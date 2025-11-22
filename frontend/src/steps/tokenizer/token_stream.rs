@@ -1,4 +1,7 @@
-use crate::{error::{SoulResult, Span}, steps::{tokenizer::{symbool::SymboolKind, tokenize::Lexer}, utils::Number}};
+use models::{error::{SoulResult, Span}, symbool_kind::SymboolKind};
+
+use crate::steps::{tokenizer::tokenize::Lexer, utils::Number};
+
 
 #[derive(Debug, Clone)]
 pub struct TokenStream<'a> {

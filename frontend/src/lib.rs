@@ -1,9 +1,8 @@
 use std::io::{BufReader, Read};
-use crate::{error::{ErrorKind, SoulError, SoulResult}, steps::tokenizer::{self, tokenize::tokenize}};
+use crate::{steps::tokenizer::{self, tokenize::tokenize}};
+use models::error::{ErrorKind, SoulError, SoulResult};
 
-mod error;
 mod steps;
-mod soul_names;
 
 pub fn compile_frontend<R: Read>(mut reader: BufReader<R>) -> SoulResult<()> {
     let mut buffer = String::new();

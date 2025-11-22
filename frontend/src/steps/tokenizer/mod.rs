@@ -1,6 +1,6 @@
 use crate::steps::tokenizer::token_stream::TokenStream;
 
-pub mod symbool;
+pub mod from_lexer;
 pub mod tokenize;
 pub mod token_stream;
 

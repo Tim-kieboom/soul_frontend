@@ -1,4 +1,6 @@
-use crate::steps::tokenizer::{Request, symbool::SymboolKind, token_stream::{Token, TokenKind}, tokenize::tokenize};
+use models::symbool_kind::SymboolKind;
+
+use crate::steps::tokenizer::{Request, token_stream::{Token, TokenKind}, tokenize::tokenize};
 
 fn tokenize_source(source: &str) -> Vec<Token> {
     let request = Request { source };
