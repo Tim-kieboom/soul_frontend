@@ -1,4 +1,5 @@
-use crate::{abstract_syntax_tree::{block::Block, expression::{BoxExpression, Expression}, expression_groups::{NamedTuple, Tuple}, soul_type::SoulType, spanned::Spanned, statment::Ident}, scope::scope::ScopeId};
+use itertools::Itertools;
+use crate::{abstract_syntax_tree::{block::Block, expression::{BoxExpression, Expression, ExpressionKind}, expression_groups::{ExpressionGroup, NamedTuple, Tuple}, soul_type::SoulType, spanned::Spanned, statment::Ident}, error::{SoulError, SoulErrorKind, SoulResult}, scope::scope::ScopeId};
 
 /// A ternary conditional expression, e.g., `cond ? a : b`.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -115,4 +116,43 @@ pub struct CompareTypeOf {
     pub left: BoxExpression,
     /// The type to compare against.
     pub ty: SoulType,
+}
+
+impl ForPattern {
+    pub fn from_expression(expression: Expression) -> SoulResult<Self> {
+
+        match expression.node {
+            ExpressionKind::Variable(name) => Ok(ForPattern::Ident(name)),
+            ExpressionKind::ExpressionGroup(ExpressionGroup::Tuple(tuple)) => {
+                let mut fors = Vec::with_capacity(tuple.values.len());
+                for el in tuple.values {
+                    fors.push(ForPattern::from_expression(el)?);
+                } 
+                Ok(ForPattern::Tuple(fors))
+            },
+            ExpressionKind::ExpressionGroup(ExpressionGroup::NamedTuple(named)) => {
+                let mut fors = Vec::with_capacity(named.values.len());
+                for (name, el) in named.values {
+                    fors.push((name, ForPattern::from_expression(el)?));
+                } 
+                Ok(ForPattern::NamedTuple(fors))
+            },
+            _ => Err(
+                SoulError::new(
+                    format!("'{}' should be ident, tuple or named tuple", expression.node.display()),
+                    SoulErrorKind::InvalidExpression,
+                    Some(expression.span),
+                )
+            )
+        }
+    }
+
+    pub fn display(&self) -> String {
+
+        match self {
+            ForPattern::Ident(ident) => ident.clone(),
+            ForPattern::Tuple(items) => format!("({})", items.iter().map(|el| el.display()).join(", ")),
+            ForPattern::NamedTuple(items) => format!("({})", items.iter().map(|(name, el)| format!("{}: {}", name, el.display())).join(", ")),
+        }
+    }
 }

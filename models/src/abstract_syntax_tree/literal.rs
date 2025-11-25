@@ -1,4 +1,4 @@
-use crate::{abstract_syntax_tree::statment::Ident, soul_names::{InternalComplexTypes, InternalPrimitiveTypes, TypeModifiers}};
+use crate::{abstract_syntax_tree::statment::Ident, soul_names::{InternalComplexTypes, InternalPrimitiveTypes, TypeModifier}};
 
 /// A literal value in the Soul language.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -106,7 +106,7 @@ impl LiteralType {
 
     /// Returns a string representation of the literal type.
     pub fn type_to_string(&self) -> String {
-        const LITERAL: &str = TypeModifiers::Literal.as_str();
+        const LITERAL: &str = TypeModifier::Literal.as_str();
         const STRING: InternalComplexTypes = InternalComplexTypes::String;
         use InternalPrimitiveTypes as types;
 

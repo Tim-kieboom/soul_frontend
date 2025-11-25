@@ -1,7 +1,7 @@
-use crate::steps::tokenizer::token_stream::TokenStream;
+use crate::steps::tokenize::token_stream::TokenStream;
 
 pub mod from_lexer;
-pub mod tokenize;
+pub mod tokenizer;
 pub mod token_stream;
 
 #[cfg(test)]

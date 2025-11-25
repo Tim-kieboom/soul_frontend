@@ -1,4 +1,4 @@
-use crate::{abstract_syntax_tree::statment::Statement, scope::scope::ScopeId, soul_names::TypeModifiers};
+use crate::{abstract_syntax_tree::statment::Statement, scope::scope::ScopeId, soul_names::TypeModifier};
 
 /// A block of statements with an associated scope.
 ///
@@ -7,7 +7,7 @@ use crate::{abstract_syntax_tree::statment::Statement, scope::scope::ScopeId, so
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Block {
     /// The type modifier applied to this block.
-    pub modifier: TypeModifiers,
+    pub modifier: TypeModifier,
     /// The statements contained in this block.
     pub statments: Vec<Statement>,
     /// The scope identifier for this block's lexical scope.

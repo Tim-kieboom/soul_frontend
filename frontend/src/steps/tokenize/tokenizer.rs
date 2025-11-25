@@ -1,18 +1,15 @@
 use std::iter::Peekable;
 use std::str::Chars;
-use models::error::{ErrorKind, ExpansionId, SoulError, SoulResult, Span};
+use models::error::{SoulErrorKind, ExpansionId, SoulError, SoulResult, Span};
 use models::symbool_kind::SymboolKind;
-use crate::steps::tokenizer::from_lexer::FromLexer;
-use crate::steps::tokenizer::{Request, Response};
-use crate::steps::tokenizer::token_stream::{Token, TokenKind, TokenStream};
-use crate::steps::utils::{Number};
+use crate::steps::tokenize::from_lexer::FromLexer;
+use crate::steps::tokenize::{Request, Response};
+use crate::steps::tokenize::token_stream::{Number, Token, TokenKind, TokenStream};
 
-pub fn tokenize<'a>(request: Request<'a>) -> SoulResult<Response<'a>> {
-    Ok(
-        Response{
-            token_stream: TokenStream::new(Lexer::new(request.source))?
-        }
-    )
+pub fn tokenize<'a>(request: Request<'a>) -> Response<'a> {
+    Response{
+        token_stream: TokenStream::new(Lexer::new(request.source))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -38,16 +35,14 @@ impl<'a> Lexer<'a> {
 
     pub(crate) fn current_char(&self) -> Option<char> {
         self.current_char
-    } 
+    }
 
-    pub(crate) fn next(&mut self) -> SoulResult<Token> {
+    pub(crate) fn next_token(&mut self) -> SoulResult<Token> {
         if self.current_char.is_none() {
-            return Ok(
-                Token::new(
-                    TokenKind::EndFile, 
-                    self.new_span(self.line, self.offset)
-                )
-            )
+            return Ok(Token::new(
+                TokenKind::EndFile, 
+                self.new_span(self.line, self.offset)
+            ))
         }
 
         self.skip_whitespace();
@@ -59,12 +54,10 @@ impl<'a> Lexer<'a> {
         if self.current_char == Some('/') && peek == Some('/') {
             self.skip_line_comment();
             self.skip_whitespace();
-            return Ok(
-                Token::new(
-                    TokenKind::EndLine,
-                    self.new_span(start_line, start_offset)
-                )
-            )
+            return Ok(Token::new(
+                TokenKind::EndLine,
+                self.new_span(start_line, start_offset)
+            ))
         }
         else if self.current_char == Some('/') && peek == Some('*') {
             self.skip_multi_comment();
@@ -73,39 +66,21 @@ impl<'a> Lexer<'a> {
 
         if let Some(symbool) = SymboolKind::from_lexer(self) {
             self.next_char();
-            return Ok(
-                Token::new(
-                    TokenKind::Symbool(symbool),
-                    self.new_span(start_line, start_offset)
-                )
-            )
+            return Ok(Token::new(
+                TokenKind::Symbool(symbool),
+                self.new_span(start_line, start_offset)
+            ))
         } 
 
         let char = match self.current_char {
             Some(val) => val,
-            None => return Ok(
-                Token::new(
-                    TokenKind::EndFile, 
-                    self.new_span(start_line, start_offset)
-                )
-            ),
+            None => return Ok(Token::new(
+                TokenKind::EndFile, 
+                self.new_span(start_line, start_offset)
+            )),
         };
 
-        let kind = match char {
-            '\n' | '\r' => {
-                self.next_char();
-                TokenKind::EndLine
-            }
-            '"' => TokenKind::StringLiteral(self.get_string(start_line, start_offset)?),
-            '\'' => TokenKind::CharLiteral(self.get_char_literal(start_line, start_offset)?),
-            ch if is_ident(ch) => TokenKind::Ident(self.get_ident()),
-            ch if is_number(ch) => TokenKind::Number(self.get_number(start_line, start_offset)?),
-            _ => {
-                self.next_char();
-                TokenKind::Unknown(char)
-            }
-        };
-        
+        let kind = self.get_token_kind(char, start_line, start_offset)?;
         Ok(Token::new(kind, self.new_span(start_line, start_offset)))
     }
 
@@ -124,6 +99,24 @@ impl<'a> Lexer<'a> {
 
     pub(crate) fn peek_char(&mut self) -> Option<char> {
         self.input.peek().copied()
+    }
+
+    fn get_token_kind(&mut self, char: char, start_line: usize, start_offset: usize) -> SoulResult<TokenKind> {
+        
+        Ok(match char {
+            '\n' | '\r' => {
+                self.next_char();
+                TokenKind::EndLine
+            }
+            '"' => TokenKind::StringLiteral(self.get_string(start_line, start_offset)?),
+            '\'' => TokenKind::CharLiteral(self.get_char_literal(start_line, start_offset)?),
+            ch if is_ident(ch) => TokenKind::Ident(self.get_ident()),
+            ch if is_number(ch) => TokenKind::Number(self.get_number(start_line, start_offset)?),
+            _ => {
+                self.next_char();
+                TokenKind::Unknown(char)
+            }
+        })
     }
 
     fn skip_line_comment(&mut self) {
@@ -163,7 +156,7 @@ impl<'a> Lexer<'a> {
                 None => {
                     return Err(SoulError::new(
                         "Unclosed char literal escape sequence",
-                        ErrorKind::InvalidEscapeSequence,
+                        SoulErrorKind::InvalidEscapeSequence,
                         Some(self.new_span(start_line, start_offset)),
                     ));
                 }
@@ -175,7 +168,7 @@ impl<'a> Lexer<'a> {
         else {
             return Err(SoulError::new(
                 "Unclosed char literal",
-                ErrorKind::InvalidEscapeSequence,
+                SoulErrorKind::InvalidEscapeSequence,
                 Some(self.new_span(start_line, start_offset)),
             ));
         };
@@ -185,7 +178,7 @@ impl<'a> Lexer<'a> {
         if self.current_char != Some('\'') {
             return Err(SoulError::new(
                 "Char literal missing closing quote",
-                ErrorKind::InvalidEscapeSequence,
+                SoulErrorKind::InvalidEscapeSequence,
                 Some(self.new_span(start_line, start_offset))
             ));
         }
@@ -225,7 +218,7 @@ impl<'a> Lexer<'a> {
             self.next_char();
         }
 
-        Err(SoulError::new("cString does not have an end qoute", ErrorKind::InvalidEscapeSequence, Some(self.new_span(start_line, start_offset))))
+        Err(SoulError::new("cString does not have an end qoute", SoulErrorKind::InvalidEscapeSequence, Some(self.new_span(start_line, start_offset))))
     }
 
     fn get_number(&mut self, start_line: usize, start_offset: usize) -> SoulResult<Number> {
@@ -263,17 +256,17 @@ impl<'a> Lexer<'a> {
         if is_float {
             num_str.parse::<f64>()
                 .map(|num| Number::Float(num))
-                .map_err(|err| SoulError::new(err.to_string(), ErrorKind::InvalidNumber, Some(self.new_span(start_line, start_offset))))
+                .map_err(|err| SoulError::new(err.to_string(), SoulErrorKind::InvalidNumber, Some(self.new_span(start_line, start_offset))))
         } 
         else if has_minus {
             num_str.parse::<i64>()
                 .map(|num| Number::Int(num))
-                .map_err(|err| SoulError::new(err.to_string(), ErrorKind::InvalidNumber, Some(self.new_span(start_line, start_offset))))
+                .map_err(|err| SoulError::new(err.to_string(), SoulErrorKind::InvalidNumber, Some(self.new_span(start_line, start_offset))))
         } 
         else {
             num_str.parse::<u64>()
                 .map(|num| Number::Uint(num))
-                .map_err(|err| SoulError::new(err.to_string(), ErrorKind::InvalidNumber, Some(self.new_span(start_line, start_offset))))
+                .map_err(|err| SoulError::new(err.to_string(), SoulErrorKind::InvalidNumber, Some(self.new_span(start_line, start_offset))))
         }
     }
 
@@ -301,7 +294,7 @@ impl<'a> Lexer<'a> {
         }
 
         if !digit_found {
-            Err(SoulError::new("exponent must have digits", ErrorKind::InvalidNumber, Some(self.new_span(start_line, start_offset))))
+            Err(SoulError::new("exponent must have digits", SoulErrorKind::InvalidNumber, Some(self.new_span(start_line, start_offset))))
         }
         else {
             Ok(())

@@ -1,4 +1,4 @@
-use crate::abstract_syntax_tree::{expression::BoxExpression, spanned::Spanned};
+use crate::abstract_syntax_tree::{expression::{BoxExpression, Expression}, spanned::Spanned};
 
 /// A unary operator wrapped with source location information.
 pub type UnaryOperator = Spanned<UnaryOperatorKind>;
@@ -64,4 +64,55 @@ pub enum BinaryOperatorKind {
     Range,
     /// Type check operator (`typeof`).
     TypeOf,
+}
+
+impl Binary {
+    pub fn new(left: Expression, operator: BinaryOperator, right: Expression) -> Self {
+        Self { left: Box::new(left), operator, right: Box::new(right) }
+    }
+}
+
+impl UnaryOperatorKind {
+
+    pub fn as_str(&self) -> &str {
+
+        match self {
+            UnaryOperatorKind::Invalid => "<invalid>",
+            UnaryOperatorKind::Neg => "!",
+            UnaryOperatorKind::Not => "-",
+            UnaryOperatorKind::Increment{..} => "++",
+            UnaryOperatorKind::Decrement{..} => "--",
+        }
+    }
+}
+
+impl BinaryOperatorKind {
+
+    pub fn as_str(&self) -> &str {
+
+        match self {
+            BinaryOperatorKind::Invalid => "<invalid>",
+            BinaryOperatorKind::Add => "+",
+            BinaryOperatorKind::Sub => "-",
+            BinaryOperatorKind::Mul => "*",
+            BinaryOperatorKind::Div => "/",
+            BinaryOperatorKind::Log => "log",
+            BinaryOperatorKind::Pow => "**",
+            BinaryOperatorKind::Root => "</",
+            BinaryOperatorKind::Mod => "%",
+            BinaryOperatorKind::BitAnd => "&",
+            BinaryOperatorKind::BitOr => "|",
+            BinaryOperatorKind::BitXor => "^",
+            BinaryOperatorKind::LogAnd => "&&",
+            BinaryOperatorKind::LogOr => "||",
+            BinaryOperatorKind::Eq => "==",
+            BinaryOperatorKind::NotEq => "!=",
+            BinaryOperatorKind::Lt => "<=",
+            BinaryOperatorKind::Gt => ">=",
+            BinaryOperatorKind::Le => "<",
+            BinaryOperatorKind::Ge => ">",
+            BinaryOperatorKind::Range => "..",
+            BinaryOperatorKind::TypeOf => "typeof",
+        }
+    }
 }

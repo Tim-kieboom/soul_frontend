@@ -1,17 +1,44 @@
-use std::io::{BufReader, Read};
-use crate::{steps::tokenizer::{self, tokenize::tokenize}};
-use models::error::{ErrorKind, SoulError, SoulResult};
+use itertools::Itertools;
+use std::io::{self, BufReader, Read};
+use models::{abstract_syntax_tree::AbstractSyntaxTree, error::{SoulError}};
+use crate::steps::{parse::{self, parser::parse}, tokenize::{self, tokenizer::tokenize}};
 
 mod steps;
 
-pub fn compile_frontend<R: Read>(mut reader: BufReader<R>) -> SoulResult<()> {
-    let mut buffer = String::new();
-    reader.read_to_string(&mut buffer)
-        .map_err(|err| SoulError::new(format!("while trying to read file, error: {}", err.to_string()), ErrorKind::InternalError, None))?;
-    
-    let request = tokenizer::Request{source: &buffer};
-    let tokenizer::Response{token_stream: stream} = tokenize(request)?;
+pub struct ParseResonse {
+    pub syntax_tree: AbstractSyntaxTree, 
+    pub errors: Vec<SoulError>,
+}
 
-    println!("{:?}", stream.to_vec().map(|vec| vec.iter().map(|el| el.kind.clone()).collect::<Vec<_>>()));
-    Ok(())
+pub fn parse_file<R: Read>(mut reader: BufReader<R>) -> io::Result<ParseResonse> {
+
+    let mut buffer = String::new();
+    reader.read_to_string(&mut buffer)?;
+    
+    let request = tokenize::Request{source: &buffer};
+    let tokenize_response = tokenize(request);
+
+    #[cfg(debug_assertions)] {
+        let tokens = tokenize_response.token_stream.clone()
+            .to_vec()
+            .map(|vec| vec.into_iter().enumerate().map(|(i, el)| format!("{i}.{:?}", el.kind)).join("\n\t"));
+        
+        match tokens {
+            Ok(tokens) => println!("[\n\t{tokens}\n]"),
+            Err(err) => eprintln!("{}", err.to_message()),
+        }
+    }
+
+    let parse::Response{mut parser} = parse(tokenize_response); 
+    
+    Ok(
+        ParseResonse {
+            syntax_tree: parser.parse_tokens(),
+            errors: parser.comsume_errors(),
+        }
+    )
+}
+
+pub fn sementic_analyse(_syntax_tree: &AbstractSyntaxTree) -> Vec<SoulError> {
+    todo!("impl sementic analyser")
 }

@@ -5,33 +5,23 @@ pub type SoulResult<T> = std::result::Result<T, SoulError>;
 
 /// The kind of error that occurred during parsing or compilation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum ErrorKind {
-    NoKind, // no kind selected
+pub enum SoulErrorKind {
+    SourceReadError,
 
-    InternalError,
-
-    ArgError, // error with program args
-    ReaderError, // e.g. could not read line
-
-    UnterminatedStringLiteral, // e.g., string not closed
-    InvalidEscapeSequence, // e.g., "\q" in a string
-    EndingWithSemicolon, // if line ends with ';'
-    UnmatchedParenthesis, // e.g., "(" without ")"
+    UnexpecedToken,
+    UnexpecedFileEnd,
+    UnexpecedStatmentStart,
     
-    WrongType,
-
-    UnexpectedToken, // e.g., found ";" but expected "\n"
+    InvalidAssignType,
     
-    NotFoundInScope,
-
-    InvalidStringFormat, // if f"..." has incorrect argument
-    InvalidInContext,
-    InvalidPath,
+    InvalidChar, 
     InvalidName,
-    InvalidType,
+    InvalidIdent, 
     InvalidNumber,
-
-    UnexpectedEnd,
+    InvalidOperator,
+    InvalidTokenKind,
+    InvalidExpression,
+    InvalidEscapeSequence,
 }
 
 /// An identifier for macro expansion context.
@@ -72,13 +62,13 @@ pub struct Span {
 /// An error that occurred during parsing or compilation.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct SoulError {
-    kind: ErrorKind,
+    kind: SoulErrorKind,
     message: String,
     span: Option<Span>,
 }
 
 impl SoulError {
-    pub fn new<S: Into<String>>(message: S, kind: ErrorKind, span: Option<Span>) -> Self {
+    pub fn new<S: Into<String>>(message: S, kind: SoulErrorKind, span: Option<Span>) -> Self {
         Self {
             message: message.into(),
             kind,
@@ -93,6 +83,16 @@ impl SoulError {
 }
 
 impl Span {
+    pub const fn default_const() -> Self {
+        Self {
+            start_line: 0,
+            start_offset: 0,
+            end_line: 0,
+            end_offset: 0,
+            expansion_id: ExpansionId(0),
+        }
+    }
+
     /// Creates a span that represents a single point on a line.
     ///
     /// Both start and end positions are set to the same line and offset.
@@ -104,5 +104,13 @@ impl Span {
             end_offset: offset, 
             expansion_id: ExpansionId::default(), 
         }
+    }
+
+    pub fn combine(mut self, other: Self) -> Self {
+        self.start_line = self.start_line.min(other.start_line);
+        self.start_offset = self.start_offset.min(other.start_offset);
+        self.end_line = self.end_line.max(other.end_line);
+        self.end_offset = self.end_offset.max(other.end_offset);
+        self
     }
 }

@@ -1,0 +1,87 @@
+use std::mem::[RawArray, Global, Allocable]
+
+class List<T, Alloc = Global> 
+where 
+    Alloc: Allocable
+{
+    array: RawArray<T> = []
+    len: uint = 0 { Get; set; } 
+    cap: uint = 0 { 
+        Get; 
+        Set{cap => this.reserve(cap)} 
+    }
+
+    This(cap: uint) {
+        return This{array: RawArray(cap), len: 0, cap}
+    }
+
+    This[vec: []T] {
+        len := vec.Len()
+        cap := vec.Cap()
+        return This{array: vec.To(), len, cap}
+    }
+
+    Len(@this): uint {
+        this.len
+    }
+
+    Cap(@this): uint {
+        this.cap
+    }
+
+    Push(&this, el: T) {
+        
+        if this.len+1 > this.cap {
+            this.reserve(this.cap*2)
+        }
+
+        this.array[this.len++] = el
+    }
+
+    Pop(&this): ?T {
+        this.len == 0 ? None : Some(this.array[this.len--])
+    }
+
+    ExpectPop(&this): Res<T, str> {
+        this.len == 0 ? Err("List is empty") : Ok(this.array[this.len--])
+    }
+
+    reserve(&this, cap: uint) {
+        this.array.realloc(cap)
+    }
+}
+
+Test test_list() {
+    
+    emptyList := List()
+    AssertEq!(emptyList.Len(), 0)
+    AssertEq!(emptyList.Cap(), 0)
+
+    vec := [1, 2, 3]
+    filledList := List[1, 2, 3]
+    AssertEq!(emptyList.Len(), 3)
+    AssertEq!(emptyList.Cap(), vec.Cap())
+
+    mut list = List(10)
+    AssertEq!(emptyList.Len(), 0)
+    AssertEq!(emptyList.Cap(), 10)
+
+    literal NOT_FOUND = 404
+
+    list.Push(1)
+    mut element = list.Pop() ?? NOT_FOUND
+    element = list.ExpectPop() 
+        .catch err => {
+            Println(err)
+            NOT_FOUND 
+        }
+
+    passError(list: List<int>): Res<none, str> {
+        element := list.ExpectPop().pass
+    }
+
+    element = list.ExpectPop().try
+
+    len := list.len
+    list.cap *= 2
+}

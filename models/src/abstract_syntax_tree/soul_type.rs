@@ -7,8 +7,7 @@
 //!
 //! Helpers are provided for checking modifiers, type categories, and displaying types.
 
-use std::collections::{BTreeMap};
-use crate::{abstract_syntax_tree::{expression::Expression, statment::Ident}, soul_names::{InternalPrimitiveTypes, TypeModifiers}};
+use crate::{abstract_syntax_tree::{expression::Expression, statment::Ident}, soul_names::{InternalPrimitiveTypes, TypeModifier}};
 
 
 /// Represents a type in the Soul language.
@@ -17,7 +16,7 @@ pub struct SoulType {
     /// The kind of type (primitive, complex, array, etc.).
     pub kind: TypeKind,
     /// Optional type modifier (const, mut, literal).
-    pub modifier: Option<TypeModifiers>,
+    pub modifier: Option<TypeModifier>,
 }
 
 
@@ -33,9 +32,9 @@ pub enum TypeKind {
     /// Array type: [T; N] or dynamic
     Array(ArrayType),
     /// Tuple type: (T1, T2, ...)
-    Tuple(Vec<SoulType>),
+    Tuple(TupleType),
     /// Named tuple / record type
-    NamedTuple(BTreeMap<Ident, SoulType>),
+    NamedTuple(NamedTupleType),
     /// Function type: (params) -> return
     Function(FunctionType),
     /// Generic type parameter
@@ -78,7 +77,7 @@ pub struct FunctionType {
     /// The kind of function (mut, const, consume).
     pub function_kind: FunctionKind,
     /// Type modifier for the function.
-    pub modifier: TypeModifiers,
+    pub modifier: TypeModifier,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -121,9 +120,19 @@ pub enum TypeGeneric {
     Expression(Expression),
 }
 
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct TupleType {
+    pub types: Vec<SoulType>,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct NamedTupleType {
+    pub types: Vec<(Ident, SoulType)>,
+}
+
 impl SoulType {
     /// Creates a new `SoulType` with the given modifier and kind.
-    pub const fn new(modifier: Option<TypeModifiers>, kind: TypeKind) -> Self {
+    pub const fn new(modifier: Option<TypeModifier>, kind: TypeKind) -> Self {
         Self {
             kind,
             modifier,
@@ -173,12 +182,12 @@ impl TypeKind {
                     None => format!("[{}]", inner),
                 }
             }
-            TypeKind::Tuple(types) => {
-                let elems: Vec<String> = types.iter().map(|t| t.display()).collect();
+            TypeKind::Tuple(tuple) => {
+                let elems: Vec<String> = tuple.types.iter().map(|t| t.display()).collect();
                 format!("({})", elems.join(", "))
             }
             TypeKind::NamedTuple(map) => {
-                let elems: Vec<String> = map.iter().map(|(k,v)| format!("{}: {}", k, v.display())).collect();
+                let elems: Vec<String> = map.types.iter().map(|(k,v)| format!("{}: {}", k, v.display())).collect();
                 format!("{{{}}}", elems.join(", "))
             }
             TypeKind::Function(f) => {

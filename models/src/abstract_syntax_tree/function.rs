@@ -1,4 +1,4 @@
-use crate::{abstract_syntax_tree::{block::Block, expression::BoxExpression, expression_groups::{NamedTuple, Tuple}, soul_type::{FunctionType, GenericParameter, SoulType, TypeGeneric}, spanned::Spanned, statment::Ident}, scope::scope::ScopeId, soul_names::TypeModifiers};
+use crate::{abstract_syntax_tree::{block::Block, expression::{BoxExpression}, expression_groups::{NamedTuple, Tuple}, soul_type::{FunctionType, GenericParameter, NamedTupleType, SoulType, TypeGeneric}, spanned::Spanned, statment::Ident}, scope::scope::ScopeId, soul_names::TypeModifier};
 
 /// A function definition with a signature and body block.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -19,11 +19,11 @@ pub struct FunctionSignature {
     /// Generic type parameters.
     pub generics: Vec<GenericParameter>,
     /// Function parameters.
-    pub parameters: Vec<Spanned<Parameter>>,
+    pub parameters: NamedTupleType,
     /// Type modifier (const, mut, etc.).
-    pub modifier: TypeModifiers,
+    pub modifier: TypeModifier,
     /// Return type, if specified.
-    pub return_type: Option<SoulType>,
+    pub return_type: SoulType,
 }
 
 /// A struct constructor call, e.g., `Point { x: 1, y: 2 }`.
@@ -64,10 +64,16 @@ pub struct Lambda {
     pub signature: LambdaSignature,
     /// The arguments passed to the lambda.
     pub arguments: Tuple,
+    pub body: LamdbaBodyKind,
     /// The scope identifier for the lambda's closure.
     pub scope_id: ScopeId,
 }
 
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum LamdbaBodyKind {
+    Block(Block),
+    Expression(BoxExpression),
+}
 /// The signature of a lambda function.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct LambdaSignature {

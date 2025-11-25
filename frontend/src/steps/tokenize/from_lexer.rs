@@ -1,5 +1,5 @@
 use models::symbool_kind::SymboolKind;
-use crate::steps::tokenizer::tokenize::Lexer;
+use crate::steps::tokenize::tokenizer::Lexer;
 
 pub trait FromLexer 
 where 
@@ -184,7 +184,7 @@ impl FromLexer for SymboolKind {
                 } 
                 else if peek == Some('=') {
                     lexer.next_char();
-                    Some(SymboolKind::Declaration)
+                    Some(SymboolKind::ColonAssign)
                 }
                 else {
                     Some(SymboolKind::Colon)
@@ -229,7 +229,7 @@ impl FromLexer for SymboolKind {
                 Some(SymboolKind::CurlyOpen)
             },
             '}'  => {
-                Some(SymboolKind::RoundClose)
+                Some(SymboolKind::CurlyClose)
             },
             _ => None,
         }

@@ -1,4 +1,4 @@
-use crate::abstract_syntax_tree::{block::Block, enum_like::{Enum, Union}, expression::Expression, function::Function, objects::{Class, Struct, Trait}, soul_type::SoulType, spanned::Spanned};
+use crate::{abstract_syntax_tree::{block::Block, enum_like::{Enum, Union}, expression::{Expression, ExpressionKind}, function::Function, objects::{Class, Struct, Trait}, soul_type::SoulType, spanned::Spanned}, error::Span};
 
 /// A statement in the Soul language, wrapped with source location information.
 pub type Statement = Spanned<StatementKind>;
@@ -9,6 +9,8 @@ pub type Statement = Spanned<StatementKind>;
 /// to type definitions and control structures.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum StatementKind {
+    EndFile,
+
     /// A standalone expression.
     Expression(Expression),
 
@@ -72,4 +74,33 @@ pub struct UseBlock {
     pub ty: SoulType,
     /// The block containing method definitions.
     pub block: Block,
+}
+
+impl Statement {
+    pub fn new_expression(kind: ExpressionKind, span: Span) -> Self {
+        Self::new(StatementKind::new_expression(kind, span), span)
+    }
+
+    pub fn from_expression(expression: Expression) -> Self {
+        let span = expression.span;
+        Self::new(StatementKind::Expression(expression), span)
+    }
+
+    pub fn new_block(block: Block, span: Span) -> Self {
+        Self::new_expression(ExpressionKind::Block(block), span)
+    }
+}
+
+impl StatementKind {
+    pub fn new_expression(kind: ExpressionKind, span: Span) -> Self {
+        Self::Expression(Expression::new(kind, span))
+    }
+
+    pub fn from_expression(expression: Expression) -> Self {
+        Self::Expression(expression)
+    }
+
+    pub fn new_block(block: Block, span: Span) -> Self {
+        Self::new_expression(ExpressionKind::Block(block), span)
+    }
 }

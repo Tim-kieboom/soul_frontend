@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::abstract_syntax_tree::{function::Function, spanned::Spanned, statment::{Variable}};
+use crate::abstract_syntax_tree::{expression::Expression, function::Function, soul_type::SoulType, spanned::Spanned, statment::{Ident, Variable}};
 
 /// An identifier for a scope in the scope tree.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -45,8 +45,16 @@ pub struct Scope {
     pub types: HashMap<String, TypeSymbol>,
 }
 
+impl ValueSymbol {
+    pub fn new_variable(name: Ident, ty: SoulType, initialize_value: Option<Expression>) -> Self {
+        Self::Variable(Variable{name, ty, initialize_value})
+    }
+}
+
 impl ScopeId {
-    pub(crate) fn new(value: usize) -> Self {
+    pub const GLOBAL: Self = Self::new(0); 
+
+    pub(crate) const fn new(value: usize) -> Self {
         Self(value)
     }
 

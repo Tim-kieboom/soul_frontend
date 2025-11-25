@@ -1,10 +1,10 @@
 use models::symbool_kind::SymboolKind;
 
-use crate::steps::tokenizer::{Request, token_stream::{Token, TokenKind}, tokenize::tokenize};
+use crate::steps::tokenize::{Request, token_stream::{Token, TokenKind}, tokenizer::tokenize};
 
 fn tokenize_source(source: &str) -> Vec<Token> {
     let request = Request { source };
-    let response = tokenize(request).expect("Tokenization failed");
+    let response = tokenize(request);
     response.token_stream.to_vec().expect("To vec failed")
 }
 

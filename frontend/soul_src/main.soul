@@ -1,30 +1,15 @@
-// test
-sum(/*comment*/one: i32, two: i32) i32 { 
-    return one + two // foo
-} 
-/*
-worgdaswef
-qwdf
-qwerf
-*/
-main() { 
-    path := "C:\\" 
-    "str".Hash() 
-    func().Hash() 
-    print("hello world\n") 
-    const string = ["1", "2", "3", "4", "5", "6"] 
-    const result: i32 = sum(1, 2.0) 
-    result += 1 
-    result -= -1 
-    result = 2 
-    println(result) 
-    
-    const string = 1.toStr()
+// import [
+//     extern lib
+//     subfile
+//     PubSubfile
+// ]
 
-    if true { 
-        return 0 
-    } 
-    else { 
-        return 1 
-    } 
-} 
+// use [
+//     this::subfile::Println
+//     this::subfile::[this, Function]
+// ]
+
+main() { 
+    Println("hello world")
+}
+ 
