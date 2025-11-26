@@ -59,6 +59,11 @@ impl<'a> TokenStream<'a> {
         &self.current
     }
 
+    pub fn peek(&self) -> SoulResult<Token> {
+        let mut lexer = self.lexer.clone();
+        lexer.next_token()
+    }
+
     pub fn advance(&mut self) -> SoulResult<()> {
         self.current = self.lexer.next_token()?;
         Ok(())

@@ -3,6 +3,7 @@ use std::sync::LazyLock;
 use crate::steps::{parse::parser::{Parser, TryError}, tokenize::token_stream::TokenKind};
 use models::{abstract_syntax_tree::{block::Block, expression::{Expression, ExpressionKind, ReturnKind}, operator::{Binary, BinaryOperator, BinaryOperatorKind}, soul_type::{SoulType}, statment::{Assignment, Ident, Statement, StatementKind, Variable}}, error::{SoulError, SoulErrorKind, SoulResult, Span}, scope::scope::ValueSymbol, soul_names::{self, AssignType, KeyWord, TypeModifier}, symbool_kind::SymboolKind};
 
+pub const SQUARE_CLOSE: TokenKind = TokenKind::Symbool(SymboolKind::SquareClose);
 pub const CURLY_OPEN: TokenKind = TokenKind::Symbool(SymboolKind::CurlyOpen);
 pub const CURLY_CLOSE: TokenKind = TokenKind::Symbool(SymboolKind::CurlyClose);
 pub const ROUND_OPEN: TokenKind = TokenKind::Symbool(SymboolKind::RoundOpen);
@@ -43,7 +44,7 @@ impl<'a> Parser<'a> {
                 }
             }
 
-            self.skip_end_lines();
+            self.skip(&[SEMI_COLON, TokenKind::EndLine]);
         }
         
         self.expect(&CURLY_CLOSE)?;
@@ -64,9 +65,7 @@ impl<'a> Parser<'a> {
     pub(crate) fn parse_statement(&mut self) -> SoulResult<Statement> {
         let start_span = self.token().span;
 
-        while self.current_is_any(STAMENT_END_TOKENS) && !self.current_is(&TokenKind::EndFile){
-            self.bump();
-        }
+        self.skip(STAMENT_END_TOKENS);
 
         let possible_kind = match &self.token().kind {
 
@@ -116,14 +115,15 @@ impl<'a> Parser<'a> {
     fn parse_statement_ident(&mut self, start_span: Span) -> SoulResult<Statement> {
         const FUNCTION_IDS: &[TokenKind] = &[ROUND_OPEN, ARROW_LEFT];
         const DECLARATION_IDS: &[TokenKind] = &[COLON, COLON_ASSIGN];
-        
-        let ident_token = self.bump_consume();
-        let ident = match ident_token.kind {
-            TokenKind::Ident(val) => val,
-            _ => unreachable!(),
-        };
+            
+        let peek = self.peek();
 
-        if self.current_is_any(FUNCTION_IDS) {
+        if FUNCTION_IDS.contains(&peek.kind) {
+            let ident_token = self.bump_consume();
+            let ident = match ident_token.kind {
+                TokenKind::Ident(val) => val,
+                _ => unreachable!(),
+            };
 
             return match self.parse_function_declaration(start_span, TypeModifier::Mut, None, ident) {
                 Ok(val) => Ok(val),
@@ -131,7 +131,12 @@ impl<'a> Parser<'a> {
                 Err(TryError::IsNotValue(ident)) => self.parse_function_call(start_span, None, ident).map(|expression| Statement::from_expression(expression)),
             }
         }
-        else if self.current_is_any(DECLARATION_IDS) {
+        else if DECLARATION_IDS.contains(&peek.kind) {
+            let ident_token = self.bump_consume();
+            let ident = match ident_token.kind {
+                TokenKind::Ident(val) => val,
+                _ => unreachable!(),
+            };
 
             let (ty, assign_type) = if self.current_is(&COLON) {
                 self.bump();
@@ -297,7 +302,7 @@ impl<'a> Parser<'a> {
 
         Ok(
             Statement::new(
-                StatementKind::Assignment(Assignment{variable: lvalue, value: resolved_rvalue}),
+                StatementKind::Assignment(Assignment{left: lvalue, right: resolved_rvalue}),
                 self.new_span(start_span), 
             )
         )

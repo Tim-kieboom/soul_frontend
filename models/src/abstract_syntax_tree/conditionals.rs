@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use crate::{abstract_syntax_tree::{block::Block, expression::{BoxExpression, Expression, ExpressionKind}, expression_groups::{ExpressionGroup, NamedTuple, Tuple}, soul_type::SoulType, spanned::Spanned, statment::Ident}, error::{SoulError, SoulErrorKind, SoulResult}, scope::scope::ScopeId};
+use crate::{abstract_syntax_tree::{block::Block, expression::{BoxExpression, Expression, ExpressionKind}, expression_groups::{ExpressionGroup, NamedTuple, Tuple}, soul_type::SoulType, spanned::Spanned, statment::Ident, syntax_display::SyntaxDisplay}, error::{SoulError, SoulErrorKind, SoulResult}, scope::scope::ScopeId};
 
 /// A ternary conditional expression, e.g., `cond ? a : b`.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -66,7 +66,7 @@ pub enum IfCaseKind {
     /// Match against a variant with named tuple parameters.
     NamedVariant{name: Ident, params: NamedTuple},
     /// Bind a value to a name, optionally with a condition.
-    Bind{name: Ident, condition: Option<Expression>},
+    Bind{name: Ident, condition: Expression},
 }
 
 /// A pattern used in `for` loops to destructure elements.

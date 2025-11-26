@@ -1,4 +1,6 @@
-use crate::{abstract_syntax_tree::{block::Block, enum_like::{Enum, Union}, expression::{Expression, ExpressionKind}, function::Function, objects::{Class, Struct, Trait}, soul_type::SoulType, spanned::Spanned}, error::Span};
+use itertools::Itertools;
+
+use crate::{abstract_syntax_tree::{block::Block, enum_like::{Enum, Union}, expression::{Expression, ExpressionKind}, function::Function, objects::{Class, Struct, Trait}, soul_type::SoulType, spanned::Spanned, syntax_display::{SyntaxDisplay, tree_prefix}}, error::Span};
 
 /// A statement in the Soul language, wrapped with source location information.
 pub type Statement = Spanned<StatementKind>;
@@ -47,9 +49,9 @@ pub type Ident = String;
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Assignment {
     /// The left-hand side expression (the variable being assigned to).
-    pub variable: Expression,
+    pub left: Expression,
     /// The right-hand side expression (the value being assigned).
-    pub value: Expression,
+    pub right: Expression,
 }
 
 /// A variable declaration.
@@ -102,5 +104,63 @@ impl StatementKind {
 
     pub fn new_block(block: Block, span: Span) -> Self {
         Self::new_expression(ExpressionKind::Block(block), span)
+    }
+}
+
+impl SyntaxDisplay for StatementKind {
+    fn display(&self) -> String {
+        let mut sb = String::new();
+        self.inner_display(&mut sb, 0, true);
+        sb
+    }
+
+    fn inner_display(&self, sb: &mut String, tab: usize, is_last: bool) {
+        let prefix = tree_prefix(tab, is_last);
+        match self {
+            StatementKind::EndFile => (),
+            StatementKind::Expression(spanned) => {
+                sb.push_str(&prefix);
+                sb.push_str("Expression >> ");
+                spanned.node.inner_display(sb, tab, is_last);
+            },
+            StatementKind::Variable(var) => {
+                sb.push_str(&prefix);
+                sb.push_str("Variable >> ");
+                sb.push_str(&var);
+            },
+            StatementKind::Assignment(assignment) => {
+                sb.push_str(&prefix);
+                sb.push_str("Assignment >> ");
+                assignment.left.node.inner_display(sb, tab, is_last);
+                sb.push_str(" = ");
+                assignment.right.node.inner_display(sb, tab, is_last);
+            },
+            StatementKind::Function(function) => {
+                sb.push_str(&prefix);
+                sb.push_str("Function >> ");
+                sb.push_str(&function.signature.name);
+                sb.push('(');
+                sb.push_str(&function.signature.parameters.types.iter().map(|(name, el)| format!("{name}: {}", el.display())).join(", "));
+                sb.push(')');
+                sb.push_str(": ");
+                function.signature.return_type.inner_display(sb, tab, is_last);
+                function.block.inner_display(sb, tab, is_last);
+            },
+            StatementKind::UseBlock(use_block) => {
+                sb.push_str(&prefix);
+                sb.push_str("UseBlock >> ");
+                if let Some(impl_trait) = &use_block.impl_trait {
+                    sb.push_str(" impl ");
+                    impl_trait.inner_display(sb, tab, is_last);
+                }
+                use_block.block.inner_display(sb, tab, is_last);
+            },
+            StatementKind::Class(_) => todo!(),
+            StatementKind::Struct(_) => todo!(),
+            StatementKind::Trait(_) => todo!(),
+            StatementKind::Enum(_) => todo!(),
+            StatementKind::Union(_) => todo!(),
+            StatementKind::CloseBlock => sb.push_str(&prefix),
+        }
     }
 }

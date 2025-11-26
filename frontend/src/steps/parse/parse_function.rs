@@ -70,6 +70,7 @@ impl<'a> Parser<'a> {
         };
 
         let return_type = if self.current_is(&COLON) {
+            self.bump();
             self.parse_type()
                 .map_err(|err| TryError::IsErr(err))?
         }

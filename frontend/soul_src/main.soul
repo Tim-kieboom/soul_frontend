@@ -9,7 +9,12 @@
 //     this::subfile::[this, Function]
 // ]
 
-main() { 
+sum(a: int, b: int): int {
+    return 0
+}
+
+main(): int { 
+    mut num := 1
+    // num = 1
     Println("hello world")
 }
- 

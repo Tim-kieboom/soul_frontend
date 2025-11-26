@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use crate::{abstract_syntax_tree::{block::Block, conditionals::{ElseKind, For, If, Match, Ternary, While}, expression_groups::ExpressionGroup, function::{FunctionCall, Lambda, StaticMethod, StructConstructor}, literal::Literal, operator::{Binary, Unary}, soul_type::SoulType, spanned::Spanned, statment::Ident}, error::Span, soul_names::{KeyWord, TypeWrapper}, soul_page_path::SoulPagePath};
+use crate::{abstract_syntax_tree::{block::Block, conditionals::{CaseDoKind, ElseKind, For, ForPattern, If, IfCaseKind, Match, Ternary, While}, expression_groups::ExpressionGroup, function::{FunctionCall, Lambda, LamdbaBodyKind, StaticMethod, StructConstructor}, literal::Literal, operator::{Binary, Unary}, soul_type::SoulType, spanned::Spanned, statment::Ident, syntax_display::{SyntaxDisplay, tree_prefix}}, error::Span, soul_names::{KeyWord, TypeWrapper}, soul_page_path::SoulPagePath};
 
 /// An expression in the Soul language, wrapped with source location information.
 pub type Expression = Spanned<ExpressionKind>;
@@ -124,99 +124,225 @@ impl Expression {
     }
 }
 
-impl ExpressionKind {
+impl SyntaxDisplay for ExpressionKind {
     
-    pub fn display(&self) -> String {
-
+    fn display(&self) -> String {
+        let mut sb = String::new();
+        self.inner_display(&mut sb, 0, true);
+        sb
+    }
+    
+    fn inner_display(&self, sb: &mut String, tab: usize, is_last: bool) {
         match self {
-            ExpressionKind::Empty => format!("<empty>"),
-            ExpressionKind::Default => format!("()"),
-            ExpressionKind::Literal(literal) => format!("{}", literal.value_to_string()),
-            ExpressionKind::Index(index) => format!("{}[{}]", index.collection.node.display(), index.index.node.display()),
-            ExpressionKind::Lambda(lambda) => format!("({}) => {{..}}", lambda.arguments.values.iter().map(|el| el.node.display()).join(", ")),
-            ExpressionKind::FunctionCall(function_call) => format!("{}({})", function_call.name, function_call.arguments.values.iter().map(|el| el.node.display()).join(", ")),
-            ExpressionKind::StructConstructor(struct_constructor) => format!(
-                "{}{{{}}}", 
-                struct_constructor.calle.display(), 
-                struct_constructor.arguments.values.iter().map(|(name, expr)| format!("{}: {}", name, expr.node.display())).join(", "),
-            ),
-            ExpressionKind::FieldAccess(field_access) => format!(
-                "{}.{}",
-                field_access.field,
-                field_access.object.node.display()
-            ),
-            ExpressionKind::StaticFieldAccess(static_field_access) => format!(
-                "{}.{}",
-                static_field_access.object.display(),
-                static_field_access.field,
-            ),
-            ExpressionKind::StaticMethod(static_method) => format!(
-                "{}.{}({})",
-                static_method.callee.node.display(),
-                static_method.name,
-                static_method.arguments.values.iter().map(|el| el.node.display()).join(", "),
-            ),
-            ExpressionKind::Variable(variable) => variable.clone(),
-            ExpressionKind::ExternalExpression(external_expression) => format!(
-                "{}::{}",
-                external_expression.path.as_str(),
-                external_expression.expr.node.display(),
-            ),
-            ExpressionKind::Unary(unary) => format!(
-                "{}{}",
-                unary.operator.node.as_str(),
-                unary.expression.node.display(),
-            ),
-            ExpressionKind::Binary(binary) => format!(
-                "{}{}{}",
-                binary.left.node.display(),
-                binary.operator.node.as_str(),
-                binary.right.node.display(),
-            ),
-            ExpressionKind::If(_if) => format!(
-                "{} {} {{..}} {}",
-                KeyWord::If.as_str(),
-                _if.condition.node.display(),
-                _if.else_branchs.iter().map(|el| match &el.node {
-                    ElseKind::ElseIf(else_if) => format!("{} {} {} {{..}}", KeyWord::Else.as_str(), KeyWord::If.as_str(), else_if.node.condition.node.display()),
-                    ElseKind::Else(_) => format!("{} {{..}}", KeyWord::Else.as_str()),
-                }).join("")
-            ),
-            ExpressionKind::For(_for) => format!(
-                "{} {}{} {{..}}",
-                KeyWord::For.as_str(),
-                _for.element.as_ref().map(|el| format!("{} {} ", el.display(), KeyWord::InForLoop.as_str())).unwrap_or(String::default()),
-                _for.collection.node.display(),
-            ),
-            ExpressionKind::While(_while) => format!(
-                "{} {} {{..}}",
-                KeyWord::While.as_str(),
-                _while.condition.as_ref().map(|el| el.node.display()).unwrap_or_default()
-            ),
-            ExpressionKind::Match(_match) => format!(
-                "{} {} {{..}}",
-                KeyWord::Match.as_str(),
-                _match.condition.node.display(),
-            ),
-            ExpressionKind::Ternary(ternary) => format!(
-                "{} ? {} : {}",
-                ternary.condition.node.display(),
-                ternary.if_branch.node.display(),
-                ternary.else_branch.node.display(),
-            ),
-            ExpressionKind::Deref(spanned) => format!("{}{}", TypeWrapper::Pointer.as_str(), spanned.node.display()),
-            ExpressionKind::Ref { is_mutable, expression } => format!(
-                "{}{}",
-                if *is_mutable {TypeWrapper::MutRef.as_str()} else {TypeWrapper::ConstRef.as_str()},
-                expression.node.display(),
-            ),
-            ExpressionKind::Block(block) => format!("{} {{..}}", block.modifier.as_str()),
-            ExpressionKind::ReturnLike(return_like) => format!(
-                "{}{}",
-                return_like.kind.as_keyword().as_str(),
-                return_like.value.as_ref().map(|el| format!(" {}", el.node.display())).unwrap_or_default(),
-            ),
-            ExpressionKind::ExpressionGroup(expression_group) => expression_group.display(),
+            ExpressionKind::Empty => sb.push_str("<empty>"),
+            ExpressionKind::Default => sb.push_str("<default>"),
+            ExpressionKind::Literal(literal) => sb.push_str(&literal.value_to_string()),
+            ExpressionKind::Index(index) => {
+                index.collection.node.inner_display(sb, tab, is_last);
+                sb.push('[');
+                index.index.node.inner_display(sb, tab, is_last);
+                sb.push(']');
+            },
+            ExpressionKind::Lambda(lambda) => {
+                sb.push('(');
+                sb.push_str(&lambda.arguments.values.iter().map(|el| el.node.display()).join(", "));
+                sb.push(')');
+                match &lambda.body {
+                    LamdbaBodyKind::Block(block) => block.inner_display(sb, tab+1, is_last),
+                    LamdbaBodyKind::Expression(spanned) => spanned.node.inner_display(sb, tab+1, is_last),
+                }
+            },
+            ExpressionKind::FunctionCall(function_call) => {
+                sb.push_str(&function_call.name);
+                sb.push('(');
+                sb.push_str(&function_call.arguments.values.iter().map(|el| el.node.display()).join(", "));
+                sb.push(')');
+            }
+            ExpressionKind::StructConstructor(struct_constructor) => {
+                struct_constructor.calle.inner_display(sb, tab, is_last);
+                sb.push_str(&struct_constructor.arguments.values.iter().map(|(name, expr)| format!("{}: {}", name, expr.node.display())).join(", "));
+            },
+            ExpressionKind::FieldAccess(field_access) => {
+                field_access.object.node.inner_display(sb, tab, is_last);
+                sb.push('.');
+                sb.push_str(&field_access.field);
+            },
+            ExpressionKind::StaticFieldAccess(static_field_access) => {
+                static_field_access.object.inner_display(sb, tab, is_last);
+                sb.push('.');
+                sb.push_str(&static_field_access.field);
+            },
+            ExpressionKind::StaticMethod(static_method) => {
+                static_method.callee.node.inner_display(sb, tab, is_last);
+                sb.push('.');
+                sb.push_str(&static_method.name);
+                sb.push('(');
+                sb.push_str(&static_method.arguments.values.iter().map(|el| el.node.display()).join(", "));
+                sb.push(')');
+            },
+            ExpressionKind::Variable(variable) => {
+                sb.push_str(&variable);
+            },
+            ExpressionKind::ExternalExpression(external_expression) => {
+                sb.push_str(external_expression.path.as_str());
+                sb.push_str("::");
+                external_expression.expr.node.inner_display(sb, tab, is_last);
+            },
+            ExpressionKind::Unary(unary) => {
+                sb.push_str(unary.operator.node.as_str());
+                unary.expression.node.inner_display(sb, tab, is_last);
+            },
+            ExpressionKind::Binary(binary) => {
+                binary.left.node.inner_display(sb, tab, is_last);
+                sb.push(' ');
+                sb.push_str(binary.operator.node.as_str());
+                sb.push(' ');
+                binary.right.node.inner_display(sb, tab, is_last);
+            },
+            ExpressionKind::If(_if) => {
+                sb.push_str(KeyWord::If.as_str());
+                sb.push(' ');
+                _if.condition.node.inner_display(sb, tab, is_last);
+                _if.block.inner_display(sb, tab, is_last);
+                for else_kind in &_if.else_branchs {
+                    
+                    match &else_kind.node {
+                        ElseKind::ElseIf(spanned) => {
+                            sb.push_str(KeyWord::Else.as_str());
+                            sb.push(' ');
+                            sb.push_str(KeyWord::If.as_str());
+                            sb.push(' ');
+                            spanned.node.condition.node.inner_display(sb, tab, is_last);
+                            spanned.node.block.inner_display(sb, tab, is_last);
+                        },
+                        ElseKind::Else(spanned) => {
+                            sb.push_str(KeyWord::Else.as_str());
+                            sb.push(' ');
+                            spanned.node.inner_display(sb, tab, is_last);
+                        },
+                    }
+                }
+            },
+            ExpressionKind::For(_for) => {
+                sb.push_str(KeyWord::For.as_str());
+                sb.push(' ');
+                if let Some(element) = &_for.element {
+
+                    for_pattern_to_string(sb, element);
+                    sb.push(' ');
+                    sb.push_str(KeyWord::InForLoop.as_str());
+                    sb.push(' ');
+                }
+                _for.collection.node.inner_display(sb, tab, is_last);
+                _for.block.inner_display(sb, tab+1, is_last);
+            },
+            ExpressionKind::While(_while) => {
+                sb.push_str(KeyWord::While.as_str());
+                sb.push(' ');
+                
+                if let Some(condition) = &_while.condition {
+                    condition.node.inner_display(sb, tab, is_last);
+                    sb.push(' ');
+                }
+                _while.block.inner_display(sb, tab, is_last);
+            },
+            ExpressionKind::Match(_match) => {
+                let prefix = tree_prefix(tab+1, is_last);
+                
+                sb.push_str(KeyWord::While.as_str());
+                sb.push(' ');
+                
+                _match.condition.node.inner_display(sb, tab, is_last);
+                sb.push(' ');
+                for case in &_match.cases {
+                    
+                    match &case.if_kind {
+                        IfCaseKind::WildCard(ident) => {
+                            sb.push('\n');
+                            sb.push_str(&prefix);
+                            sb.push_str(ident.as_ref().unwrap_or(&String::new()));
+                            sb.push_str(" => ");
+                        },
+                        IfCaseKind::Expression(spanned) => {
+                            sb.push('\n');
+                            sb.push_str(&prefix);
+                            spanned.node.inner_display(sb, tab, is_last);
+                            sb.push_str(" => ");
+                        },
+                        IfCaseKind::Variant { name, params } => {
+                            sb.push('\n');
+                            sb.push_str(&prefix);
+                            sb.push_str(&name);
+                            sb.push('(');
+                            for value in &params.values {
+                                value.node.inner_display(sb, tab, is_last);
+                                sb.push_str(", ");
+                            }
+                            sb.push(')');
+                            sb.push_str(" => ");
+                        },
+                        IfCaseKind::NamedVariant { name, params } => {
+                            sb.push('\n');
+                            sb.push_str(&prefix);
+                            sb.push_str(&name);
+                            sb.push('{');
+                            for (name, value) in &params.values {
+                                sb.push_str(&name);
+                                sb.push_str(": ");
+                                value.node.inner_display(sb, tab, is_last);
+                                sb.push_str(", ");
+                            }
+                            sb.push('}');
+                            sb.push_str(" => ");
+                        },
+                        IfCaseKind::Bind { name, condition } => {
+                            sb.push('\n');
+                            sb.push_str(&prefix);
+                            sb.push_str(&name);
+                            sb.push(' ');
+                            sb.push_str(KeyWord::If.as_str());
+                            sb.push(' ');
+                            condition.node.inner_display(sb, tab, is_last);
+                            sb.push_str(" => ");
+                        },
+                    }
+
+                    match &case.do_fn {
+                        CaseDoKind::Block(spanned) => spanned.node.inner_display(sb, tab+2, is_last),
+                        CaseDoKind::Expression(spanned) => spanned.node.inner_display(sb, tab, is_last),
+                    }
+                }
+            },
+            ExpressionKind::Ternary(ternary) => {
+                ternary.condition.node.inner_display(sb, tab, is_last);
+                sb.push_str(" ? ");
+                ternary.if_branch.node.inner_display(sb, tab, is_last);
+                sb.push_str(" : ");
+                ternary.else_branch.node.inner_display(sb, tab, is_last);
+            },
+            ExpressionKind::Deref(spanned) => {
+                sb.push_str(TypeWrapper::Pointer.as_str());
+                spanned.node.inner_display(sb, tab, is_last);
+            },
+            ExpressionKind::Ref { is_mutable, expression } => {
+                if *is_mutable {
+                    sb.push_str(TypeWrapper::MutRef.as_str());
+                }
+                else {
+                    sb.push_str(TypeWrapper::ConstRef.as_str());
+                }
+
+                expression.node.inner_display(sb, tab, is_last);
+            }
+            ExpressionKind::Block(block) => block.inner_display(sb, tab, is_last),
+            ExpressionKind::ReturnLike(return_like) => {
+                sb.push_str(return_like.kind.as_keyword().as_str());
+                if let Some(value) = &return_like.value {
+                    sb.push(' ');
+                    value.node.inner_display(sb, tab, is_last);
+                }
+            },
+            ExpressionKind::ExpressionGroup(expression_group) => expression_group.inner_display(sb, tab, is_last),
         }
     } 
 }
@@ -228,5 +354,29 @@ impl ReturnKind {
             ReturnKind::Return => KeyWord::Return,
             ReturnKind::Continue => KeyWord::Continue,
         }
+    }
+}
+
+fn for_pattern_to_string(sb: &mut String, el: &ForPattern) {
+    match el {
+        ForPattern::Ident(ident) => sb.push_str(ident),
+        ForPattern::Tuple(items) => {
+            sb.push('(');
+            for item in items {
+                for_pattern_to_string(sb, item);
+                sb.push_str(", ");
+            }
+            sb.push(')');
+        },
+        ForPattern::NamedTuple(items) => {
+            sb.push('(');
+            for (name, item) in items {
+                sb.push_str(&name);
+                sb.push_str(": ");
+                for_pattern_to_string(sb, item);
+                sb.push_str(", ");
+            }
+            sb.push(')');
+        },
     }
 }

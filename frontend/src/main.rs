@@ -1,6 +1,7 @@
 extern crate frontend;
 
 use frontend::{ParseResonse, parse_file};
+use models::abstract_syntax_tree::syntax_display::SyntaxDisplay;
 use std::{fs::File, io::BufReader, process::exit};
 
 fn main() {
@@ -17,7 +18,7 @@ fn main() {
         }
     };
 
-    println!("{:#?}", syntax_tree);
+    println!("{}", syntax_tree.root.display());
 
     for error in errors {
         eprintln!("{}", error.to_message());

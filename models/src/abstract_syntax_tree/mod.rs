@@ -14,6 +14,7 @@ pub mod enum_like;
 pub mod soul_type;
 pub mod expression;
 pub mod conditionals;
+pub mod syntax_display;
 pub mod expression_groups;
 
 use crate::abstract_syntax_tree::block::Block;

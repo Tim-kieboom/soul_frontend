@@ -1,5 +1,5 @@
-use crate::steps::{parse::{Request, Response}, tokenize::token_stream::{Token, TokenKind, TokenStream, TokenStreamPosition}};
-use models::{abstract_syntax_tree::{AbstractSyntaxTree, block::Block, statment::Ident}, error::{SoulError, SoulErrorKind, SoulResult, Span}, scope::{scope::{ScopeId, TypeSymbol, ValueSymbol}, scope_builder::ScopeBuilder}, soul_names::TypeModifier};
+use crate::steps::{parse::{Request, Response, parse_statement::SEMI_COLON}, tokenize::token_stream::{Token, TokenKind, TokenStream, TokenStreamPosition}};
+use models::{abstract_syntax_tree::{AbstractSyntaxTree, block::Block, statment::Ident}, error::{SoulError, SoulErrorKind, SoulResult, Span}, scope::{scope::{ScopeId, ValueSymbol}, scope_builder::ScopeBuilder}, soul_names::TypeModifier};
 
 pub fn parse<'a>(request: Request) -> Response {
     Response {
@@ -64,11 +64,11 @@ impl<'a> Parser<'a> {
             self.add_error(err);
         }
         
-        self.skip_end_lines();
-        
         #[cfg(debug_assertions)] {
             self.current = self.token().kind.clone();
         }
+
+        self.skip_end_lines();
 
         let mut statments = vec![];
 
@@ -82,7 +82,7 @@ impl<'a> Parser<'a> {
                 }
             }
 
-            self.skip_end_lines();
+            self.skip(&[SEMI_COLON, TokenKind::EndLine]);
         }
 
         AbstractSyntaxTree{ 
@@ -108,10 +108,6 @@ impl<'a> Parser<'a> {
 
     pub(crate) fn add_scope_value(&mut self, name: Ident, symbol: ValueSymbol) {
         self.scopes.insert_value(name, symbol);
-    }    
-    
-    pub(crate) fn add_scope_type(&mut self, name: Ident, symbol: TypeSymbol) -> Result<(), String> {
-        self.scopes.insert_type(name, symbol)
     }
 
     pub(crate) fn add_error(&mut self, err: SoulError) {
@@ -123,6 +119,17 @@ impl<'a> Parser<'a> {
         
         #[cfg(not(debug_assertions))]
         self.errors.push(err);
+    }
+
+    pub(crate) fn peek(&mut self) -> Token {
+        match self.tokens.peek() {
+            Ok(val) => val,
+            Err(err) => {
+                self.add_error(err);
+                self.token().clone()
+            }
+        
+        }
     }
 
     pub(crate) fn current_is(&self, kind: &TokenKind) -> bool {
@@ -199,7 +206,7 @@ impl<'a> Parser<'a> {
     pub(crate) fn expect_ident(&mut self, expected: &str) -> SoulResult<()> {
 
         if let TokenKind::Ident(ident) = &self.token().kind {
-            if ident != expected {
+            if ident == expected {
                 self.bump();
                 Ok(())
             }
@@ -223,7 +230,11 @@ impl<'a> Parser<'a> {
     }
 
     pub(crate) fn skip_end_lines(&mut self) {
-        while self.current_is(&TokenKind::EndLine) && !self.current_is(&TokenKind::EndFile) {
+        self.skip(&[TokenKind::EndLine])
+    }
+
+    pub(crate) fn skip(&mut self, kinds: &[TokenKind]) {
+        while self.current_is_any(kinds) && !self.current_is(&TokenKind::EndFile) {
             self.bump();
         }
     }

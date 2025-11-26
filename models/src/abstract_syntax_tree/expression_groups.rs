@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap};
 use itertools::Itertools;
 
-use crate::{abstract_syntax_tree::{expression::{BoxExpression, Expression}, soul_type::SoulType, statment::Ident}, scope::scope::ScopeId, soul_names::KeyWord};
+use crate::{abstract_syntax_tree::{expression::{BoxExpression, Expression}, soul_type::SoulType, statment::Ident, syntax_display::SyntaxDisplay}, scope::scope::ScopeId, soul_names::KeyWord};
 
 /// A grouped expression type, such as tuple, array, or named tuple.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -64,13 +64,19 @@ pub struct Tuple {
     pub values: Vec<Expression>
 }
 
-impl ExpressionGroup {
-    pub fn display(&self) -> String {
+impl SyntaxDisplay for ExpressionGroup {
+    fn display(&self) -> String {
+        let mut sb = String::new();
+        self.inner_display(&mut sb, 0, true);
+        sb
+    }
+
+    fn inner_display(&self, sb: &mut String, _tab: usize, _is_last: bool) {
         match self {
-            ExpressionGroup::Tuple(tuple) => format!("({})", tuple.values.iter().map(|el| el.node.display()).join(", ")),
-            ExpressionGroup::Array(array) => format!("[{}]", array.values.iter().map(|el| el.node.display()).join(", ")),
-            ExpressionGroup::NamedTuple(named_tuple) => format!("{{{}}}", named_tuple.values.iter().map(|(name, el)| format!("{}: {}", name, el.node.display())).join(", ")),
-            ExpressionGroup::ArrayFiller(array_filler) => format!(
+            ExpressionGroup::Tuple(tuple) => sb.push_str(&format!("({})", tuple.values.iter().map(|el| el.node.display()).join(", "))),
+            ExpressionGroup::Array(array) => sb.push_str(&format!("[{}]", array.values.iter().map(|el| el.node.display()).join(", "))),
+            ExpressionGroup::NamedTuple(named_tuple) => sb.push_str(&format!("{{{}}}", named_tuple.values.iter().map(|(name, el)| format!("{}: {}", name, el.node.display())).join(", "))),
+            ExpressionGroup::ArrayFiller(array_filler) => sb.push_str(&format!(
                 "{}[{}{} {}{} => {}]", 
                 array_filler.collection_type.as_ref().map(|el| el.display()).unwrap_or_default(),
                 array_filler.element_type.as_ref().map(|el| format!("{}: ", el.display())).unwrap_or_default(),
@@ -78,7 +84,7 @@ impl ExpressionGroup {
                 array_filler.index.as_ref().map(|el| format!("{} {} ", el, KeyWord::InForLoop.as_str())).unwrap_or_default(), 
                 array_filler.amount.node.display(), 
                 array_filler.fill_expr.node.display(),
-            ),
+            )),
         }
     }
 }

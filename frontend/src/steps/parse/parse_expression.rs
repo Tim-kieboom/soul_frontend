@@ -1,8 +1,8 @@
 use std::sync::LazyLock;
 
-use models::{abstract_syntax_tree::{conditionals::{ElseKind, For, ForPattern, If}, expression::{Expression, ExpressionKind, ReturnKind, ReturnLike}, literal::Literal, operator::{Binary, BinaryOperator, Unary, UnaryOperator, UnaryOperatorKind}, spanned::Spanned}, error::{SoulError, SoulErrorKind, SoulResult, Span}, soul_names::{self, AccessType, KeyWord, Operator, TypeModifier}, symbool_kind::SymboolKind};
+use models::{abstract_syntax_tree::{conditionals::{ElseKind, For, ForPattern, If}, expression::{Expression, ExpressionKind, Index, ReturnKind, ReturnLike}, literal::Literal, operator::{Binary, BinaryOperator, Unary, UnaryOperator, UnaryOperatorKind}, spanned::Spanned}, error::{SoulError, SoulErrorKind, SoulResult, Span}, soul_names::{self, AccessType, KeyWord, Operator, TypeModifier}, symbool_kind::SymboolKind};
 
-use crate::steps::{parse::{parse_statement::{CURLY_OPEN, STAMENT_END_TOKENS}, parser::Parser}, tokenize::token_stream::{Number, TokenKind}};
+use crate::steps::{parse::{parse_statement::{CURLY_OPEN, SQUARE_CLOSE, STAMENT_END_TOKENS}, parser::Parser}, tokenize::token_stream::{Number, TokenKind}};
 
 const INCREMENT: TokenKind = TokenKind::Symbool(SymboolKind::DoublePlus);
 const DECREMENT: TokenKind = TokenKind::Symbool(SymboolKind::DoubleMinus);
@@ -208,29 +208,26 @@ impl<'a> Parser<'a> {
                     Some(KeyWord::Break) => self.parse_return_like(ReturnKind::Break)?,
                     Some(KeyWord::Return) => self.parse_return_like(ReturnKind::Return)?,
                     Some(KeyWord::Continue) => self.parse_return_like(ReturnKind::Continue)?,
-                    _ => {
-                        todo!()
+                    other => {
+                        todo!("{} == {:?}", ident, other)
                     },
                 };
 
                 self.bump();
                 expression
             },
-            TokenKind::CharLiteral(_) => {
-                let token = self.bump_consume();
-                let literal = match token.kind {
-                    TokenKind::CharLiteral(val) => val,
-                    _ => unreachable!(),
-                };
-                Expression::new_literal(Literal::Char(literal), self.new_span(start_span))
+            TokenKind::CharLiteral(char) => {
+                let char = *char;
+                self.bump();
+                Expression::new_literal(Literal::Char(char), self.new_span(start_span))
             },
             TokenKind::StringLiteral(_) => {
                 let token = self.bump_consume();
-                let literal = match token.kind {
+                let ident = match token.kind {
                     TokenKind::StringLiteral(val) => val,
                     _ => unreachable!(),
                 };
-                Expression::new_literal(Literal::Str(literal), self.new_span(start_span))
+                Expression::new_literal(Literal::Str(ident), self.new_span(start_span))
             },
             TokenKind::Number(Number::Int(num)) => {
                 let number = *num;
@@ -277,8 +274,14 @@ impl<'a> Parser<'a> {
         Ok(expression)
     }
 
-    fn parse_index(&mut self, start_span: Span, expression: Expression) -> SoulResult<Expression> {
-        todo!()
+    fn parse_index(&mut self, start_span: Span, collection: Expression) -> SoulResult<Expression> {
+        let index = self.parse_expression(&[SQUARE_CLOSE])?;
+        self.expect(&SQUARE_CLOSE)?;
+
+        Ok(Expression::new(
+            ExpressionKind::Index(Index{collection: Box::new(collection), index: Box::new(index)}),
+            self.new_span(start_span),
+        ))
     }
 
     fn parse_access(&mut self, start_span: Span, expression: Expression) -> SoulResult<Expression> {
