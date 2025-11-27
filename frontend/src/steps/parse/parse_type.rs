@@ -132,7 +132,16 @@ impl<'a> Parser<'a> {
     }
 
     pub(crate) fn parse_named_tuple_type(&mut self, open: &TokenKind, close: &TokenKind) -> TryResult<NamedTupleType, SoulError> {
+        let begin_position = self.current_position();
+        let result = self.inner_parse_named_tuple_type(open, close);
+        if result.is_err() {
+            self.go_to(begin_position);
+        }
 
+        result
+    }
+
+    fn inner_parse_named_tuple_type(&mut self, open: &TokenKind, close: &TokenKind) -> TryResult<NamedTupleType, SoulError> {
         self.expect(open)
             .map_err(|err| TryError::IsErr(err))?;
 
@@ -144,7 +153,6 @@ impl<'a> Parser<'a> {
         }
 
         let mut types = vec![];
-        let begin_position = self.current_position();
 
         loop {
             
@@ -161,7 +169,6 @@ impl<'a> Parser<'a> {
             };
 
             if !self.current_is(&COLON) {
-                self.go_to(begin_position);
                 return Err(TryError::IsNotValue(self.get_error_expected(&COLON))) // is probebly tuple
             }
 
@@ -169,11 +176,11 @@ impl<'a> Parser<'a> {
             let ty = self.parse_type()
                 .map_err(|err| TryError::IsNotValue(err))?; // is probebly named_tuple expression 
             
+            types.push((name, ty));
             if self.current_is(close) {
                 break
             }
 
-            types.push((name, ty));
             self.expect(&COMMA)
                 .map_err(|err| TryError::IsErr(err))?;
         

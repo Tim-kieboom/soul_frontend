@@ -1,0 +1,9 @@
+
+├── Function >> sum(a: int, b: int): int
+│   └── Expression >> return 0
+└── Function >> main(): int
+│   ├── Variable >> array
+│   ├── Assignment >> array = {name: 1 + 2, field: true, ..}
+│   ├── Variable >> num
+│   ├── Assignment >> num = 1
+│   └── Expression >> Println("hello world")

@@ -1,8 +1,8 @@
 use std::sync::LazyLock;
 
-use models::{abstract_syntax_tree::{conditionals::{ElseKind, For, ForPattern, If}, expression::{Expression, ExpressionKind, Index, ReturnKind, ReturnLike}, literal::Literal, operator::{Binary, BinaryOperator, Unary, UnaryOperator, UnaryOperatorKind}, spanned::Spanned}, error::{SoulError, SoulErrorKind, SoulResult, Span}, soul_names::{self, AccessType, KeyWord, Operator, TypeModifier}, symbool_kind::SymboolKind};
+use models::{abstract_syntax_tree::{conditionals::{ElseKind, For, ForPattern, If}, expression::{Expression, ExpressionKind, Index, ReturnKind, ReturnLike}, expression_groups::ExpressionGroup, literal::Literal, operator::{Binary, BinaryOperator, Unary, UnaryOperator, UnaryOperatorKind}, spanned::Spanned}, error::{SoulError, SoulErrorKind, SoulResult, Span}, soul_names::{self, AccessType, KeyWord, Operator, TypeModifier}, symbool_kind::SymboolKind};
 
-use crate::steps::{parse::{parse_statement::{CURLY_OPEN, SQUARE_CLOSE, STAMENT_END_TOKENS}, parser::Parser}, tokenize::token_stream::{Number, TokenKind}};
+use crate::steps::{parse::{parse_statement::{CURLY_OPEN, SQUARE_CLOSE, STAMENT_END_TOKENS}, parser::{Parser, TryError}}, tokenize::token_stream::{Number, TokenKind}};
 
 const INCREMENT: TokenKind = TokenKind::Symbool(SymboolKind::DoublePlus);
 const DECREMENT: TokenKind = TokenKind::Symbool(SymboolKind::DoubleMinus);
@@ -10,6 +10,10 @@ const DECREMENT: TokenKind = TokenKind::Symbool(SymboolKind::DoubleMinus);
 impl<'a> Parser<'a> {
 
     pub(crate) fn parse_expression(&mut self, end_tokens: &[TokenKind]) -> SoulResult<Expression> {
+        if self.token().span.start_line == 19 {
+            println!("breakpoint")
+        }
+        
         let expression = self.pratt_parse_precedence(0, end_tokens)?;
         Ok(
             expression
@@ -118,7 +122,7 @@ impl<'a> Parser<'a> {
 
         self.expect_any(STAMENT_END_TOKENS)?;
         Ok(Expression::new(
-            ExpressionKind::ReturnLike(ReturnLike{value, kind: ReturnKind::Break}), 
+            ExpressionKind::ReturnLike(ReturnLike{value, kind}), 
             self.new_span(start_span),
         ))
     }
@@ -186,9 +190,21 @@ impl<'a> Parser<'a> {
         let start_span = self.token().span;
 
         let expression = match &self.token().kind {
-            TokenKind::Symbool(SymboolKind::RoundOpen) => {
-                let block = self.parse_block(TypeModifier::Mut)?;
-                Expression::new(ExpressionKind::Block(block), self.new_span(start_span))
+            &CURLY_OPEN => {
+                
+                match self.try_parse_named_tuple() {
+                    Ok(named_tuple) => {
+                        Expression::new(
+                            ExpressionKind::ExpressionGroup(ExpressionGroup::NamedTuple(named_tuple)), 
+                            self.new_span(start_span),
+                        )
+                    },
+                    Err(TryError::IsErr(err)) => return Err(err),
+                    Err(TryError::IsNotValue(_)) => {
+                        let block = self.parse_block(TypeModifier::Mut)?;
+                        Expression::new(ExpressionKind::Block(block), self.new_span(start_span))
+                    }
+                }
             },
             TokenKind::Symbool(symbool) => {
 
@@ -208,8 +224,11 @@ impl<'a> Parser<'a> {
                     Some(KeyWord::Break) => self.parse_return_like(ReturnKind::Break)?,
                     Some(KeyWord::Return) => self.parse_return_like(ReturnKind::Return)?,
                     Some(KeyWord::Continue) => self.parse_return_like(ReturnKind::Continue)?,
-                    other => {
-                        todo!("{} == {:?}", ident, other)
+                    _ => {
+                        Expression::new(
+                            ExpressionKind::Variable(ident.clone()),
+                            self.new_span(start_span),
+                        )
                     },
                 };
 
@@ -268,6 +287,7 @@ impl<'a> Parser<'a> {
                 )
             };
             
+            self.bump();
             return Ok(self.new_unary(start_span, operator, expression));
         }
 

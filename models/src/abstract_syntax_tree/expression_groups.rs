@@ -1,6 +1,4 @@
-use std::collections::{BTreeMap};
 use itertools::Itertools;
-
 use crate::{abstract_syntax_tree::{expression::{BoxExpression, Expression}, soul_type::SoulType, statment::Ident, syntax_display::SyntaxDisplay}, scope::scope::ScopeId, soul_names::KeyWord};
 
 /// A grouped expression type, such as tuple, array, or named tuple.
@@ -49,7 +47,7 @@ pub struct ArrayFiller {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct NamedTuple {
     /// Map of field names to their expression values.
-    pub values: BTreeMap<Ident, Expression>,
+    pub values: Vec<(Ident, Expression)>,
     
     /// Whether to insert default values for missing fields.
     ///
@@ -75,7 +73,10 @@ impl SyntaxDisplay for ExpressionGroup {
         match self {
             ExpressionGroup::Tuple(tuple) => sb.push_str(&format!("({})", tuple.values.iter().map(|el| el.node.display()).join(", "))),
             ExpressionGroup::Array(array) => sb.push_str(&format!("[{}]", array.values.iter().map(|el| el.node.display()).join(", "))),
-            ExpressionGroup::NamedTuple(named_tuple) => sb.push_str(&format!("{{{}}}", named_tuple.values.iter().map(|(name, el)| format!("{}: {}", name, el.node.display())).join(", "))),
+            ExpressionGroup::NamedTuple(named_tuple) => sb.push_str(
+                &format!("{{{}{}}}", named_tuple.values.iter().map(|(name, el)| format!("{}: {}", name, el.node.display())).join(", "), 
+                if named_tuple.insert_defaults {", .."} else {""}
+            )),
             ExpressionGroup::ArrayFiller(array_filler) => sb.push_str(&format!(
                 "{}[{}{} {}{} => {}]", 
                 array_filler.collection_type.as_ref().map(|el| el.display()).unwrap_or_default(),

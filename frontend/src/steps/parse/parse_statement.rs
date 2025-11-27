@@ -1,5 +1,4 @@
-use std::sync::LazyLock;
-
+use std::{iter::{self}, sync::LazyLock};
 use crate::steps::{parse::parser::{Parser, TryError}, tokenize::token_stream::TokenKind};
 use models::{abstract_syntax_tree::{block::Block, expression::{Expression, ExpressionKind, ReturnKind}, operator::{Binary, BinaryOperator, BinaryOperatorKind}, soul_type::{SoulType}, statment::{Assignment, Ident, Statement, StatementKind, Variable}}, error::{SoulError, SoulErrorKind, SoulResult, Span}, scope::scope::ValueSymbol, soul_names::{self, AssignType, KeyWord, TypeModifier}, symbool_kind::SymboolKind};
 
@@ -156,7 +155,7 @@ impl<'a> Parser<'a> {
             ));
         }
         else {
-            return self.parse_assignment(start_span);
+            return self.parse_assignment_or_expression(start_span);
         }
     }
 
@@ -283,17 +282,36 @@ impl<'a> Parser<'a> {
         Ok(kind)
     }
 
-    fn parse_assignment(&mut self, start_span: Span) -> SoulResult<Statement> {
-        static ASSIGN_TYPES: LazyLock<Vec<TokenKind>> = LazyLock::new(|| 
+    fn parse_assignment_or_expression(&mut self, start_span: Span) -> SoulResult<Statement> {
+        static ASSIGNMENT_TOKENS: LazyLock<Vec<TokenKind>> = LazyLock::new(|| 
             AssignType::SYMBOLS
                 .iter()
                 .map(|sym| TokenKind::Symbool(*sym))
+                .chain(iter::once(TokenKind::EndLine))
+                .chain(iter::once(SEMI_COLON))
                 .collect()
         );
         
-        let lvalue = self.parse_expression(ASSIGN_TYPES.as_ref())?;
+        let lvalue = self.parse_expression(ASSIGNMENT_TOKENS.as_ref())?;
+        if self.current_is_any(STAMENT_END_TOKENS)  {
+
+            return Ok(
+                Statement::new(
+                    StatementKind::Expression(lvalue),
+                    self.new_span(start_span), 
+                )
+            )
+        }
+
         let assign_token = self.bump_consume();
-        let assign = try_get_assign_type(&assign_token.kind).expect("should be assign type");
+        let assign = try_get_assign_type(&assign_token.kind)
+            .ok_or(
+                SoulError::new(
+                    format!("'{}' should be an assign symbool", assign_token.kind.display()),
+                    SoulErrorKind::InvalidAssignType,
+                    Some(self.new_span(start_span)),
+                )
+            )?;
 
         let rvalue = self.parse_expression(STAMENT_END_TOKENS)?;
         let resolved_rvalue = resolve_assign_type(&lvalue, assign, assign_token.span, rvalue);

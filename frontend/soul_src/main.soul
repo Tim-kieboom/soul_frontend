@@ -14,7 +14,10 @@ sum(a: int, b: int): int {
 }
 
 main(): int { 
-    mut num := 1
-    // num = 1
+    array := {}
+    array = {name: 1 + 2, field: true, ..}
+    num := 1
+    num = 1
+    
     Println("hello world")
 }

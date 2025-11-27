@@ -6,7 +6,7 @@
 //! `literal`.
 //!
 //! Helpers are provided for checking modifiers, type categories, and displaying types.
-use crate::{abstract_syntax_tree::{expression::Expression, statment::Ident, syntax_display::SyntaxDisplay}, soul_names::{InternalComplexTypes, InternalPrimitiveTypes, TypeModifier}};
+use crate::{abstract_syntax_tree::{expression::Expression, statment::Ident, syntax_display::SyntaxDisplay}, soul_names::{InternalComplexTypes, InternalPrimitiveTypes, TypeModifier, TypeWrapper}};
 
 
 /// Represents a type in the Soul language.
@@ -162,9 +162,9 @@ impl SyntaxDisplay for SoulType {
         
         if let Some(modifier) = self.modifier {
             sb.push_str(modifier.as_str());
+            sb.push(' ');
         }
 
-        sb.push(' ');
         sb.push_str(&self.kind.display());
     }
 }
@@ -196,8 +196,8 @@ impl TypeKind {
             }
             TypeKind::Generic(ident) => ident.clone(),
             TypeKind::Reference(r) => {
-                let mutability = if r.mutable { "mut " } else { "" };
-                format!("&{}{}", mutability, r.inner.display())
+                let ref_str = if r.mutable { TypeWrapper::MutRef.as_str() } else { TypeWrapper::ConstRef.as_str() };
+                format!("{}{}", ref_str, r.inner.display())
             }
             TypeKind::Pointer(inner) => format!("*{}", inner.display()),
             TypeKind::Optional(inner) => format!("{}?", inner.display()),

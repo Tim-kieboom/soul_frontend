@@ -2,7 +2,7 @@ extern crate frontend;
 
 use frontend::{ParseResonse, parse_file};
 use models::abstract_syntax_tree::syntax_display::SyntaxDisplay;
-use std::{fs::File, io::BufReader, process::exit};
+use std::{fs::File, io::{BufReader, Write}, process::exit};
 
 fn main() {
     
@@ -18,7 +18,12 @@ fn main() {
         }
     };
 
-    println!("{}", syntax_tree.root.display());
+    const SYNTAX_TREE: &str = "F:\\Code\\Github\\soul_frontend\\frontend\\tree.soulc";
+    let tree_string = syntax_tree.root.display();
+    let mut file = File::create(SYNTAX_TREE)
+        .expect("can not open file");
+
+    file.write(tree_string.as_bytes()).unwrap();
 
     for error in errors {
         eprintln!("{}", error.to_message());
