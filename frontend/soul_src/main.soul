@@ -15,6 +15,7 @@ sum(a: int, b: int): int {
 
 main(): int { 
     array := {}
+    array = [1, 2, 3, 4]
     array = {name: 1 + 2, field: true, ..}
     num := 1
     num = 1

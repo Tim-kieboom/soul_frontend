@@ -1,7 +1,8 @@
 use std::{iter::{self}, sync::LazyLock};
-use crate::steps::{parse::parser::{Parser, TryError}, tokenize::token_stream::TokenKind};
+use crate::{steps::{parse::parser::Parser, tokenize::token_stream::TokenKind}, utils::try_result::{ResultTryResult, TryErr, TryError, TryNotValue, TryOk, TryResult}};
 use models::{abstract_syntax_tree::{block::Block, expression::{Expression, ExpressionKind, ReturnKind}, operator::{Binary, BinaryOperator, BinaryOperatorKind}, soul_type::{SoulType}, statment::{Assignment, Ident, Statement, StatementKind, Variable}}, error::{SoulError, SoulErrorKind, SoulResult, Span}, scope::scope::ValueSymbol, soul_names::{self, AssignType, KeyWord, TypeModifier}, symbool_kind::SymboolKind};
 
+pub const SQUARE_OPEN: TokenKind = TokenKind::Symbool(SymboolKind::SquareOpen);
 pub const SQUARE_CLOSE: TokenKind = TokenKind::Symbool(SymboolKind::SquareClose);
 pub const CURLY_OPEN: TokenKind = TokenKind::Symbool(SymboolKind::CurlyOpen);
 pub const CURLY_CLOSE: TokenKind = TokenKind::Symbool(SymboolKind::CurlyClose);
@@ -71,16 +72,16 @@ impl<'a> Parser<'a> {
             TokenKind::Ident(ident) => {
 
                 if let Some(modifier) = soul_names::TypeModifier::from_str(&ident) {
-                    self.parse_statement_modifier(start_span, modifier)?
+                    self.try_parse_statement_modifier(start_span, modifier)
                 }
                 else if let Some(keyword) = soul_names::KeyWord::from_str(&ident) {
-                    self.parse_stament_keyword(start_span, keyword)?
+                    self.parse_stament_keyword(start_span, keyword)
                 }
                 else {
-                    Some(self.parse_statement_ident(start_span)?)
+                    TryOk(self.parse_statement_ident(start_span)?)
                 }
             },
-            &CURLY_OPEN => Some(Statement::new_block(
+            &CURLY_OPEN => TryOk(Statement::new_block(
                 self.parse_block(TypeModifier::Mut)?, 
                 self.new_span(start_span),
             )),
@@ -91,23 +92,24 @@ impl<'a> Parser<'a> {
                     Some(start_span),
                 ),
             ),
-            _ => None
+            _ => TryNotValue(SoulError::empty())
         };
 
-        if let Some(kind) = possible_kind {
-            Ok(kind)
-        }
-        else {
+        match possible_kind {
+            Ok(val) => Ok(val),
+            Err(TryError::IsErr(err)) => Err(err),
+            Err(TryError::IsNotValue(_)) => {
 
-            match self.parse_expression(STAMENT_END_TOKENS) {
-                Ok(expression) => Ok(
-                    Statement::new(StatementKind::Expression(expression), self.new_span(start_span))
-                ),
-                Err(err) => {
-                    self.skip_over_statement();
-                    Err(err)
-                },
-            }
+                match self.parse_expression(STAMENT_END_TOKENS) {
+                    Ok(expression) => Ok(
+                        Statement::new(StatementKind::Expression(expression), self.new_span(start_span))
+                    ),
+                    Err(err) => {
+                        self.skip_over_statement();
+                        Err(err)
+                    },
+                }
+            },
         }
     }
     
@@ -139,7 +141,11 @@ impl<'a> Parser<'a> {
 
             let (ty, assign_type) = if self.current_is(&COLON) {
                 self.bump();
-                let ty = self.parse_type()?;
+                let ty = match self.try_parse_type() {
+                    Ok(val) => val,
+                    Err(TryError::IsErr(err)) |
+                    Err(TryError::IsNotValue(err)) => return Err(err),
+                };
                 self.expect_any(&[COLON_ASSIGN, ASSIGN])?;
                 (Some(ty), AssignType::Assign)
             }
@@ -159,17 +165,17 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_statement_modifier(&mut self, start_span: Span, modifier: TypeModifier) -> SoulResult<Option<Statement>> {
+    fn try_parse_statement_modifier(&mut self, start_span: Span, modifier: TypeModifier) -> TryResult<Statement, SoulError> {
         self.bump();
 
         if self.token().kind == CURLY_OPEN {
-            let block = self.parse_block(modifier)?;
-            return Ok(Some(
+            let block = self.parse_block(modifier).try_err()?;
+            return TryOk(
                 Statement::new_block(block, self.new_span(start_span))
-            ))
+            )
         }
 
-        if let Some(name) = self.try_consume_name(start_span)? {
+        if let Some(name) = self.try_consume_name(start_span).try_err()? {
             
             if self.current_is_any(&[ROUND_OPEN, ARROW_LEFT]) {
                 todo!("function call/decl")
@@ -178,7 +184,7 @@ impl<'a> Parser<'a> {
             let mut ty = None;
             if self.current_is(&COLON) {
                 self.bump();
-                ty = Some(self.parse_type()?);
+                ty = Some(self.try_parse_type()?);
             }
 
             if self.current_is_any(STAMENT_END_TOKENS) {
@@ -192,22 +198,22 @@ impl<'a> Parser<'a> {
                     ),
                 );
 
-                return Ok(Some(
+                return TryOk(
                     Statement::new(StatementKind::Variable(name), self.new_span(start_span))
-                ))
+                )
             }
 
             if let Some(assign_type) = try_get_assign_type(&self.token().kind) {
-                let variable = self.parse_variable_declaration(start_span, name.clone(), assign_type, ty)?;
+                let variable = self.parse_variable_declaration(start_span, name.clone(), assign_type, ty).try_err()?;
                 self.add_scope_value(name.clone(), ValueSymbol::Variable(variable));
 
-                return Ok(Some(
+                return TryOk(
                     Statement::new(StatementKind::Variable(name), self.new_span(start_span))
-                )) 
+                )
             }
             else {
 
-                return Err(
+                return TryErr(
                     SoulError::new(
                         format!("'{}' should be '=' or ':='", self.token().kind.display()),
                         SoulErrorKind::InvalidAssignType,
@@ -217,7 +223,7 @@ impl<'a> Parser<'a> {
             } 
         }
         
-        Err(
+        TryErr(
             SoulError::new(
                 format!("'{}' invalid after modifier (could be ['{{' or <name>])", self.token().kind.display()),
                 SoulErrorKind::UnexpecedToken,
@@ -226,7 +232,7 @@ impl<'a> Parser<'a> {
         )
     }
 
-    fn parse_stament_keyword(&mut self, start_span: Span, keyword: KeyWord) -> SoulResult<Option<Statement>> {
+    fn parse_stament_keyword(&mut self, start_span: Span, keyword: KeyWord) -> TryResult<Statement, SoulError> {
         
         let kind = match keyword {
                 
@@ -237,29 +243,15 @@ impl<'a> Parser<'a> {
             KeyWord::Union => todo!("union decl"),
             KeyWord::Struct => todo!("struct decl"),
             
-            KeyWord::If => Some(
-                Statement::from_expression(self.parse_if()?)
-            ), 
-            KeyWord::For => Some(
-                Statement::from_expression(self.parse_for()?)
-            ), 
-            KeyWord::Match => Some(
-                Statement::from_expression(self.parse_match()?)
-            ), 
-            KeyWord::While => Some(
-                Statement::from_expression(self.parse_while()?)
-            ), 
-            KeyWord::Return => Some(
-                Statement::from_expression(self.parse_return_like(ReturnKind::Return)?)
-            ), 
-            KeyWord::Continue => Some(
-                Statement::from_expression(self.parse_return_like(ReturnKind::Continue)?)
-            ), 
-            KeyWord::Break => Some(
-                Statement::from_expression(self.parse_return_like(ReturnKind::Break)?)
-            ), 
+            KeyWord::If => Statement::from_expression(self.parse_if().try_err()?), 
+            KeyWord::For => Statement::from_expression(self.parse_for().try_err()?), 
+            KeyWord::Match => Statement::from_expression(self.parse_match().try_err()?), 
+            KeyWord::While => Statement::from_expression(self.parse_while().try_err()?), 
+            KeyWord::Return => Statement::from_expression(self.parse_return_like(ReturnKind::Return).try_err()?),
+            KeyWord::Continue => Statement::from_expression(self.parse_return_like(ReturnKind::Continue).try_err()?), 
+            KeyWord::Break => Statement::from_expression(self.parse_return_like(ReturnKind::Break).try_err()?),
             
-            KeyWord::Else => return Err(
+            KeyWord::Else => return TryErr(
                 SoulError::new(
                     format!("can not have '{}' without first '{}'", KeyWord::Else.as_str(), KeyWord::If.as_str()),
                     SoulErrorKind::InvalidExpression,
@@ -270,7 +262,7 @@ impl<'a> Parser<'a> {
             KeyWord::Copy |
             KeyWord::Await |
             KeyWord::InForLoop |
-            KeyWord::GenericWhere => return Err(
+            KeyWord::GenericWhere => return TryErr(
                 SoulError::new(
                     format!("keyword: '{}' invalid start to statment", keyword.as_str()), 
                     SoulErrorKind::UnexpecedStatmentStart,
@@ -279,7 +271,9 @@ impl<'a> Parser<'a> {
             )
         };
 
-        Ok(kind)
+        TryOk(
+            kind
+        )
     }
 
     fn parse_assignment_or_expression(&mut self, start_span: Span) -> SoulResult<Statement> {

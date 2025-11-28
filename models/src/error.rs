@@ -68,6 +68,10 @@ pub struct SoulError {
 }
 
 impl SoulError {
+    pub fn empty() -> Self {
+        Self { kind: SoulErrorKind::InvalidName, message: String::default(), span: None }
+    }
+
     pub fn new<S: Into<String>>(message: S, kind: SoulErrorKind, span: Option<Span>) -> Self {
         Self {
             message: message.into(),

@@ -3,6 +3,7 @@
 │   └── Expression >> return 0
 └── Function >> main(): int
 │   ├── Variable >> array
+│   ├── Assignment >> array = [1, 2, 3, 4]
 │   ├── Assignment >> array = {name: 1 + 2, field: true, ..}
 │   ├── Variable >> num
 │   ├── Assignment >> num = 1

@@ -1,10 +1,65 @@
-use crate::steps::{parse::{parse_statement::{COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, ROUND_CLOSE, ROUND_OPEN}, parser::{Parser, TryError, TryResult}}, tokenize::token_stream::TokenKind};
+use crate::{steps::{parse::{parse_statement::{COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, ROUND_CLOSE, ROUND_OPEN}, parser::Parser}, tokenize::token_stream::TokenKind}, utils::try_result::{ResultTryResult, TryError, TryNotValue, TryResult}};
 use models::{abstract_syntax_tree::soul_type::{ArrayType, NamedTupleType, ReferenceType, SoulType, TupleType, TypeKind}, error::{SoulError, SoulErrorKind, SoulResult}, soul_names::{InternalComplexTypes, InternalPrimitiveTypes, TypeModifier, TypeWrapper}};
 
 impl<'a> Parser<'a> {
     
-    pub(crate) fn parse_type(&mut self) -> SoulResult<SoulType> {
+    pub(crate) fn try_parse_type(&mut self) -> TryResult<SoulType, SoulError> {
+        let begin_position = self.current_position();
+        let result = self.inner_parse_type();
+        if result.is_err() {
+            self.go_to(begin_position);
+        }
+
+        result
+    }
+
+    pub(crate) fn parse_tuple_type(&mut self) -> SoulResult<TupleType> {
+        self.expect(&ROUND_OPEN)?;
+
+        if self.current_is(&ROUND_CLOSE) {
+            self.bump();
+            return Ok(
+                TupleType{types: vec![]}
+            ) 
+        }
+
+        let mut types = vec![];
+
+        loop {
+            
+            let ty = match self.try_parse_type() {
+                Ok(val) => val,
+                Err(TryError::IsErr(err)) |
+                Err(TryError::IsNotValue(err)) => return Err(err),
+            };
+
+            if self.current_is(&ROUND_CLOSE) {
+                break
+            }
+
+            types.push(ty);
+            self.expect(&COMMA)?;
         
+        }
+
+        self.expect(&ROUND_CLOSE)?;
+        
+        Ok(
+            TupleType{types}
+        )
+    }
+
+    pub(crate) fn parse_named_tuple_type(&mut self, open: &TokenKind, close: &TokenKind) -> TryResult<NamedTupleType, SoulError> {
+        let begin_position = self.current_position();
+        let result = self.inner_parse_named_tuple_type(open, close);
+        if result.is_err() {
+            self.go_to(begin_position);
+        }
+
+        result
+    }
+
+    fn inner_parse_type(&mut self) -> TryResult<SoulType, SoulError> {
         let modifier = match &self.token().kind {
             TokenKind::Ident(ident) => {
                 let modifier = TypeModifier::from_str(&ident);
@@ -24,21 +79,19 @@ impl<'a> Parser<'a> {
         else if self.current_is(&ROUND_OPEN) {
 
             self.parse_tuple_type()
-                .map(|el| SoulType::new(None, TypeKind::Tuple(el)))?
+                .map(|el| SoulType::new(None, TypeKind::Tuple(el)))
+                .try_err()?
         }
         else if self.current_is(&CURLY_OPEN) {
 
-            match self.parse_named_tuple_type(&CURLY_OPEN, &CURLY_CLOSE) {
-                Ok(val) => SoulType::new(None, TypeKind::NamedTuple(val)),
-                Err(TryError::IsErr(err)) |
-                Err(TryError::IsNotValue(err)) => return Err(err),
-            }
+            self.parse_named_tuple_type(&CURLY_OPEN, &CURLY_CLOSE)
+                .map(|val| SoulType::new(None, TypeKind::NamedTuple(val)))?    
         }
         else {
 
             let name = match self.bump_consume().kind {
                 TokenKind::Ident(val) => val,
-                other => return Err(
+                other => return TryNotValue(
                     SoulError::new(
                         format!("expected ident got '{}'", other.display()),
                         SoulErrorKind::UnexpecedToken,
@@ -99,48 +152,6 @@ impl<'a> Parser<'a> {
         Ok(ty)
     }
 
-    pub(crate) fn parse_tuple_type(&mut self) -> SoulResult<TupleType> {
-        self.expect(&ROUND_OPEN)?;
-
-        if self.current_is(&ROUND_CLOSE) {
-            self.bump();
-            return Ok(
-                TupleType{types: vec![]}
-            ) 
-        }
-
-        let mut types = vec![];
-
-        loop {
-            
-            let ty = self.parse_type()?;
-
-            if self.current_is(&ROUND_CLOSE) {
-                break
-            }
-
-            types.push(ty);
-            self.expect(&COMMA)?;
-        
-        }
-
-        self.expect(&ROUND_CLOSE)?;
-        
-        Ok(
-            TupleType{types}
-        )
-    }
-
-    pub(crate) fn parse_named_tuple_type(&mut self, open: &TokenKind, close: &TokenKind) -> TryResult<NamedTupleType, SoulError> {
-        let begin_position = self.current_position();
-        let result = self.inner_parse_named_tuple_type(open, close);
-        if result.is_err() {
-            self.go_to(begin_position);
-        }
-
-        result
-    }
-
     fn inner_parse_named_tuple_type(&mut self, open: &TokenKind, close: &TokenKind) -> TryResult<NamedTupleType, SoulError> {
         self.expect(open)
             .map_err(|err| TryError::IsErr(err))?;
@@ -173,8 +184,7 @@ impl<'a> Parser<'a> {
             }
 
             self.bump();
-            let ty = self.parse_type()
-                .map_err(|err| TryError::IsNotValue(err))?; // is probebly named_tuple expression 
+            let ty = self.try_parse_type()?; // is probebly named_tuple expression 
             
             types.push((name, ty));
             if self.current_is(close) {

@@ -1,8 +1,6 @@
 use std::sync::LazyLock;
-
+use crate::{steps::{parse::{parse_statement::{CURLY_OPEN, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS}, parser::Parser}, tokenize::token_stream::{Number, TokenKind}}, utils::try_result::TryError};
 use models::{abstract_syntax_tree::{conditionals::{ElseKind, For, ForPattern, If}, expression::{Expression, ExpressionKind, Index, ReturnKind, ReturnLike}, expression_groups::ExpressionGroup, literal::Literal, operator::{Binary, BinaryOperator, Unary, UnaryOperator, UnaryOperatorKind}, spanned::Spanned}, error::{SoulError, SoulErrorKind, SoulResult, Span}, soul_names::{self, AccessType, KeyWord, Operator, TypeModifier}, symbool_kind::SymboolKind};
-
-use crate::steps::{parse::{parse_statement::{CURLY_OPEN, SQUARE_CLOSE, STAMENT_END_TOKENS}, parser::{Parser, TryError}}, tokenize::token_stream::{Number, TokenKind}};
 
 const INCREMENT: TokenKind = TokenKind::Symbool(SymboolKind::DoublePlus);
 const DECREMENT: TokenKind = TokenKind::Symbool(SymboolKind::DoubleMinus);
@@ -10,10 +8,7 @@ const DECREMENT: TokenKind = TokenKind::Symbool(SymboolKind::DoubleMinus);
 impl<'a> Parser<'a> {
 
     pub(crate) fn parse_expression(&mut self, end_tokens: &[TokenKind]) -> SoulResult<Expression> {
-        if self.token().span.start_line == 19 {
-            println!("breakpoint")
-        }
-        
+
         let expression = self.pratt_parse_precedence(0, end_tokens)?;
         Ok(
             expression
@@ -188,6 +183,7 @@ impl<'a> Parser<'a> {
     
     fn parse_primary(&mut self) -> SoulResult<Expression> {
         let start_span = self.token().span;
+        // let possible_ty = self.try_parse_type()
 
         let expression = match &self.token().kind {
             &CURLY_OPEN => {
@@ -205,6 +201,15 @@ impl<'a> Parser<'a> {
                         Expression::new(ExpressionKind::Block(block), self.new_span(start_span))
                     }
                 }
+            },
+            &SQUARE_OPEN => {
+                self.parse_array(None)
+                    .map(|el| 
+                        Expression::new(
+                            ExpressionKind::ExpressionGroup(ExpressionGroup::Array(el)), 
+                            self.new_span(start_span),
+                        )
+                    )?
             },
             TokenKind::Symbool(symbool) => {
 

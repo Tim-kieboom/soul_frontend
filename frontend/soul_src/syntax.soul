@@ -69,7 +69,7 @@ Test test_list() {
     literal NOT_FOUND = 404
 
     list.Push(1)
-    mut element: int = list.Pop()/*?int*/ ?? NOT_FOUND
+    mut element: int = list.Pop() ?? NOT_FOUND
 
     element = list.ExpectPop() 
         .catch err => {

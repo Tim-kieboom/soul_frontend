@@ -4,6 +4,7 @@ use models::{abstract_syntax_tree::AbstractSyntaxTree, error::{SoulError}};
 use crate::steps::{parse::{self, parser::parse}, tokenize::{self, tokenizer::tokenize}};
 
 mod steps;
+mod utils;
 
 pub struct ParseResonse {
     pub syntax_tree: AbstractSyntaxTree, 
@@ -21,7 +22,7 @@ pub fn parse_file<R: Read>(mut reader: BufReader<R>) -> io::Result<ParseResonse>
     #[cfg(debug_assertions)] {
         let tokens = tokenize_response.token_stream.clone()
             .to_vec()
-            .map(|vec| vec.into_iter().enumerate().map(|(i, el)| format!("{i}.{:?}", el.kind)).join("\n\t"));
+            .map(|vec| vec.into_iter().enumerate().map(|(i, el)| format!("{}.{:?}", i+1, el.kind)).join("\n\t"));
         
         match tokens {
             Ok(tokens) => println!("[\n\t{tokens}\n]"),

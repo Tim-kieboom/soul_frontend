@@ -1,6 +1,6 @@
 use models::{abstract_syntax_tree::{expression::{BoxExpression, Expression, ExpressionKind}, function::{Function, FunctionCall, FunctionCallee, FunctionSignature}, soul_type::{GenericParameter, SoulType, TypeGeneric}, spanned::Spanned, statment::{Ident, Statement, StatementKind}}, error::{SoulError, SoulErrorKind, SoulResult, Span}, soul_names::TypeModifier};
 
-use crate::steps::parse::{parse_statement::{ARROW_LEFT, COLON, ROUND_CLOSE, ROUND_OPEN}, parser::{Parser, TryError, TryResult}};
+use crate::{steps::parse::{parse_statement::{ARROW_LEFT, COLON, ROUND_CLOSE, ROUND_OPEN}, parser::Parser}, utils::try_result::{ResultTryResult, TryErr, TryError, TryNotValue, TryResult}};
 
 impl<'a> Parser<'a> {
     
@@ -36,14 +36,12 @@ impl<'a> Parser<'a> {
         let begin_position = self.current_position();
         
         if !self.current_is_any(&[ROUND_OPEN, ARROW_LEFT]) {
-            return Err(TryError::IsErr(
-                self.get_error_expected_any(&[ROUND_OPEN, ARROW_LEFT])
-            ))
+            return TryErr(self.get_error_expected_any(&[ROUND_OPEN, ARROW_LEFT]))
         }
 
         let generics = if self.current_is(&ARROW_LEFT) {
             self.parse_generic_declare()
-                .map_err(|err| TryError::IsErr(err))?
+                .try_err()?
         } 
         else {
             vec![]
@@ -51,12 +49,12 @@ impl<'a> Parser<'a> {
 
         if !self.current_is(&ROUND_OPEN) {
             
-            return Err(
-                TryError::IsErr(SoulError::new(
+            return TryErr(
+                SoulError::new(
                     format!("'{}' should be '{}'", self.token().kind.display(), ROUND_OPEN.display()), 
                     SoulErrorKind::InvalidTokenKind, 
                     Some(self.new_span(start_span)),
-                ))
+                )
             )
         }
 
@@ -64,15 +62,18 @@ impl<'a> Parser<'a> {
             Ok(val) => val,
             Err(TryError::IsNotValue(_)) => {
                 self.go_to(begin_position);
-                return Err(TryError::IsNotValue(name))
+                return TryNotValue(name)
             },
-            Err(TryError::IsErr(err)) => return Err(TryError::IsErr(err))
+            Err(TryError::IsErr(err)) => return TryErr(err)
         };
 
         let return_type = if self.current_is(&COLON) {
             self.bump();
-            self.parse_type()
-                .map_err(|err| TryError::IsErr(err))?
+            match self.try_parse_type() {
+                Ok(val) => val,
+                Err(TryError::IsErr(err)) => return TryErr(err),
+                Err(TryError::IsNotValue(_)) => return TryNotValue(name),
+            }
         }
         else {
             SoulType::none()

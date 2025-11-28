@@ -7,20 +7,6 @@ pub fn parse<'a>(request: Request) -> Response {
     }
 }
 
-/// - `TryError::IsNotValue(R)` is not of type (type: `R` is so that you could give ownership of value back if needed) 
-/// - `TryError::IsErr(SoulError)` is of type but has error
-pub(crate) enum TryError<R> {
-    IsErr(SoulError),
-    IsNotValue(R),
-}
-
-/// # TryResult
-/// used to try parse instead of parse value
-/// - `Ok(T)` success
-/// - `Err(TryError::IsNotValue(R))` is not of type (type: `R` is so that you could give ownership of value back if needed) 
-/// - `Err(TryError::IsErr(SoulError))` is of type but has error
-pub(crate) type TryResult<T, R> = Result<T, TryError<R>>;
-
 #[derive(Debug)]
 pub struct Parser<'a> {
     #[cfg(debug_assertions)]
