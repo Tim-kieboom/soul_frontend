@@ -241,7 +241,7 @@ impl<'a> Parser<'a> {
             KeyWord::Class => todo!("class decl"),
             KeyWord::Trait => todo!("trait decl"),
             KeyWord::Union => todo!("union decl"),
-            KeyWord::Struct => todo!("struct decl"),
+            KeyWord::Struct => Statement::new(StatementKind::Struct(self.parse_struct().try_err()?), self.new_span(start_span)),
             
             KeyWord::If => Statement::from_expression(self.parse_if().try_err()?), 
             KeyWord::For => Statement::from_expression(self.parse_for().try_err()?), 

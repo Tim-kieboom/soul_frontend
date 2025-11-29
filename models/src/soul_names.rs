@@ -357,6 +357,8 @@ define_symbols!(
         Add => "+", SymboolKind::Plus, 5,
         /// subtraction
         Sub => "-", SymboolKind::Minus, 5,
+        /// constref
+        ConstRef => "@", SymboolKind::ConstRef, 6,
         
         /// smaller equals
         LessEq => "<=", SymboolKind::Ge, 4,
@@ -385,6 +387,7 @@ define_symbols!(
         LogOr => "||", SymboolKind::DoubleOr, 0,
         /// logical and
         LogAnd => "&&", SymboolKind::DoubleAnd, 0,
+
     }
 );
     
@@ -464,6 +467,9 @@ impl Operator {
         Some(match self {
             Operator::Not => UnaryOperatorKind::Not,
             Operator::Sub => UnaryOperatorKind::Neg,
+            Operator::Mul => UnaryOperatorKind::DeRef,
+            Operator::BitAnd => UnaryOperatorKind::MutRef,
+            Operator::ConstRef => UnaryOperatorKind::ConstRef,
             Operator::Incr => UnaryOperatorKind::Increment{before_var: true},
             Operator::Decr => UnaryOperatorKind::Decrement{before_var: true},
             _ => return None
@@ -493,9 +499,11 @@ impl Operator {
             Operator::BitXor => BinaryOperatorKind::BitXor,
             Operator::LogAnd => BinaryOperatorKind::LogAnd,
 
+
             Operator::Not |
             Operator::Incr |
-            Operator::Decr => return None,
+            Operator::Decr |
+            Operator::ConstRef => return None,
         })
     }
 }

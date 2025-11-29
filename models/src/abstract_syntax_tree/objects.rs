@@ -73,7 +73,7 @@ pub struct Field {
 }
 
 /// Field access visibility and mutability settings.
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FieldAccess {
     /// Getter visibility. `None` means use default (e.g., public).
     pub get: Option<Visibility>, 
@@ -88,4 +88,39 @@ pub enum Visibility {
     Public,
     /// Private visibility (only accessible within the same module/type).
     Private,
+}
+
+impl FieldAccess {
+    pub const PUBLIC_GET: &str = "Get";
+    pub const PRIVATE_GET: &str = "get";
+    pub const PUBLIC_SET: &str = "Set";
+    pub const PRIVATE_SET: &str = "set";
+
+    pub fn inner_display(&self, sb: &mut String) {
+        
+        if let Some(get) = &self.get {
+
+            let str = match get {
+                Visibility::Public => Self::PUBLIC_GET,
+                Visibility::Private => Self::PRIVATE_GET,
+            };
+
+            sb.push_str(str);
+            sb.push(';');
+        }
+
+        if let Some(set) = &self.set {
+            if self.get.is_some() {
+                sb.push(' ');
+            }
+
+            let str = match set {
+                Visibility::Public => Self::PUBLIC_SET,
+                Visibility::Private => Self::PRIVATE_SET,
+            };
+
+            sb.push_str(str);
+            sb.push(';');
+        }
+    }
 }

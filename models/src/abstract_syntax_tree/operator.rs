@@ -31,6 +31,9 @@ pub enum UnaryOperatorKind {
     Invalid,
     Neg, // -
     Not, // !
+    DeRef, // *
+    MutRef, // &
+    ConstRef, // @
     Increment{before_var: bool}, // ++
     Decrement{before_var: bool}, // --
 }
@@ -74,7 +77,7 @@ impl Binary {
 
 impl UnaryOperatorKind {
 
-    pub fn as_str(&self) -> &str {
+    pub const fn as_str(&self) -> &str {
 
         match self {
             UnaryOperatorKind::Invalid => "<invalid>",
@@ -82,13 +85,16 @@ impl UnaryOperatorKind {
             UnaryOperatorKind::Not => "-",
             UnaryOperatorKind::Increment{..} => "++",
             UnaryOperatorKind::Decrement{..} => "--",
+            UnaryOperatorKind::DeRef => "*",
+            UnaryOperatorKind::MutRef => "&",
+            UnaryOperatorKind::ConstRef => "@",
         }
     }
 }
 
 impl BinaryOperatorKind {
 
-    pub fn as_str(&self) -> &str {
+    pub const fn as_str(&self) -> &str {
 
         match self {
             BinaryOperatorKind::Invalid => "<invalid>",

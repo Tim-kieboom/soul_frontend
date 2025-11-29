@@ -4,6 +4,7 @@ pub mod parser;
 
 mod expect;
 mod parse_type;
+mod parse_objects;
 mod parse_function;
 mod parse_statement;
 mod parse_expression;

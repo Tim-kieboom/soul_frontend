@@ -302,17 +302,6 @@ impl<'a> Lexer<'a> {
     }
 
     fn lex_float(&mut self, num_str: &mut String) -> bool {
-        let mut clone_iter = self.input.clone();
-        let next_char = clone_iter.next();
-
-        let next_char = match next_char {
-            Some(val) => val,
-            None => return false,
-        };
-
-        if next_char.is_ascii_digit() {
-            return false
-        }
 
         num_str.push('.');
         self.next_char();

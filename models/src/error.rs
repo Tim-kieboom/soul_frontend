@@ -62,9 +62,9 @@ pub struct Span {
 /// An error that occurred during parsing or compilation.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct SoulError {
-    kind: SoulErrorKind,
-    message: String,
-    span: Option<Span>,
+    pub kind: SoulErrorKind,
+    pub message: String,
+    pub span: Option<Span>,
 }
 
 impl SoulError {
@@ -79,11 +79,6 @@ impl SoulError {
             span,
         }
     }
-
-    /// Consumes the error and returns its message.
-    pub fn to_message(self) -> String {
-        self.message
-    } 
 }
 
 impl Span {

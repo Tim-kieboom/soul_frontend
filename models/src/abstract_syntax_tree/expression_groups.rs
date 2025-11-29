@@ -72,7 +72,12 @@ impl SyntaxDisplay for ExpressionGroup {
     fn inner_display(&self, sb: &mut String, _tab: usize, _is_last: bool) {
         match self {
             ExpressionGroup::Tuple(tuple) => sb.push_str(&format!("({})", tuple.values.iter().map(|el| el.node.display()).join(", "))),
-            ExpressionGroup::Array(array) => sb.push_str(&format!("[{}]", array.values.iter().map(|el| el.node.display()).join(", "))),
+            ExpressionGroup::Array(array) => sb.push_str(&format!(
+                "{}[{}{}]", 
+                array.collection_type.as_ref().map(|el| el.display()).unwrap_or(String::new()),
+                array.element_type.as_ref().map(|el| format!("{}: ", el.display())).unwrap_or(String::new()),
+                array.values.iter().map(|el| el.node.display()).join(", ")
+            )),
             ExpressionGroup::NamedTuple(named_tuple) => sb.push_str(
                 &format!("{{{}{}}}", named_tuple.values.iter().map(|(name, el)| format!("{}: {}", name, el.node.display())).join(", "), 
                 if named_tuple.insert_defaults {", .."} else {""}

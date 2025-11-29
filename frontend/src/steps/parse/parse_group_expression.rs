@@ -6,6 +6,11 @@ impl<'a> Parser<'a> {
     pub fn parse_tuple(&mut self) -> SoulResult<Tuple> {
         self.expect(&ROUND_OPEN)?;
         
+        if self.current_is(&ROUND_CLOSE) {
+            self.bump();
+            return Ok(Tuple{values: vec![]})
+        }
+
         let mut values = vec![];
         loop {
 

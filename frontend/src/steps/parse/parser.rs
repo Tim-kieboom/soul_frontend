@@ -92,18 +92,15 @@ impl<'a> Parser<'a> {
         self.scopes.push_scope()
     }
 
+    pub(crate) fn pop_scope(&mut self) {
+        self.scopes.pop_scope()
+    }
+
     pub(crate) fn add_scope_value(&mut self, name: Ident, symbol: ValueSymbol) {
         self.scopes.insert_value(name, symbol);
     }
 
     pub(crate) fn add_error(&mut self, err: SoulError) {
-        
-        #[cfg(debug_assertions)] {
-            println!("{}", err.to_message());
-            panic!();
-        }
-        
-        #[cfg(not(debug_assertions))]
         self.errors.push(err);
     }
 

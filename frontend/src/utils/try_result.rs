@@ -39,6 +39,35 @@ pub(crate) trait ResultTryResult<T, R> {
     fn try_err(self) -> TryResult<T, R>;
 }
 
+pub(crate) trait TryToResult<T> {
+    fn to_result(self) -> Result<T, SoulError>;
+}
+
+pub(crate) trait MapNotValue<T, E> {
+    fn map_not_value<R, F: FnOnce(E) -> R>(self, func: F) -> TryResult<T, R>;
+}
+
+impl<T, E> MapNotValue<T, E> for TryResult<T, E> {
+    fn map_not_value<R, F: FnOnce(E) -> R>(self, func: F) -> TryResult<T, R> {
+        
+        match self {
+            Ok(val) => TryOk(val),
+            Err(TryError::IsErr(err)) => TryErr(err),
+            Err(TryError::IsNotValue(err)) => TryNotValue(func(err)),
+        }
+    }
+}
+
+impl<T> TryToResult<T> for TryResult<T, SoulError> {
+    fn to_result(self) -> Result<T, SoulError> {
+        match self {
+            Ok(val) => Ok(val),
+            Err(TryError::IsErr(err)) |
+            Err(TryError::IsNotValue(err)) => Err(err)
+        }
+    }
+}
+
 impl<T, R> OptionTryResult<T, R> for Option<T> {
     fn try_not_value(self, rest: R) -> TryResult<T, R> {
         match self {

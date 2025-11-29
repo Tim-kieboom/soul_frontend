@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-use crate::{abstract_syntax_tree::{block::Block, enum_like::{Enum, Union}, expression::{Expression, ExpressionKind}, function::Function, objects::{Class, Struct, Trait}, soul_type::SoulType, spanned::Spanned, syntax_display::{SyntaxDisplay, tree_prefix}}, error::Span};
+use crate::{abstract_syntax_tree::{block::Block, enum_like::{Enum, Union}, expression::{Expression, ExpressionKind}, function::Function, objects::{Class, Field, Struct, Trait}, soul_type::SoulType, spanned::Spanned, syntax_display::{SyntaxDisplay, tree_prefix}}, error::Span};
 
 /// A statement in the Soul language, wrapped with source location information.
 pub type Statement = Spanned<StatementKind>;
@@ -155,12 +155,46 @@ impl SyntaxDisplay for StatementKind {
                 }
                 use_block.block.inner_display(sb, tab, is_last);
             },
+            StatementKind::Struct(_struct) => {
+                const USE_LAST: bool = true;
+                sb.push_str(&prefix);
+                sb.push_str("Struct >> ");
+                sb.push_str(&_struct.name);
+                inner_display_fields(sb, &_struct.fields, tab+1, USE_LAST);
+            },
             StatementKind::Class(_) => todo!(),
-            StatementKind::Struct(_) => todo!(),
             StatementKind::Trait(_) => todo!(),
             StatementKind::Enum(_) => todo!(),
             StatementKind::Union(_) => todo!(),
             StatementKind::CloseBlock => sb.push_str(&prefix),
         }
+    }
+}
+
+fn inner_display_fields(sb: &mut String, fields: &Vec<Spanned<Field>>, tab: usize, use_last: bool) {
+    
+    let get_is_last = |i: usize| fields.len() -1 == i;
+
+    for (i, Spanned{node: field, ..}) in fields.iter().enumerate() {
+        let is_last = use_last && get_is_last(i);
+        let prefix = tree_prefix(tab, is_last);
+
+        sb.push_str(&prefix);
+        sb.push_str("Field >> ");
+        sb.push_str(&field.name);
+        sb.push_str(": ");
+        field.ty.inner_display(sb, tab, is_last);
+        if let Some(default) = &field.default_value {
+            sb.push_str(" = ");
+            default.node.inner_display(sb, tab, is_last);
+        }
+        
+        if field.vis.get.is_none() && field.vis.set.is_none() {
+            return
+        }
+
+        sb.push_str("{ ");
+        field.vis.inner_display(sb);
+        sb.push_str(" }");
     }
 }

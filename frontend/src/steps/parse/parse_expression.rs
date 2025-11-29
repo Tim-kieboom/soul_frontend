@@ -1,5 +1,5 @@
 use std::sync::LazyLock;
-use crate::{steps::{parse::{parse_statement::{CURLY_OPEN, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS}, parser::Parser}, tokenize::token_stream::{Number, TokenKind}}, utils::try_result::TryError};
+use crate::{steps::{parse::{parse_statement::{CURLY_OPEN, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS}, parser::Parser}, tokenize::token_stream::{Number, TokenKind}}, utils::try_result::TryError};
 use models::{abstract_syntax_tree::{conditionals::{ElseKind, For, ForPattern, If}, expression::{Expression, ExpressionKind, Index, ReturnKind, ReturnLike}, expression_groups::ExpressionGroup, literal::Literal, operator::{Binary, BinaryOperator, Unary, UnaryOperator, UnaryOperatorKind}, spanned::Spanned}, error::{SoulError, SoulErrorKind, SoulResult, Span}, soul_names::{self, AccessType, KeyWord, Operator, TypeModifier}, symbool_kind::SymboolKind};
 
 const INCREMENT: TokenKind = TokenKind::Symbool(SymboolKind::DoublePlus);
@@ -183,8 +183,7 @@ impl<'a> Parser<'a> {
     
     fn parse_primary(&mut self) -> SoulResult<Expression> {
         let start_span = self.token().span;
-        // let possible_ty = self.try_parse_type()
-
+        
         let expression = match &self.token().kind {
             &CURLY_OPEN => {
                 
@@ -210,6 +209,20 @@ impl<'a> Parser<'a> {
                             self.new_span(start_span),
                         )
                     )?
+            },
+            &ROUND_OPEN => {
+                let tuple = self.parse_tuple()?;
+                let kind = if tuple.values.is_empty() {
+                    ExpressionKind::Default
+                } 
+                else {
+                    ExpressionKind::ExpressionGroup(ExpressionGroup::Tuple(tuple))
+                };
+
+                Expression::new(
+                    kind, 
+                    self.new_span(start_span)
+                )
             },
             TokenKind::Symbool(symbool) => {
 

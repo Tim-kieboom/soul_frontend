@@ -22,6 +22,10 @@ impl SyntaxDisplay for Block {
     }
 
     fn inner_display(&self, sb: &mut String, tab: usize, _is_last: bool) {
+        if self.statments.is_empty() {
+            return
+        }
+
         let last_index = self.statments.len() - 1;
 
         for (i, statment) in self.statments.iter().enumerate() {

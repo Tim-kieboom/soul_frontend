@@ -2,9 +2,14 @@
 ├── Function >> sum(a: int, b: int): int
 │   └── Expression >> return 0
 └── Function >> main(): int
-│   ├── Variable >> array
-│   ├── Assignment >> array = [1, 2, 3, 4]
-│   ├── Assignment >> array = {name: 1 + 2, field: true, ..}
-│   ├── Variable >> num
-│   ├── Assignment >> num = 1
+│   ├── Variable >> var
+│   ├── Assignment >> var = <default>
+│   ├── Assignment >> var = (true, "string", 1, 2)
+│   ├── Assignment >> var = [1, 2, 3, 4]
+│   ├── Assignment >> var = [int: 1, 2, 3, 4]
+│   ├── Assignment >> var = {name: 1 + 2, field: true, ..}
+│   ├── Assignment >> var = 1
+│   ├── Assignment >> var = &1
+│   ├── Assignment >> var = @1
+│   ├── Assignment >> var = *1 + 2
 │   └── Expression >> Println("hello world")
