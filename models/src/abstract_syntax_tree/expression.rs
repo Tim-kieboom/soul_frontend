@@ -205,7 +205,10 @@ impl SyntaxDisplay for ExpressionKind {
                 _if.condition.node.inner_display(sb, tab, is_last);
                 _if.block.inner_display(sb, tab, is_last);
                 for else_kind in &_if.else_branchs {
-                    
+                    sb.push('\n');
+                    let prefix = tree_prefix(tab, is_last);
+                    sb.push_str(&prefix);
+
                     match &else_kind.node {
                         ElseKind::ElseIf(spanned) => {
                             sb.push_str(KeyWord::Else.as_str());

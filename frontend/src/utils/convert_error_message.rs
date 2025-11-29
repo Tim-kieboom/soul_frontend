@@ -18,14 +18,16 @@ pub trait ToMessage {
 
 impl ToMessage for SoulError {
     fn to_message(self, level: Level, file_path: &str, source_file: &str) -> String {
-        const BEGIN_SPACE: &str = "    ";
+        let start_line = self.span.map(|el| el.start_line).unwrap_or(0);
+        let number_len = start_line.to_string().len();
+        let begin_space = " ".repeat(number_len+2);
+
         let mut sb = String::new();
 
-        sb.push_str(BEGIN_SPACE);
         sb.push_str(level.as_str());
         sb.push_str(": ");
         sb.push_str(&self.message);
-        sb.push_str(&format!("\n{BEGIN_SPACE}├── at "));
+        sb.push_str(&format!("\n{begin_space}├── at "));
         sb.push_str(file_path);
         if let Some(span) = self.span {
             sb.push_str(":");
@@ -36,7 +38,7 @@ impl ToMessage for SoulError {
         sb.push_str(" ──");
         if let Some(span) = self.span {
             sb.push('\n');
-            get_source_snippet(&mut sb, &span, source_file.lines(), BEGIN_SPACE);
+            get_source_snippet(&mut sb, &span, source_file.lines(), &begin_space);
         }
 
         sb
@@ -51,13 +53,12 @@ fn get_source_snippet(out: &mut String, span: &Span, mut lines: Lines, begin_spa
     for _ in 0..(span.start_line.saturating_sub(2)) {
         lines.next();
     }
-    let prev_line = lines.next();
 
+    let prev_line = lines.next();
     let current_line = match lines.next() {
         Some(val) => val,
         _ => return,
     };
-
     let next_line = lines.next();
 
     let max_len = [
@@ -103,8 +104,7 @@ fn get_source_snippet(out: &mut String, span: &Span, mut lines: Lines, begin_spa
         },
         _ => (),
     };
+
     out.push_str(&format!("{begin_space}└──"));
-
     out.push_str(&"─".repeat(max_len))
-
 }

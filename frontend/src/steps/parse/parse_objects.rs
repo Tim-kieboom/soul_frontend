@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use models::{abstract_syntax_tree::{objects::{Field, FieldAccess, Struct, Visibility}, spanned::Spanned}, error::{SoulError, SoulErrorKind, SoulResult}, soul_names::KeyWord};
 use crate::{steps::{parse::{parse_statement::{ASSIGN, COLON, CURLY_CLOSE, CURLY_OPEN, SEMI_COLON, STAMENT_END_TOKENS}, parser::Parser}, tokenize::token_stream::TokenKind}, utils::try_result::{MapNotValue, ResultTryResult, TryError, TryNotValue, TryOk, TryResult}};
 
@@ -57,6 +56,7 @@ impl<'a> Parser<'a> {
     fn inner_parse_field(&mut self) -> TryResult<Spanned<Field>, ()> {
         let start_span = self.token().span;
 
+        self.skip_end_lines();
         let ident_token = self.bump_consume(); 
         let name = match ident_token.kind {
             TokenKind::Ident(val) => val,
@@ -70,6 +70,8 @@ impl<'a> Parser<'a> {
         self.bump();
         let ty = self.try_parse_type()
             .map_not_value(|_| ())?;
+
+        let vis = self.parse_field_access();
 
         if self.current_is_any(STAMENT_END_TOKENS) {
 
@@ -90,18 +92,6 @@ impl<'a> Parser<'a> {
         if self.current_is(&SEMI_COLON) {
             self.bump();
         }
-        self.skip_end_lines();
-        
-        if !self.current_is(&CURLY_OPEN) {
-            
-            return TryOk(Spanned::new(
-                Field{name, ty, default_value, vis: FieldAccess::default()},
-                self.new_span(start_span)
-            ))
-        }
-
-        let vis = self.parse_field_access()
-            .try_err()?;
 
         return TryOk(Spanned::new(
             Field{name, ty, default_value, vis},
@@ -109,49 +99,22 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn parse_field_access(&mut self) -> SoulResult<FieldAccess> {
-        const ALL_ACCESS_IDENTS: &[&str] = &[FieldAccess::PUBLIC_GET, FieldAccess::PRIVATE_GET, FieldAccess::PUBLIC_SET, FieldAccess::PRIVATE_SET];
-        let start_span = self.token().span;
+    fn parse_field_access(&mut self) -> FieldAccess {
 
-        self.expect(&CURLY_OPEN)?;
         let mut access = FieldAccess::default();
-        
         loop {
 
-            self.skip_end_lines();
-            let ident = match &self.token().kind{
-                TokenKind::Ident(val) => val,
-                &CURLY_CLOSE => break,
-                other => return Err(
-                    SoulError::new(
-                        format!("expeced ident got '{}'", other.display()),
-                        SoulErrorKind::InvalidTokenKind,
-                        Some(self.new_span(start_span)),
-                    )
-                ),
-            };
-
-
-            match ident.as_str() {
-                FieldAccess::PUBLIC_GET => access.get = Some(Visibility::Public),
-                FieldAccess::PRIVATE_GET => access.get = Some(Visibility::Private),
-                FieldAccess::PUBLIC_SET => access.set = Some(Visibility::Public),
-                FieldAccess::PRIVATE_SET => access.set = Some(Visibility::Private),
-                other => return Err(
-                    SoulError::new(
-                        format!("expected on of ['{}'] got '{}'", ALL_ACCESS_IDENTS.iter().join("', '"), other),
-                        SoulErrorKind::InvalidIdent,
-                        Some(self.new_span(start_span)),
-                    )
-                ),
+            match self.token().kind.try_as_ident() {
+                Some(FieldAccess::PUBLIC_GET) => access.get = Some(Visibility::Public),
+                Some(FieldAccess::PRIVATE_GET) => access.get = Some(Visibility::Private),
+                Some(FieldAccess::PUBLIC_SET) => access.set = Some(Visibility::Public),
+                Some(FieldAccess::PRIVATE_SET) => access.set = Some(Visibility::Private),
+                _ => break,
             }
 
-            self.expect_any(&[SEMI_COLON, TokenKind::EndLine])?;
+            self.bump();
         }
 
-        self.expect(&CURLY_CLOSE)?;
-        Ok(
-            access
-        )
+        access
     }
 }

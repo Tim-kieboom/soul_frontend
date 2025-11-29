@@ -13,7 +13,7 @@ pub enum SoulErrorKind {
     UnexpecedStatmentStart,
     
     InvalidAssignType,
-    
+    InvalidContext,
     InvalidChar, 
     InvalidName,
     InvalidIdent, 

@@ -1,5 +1,5 @@
+use std::io::{self};
 use itertools::Itertools;
-use std::io::{self, Read};
 use models::{abstract_syntax_tree::AbstractSyntaxTree, error::{SoulError}};
 use crate::steps::{parse::{self, parser::parse}, tokenize::{self, tokenizer::tokenize}};
 

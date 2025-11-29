@@ -242,7 +242,7 @@ impl<'a> Lexer<'a> {
             }
         }
 
-        if self.current_char == Some('.') {
+        if self.current_char == Some('.') && self.peek_char() != Some('.') {
             is_float = self.lex_float(&mut num_str)
         }
 

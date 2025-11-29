@@ -1,4 +1,5 @@
 use crate::steps::{parse::{Request, Response, parse_statement::SEMI_COLON}, tokenize::token_stream::{Token, TokenKind, TokenStream, TokenStreamPosition}};
+use itertools::Itertools;
 use models::{abstract_syntax_tree::{AbstractSyntaxTree, block::Block, statment::Ident}, error::{SoulError, SoulErrorKind, SoulResult, Span}, scope::{scope::{ScopeId, ValueSymbol}, scope_builder::ScopeBuilder}, soul_names::TypeModifier};
 
 pub fn parse<'a>(request: Request) -> Response {
@@ -223,7 +224,7 @@ impl<'a> Parser<'a> {
     }
 
     pub(crate) fn get_error_expected(&self, expected: &TokenKind) -> SoulError {
-        let message = format!("expected: '{:?}' but found: '{:?}'", expected, self.token().kind);
+        let message = format!("expected: '{}' but found: '{}'", expected.display(), self.token().kind.display());
         SoulError::new(
             message, 
             SoulErrorKind::InvalidTokenKind,
@@ -232,7 +233,7 @@ impl<'a> Parser<'a> {
     }
 
     pub(crate) fn get_error_expected_any(&self, expected: &[TokenKind]) -> SoulError {
-        let message = format!("expected on of: [{:?}] but found: '{:?}'", expected, self.token().kind);
+        let message = format!("expected on of: ['{}'] but found: '{}'", expected.iter().map(|token| token.display()).join("', '"), self.token().kind.display());
         SoulError::new(
             message, 
             SoulErrorKind::InvalidTokenKind,

@@ -106,7 +106,6 @@ impl FieldAccess {
             };
 
             sb.push_str(str);
-            sb.push(';');
         }
 
         if let Some(set) = &self.set {
@@ -120,7 +119,6 @@ impl FieldAccess {
             };
 
             sb.push_str(str);
-            sb.push(';');
         }
     }
 }

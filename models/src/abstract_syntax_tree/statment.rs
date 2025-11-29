@@ -179,11 +179,14 @@ fn inner_display_fields(sb: &mut String, fields: &Vec<Spanned<Field>>, tab: usiz
         let is_last = use_last && get_is_last(i);
         let prefix = tree_prefix(tab, is_last);
 
+        sb.push('\n');
         sb.push_str(&prefix);
         sb.push_str("Field >> ");
         sb.push_str(&field.name);
         sb.push_str(": ");
         field.ty.inner_display(sb, tab, is_last);
+        sb.push(' ');
+        field.vis.inner_display(sb);
         if let Some(default) = &field.default_value {
             sb.push_str(" = ");
             default.node.inner_display(sb, tab, is_last);
@@ -193,8 +196,5 @@ fn inner_display_fields(sb: &mut String, fields: &Vec<Spanned<Field>>, tab: usiz
             return
         }
 
-        sb.push_str("{ ");
-        field.vis.inner_display(sb);
-        sb.push_str(" }");
     }
 }

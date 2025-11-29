@@ -32,12 +32,12 @@ impl<'a> Parser<'a> {
                 Err(TryError::IsErr(err)) |
                 Err(TryError::IsNotValue(err)) => return Err(err),
             };
+            types.push(ty);
 
             if self.current_is(&ROUND_CLOSE) {
                 break
             }
 
-            types.push(ty);
             self.expect(&COMMA)?;
         
         }

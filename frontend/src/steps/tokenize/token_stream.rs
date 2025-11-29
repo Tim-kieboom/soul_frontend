@@ -116,9 +116,17 @@ impl TokenKind {
             TokenKind::EndFile => format!("<end of file>"),
             TokenKind::EndLine => format!("<end of line>"),
             TokenKind::CharLiteral(char) => format!("'{char}'"),
-            TokenKind::Number(number) => format!("{:?}", number),
+            TokenKind::Number(number) => number.display(),
             TokenKind::StringLiteral(str) => format!("\"{str}\""),
             TokenKind::Symbool(symbool_kind) => symbool_kind.as_str().to_string(),
+        }
+    }
+
+    pub fn try_as_ident(&self) -> Option<&str> {
+
+        match self {
+            TokenKind::Ident(val) => Some(val),
+            _ => None,
         }
     }
 }
@@ -133,5 +141,16 @@ impl Token {
 
     pub const fn is_end_of_file(&self) -> bool {
         matches!(self.kind, TokenKind::EndFile)
+    }
+}
+
+impl Number {
+    pub fn display(&self) -> String {
+        
+        match self {
+            Number::Int(num) => format!("{num}i"),
+            Number::Uint(num) => format!("{num}u"),
+            Number::Float(num) => format!("{num}f"),
+        }
     }
 }

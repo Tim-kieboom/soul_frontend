@@ -1,18 +1,19 @@
 // import [
-//     extern lib
-//     subfile
-//     PubSubfile
-// ]
-
-// use [
 //     this::subfile::Println
 //     this::subfile::[this, Function]
 // ]
 
+struct Struct {
+    field: int
+    foo: bool
+}
+
 struct Object {
-    field: int = 0 {set;}
-    // name: str = "empty"
-} 
+    field: int set = 0 
+    name: str get set = "empty"
+    name2: Struct Get set = {field: 1, foo: true}
+    name3: (int, str) = (0, "empty")
+}
 
 sum(a: int, b: int): int {
     return 0
@@ -30,6 +31,20 @@ main(): int {
     var = &1
     var = @1
     var = *1 + 2
+
+    if 1 == 1 {
+        Println("condition")
+    }
+    else if 2 == 3 {
+        Println("HOW!!")
+    }
+    else {
+        Println("HOW!!")
+    }
+
+    for i in 0..1 {
+        Println("stuff")
+    }
     
     Println("hello world")
 }

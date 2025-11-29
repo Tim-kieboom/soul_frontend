@@ -1,6 +1,6 @@
 extern crate frontend;
 use frontend::{ParseResonse, parse_file, utils::convert_error_message::Level};
-use models::{abstract_syntax_tree::{AbstractSyntaxTree, syntax_display::SyntaxDisplay}, symbool_kind};
+use models::{abstract_syntax_tree::{AbstractSyntaxTree, syntax_display::SyntaxDisplay}};
 use crate::frontend::utils::convert_error_message::ToMessage;
 use std::{fs::File, io::{self, BufReader, Read, Write}, process::exit};
 
@@ -21,7 +21,7 @@ fn main() -> io::Result<()> {
     print_syntax_tree(&syntax_tree, SYNTAX_TREE);
 
     for error in errors {
-        eprintln!("{}", error.to_message(Level::Error, RELATIVE_PATH, &source_file));
+        eprintln!("{}\n", error.to_message(Level::Error, RELATIVE_PATH, &source_file));
     }
 
     Ok(())

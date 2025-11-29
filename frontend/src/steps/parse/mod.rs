@@ -8,6 +8,7 @@ mod parse_objects;
 mod parse_function;
 mod parse_statement;
 mod parse_expression;
+mod parse_conditionals;
 mod parse_group_expression;
 
 pub type Request<'a> = crate::steps::tokenize::Response<'a>;
