@@ -1,13 +1,16 @@
 
-├── Struct >> Struct
-│   ├── Field >> field: int 
 ├── Struct >> Object
+│   ├── Field >> bar: int 
+│   ├── Field >> foo: int  = 0
 │   ├── Field >> field: int set = 0
 │   ├── Field >> name: str get set = "empty"
-│   ├── Field >> name2: Struct Get set = {field: 1, foo: true}
-│   └── Field >> name3: (int, str)  = (0, "empty")
+│   ├── Field >> name2: str Get Set = "empty"
+│   ├── Field >> tpl: (int, str)  = (0, "empty")
+│   └── Field >> nmdtpl: {field: int, foo: bool} Get set = {field: 1, foo: true}
+│   │   
 ├── Function >> sum(a: int, b: int): int
 │   └── Expression >> return 0
+│   │   
 └── Function >> main(): int
 │   ├── Variable >> var
 │   ├── Assignment >> var = <default>
@@ -17,14 +20,23 @@
 │   ├── Assignment >> var = {name: 1 + 2, field: true, ..}
 │   ├── Assignment >> var = 1
 │   ├── Assignment >> var = &1
-│   ├── Assignment >> var = @1
-│   ├── Assignment >> var = *1 + 2
+│   ├── Variable >> ref
+│   ├── Assignment >> var = *var + 2
 │   ├── Expression >> if 1 == 1
 │   │   └── Expression >> Println("condition")
+│   │   │   
 │   ├── else if 2 == 3
 │   │   └── Expression >> Println("HOW!!")
+│   │   │   
 │   ├── else 
 │   │   └── Expression >> Println("HOW!!")
+│   │   │   
 │   ├── Expression >> for i in 0 .. 1
-│   │   │   └── Expression >> Println("stuff")
+│   │   └── Expression >> Println("stuff")
+│   │   │   
+│   ├── Expression >> while true 
+│   │   └── Expression >> Println("while loop")
+│   │   │   
 │   └── Expression >> Println("hello world")
+│   │   
+│   

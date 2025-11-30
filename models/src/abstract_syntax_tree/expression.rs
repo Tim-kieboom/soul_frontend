@@ -237,7 +237,7 @@ impl SyntaxDisplay for ExpressionKind {
                     sb.push(' ');
                 }
                 _for.collection.node.inner_display(sb, tab, is_last);
-                _for.block.inner_display(sb, tab+1, is_last);
+                _for.block.inner_display(sb, tab, is_last);
             },
             ExpressionKind::While(_while) => {
                 sb.push_str(KeyWord::While.as_str());

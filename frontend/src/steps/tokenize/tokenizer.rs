@@ -6,12 +6,19 @@ use crate::steps::tokenize::from_lexer::FromLexer;
 use crate::steps::tokenize::{Request, Response};
 use crate::steps::tokenize::token_stream::{Number, Token, TokenKind, TokenStream};
 
+/// Converts source code into a token stream.
+/// 
+/// This is the main entry point for tokenization.
 pub fn tokenize<'a>(request: Request<'a>) -> Response<'a> {
     Response{
         token_stream: TokenStream::new(Lexer::new(request.source))
     }
 }
 
+/// Lexer that processes character streams into tokens with position tracking.
+/// 
+/// Handles whitespace skipping, comments, literals, identifiers, numbers,
+/// and symbols. Maintains line/offset position for accurate span reporting. 
 #[derive(Debug, Clone)]
 pub struct Lexer<'a> {
     input: Peekable<Chars<'a>>,
@@ -33,10 +40,15 @@ impl<'a> Lexer<'a> {
         lexer
     }
 
+    /// Returns the current character without consuming it.
     pub(crate) fn current_char(&self) -> Option<char> {
         self.current_char
     }
 
+    /// Produces the next token from the input stream.
+    /// 
+    /// Skips whitespace/comments first, then matches symbol, literal, ident,
+    /// number, or unknown character patterns.
     pub(crate) fn next_token(&mut self) -> SoulResult<Token> {
         if self.current_char.is_none() {
             return Ok(Token::new(
@@ -84,6 +96,7 @@ impl<'a> Lexer<'a> {
         Ok(Token::new(kind, self.new_span(start_line, start_offset)))
     }
 
+    /// Advances to the next character, updating line/offset tracking.
     pub(crate) fn next_char(&mut self) {
         self.current_char = self.input.next();
         if let Some(char) = self.current_char {
@@ -97,6 +110,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Peeks at the next character without consuming it.
     pub(crate) fn peek_char(&mut self) -> Option<char> {
         self.input.peek().copied()
     }

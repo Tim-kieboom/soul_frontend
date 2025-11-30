@@ -1,4 +1,4 @@
-use crate::{abstract_syntax_tree::{statment::Statement, syntax_display::SyntaxDisplay}, scope::scope::ScopeId, soul_names::TypeModifier};
+use crate::{abstract_syntax_tree::{statment::Statement, syntax_display::{SyntaxDisplay, gap_prefix}}, scope::scope::ScopeId, soul_names::TypeModifier};
 
 /// A block of statements with an associated scope.
 ///
@@ -31,6 +31,11 @@ impl SyntaxDisplay for Block {
         for (i, statment) in self.statments.iter().enumerate() {
             sb.push('\n');
             statment.node.inner_display(sb, tab+1, i == last_index);
+
+            if i == last_index {
+                sb.push('\n');
+                sb.push_str(&gap_prefix(tab+1));
+            }
         }
     }
 }

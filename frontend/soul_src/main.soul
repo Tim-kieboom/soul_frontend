@@ -3,23 +3,28 @@
 //     this::subfile::[this, Function]
 // ]
 
-struct Struct {
-    field: int
-    foo: bool
-}
+// val := if 1==1 {
+//     2
+// }
+// else {
+//     3
+// }
 
 struct Object {
+    bar: int
+    foo: int = 0
     field: int set = 0 
     name: str get set = "empty"
-    name2: Struct Get set = {field: 1, foo: true}
-    name3: (int, str) = (0, "empty")
+    name2: str Get Set = "empty"
+    tpl: (int, str) = (0, "empty")
+    nmdtpl: {field: int, foo: bool} Get set = {field: 1, foo: true}
 }
 
 sum(a: int, b: int): int {
     return 0
 }
 
-main(): int { 
+main(): int {
     var := {}
     var = ()
     var = (true, "string", 1, 2.0)
@@ -29,8 +34,8 @@ main(): int {
     var = {name: 1 + 2, field: true, ..}
     var = 1
     var = &1
-    var = @1
-    var = *1 + 2
+    ref := @1
+    var = *var + 2
 
     if 1 == 1 {
         Println("condition")
@@ -46,5 +51,9 @@ main(): int {
         Println("stuff")
     }
     
+    while true {
+        Println("while loop")
+    }
+
     Println("hello world")
 }

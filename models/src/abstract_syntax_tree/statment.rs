@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-use crate::{abstract_syntax_tree::{block::Block, enum_like::{Enum, Union}, expression::{Expression, ExpressionKind}, function::Function, objects::{Class, Field, Struct, Trait}, soul_type::SoulType, spanned::Spanned, syntax_display::{SyntaxDisplay, tree_prefix}}, error::Span};
+use crate::{abstract_syntax_tree::{block::Block, enum_like::{Enum, Union}, expression::{Expression, ExpressionKind}, function::Function, objects::{Class, Field, Struct, Trait}, soul_type::SoulType, spanned::Spanned, syntax_display::{SyntaxDisplay, gap_prefix, tree_prefix}}, error::Span};
 
 /// A statement in the Soul language, wrapped with source location information.
 pub type Statement = Spanned<StatementKind>;
@@ -173,10 +173,10 @@ impl SyntaxDisplay for StatementKind {
 
 fn inner_display_fields(sb: &mut String, fields: &Vec<Spanned<Field>>, tab: usize, use_last: bool) {
     
-    let get_is_last = |i: usize| fields.len() -1 == i;
+    let last_index = fields.len() -1;
 
     for (i, Spanned{node: field, ..}) in fields.iter().enumerate() {
-        let is_last = use_last && get_is_last(i);
+        let is_last = use_last && last_index == i;
         let prefix = tree_prefix(tab, is_last);
 
         sb.push('\n');
@@ -192,9 +192,9 @@ fn inner_display_fields(sb: &mut String, fields: &Vec<Spanned<Field>>, tab: usiz
             default.node.inner_display(sb, tab, is_last);
         }
         
-        if field.vis.get.is_none() && field.vis.set.is_none() {
-            return
+        if last_index == i {
+            sb.push('\n');
+            sb.push_str(&gap_prefix(tab));
         }
-
     }
 }

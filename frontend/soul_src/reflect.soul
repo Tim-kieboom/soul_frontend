@@ -1,0 +1,27 @@
+struct SpannedNode impl Spanned(Node)
+struct Node {
+    field: int,
+}
+
+struct Span {
+    line: uint
+    offset: uint
+}
+
+// Spanned receives:
+type Spanned(node: Type): Type.Struct {  // node = { values: [{name:"foo", ty:bool}] }
+    
+    structFields := match node {
+        Type.Struct(_struct) => _struct.fields,
+        other => literal Panic(f"Type:'{other.display()}' is not allowed in Spanned"), 
+    }
+
+    span_field := Type.Field{
+        name: "span", 
+        ty: Span.typeof, 
+        ..
+    }
+
+    fields := structFields + [span_field]
+    return Type.Struct{fields, ..}
+}

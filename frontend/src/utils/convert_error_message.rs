@@ -2,6 +2,8 @@ use std::{str::Lines};
 
 use models::{define_str_enum, error::{SoulError, Span}};
 
+use crate::utils::char_colors::*;
+
 define_str_enum!(
 
     pub enum Level {
@@ -24,10 +26,14 @@ impl ToMessage for SoulError {
 
         let mut sb = String::new();
 
+        sb.push_str(level_color(&level));
         sb.push_str(level.as_str());
         sb.push_str(": ");
+        sb.push_str(DEFAULT);
+
         sb.push_str(&self.message);
-        sb.push_str(&format!("\n{begin_space}├── at "));
+        sb.push_str(&format!("\n{begin_space}├── "));
+        sb.push_str(BLUE);
         sb.push_str(file_path);
         if let Some(span) = self.span {
             sb.push_str(":");
@@ -35,6 +41,7 @@ impl ToMessage for SoulError {
             sb.push(':');
             sb.push_str(&format!("{}", span.start_offset));
         }
+        sb.push_str(DEFAULT);
         sb.push_str(" ──");
         if let Some(span) = self.span {
             sb.push('\n');
@@ -43,6 +50,16 @@ impl ToMessage for SoulError {
 
         sb
     } 
+}
+
+fn level_color(level: &Level) -> &'static str {
+
+    match level {
+        Level::Warning => YELLOW,
+        Level::Error => BRIGHT_RED,
+        Level::Debug => CYAN,
+        Level::Note => BLUE,
+    }
 }
 
 fn get_source_snippet(out: &mut String, span: &Span, mut lines: Lines, begin_space: &str) {

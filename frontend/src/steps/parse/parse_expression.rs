@@ -31,10 +31,6 @@ impl<'a> Parser<'a> {
             self.new_span(start_span),
         ))
     }
-    
-    pub(crate) fn parse_match(&self) -> SoulResult<Expression> {
-        todo!()
-    }
 
     fn pratt_parse_precedence(&mut self, min_precedence: usize, end_tokens: &[TokenKind]) -> SoulResult<Expression> {
         let start_span = self.token().span;
@@ -144,23 +140,41 @@ impl<'a> Parser<'a> {
             },
             TokenKind::Ident(ident) => {
                 
-                let expression = match KeyWord::from_str(&ident) {
-                    Some(KeyWord::If) => self.parse_if()?,
-                    Some(KeyWord::For) => self.parse_for()?,
-                    Some(KeyWord::While) => self.parse_while()?,
-                    Some(KeyWord::Match) => self.parse_match()?,
-                    Some(KeyWord::Break) => self.parse_return_like(ReturnKind::Break)?,
-                    Some(KeyWord::Return) => self.parse_return_like(ReturnKind::Return)?,
-                    Some(KeyWord::Continue) => self.parse_return_like(ReturnKind::Continue)?,
-                    _ => {
-                        Expression::new(
-                            ExpressionKind::Variable(ident.clone()),
-                            self.new_span(start_span),
-                        )
-                    },
-                };
+                let expression = if ident == "true" {
+                    self.bump();
+                    Expression::new(
+                        ExpressionKind::Literal(Literal::Bool(true)), 
+                        self.new_span(start_span),
+                    )
+                }
+                else if ident == "false" {
+                    self.bump();
+                    Expression::new(
+                        ExpressionKind::Literal(Literal::Bool(true)), 
+                        self.new_span(start_span),
+                    )
+                }
+                else {
 
-                self.bump();
+                    match KeyWord::from_str(&ident) {
+                        Some(KeyWord::If) => self.parse_if()?,
+                        Some(KeyWord::For) => self.parse_for()?,
+                        Some(KeyWord::While) => self.parse_while()?,
+                        Some(KeyWord::Match) => self.parse_match()?,
+                        Some(KeyWord::Break) => self.parse_return_like(ReturnKind::Break)?,
+                        Some(KeyWord::Return) => self.parse_return_like(ReturnKind::Return)?,
+                        Some(KeyWord::Continue) => self.parse_return_like(ReturnKind::Continue)?,
+                        _ => {
+                            let ident = ident.clone();
+                            self.bump();
+                            Expression::new(
+                                ExpressionKind::Variable(ident),
+                                self.new_span(start_span),
+                            )
+                        },
+                    }
+                };
+                    
                 expression
             },
             TokenKind::CharLiteral(char) => {

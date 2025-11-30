@@ -6,7 +6,7 @@
 //! `literal`.
 //!
 //! Helpers are provided for checking modifiers, type categories, and displaying types.
-use crate::{abstract_syntax_tree::{expression::Expression, statment::Ident, syntax_display::SyntaxDisplay}, soul_names::{InternalComplexTypes, InternalPrimitiveTypes, TypeModifier, TypeWrapper}};
+use crate::{abstract_syntax_tree::{enum_like::{Enum, Union}, expression::Expression, objects::{Class, Struct, Trait}, statment::Ident, syntax_display::SyntaxDisplay}, soul_names::{InternalComplexTypes, InternalPrimitiveTypes, TypeModifier, TypeWrapper}};
 
 
 /// Represents a type in the Soul language.
@@ -26,13 +26,19 @@ pub struct SoulType {
 pub enum TypeKind {
     /// empty type
     None,
+    /// Represents the type of all types
+    Type,
+    /// unknown (used in parsing stage)
     Unknown(Ident),
     /// Primitive types like int, bool, float
     InternalComplex(InternalComplexTypes),
     /// Primitive types like int, bool, float
     Primitive(InternalPrimitiveTypes),
-    /// Named complex types like structs, classes, traits, enums
-    Complex(Ident),
+    Struct(Struct),
+    Class(Class),
+    Trait(Trait),
+    Enum(Enum),
+    Union(Union),
     /// Array type: [T; N] or dynamic
     Array(ArrayType),
     /// Tuple type: (T1, T2, ...)
@@ -146,7 +152,7 @@ impl SoulType {
     /// Returns whether this type is a pointer (`*T`).
     pub fn is_pointer(&self) -> bool { matches!(self.kind, TypeKind::Pointer(_)) }
     /// Returns whether this type is a complex/named type.
-    pub fn is_complex(&self) -> bool { matches!(self.kind, TypeKind::Complex(_)) }
+    pub fn is_complex(&self) -> bool { matches!(self.kind, TypeKind::Struct(_) | TypeKind::Class(_) | TypeKind::Trait(_) | TypeKind::Enum(_) | TypeKind::Union(_)) }
     /// Returns whether this type is a primitive type.
     pub fn is_primitive(&self) -> bool { matches!(self.kind, TypeKind::InternalComplex(_)) }
 }
@@ -173,8 +179,13 @@ impl TypeKind {
     /// Returns a string representation of the type kind
     pub fn display(&self) -> String {
         match self {
+            TypeKind::Type => "Type".to_string(),
             TypeKind::InternalComplex(p) => p.as_str().to_string(),
-            TypeKind::Complex(c) => c.clone(),
+            TypeKind::Struct(c) => c.name.clone(),
+            TypeKind::Class(c) => c.name.clone(),
+            TypeKind::Enum(c) => c.name.clone(),
+            TypeKind::Union(c) => c.name.clone(),
+            TypeKind::Trait(c) => c.signature.name.clone(),
             TypeKind::Array(a) => {
                 let inner = a.of_type.display();
                 match a.size {

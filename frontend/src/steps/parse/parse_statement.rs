@@ -23,46 +23,8 @@ pub const STAMENT_END_TOKENS: &[TokenKind] = &[
 
 impl<'a> Parser<'a> {
 
-    pub(crate) fn parse_block(&mut self, modifier: TypeModifier) -> SoulResult<Block> {
-        const END_TOKENS: &[TokenKind] = &[
-            CURLY_CLOSE, 
-            TokenKind::EndFile,
-        ];
-
-        let mut statments = vec![];
-
-        let scope_id = self.push_scope();
-
-        self.expect(&CURLY_OPEN)?;
-        while !self.current_is_any(END_TOKENS) {
-
-            match self.parse_statement() {
-                Ok(statment) => statments.push(statment),
-                Err(err) => {
-                    self.add_error(err);
-                    self.skip_over_statement();
-                }
-            }
-
-            self.skip(&[SEMI_COLON, TokenKind::EndLine]);
-        }
-        
-        self.expect(&CURLY_CLOSE)?;
-        Ok(Block{modifier, statments, scope_id})
-    }
-
-    pub(crate) fn skip_over_statement(&mut self) {
-
-        while !self.current_is(&TokenKind::EndFile) {
-            self.bump();
-            
-            if self.current_is_any(STAMENT_END_TOKENS) {
-                return
-            }
-        }
-    }
-
     pub(crate) fn parse_statement(&mut self) -> SoulResult<Statement> {
+        let begin_position = self.current_position();
         let start_span = self.token().span;
 
         self.skip(STAMENT_END_TOKENS);
@@ -105,11 +67,59 @@ impl<'a> Parser<'a> {
                         Statement::new(StatementKind::Expression(expression), self.new_span(start_span))
                     ),
                     Err(err) => {
-                        self.skip_over_statement();
+                        self.go_to(begin_position);
                         Err(err)
                     },
                 }
             },
+        }
+    }
+
+    pub(crate) fn parse_block(&mut self, modifier: TypeModifier) -> SoulResult<Block> {
+        const END_TOKENS: &[TokenKind] = &[
+            CURLY_CLOSE, 
+            TokenKind::EndFile,
+        ];
+
+        let mut statments = vec![];
+
+        let scope_id = self.push_scope();
+
+        self.expect(&CURLY_OPEN)?;
+        while !self.current_is_any(END_TOKENS) {
+
+            match self.parse_statement() {
+                Ok(statment) => statments.push(statment),
+                Err(err) => {
+                    self.add_error(err);
+                    self.skip_over_statement();
+                }
+            }
+
+            self.skip(&[SEMI_COLON, TokenKind::EndLine]);
+        }
+        
+        self.expect(&CURLY_CLOSE)?;
+        Ok(Block{modifier, statments, scope_id})
+    }
+
+    pub(crate) fn skip_over_statement(&mut self) {
+
+        let mut curly_bracket_stack = 0usize;
+
+        while !self.current_is(&TokenKind::EndFile) {
+            self.bump();
+            
+            if self.current_is(&CURLY_OPEN) {
+                curly_bracket_stack = curly_bracket_stack.saturating_add(1)
+            }
+            else if self.current_is(&CURLY_CLOSE) {
+                curly_bracket_stack = curly_bracket_stack.saturating_sub(1)
+            }
+
+            if self.current_is_any(STAMENT_END_TOKENS) && curly_bracket_stack == 0 {
+                return
+            }
         }
     }
     

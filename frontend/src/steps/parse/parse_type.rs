@@ -95,7 +95,7 @@ impl<'a> Parser<'a> {
                     SoulError::new(
                         format!("expected ident got '{}'", other.display()),
                         SoulErrorKind::UnexpecedToken,
-                        None,
+                        Some(self.token().span),
                     )
                 ),
             };

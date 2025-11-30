@@ -20,8 +20,15 @@ fn main() -> io::Result<()> {
 
     print_syntax_tree(&syntax_tree, SYNTAX_TREE);
 
+    let error_len = errors.len();
     for error in errors {
         eprintln!("{}\n", error.to_message(Level::Error, RELATIVE_PATH, &source_file));
+    }
+
+    if error_len > 0 {
+        use frontend::utils::char_colors::*;
+
+        eprintln!("{RED}code failed:{DEFAULT} code could not compile because of '{BLUE}{error_len}{DEFAULT}' errors")
     }
 
     Ok(())

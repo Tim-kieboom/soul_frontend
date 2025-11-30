@@ -69,7 +69,8 @@ pub struct Field {
     /// Optional default value for the field.
     pub default_value: Option<Expression>,
     /// Field access visibility settings.
-    pub vis: FieldAccess
+    pub vis: FieldAccess,
+    pub allignment: u32,
 }
 
 /// Field access visibility and mutability settings.

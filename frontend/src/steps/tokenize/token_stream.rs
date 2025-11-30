@@ -1,39 +1,61 @@
 use crate::steps::{tokenize::tokenizer::Lexer};
-use models::{error::{SoulError, SoulResult, Span}, symbool_kind::SymboolKind};
+use models::{error::{SoulError, SoulResult, Span}, soul_names::{InternalPrimitiveTypes}, symbool_kind::SymboolKind};
 
+/// This struct provides methods for token stream navigation, consumption, and
+/// conversion to a complete token vector. It supports save/restore positions
+/// and peeking at upcoming tokens.
 #[derive(Debug, Clone)]
 pub struct TokenStream<'a> {
     lexer: Lexer<'a>,
     current: Token,
 }
 
+/// A single token containing its kind and source span information.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token {
+    /// The kind/variant of this token.
     pub kind: TokenKind,
+    /// The source code span for this token.
     pub span: Span,
 }
 
+/// Position snapshot of a TokenStream for save/restore functionality.
+#[derive(Debug, Clone)]
+pub struct TokenStreamPosition<'a>(TokenStream<'a>);
+
+/// Represents different numeric literal kinds parsed from source code.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Number {
+    /// Signed integer literal, e.g. `-42`.
     Int(i64),
+    /// Unsigned integer literal, e.g. `42u32`.
     Uint(u64),
+    /// Floating point literal, e.g. `3.14`.
     Float(f64),
 }
 
+/// Enumerates all possible token kinds recognized by the lexer.
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenKind {
+    /// Marks the end of the input file.
     EndFile,
+    /// Marks the end of a source line.
     EndLine,
+    /// Identifier name, e.g. variable or function name.
     Ident(String),
+    /// Single unrecognized character.
     Unknown(char),
+    /// Numeric literal of any supported kind.
     Number(Number),
+    /// Character literal, e.g. `'a'`.
     CharLiteral(char),
+    /// Symbol/operator token with associated kind.
     Symbool(SymboolKind),
+    /// String literal, e.g. `"hello"`.
     StringLiteral(String),
 }
 
-#[derive(Debug, Clone)]
-pub struct TokenStreamPosition<'a>(TokenStream<'a>);
+
 
 impl<'a> TokenStream<'a> {
     pub fn new(lexer: Lexer<'a>) -> Self {
@@ -43,32 +65,43 @@ impl<'a> TokenStream<'a> {
         }
     }
 
+    /// initializes tokenstream plz call this before using tokenstream
     pub fn initialize(&mut self) -> SoulResult<()> {
         self.advance()
     }
 
+    /// Captures the current stream position for later restoration
     pub fn current_position(&self) -> TokenStreamPosition<'a> {
         TokenStreamPosition(self.clone())
     }
 
+    /// Restores the stream to a previously saved position.
     pub fn set_position(&mut self, position: TokenStreamPosition<'a>) {
         *self = position.0
     }
 
+    /// Returns a reference to the current token.
     pub fn current(&self) -> &Token {
         &self.current
     }
 
+    /// Peeks at the next token without advancing the stream position.
     pub fn peek(&self) -> SoulResult<Token> {
         let mut lexer = self.lexer.clone();
         lexer.next_token()
     }
 
+    /// Advances the stream to the next token, updating current token.
     pub fn advance(&mut self) -> SoulResult<()> {
         self.current = self.lexer.next_token()?;
         Ok(())
     }
 
+    /// Consumes and returns the current token, then advances.
+    /// 
+    /// # Returns
+    /// - `Ok(Token)` no lexer error returns token
+    /// - `Err((Token, SoulError))` returns lexer error and token
     pub fn consume_advance(&mut self) -> Result<Token, (Token, SoulError)> {
         use std::mem::swap;
         
@@ -83,6 +116,7 @@ impl<'a> TokenStream<'a> {
         }
     }
 
+    /// Consumes all remaining tokens into a Vec, including the current token.
     pub fn to_vec(mut self) -> SoulResult<Vec<Token>> {
         use std::mem::swap;
 
@@ -108,6 +142,7 @@ impl<'a> TokenStream<'a> {
 
 impl TokenKind {
 
+    /// Returns a display string representation of the token kind.
     pub fn display(&self) -> String {
 
         match self {
@@ -122,6 +157,7 @@ impl TokenKind {
         }
     }
 
+    /// Attempts to extract the string value if this is an Ident token.
     pub fn try_as_ident(&self) -> Option<&str> {
 
         match self {
@@ -139,18 +175,21 @@ impl Token {
         }
     }
 
+    /// Checks if this token marks the end of file.
     pub const fn is_end_of_file(&self) -> bool {
         matches!(self.kind, TokenKind::EndFile)
     }
 }
 
 impl Number {
+    
+    /// Number display formatting with type annotation.
     pub fn display(&self) -> String {
         
         match self {
-            Number::Int(num) => format!("{num}i"),
-            Number::Uint(num) => format!("{num}u"),
-            Number::Float(num) => format!("{num}f"),
+            Number::Int(num) => format!("{num}: {}", InternalPrimitiveTypes::UntypedInt.as_str()),
+            Number::Uint(num) => format!("{num}: {}", InternalPrimitiveTypes::UntypedUint.as_str()),
+            Number::Float(num) => format!("{num}: {}", InternalPrimitiveTypes::UntypedFloat.as_str()),
         }
     }
 }

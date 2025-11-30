@@ -76,7 +76,7 @@ impl<'a> Parser<'a> {
         if self.current_is_any(STAMENT_END_TOKENS) {
 
             return TryOk(Spanned::new(
-                Field{name, ty, default_value: None, vis: FieldAccess::default()},
+                Field{name, ty, default_value: None, vis: FieldAccess::default(), allignment: u32::default()},
                 self.new_span(start_span)
             ))
         }
@@ -94,7 +94,7 @@ impl<'a> Parser<'a> {
         }
 
         return TryOk(Spanned::new(
-            Field{name, ty, default_value, vis},
+            Field{name, ty, default_value, vis, allignment: u32::default()},
             self.new_span(start_span)
         ))
     }
@@ -106,8 +106,8 @@ impl<'a> Parser<'a> {
 
             match self.token().kind.try_as_ident() {
                 Some(FieldAccess::PUBLIC_GET) => access.get = Some(Visibility::Public),
-                Some(FieldAccess::PRIVATE_GET) => access.get = Some(Visibility::Private),
                 Some(FieldAccess::PUBLIC_SET) => access.set = Some(Visibility::Public),
+                Some(FieldAccess::PRIVATE_GET) => access.get = Some(Visibility::Private),
                 Some(FieldAccess::PRIVATE_SET) => access.set = Some(Visibility::Private),
                 _ => break,
             }

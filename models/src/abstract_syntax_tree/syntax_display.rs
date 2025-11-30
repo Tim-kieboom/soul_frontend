@@ -16,3 +16,15 @@ pub fn tree_prefix(tab: usize, is_last: bool) -> String {
     sb.push_str(if is_last { "└── " } else { "├── " });
     sb
 }
+
+pub fn gap_prefix(tab: usize) -> String {
+    let mut sb = String::new(); 
+    if tab == 0 {
+        return sb
+    }
+
+    for _ in 0..tab {
+        sb.push_str("│   ");
+    }
+    sb
+}
