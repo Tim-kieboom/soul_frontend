@@ -1,6 +1,9 @@
-use std::{str::Lines};
+use std::str::Lines;
 
-use models::{define_str_enum, error::{SoulError, Span}};
+use models::{
+    define_str_enum,
+    error::{SoulError, Span},
+};
 
 use crate::utils::char_colors::*;
 
@@ -22,7 +25,7 @@ impl ToMessage for SoulError {
     fn to_message(self, level: Level, file_path: &str, source_file: &str) -> String {
         let start_line = self.span.map(|el| el.start_line).unwrap_or(0);
         let number_len = start_line.to_string().len();
-        let begin_space = " ".repeat(number_len+2);
+        let begin_space = " ".repeat(number_len + 2);
 
         let mut sb = String::new();
 
@@ -49,11 +52,10 @@ impl ToMessage for SoulError {
         }
 
         sb
-    } 
+    }
 }
 
 fn level_color(level: &Level) -> &'static str {
-
     match level {
         Level::Warning => YELLOW,
         Level::Error => BRIGHT_RED,
@@ -64,7 +66,7 @@ fn level_color(level: &Level) -> &'static str {
 
 fn get_source_snippet(out: &mut String, span: &Span, mut lines: Lines, begin_space: &str) {
     if span.start_line == 0 {
-        return
+        return;
     }
 
     for _ in 0..(span.start_line.saturating_sub(2)) {
@@ -82,15 +84,18 @@ fn get_source_snippet(out: &mut String, span: &Span, mut lines: Lines, begin_spa
         prev_line.as_ref().map(|s| s.len()).unwrap_or(0),
         current_line.len(),
         next_line.as_ref().map(|s| s.len()).unwrap_or(0),
-    ].into_iter().max().unwrap_or(0);
+    ]
+    .into_iter()
+    .max()
+    .unwrap_or(0);
 
     match prev_line {
         Some(line) => {
-            let begin = format!("{}.", span.start_line-1);
+            let begin = format!("{}.", span.start_line - 1);
             let len = (begin.len() as i64 - begin_space.len() as i64).abs() as usize;
             let spaces = " ".repeat(len);
             out.push_str(&format!("{spaces}{begin}│ {}\n", line))
-        },
+        }
         _ => (),
     };
 
@@ -102,8 +107,7 @@ fn get_source_snippet(out: &mut String, span: &Span, mut lines: Lines, begin_spa
     let start_col = span.start_offset.max(1);
     let end_col = if span.end_line == span.start_line {
         span.end_offset.max(start_col)
-    } 
-    else {
+    } else {
         start_col
     };
 
@@ -114,11 +118,11 @@ fn get_source_snippet(out: &mut String, span: &Span, mut lines: Lines, begin_spa
 
     match next_line {
         Some(line) => {
-            let begin = format!("{}.", span.start_line+1);
+            let begin = format!("{}.", span.start_line + 1);
             let len = (begin.len() as i64 - begin_space.len() as i64).abs() as usize;
             let spaces = " ".repeat(len);
             out.push_str(&format!("{spaces}{begin}│ {}\n", line))
-        },
+        }
         _ => (),
     };
 

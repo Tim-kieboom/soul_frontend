@@ -1,6 +1,10 @@
 use models::symbool_kind::SymboolKind;
 
-use crate::steps::tokenize::{Request, token_stream::{Token, TokenKind}, tokenizer::tokenize};
+use crate::steps::tokenize::{
+    Request,
+    token_stream::{Token, TokenKind},
+    tokenizer::tokenize,
+};
 
 fn tokenize_source(source: &str) -> Vec<Token> {
     let request = Request { source };
@@ -54,9 +58,14 @@ fn test_sum_function_tokens() {
         TokenKind::EndLine,
     ];
 
-    assert_eq!(tokens.len(), expected_kinds.len(), "{:#?}", to_token_kinds(tokens));
+    assert_eq!(
+        tokens.len(),
+        expected_kinds.len(),
+        "{:#?}",
+        to_token_kinds(tokens)
+    );
 
-    for (i, Token{kind, ..}) in tokens.into_iter().enumerate() {
+    for (i, Token { kind, .. }) in tokens.into_iter().enumerate() {
         assert_eq!(kind, expected_kinds[i])
     }
 }

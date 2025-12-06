@@ -1,9 +1,9 @@
-use models::symbool_kind::SymboolKind;
 use crate::steps::tokenize::tokenizer::Lexer;
+use models::symbool_kind::SymboolKind;
 
-pub trait FromLexer 
-where 
-    Self: Sized
+pub trait FromLexer
+where
+    Self: Sized,
 {
     fn from_lexer<'a>(lexer: &mut Lexer<'a>) -> Option<Self>;
 }
@@ -13,224 +13,182 @@ impl FromLexer for SymboolKind {
         let current = lexer.current_char()?;
 
         match current {
-            '@' => {
-                Some(SymboolKind::ConstRef)
-            },
-            '$' => {
-                Some(SymboolKind::Money)
-            },
+            '@' => Some(SymboolKind::ConstRef),
+            '$' => Some(SymboolKind::Money),
             '+' => {
                 let peek = lexer.peek_char();
                 if peek == Some('=') {
-                    lexer.next_char(); 
+                    lexer.next_char();
                     Some(SymboolKind::PlusEq)
-                }
-                else if peek == Some('+') {
+                } else if peek == Some('+') {
                     lexer.next_char();
                     Some(SymboolKind::DoublePlus)
-                }
-                else {
+                } else {
                     Some(SymboolKind::Plus)
                 }
-            },
+            }
             '-' => {
                 let peek = lexer.peek_char();
                 if peek == Some('=') {
-                    lexer.next_char(); 
+                    lexer.next_char();
                     Some(SymboolKind::MinusEq)
-                }
-                else if peek == Some('-') {
+                } else if peek == Some('-') {
                     lexer.next_char();
                     Some(SymboolKind::DoubleMinus)
-                }
-                else {
+                } else {
                     Some(SymboolKind::Minus)
                 }
-            },
+            }
             '%' => {
                 let peek = lexer.peek_char();
                 if peek == Some('=') {
-                    lexer.next_char(); 
+                    lexer.next_char();
                     Some(SymboolKind::ModEq)
-                }
-                else {
+                } else {
                     Some(SymboolKind::Mod)
                 }
-            },
+            }
             '*' => {
                 let peek = lexer.peek_char();
                 if peek == Some('*') {
-                    lexer.next_char(); 
+                    lexer.next_char();
                     Some(SymboolKind::DoubleStar)
-                } 
-                else if peek == Some('=') {
+                } else if peek == Some('=') {
                     lexer.next_char();
                     Some(SymboolKind::StarEq)
-                }
-                else {
+                } else {
                     Some(SymboolKind::Star)
                 }
-            },
+            }
             '/' => {
                 let peek = lexer.peek_char();
                 if peek == Some('<') {
-                    lexer.next_char(); 
+                    lexer.next_char();
                     Some(SymboolKind::Root)
-                } 
-                else if peek == Some('=') {
+                } else if peek == Some('=') {
                     lexer.next_char();
                     Some(SymboolKind::SlashEq)
-                } 
-                else {
+                } else {
                     Some(SymboolKind::Slash)
                 }
-            },
+            }
             '&' => {
                 let peek = lexer.peek_char();
                 if peek == Some('&') {
-                    lexer.next_char(); 
+                    lexer.next_char();
                     Some(SymboolKind::DoubleAnd)
-                } 
-                else if peek == Some('=') {
+                } else if peek == Some('=') {
                     lexer.next_char();
                     Some(SymboolKind::AndEq)
-                }
-                else {
+                } else {
                     Some(SymboolKind::And)
                 }
-            },
+            }
             '|' => {
                 let peek = lexer.peek_char();
                 if peek == Some('|') {
                     lexer.next_char();
                     Some(SymboolKind::DoubleOr)
-                } 
-                else if peek == Some('=') {
+                } else if peek == Some('=') {
                     lexer.next_char();
                     Some(SymboolKind::OrEq)
-                }
-                else {
+                } else {
                     Some(SymboolKind::Or)
                 }
-            },
+            }
             '^' => {
                 let peek = lexer.peek_char();
                 if peek == Some('=') {
                     Some(Self::XorEq)
-                }
-                else {
+                } else {
                     Some(SymboolKind::Xor)
                 }
-            },
+            }
             '=' => {
                 let peek = lexer.peek_char();
                 if peek == Some('=') {
                     lexer.next_char();
                     Some(SymboolKind::Eq)
-                } 
-                else if peek == Some('>') {
+                } else if peek == Some('>') {
                     lexer.next_char();
                     Some(SymboolKind::LambdaArray)
-                } 
-                else {
+                } else {
                     Some(SymboolKind::Assign)
                 }
-            },
+            }
             '!' => {
                 let peek = lexer.peek_char();
                 if peek == Some('=') {
                     lexer.next_char();
                     Some(SymboolKind::NotEq)
-                } 
-                else {
+                } else {
                     Some(SymboolKind::Not)
                 }
-            },
+            }
             '?' => {
                 let peek = lexer.peek_char();
                 if peek == Some('?') {
                     lexer.next_char();
                     Some(SymboolKind::DoubleQuestion)
-                }
-                else {
+                } else {
                     Some(SymboolKind::Question)
                 }
-            },
+            }
             '<' => {
                 let peek = lexer.peek_char();
                 if peek == Some('=') {
                     lexer.next_char();
                     Some(SymboolKind::Le)
-                } 
-                else {
+                } else {
                     Some(SymboolKind::LeftArray)
                 }
-            },
+            }
             '>' => {
                 let peek = lexer.peek_char();
                 if peek == Some('=') {
                     lexer.next_char();
                     Some(SymboolKind::Ge)
-                } 
-                else {
+                } else {
                     Some(SymboolKind::RightArray)
                 }
-            },
+            }
             ':' => {
                 let peek = lexer.peek_char();
                 if peek == Some(':') {
                     lexer.next_char();
                     Some(SymboolKind::DoubleColon)
-                } 
-                else if peek == Some('=') {
+                } else if peek == Some('=') {
                     lexer.next_char();
                     Some(SymboolKind::ColonAssign)
-                }
-                else {
+                } else {
                     Some(SymboolKind::Colon)
                 }
-            },
-            ';' => {
-                Some(SymboolKind::SemiColon)
-            },
+            }
+            ';' => Some(SymboolKind::SemiColon),
             '.' => {
                 let peek = lexer.peek_char();
                 if peek == Some('.') {
                     lexer.next_char();
                     Some(SymboolKind::DoubleDot)
-                } 
-                else {
+                } else {
                     Some(SymboolKind::Dot)
                 }
-            },
-            ',' => {
-                Some(SymboolKind::Comma)
-            },
+            }
+            ',' => Some(SymboolKind::Comma),
             '[' => {
                 let peek = lexer.peek_char();
                 if peek == Some(']') {
                     lexer.next_char();
                     Some(SymboolKind::Array)
-                }
-                else {
+                } else {
                     Some(SymboolKind::SquareOpen)
                 }
-            },
-            ']' => {
-                Some(SymboolKind::SquareClose)
-            },
-            '('  => {
-                Some(SymboolKind::RoundOpen)
-            },
-            ')'  => {
-                Some(SymboolKind::RoundClose)
-            },
-            '{'  => {
-                Some(SymboolKind::CurlyOpen)
-            },
-            '}'  => {
-                Some(SymboolKind::CurlyClose)
-            },
+            }
+            ']' => Some(SymboolKind::SquareClose),
+            '(' => Some(SymboolKind::RoundOpen),
+            ')' => Some(SymboolKind::RoundClose),
+            '{' => Some(SymboolKind::CurlyOpen),
+            '}' => Some(SymboolKind::CurlyClose),
             _ => None,
         }
     }

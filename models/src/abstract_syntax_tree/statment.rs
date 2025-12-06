@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-use crate::{abstract_syntax_tree::{block::Block, enum_like::{Enum, Union}, expression::{Expression, ExpressionKind}, function::Function, objects::{Class, Field, Struct, Trait}, soul_type::SoulType, spanned::Spanned, syntax_display::{SyntaxDisplay, gap_prefix, tree_prefix}}, error::Span};
+use crate::{abstract_syntax_tree::{block::Block, enum_like::{Enum, Union}, expression::{Expression, ExpressionKind}, function::{Function, FunctionSignature}, objects::{Class, Field, Struct, Trait}, soul_type::SoulType, spanned::Spanned, syntax_display::{SyntaxDisplay, gap_prefix, tree_prefix}}, error::Span};
 
 /// A statement in the Soul language, wrapped with source location information.
 pub type Statement = Spanned<StatementKind>;
@@ -136,14 +136,10 @@ impl SyntaxDisplay for StatementKind {
                 assignment.right.node.inner_display(sb, tab, is_last);
             },
             StatementKind::Function(function) => {
+                
                 sb.push_str(&prefix);
                 sb.push_str("Function >> ");
-                sb.push_str(&function.signature.name);
-                sb.push('(');
-                sb.push_str(&function.signature.parameters.types.iter().map(|(name, el)| format!("{name}: {}", el.display())).join(", "));
-                sb.push(')');
-                sb.push_str(": ");
-                function.signature.return_type.inner_display(sb, tab, is_last);
+                
                 function.block.inner_display(sb, tab, is_last);
             },
             StatementKind::UseBlock(use_block) => {
@@ -162,8 +158,15 @@ impl SyntaxDisplay for StatementKind {
                 sb.push_str(&_struct.name);
                 inner_display_fields(sb, &_struct.fields, tab+1, USE_LAST);
             },
+            StatementKind::Trait(_trait) => {
+                const USE_LAST: bool = true;
+                sb.push_str(&prefix);
+                sb.push_str("Trait >> ");
+                sb.push_str(&_trait.signature.name);
+                inner_display_methode_declaration(sb, &_trait.methods, tab+1, USE_LAST);
+            },
+
             StatementKind::Class(_) => todo!(),
-            StatementKind::Trait(_) => todo!(),
             StatementKind::Enum(_) => todo!(),
             StatementKind::Union(_) => todo!(),
             StatementKind::CloseBlock => sb.push_str(&prefix),
@@ -171,9 +174,36 @@ impl SyntaxDisplay for StatementKind {
     }
 }
 
+fn inner_displat_function_declaration(sb: &mut String, signature: &FunctionSignature, tab: usize, is_last: bool) {
+    sb.push_str(&signature.callee.as_ref().map(|el| format!("{} ", el.node.extention_type.display())).unwrap_or_default());
+    sb.push_str(&signature.name);
+    sb.push('(');
+    sb.push_str(&signature.callee.as_ref().map(|el| format!("{}, ", el.node.this.display())).unwrap_or_default());
+    sb.push_str(&signature.parameters.types.iter().map(|(name, el)| format!("{name}: {}", el.display())).join(", "));
+    sb.push(')');
+    sb.push_str(": ");
+    signature.return_type.inner_display(sb, tab, is_last);
+}
+
+fn inner_display_methode_declaration(sb: &mut String, methods: &Vec<Spanned<FunctionSignature>>, tab: usize, use_last: bool) {
+
+    let lat_index = methods.len() - 1;
+
+    for (i, methode) in methods.iter().enumerate() {
+        let is_last = use_last && lat_index == i;
+        let prefix = tree_prefix(tab, is_last);
+        
+        sb.push('\n');
+        sb.push_str(&prefix);
+        sb.push_str("Methode >> ");
+        inner_displat_function_declaration(sb, &methode.node, tab, is_last);
+    }
+
+}
+
 fn inner_display_fields(sb: &mut String, fields: &Vec<Spanned<Field>>, tab: usize, use_last: bool) {
     
-    let last_index = fields.len() -1;
+    let last_index = fields.len() - 1;
 
     for (i, Spanned{node: field, ..}) in fields.iter().enumerate() {
         let is_last = use_last && last_index == i;

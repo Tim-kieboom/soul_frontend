@@ -1,19 +1,32 @@
-use crate::steps::{parse::{Request, Response, parse_statement::SEMI_COLON}, tokenize::token_stream::{Token, TokenKind, TokenStream, TokenStreamPosition}};
+use crate::steps::{
+    parse::{Request, Response, parse_statement::SEMI_COLON},
+    tokenize::token_stream::{Token, TokenKind, TokenStream, TokenStreamPosition},
+};
 use itertools::Itertools;
-use models::{abstract_syntax_tree::{AbstractSyntaxTree, block::Block, statment::Ident}, error::{SoulError, SoulErrorKind, SoulResult, Span}, scope::{scope::{ScopeId, ValueSymbol}, scope_builder::ScopeBuilder}, soul_names::TypeModifier};
+use models::{
+    abstract_syntax_tree::{
+        AbstractSyntaxTree, block::Block, soul_type::SoulType, statment::Ident,
+    },
+    error::{SoulError, SoulErrorKind, SoulResult, Span},
+    scope::{
+        scope::{ScopeId, ValueSymbol},
+        scope_builder::ScopeBuilder,
+    },
+    soul_names::TypeModifier,
+};
 
 /// Main entry point for parsing token stream into Abstract Syntax Tree.
-/// 
+///
 /// Creates a parser instance that processes the entire token stream into
 /// statements forming the root block of the AST.
 pub fn parse<'a>(request: Request) -> Response {
     Response {
-        parser: Parser::new(request.token_stream)
+        parser: Parser::new(request.token_stream),
     }
 }
 
 /// Recursive descent parser that builds AST from token stream.
-/// 
+///
 /// Manages token consumption, error recovery, scope tracking, and debug
 /// information (debug builds only). Supports position save/restore for
 /// backtracking during parsing.
@@ -29,7 +42,6 @@ pub struct Parser<'a> {
     scopes: ScopeBuilder,
 }
 impl<'a> Parser<'a> {
-
     #[cfg(not(debug_assertions))]
     pub fn new(tokens: TokenStream<'a>) -> Self {
         Self {
@@ -56,8 +68,9 @@ impl<'a> Parser<'a> {
         if let Err(err) = self.tokens.initialize() {
             self.add_error(err);
         }
-        
-        #[cfg(debug_assertions)] {
+
+        #[cfg(debug_assertions)]
+        {
             self.current = self.token().kind.clone();
         }
 
@@ -66,7 +79,6 @@ impl<'a> Parser<'a> {
         let mut statments = vec![];
 
         while !self.current_is(&TokenKind::EndFile) {
-
             match self.parse_statement() {
                 Ok(statment) => statments.push(statment),
                 Err(err) => {
@@ -78,22 +90,22 @@ impl<'a> Parser<'a> {
             self.skip(&[SEMI_COLON, TokenKind::EndLine]);
         }
 
-        AbstractSyntaxTree{ 
-            root: Block{
+        AbstractSyntaxTree {
+            root: Block {
                 statments,
                 modifier: TypeModifier::Mut,
                 scope_id: self.scopes.current_scope().id,
-            } 
+            },
         }
     }
 
     /// Returns all accumulated parse errors.
-    /// 
+    ///
     /// Consumes Parser.
     pub fn comsume_errors(self) -> Vec<SoulError> {
         self.errors
     }
-    
+
     /// Saves current token stream position for backtracking.
     pub(crate) fn current_position(&self) -> TokenStreamPosition<'a> {
         self.tokens.current_position()
@@ -102,11 +114,20 @@ impl<'a> Parser<'a> {
     /// Restores token stream to saved position.
     pub(crate) fn go_to(&mut self, position: TokenStreamPosition<'a>) {
         self.tokens.set_position(position);
+        #[cfg(debug_assertions)]
+        {
+            self.current = self.token().kind.clone();
+            self.current_index = self.tokens.current_token_index();
+        }
     }
 
     /// Pushes new scope onto scope stack. (used when opening a scope)
-    pub(crate) fn push_scope(&mut self) -> ScopeId {
-        self.scopes.push_scope()
+    pub(crate) fn push_scope(
+        &mut self,
+        modifier: TypeModifier,
+        use_block: Option<SoulType>,
+    ) -> ScopeId {
+        self.scopes.push_scope(modifier, use_block)
     }
 
     /// Pops current scope from stack. (used at and of scope)
@@ -132,7 +153,6 @@ impl<'a> Parser<'a> {
                 self.add_error(err);
                 self.token().clone()
             }
-        
         }
     }
 
@@ -156,12 +176,12 @@ impl<'a> Parser<'a> {
 
     /// Advances to next token.
     pub(crate) fn bump(&mut self) {
-
         if let Err(err) = self.tokens.advance() {
             self.add_error(err);
         }
 
-        #[cfg(debug_assertions)] {
+        #[cfg(debug_assertions)]
+        {
             self.current = self.token().kind.clone();
             self.current_index += 1;
         }
@@ -169,16 +189,16 @@ impl<'a> Parser<'a> {
 
     /// Consumes current token and advances.
     pub(crate) fn bump_consume(&mut self) -> Token {
-
         let token = match self.tokens.consume_advance() {
             Ok(token) => token,
             Err((token, err)) => {
                 self.add_error(err);
                 token
-            },
+            }
         };
 
-        #[cfg(debug_assertions)] {
+        #[cfg(debug_assertions)]
+        {
             self.current = self.token().kind.clone();
             self.current_index += 1;
         }
@@ -193,47 +213,38 @@ impl<'a> Parser<'a> {
 
     /// Expects exact token kind, errors if mismatch.
     pub(crate) fn expect(&mut self, kind: &TokenKind) -> SoulResult<()> {
-
         if self.current_is(&kind) {
             self.bump();
             Ok(())
-        }
-        else {
+        } else {
             Err(self.get_error_expected(kind))
         }
     }
 
     /// Expects any token from given kinds.
     pub(crate) fn expect_any(&mut self, kinds: &[TokenKind]) -> SoulResult<()> {
-
         if self.current_is_any(kinds) {
             self.bump();
             Ok(())
-        }
-        else {
+        } else {
             Err(self.get_error_expected_any(kinds))
         }
     }
 
     /// Expects specific identifier name.
     pub(crate) fn expect_ident(&mut self, expected: &str) -> SoulResult<()> {
-
         if let TokenKind::Ident(ident) = &self.token().kind {
             if ident == expected {
                 self.bump();
                 Ok(())
+            } else {
+                Err(SoulError::new(
+                    format!("expected: '{}' but found: '{}'", expected, ident),
+                    SoulErrorKind::InvalidAssignType,
+                    Some(self.token().span),
+                ))
             }
-            else {
-                Err(
-                    SoulError::new(
-                        format!("expected: '{}' but found: '{}'", expected, ident),
-                        SoulErrorKind::InvalidAssignType,
-                        Some(self.token().span),
-                    )
-                )
-            }
-        }
-        else {
+        } else {
             Err(self.get_error_expected(&TokenKind::Ident(expected.to_string())))
         }
     }
@@ -257,9 +268,13 @@ impl<'a> Parser<'a> {
 
     /// Creates error for expected single token kind.
     pub(crate) fn get_error_expected(&self, expected: &TokenKind) -> SoulError {
-        let message = format!("expected: '{}' but found: '{}'", expected.display(), self.token().kind.display());
+        let message = format!(
+            "expected: '{}' but found: '{}'",
+            expected.display(),
+            self.token().kind.display()
+        );
         SoulError::new(
-            message, 
+            message,
             SoulErrorKind::InvalidTokenKind,
             Some(self.token().span),
         )
@@ -267,9 +282,13 @@ impl<'a> Parser<'a> {
 
     /// Creates error for expected token from set.
     pub(crate) fn get_error_expected_any(&self, expected: &[TokenKind]) -> SoulError {
-        let message = format!("expected on of: ['{}'] but found: '{}'", expected.iter().map(|token| token.display()).join("', '"), self.token().kind.display());
+        let message = format!(
+            "expected on of: ['{}'] but found: '{}'",
+            expected.iter().map(|token| token.display()).join("', '"),
+            self.token().kind.display()
+        );
         SoulError::new(
-            message, 
+            message,
             SoulErrorKind::InvalidTokenKind,
             Some(self.token().span),
         )

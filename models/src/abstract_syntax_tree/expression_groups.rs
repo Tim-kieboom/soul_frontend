@@ -14,7 +14,6 @@ pub enum ExpressionGroup {
     ArrayFiller(ArrayFiller),
 }
 
-
 /// An array literal, e.g., `[1, 2, 3]`.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Array {

@@ -1,42 +1,56 @@
-use models::{abstract_syntax_tree::{expression_groups::{Array, NamedTuple, Tuple}, soul_type::SoulType}, error::{SoulError, SoulErrorKind, SoulResult}, symbool_kind::SymboolKind};
-use crate::{steps::{parse::{parse_statement::{COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, ROUND_CLOSE, ROUND_OPEN, SEMI_COLON, SQUARE_CLOSE, SQUARE_OPEN}, parser::Parser}, tokenize::token_stream::TokenKind}, utils::try_result::{ResultTryResult, TryErr, TryError, TryNotValue, TryResult}};
+use crate::{
+    steps::{
+        parse::{
+            parse_statement::{
+                COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, ROUND_CLOSE, ROUND_OPEN, SEMI_COLON,
+                SQUARE_CLOSE, SQUARE_OPEN,
+            },
+            parser::Parser,
+        },
+        tokenize::token_stream::TokenKind,
+    },
+    utils::try_result::{ResultTryResult, TryErr, TryError, TryNotValue, TryResult},
+};
+use models::{
+    abstract_syntax_tree::{
+        expression_groups::{Array, NamedTuple, Tuple},
+        soul_type::SoulType,
+    },
+    error::{SoulError, SoulErrorKind, SoulResult},
+    symbool_kind::SymboolKind,
+};
 
 impl<'a> Parser<'a> {
-
     pub fn parse_tuple(&mut self) -> SoulResult<Tuple> {
         self.expect(&ROUND_OPEN)?;
-        
+
         if self.current_is(&ROUND_CLOSE) {
             self.bump();
-            return Ok(Tuple{values: vec![]})
+            return Ok(Tuple { values: vec![] });
         }
 
         let mut values = vec![];
         loop {
-
             self.skip_end_lines();
-            
+
             let element = self.parse_expression(&[ROUND_CLOSE, COMMA])?;
             values.push(element);
 
             self.skip_end_lines();
             if self.current_is(&ROUND_CLOSE) {
-                break
+                break;
             }
             self.expect(&COMMA)?;
         }
 
         self.expect(&ROUND_CLOSE)?;
         self.expect_any(&[TokenKind::EndLine, SEMI_COLON])?;
-        Ok(
-            Tuple{values}
-        )
+        Ok(Tuple { values })
     }
 
     pub fn parse_array(&mut self, collection_type: Option<SoulType>) -> SoulResult<Array> {
         self.expect(&SQUARE_OPEN)?;
-        
-        
+
         let element_type = match self.try_parse_type() {
             Ok(ty) => {
                 self.expect(&COLON)?;
@@ -48,7 +62,6 @@ impl<'a> Parser<'a> {
 
         let mut values = vec![];
         loop {
-
             self.skip_end_lines();
 
             let element = self.parse_expression(&[SQUARE_CLOSE, COMMA])?;
@@ -56,20 +69,18 @@ impl<'a> Parser<'a> {
 
             self.skip_end_lines();
             if self.current_is(&SQUARE_CLOSE) {
-                break
+                break;
             }
             self.expect(&COMMA)?;
         }
 
         self.expect(&SQUARE_CLOSE)?;
         self.expect_any(&[TokenKind::EndLine, SEMI_COLON])?;
-        Ok(
-            Array{
-                values,
-                element_type, 
-                collection_type, 
-            }
-        )
+        Ok(Array {
+            values,
+            element_type,
+            collection_type,
+        })
     }
 
     pub fn try_parse_named_tuple(&mut self) -> TryResult<NamedTuple, SoulError> {
@@ -82,17 +93,14 @@ impl<'a> Parser<'a> {
         result
     }
 
-
     fn inner_try_parse_named_tuple(&mut self) -> TryResult<NamedTuple, SoulError> {
         const INSERT_DEFAULTS: TokenKind = TokenKind::Symbool(SymboolKind::DoubleDot);
         let start_span = self.token().span;
-        self.expect(&CURLY_OPEN)
-            .try_err()?;
+        self.expect(&CURLY_OPEN).try_err()?;
 
         let mut values = vec![];
         let mut insert_defaults = false;
         loop {
-
             self.skip_end_lines();
 
             if self.current_is(&INSERT_DEFAULTS) {
@@ -100,51 +108,53 @@ impl<'a> Parser<'a> {
                 insert_defaults = true;
 
                 if self.current_is(&CURLY_CLOSE) {
-                    break
+                    break;
                 }
 
                 return TryErr(SoulError::new(
                     "token after '..' has to be '}'",
                     SoulErrorKind::InvalidEscapeSequence,
                     Some(self.new_span(start_span)),
-                ))
+                ));
             }
 
             let ident_token = self.bump_consume();
             let ident = match ident_token.kind {
                 TokenKind::Ident(ident) => ident,
-                _ => return TryNotValue(SoulError::new(
-                    format!("expected ident but found: '{:?}'", self.token().kind), 
-                    SoulErrorKind::InvalidIdent, 
-                    Some(self.new_span(start_span)),
-                ))
+                _ => {
+                    return TryNotValue(SoulError::new(
+                        format!("expected ident but found: '{:?}'", self.token().kind),
+                        SoulErrorKind::InvalidIdent,
+                        Some(self.new_span(start_span)),
+                    ));
+                }
             };
 
             self.expect(&COLON)
                 .map_err(|err| TryError::IsNotValue(err))?;
 
-            let element = self.parse_expression(&[CURLY_CLOSE, COMMA])
+            let element = self
+                .parse_expression(&[CURLY_CLOSE, COMMA])
                 .map_err(|err| TryError::IsNotValue(err))?;
 
             values.push((ident, element));
 
             self.skip_end_lines();
             if self.current_is(&CURLY_CLOSE) {
-                break
+                break;
             }
 
-            self.expect(&COMMA)
-                .try_err()?;
+            self.expect(&COMMA).try_err()?;
         }
 
-        self.expect(&CURLY_CLOSE)
-            .try_err()?;
+        self.expect(&CURLY_CLOSE).try_err()?;
 
         self.expect_any(&[TokenKind::EndLine, SEMI_COLON])
             .try_err()?;
 
-        Ok(
-            NamedTuple{values, insert_defaults}
-        )
+        Ok(NamedTuple {
+            values,
+            insert_defaults,
+        })
     }
 }

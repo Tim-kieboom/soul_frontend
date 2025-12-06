@@ -3,14 +3,11 @@
 //     this::subfile::[this, Function]
 // ]
 
-// val := if 1==1 {
-//     2
-// }
-// else {
-//     3
-// }
+f32 pow(this, b: f32): f32 {
+    return this ** b
+}
 
-struct Object {
+struct Struct {
     bar: int
     foo: int = 0
     field: int set = 0 
@@ -21,10 +18,51 @@ struct Object {
 }
 
 sum(a: int, b: int): int {
-    return 0
+    return a + b
 }
 
+pow(a: f32, b: f32): f32 {
+    return a ** b 
+}
+
+// use f32 {
+//     sub(this, b: f32): f32 {
+//         return this - b
+//     }
+// }
+
+trait Pow {
+    Pow(this, other: This): This
+}
+
+// use f32 impl Pow {
+//     Pow(this, other: This): This {
+//         return this + other
+//     }
+// }
+
+// class Class {
+//     field: int
+//     pubField: f32 Get Set = 0
+//
+//     This(value: int) {
+//         return Class{field: value, ..}
+//     }
+//
+//     Methode(@this): int {
+//         this.field
+//     }
+//
+//     impl Pow {
+//         Pow(this, other: This): This {
+//             this.field = this.field ** other.field
+//             return this
+//         }
+//     }
+// }
+
 main(): int {
+
     var := {}
     var = ()
     var = (true, "string", 1, 2.0)

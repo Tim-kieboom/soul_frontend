@@ -1,30 +1,46 @@
-use models::{abstract_syntax_tree::{objects::{Field, FieldAccess, Struct, Visibility}, spanned::Spanned}, error::{SoulError, SoulErrorKind, SoulResult}, soul_names::KeyWord};
-use crate::{steps::{parse::{parse_statement::{ASSIGN, COLON, CURLY_CLOSE, CURLY_OPEN, SEMI_COLON, STAMENT_END_TOKENS}, parser::Parser}, tokenize::token_stream::TokenKind}, utils::try_result::{MapNotValue, ResultTryResult, TryError, TryNotValue, TryOk, TryResult}};
+use crate::{
+    steps::{
+        parse::{
+            parse_statement::{
+                ASSIGN, COLON, CURLY_CLOSE, CURLY_OPEN, SEMI_COLON, STAMENT_END_TOKENS,
+            },
+            parser::Parser,
+        },
+        tokenize::token_stream::TokenKind,
+    },
+    utils::try_result::{MapNotValue, ResultTryResult, TryError, TryNotValue, TryOk, TryResult},
+};
+use models::{
+    abstract_syntax_tree::{
+        objects::{Field, FieldAccess, Struct, Trait, TraitSignature, Visibility},
+        spanned::Spanned,
+    },
+    error::{SoulError, SoulErrorKind, SoulResult},
+    soul_names::{KeyWord, TypeModifier},
+};
 
 impl<'a> Parser<'a> {
-    
     pub(crate) fn parse_struct(&mut self) -> SoulResult<Struct> {
         let start_span = self.token().span;
         self.expect_ident(KeyWord::Struct.as_str())?;
 
-        let ident_token = self.bump_consume(); 
+        let ident_token = self.bump_consume();
         let ident = match ident_token.kind {
             TokenKind::Ident(val) => val,
-            other => return Err(
-                SoulError::new(
+            other => {
+                return Err(SoulError::new(
                     format!("expected name got '{}'", other.display()),
                     SoulErrorKind::InvalidTokenKind,
-                    Some(self.new_span(start_span))
-                )
-            ),
+                    Some(self.new_span(start_span)),
+                ));
+            }
         };
 
         self.expect(&CURLY_OPEN)?;
-        let scope_id = self.push_scope();
+        let scope_id = self.push_scope(TypeModifier::Mut, None);
 
         let mut fields = vec![];
         loop {
-
             match self.parse_field() {
                 Ok(val) => fields.push(val),
                 Err(TryError::IsNotValue(())) => break,
@@ -35,11 +51,82 @@ impl<'a> Parser<'a> {
         self.skip_end_lines();
         self.expect(&CURLY_CLOSE)?;
 
-        Ok(Struct{
-            fields, 
-            scope_id, 
-            name: ident, 
-            generics: vec![], 
+        Ok(Struct {
+            fields,
+            scope_id,
+            name: ident,
+            generics: vec![],
+        })
+    }
+
+    pub(crate) fn parse_trait(&mut self) -> SoulResult<Trait> {
+        let start_span = self.token().span;
+        self.expect_ident(KeyWord::Trait.as_str())?;
+
+        let ident_token = self.bump_consume();
+        let name = match ident_token.kind {
+            TokenKind::Ident(val) => val,
+            other => {
+                return Err(SoulError::new(
+                    format!("expected name got '{}'", other.display()),
+                    SoulErrorKind::InvalidTokenKind,
+                    Some(self.new_span(start_span)),
+                ));
+            }
+        };
+
+        let signature = TraitSignature {
+            name,
+            generics: vec![],
+            implements: vec![],
+        };
+
+        let mut methods = vec![];
+
+        self.expect(&CURLY_OPEN)?;
+        let scope_id = self.push_scope(TypeModifier::Mut, None);
+        loop {
+            self.skip_end_lines();
+
+            let modifier = match &self.token().kind {
+                TokenKind::Ident(name) if TypeModifier::from_str(name).is_some() => {
+                    let modifier =
+                        TypeModifier::from_str(name).expect("just checked should be Some");
+                    self.bump();
+                    modifier
+                }
+                &CURLY_CLOSE => break,
+                _ => TypeModifier::Mut,
+            };
+
+            let ident_token = self.bump_consume();
+            let name = match ident_token.kind {
+                TokenKind::Ident(val) => val,
+                other => {
+                    return Err(SoulError::new(
+                        format!("expected name got '{}'", other.display()),
+                        SoulErrorKind::InvalidTokenKind,
+                        Some(self.token().span),
+                    ));
+                }
+            };
+
+            let result = self.try_parse_function_signature(self.token().span, modifier, None, name);
+
+            match result {
+                Ok(val) => methods.push(val),
+                Err(TryError::IsErr(err)) => return Err(err),
+                Err(TryError::IsNotValue(_)) => break,
+            }
+        }
+        self.pop_scope();
+        self.skip_end_lines();
+        self.expect(&CURLY_CLOSE)?;
+
+        Ok(Trait {
+            signature,
+            methods,
+            scope_id,
         })
     }
 
@@ -57,36 +144,39 @@ impl<'a> Parser<'a> {
         let start_span = self.token().span;
 
         self.skip_end_lines();
-        let ident_token = self.bump_consume(); 
+        let ident_token = self.bump_consume();
         let name = match ident_token.kind {
             TokenKind::Ident(val) => val,
             _ => return TryNotValue(()),
         };
 
         if !self.current_is(&COLON) {
-            return TryNotValue(())
+            return TryNotValue(());
         }
 
         self.bump();
-        let ty = self.try_parse_type()
-            .map_not_value(|_| ())?;
+        let ty = self.try_parse_type().map_not_value(|_| ())?;
 
         let vis = self.parse_field_access();
 
         if self.current_is_any(STAMENT_END_TOKENS) {
-
             return TryOk(Spanned::new(
-                Field{name, ty, default_value: None, vis: FieldAccess::default(), allignment: u32::default()},
-                self.new_span(start_span)
-            ))
+                Field {
+                    name,
+                    ty,
+                    default_value: None,
+                    vis: FieldAccess::default(),
+                    allignment: u32::default(),
+                },
+                self.new_span(start_span),
+            ));
         }
 
-        self.expect(&ASSIGN)
-            .try_err()?;
+        self.expect(&ASSIGN).try_err()?;
 
         let default_value = Some(
             self.parse_expression(&[CURLY_OPEN, SEMI_COLON, TokenKind::EndLine])
-                .try_err()?
+                .try_err()?,
         );
 
         if self.current_is(&SEMI_COLON) {
@@ -94,16 +184,20 @@ impl<'a> Parser<'a> {
         }
 
         return TryOk(Spanned::new(
-            Field{name, ty, default_value, vis, allignment: u32::default()},
-            self.new_span(start_span)
-        ))
+            Field {
+                name,
+                ty,
+                default_value,
+                vis,
+                allignment: u32::default(),
+            },
+            self.new_span(start_span),
+        ));
     }
 
     fn parse_field_access(&mut self) -> FieldAccess {
-
         let mut access = FieldAccess::default();
         loop {
-
             match self.token().kind.try_as_ident() {
                 Some(FieldAccess::PUBLIC_GET) => access.get = Some(Visibility::Public),
                 Some(FieldAccess::PUBLIC_SET) => access.set = Some(Visibility::Public),

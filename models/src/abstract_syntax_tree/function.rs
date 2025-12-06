@@ -54,7 +54,19 @@ pub struct FunctionCallee {
     /// The extension type this method extends.
     pub extention_type: SoulType,
     /// Optional `this` parameter type.
-    pub this: Option<SoulType>,
+    pub this: ThisCallee,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum ThisCallee {
+    /// `&this`
+    MutRef,
+    /// ``
+    Static,
+    /// `this`
+    Consume,
+    /// `@this`
+    ConstRef,
 }
 
 /// A lambda/anonymous function expression.
@@ -114,4 +126,17 @@ pub struct StaticMethod {
     pub generics: Vec<TypeGeneric>,
     /// Method arguments.
     pub arguments: Tuple,
+}
+
+impl ThisCallee {
+
+    pub fn display(&self) -> &'static str {
+
+        match self {
+            ThisCallee::Static => "",
+            ThisCallee::MutRef => "&this",
+            ThisCallee::Consume => "this",
+            ThisCallee::ConstRef => "@this",
+        }
+    }
 }

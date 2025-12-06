@@ -1,5 +1,8 @@
 
-├── Struct >> Object
+├── Function >> 
+│   └── Expression >> return this ** b
+│   │   
+├── Struct >> Struct
 │   ├── Field >> bar: int 
 │   ├── Field >> foo: int  = 0
 │   ├── Field >> field: int set = 0
@@ -8,10 +11,15 @@
 │   ├── Field >> tpl: (int, str)  = (0, "empty")
 │   └── Field >> nmdtpl: {field: int, foo: bool} Get set = {field: 1, foo: true}
 │   │   
-├── Function >> sum(a: int, b: int): int
-│   └── Expression >> return 0
+├── Function >> 
+│   └── Expression >> return a + b
 │   │   
-└── Function >> main(): int
+├── Function >> 
+│   └── Expression >> return a ** b
+│   │   
+├── Trait >> Pow
+│   └── Methode >> Pow(other: This): This
+└── Function >> 
 │   ├── Variable >> var
 │   ├── Assignment >> var = <default>
 │   ├── Assignment >> var = (true, "string", 1, 2)

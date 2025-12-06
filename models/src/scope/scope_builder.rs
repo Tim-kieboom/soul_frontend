@@ -1,4 +1,4 @@
-use crate::scope::scope::{Scope, ScopeId, TypeSymbol, ValueSymbol};
+use crate::{abstract_syntax_tree::soul_type::SoulType, scope::scope::{Scope, ScopeId, TypeSymbol, ValueSymbol}, soul_names::TypeModifier};
 
 /// A builder for managing a tree of scopes.
 ///
@@ -21,11 +21,11 @@ impl ScopeBuilder {
     }
 
     /// Push a new child scope and make it current
-    pub fn push_scope(&mut self) -> ScopeId {
+    pub fn push_scope(&mut self, modifier: TypeModifier, use_block: Option<SoulType>) -> ScopeId {
         let new_id = ScopeId::new(self.scopes.len());
         let parent = self.current;
         self.current_scope_mut().children.push(new_id);
-        self.scopes.push(Scope::new_child(new_id, parent));
+        self.scopes.push(Scope::new_child(new_id, parent, modifier, use_block));
         self.current = new_id;
         new_id
     }
@@ -50,6 +50,20 @@ impl ScopeBuilder {
     pub fn insert_value(&mut self, name: String, symbol: ValueSymbol) {
         let scope = self.current_scope_mut();
         scope.values.entry(name).or_default().push(symbol);
+    }
+
+    pub fn get_current_use_block_type(&self) -> Option<&SoulType> {
+        self.scopes
+            .get(self.current.as_usize())?
+            .use_block
+            .as_ref()
+    }
+
+    pub fn get_current_modifier(&self) -> TypeModifier {
+        self.scopes
+            .get(self.current.as_usize())
+            .map(|scope| scope.modifier)
+            .unwrap_or(TypeModifier::Mut)
     }
 
     /// Resolves a type symbol by walking up the scope tree.

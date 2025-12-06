@@ -1,7 +1,11 @@
-use crate::error::Span;
+use crate::{abstract_syntax_tree::statment::Ident, error::Span};
 
-/// An attribute identifier (TODO: implement proper type).
-pub type Attribute = u8;
+/// An attribute identifier
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Attribute {
+    pub name: Ident,
+    pub values: Vec<Ident>,
+}
 
 /// A node wrapped with source location information and attributes.
 ///
@@ -17,9 +21,12 @@ pub struct Spanned<T> {
     pub attributes: Vec<Attribute>,
 }
 impl<T> Spanned<T> {
-    /// Creates a new `Spanned` node with the given inner value and span.
     pub fn new(inner: T, span: Span) -> Self {
         Self {node: inner, span, attributes: vec![]}
-    } 
+    }
+
+    pub fn with_atribute(inner: T, span: Span, attributes: Vec<Attribute>) -> Self {
+        Self {node: inner, span, attributes}
+    }
 }
 

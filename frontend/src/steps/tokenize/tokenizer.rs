@@ -1,43 +1,48 @@
+use crate::steps::tokenize::from_lexer::FromLexer;
+use crate::steps::tokenize::token_stream::{Number, Token, TokenKind, TokenStream};
+use crate::steps::tokenize::{Request, Response};
+use models::error::{ExpansionId, SoulError, SoulErrorKind, SoulResult, Span};
+use models::symbool_kind::SymboolKind;
 use std::iter::Peekable;
 use std::str::Chars;
-use models::error::{SoulErrorKind, ExpansionId, SoulError, SoulResult, Span};
-use models::symbool_kind::SymboolKind;
-use crate::steps::tokenize::from_lexer::FromLexer;
-use crate::steps::tokenize::{Request, Response};
-use crate::steps::tokenize::token_stream::{Number, Token, TokenKind, TokenStream};
 
 /// Converts source code into a token stream.
-/// 
+///
 /// This is the main entry point for tokenization.
 pub fn tokenize<'a>(request: Request<'a>) -> Response<'a> {
-    Response{
-        token_stream: TokenStream::new(Lexer::new(request.source))
+    Response {
+        token_stream: TokenStream::new(Lexer::new(request.source)),
     }
 }
 
 /// Lexer that processes character streams into tokens with position tracking.
-/// 
+///
 /// Handles whitespace skipping, comments, literals, identifiers, numbers,
-/// and symbols. Maintains line/offset position for accurate span reporting. 
+/// and symbols. Maintains line/offset position for accurate span reporting.
 #[derive(Debug, Clone)]
 pub struct Lexer<'a> {
     input: Peekable<Chars<'a>>,
     current_char: Option<char>,
     line: usize,
     offset: usize,
+    token_index: usize,
 }
 
 impl<'a> Lexer<'a> {
-
     pub(crate) fn new(source: &'a str) -> Self {
         let mut lexer = Lexer {
             input: source.chars().peekable(),
             current_char: None,
             line: 1,
             offset: 0,
+            token_index: 0,
         };
         lexer.next_char();
         lexer
+    }
+
+    pub(crate) fn current_token_index(&self) -> usize {
+        self.token_index
     }
 
     /// Returns the current character without consuming it.
@@ -46,19 +51,20 @@ impl<'a> Lexer<'a> {
     }
 
     /// Produces the next token from the input stream.
-    /// 
+    ///
     /// Skips whitespace/comments first, then matches symbol, literal, ident,
     /// number, or unknown character patterns.
     pub(crate) fn next_token(&mut self) -> SoulResult<Token> {
+        self.token_index += 1;
         if self.current_char.is_none() {
             return Ok(Token::new(
-                TokenKind::EndFile, 
-                self.new_span(self.line, self.offset)
-            ))
+                TokenKind::EndFile,
+                self.new_span(self.line, self.offset),
+            ));
         }
 
         self.skip_whitespace();
-        
+
         let start_line = self.line;
         let start_offset = self.offset;
 
@@ -68,10 +74,9 @@ impl<'a> Lexer<'a> {
             self.skip_whitespace();
             return Ok(Token::new(
                 TokenKind::EndLine,
-                self.new_span(start_line, start_offset)
-            ))
-        }
-        else if self.current_char == Some('/') && peek == Some('*') {
+                self.new_span(start_line, start_offset),
+            ));
+        } else if self.current_char == Some('/') && peek == Some('*') {
             self.skip_multi_comment();
             self.skip_whitespace();
         }
@@ -80,16 +85,18 @@ impl<'a> Lexer<'a> {
             self.next_char();
             return Ok(Token::new(
                 TokenKind::Symbool(symbool),
-                self.new_span(start_line, start_offset)
-            ))
-        } 
+                self.new_span(start_line, start_offset),
+            ));
+        }
 
         let char = match self.current_char {
             Some(val) => val,
-            None => return Ok(Token::new(
-                TokenKind::EndFile, 
-                self.new_span(start_line, start_offset)
-            )),
+            None => {
+                return Ok(Token::new(
+                    TokenKind::EndFile,
+                    self.new_span(start_line, start_offset),
+                ));
+            }
         };
 
         let kind = self.get_token_kind(char, start_line, start_offset)?;
@@ -103,8 +110,7 @@ impl<'a> Lexer<'a> {
             if char == '\n' {
                 self.line += 1;
                 self.offset = 0;
-            } 
-            else {
+            } else {
                 self.offset += 1;
             }
         }
@@ -115,8 +121,12 @@ impl<'a> Lexer<'a> {
         self.input.peek().copied()
     }
 
-    fn get_token_kind(&mut self, char: char, start_line: usize, start_offset: usize) -> SoulResult<TokenKind> {
-        
+    fn get_token_kind(
+        &mut self,
+        char: char,
+        start_line: usize,
+        start_offset: usize,
+    ) -> SoulResult<TokenKind> {
         Ok(match char {
             '\n' | '\r' => {
                 self.next_char();
@@ -134,22 +144,20 @@ impl<'a> Lexer<'a> {
     }
 
     fn skip_line_comment(&mut self) {
-
         while let Some(char) = self.current_char {
             self.next_char();
             if char == '\n' || char == '\r' {
-                break
-            } 
+                break;
+            }
         }
     }
 
     fn skip_multi_comment(&mut self) {
-
         let mut star = false;
         while let Some(char) = self.current_char {
             self.next_char();
             if char == '/' && star {
-                break
+                break;
             }
             star = char == '*';
         }
@@ -175,11 +183,9 @@ impl<'a> Lexer<'a> {
                     ));
                 }
             }
-        }
-        else if let Some(char) = self.current_char {
+        } else if let Some(char) = self.current_char {
             char
-        }
-        else {
+        } else {
             return Err(SoulError::new(
                 "Unclosed char literal",
                 SoulErrorKind::InvalidEscapeSequence,
@@ -193,7 +199,7 @@ impl<'a> Lexer<'a> {
             return Err(SoulError::new(
                 "Char literal missing closing quote",
                 SoulErrorKind::InvalidEscapeSequence,
-                Some(self.new_span(start_line, start_offset))
+                Some(self.new_span(start_line, start_offset)),
             ));
         }
 
@@ -218,21 +224,22 @@ impl<'a> Lexer<'a> {
                 };
                 cstring.push(escaped_char);
                 backslash = false;
-            } 
-            else if ch == '\\' {
+            } else if ch == '\\' {
                 backslash = true;
-            } 
-            else if ch == '"' {
+            } else if ch == '"' {
                 self.next_char();
                 return Ok(cstring);
-            } 
-            else {
+            } else {
                 cstring.push(ch);
             }
             self.next_char();
         }
 
-        Err(SoulError::new("cString does not have an end qoute", SoulErrorKind::InvalidEscapeSequence, Some(self.new_span(start_line, start_offset))))
+        Err(SoulError::new(
+            "cString does not have an end qoute",
+            SoulErrorKind::InvalidEscapeSequence,
+            Some(self.new_span(start_line, start_offset)),
+        ))
     }
 
     fn get_number(&mut self, start_line: usize, start_offset: usize) -> SoulResult<Number> {
@@ -250,9 +257,8 @@ impl<'a> Lexer<'a> {
             if ch.is_ascii_digit() {
                 num_str.push(ch);
                 self.next_char();
-            } 
-            else {
-                break
+            } else {
+                break;
             }
         }
 
@@ -268,23 +274,48 @@ impl<'a> Lexer<'a> {
         }
 
         if is_float {
-            num_str.parse::<f64>()
+            num_str
+                .parse::<f64>()
                 .map(|num| Number::Float(num))
-                .map_err(|err| SoulError::new(err.to_string(), SoulErrorKind::InvalidNumber, Some(self.new_span(start_line, start_offset))))
-        } 
-        else if has_minus {
-            num_str.parse::<i64>()
+                .map_err(|err| {
+                    SoulError::new(
+                        err.to_string(),
+                        SoulErrorKind::InvalidNumber,
+                        Some(self.new_span(start_line, start_offset)),
+                    )
+                })
+        } else if has_minus {
+            num_str
+                .parse::<i64>()
                 .map(|num| Number::Int(num))
-                .map_err(|err| SoulError::new(err.to_string(), SoulErrorKind::InvalidNumber, Some(self.new_span(start_line, start_offset))))
-        } 
-        else {
-            num_str.parse::<u64>()
+                .map_err(|err| {
+                    SoulError::new(
+                        err.to_string(),
+                        SoulErrorKind::InvalidNumber,
+                        Some(self.new_span(start_line, start_offset)),
+                    )
+                })
+        } else {
+            num_str
+                .parse::<u64>()
                 .map(|num| Number::Uint(num))
-                .map_err(|err| SoulError::new(err.to_string(), SoulErrorKind::InvalidNumber, Some(self.new_span(start_line, start_offset))))
+                .map_err(|err| {
+                    SoulError::new(
+                        err.to_string(),
+                        SoulErrorKind::InvalidNumber,
+                        Some(self.new_span(start_line, start_offset)),
+                    )
+                })
         }
     }
 
-    fn lex_exponextion_number(&mut self, ch: char, num_str: &mut String, start_line: usize, start_offset: usize) -> SoulResult<()> {
+    fn lex_exponextion_number(
+        &mut self,
+        ch: char,
+        num_str: &mut String,
+        start_line: usize,
+        start_offset: usize,
+    ) -> SoulResult<()> {
         num_str.push(ch);
         self.next_char();
 
@@ -301,33 +332,32 @@ impl<'a> Lexer<'a> {
                 digit_found = true;
                 num_str.push(ch3);
                 self.next_char();
-            } 
-            else {
-                break
+            } else {
+                break;
             }
         }
 
         if !digit_found {
-            Err(SoulError::new("exponent must have digits", SoulErrorKind::InvalidNumber, Some(self.new_span(start_line, start_offset))))
-        }
-        else {
+            Err(SoulError::new(
+                "exponent must have digits",
+                SoulErrorKind::InvalidNumber,
+                Some(self.new_span(start_line, start_offset)),
+            ))
+        } else {
             Ok(())
         }
     }
 
     fn lex_float(&mut self, num_str: &mut String) -> bool {
-
         num_str.push('.');
         self.next_char();
 
         while let Some(ch) = self.current_char {
-
             if ch.is_ascii_digit() {
                 num_str.push(ch);
                 self.next_char();
-            } 
-            else {
-                break
+            } else {
+                break;
             }
         }
 
@@ -338,13 +368,11 @@ impl<'a> Lexer<'a> {
         let mut ident = String::new();
 
         while let Some(char) = self.current_char {
-
             if char.is_alphabetic() || char == '_' || char.is_ascii_digit() {
                 ident.push(char);
                 self.next_char();
-            }
-            else {
-                break
+            } else {
+                break;
             }
         }
 
@@ -352,17 +380,16 @@ impl<'a> Lexer<'a> {
     }
 
     fn new_span(&self, start_line: usize, start_offset: usize) -> Span {
-        Span{
-            start_line, 
-            start_offset, 
-            end_line: self.line, 
-            end_offset: self.offset, 
+        Span {
+            start_line,
+            start_offset,
+            end_line: self.line,
+            end_offset: self.offset,
             expansion_id: ExpansionId::default(),
         }
     }
 
     fn skip_whitespace(&mut self) {
-        
         while self.current_char == Some(' ') || self.current_char == Some('\t') {
             self.next_char();
         }

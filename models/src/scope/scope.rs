@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::abstract_syntax_tree::{expression::Expression, function::Function, soul_type::SoulType, spanned::Spanned, statment::{Ident, Variable}};
+use crate::{abstract_syntax_tree::{expression::Expression, function::Function, soul_type::SoulType, spanned::Spanned, statment::{Ident, Variable}}, soul_names::TypeModifier};
 
 /// An identifier for a scope in the scope tree.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -43,6 +43,9 @@ pub struct Scope {
     pub values: HashMap<String, Vec<ValueSymbol>>,
     /// Map of type names to their type symbols.
     pub types: HashMap<String, TypeSymbol>,
+
+    pub modifier: TypeModifier,
+    pub use_block: Option<SoulType>,
 }
 
 impl ValueSymbol {
@@ -73,17 +76,21 @@ impl Scope {
             children: vec![],
             values: HashMap::new(),
             types: HashMap::new(),
+            modifier: TypeModifier::Mut,
+            use_block: None,
         }
     }
 
     /// Creates a new child scope with the given id and parent.
-    pub fn new_child(id: ScopeId, parent: ScopeId) -> Self {
+    pub fn new_child(id: ScopeId, parent: ScopeId, modifier: TypeModifier, use_block: Option<SoulType>) -> Self {
         Self {
             id,
             parent: Some(parent),
             children: vec![],
             values: HashMap::new(),
             types: HashMap::new(),
+            modifier,
+            use_block,
         }
     }
 }

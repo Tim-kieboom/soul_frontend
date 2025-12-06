@@ -1,15 +1,15 @@
 use crate::steps::tokenize::token_stream::TokenStream;
 
 pub mod from_lexer;
-pub mod tokenizer;
 pub mod token_stream;
+pub mod tokenizer;
 
 #[cfg(test)]
 mod test_tokenizer;
 
 #[derive(Debug)]
 pub(crate) struct Request<'a> {
-    pub source: &'a str
+    pub source: &'a str,
 }
 
 #[derive(Debug, Clone)]

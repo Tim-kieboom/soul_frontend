@@ -8,7 +8,6 @@
 //! Helpers are provided for checking modifiers, type categories, and displaying types.
 use crate::{abstract_syntax_tree::{enum_like::{Enum, Union}, expression::Expression, objects::{Class, Struct, Trait}, statment::Ident, syntax_display::SyntaxDisplay}, soul_names::{InternalComplexTypes, InternalPrimitiveTypes, TypeModifier, TypeWrapper}};
 
-
 /// Represents a type in the Soul language.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SoulType {
@@ -20,7 +19,6 @@ pub struct SoulType {
     pub generics: Vec<TypeGeneric>,
 }
 
-
 /// The specific kind of a type
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum TypeKind {
@@ -28,16 +26,21 @@ pub enum TypeKind {
     None,
     /// Represents the type of all types
     Type,
-    /// unknown (used in parsing stage)
-    Unknown(Ident),
+    /// stub type (used in parsing stage)
+    Stub(Ident),
     /// Primitive types like int, bool, float
     InternalComplex(InternalComplexTypes),
     /// Primitive types like int, bool, float
     Primitive(InternalPrimitiveTypes),
+    /// A struct type
     Struct(Struct),
+    /// A class type
     Class(Class),
+    /// A trait type
     Trait(Trait),
+    /// A enum type
     Enum(Enum),
+    /// A union type
     Union(Union),
     /// Array type: [T; N] or dynamic
     Array(ArrayType),
@@ -212,7 +215,7 @@ impl TypeKind {
             }
             TypeKind::Pointer(inner) => format!("*{}", inner.display()),
             TypeKind::Optional(inner) => format!("{}?", inner.display()),
-            TypeKind::Unknown(ident) => ident.clone(),
+            TypeKind::Stub(ident) => ident.clone(),
             TypeKind::None => "none".to_string(),
             TypeKind::Primitive(internal_primitive_types) => internal_primitive_types.as_str().to_string(),
         }

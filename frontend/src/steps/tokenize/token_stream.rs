@@ -1,5 +1,9 @@
-use crate::steps::{tokenize::tokenizer::Lexer};
-use models::{error::{SoulError, SoulResult, Span}, soul_names::{InternalPrimitiveTypes}, symbool_kind::SymboolKind};
+use crate::steps::tokenize::tokenizer::Lexer;
+use models::{
+    error::{SoulError, SoulResult, Span},
+    soul_names::InternalPrimitiveTypes,
+    symbool_kind::SymboolKind,
+};
 
 /// This struct provides methods for token stream navigation, consumption, and
 /// conversion to a complete token vector. It supports save/restore positions
@@ -55,12 +59,10 @@ pub enum TokenKind {
     StringLiteral(String),
 }
 
-
-
 impl<'a> TokenStream<'a> {
     pub fn new(lexer: Lexer<'a>) -> Self {
-        Self{
-            lexer, 
+        Self {
+            lexer,
             current: Token::new(TokenKind::EndLine, Span::default()),
         }
     }
@@ -75,9 +77,13 @@ impl<'a> TokenStream<'a> {
         TokenStreamPosition(self.clone())
     }
 
+    pub fn current_token_index(&self) -> usize {
+        self.lexer.current_token_index()
+    }
+
     /// Restores the stream to a previously saved position.
     pub fn set_position(&mut self, position: TokenStreamPosition<'a>) {
-        *self = position.0
+        *self = position.0;
     }
 
     /// Returns a reference to the current token.
@@ -98,20 +104,19 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Consumes and returns the current token, then advances.
-    /// 
+    ///
     /// # Returns
     /// - `Ok(Token)` no lexer error returns token
     /// - `Err((Token, SoulError))` returns lexer error and token
     pub fn consume_advance(&mut self) -> Result<Token, (Token, SoulError)> {
         use std::mem::swap;
-        
+
         let mut consume_token = Token::new(TokenKind::EndLine, Span::default());
         swap(&mut self.current, &mut consume_token);
-        
+
         if let Err(err) = self.advance() {
             Err((consume_token, err))
-        }
-        else {
+        } else {
             Ok(consume_token)
         }
     }
@@ -120,19 +125,18 @@ impl<'a> TokenStream<'a> {
     pub fn to_vec(mut self) -> SoulResult<Vec<Token>> {
         use std::mem::swap;
 
-        let mut token = Token::new(TokenKind::EndFile, Span::default()); 
+        let mut token = Token::new(TokenKind::EndFile, Span::default());
         swap(&mut self.current, &mut token);
         let mut tokens = vec![token];
 
         loop {
-
             self.advance()?;
-            let mut token = Token::new(TokenKind::EndFile, Span::default()); 
+            let mut token = Token::new(TokenKind::EndFile, Span::default());
             swap(&mut self.current, &mut token);
             let is_end = token.is_end_of_file();
             tokens.push(token);
             if is_end {
-                break
+                break;
             }
         }
 
@@ -141,10 +145,8 @@ impl<'a> TokenStream<'a> {
 }
 
 impl TokenKind {
-
     /// Returns a display string representation of the token kind.
     pub fn display(&self) -> String {
-
         match self {
             TokenKind::Ident(ident) => ident.clone(),
             TokenKind::Unknown(char) => format!("{char}"),
@@ -159,7 +161,6 @@ impl TokenKind {
 
     /// Attempts to extract the string value if this is an Ident token.
     pub fn try_as_ident(&self) -> Option<&str> {
-
         match self {
             TokenKind::Ident(val) => Some(val),
             _ => None,
@@ -169,10 +170,7 @@ impl TokenKind {
 
 impl Token {
     pub const fn new(kind: TokenKind, span: Span) -> Self {
-        Self {
-            kind,
-            span,
-        }
+        Self { kind, span }
     }
 
     /// Checks if this token marks the end of file.
@@ -182,14 +180,14 @@ impl Token {
 }
 
 impl Number {
-    
     /// Number display formatting with type annotation.
     pub fn display(&self) -> String {
-        
         match self {
             Number::Int(num) => format!("{num}: {}", InternalPrimitiveTypes::UntypedInt.as_str()),
             Number::Uint(num) => format!("{num}: {}", InternalPrimitiveTypes::UntypedUint.as_str()),
-            Number::Float(num) => format!("{num}: {}", InternalPrimitiveTypes::UntypedFloat.as_str()),
+            Number::Float(num) => {
+                format!("{num}: {}", InternalPrimitiveTypes::UntypedFloat.as_str())
+            }
         }
     }
 }
