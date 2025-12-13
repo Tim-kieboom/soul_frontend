@@ -1,8 +1,5 @@
 use crate::steps::{
-    parse::{
-        parse_statement::{CURLY_OPEN, STAMENT_END_TOKENS},
-        parser::Parser,
-    },
+    parse::{CURLY_OPEN, STAMENT_END_TOKENS, parser::Parser},
     tokenize::token_stream::TokenKind,
 };
 use models::{
@@ -94,7 +91,6 @@ impl<'a> Parser<'a> {
     }
 
     pub(crate) fn parse_match(&mut self) -> SoulResult<Expression> {
-        let start_span = self.token().span;
         self.expect_ident(MATCH_STR)?;
         todo!()
     }
@@ -105,7 +101,7 @@ impl<'a> Parser<'a> {
 
         loop {
             let position = self.current_position();
-            self.skip(STAMENT_END_TOKENS);
+            self.skip_till(STAMENT_END_TOKENS);
 
             let start_span = self.token().span;
             if !self.current_is_ident(ELSE_STR) {

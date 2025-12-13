@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-use crate::{abstract_syntax_tree::{block::Block, enum_like::{Enum, Union}, expression::{Expression, ExpressionKind}, function::{Function, FunctionSignature}, objects::{Class, Field, Struct, Trait}, soul_type::SoulType, spanned::Spanned, syntax_display::{SyntaxDisplay, gap_prefix, tree_prefix}}, error::Span};
+use crate::{abstract_syntax_tree::{block::Block, enum_like::{Enum, Union}, expression::{Expression, ExpressionKind}, function::{Function, FunctionCall, FunctionSignature}, objects::{Class, ClassChild, Field, Struct, Trait}, soul_type::{GenericDeclare, SoulType}, spanned::Spanned, syntax_display::{SyntaxDisplay, gap_prefix, tree_prefix}}, error::Span, soul_names::KeyWord, soul_page_path::SoulPagePath};
 
 /// A statement in the Soul language, wrapped with source location information.
 pub type Statement = Spanned<StatementKind>;
@@ -12,6 +12,9 @@ pub type Statement = Spanned<StatementKind>;
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum StatementKind {
     EndFile,
+
+    /// Imported paths
+    Import(Vec<SoulPagePath>),
 
     /// A standalone expression.
     Expression(Expression),
@@ -88,6 +91,12 @@ impl Statement {
         Self::new(StatementKind::Expression(expression), span)
     }
 
+    pub fn from_function_call(function: Spanned<FunctionCall>) -> Self {
+        Self::from_expression(
+            Expression::with_atribute(ExpressionKind::FunctionCall(function.node), function.span, function.attributes)
+        )
+    }
+
     pub fn new_block(block: Block, span: Span) -> Self {
         Self::new_expression(ExpressionKind::Block(block), span)
     }
@@ -118,6 +127,18 @@ impl SyntaxDisplay for StatementKind {
         let prefix = tree_prefix(tab, is_last);
         match self {
             StatementKind::EndFile => (),
+            StatementKind::Import(paths) => {
+
+                sb.push_str(&prefix);
+                sb.push_str("Import >> ");
+                let prefix = tree_prefix(tab+1, is_last);
+                for path in paths {
+                    sb.push('\n');
+                    sb.push_str(&prefix);
+                    sb.push_str("Path >> ");
+                    sb.push_str(path.as_str());
+                }
+            },
             StatementKind::Expression(spanned) => {
                 sb.push_str(&prefix);
                 sb.push_str("Expression >> ");
@@ -139,12 +160,13 @@ impl SyntaxDisplay for StatementKind {
                 
                 sb.push_str(&prefix);
                 sb.push_str("Function >> ");
-                
+                inner_display_function_declaration(sb, &function.signature, tab, is_last);
                 function.block.inner_display(sb, tab, is_last);
             },
             StatementKind::UseBlock(use_block) => {
                 sb.push_str(&prefix);
                 sb.push_str("UseBlock >> ");
+                use_block.ty.inner_display(sb, tab, is_last);
                 if let Some(impl_trait) = &use_block.impl_trait {
                     sb.push_str(" impl ");
                     impl_trait.inner_display(sb, tab, is_last);
@@ -156,6 +178,7 @@ impl SyntaxDisplay for StatementKind {
                 sb.push_str(&prefix);
                 sb.push_str("Struct >> ");
                 sb.push_str(&_struct.name);
+                inner_display_generic_parameters(sb, &_struct.generics);
                 inner_display_fields(sb, &_struct.fields, tab+1, USE_LAST);
             },
             StatementKind::Trait(_trait) => {
@@ -163,10 +186,24 @@ impl SyntaxDisplay for StatementKind {
                 sb.push_str(&prefix);
                 sb.push_str("Trait >> ");
                 sb.push_str(&_trait.signature.name);
-                inner_display_methode_declaration(sb, &_trait.methods, tab+1, USE_LAST);
+                if !_trait.signature.for_types.is_empty() {
+                    let fors = _trait.signature.for_types.iter().map(|el| el.display()).join(", ");
+                    sb.push_str(&format!(" {} [{}]", KeyWord::For.as_str(), fors));
+                }
+                if !_trait.signature.implements.is_empty() {
+                    let fors = _trait.signature.implements.iter().map(|el| el.display()).join(", ");
+                    sb.push_str(&format!(" {} {}", KeyWord::Impl.as_str(), fors));
+                }
+                inner_display_methode_signatures(sb, &_trait.methods, tab+1, USE_LAST);
             },
-
-            StatementKind::Class(_) => todo!(),
+            StatementKind::Class(class) => {
+                const USE_LAST: bool = true;
+                sb.push_str(&prefix);
+                sb.push_str("Class >> ");
+                sb.push_str(&class.name);
+                inner_display_generic_parameters(sb, &class.generics);
+                inner_display_classchild(sb, &class.members, tab+1, USE_LAST);
+            },
             StatementKind::Enum(_) => todo!(),
             StatementKind::Union(_) => todo!(),
             StatementKind::CloseBlock => sb.push_str(&prefix),
@@ -174,9 +211,10 @@ impl SyntaxDisplay for StatementKind {
     }
 }
 
-fn inner_displat_function_declaration(sb: &mut String, signature: &FunctionSignature, tab: usize, is_last: bool) {
+fn inner_display_function_declaration(sb: &mut String, signature: &FunctionSignature, tab: usize, is_last: bool) {
     sb.push_str(&signature.callee.as_ref().map(|el| format!("{} ", el.node.extention_type.display())).unwrap_or_default());
     sb.push_str(&signature.name);
+    inner_display_generic_parameters(sb, &signature.generics);
     sb.push('(');
     sb.push_str(&signature.callee.as_ref().map(|el| format!("{}, ", el.node.this.display())).unwrap_or_default());
     sb.push_str(&signature.parameters.types.iter().map(|(name, el)| format!("{name}: {}", el.display())).join(", "));
@@ -185,18 +223,92 @@ fn inner_displat_function_declaration(sb: &mut String, signature: &FunctionSigna
     signature.return_type.inner_display(sb, tab, is_last);
 }
 
-fn inner_display_methode_declaration(sb: &mut String, methods: &Vec<Spanned<FunctionSignature>>, tab: usize, use_last: bool) {
+fn inner_display_generic_parameters(sb: &mut String, parameters: &Vec<GenericDeclare>) {
+    if parameters.is_empty() {
+        return
+    }
 
-    let lat_index = methods.len() - 1;
+    sb.push('<');
+    for parameter in parameters {
+        
+        match parameter {
+            GenericDeclare::Lifetime(lifetime) => {
+                sb.push('\'');
+                sb.push_str(lifetime);
+            },
+            GenericDeclare::Expression{name, for_type, default} => {
+                sb.push_str(&name);
+                if let Some(ty) = &for_type {
+                    sb.push_str(" impl ");
+                    ty.inner_display(sb, 0, false);
+                }
 
-    for (i, methode) in methods.iter().enumerate() {
+                if let Some(expression) = &default {
+                    sb.push_str(" = ");
+                    expression.node.inner_display(sb, 0, false);
+                }
+            },
+            GenericDeclare::Type{name, traits, default} => {
+                sb.push_str(&name);
+                if !traits.is_empty() {
+                    sb.push_str(": ");
+                    sb.push_str(&traits.iter().map(|el| el.display()).join(", "))
+                }
+
+                if let Some(ty) = &default {
+                    sb.push_str(" = ");
+                    ty.inner_display(sb, 0, false);
+                }
+            },
+        }
+    }
+    sb.push('>');
+}
+
+fn inner_display_classchild(sb: &mut String, kinds: &Vec<Spanned<ClassChild>>, tab: usize, use_last: bool) {
+
+    fn get_tag(child: &Spanned<ClassChild>) -> &'static str {
+
+        match &child.node {
+            ClassChild::Field(_) => "Field >> ",
+            ClassChild::Method(_) => "Methode >> ",
+            ClassChild::ImplBlock(_) => "ImplBlock >> ",
+        }
+    }
+
+    let lat_index = kinds.len() - 1;
+
+    for (i, child) in kinds.iter().enumerate() {
         let is_last = use_last && lat_index == i;
         let prefix = tree_prefix(tab, is_last);
         
         sb.push('\n');
         sb.push_str(&prefix);
+        sb.push_str(get_tag(child));
+        match &child.node {
+            ClassChild::Field(field) => inner_display_field(sb, field, tab, is_last),
+            ClassChild::Method(function) => inner_display_methode(sb, function, tab, is_last),
+            ClassChild::ImplBlock(_) => todo!(),
+        }
+    }
+
+}
+
+fn inner_display_methode_signatures(sb: &mut String, methods: &Vec<Spanned<FunctionSignature>>, tab: usize, use_last: bool) {
+    if methods.is_empty() {
+        return 
+    }
+
+    let lat_index = methods.len() - 1;
+
+    for (i, methode) in methods.iter().enumerate() {
+        let is_last = use_last && lat_index == i;
+        
+        let prefix = tree_prefix(tab, is_last);
+        sb.push('\n');
+        sb.push_str(&prefix);
         sb.push_str("Methode >> ");
-        inner_displat_function_declaration(sb, &methode.node, tab, is_last);
+        inner_display_methode_signature(sb, &methode.node, tab, is_last);
     }
 
 }
@@ -207,24 +319,36 @@ fn inner_display_fields(sb: &mut String, fields: &Vec<Spanned<Field>>, tab: usiz
 
     for (i, Spanned{node: field, ..}) in fields.iter().enumerate() {
         let is_last = use_last && last_index == i;
-        let prefix = tree_prefix(tab, is_last);
 
+        let prefix = tree_prefix(tab, is_last);
         sb.push('\n');
         sb.push_str(&prefix);
         sb.push_str("Field >> ");
-        sb.push_str(&field.name);
-        sb.push_str(": ");
-        field.ty.inner_display(sb, tab, is_last);
-        sb.push(' ');
-        field.vis.inner_display(sb);
-        if let Some(default) = &field.default_value {
-            sb.push_str(" = ");
-            default.node.inner_display(sb, tab, is_last);
-        }
-        
+        inner_display_field(sb, field, tab, is_last);
         if last_index == i {
             sb.push('\n');
             sb.push_str(&gap_prefix(tab));
         }
+    }
+}
+
+fn inner_display_methode(sb: &mut String, methode: &Function, tab: usize, is_last: bool) {
+    inner_display_methode_signature(sb, &methode.signature, tab, is_last);
+    methode.block.inner_display(sb, tab+1, is_last);
+}
+
+fn inner_display_methode_signature(sb: &mut String, methode: &FunctionSignature, tab: usize, is_last: bool) {
+    inner_display_function_declaration(sb, &methode, tab, is_last);
+}
+
+fn inner_display_field(sb: &mut String, field: &Field, tab: usize, is_last: bool) {
+    sb.push_str(&field.name);
+    sb.push_str(": ");
+    field.ty.inner_display(sb, tab, is_last);
+    sb.push(' ');
+    field.vis.inner_display(sb);
+    if let Some(default) = &field.default_value {
+        sb.push_str(" = ");
+        default.node.inner_display(sb, tab, is_last);
     }
 }

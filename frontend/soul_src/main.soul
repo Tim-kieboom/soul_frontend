@@ -1,20 +1,51 @@
-// import [
-//     this::subfile::Println
-//     this::subfile::[this, Function]
-// ]
+import [
+    this::Subfile::Println,
+    this::Subfile::[
+        this, Function::[Test, Test2]
+    ]
+]
+
+sum<T: Number = int>(a: T, b: T): f32 {
+    return f32(a + b)
+}
+
+sum<N impl uint = 2>(a: f32, b: f32): f32 {
+    mut sum = 0.0
+    // for i in 0..a.Len() {
+    //     sum += a[i] + b[i]
+    // }
+    return a + b
+}
 
 f32 pow(this, b: f32): f32 {
     return this ** b
 }
 
-struct Struct {
+struct Struct<N impl uint> {
     bar: int
-    foo: int = 0
-    field: int set = 0 
-    name: str get set = "empty"
-    name2: str Get Set = "empty"
-    tpl: (int, str) = (0, "empty")
-    nmdtpl: {field: int, foo: bool} Get set = {field: 1, foo: true}
+    bara: [2]int
+    barsa: [N]int
+    bar2 = 1
+    const foo = 0
+    literal tpl = (0, "empty")
+
+    mut field: uint set = 0
+    mut name get set = "empty"
+    mut name2 Get Set = "empty"
+    mut nmdtpl Get set = {field: 1, foo: true}
+}
+
+trait Empty
+trait Add {
+    Methode(number: i32)
+    Add(this, other: This): This
+}
+
+use f32 impl Add {
+    Methode(number: i32) {}
+    Add(this, other: f32): f32 {
+        return this + other
+    }
 }
 
 sum(a: int, b: int): int {
@@ -25,55 +56,70 @@ pow(a: f32, b: f32): f32 {
     return a ** b 
 }
 
-// use f32 {
-//     sub(this, b: f32): f32 {
-//         return this - b
-//     }
-// }
+use f32 {
+    sub(this, b: f32): f32 {
+        return this - b
+    }
+
+    div(this, b: f32): f32 {
+        return this / b
+    }
+}
 
 trait Pow {
     Pow(this, other: This): This
 }
 
-// use f32 impl Pow {
-//     Pow(this, other: This): This {
-//         return this + other
-//     }
-// }
+use f32 impl Pow {
+    Pow(this, other: This): This {
+        return this + other
+    }
+}
 
-// class Class {
-//     field: int
-//     pubField: f32 Get Set = 0
-//
-//     This(value: int) {
-//         return Class{field: value, ..}
-//     }
-//
-//     Methode(@this): int {
-//         this.field
-//     }
-//
-//     impl Pow {
-//         Pow(this, other: This): This {
-//             this.field = this.field ** other.field
-//             return this
-//         }
-//     }
-// }
+class Class {
+    mut field: int
+    mut pubField: f32 Get Set = 0
+
+    This(value: int) {
+        // return This{field: value, ..}
+    }
+
+    // This:[values: []int] {
+    //     return This{field: values.Sum(), ..}
+    // }
+
+    Methode() {
+        Println("foo")
+    }
+    
+    empty() {
+    
+    }
+
+    num(this): int {
+        return 0
+    }
+}
 
 main(): int {
-
-    var := {}
+    
+    mut var: Any
     var = ()
     var = (true, "string", 1, 2.0)
     var = [1, 2, 3, 4]
     var = [int: 1, 2, 3, 4]
-    // var = List[int: 1, 2, 3, 4]
+    var = List:[1, 2, 3, 4]
+    var = HashMap:[(str, int):
+        ("1", 1),
+        ("2", 2),
+        ("3", 3),
+        ("4", 4),
+    ]
     var = {name: 1 + 2, field: true, ..}
     var = 1
     var = &1
     ref := @1
-    var = *var + 2
+    var = *ref + 2
 
     if 1 == 1 {
         Println("condition")

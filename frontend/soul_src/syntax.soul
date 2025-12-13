@@ -1,25 +1,25 @@
-use std::mem::[RawArray, Global, Allocable]
+import Std::Mem::[RawArray, Global, Allocable]
 
 class List<T, Alloc = Global> 
 where 
     Alloc: Allocable
 {
-    array: RawArray<T> = []
-    len: uint Get = 0  
-    cap: uint Get = 0
+    literal EMPTY_LEN = 0
+    mut array = RawArray:[]
+    mut len Get = uint(0)
+    mut cap Get = uint(0)
 
     This(cap: uint) {
         return This{array: RawArray(cap), len: 0, cap}
     }
 
-    This[vec: []T] {
+    This:[vec: []T] {
         len := vec.Len()
         cap := vec.Cap()
         return This{array: vec.To(), len, cap}
     }
 
     Push(&this, el: T) {
-        
         if this.len+1 > this.cap {
             this.reserve(this.cap*2)
         }
@@ -28,11 +28,19 @@ where
     }
 
     Pop(&this): ?T {
-        this.len == 0 ? None : Some(this.array[this.len--])
+        if this.len == 0 {
+            return null
+        } 
+
+        return this.array[this.len--]
     }
 
     ExpectPop(&this): Res<T, str> {
-        this.len == 0 ? Err("List is empty") : Ok(this.array[this.len--])
+        if this.len == 0 {
+            return Err("List is empty")
+        }
+        
+        return Ok(this.array[this.len--])
     }
 
     reserve(&this, cap: uint) {
@@ -47,7 +55,7 @@ Test test_list() {
     AssertEq!(emptyList.cap, 0)
 
     vec := [1, 2, 3]
-    filledList := List[1, 2, 3]
+    filledList := List:[1, 2, 3]
     AssertEq!(emptyList.len, 3)
     AssertEq!(emptyList.cap, vec.Cap())
 

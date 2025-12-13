@@ -1,6 +1,12 @@
 use crate::{
-    steps::{parse::parser::Parser, tokenize::token_stream::TokenKind},
-    utils::try_result::{ResultTryResult, TryErr, TryError, TryNotValue, TryOk, TryResult},
+    steps::{
+        parse::{
+            ARROW_LEFT, ASSIGN, COLON, COLON_ASSIGN, COMMA, CURLY_CLOSE, CURLY_OPEN, ROUND_OPEN,
+            SEMI_COLON, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS, parser::Parser,
+        },
+        tokenize::token_stream::TokenKind,
+    },
+    utils::try_result::{ResultTryErr, ToResult, TryErr, TryError, TryNotValue, TryOk, TryResult},
 };
 use models::{
     abstract_syntax_tree::{
@@ -8,11 +14,13 @@ use models::{
         expression::{Expression, ExpressionKind, ReturnKind},
         operator::{Binary, BinaryOperator, BinaryOperatorKind},
         soul_type::SoulType,
-        statment::{Assignment, Ident, Statement, StatementKind, Variable},
+        spanned::Spanned,
+        statment::{Assignment, Ident, Statement, StatementKind, UseBlock, Variable},
     },
     error::{SoulError, SoulErrorKind, SoulResult, Span},
     scope::scope::ValueSymbol,
     soul_names::{self, AssignType, KeyWord, TypeModifier},
+    soul_page_path::SoulPagePath,
     symbool_kind::SymboolKind,
 };
 use std::{
@@ -20,37 +28,18 @@ use std::{
     sync::LazyLock,
 };
 
-pub const COMMA: TokenKind = TokenKind::Symbool(SymboolKind::Comma);
-pub const COLON: TokenKind = TokenKind::Symbool(SymboolKind::Colon);
-pub const ASSIGN: TokenKind = TokenKind::Symbool(SymboolKind::Assign);
-pub const CURLY_OPEN: TokenKind = TokenKind::Symbool(SymboolKind::CurlyOpen);
-pub const ROUND_OPEN: TokenKind = TokenKind::Symbool(SymboolKind::RoundOpen);
-pub const ARROW_LEFT: TokenKind = TokenKind::Symbool(SymboolKind::LeftArray);
-pub const SEMI_COLON: TokenKind = TokenKind::Symbool(SymboolKind::SemiColon);
-pub const SQUARE_OPEN: TokenKind = TokenKind::Symbool(SymboolKind::SquareOpen);
-pub const CURLY_CLOSE: TokenKind = TokenKind::Symbool(SymboolKind::CurlyClose);
-pub const ROUND_CLOSE: TokenKind = TokenKind::Symbool(SymboolKind::RoundClose);
-pub const SQUARE_CLOSE: TokenKind = TokenKind::Symbool(SymboolKind::SquareClose);
-pub const COLON_ASSIGN: TokenKind = TokenKind::Symbool(SymboolKind::ColonAssign);
-pub const STAMENT_END_TOKENS: &[TokenKind] = &[
-    CURLY_CLOSE,
-    TokenKind::EndFile,
-    TokenKind::EndLine,
-    TokenKind::Symbool(SymboolKind::SemiColon),
-];
-
 impl<'a> Parser<'a> {
     pub(crate) fn parse_statement(&mut self) -> SoulResult<Statement> {
         let begin_position = self.current_position();
         let start_span = self.token().span;
 
-        self.skip(STAMENT_END_TOKENS);
+        self.skip_till(STAMENT_END_TOKENS);
 
         let possible_kind = match &self.token().kind {
             TokenKind::Ident(ident) => {
-                if let Some(modifier) = soul_names::TypeModifier::from_str(&ident) {
+                if let Some(modifier) = soul_names::TypeModifier::from_str(ident) {
                     self.try_parse_statement_modifier(start_span, modifier)
-                } else if let Some(keyword) = soul_names::KeyWord::from_str(&ident) {
+                } else if let Some(keyword) = soul_names::KeyWord::from_str(ident) {
                     self.parse_stament_keyword(start_span, keyword)
                 } else {
                     TryOk(self.parse_statement_ident(start_span)?)
@@ -95,6 +84,11 @@ impl<'a> Parser<'a> {
 
         self.expect(&CURLY_OPEN)?;
         while !self.current_is_any(END_TOKENS) {
+            self.skip_end_lines();
+            if self.current_is(&CURLY_CLOSE) {
+                break;
+            }
+
             match self.parse_statement() {
                 Ok(statment) => statments.push(statment),
                 Err(err) => {
@@ -103,7 +97,7 @@ impl<'a> Parser<'a> {
                 }
             }
 
-            self.skip(&[SEMI_COLON, TokenKind::EndLine]);
+            self.skip_till(&[SEMI_COLON, TokenKind::EndLine]);
         }
 
         self.expect(&CURLY_CLOSE)?;
@@ -111,6 +105,35 @@ impl<'a> Parser<'a> {
             modifier,
             statments,
             scope_id,
+        })
+    }
+
+    pub(crate) fn parse_use_block(&mut self) -> SoulResult<UseBlock> {
+        self.expect_ident(KeyWord::Use.as_str())?;
+
+        let ty = match self.try_parse_type() {
+            Ok(val) => val,
+            Err(TryError::IsErr(err)) => return Err(err),
+            Err(TryError::IsNotValue(err)) => return Err(err),
+        };
+
+        let impl_trait = if self.current_is_ident(KeyWord::Impl.as_str()) {
+            self.bump();
+
+            match self.try_parse_type() {
+                Ok(val) => Some(val),
+                Err(TryError::IsErr(err)) => return Err(err),
+                Err(TryError::IsNotValue(err)) => return Err(err),
+            }
+        } else {
+            None
+        };
+
+        let block = self.parse_block(TypeModifier::Mut)?;
+        Ok(UseBlock {
+            impl_trait,
+            ty,
+            block,
         })
     }
 
@@ -148,13 +171,14 @@ impl<'a> Parser<'a> {
             let result =
                 self.try_parse_function_declaration(start_span, TypeModifier::Mut, None, ident);
 
-            return match result {
+            match result {
                 Ok(val) => Ok(val),
                 Err(TryError::IsErr(err)) => Err(err),
                 Err(TryError::IsNotValue((ident, _err))) => self
-                    .parse_function_call(start_span, None, ident)
-                    .map(|expression| Statement::from_expression(expression)),
-            };
+                    .try_parse_function_call(start_span, None, ident)
+                    .merge_to_result()
+                    .map(Statement::from_function_call),
+            }
         } else if DECLARATION_IDS.contains(&peek.kind) {
             let ident_token = self.bump_consume();
             let ident = match ident_token.kind {
@@ -177,12 +201,12 @@ impl<'a> Parser<'a> {
             let variable =
                 self.parse_variable_declaration(start_span, ident.clone(), assign_type, ty)?;
             self.add_scope_value(ident.clone(), ValueSymbol::Variable(variable));
-            return Ok(Statement::new(
+            Ok(Statement::new(
                 StatementKind::Variable(ident),
                 self.new_span(start_span),
-            ));
+            ))
         } else {
-            return self.parse_unknown_ident(start_span);
+            self.parse_unknown_ident(start_span)
         }
     }
 
@@ -256,9 +280,15 @@ impl<'a> Parser<'a> {
         keyword: KeyWord,
     ) -> TryResult<Statement, SoulError> {
         let kind = match keyword {
-            KeyWord::Use => todo!("use decl"),
+            KeyWord::Use => Statement::new(
+                StatementKind::UseBlock(self.parse_use_block().try_err()?),
+                self.new_span(start_span),
+            ),
             KeyWord::Enum => todo!("enum decl"),
-            KeyWord::Class => todo!("class decl"),
+            KeyWord::Class => Statement::new(
+                StatementKind::Class(self.parse_class().try_err()?),
+                self.new_span(start_span),
+            ),
             KeyWord::Trait => Statement::new(
                 StatementKind::Trait(self.parse_trait().try_err()?),
                 self.new_span(start_span),
@@ -268,7 +298,6 @@ impl<'a> Parser<'a> {
                 StatementKind::Struct(self.parse_struct().try_err()?),
                 self.new_span(start_span),
             ),
-
             KeyWord::If => Statement::from_expression(self.parse_if().try_err()?),
             KeyWord::For => Statement::from_expression(self.parse_for().try_err()?),
             KeyWord::Match => Statement::from_expression(self.parse_match().try_err()?),
@@ -282,7 +311,6 @@ impl<'a> Parser<'a> {
             KeyWord::Break => {
                 Statement::from_expression(self.parse_return_like(ReturnKind::Break).try_err()?)
             }
-
             KeyWord::Else => {
                 return TryErr(SoulError::new(
                     format!(
@@ -295,7 +323,14 @@ impl<'a> Parser<'a> {
                 ));
             }
 
-            KeyWord::Copy | KeyWord::Await | KeyWord::InForLoop | KeyWord::GenericWhere => {
+            KeyWord::Import => self.parse_import().try_err()?,
+            KeyWord::Typeof
+            | KeyWord::Dyn
+            | KeyWord::Impl
+            | KeyWord::Copy
+            | KeyWord::Await
+            | KeyWord::InForLoop
+            | KeyWord::GenericWhere => {
                 return TryErr(SoulError::new(
                     format!("keyword: '{}' invalid start to statment", keyword.as_str()),
                     SoulErrorKind::UnexpecedStatmentStart,
@@ -416,6 +451,91 @@ impl<'a> Parser<'a> {
             name: variable_name,
             initialize_value: Some(expression),
         })
+    }
+
+    fn parse_import(&mut self) -> SoulResult<Spanned<StatementKind>> {
+        const PATH_SYMBOOL: TokenKind = TokenKind::Symbool(SymboolKind::DoubleColon);
+
+        self.expect_ident(KeyWord::Import.as_str())?;
+        self.expect(&SQUARE_OPEN)?;
+
+        let mut paths = vec![];
+        let mut bases = vec![];
+        let mut current = SoulPagePath::new();
+        loop {
+            self.skip_end_lines();
+
+            match &self.token().kind {
+                TokenKind::Ident(name) => current.push(name),
+                &SQUARE_CLOSE => break,
+                other => {
+                    return Err(SoulError::new(
+                        format!("expected ident got '{}'", other.display()),
+                        SoulErrorKind::InvalidTokenKind,
+                        Some(self.token().span),
+                    ));
+                }
+            };
+
+            self.bump();
+
+            if self.current_is(&PATH_SYMBOOL) {
+                self.bump();
+                if self.current_is(&SQUARE_OPEN) {
+                    self.bump();
+                    bases.push(current.clone());
+                }
+
+                continue;
+            }
+
+            if self.current_is(&COMMA) {
+                self.bump();
+                self.skip_end_lines();
+
+                paths.push(current);
+                current = bases.last().cloned().unwrap_or(SoulPagePath::new());
+
+                continue;
+            }
+
+            if self.current_is(&SQUARE_CLOSE) && !bases.is_empty() {
+                paths.push(current);
+
+                let _ = bases.pop().is_none();
+                self.bump();
+                
+                while !bases.is_empty() && !self.current_is(&SQUARE_CLOSE) {
+                    self.skip_end_lines();
+                    self.expect(&SQUARE_CLOSE)?;
+                    let _ = bases.pop();
+                }
+
+                current = bases.last().cloned().unwrap_or(SoulPagePath::new());
+
+                continue;
+            }
+
+            if self.current_is(&SQUARE_CLOSE) {
+                paths.push(current);
+                break;
+            }
+
+            return Err(SoulError::new(
+                format!(
+                    "'{}' unexpected for import statment",
+                    self.token().kind.display()
+                ),
+                SoulErrorKind::InvalidTokenKind,
+                Some(self.token().span),
+            ));
+        }
+
+        self.expect(&SQUARE_CLOSE)?;
+        Ok(Statement::new(
+            StatementKind::Import(paths),
+            self.token().span,
+        ))
     }
 }
 

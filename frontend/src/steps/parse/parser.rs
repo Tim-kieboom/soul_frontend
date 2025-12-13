@@ -1,5 +1,5 @@
 use crate::steps::{
-    parse::{Request, Response, parse_statement::SEMI_COLON},
+    parse::{Request, Response, SEMI_COLON},
     tokenize::token_stream::{Token, TokenKind, TokenStream, TokenStreamPosition},
 };
 use itertools::Itertools;
@@ -9,7 +9,7 @@ use models::{
     },
     error::{SoulError, SoulErrorKind, SoulResult, Span},
     scope::{
-        scope::{ScopeId, ValueSymbol},
+        scope::{ScopeId, TypeSymbol, ValueSymbol},
         scope_builder::ScopeBuilder,
     },
     soul_names::TypeModifier,
@@ -19,7 +19,7 @@ use models::{
 ///
 /// Creates a parser instance that processes the entire token stream into
 /// statements forming the root block of the AST.
-pub fn parse<'a>(request: Request) -> Response {
+pub fn parse(request: Request) -> Response {
     Response {
         parser: Parser::new(request.token_stream),
     }
@@ -75,7 +75,6 @@ impl<'a> Parser<'a> {
         }
 
         self.skip_end_lines();
-
         let mut statments = vec![];
 
         while !self.current_is(&TokenKind::EndFile) {
@@ -87,7 +86,7 @@ impl<'a> Parser<'a> {
                 }
             }
 
-            self.skip(&[SEMI_COLON, TokenKind::EndLine]);
+            self.skip_till(&[SEMI_COLON, TokenKind::EndLine]);
         }
 
         AbstractSyntaxTree {
@@ -140,6 +139,17 @@ impl<'a> Parser<'a> {
         self.scopes.insert_value(name, symbol);
     }
 
+    /// Adds type symbol to current scope.
+    pub(crate) fn add_scope_type(
+        &mut self,
+        name: Ident,
+        symbol: TypeSymbol,
+    ) -> Result<(), SoulError> {
+        self.scopes.insert_type(name, symbol).map_err(|err| {
+            SoulError::new(err, SoulErrorKind::InvalidContext, Some(self.token().span))
+        })
+    }
+
     /// Records parse error.
     pub(crate) fn add_error(&mut self, err: SoulError) {
         self.errors.push(err);
@@ -190,8 +200,8 @@ impl<'a> Parser<'a> {
     /// Consumes current token and advances.
     pub(crate) fn bump_consume(&mut self) -> Token {
         let token = match self.tokens.consume_advance() {
-            Ok(token) => token,
-            Err((token, err)) => {
+            (token, None) => token,
+            (token, Some(err)) => {
                 self.add_error(err);
                 token
             }
@@ -213,11 +223,11 @@ impl<'a> Parser<'a> {
 
     /// Expects exact token kind, errors if mismatch.
     pub(crate) fn expect(&mut self, kind: &TokenKind) -> SoulResult<()> {
-        if self.current_is(&kind) {
+        if self.current_is(kind) {
             self.bump();
             Ok(())
         } else {
-            Err(self.get_error_expected(kind))
+            Err(self.get_expect_error(kind))
         }
     }
 
@@ -227,7 +237,7 @@ impl<'a> Parser<'a> {
             self.bump();
             Ok(())
         } else {
-            Err(self.get_error_expected_any(kinds))
+            Err(self.get_expect_any_error(kinds))
         }
     }
 
@@ -245,7 +255,7 @@ impl<'a> Parser<'a> {
                 ))
             }
         } else {
-            Err(self.get_error_expected(&TokenKind::Ident(expected.to_string())))
+            Err(self.get_expect_error(&TokenKind::Ident(expected.to_string())))
         }
     }
 
@@ -256,18 +266,18 @@ impl<'a> Parser<'a> {
 
     /// Skips all [`TokenKind::EndLine`] tokens.
     pub(crate) fn skip_end_lines(&mut self) {
-        self.skip(&[TokenKind::EndLine])
+        self.skip_till(&[TokenKind::EndLine])
     }
 
     /// Skips tokens matching any of given kinds.
-    pub(crate) fn skip(&mut self, kinds: &[TokenKind]) {
+    pub(crate) fn skip_till(&mut self, kinds: &[TokenKind]) {
         while self.current_is_any(kinds) && !self.current_is(&TokenKind::EndFile) {
             self.bump();
         }
     }
 
     /// Creates error for expected single token kind.
-    pub(crate) fn get_error_expected(&self, expected: &TokenKind) -> SoulError {
+    pub(crate) fn get_expect_error(&self, expected: &TokenKind) -> SoulError {
         let message = format!(
             "expected: '{}' but found: '{}'",
             expected.display(),
@@ -281,7 +291,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Creates error for expected token from set.
-    pub(crate) fn get_error_expected_any(&self, expected: &[TokenKind]) -> SoulError {
+    pub(crate) fn get_expect_any_error(&self, expected: &[TokenKind]) -> SoulError {
         let message = format!(
             "expected on of: ['{}'] but found: '{}'",
             expected.iter().map(|token| token.display()).join("', '"),

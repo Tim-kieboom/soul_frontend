@@ -1,4 +1,4 @@
-use crate::{abstract_syntax_tree::{expression::Expression, function::{Function, FunctionSignature}, soul_type::{GenericParameter, SoulType}, spanned::Spanned, statment::{Ident, UseBlock}}, scope::scope::ScopeId};
+use crate::{abstract_syntax_tree::{expression::Expression, function::{Function, FunctionSignature}, soul_type::{GenericDeclare, SoulType}, spanned::Spanned, statment::{Ident, UseBlock}}, scope::scope::ScopeId};
 
 /// A struct type definition.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -6,7 +6,7 @@ pub struct Struct {
     /// The name of the struct.
     pub name: Ident,
     /// Generic type parameters.
-    pub generics: Vec<GenericParameter>,
+    pub generics: Vec<GenericDeclare>,
     /// The fields of the struct.
     pub fields: Vec<Spanned<Field>>,
     /// The scope identifier for this struct.
@@ -19,7 +19,7 @@ pub struct Class {
     /// The name of the class.
     pub name: Ident,
     /// Generic type parameters.
-    pub generics: Vec<GenericParameter>,
+    pub generics: Vec<GenericDeclare>,
     /// The members of the class (fields, methods, impl blocks).
     pub members: Vec<Spanned<ClassChild>>,
     /// The scope identifier for this class.
@@ -43,20 +43,21 @@ pub struct TraitSignature {
     /// The name of the trait.
     pub name: Ident,
     /// Generic type parameters.
-    pub generics: Vec<GenericParameter>,
+    pub generics: Vec<GenericDeclare>,
     /// Traits that this trait implements/extends.
     pub implements: Vec<SoulType>,
+    pub for_types: Vec<SoulType>,
 }
 
 /// A child element of a class (field, method, or impl block).
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ClassChild {
     /// A field definition.
-    Field(Spanned<Field>),
+    Field(Field),
     /// A method definition.
-    Method(Spanned<Function>),
+    Method(Function),
     /// An implementation block.
-    ImplBlock(Spanned<UseBlock>),
+    ImplBlock(UseBlock),
 }
 
 /// A field definition in a struct or class.

@@ -1,11 +1,11 @@
-use crate::{abstract_syntax_tree::{soul_type::SoulType, statment::Variable}, scope::{scope::{ScopeId, TypeSymbol, ValueSymbol}, scope_builder::ScopeBuilder}};
+use crate::{abstract_syntax_tree::{soul_type::SoulType, statment::Variable}, scope::{scope::{ScopeId, TypeSymbol, ValueSymbol}, scope_builder::ScopeBuilder}, soul_names::TypeModifier};
 
 
 #[test]
 fn scope_push_pop() {
     let mut sb = ScopeBuilder::new();
     assert_eq!(sb.current, ScopeId::new(0));
-    sb.push_scope();
+    sb.push_scope(TypeModifier::Mut, None);
     assert_eq!(sb.current, ScopeId::new(1));
     sb.pop_scope();
     assert_eq!(sb.current, ScopeId::new(0));

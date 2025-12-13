@@ -9,15 +9,16 @@ use std::{
 };
 
 fn main() -> io::Result<()> {
-    const MAIN_FILE: &str = "F:/Code/Github/soul_frontend/frontend/soul_src/main.soul";
-    const SYNTAX_TREE: &str = "F:/Code/Github/soul_frontend/frontend/tree.soulc";
     const RELATIVE_PATH: &str = "main.soul";
+    const SYNTAX_TREE: &str = "F:/Code/Github/soul_frontend/frontend/tree.soulc";
+    const MAIN_FILE: &str = "F:/Code/Github/soul_frontend/frontend/soul_src/main.soul";
 
     let source_file = get_source_file(MAIN_FILE)?;
+
     let ParseResonse {
         syntax_tree,
         errors,
-    } = match parse_file(RELATIVE_PATH, &source_file) {
+    } = match parse_file(&source_file) {
         Ok(val) => val,
         Err(err) => {
             eprintln!("{err}");
@@ -38,18 +39,23 @@ fn main() -> io::Result<()> {
     if error_len > 0 {
         use frontend::utils::char_colors::*;
         eprintln!(
-            "{RED}code failed:{DEFAULT} code could not compile because of '{BLUE}{error_len}{DEFAULT}' errors"
-        )
+            "{RED}code failed:{DEFAULT} code could not compile because of {BLUE}{error_len}{DEFAULT} {}",
+            if error_len == 1 { "error" } else { "errors" }
+        );
+        Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "compilation failed read io::stderr to learn more",
+        ))
+    } else {
+        Ok(())
     }
-
-    Ok(())
 }
 
 fn print_syntax_tree(syntax_tree: &AbstractSyntaxTree, path: &str) -> io::Result<()> {
     let tree_string = syntax_tree.root.display();
     let mut out_file = File::create(path)?;
 
-    out_file.write(tree_string.as_bytes())?;
+    let _write_amount = out_file.write(tree_string.as_bytes())?;
     Ok(())
 }
 

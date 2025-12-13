@@ -73,7 +73,7 @@ impl SyntaxDisplay for ExpressionGroup {
             ExpressionGroup::Tuple(tuple) => sb.push_str(&format!("({})", tuple.values.iter().map(|el| el.node.display()).join(", "))),
             ExpressionGroup::Array(array) => sb.push_str(&format!(
                 "{}[{}{}]", 
-                array.collection_type.as_ref().map(|el| el.display()).unwrap_or(String::new()),
+                array.collection_type.as_ref().map(|el| format!("{}:", el.display())).unwrap_or(String::new()),
                 array.element_type.as_ref().map(|el| format!("{}: ", el.display())).unwrap_or(String::new()),
                 array.values.iter().map(|el| el.node.display()).join(", ")
             )),

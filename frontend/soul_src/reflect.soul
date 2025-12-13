@@ -1,11 +1,11 @@
-struct SpannedNode impl Spanned(Node)
+struct SpannedNode = Spanned(Node)
 struct Node {
-    field: int,
+    mut field: int,
 }
 
 struct Span {
-    line: uint
-    offset: uint
+    mut line: uint
+    mut offset: uint
 }
 
 // Spanned receives:

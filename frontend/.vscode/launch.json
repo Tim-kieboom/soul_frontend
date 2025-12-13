@@ -27,6 +27,19 @@
             "args": []
         },
         {
+            "name": "Release executable 'frontend'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "run",
+                    "--bin=frontend",
+                    "--release"
+                ]
+            },
+            "args": []
+        },
+        {
             "name": "Debug unit tests in executable 'frontend'",
             "type": "lldb",
             "request": "launch",

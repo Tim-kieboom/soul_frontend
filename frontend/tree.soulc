@@ -1,35 +1,86 @@
 
-├── Function >> 
-│   └── Expression >> return this ** b
+├── Import >> 
+│   ├── Path >> this::Subfile::Println
+│   ├── Path >> this::Subfile::this
+│   ├── Path >> this::Subfile::Function::Test
+│   ├── Path >> this::Subfile::Function::Test2
+├── Function >> sum<T: Number = int>(a: T, b: T): f32
+│   └── Expression >> return f32(a + b)
 │   │   
-├── Struct >> Struct
-│   ├── Field >> bar: int 
-│   ├── Field >> foo: int  = 0
-│   ├── Field >> field: int set = 0
-│   ├── Field >> name: str get set = "empty"
-│   ├── Field >> name2: str Get Set = "empty"
-│   ├── Field >> tpl: (int, str)  = (0, "empty")
-│   └── Field >> nmdtpl: {field: int, foo: bool} Get set = {field: 1, foo: true}
-│   │   
-├── Function >> 
+├── Function >> sum<N impl uint = 2>(a: f32, b: f32): f32
+│   ├── Variable >> sum
 │   └── Expression >> return a + b
 │   │   
-├── Function >> 
+├── Function >> f32 pow(this, b: f32): f32
+│   └── Expression >> return this ** b
+│   │   
+├── Struct >> Struct<N impl uint>
+│   ├── Field >> bar: const int 
+│   ├── Field >> bara: const [2]int 
+│   ├── Field >> barsa: const [N]int 
+│   ├── Field >> bar2: const none  = 1
+│   ├── Field >> foo: const none  = 0
+│   ├── Field >> tpl: literal none  = (0, "empty")
+│   ├── Field >> field: mut uint set = 0
+│   ├── Field >> name: mut none get set = "empty"
+│   ├── Field >> name2: mut none Get Set = "empty"
+│   └── Field >> nmdtpl: mut none Get set = {field: 1, foo: true}
+│   │   
+├── Trait >> Empty
+├── Trait >> Add
+│   ├── Methode >> Add Methode(, number: i32): none
+│   └── Methode >> Add Add(this, other: This): This
+├── UseBlock >> f32 impl Add
+│   ├── Function >> Methode(number: i32): none
+│   └── Function >> Add(other: f32): f32
+│   │   └── Expression >> return this + other
+│   │   │   
+│   │   
+├── Function >> sum(a: int, b: int): int
+│   └── Expression >> return a + b
+│   │   
+├── Function >> pow(a: f32, b: f32): f32
 │   └── Expression >> return a ** b
 │   │   
+├── UseBlock >> f32
+│   ├── Function >> sub(b: f32): f32
+│   │   └── Expression >> return this - b
+│   │   │   
+│   └── Function >> div(b: f32): f32
+│   │   └── Expression >> return this / b
+│   │   │   
+│   │   
 ├── Trait >> Pow
-│   └── Methode >> Pow(other: This): This
-└── Function >> 
+│   └── Methode >> Pow Pow(this, other: This): This
+├── UseBlock >> f32 impl Pow
+│   └── Function >> Pow(other: This): This
+│   │   └── Expression >> return this + other
+│   │   │   
+│   │   
+├── Class >> Class
+│   ├── Field >> field: mut int 
+│   ├── Field >> pubField: mut f32 Get Set = 0
+│   ├── Methode >> Class This(, value: int): none
+│   ├── Methode >> Class Methode(, ): none
+│   │   │   └── Expression >> Println("foo")
+│   │   │   │   
+│   ├── Methode >> Class empty(, ): none
+│   └── Methode >> Class num(this, ): int
+│   │   │   └── Expression >> return 0
+│   │   │   │   
+└── Function >> main(): int
 │   ├── Variable >> var
 │   ├── Assignment >> var = <default>
 │   ├── Assignment >> var = (true, "string", 1, 2)
 │   ├── Assignment >> var = [1, 2, 3, 4]
 │   ├── Assignment >> var = [int: 1, 2, 3, 4]
+│   ├── Assignment >> var = List:[1, 2, 3, 4]
+│   ├── Assignment >> var = HashMap:[(str, int): ("1", 1), ("2", 2), ("3", 3), ("4", 4)]
 │   ├── Assignment >> var = {name: 1 + 2, field: true, ..}
 │   ├── Assignment >> var = 1
 │   ├── Assignment >> var = &1
 │   ├── Variable >> ref
-│   ├── Assignment >> var = *var + 2
+│   ├── Assignment >> var = *ref + 2
 │   ├── Expression >> if 1 == 1
 │   │   └── Expression >> Println("condition")
 │   │   │   

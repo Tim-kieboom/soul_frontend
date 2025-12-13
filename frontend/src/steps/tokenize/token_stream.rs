@@ -106,33 +106,34 @@ impl<'a> TokenStream<'a> {
     /// Consumes and returns the current token, then advances.
     ///
     /// # Returns
-    /// - `Ok(Token)` no lexer error returns token
-    /// - `Err((Token, SoulError))` returns lexer error and token
-    pub fn consume_advance(&mut self) -> Result<Token, (Token, SoulError)> {
+    /// - `(Token, None)` no lexer error returns token
+    /// - `(Token, Some(SoulError))` returns lexer error and token
+    pub fn consume_advance(&mut self) -> (Token, Option<SoulError>) {
         use std::mem::swap;
 
         let mut consume_token = Token::new(TokenKind::EndLine, Span::default());
         swap(&mut self.current, &mut consume_token);
 
         if let Err(err) = self.advance() {
-            Err((consume_token, err))
+            (consume_token, Some(err))
         } else {
-            Ok(consume_token)
+            (consume_token, None)
         }
     }
 
     /// Consumes all remaining tokens into a Vec, including the current token.
-    pub fn to_vec(mut self) -> SoulResult<Vec<Token>> {
+    pub fn to_vec(&self) -> SoulResult<Vec<Token>> {
         use std::mem::swap;
 
+        let mut this = self.clone();
         let mut token = Token::new(TokenKind::EndFile, Span::default());
-        swap(&mut self.current, &mut token);
+        swap(&mut this.current, &mut token);
         let mut tokens = vec![token];
 
         loop {
-            self.advance()?;
+            this.advance()?;
             let mut token = Token::new(TokenKind::EndFile, Span::default());
-            swap(&mut self.current, &mut token);
+            swap(&mut this.current, &mut token);
             let is_end = token.is_end_of_file();
             tokens.push(token);
             if is_end {
@@ -150,8 +151,8 @@ impl TokenKind {
         match self {
             TokenKind::Ident(ident) => ident.clone(),
             TokenKind::Unknown(char) => format!("{char}"),
-            TokenKind::EndFile => format!("<end of file>"),
-            TokenKind::EndLine => format!("<end of line>"),
+            TokenKind::EndFile => "<end of file>".to_string(),
+            TokenKind::EndLine => "<end of line>".to_string(),
             TokenKind::CharLiteral(char) => format!("'{char}'"),
             TokenKind::Number(number) => number.display(),
             TokenKind::StringLiteral(str) => format!("\"{str}\""),

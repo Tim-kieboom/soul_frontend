@@ -1,4 +1,4 @@
-use crate::{abstract_syntax_tree::{block::Block, expression::{BoxExpression}, expression_groups::{NamedTuple, Tuple}, soul_type::{FunctionType, GenericParameter, NamedTupleType, SoulType, TypeGeneric}, spanned::Spanned, statment::Ident}, scope::scope::ScopeId, soul_names::TypeModifier};
+use crate::{abstract_syntax_tree::{block::Block, expression::{BoxExpression}, expression_groups::{NamedTuple, Tuple}, soul_type::{FunctionType, GenericDeclare, NamedTupleType, SoulType, GenericDefine}, spanned::Spanned, statment::Ident}, scope::scope::ScopeId, soul_names::TypeModifier};
 
 /// A function definition with a signature and body block.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -12,18 +12,25 @@ pub struct Function {
 /// A function signature describing a function's interface.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FunctionSignature {
+    pub contructor: Option<CtorKind>,
     /// The name of the function.
     pub name: Ident,
     /// Optional callee information for extension methods.
     pub callee: Option<Spanned<FunctionCallee>>,
     /// Generic type parameters.
-    pub generics: Vec<GenericParameter>,
+    pub generics: Vec<GenericDeclare>,
     /// Function parameters.
     pub parameters: NamedTupleType,
     /// Type modifier (const, mut, etc.).
     pub modifier: TypeModifier,
     /// Return type, if specified.
     pub return_type: SoulType,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum CtorKind {
+    Normal,
+    Array,
 }
 
 /// A struct constructor call, e.g., `Point { x: 1, y: 2 }`.
@@ -43,7 +50,7 @@ pub struct FunctionCall {
     /// Optional callee expression (for method calls).
     pub callee: Option<BoxExpression>,
     /// Generic type arguments.
-    pub generics: Vec<TypeGeneric>,
+    pub generics: Vec<GenericDefine>,
     /// Function arguments.
     pub arguments: Tuple,
 }
@@ -123,7 +130,7 @@ pub struct StaticMethod {
     /// The method name.
     pub name: Ident,
     /// Generic type arguments.
-    pub generics: Vec<TypeGeneric>,
+    pub generics: Vec<GenericDefine>,
     /// Method arguments.
     pub arguments: Tuple,
 }

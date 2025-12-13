@@ -2,7 +2,6 @@ use crate::steps::{
     parse::{self, parser::parse},
     tokenize::{self, tokenizer::tokenize},
 };
-use itertools::Itertools;
 use models::{abstract_syntax_tree::AbstractSyntaxTree, error::SoulError};
 use std::io::{self};
 
@@ -14,26 +13,29 @@ pub struct ParseResonse {
     pub errors: Vec<SoulError>,
 }
 
-pub fn parse_file(file_path: &str, source_file: &str) -> io::Result<ParseResonse> {
+pub fn parse_file(source_file: &str) -> io::Result<ParseResonse> {
     let request = tokenize::Request {
-        source: &source_file,
+        source: source_file,
     };
     let tokenize_response = tokenize(request);
 
     #[cfg(debug_assertions)]
     {
+        use itertools::Itertools;
+
         use crate::utils::convert_error_message::{Level, ToMessage};
 
-        let tokens = tokenize_response.token_stream.clone().to_vec().map(|vec| {
+        match tokenize_response.token_stream.clone().to_vec().map(|vec| {
             vec.into_iter()
                 .enumerate()
                 .map(|(i, el)| format!("{}.{:?}", i + 1, el.kind))
                 .join("\n\t")
-        });
-
-        match tokens {
+        }) {
             Ok(tokens) => println!("[\n\t{tokens}\n]"),
-            Err(err) => eprintln!("{}", err.to_message(Level::Debug, file_path, &source_file)),
+            Err(err) => eprintln!(
+                "{}",
+                err.to_message(Level::Debug, "(filepath hardcoded) main.soul", source_file)
+            ),
         }
     }
 

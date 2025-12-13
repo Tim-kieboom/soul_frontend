@@ -1,12 +1,14 @@
 use crate::{
     steps::{
         parse::{
-            parse_statement::{COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, ROUND_CLOSE, ROUND_OPEN},
-            parser::Parser,
+            COLON, COMMA, CONST_REF, CURLY_CLOSE, CURLY_OPEN, MUT_REF, ROUND_CLOSE, ROUND_OPEN,
+            SQUARE_CLOSE, SQUARE_OPEN, parser::Parser,
         },
-        tokenize::token_stream::TokenKind,
+        tokenize::token_stream::{Number, TokenKind},
     },
-    utils::try_result::{ResultTryResult, TryErr, TryError, TryNotValue, TryResult},
+    utils::try_result::{
+        ResultTryErr, ResultTryNotValue, TryErr, TryError, TryNotValue, TryOk, TryResult,
+    },
 };
 use models::{
     abstract_syntax_tree::{
@@ -14,7 +16,9 @@ use models::{
         soul_type::{ArrayType, NamedTupleType, ReferenceType, SoulType, TupleType, TypeKind},
     },
     error::{SoulError, SoulErrorKind, SoulResult},
-    soul_names::{InternalComplexTypes, InternalPrimitiveTypes, TypeModifier, TypeWrapper},
+    soul_names::{
+        InternalComplexTypes, InternalPrimitiveTypes, StackArrayKind, TypeModifier, TypeWrapper,
+    },
 };
 
 impl<'a> Parser<'a> {
@@ -73,7 +77,7 @@ impl<'a> Parser<'a> {
     fn inner_parse_type(&mut self) -> TryResult<SoulType, SoulError> {
         let modifier = match &self.token().kind {
             TokenKind::Ident(ident) => {
-                let modifier = TypeModifier::from_str(&ident);
+                let modifier = TypeModifier::from_str(ident);
                 if modifier.is_some() {
                     self.bump();
                 }
@@ -82,38 +86,8 @@ impl<'a> Parser<'a> {
             _ => None,
         };
 
-        let wrapper = self.get_type_wrappers();
-
-        let mut ty = if self.current_is_ident(InternalPrimitiveTypes::None.as_str()) {
-            SoulType::none()
-        } else if self.current_is(&ROUND_OPEN) {
-            self.parse_tuple_type()
-                .map(|el| SoulType::new(None, TypeKind::Tuple(el)))
-                .try_err()?
-        } else if self.current_is(&CURLY_OPEN) {
-            const IS_NAMED_TUPLE: bool = false;
-            self.parse_named_tuple_type(IS_NAMED_TUPLE)
-                .map(|(tuple, _this)| SoulType::new(None, TypeKind::NamedTuple(tuple)))?
-        } else {
-            let name = match self.bump_consume().kind {
-                TokenKind::Ident(val) => val,
-                other => {
-                    return TryNotValue(SoulError::new(
-                        format!("expected ident got '{}'", other.display()),
-                        SoulErrorKind::UnexpecedToken,
-                        Some(self.token().span),
-                    ));
-                }
-            };
-
-            if let Some(prim) = InternalPrimitiveTypes::from_str(&name) {
-                SoulType::new(None, TypeKind::Primitive(prim))
-            } else if let Some(prim) = InternalComplexTypes::from_str(&name) {
-                SoulType::new(None, TypeKind::InternalComplex(prim))
-            } else {
-                SoulType::new(None, TypeKind::Stub(name))
-            }
-        };
+        let wrapper = self.get_type_wrappers()?;
+        let mut ty = self.inner_get_base_type()?;
 
         for (wrap, lifetime, size) in wrapper {
             ty = match wrap {
@@ -149,6 +123,48 @@ impl<'a> Parser<'a> {
         Ok(ty)
     }
 
+    fn inner_get_base_type(&mut self) -> TryResult<SoulType, SoulError> {
+        const NONE_STR: &str = InternalPrimitiveTypes::None.as_str();
+
+        match &self.token().kind {
+            TokenKind::Ident(val) if val == NONE_STR => return TryOk(SoulType::none()),
+            &ROUND_OPEN => {
+                return self
+                    .parse_tuple_type()
+                    .map(|el| SoulType::new(None, TypeKind::Tuple(el)))
+                    .try_err();
+            }
+            &CURLY_OPEN => {
+                const IS_NAMED_TUPLE: bool = false;
+                return self
+                    .parse_named_tuple_type(IS_NAMED_TUPLE)
+                    .map(|(tuple, _this)| SoulType::new(None, TypeKind::NamedTuple(tuple)));
+            }
+            _ => (),
+        }
+
+        let name = match self.bump_consume().kind {
+            TokenKind::Ident(val) => val,
+            other => {
+                return TryNotValue(SoulError::new(
+                    format!("expected ident got '{}'", other.display()),
+                    SoulErrorKind::UnexpecedToken,
+                    Some(self.token().span),
+                ));
+            }
+        };
+
+        if let Some(prim) = InternalPrimitiveTypes::from_str(&name) {
+            return TryOk(SoulType::new(None, TypeKind::Primitive(prim)));
+        }
+
+        if let Some(prim) = InternalComplexTypes::from_str(&name) {
+            return TryOk(SoulType::new(None, TypeKind::InternalComplex(prim)));
+        }
+
+        TryOk(SoulType::new(None, TypeKind::Stub(name)))
+    }
+
     fn inner_parse_named_tuple_type(
         &mut self,
         is_function: bool,
@@ -164,7 +180,7 @@ impl<'a> Parser<'a> {
             &CURLY_CLOSE
         };
 
-        self.expect(open).map_err(|err| TryError::IsErr(err))?;
+        self.expect(open).try_err()?;
 
         if self.current_is(close) {
             self.bump();
@@ -174,9 +190,11 @@ impl<'a> Parser<'a> {
         let mut this = ThisCallee::Static;
         let mut types = vec![];
         loop {
-            let possible_this = if self.current_is_ident(TypeWrapper::ConstRef.as_str()) {
+            let possible_this = if self.current_is(&CONST_REF) {
+                self.bump();
                 Some(ThisCallee::ConstRef)
-            } else if self.current_is_ident(TypeWrapper::MutRef.as_str()) {
+            } else if self.current_is(&MUT_REF) {
+                self.bump();
                 Some(ThisCallee::MutRef)
             } else if self.current_is_ident("this") {
                 Some(ThisCallee::Consume)
@@ -187,7 +205,7 @@ impl<'a> Parser<'a> {
             if let Some(callee) = possible_this {
                 if this != ThisCallee::Static {
                     return TryErr(SoulError::new(
-                        format!("can not have more then one 'this' in methode"),
+                        "can not have more then one 'this' in methode".to_string(),
                         SoulErrorKind::InvalidContext,
                         Some(self.token().span),
                     ));
@@ -195,8 +213,15 @@ impl<'a> Parser<'a> {
 
                 this = callee;
                 self.expect_ident("this").try_err()?;
-                self.expect(&COMMA).try_err()?;
-                continue;
+
+                if self.current_is(&COMMA) {
+                    self.bump();
+                    continue;
+                } else if self.current_is(&ROUND_CLOSE) {
+                    break;
+                } else {
+                    return TryErr(self.get_expect_any_error(&[COMMA, ROUND_CLOSE]));
+                }
             }
 
             let token = self.bump_consume();
@@ -212,7 +237,7 @@ impl<'a> Parser<'a> {
             };
 
             if !self.current_is(&COLON) {
-                return Err(TryError::IsNotValue(self.get_error_expected(&COLON))); // is probebly tuple
+                return Err(TryError::IsNotValue(self.get_expect_error(&COLON))); // is probebly tuple
             }
 
             self.bump();
@@ -226,26 +251,65 @@ impl<'a> Parser<'a> {
             self.expect(&COMMA).try_err()?;
         }
 
-        self.expect(close).map_err(|err| TryError::IsErr(err))?;
+        self.expect(close).try_err()?;
 
         Ok((NamedTupleType { types }, this))
     }
 
-    fn get_type_wrappers(&mut self) -> Vec<(TypeWrapper, String, Option<usize>)> {
+    fn get_type_wrappers(
+        &mut self,
+    ) -> TryResult<Vec<(TypeWrapper, String, Option<StackArrayKind>)>, SoulError> {
+        
         let mut wrapper = vec![];
         loop {
+            let mut size = None;
+
             let possible_wrap = match &self.token().kind {
+                &SQUARE_OPEN => {
+                    self.bump();
+                    size = self.inner_get_stack_modifier()
+                        .try_not_value()?;
+                    
+                    Some(TypeWrapper::Array)
+                }
                 TokenKind::Symbool(sym) => TypeWrapper::from_symbool(*sym),
                 _ => None,
             };
 
             let wrap = match possible_wrap {
                 Some(val) => val,
-                None => break wrapper,
+                None => break TryOk(wrapper),
             };
 
-            wrapper.push((wrap, String::new(), None));
-            self.bump();
+            if size.is_none() {
+                self.bump();
+            }
+            wrapper.push((wrap, String::new(), size));
         }
+    }
+
+    fn inner_get_stack_modifier(&mut self) -> SoulResult<Option<StackArrayKind>>{
+        let token = self.bump_consume();
+        let size = match token.kind {
+            TokenKind::Ident(generic_type) => Some(StackArrayKind::Ident(generic_type)),
+            TokenKind::Number(Number::Uint(number)) => {
+                Some(StackArrayKind::Number(number))
+            }
+            other => {
+                return Err(SoulError::new(
+                    format!(
+                        "expected ident or literal uint but got '{}'",
+                        other.display()
+                    ),
+                    SoulErrorKind::InvalidTokenKind,
+                    Some(token.span),
+                ));
+            }
+        };
+
+        self.expect(&SQUARE_CLOSE)?;
+        Ok(
+            size
+        )
     }
 }

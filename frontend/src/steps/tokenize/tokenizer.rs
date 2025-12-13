@@ -133,7 +133,10 @@ impl<'a> Lexer<'a> {
                 TokenKind::EndLine
             }
             '"' => TokenKind::StringLiteral(self.get_string(start_line, start_offset)?),
-            '\'' => TokenKind::CharLiteral(self.get_char_literal(start_line, start_offset)?),
+            '\'' => match self.try_get_char_literal(start_line, start_offset)? {
+                Some(char) => TokenKind::CharLiteral(char),
+                None => TokenKind::Unknown('\''),
+            },
             ch if is_ident(ch) => TokenKind::Ident(self.get_ident()),
             ch if is_number(ch) => TokenKind::Number(self.get_number(start_line, start_offset)?),
             _ => {
@@ -163,7 +166,11 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn get_char_literal(&mut self, start_line: usize, start_offset: usize) -> SoulResult<char> {
+    fn try_get_char_literal(
+        &mut self,
+        start_line: usize,
+        start_offset: usize,
+    ) -> SoulResult<Option<char>> {
         self.next_char();
 
         let char = if self.current_char == Some('\\') {
@@ -193,18 +200,13 @@ impl<'a> Lexer<'a> {
             ));
         };
 
-        self.next_char();
-
-        if self.current_char != Some('\'') {
-            return Err(SoulError::new(
-                "Char literal missing closing quote",
-                SoulErrorKind::InvalidEscapeSequence,
-                Some(self.new_span(start_line, start_offset)),
-            ));
+        if self.peek_char() != Some('\'') {
+            return Ok(None);
         }
 
         self.next_char();
-        Ok(char)
+        self.next_char();
+        Ok(Some(char))
     }
 
     fn get_string(&mut self, start_line: usize, start_offset: usize) -> SoulResult<String> {
@@ -266,46 +268,37 @@ impl<'a> Lexer<'a> {
             is_float = self.lex_float(&mut num_str)
         }
 
-        if let Some(ch) = self.current_char {
-            if ch == 'e' || ch == 'E' {
-                is_float = true;
-                self.lex_exponextion_number(ch, &mut num_str, start_line, start_offset)?;
-            }
+        if let Some(ch) = self.current_char
+            && (ch == 'e' || ch == 'E')
+        {
+            is_float = true;
+            self.lex_exponextion_number(ch, &mut num_str, start_line, start_offset)?;
         }
 
         if is_float {
-            num_str
-                .parse::<f64>()
-                .map(|num| Number::Float(num))
-                .map_err(|err| {
-                    SoulError::new(
-                        err.to_string(),
-                        SoulErrorKind::InvalidNumber,
-                        Some(self.new_span(start_line, start_offset)),
-                    )
-                })
+            num_str.parse::<f64>().map(Number::Float).map_err(|err| {
+                SoulError::new(
+                    err.to_string(),
+                    SoulErrorKind::InvalidNumber,
+                    Some(self.new_span(start_line, start_offset)),
+                )
+            })
         } else if has_minus {
-            num_str
-                .parse::<i64>()
-                .map(|num| Number::Int(num))
-                .map_err(|err| {
-                    SoulError::new(
-                        err.to_string(),
-                        SoulErrorKind::InvalidNumber,
-                        Some(self.new_span(start_line, start_offset)),
-                    )
-                })
+            num_str.parse::<i64>().map(Number::Int).map_err(|err| {
+                SoulError::new(
+                    err.to_string(),
+                    SoulErrorKind::InvalidNumber,
+                    Some(self.new_span(start_line, start_offset)),
+                )
+            })
         } else {
-            num_str
-                .parse::<u64>()
-                .map(|num| Number::Uint(num))
-                .map_err(|err| {
-                    SoulError::new(
-                        err.to_string(),
-                        SoulErrorKind::InvalidNumber,
-                        Some(self.new_span(start_line, start_offset)),
-                    )
-                })
+            num_str.parse::<u64>().map(Number::Uint).map_err(|err| {
+                SoulError::new(
+                    err.to_string(),
+                    SoulErrorKind::InvalidNumber,
+                    Some(self.new_span(start_line, start_offset)),
+                )
+            })
         }
     }
 
@@ -319,11 +312,11 @@ impl<'a> Lexer<'a> {
         num_str.push(ch);
         self.next_char();
 
-        if let Some(ch2) = self.current_char {
-            if ch2 == '+' || ch2 == '-' {
-                num_str.push(ch2);
-                self.next_char();
-            }
+        if let Some(ch2) = self.current_char
+            && (ch2 == '+' || ch2 == '-')
+        {
+            num_str.push(ch2);
+            self.next_char();
         }
 
         let mut digit_found = false;

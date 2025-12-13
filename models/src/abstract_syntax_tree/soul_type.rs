@@ -6,7 +6,7 @@
 //! `literal`.
 //!
 //! Helpers are provided for checking modifiers, type categories, and displaying types.
-use crate::{abstract_syntax_tree::{enum_like::{Enum, Union}, expression::Expression, objects::{Class, Struct, Trait}, statment::Ident, syntax_display::SyntaxDisplay}, soul_names::{InternalComplexTypes, InternalPrimitiveTypes, TypeModifier, TypeWrapper}};
+use crate::{abstract_syntax_tree::{enum_like::{Enum, Union}, expression::Expression, objects::{Class, Struct, Trait}, statment::Ident, syntax_display::SyntaxDisplay}, soul_names::{InternalComplexTypes, InternalPrimitiveTypes, StackArrayKind, TypeModifier, TypeWrapper}};
 
 /// Represents a type in the Soul language.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -16,7 +16,7 @@ pub struct SoulType {
     /// Optional type modifier (const, mut, literal).
     pub modifier: Option<TypeModifier>,
 
-    pub generics: Vec<TypeGeneric>,
+    pub generics: Vec<GenericDefine>,
 }
 
 /// The specific kind of a type
@@ -66,7 +66,7 @@ pub struct ArrayType {
     /// The element type of the array.
     pub of_type: Box<SoulType>,
     /// Compile-time size, or `None` for dynamic arrays.
-    pub size: Option<usize>,
+    pub size: Option<StackArrayKind>,
 }
 
 
@@ -105,16 +105,18 @@ pub struct ReferenceType {
 
 /// A generic parameter (lifetime or type).
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum GenericParameter {
+pub enum GenericDeclare {
     /// A lifetime parameter.
     Lifetime(Ident),
     /// A type parameter.
-    Type(SoulType),
+    Type{name: Ident, traits: Vec<SoulType>, default: Option<SoulType>},
+    /// A type parameter.
+    Expression{name: Ident, for_type: Option<SoulType>, default: Option<Expression>},
 }
 
 /// A generic argument (type, lifetime, or expression).
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum TypeGeneric {
+pub enum GenericDefine {
     /// A type argument.
     Type(SoulType),
     /// A lifetime argument.
@@ -191,8 +193,9 @@ impl TypeKind {
             TypeKind::Trait(c) => c.signature.name.clone(),
             TypeKind::Array(a) => {
                 let inner = a.of_type.display();
-                match a.size {
-                    Some(size) => format!("[{}; {}]", inner, size),
+                match &a.size {
+                    Some(StackArrayKind::Number(num)) => format!("[{}]{}", num, inner),
+                    Some(StackArrayKind::Ident(ident)) => format!("[{}]{}", ident, inner),
                     None => format!("[{}]", inner),
                 }
             }

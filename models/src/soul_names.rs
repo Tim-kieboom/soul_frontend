@@ -95,7 +95,6 @@ macro_rules! define_str_enum {
         
     }
 }
-
 macro_rules! define_symbols {
     (
         $(#[$enum_doc:meta])*
@@ -239,6 +238,11 @@ define_symbols!(
     }
 );
 
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum StackArrayKind {
+    Number(u64),
+    Ident(String),
+}
 
 define_str_enum!(
     /// Type modifiers that affect how values can be used or stored.
@@ -327,7 +331,11 @@ define_str_enum!(
         /// Text/string type (`str`).
         String => "str",
         /// Range type (`Range`).
-        Rang => "Range",
+        Range => "Range",
+        /// own type
+        This => "This",
+        /// metadata type
+        Type => "Type",
     }
 );
 
@@ -457,6 +465,10 @@ define_str_enum!(
         Await => "await", 0,
         
         Use => "use", 0,
+        Impl => "impl", 0,
+        Dyn => "dyn", 0,
+        Typeof => "typeof", 0,
+        Import => "import", 0,
     }
 );
 

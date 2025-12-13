@@ -1,0 +1,14 @@
+type IntNumbers = [i8, i16, i32, i64, int]
+type UintNumbers = [u8, u16, u32, u64, uint]
+type FloatNumbers = [f16, f32, f64]
+type FixedNumbers = IntNumbers + UintNumbers
+type Numbers = FixedNumbers + FloatNumbers
+
+use UintNumbers {
+    literal MAX = uint(2) ** This.sizeof -1
+    literal MIN = uint(0)
+}
+use IntNumbers {
+    literal MAX = (uint(2) ** This.sizeof)/2 -1
+    literal MIN = (uint(2) ** This.sizeof)/2
+}

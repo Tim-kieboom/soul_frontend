@@ -1,36 +1,31 @@
 use crate::{
     steps::{
         parse::{
-            parse_statement::{
-                CURLY_OPEN, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS,
-            },
-            parser::Parser,
+            ARROW_LEFT, COLON, CURLY_OPEN, DECREMENT, INCREMENT, ROUND_OPEN, SQUARE_CLOSE,
+            SQUARE_OPEN, STAMENT_END_TOKENS, parser::Parser,
         },
         tokenize::token_stream::{Number, TokenKind},
     },
-    utils::try_result::TryError,
+    utils::try_result::{ToResult, TryError},
 };
 use models::{
     abstract_syntax_tree::{
-        expression::{Expression, ExpressionKind, Index, ReturnKind, ReturnLike},
+        expression::{Expression, ExpressionKind, FieldAccess, Index, ReturnKind, ReturnLike},
         expression_groups::ExpressionGroup,
         literal::Literal,
         operator::{Binary, BinaryOperator, Unary, UnaryOperator, UnaryOperatorKind},
+        soul_type::{SoulType, TypeKind},
     },
     error::{SoulError, SoulErrorKind, SoulResult, Span},
     soul_names::{self, AccessType, KeyWord, Operator, TypeModifier},
     symbool_kind::SymboolKind,
 };
 
-const INCREMENT: TokenKind = TokenKind::Symbool(SymboolKind::DoublePlus);
-const DECREMENT: TokenKind = TokenKind::Symbool(SymboolKind::DoubleMinus);
-
 impl<'a> Parser<'a> {
     pub(crate) fn parse_expression(&mut self, end_tokens: &[TokenKind]) -> SoulResult<Expression> {
         let expression = self.pratt_parse_precedence(0, end_tokens)?;
         Ok(expression)
     }
-
     pub(crate) fn parse_return_like(&mut self, kind: ReturnKind) -> SoulResult<Expression> {
         let start_span = self.token().span;
         self.expect_ident(kind.as_keyword().as_str())?;
@@ -68,7 +63,7 @@ impl<'a> Parser<'a> {
 
             if self.current_is(&TokenKind::EndFile) {
                 return Err(SoulError::new(
-                    format!("unexpected end of file while parsing expression"),
+                    "unexpected end of file while parsing expression".to_string(),
                     SoulErrorKind::UnexpecedFileEnd,
                     Some(self.new_span(start_span)),
                 ));
@@ -141,20 +136,15 @@ impl<'a> Parser<'a> {
                 self.new_unary(start_span, unary, right)
             }
             TokenKind::Ident(ident) => {
-                let expression = if ident == "true" {
+                if ident == "true" || ident == "false" {
+                    let value = ident == "true";
                     self.bump();
                     Expression::new(
-                        ExpressionKind::Literal(Literal::Bool(true)),
-                        self.new_span(start_span),
-                    )
-                } else if ident == "false" {
-                    self.bump();
-                    Expression::new(
-                        ExpressionKind::Literal(Literal::Bool(true)),
+                        ExpressionKind::Literal(Literal::Bool(value)),
                         self.new_span(start_span),
                     )
                 } else {
-                    match KeyWord::from_str(&ident) {
+                    match KeyWord::from_str(ident) {
                         Some(KeyWord::If) => self.parse_if()?,
                         Some(KeyWord::For) => self.parse_for()?,
                         Some(KeyWord::While) => self.parse_while()?,
@@ -163,17 +153,39 @@ impl<'a> Parser<'a> {
                         Some(KeyWord::Return) => self.parse_return_like(ReturnKind::Return)?,
                         Some(KeyWord::Continue) => self.parse_return_like(ReturnKind::Continue)?,
                         _ => {
-                            let ident = ident.clone();
-                            self.bump();
-                            Expression::new(
-                                ExpressionKind::Variable(ident),
-                                self.new_span(start_span),
-                            )
+                            let ident_token = self.bump_consume();
+                            let ident = match ident_token.kind {
+                                TokenKind::Ident(val) => val,
+                                _ => unreachable!(),
+                            };
+
+                            if self.current_is(&COLON) && self.peek().kind == SQUARE_OPEN {
+                                self.bump();
+                                let collection_type = SoulType::new(None, TypeKind::Stub(ident));
+                                let array = self.parse_array(Some(collection_type))?;
+                                Expression::new(
+                                    ExpressionKind::ExpressionGroup(ExpressionGroup::Array(array)),
+                                    self.new_span(start_span),
+                                )
+                            } else if self.current_is(&ROUND_OPEN) || self.current_is(&ARROW_LEFT) {
+                                let function_call = self
+                                    .try_parse_function_call(start_span, None, ident)
+                                    .merge_to_result()?;
+
+                                Expression::with_atribute(
+                                    ExpressionKind::FunctionCall(function_call.node),
+                                    self.new_span(start_span),
+                                    function_call.attributes,
+                                )
+                            } else {
+                                Expression::new(
+                                    ExpressionKind::Variable(ident),
+                                    self.new_span(start_span),
+                                )
+                            }
                         }
                     }
-                };
-
-                expression
+                }
             }
             TokenKind::CharLiteral(char) => {
                 let char = *char;
@@ -245,8 +257,38 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn parse_access(&mut self, start_span: Span, expression: Expression) -> SoulResult<Expression> {
-        todo!()
+    fn parse_access(&mut self, start_span: Span, lvalue: Expression) -> SoulResult<Expression> {
+        let token = self.bump_consume();
+        let ident = match token.kind {
+            TokenKind::Ident(val) => val,
+            other => {
+                return Err(SoulError::new(
+                    format!("expected ident got '{}'", other.display()),
+                    SoulErrorKind::InvalidTokenKind,
+                    Some(token.span),
+                ));
+            }
+        };
+
+        match self.try_parse_function_call(start_span, Some(&lvalue), &ident) {
+            Ok(methode) => {
+                return Ok(Expression::with_atribute(
+                    ExpressionKind::FunctionCall(methode.node),
+                    methode.span,
+                    methode.attributes,
+                ));
+            }
+            Err(TryError::IsErr(err)) => return Err(err),
+            Err(TryError::IsNotValue(_)) => (),
+        }
+
+        Ok(Expression::new(
+            ExpressionKind::FieldAccess(FieldAccess {
+                object: Box::new(lvalue),
+                field: ident,
+            }),
+            self.token().span,
+        ))
     }
 
     fn expect_unary(&self, start_span: Span, symbool: SymboolKind) -> SoulResult<UnaryOperator> {
@@ -326,17 +368,17 @@ impl<'a> Parser<'a> {
                     )));
                 }
 
-                return get_invalid_error();
+                get_invalid_error()
             }
 
-            _ => return get_invalid_error(),
+            _ => get_invalid_error(),
         }
     }
 
     fn current_precedence(&self) -> usize {
         match &self.token().kind {
             TokenKind::Ident(ident) => {
-                if let Some(keyword) = soul_names::KeyWord::from_str(&ident) {
+                if let Some(keyword) = soul_names::KeyWord::from_str(ident) {
                     keyword.precedence()
                 } else {
                     0

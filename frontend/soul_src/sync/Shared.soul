@@ -1,0 +1,20 @@
+import Std::Sync::[Mutex, Arc]
+
+class Shared<T> {
+    inner: Arc<Mutex<T>>
+
+    This(value: T) {
+        return This{inner: Arc(Mutex(value))}
+    }
+
+    impl CopyAuto {}
+    impl ConstRef<T> {
+        ConstRef(@'a this) -> @'a T 
+            => @this.inner.Lock()
+    }
+
+    impl MutRef<T> {
+        MutRef(&'a this) -> &'a T 
+            => &this.inner.Lock()
+    }
+}

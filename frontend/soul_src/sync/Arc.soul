@@ -1,0 +1,51 @@
+import Std::Sync::Atomic::[AtomicUint, Ordering]
+
+class Arc<T, Alloc = Global> {
+    ptr: *mut This.Inner<T>
+    
+    struct Inner<T> {
+        mut value: T
+        mut refCount: AtomicUint
+    }
+
+    This(value: T) { 
+        
+        inner := This.Inner{value, refCount: AtomicUint(1)}
+        return Arc {
+            ptr: unsafe { Alloc.Unchecked.NewPtr(inner) }
+        }
+    }
+
+    impl Sync{}
+    impl Send{}
+    impl Copy {
+        Copy(@this): This {
+
+            unsafe { 
+                this.ptr.refCount.FetchAdd(1, Ordering::Relax) 
+            }
+            return This { 
+                ptr: this.ptr
+            }
+        }
+    }
+
+    impl ConstRef<T> {
+        ConstRef(@this): @T 
+            => unsafe{@*ptr.value}
+    }
+
+    impl Drop {
+        Drop(&this) {
+
+            unsafe {
+                refCount := this.ptr.refCount.FetchSub(1, Ordering::AcqRel)
+                if refCount != 1 {
+                    return
+                }
+
+                Alloc.Unchecked.Drop(this.ptr)
+            }
+        }
+    }
+}

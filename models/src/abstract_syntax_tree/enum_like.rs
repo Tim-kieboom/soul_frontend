@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap};
-use crate::{abstract_syntax_tree::{expression::Expression, soul_type::{GenericParameter, SoulType}, spanned::Spanned, statment::Ident}, scope::scope::ScopeId};
+use crate::{abstract_syntax_tree::{expression::Expression, soul_type::{GenericDeclare, SoulType}, spanned::Spanned, statment::Ident}, scope::scope::ScopeId};
 
 /// A C-like enum definition (enumeration with integer values).
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -18,7 +18,7 @@ pub struct Union {
     /// The name of the union.
     pub name: Ident,
     /// Generic type parameters.
-    pub generics: Vec<GenericParameter>,
+    pub generics: Vec<GenericDeclare>,
     /// The union variants.
     pub variants: Vec<Spanned<UnionVariant>>,
     /// The scope identifier for this union.

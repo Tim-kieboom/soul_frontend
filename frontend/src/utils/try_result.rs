@@ -1,4 +1,4 @@
-use models::error::SoulError;
+use models::error::{SoulError, SoulResult};
 
 /// - `TryError::IsNotValue(R)` is not of type (type: `R` is so that you could give ownership of value back if needed)
 /// - `TryError::IsErr(SoulError)` is of type but has error
@@ -29,29 +29,51 @@ pub(crate) fn TryNotValue<T, R>(rest: R) -> TryResult<T, R> {
     Err(TryError::IsNotValue(rest))
 }
 
-pub(crate) trait ResultTryResult<T, R> {
+pub(crate) trait ResultTryErr<T, R> {
     fn try_err(self) -> TryResult<T, R>;
 }
 
-pub(crate) trait MapNotValue<T, E> {
-    fn map_not_value<R, F: FnOnce(E) -> R>(self, func: F) -> TryResult<T, R>;
+pub(crate) trait ResultTryNotValue<T, R> {
+    fn try_not_value(self) -> TryResult<T, R>;
 }
 
-impl<T, E> MapNotValue<T, E> for TryResult<T, E> {
-    fn map_not_value<R, F: FnOnce(E) -> R>(self, func: F) -> TryResult<T, R> {
+pub(crate) trait ToResult<T> {
+    fn merge_to_result(self) -> SoulResult<T>;
+}
+
+impl<T> ToResult<T> for TryResult<T, SoulError> {
+    fn merge_to_result(self) -> SoulResult<T> {
         match self {
-            Ok(val) => TryOk(val),
-            Err(TryError::IsErr(err)) => TryErr(err),
-            Err(TryError::IsNotValue(err)) => TryNotValue(func(err)),
+            Ok(val) => Ok(val),
+            Err(TryError::IsErr(err)) => Err(err),
+            Err(TryError::IsNotValue(err)) => Err(err),
         }
     }
 }
 
-impl<T, R> ResultTryResult<T, R> for Result<T, SoulError> {
+impl<T, R> ResultTryErr<T, R> for Result<T, SoulError> {
     fn try_err(self) -> TryResult<T, R> {
         match self {
             Ok(val) => TryOk(val),
             Err(err) => TryErr(err),
+        }
+    }
+}
+
+impl<T> ResultTryNotValue<T, SoulError> for Result<T, SoulError> {
+    fn try_not_value(self) -> TryResult<T, SoulError> {
+        match self {
+            Ok(val) => TryOk(val),
+            Err(err) => TryNotValue(err),
+        }
+    }
+}
+
+impl<T> ResultTryNotValue<T, ()> for Result<T, SoulError> {
+    fn try_not_value(self) -> TryResult<T, ()> {
+        match self {
+            Ok(val) => TryOk(val),
+            Err(_) => TryNotValue(()),
         }
     }
 }

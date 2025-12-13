@@ -1,15 +1,12 @@
 use crate::{
     steps::{
         parse::{
-            parse_statement::{
-                COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, ROUND_CLOSE, ROUND_OPEN, SEMI_COLON,
-                SQUARE_CLOSE, SQUARE_OPEN,
-            },
-            parser::Parser,
+            COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, ROUND_CLOSE, ROUND_OPEN, SEMI_COLON,
+            SQUARE_CLOSE, SQUARE_OPEN, parser::Parser,
         },
         tokenize::token_stream::TokenKind,
     },
-    utils::try_result::{ResultTryResult, TryErr, TryError, TryNotValue, TryResult},
+    utils::try_result::{ResultTryErr, TryErr, TryError, TryNotValue, TryResult},
 };
 use models::{
     abstract_syntax_tree::{
@@ -44,7 +41,6 @@ impl<'a> Parser<'a> {
         }
 
         self.expect(&ROUND_CLOSE)?;
-        self.expect_any(&[TokenKind::EndLine, SEMI_COLON])?;
         Ok(Tuple { values })
     }
 
@@ -63,6 +59,9 @@ impl<'a> Parser<'a> {
         let mut values = vec![];
         loop {
             self.skip_end_lines();
+            if self.current_is(&SQUARE_CLOSE) {
+                break;
+            }
 
             let element = self.parse_expression(&[SQUARE_CLOSE, COMMA])?;
             values.push(element);
@@ -130,12 +129,11 @@ impl<'a> Parser<'a> {
                 }
             };
 
-            self.expect(&COLON)
-                .map_err(|err| TryError::IsNotValue(err))?;
+            self.expect(&COLON).map_err(TryError::IsNotValue)?;
 
             let element = self
                 .parse_expression(&[CURLY_CLOSE, COMMA])
-                .map_err(|err| TryError::IsNotValue(err))?;
+                .map_err(TryError::IsNotValue)?;
 
             values.push((ident, element));
 

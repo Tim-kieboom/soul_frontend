@@ -1,0 +1,34 @@
+type A 
+type B
+
+trait Other
+trait MyAdd {
+    MyAdd(this, other: This): This
+}
+trait MySub {
+    MySub(this, other: This): This
+}
+
+use A impl MyAdd {
+    MyAdd(this, other: This): This
+        => this + other
+}
+use A impl MySub {
+    MySub(this, other: This): This
+        => this - other
+}
+
+use B impl MyAdd {
+    MyAdd(this, other: This): This
+        => this + other
+}
+use B impl MySub {
+    MySub(this, other: This): This
+        => this - other
+}
+
+use A impl Other {}
+
+trait Ops1 impl MyAdd, MySub
+trait Ops2 typeof [A, B] // MyAdd and MySub both in A and B so 'impl MyAdd, MySub'
+trait Ops3 typeof [A, B] impl Other // 'impl MyAdd, MySub, Other'

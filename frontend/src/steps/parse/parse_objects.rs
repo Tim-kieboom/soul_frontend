@@ -1,25 +1,93 @@
 use crate::{
     steps::{
         parse::{
-            parse_statement::{
-                ASSIGN, COLON, CURLY_CLOSE, CURLY_OPEN, SEMI_COLON, STAMENT_END_TOKENS,
-            },
-            parser::Parser,
+            ARROW_LEFT, ASSIGN, COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, SEMI_COLON, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS, parser::Parser
         },
         tokenize::token_stream::TokenKind,
     },
-    utils::try_result::{MapNotValue, ResultTryResult, TryError, TryNotValue, TryOk, TryResult},
+    utils::try_result::{ResultTryErr, TryErr, TryError, TryNotValue, TryOk, TryResult},
 };
 use models::{
     abstract_syntax_tree::{
-        objects::{Field, FieldAccess, Struct, Trait, TraitSignature, Visibility},
+        function::Function,
+        objects::{
+            Class, ClassChild, Field, FieldAccess, Struct, Trait, TraitSignature, Visibility,
+        },
+        soul_type::{SoulType, TypeKind},
         spanned::Spanned,
     },
     error::{SoulError, SoulErrorKind, SoulResult},
+    scope::scope::TypeSymbol,
     soul_names::{KeyWord, TypeModifier},
 };
 
 impl<'a> Parser<'a> {
+    pub(crate) fn parse_class(&mut self) -> SoulResult<Class> {
+        self.expect_ident(KeyWord::Class.as_str())?;
+
+        let ident_token = self.bump_consume();
+        let ident = match ident_token.kind {
+            TokenKind::Ident(val) => val,
+            other => {
+                return Err(SoulError::new(
+                    format!("expected name got '{}'", other.display()),
+                    SoulErrorKind::InvalidTokenKind,
+                    Some(self.token().span),
+                ));
+            }
+        };
+
+        let this_type = SoulType::new(None, TypeKind::Stub(ident.clone()));
+
+        let generics = if self.current_is(&ARROW_LEFT) {
+            self.parse_generic_declare()?
+        } else {
+            vec![]
+        };
+
+        self.expect(&CURLY_OPEN)?;
+        let scope_id = self.push_scope(TypeModifier::Mut, Some(this_type.clone()));
+
+        let mut members = vec![];
+
+        loop {
+            self.skip_end_lines();
+            if self.current_is(&CURLY_CLOSE) {
+                break;
+            }
+
+            match self.try_parse_methode(&this_type) {
+                Ok(val) => {
+                    members.push(Spanned::new(ClassChild::Method(val.node), val.span));
+                    continue;
+                }
+                Err(TryError::IsNotValue(_)) => (),
+                Err(TryError::IsErr(err)) => return Err(err),
+            }
+
+            match self.try_parse_field() {
+                Ok(val) => {
+                    members.push(Spanned::new(ClassChild::Field(val.node), val.span));
+                    continue;
+                }
+                Err(TryError::IsErr(err)) | Err(TryError::IsNotValue(err)) => return Err(err),
+            }
+        }
+
+        self.pop_scope();
+        self.skip_end_lines();
+        self.expect(&CURLY_CLOSE)?;
+
+        let class = Class {
+            members,
+            scope_id,
+            name: ident,
+            generics,
+        };
+        self.add_scope_type(class.name.clone(), TypeSymbol::Class(class.name.clone()))?;
+        Ok(class)
+    }
+
     pub(crate) fn parse_struct(&mut self) -> SoulResult<Struct> {
         let start_span = self.token().span;
         self.expect_ident(KeyWord::Struct.as_str())?;
@@ -36,26 +104,35 @@ impl<'a> Parser<'a> {
             }
         };
 
+        let generics = if self.current_is(&ARROW_LEFT) {
+            self.parse_generic_declare()?
+        } else {
+            vec![]
+        };
+
         self.expect(&CURLY_OPEN)?;
         let scope_id = self.push_scope(TypeModifier::Mut, None);
 
         let mut fields = vec![];
         loop {
-            match self.parse_field() {
+            self.skip_end_lines();
+            if self.current_is(&CURLY_CLOSE) {
+                break;
+            }
+
+            match self.try_parse_field() {
                 Ok(val) => fields.push(val),
-                Err(TryError::IsNotValue(())) => break,
-                Err(TryError::IsErr(err)) => return Err(err),
+                Err(TryError::IsErr(err)) | Err(TryError::IsNotValue(err)) => return Err(err),
             }
         }
         self.pop_scope();
-        self.skip_end_lines();
         self.expect(&CURLY_CLOSE)?;
 
         Ok(Struct {
             fields,
             scope_id,
             name: ident,
-            generics: vec![],
+            generics,
         })
     }
 
@@ -75,13 +152,36 @@ impl<'a> Parser<'a> {
             }
         };
 
-        let signature = TraitSignature {
-            name,
-            generics: vec![],
-            implements: vec![],
+        let generics = if self.current_is(&ARROW_LEFT) {
+            self.parse_generic_declare()?
+        } else {
+            vec![]
         };
 
+        let mut signature = TraitSignature {
+            name: name.clone(),
+            generics,
+            implements: vec![],
+            for_types: vec![],
+        };
+
+        let this_type = SoulType::new(None, TypeKind::Stub(name));
+
         let mut methods = vec![];
+        let (for_types, implements) = self.inner_parse_trait_impls()?;
+        signature.implements = implements;
+        signature.for_types = for_types;
+
+        if self.current_is_any(STAMENT_END_TOKENS) {
+            self.bump();
+            let scope_id = self.push_scope(TypeModifier::Mut, None);
+            self.pop_scope();
+            return Ok(Trait {
+                signature,
+                methods,
+                scope_id,
+            });
+        }
 
         self.expect(&CURLY_OPEN)?;
         let scope_id = self.push_scope(TypeModifier::Mut, None);
@@ -93,10 +193,10 @@ impl<'a> Parser<'a> {
                     let modifier =
                         TypeModifier::from_str(name).expect("just checked should be Some");
                     self.bump();
-                    modifier
+                    Some(modifier)
                 }
                 &CURLY_CLOSE => break,
-                _ => TypeModifier::Mut,
+                _ => None,
             };
 
             let ident_token = self.bump_consume();
@@ -111,7 +211,14 @@ impl<'a> Parser<'a> {
                 }
             };
 
-            let result = self.try_parse_function_signature(self.token().span, modifier, None, name);
+            let mut this = this_type.clone();
+            this.modifier = modifier;
+            let result = self.try_parse_function_signature(
+                self.token().span,
+                modifier.unwrap_or(TypeModifier::Mut),
+                Some(this),
+                name,
+            );
 
             match result {
                 Ok(val) => methods.push(val),
@@ -130,7 +237,108 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_field(&mut self) -> TryResult<Spanned<Field>, ()> {
+    fn inner_parse_trait_impls(&mut self) -> Result<(Vec<SoulType>, Vec<SoulType>), SoulError> {
+        let mut for_types = vec![];
+        let mut impl_traits = vec![];
+
+        const IMPL: &str = KeyWord::Impl.as_str();
+        const TYPEOF: &str = KeyWord::Typeof.as_str();
+
+        if self.current_is_ident(TYPEOF) {
+            self.bump();
+            self.expect(&SQUARE_OPEN)?;
+            loop {
+                match self.try_parse_type() {
+                    Ok(val) => for_types.push(val),
+                    Err(TryError::IsErr(err)) | Err(TryError::IsNotValue(err)) => return Err(err),
+                }
+
+                if !self.current_is(&COMMA) {
+                    break;
+                }
+                self.bump();
+            }
+            self.expect(&SQUARE_CLOSE)?;
+        }
+
+        if self.current_is_ident(IMPL) {
+            loop {
+                match self.try_parse_type() {
+                    Ok(val) => impl_traits.push(val),
+                    Err(TryError::IsErr(err)) | Err(TryError::IsNotValue(err)) => return Err(err),
+                }
+
+                if !self.current_is(&COMMA) {
+                    break;
+                }
+                self.bump();
+            }
+
+            if self.current_is_ident(IMPL) {
+                return Err(SoulError::new(
+                    format!("can not have {IMPL} after {TYPEOF} in trait"),
+                    SoulErrorKind::InvalidContext,
+                    Some(self.token().span),
+                ));
+            }
+        }
+
+        Ok((for_types, impl_traits))
+    }
+
+    fn try_parse_methode(&mut self, this_type: &SoulType) -> TryResult<Spanned<Function>, ()> {
+        let begin_position = self.current_position();
+        let result = self.inner_parse_methode(this_type);
+        if result.is_err() {
+            self.go_to(begin_position);
+        }
+
+        result
+    }
+
+    fn inner_parse_methode(&mut self, this_type: &SoulType) -> TryResult<Spanned<Function>, ()> {
+        let start_span = self.token().span;
+        let modifier = match &self.token().kind {
+            TokenKind::Ident(name) if TypeModifier::from_str(name).is_some() => {
+                let modifier = TypeModifier::from_str(name).expect("just checked should be Some");
+                self.bump();
+                Some(modifier)
+            }
+            _ => None,
+        };
+
+        let ident_token = self.bump_consume();
+        let name = match ident_token.kind {
+            TokenKind::Ident(val) => val,
+            _ => return TryNotValue(()),
+        };
+
+        let mut this_type = this_type.clone();
+        this_type.modifier = modifier;
+        let result = self.try_parse_function_signature(
+            self.token().span,
+            modifier.unwrap_or(TypeModifier::Mut),
+            Some(this_type),
+            name,
+        );
+
+        let signature = match result {
+            Ok(val) => val.node,
+            Err(TryError::IsErr(err)) => return TryErr(err),
+            Err(TryError::IsNotValue(_)) => return TryNotValue(()),
+        };
+
+        let block = self
+            .parse_block(modifier.unwrap_or(TypeModifier::Mut))
+            .try_err()?;
+
+        TryOk(Spanned::new(
+            Function { signature, block },
+            self.new_span(start_span),
+        ))
+    }
+
+    fn try_parse_field(&mut self) -> TryResult<Spanned<Field>, SoulError> {
         let begin_position = self.current_position();
         let result = self.inner_parse_field();
         if result.is_err() {
@@ -140,22 +348,44 @@ impl<'a> Parser<'a> {
         result
     }
 
-    fn inner_parse_field(&mut self) -> TryResult<Spanned<Field>, ()> {
+    fn inner_parse_field(&mut self) -> TryResult<Spanned<Field>, SoulError> {
         let start_span = self.token().span;
 
         self.skip_end_lines();
+
+        let possible_modifier = match &self.token().kind {
+            TokenKind::Ident(ident) => TypeModifier::from_str(ident),
+            _ => None,
+        };
+
+        let modifier = match possible_modifier {
+            Some(val) => {
+                self.bump();
+                val
+            }
+            None => TypeModifier::Const,
+        };
+
         let ident_token = self.bump_consume();
         let name = match ident_token.kind {
             TokenKind::Ident(val) => val,
-            _ => return TryNotValue(()),
+            other => {
+                return TryNotValue(SoulError::new(
+                    format!("expected ident but got '{}'", other.display()),
+                    SoulErrorKind::InvalidTokenKind,
+                    Some(self.token().span),
+                ));
+            }
         };
 
-        if !self.current_is(&COLON) {
-            return TryNotValue(());
-        }
+        let mut ty = if self.current_is(&COLON) {
+            self.bump();
+            self.try_parse_type()?
+        } else {
+            SoulType::none()
+        };
 
-        self.bump();
-        let ty = self.try_parse_type().map_not_value(|_| ())?;
+        ty.modifier = Some(modifier);
 
         let vis = self.parse_field_access();
 
@@ -183,7 +413,7 @@ impl<'a> Parser<'a> {
             self.bump();
         }
 
-        return TryOk(Spanned::new(
+        TryOk(Spanned::new(
             Field {
                 name,
                 ty,
@@ -192,7 +422,7 @@ impl<'a> Parser<'a> {
                 allignment: u32::default(),
             },
             self.new_span(start_span),
-        ));
+        ))
     }
 
     fn parse_field_access(&mut self) -> FieldAccess {

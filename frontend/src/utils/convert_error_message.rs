@@ -39,10 +39,14 @@ impl ToMessage for SoulError {
         sb.push_str(BLUE);
         sb.push_str(file_path);
         if let Some(span) = self.span {
-            sb.push_str(":");
+            sb.push(':');
             sb.push_str(&format!("{}", span.start_line));
             sb.push(':');
             sb.push_str(&format!("{}", span.start_offset));
+            sb.push_str(" to ");
+            sb.push_str(&format!("{}", span.end_line));
+            sb.push(':');
+            sb.push_str(&format!("{}", span.end_offset));
         }
         sb.push_str(DEFAULT);
         sb.push_str(" ──");
@@ -89,18 +93,15 @@ fn get_source_snippet(out: &mut String, span: &Span, mut lines: Lines, begin_spa
     .max()
     .unwrap_or(0);
 
-    match prev_line {
-        Some(line) => {
-            let begin = format!("{}.", span.start_line - 1);
-            let len = (begin.len() as i64 - begin_space.len() as i64).abs() as usize;
-            let spaces = " ".repeat(len);
-            out.push_str(&format!("{spaces}{begin}│ {}\n", line))
-        }
-        _ => (),
+    if let Some(line) = prev_line {
+        let begin = format!("{}.", span.start_line - 1);
+        let len = (begin.len() as i64 - begin_space.len() as i64).unsigned_abs() as usize;
+        let spaces = " ".repeat(len);
+        out.push_str(&format!("{spaces}{begin}│ {}\n", line))
     };
 
     let begin = format!("{}.", span.start_line);
-    let len = (begin.len() as i64 - begin_space.len() as i64).abs() as usize;
+    let len = (begin.len() as i64 - begin_space.len() as i64).unsigned_abs() as usize;
     let spaces = " ".repeat(len);
     out.push_str(&format!("{spaces}{begin}│ {}\n", current_line));
 
@@ -116,14 +117,11 @@ fn get_source_snippet(out: &mut String, span: &Span, mut lines: Lines, begin_spa
 
     out.push_str(&format!("{begin_space}│ {spaces}{carets}\n"));
 
-    match next_line {
-        Some(line) => {
-            let begin = format!("{}.", span.start_line + 1);
-            let len = (begin.len() as i64 - begin_space.len() as i64).abs() as usize;
-            let spaces = " ".repeat(len);
-            out.push_str(&format!("{spaces}{begin}│ {}\n", line))
-        }
-        _ => (),
+    if let Some(line) = next_line {
+        let begin = format!("{}.", span.start_line + 1);
+        let len = (begin.len() as i64 - begin_space.len() as i64).unsigned_abs() as usize;
+        let spaces = " ".repeat(len);
+        out.push_str(&format!("{spaces}{begin}│ {}\n", line))
     };
 
     out.push_str(&format!("{begin_space}└──"));

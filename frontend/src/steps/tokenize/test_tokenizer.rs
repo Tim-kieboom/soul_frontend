@@ -8,8 +8,10 @@ use crate::steps::tokenize::{
 
 fn tokenize_source(source: &str) -> Vec<Token> {
     let request = Request { source };
-    let response = tokenize(request);
-    response.token_stream.to_vec().expect("To vec failed")
+    tokenize(request)
+        .token_stream
+        .to_vec()
+        .expect("To vec failed")
 }
 
 fn to_token_kinds(tokens: Vec<Token>) -> Vec<TokenKind> {

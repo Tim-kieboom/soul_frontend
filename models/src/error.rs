@@ -19,6 +19,7 @@ pub enum SoulErrorKind {
     InvalidIdent, 
     InvalidNumber,
     InvalidOperator,
+    InvalidStatment,
     InvalidTokenKind,
     InvalidExpression,
     InvalidEscapeSequence,
