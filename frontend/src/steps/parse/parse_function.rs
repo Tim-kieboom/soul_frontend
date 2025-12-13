@@ -9,13 +9,10 @@ use models::{
     abstract_syntax_tree::{
         expression::Expression,
         function::{Function, FunctionCall, FunctionCallee, FunctionSignature},
-        soul_type::{GenericDeclare, SoulType, GenericDefine},
+        soul_type::{GenericDeclare, GenericDefine, SoulType},
         spanned::Spanned,
         statment::{Ident, Statement, StatementKind},
-    },
-    error::{SoulError, SoulErrorKind, SoulResult, Span},
-    soul_names::{KeyWord, TypeModifier},
-    symbool_kind::SymboolKind,
+    }, error::{SoulError, SoulErrorKind, SoulResult, Span}, soul_names::{KeyWord, TypeModifier}, symbool_kind::SymboolKind
 };
 
 impl<'a> Parser<'a> {
@@ -79,6 +76,7 @@ impl<'a> Parser<'a> {
         } = self.try_parse_function_signature(start_span, modifier, extention_type, name)?;
         let block = self.parse_block(modifier).try_err()?;
 
+        self.add_function_delcaration(signature.clone());
         Ok(Statement::with_atribute(
             StatementKind::Function(Function { signature, block }),
             span.combine(self.token().span),

@@ -80,12 +80,12 @@ class Class {
     mut field: int
     mut pubField: f32 Get Set = 0
 
-    This(value: int) {
-        // return This{field: value, ..}
+    This(numStr: str) {
+        return {field: int(numStr), ..}
     }
 
     // This:[values: []int] {
-    //     return This{field: values.Sum(), ..}
+    //     return {field: values.Sum(), ..}
     // }
 
     Methode() {

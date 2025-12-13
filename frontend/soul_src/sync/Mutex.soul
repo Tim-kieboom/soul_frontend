@@ -1,12 +1,12 @@
 import Std::Sync::Atomic::[AtomicBool, Ordering]
 
-union LockError {
-    PoisonError,
+enum LockError {
+    PoisonError, 
     NoAquireError,
 }
 
-use LockResult<'a, T> = Res<MutexGuard<'a, T>, LockError.PoisonError>
-use TryLockResult<'a, T> = Res<MutexGuard<'a, T>, LockError>
+use LockResult<'a, T> = Res<Guard<'a, T>, LockError.PoisonError>
+use TryLockResult<'a, T> = Res<Guard<'a, T>, LockError>
 
 class Mutex<T> {
     isLocked: AtomicBool
@@ -26,7 +26,7 @@ class Mutex<T> {
         }
 
         return Ok(
-            MutexGuard(this)
+            Guard(this)
         )
     }
 
@@ -39,7 +39,7 @@ class Mutex<T> {
         }
         
         return Ok(
-            MutexGuard(this)
+            Guard(this)
         )
     }
 
@@ -51,7 +51,7 @@ class PoisonFlag {
     atomicCheck: AtomicBool
 }
 
-class MutexGuard<'a, T> {
+class Guard<'a, T> {
     mutex: @'a Mutex<T>,
 
     impl ConstRef<T> {

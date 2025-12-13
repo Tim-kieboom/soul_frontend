@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{abstract_syntax_tree::{expression::Expression, function::Function, soul_type::SoulType, spanned::Spanned, statment::{Ident, Variable}}, soul_names::TypeModifier};
+use crate::{abstract_syntax_tree::{expression::Expression, function::{FunctionSignature}, soul_type::SoulType, statment::{Ident, Variable}}, soul_names::TypeModifier};
 
 /// An identifier for a scope in the scope tree.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -22,8 +22,6 @@ pub enum TypeSymbol {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ValueSymbol {
     Variable(Variable),
-    /// One or more function definitions with the same name (overloading).
-    Functions(Vec<Spanned<Function>>),
 }
 
 /// A lexical scope containing symbols (variables, functions, types).
@@ -43,6 +41,8 @@ pub struct Scope {
     pub values: HashMap<String, Vec<ValueSymbol>>,
     /// Map of type names to their type symbols.
     pub types: HashMap<String, TypeSymbol>,
+    /// Map of functions to their type symbols.
+    pub functions: HashMap<String, Vec<FunctionSignature>>,
 
     pub modifier: TypeModifier,
     pub use_block: Option<SoulType>,
@@ -76,6 +76,7 @@ impl Scope {
             children: vec![],
             values: HashMap::new(),
             types: HashMap::new(),
+            functions: HashMap::new(),
             modifier: TypeModifier::Mut,
             use_block: None,
         }
@@ -89,6 +90,7 @@ impl Scope {
             children: vec![],
             values: HashMap::new(),
             types: HashMap::new(),
+            functions: HashMap::new(),
             modifier,
             use_block,
         }

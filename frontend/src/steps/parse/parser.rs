@@ -5,7 +5,7 @@ use crate::steps::{
 use itertools::Itertools;
 use models::{
     abstract_syntax_tree::{
-        AbstractSyntaxTree, block::Block, soul_type::SoulType, statment::Ident,
+        AbstractSyntaxTree, block::Block, function::FunctionSignature, soul_type::SoulType, statment::Ident
     },
     error::{SoulError, SoulErrorKind, SoulResult, Span},
     scope::{
@@ -148,6 +148,13 @@ impl<'a> Parser<'a> {
         self.scopes.insert_type(name, symbol).map_err(|err| {
             SoulError::new(err, SoulErrorKind::InvalidContext, Some(self.token().span))
         })
+    }
+
+    pub(crate) fn add_function_delcaration(
+        &mut self,
+        symbol: FunctionSignature,
+    ) {
+        self.scopes.insert_function(symbol)
     }
 
     /// Records parse error.

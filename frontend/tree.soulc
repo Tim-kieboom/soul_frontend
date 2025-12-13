@@ -60,7 +60,9 @@
 ├── Class >> Class
 │   ├── Field >> field: mut int 
 │   ├── Field >> pubField: mut f32 Get Set = 0
-│   ├── Methode >> Class This(, value: int): none
+│   ├── Methode >> Class This(, numStr: str): none
+│   │   │   └── Expression >> return {field: int(numStr), ..}
+│   │   │   │   
 │   ├── Methode >> Class Methode(, ): none
 │   │   │   └── Expression >> Println("foo")
 │   │   │   │   

@@ -1,8 +1,8 @@
 use crate::{
     steps::{
         parse::{
-            ARROW_LEFT, ASSIGN, COLON, COLON_ASSIGN, COMMA, CURLY_CLOSE, CURLY_OPEN, ROUND_OPEN,
-            SEMI_COLON, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS, parser::Parser,
+            ARROW_LEFT, ASSIGN, COLON, COLON_ASSIGN, CURLY_CLOSE, CURLY_OPEN, ROUND_OPEN,
+            SEMI_COLON, STAMENT_END_TOKENS, parser::Parser,
         },
         tokenize::token_stream::TokenKind,
     },
@@ -10,18 +10,14 @@ use crate::{
 };
 use models::{
     abstract_syntax_tree::{
-        block::Block,
         expression::{Expression, ExpressionKind, ReturnKind},
         operator::{Binary, BinaryOperator, BinaryOperatorKind},
         soul_type::SoulType,
-        spanned::Spanned,
-        statment::{Assignment, Ident, Statement, StatementKind, UseBlock, Variable},
+        statment::{Assignment, Ident, Statement, StatementKind, Variable},
     },
     error::{SoulError, SoulErrorKind, SoulResult, Span},
     scope::scope::ValueSymbol,
     soul_names::{self, AssignType, KeyWord, TypeModifier},
-    soul_page_path::SoulPagePath,
-    symbool_kind::SymboolKind,
 };
 use std::{
     iter::{self},
@@ -73,68 +69,6 @@ impl<'a> Parser<'a> {
                 }
             },
         }
-    }
-
-    pub(crate) fn parse_block(&mut self, modifier: TypeModifier) -> SoulResult<Block> {
-        const END_TOKENS: &[TokenKind] = &[CURLY_CLOSE, TokenKind::EndFile];
-
-        let mut statments = vec![];
-
-        let scope_id = self.push_scope(modifier, None);
-
-        self.expect(&CURLY_OPEN)?;
-        while !self.current_is_any(END_TOKENS) {
-            self.skip_end_lines();
-            if self.current_is(&CURLY_CLOSE) {
-                break;
-            }
-
-            match self.parse_statement() {
-                Ok(statment) => statments.push(statment),
-                Err(err) => {
-                    self.add_error(err);
-                    self.skip_over_statement();
-                }
-            }
-
-            self.skip_till(&[SEMI_COLON, TokenKind::EndLine]);
-        }
-
-        self.expect(&CURLY_CLOSE)?;
-        Ok(Block {
-            modifier,
-            statments,
-            scope_id,
-        })
-    }
-
-    pub(crate) fn parse_use_block(&mut self) -> SoulResult<UseBlock> {
-        self.expect_ident(KeyWord::Use.as_str())?;
-
-        let ty = match self.try_parse_type() {
-            Ok(val) => val,
-            Err(TryError::IsErr(err)) => return Err(err),
-            Err(TryError::IsNotValue(err)) => return Err(err),
-        };
-
-        let impl_trait = if self.current_is_ident(KeyWord::Impl.as_str()) {
-            self.bump();
-
-            match self.try_parse_type() {
-                Ok(val) => Some(val),
-                Err(TryError::IsErr(err)) => return Err(err),
-                Err(TryError::IsNotValue(err)) => return Err(err),
-            }
-        } else {
-            None
-        };
-
-        let block = self.parse_block(TypeModifier::Mut)?;
-        Ok(UseBlock {
-            impl_trait,
-            ty,
-            block,
-        })
     }
 
     pub(crate) fn skip_over_statement(&mut self) {
@@ -446,96 +380,13 @@ impl<'a> Parser<'a> {
             }
         };
 
-        Ok(Variable {
+        let variable = Variable {
             ty: ty.unwrap_or(SoulType::none()),
             name: variable_name,
             initialize_value: Some(expression),
-        })
-    }
-
-    fn parse_import(&mut self) -> SoulResult<Spanned<StatementKind>> {
-        const PATH_SYMBOOL: TokenKind = TokenKind::Symbool(SymboolKind::DoubleColon);
-
-        self.expect_ident(KeyWord::Import.as_str())?;
-        self.expect(&SQUARE_OPEN)?;
-
-        let mut paths = vec![];
-        let mut bases = vec![];
-        let mut current = SoulPagePath::new();
-        loop {
-            self.skip_end_lines();
-
-            match &self.token().kind {
-                TokenKind::Ident(name) => current.push(name),
-                &SQUARE_CLOSE => break,
-                other => {
-                    return Err(SoulError::new(
-                        format!("expected ident got '{}'", other.display()),
-                        SoulErrorKind::InvalidTokenKind,
-                        Some(self.token().span),
-                    ));
-                }
-            };
-
-            self.bump();
-
-            if self.current_is(&PATH_SYMBOOL) {
-                self.bump();
-                if self.current_is(&SQUARE_OPEN) {
-                    self.bump();
-                    bases.push(current.clone());
-                }
-
-                continue;
-            }
-
-            if self.current_is(&COMMA) {
-                self.bump();
-                self.skip_end_lines();
-
-                paths.push(current);
-                current = bases.last().cloned().unwrap_or(SoulPagePath::new());
-
-                continue;
-            }
-
-            if self.current_is(&SQUARE_CLOSE) && !bases.is_empty() {
-                paths.push(current);
-
-                let _ = bases.pop().is_none();
-                self.bump();
-                
-                while !bases.is_empty() && !self.current_is(&SQUARE_CLOSE) {
-                    self.skip_end_lines();
-                    self.expect(&SQUARE_CLOSE)?;
-                    let _ = bases.pop();
-                }
-
-                current = bases.last().cloned().unwrap_or(SoulPagePath::new());
-
-                continue;
-            }
-
-            if self.current_is(&SQUARE_CLOSE) {
-                paths.push(current);
-                break;
-            }
-
-            return Err(SoulError::new(
-                format!(
-                    "'{}' unexpected for import statment",
-                    self.token().kind.display()
-                ),
-                SoulErrorKind::InvalidTokenKind,
-                Some(self.token().span),
-            ));
-        }
-
-        self.expect(&SQUARE_CLOSE)?;
-        Ok(Statement::new(
-            StatementKind::Import(paths),
-            self.token().span,
-        ))
+        };
+        self.add_scope_value(variable.name.clone(), ValueSymbol::Variable(variable.clone()));
+        Ok(variable)
     }
 }
 

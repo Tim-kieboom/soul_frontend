@@ -1,4 +1,4 @@
-use crate::{abstract_syntax_tree::soul_type::SoulType, scope::scope::{Scope, ScopeId, TypeSymbol, ValueSymbol}, soul_names::TypeModifier};
+use crate::{abstract_syntax_tree::{function::{FunctionSignature}, soul_type::SoulType}, scope::scope::{Scope, ScopeId, TypeSymbol, ValueSymbol}, soul_names::TypeModifier};
 
 /// A builder for managing a tree of scopes.
 ///
@@ -44,6 +44,16 @@ impl ScopeBuilder {
         }
         scope.types.insert(name, symbol);
         Ok(())
+    }
+
+    /// Insert a type into current scope
+    pub fn insert_function(&mut self, signature: FunctionSignature) {
+        let scope = self.current_scope_mut();
+        if let Some(overloads) = scope.functions.get_mut(&signature.name) {
+            overloads.push(signature);
+            return
+        }
+        scope.functions.insert(signature.name.clone(), vec![signature]);
     }
 
     /// Insert a value (variable or function) into current scope

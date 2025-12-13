@@ -93,7 +93,7 @@ impl<'a> Parser<'a> {
         self.expect_ident(KeyWord::Struct.as_str())?;
 
         let ident_token = self.bump_consume();
-        let ident = match ident_token.kind {
+        let name = match ident_token.kind {
             TokenKind::Ident(val) => val,
             other => {
                 return Err(SoulError::new(
@@ -117,7 +117,7 @@ impl<'a> Parser<'a> {
         loop {
             self.skip_end_lines();
             if self.current_is(&CURLY_CLOSE) {
-                break;
+                break
             }
 
             match self.try_parse_field() {
@@ -128,10 +128,11 @@ impl<'a> Parser<'a> {
         self.pop_scope();
         self.expect(&CURLY_CLOSE)?;
 
+        self.add_scope_type(name.clone(), TypeSymbol::Struct(name.clone()))?;
         Ok(Struct {
             fields,
             scope_id,
-            name: ident,
+            name,
             generics,
         })
     }
@@ -175,6 +176,7 @@ impl<'a> Parser<'a> {
         if self.current_is_any(STAMENT_END_TOKENS) {
             self.bump();
             let scope_id = self.push_scope(TypeModifier::Mut, None);
+            self.add_scope_type(signature.name.clone(), TypeSymbol::Trait(signature.name.clone()))?;
             self.pop_scope();
             return Ok(Trait {
                 signature,
@@ -230,6 +232,7 @@ impl<'a> Parser<'a> {
         self.skip_end_lines();
         self.expect(&CURLY_CLOSE)?;
 
+        self.add_scope_type(signature.name.clone(), TypeSymbol::Trait(signature.name.clone()))?;
         Ok(Trait {
             signature,
             methods,
