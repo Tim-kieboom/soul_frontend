@@ -1,6 +1,21 @@
 use itertools::Itertools;
 
-use crate::{abstract_syntax_tree::{block::Block, enum_like::{Enum, Union}, expression::{Expression, ExpressionKind}, function::{Function, FunctionCall, FunctionSignature}, objects::{Class, ClassChild, Field, Struct, Trait}, soul_type::{GenericDeclare, SoulType}, spanned::Spanned, syntax_display::{SyntaxDisplay, gap_prefix, tree_prefix}}, error::Span, soul_names::KeyWord, soul_page_path::SoulPagePath};
+use crate::{
+    abstract_syntax_tree::{
+        block::Block,
+        enum_like::{Enum, Union},
+        expression::{Expression, ExpressionKind},
+        function::{Function, FunctionCall, FunctionSignature},
+        objects::{Class, ClassChild, Field, Struct, Trait},
+        soul_type::{GenericDeclare, SoulType},
+        spanned::Spanned,
+        syntax_display::{SyntaxDisplay, gap_prefix, tree_prefix},
+    },
+    error::Span,
+    sementic_models::scope::NodeId,
+    soul_names::KeyWord,
+    soul_page_path::SoulPagePath,
+};
 
 /// A statement in the Soul language, wrapped with source location information.
 pub type Statement = Spanned<StatementKind>;
@@ -20,10 +35,10 @@ pub enum StatementKind {
     Expression(Expression),
 
     /// A variable declaration.
-    Variable(Ident),
+    Variable(Variable),
     /// An assignment to an existing variable.
     Assignment(Assignment),
-    
+
     /// A function declaration (with body block).
     Function(Function),
     /// A scoped `use` block (soul version of rusts 'impl' with optional trait implementation).
@@ -35,7 +50,7 @@ pub enum StatementKind {
     Struct(Struct),
     /// A trait declaration.
     Trait(Trait),
-    
+
     /// An enum declaration (c like enum).
     Enum(Enum),
     /// A union declaration (rust like enum).
@@ -66,6 +81,8 @@ pub struct Variable {
     pub ty: SoulType,
     /// Optional initial value expression.
     pub initialize_value: Option<Expression>,
+
+    pub node_id: Option<NodeId>,
 }
 
 /// A `use` block (similar to Rust's `impl` block).
@@ -92,9 +109,11 @@ impl Statement {
     }
 
     pub fn from_function_call(function: Spanned<FunctionCall>) -> Self {
-        Self::from_expression(
-            Expression::with_atribute(ExpressionKind::FunctionCall(function.node), function.span, function.attributes)
-        )
+        Self::from_expression(Expression::with_atribute(
+            ExpressionKind::FunctionCall(function.node),
+            function.span,
+            function.attributes,
+        ))
     }
 
     pub fn new_block(block: Block, span: Span) -> Self {
@@ -128,41 +147,55 @@ impl SyntaxDisplay for StatementKind {
         match self {
             StatementKind::EndFile => (),
             StatementKind::Import(paths) => {
-
                 sb.push_str(&prefix);
                 sb.push_str("Import >> ");
-                let prefix = tree_prefix(tab+1, is_last);
+                let prefix = tree_prefix(tab + 1, is_last);
                 for path in paths {
                     sb.push('\n');
                     sb.push_str(&prefix);
                     sb.push_str("Path >> ");
                     sb.push_str(path.as_str());
                 }
-            },
+            }
             StatementKind::Expression(spanned) => {
                 sb.push_str(&prefix);
                 sb.push_str("Expression >> ");
                 spanned.node.inner_display(sb, tab, is_last);
-            },
+            }
             StatementKind::Variable(var) => {
                 sb.push_str(&prefix);
+                if let Some(id) = var.node_id {
+                    sb.push_str("NodeId(");
+                    sb.push_str(&id.display());
+                    sb.push_str(") ");
+                }
                 sb.push_str("Variable >> ");
-                sb.push_str(&var);
-            },
+                sb.push_str(&var.name);
+                sb.push_str(": ");
+                var.ty.inner_display(sb, tab, is_last);
+                if let Some(val) = &var.initialize_value {
+                    sb.push_str(" = ");
+                    val.node.inner_display(sb, tab, is_last);
+                }
+            }
             StatementKind::Assignment(assignment) => {
                 sb.push_str(&prefix);
                 sb.push_str("Assignment >> ");
                 assignment.left.node.inner_display(sb, tab, is_last);
                 sb.push_str(" = ");
                 assignment.right.node.inner_display(sb, tab, is_last);
-            },
+            }
             StatementKind::Function(function) => {
-                
                 sb.push_str(&prefix);
+                if let Some(id) = function.node_id {
+                    sb.push_str("NodeId(");
+                    sb.push_str(&id.display());
+                    sb.push_str(") ");
+                }
                 sb.push_str("Function >> ");
                 inner_display_function_declaration(sb, &function.signature, tab, is_last);
                 function.block.inner_display(sb, tab, is_last);
-            },
+            }
             StatementKind::UseBlock(use_block) => {
                 sb.push_str(&prefix);
                 sb.push_str("UseBlock >> ");
@@ -172,38 +205,63 @@ impl SyntaxDisplay for StatementKind {
                     impl_trait.inner_display(sb, tab, is_last);
                 }
                 use_block.block.inner_display(sb, tab, is_last);
-            },
+            }
             StatementKind::Struct(_struct) => {
                 const USE_LAST: bool = true;
                 sb.push_str(&prefix);
+                if let Some(id) = _struct.node_id {
+                    sb.push_str("NodeId(");
+                    sb.push_str(&id.display());
+                    sb.push_str(") ");
+                }
                 sb.push_str("Struct >> ");
                 sb.push_str(&_struct.name);
                 inner_display_generic_parameters(sb, &_struct.generics);
-                inner_display_fields(sb, &_struct.fields, tab+1, USE_LAST);
-            },
+                inner_display_fields(sb, &_struct.fields, tab + 1, USE_LAST);
+            }
             StatementKind::Trait(_trait) => {
                 const USE_LAST: bool = true;
                 sb.push_str(&prefix);
+                if let Some(id) = _trait.node_id {
+                    sb.push_str("NodeId(");
+                    sb.push_str(&id.display());
+                    sb.push_str(") ");
+                }
                 sb.push_str("Trait >> ");
                 sb.push_str(&_trait.signature.name);
                 if !_trait.signature.for_types.is_empty() {
-                    let fors = _trait.signature.for_types.iter().map(|el| el.display()).join(", ");
+                    let fors = _trait
+                        .signature
+                        .for_types
+                        .iter()
+                        .map(|el| el.display())
+                        .join(", ");
                     sb.push_str(&format!(" {} [{}]", KeyWord::For.as_str(), fors));
                 }
                 if !_trait.signature.implements.is_empty() {
-                    let fors = _trait.signature.implements.iter().map(|el| el.display()).join(", ");
+                    let fors = _trait
+                        .signature
+                        .implements
+                        .iter()
+                        .map(|el| el.display())
+                        .join(", ");
                     sb.push_str(&format!(" {} {}", KeyWord::Impl.as_str(), fors));
                 }
-                inner_display_methode_signatures(sb, &_trait.methods, tab+1, USE_LAST);
-            },
+                inner_display_methode_signatures(sb, &_trait.methods, tab + 1, USE_LAST);
+            }
             StatementKind::Class(class) => {
                 const USE_LAST: bool = true;
                 sb.push_str(&prefix);
+                if let Some(id) = class.node_id {
+                    sb.push_str("NodeId(");
+                    sb.push_str(&id.display());
+                    sb.push_str(") ");
+                }
                 sb.push_str("Class >> ");
                 sb.push_str(&class.name);
                 inner_display_generic_parameters(sb, &class.generics);
-                inner_display_classchild(sb, &class.members, tab+1, USE_LAST);
-            },
+                inner_display_classchild(sb, &class.members, tab + 1, USE_LAST);
+            }
             StatementKind::Enum(_) => todo!(),
             StatementKind::Union(_) => todo!(),
             StatementKind::CloseBlock => sb.push_str(&prefix),
@@ -211,13 +269,37 @@ impl SyntaxDisplay for StatementKind {
     }
 }
 
-fn inner_display_function_declaration(sb: &mut String, signature: &FunctionSignature, tab: usize, is_last: bool) {
-    sb.push_str(&signature.callee.as_ref().map(|el| format!("{} ", el.node.extention_type.display())).unwrap_or_default());
+fn inner_display_function_declaration(
+    sb: &mut String,
+    signature: &FunctionSignature,
+    tab: usize,
+    is_last: bool,
+) {
+    sb.push_str(
+        &signature
+            .callee
+            .as_ref()
+            .map(|el| format!("{} ", el.node.extention_type.display()))
+            .unwrap_or_default(),
+    );
     sb.push_str(&signature.name);
     inner_display_generic_parameters(sb, &signature.generics);
     sb.push('(');
-    sb.push_str(&signature.callee.as_ref().map(|el| format!("{}, ", el.node.this.display())).unwrap_or_default());
-    sb.push_str(&signature.parameters.types.iter().map(|(name, el)| format!("{name}: {}", el.display())).join(", "));
+    sb.push_str(
+        &signature
+            .callee
+            .as_ref()
+            .map(|el| format!("{}, ", el.node.this.display()))
+            .unwrap_or_default(),
+    );
+    sb.push_str(
+        &signature
+            .parameters
+            .types
+            .iter()
+            .map(|(name, el, node_id)| format!("{}{}: {}", node_id.map(|el| format!("|NodeId({})|", el.display())).unwrap_or(String::new()), name, el.display()))
+            .join(", "),
+    );
     sb.push(')');
     sb.push_str(": ");
     signature.return_type.inner_display(sb, tab, is_last);
@@ -225,18 +307,21 @@ fn inner_display_function_declaration(sb: &mut String, signature: &FunctionSigna
 
 fn inner_display_generic_parameters(sb: &mut String, parameters: &Vec<GenericDeclare>) {
     if parameters.is_empty() {
-        return
+        return;
     }
 
     sb.push('<');
     for parameter in parameters {
-        
         match parameter {
             GenericDeclare::Lifetime(lifetime) => {
                 sb.push('\'');
                 sb.push_str(lifetime);
-            },
-            GenericDeclare::Expression{name, for_type, default} => {
+            }
+            GenericDeclare::Expression {
+                name,
+                for_type,
+                default,
+            } => {
                 sb.push_str(&name);
                 if let Some(ty) = &for_type {
                     sb.push_str(" impl ");
@@ -247,8 +332,12 @@ fn inner_display_generic_parameters(sb: &mut String, parameters: &Vec<GenericDec
                     sb.push_str(" = ");
                     expression.node.inner_display(sb, 0, false);
                 }
-            },
-            GenericDeclare::Type{name, traits, default} => {
+            }
+            GenericDeclare::Type {
+                name,
+                traits,
+                default,
+            } => {
                 sb.push_str(&name);
                 if !traits.is_empty() {
                     sb.push_str(": ");
@@ -259,16 +348,19 @@ fn inner_display_generic_parameters(sb: &mut String, parameters: &Vec<GenericDec
                     sb.push_str(" = ");
                     ty.inner_display(sb, 0, false);
                 }
-            },
+            }
         }
     }
     sb.push('>');
 }
 
-fn inner_display_classchild(sb: &mut String, kinds: &Vec<Spanned<ClassChild>>, tab: usize, use_last: bool) {
-
+fn inner_display_classchild(
+    sb: &mut String,
+    kinds: &Vec<Spanned<ClassChild>>,
+    tab: usize,
+    use_last: bool,
+) {
     fn get_tag(child: &Spanned<ClassChild>) -> &'static str {
-
         match &child.node {
             ClassChild::Field(_) => "Field >> ",
             ClassChild::Method(_) => "Methode >> ",
@@ -281,7 +373,7 @@ fn inner_display_classchild(sb: &mut String, kinds: &Vec<Spanned<ClassChild>>, t
     for (i, child) in kinds.iter().enumerate() {
         let is_last = use_last && lat_index == i;
         let prefix = tree_prefix(tab, is_last);
-        
+
         sb.push('\n');
         sb.push_str(&prefix);
         sb.push_str(get_tag(child));
@@ -291,33 +383,35 @@ fn inner_display_classchild(sb: &mut String, kinds: &Vec<Spanned<ClassChild>>, t
             ClassChild::ImplBlock(_) => todo!(),
         }
     }
-
 }
 
-fn inner_display_methode_signatures(sb: &mut String, methods: &Vec<Spanned<FunctionSignature>>, tab: usize, use_last: bool) {
+fn inner_display_methode_signatures(
+    sb: &mut String,
+    methods: &Vec<Spanned<FunctionSignature>>,
+    tab: usize,
+    use_last: bool,
+) {
     if methods.is_empty() {
-        return 
+        return;
     }
 
     let lat_index = methods.len() - 1;
 
     for (i, methode) in methods.iter().enumerate() {
         let is_last = use_last && lat_index == i;
-        
+
         let prefix = tree_prefix(tab, is_last);
         sb.push('\n');
         sb.push_str(&prefix);
         sb.push_str("Methode >> ");
         inner_display_methode_signature(sb, &methode.node, tab, is_last);
     }
-
 }
 
 fn inner_display_fields(sb: &mut String, fields: &Vec<Spanned<Field>>, tab: usize, use_last: bool) {
-    
     let last_index = fields.len() - 1;
 
-    for (i, Spanned{node: field, ..}) in fields.iter().enumerate() {
+    for (i, Spanned { node: field, .. }) in fields.iter().enumerate() {
         let is_last = use_last && last_index == i;
 
         let prefix = tree_prefix(tab, is_last);
@@ -334,10 +428,15 @@ fn inner_display_fields(sb: &mut String, fields: &Vec<Spanned<Field>>, tab: usiz
 
 fn inner_display_methode(sb: &mut String, methode: &Function, tab: usize, is_last: bool) {
     inner_display_methode_signature(sb, &methode.signature, tab, is_last);
-    methode.block.inner_display(sb, tab+1, is_last);
+    methode.block.inner_display(sb, tab + 1, is_last);
 }
 
-fn inner_display_methode_signature(sb: &mut String, methode: &FunctionSignature, tab: usize, is_last: bool) {
+fn inner_display_methode_signature(
+    sb: &mut String,
+    methode: &FunctionSignature,
+    tab: usize,
+    is_last: bool,
+) {
     inner_display_function_declaration(sb, &methode, tab, is_last);
 }
 

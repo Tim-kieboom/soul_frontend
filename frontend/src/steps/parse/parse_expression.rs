@@ -161,7 +161,14 @@ impl<'a> Parser<'a> {
 
                             if self.current_is(&COLON) && self.peek().kind == SQUARE_OPEN {
                                 self.bump();
-                                let collection_type = SoulType::new(None, TypeKind::Stub(ident));
+                                let collection_type = SoulType::new(
+                                    None,
+                                    TypeKind::Stub {
+                                        ident,
+                                        resolved: None,
+                                    },
+                                    self.token().span,
+                                );
                                 let array = self.parse_array(Some(collection_type))?;
                                 Expression::new(
                                     ExpressionKind::ExpressionGroup(ExpressionGroup::Array(array)),
@@ -179,7 +186,10 @@ impl<'a> Parser<'a> {
                                 )
                             } else {
                                 Expression::new(
-                                    ExpressionKind::Variable(ident),
+                                    ExpressionKind::Variable {
+                                        ident,
+                                        resolved: None,
+                                    },
                                     self.new_span(start_span),
                                 )
                             }

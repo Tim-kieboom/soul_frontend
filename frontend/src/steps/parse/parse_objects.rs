@@ -1,7 +1,8 @@
 use crate::{
     steps::{
         parse::{
-            ARROW_LEFT, ASSIGN, COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, SEMI_COLON, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS, parser::Parser
+            ARROW_LEFT, ASSIGN, COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, SEMI_COLON, SQUARE_CLOSE,
+            SQUARE_OPEN, STAMENT_END_TOKENS, parser::Parser,
         },
         tokenize::token_stream::TokenKind,
     },
@@ -17,7 +18,6 @@ use models::{
         spanned::Spanned,
     },
     error::{SoulError, SoulErrorKind, SoulResult},
-    scope::scope::TypeSymbol,
     soul_names::{KeyWord, TypeModifier},
 };
 
@@ -37,7 +37,14 @@ impl<'a> Parser<'a> {
             }
         };
 
-        let this_type = SoulType::new(None, TypeKind::Stub(ident.clone()));
+        let this_type = SoulType::new(
+            None,
+            TypeKind::Stub {
+                ident: ident.clone(),
+                resolved: None,
+            },
+            self.token().span,
+        );
 
         let generics = if self.current_is(&ARROW_LEFT) {
             self.parse_generic_declare()?
@@ -46,7 +53,6 @@ impl<'a> Parser<'a> {
         };
 
         self.expect(&CURLY_OPEN)?;
-        let scope_id = self.push_scope(TypeModifier::Mut, Some(this_type.clone()));
 
         let mut members = vec![];
 
@@ -74,17 +80,15 @@ impl<'a> Parser<'a> {
             }
         }
 
-        self.pop_scope();
         self.skip_end_lines();
         self.expect(&CURLY_CLOSE)?;
 
         let class = Class {
             members,
-            scope_id,
             name: ident,
             generics,
+            node_id: None,
         };
-        self.add_scope_type(class.name.clone(), TypeSymbol::Class(class.name.clone()))?;
         Ok(class)
     }
 
@@ -111,13 +115,12 @@ impl<'a> Parser<'a> {
         };
 
         self.expect(&CURLY_OPEN)?;
-        let scope_id = self.push_scope(TypeModifier::Mut, None);
 
         let mut fields = vec![];
         loop {
             self.skip_end_lines();
             if self.current_is(&CURLY_CLOSE) {
-                break
+                break;
             }
 
             match self.try_parse_field() {
@@ -125,15 +128,13 @@ impl<'a> Parser<'a> {
                 Err(TryError::IsErr(err)) | Err(TryError::IsNotValue(err)) => return Err(err),
             }
         }
-        self.pop_scope();
         self.expect(&CURLY_CLOSE)?;
 
-        self.add_scope_type(name.clone(), TypeSymbol::Struct(name.clone()))?;
         Ok(Struct {
             fields,
-            scope_id,
             name,
             generics,
+            node_id: None,
         })
     }
 
@@ -166,7 +167,14 @@ impl<'a> Parser<'a> {
             for_types: vec![],
         };
 
-        let this_type = SoulType::new(None, TypeKind::Stub(name));
+        let this_type = SoulType::new(
+            None,
+            TypeKind::Stub {
+                ident: name,
+                resolved: None,
+            },
+            self.token().span,
+        );
 
         let mut methods = vec![];
         let (for_types, implements) = self.inner_parse_trait_impls()?;
@@ -175,18 +183,14 @@ impl<'a> Parser<'a> {
 
         if self.current_is_any(STAMENT_END_TOKENS) {
             self.bump();
-            let scope_id = self.push_scope(TypeModifier::Mut, None);
-            self.add_scope_type(signature.name.clone(), TypeSymbol::Trait(signature.name.clone()))?;
-            self.pop_scope();
             return Ok(Trait {
                 signature,
                 methods,
-                scope_id,
+                node_id: None,
             });
         }
 
         self.expect(&CURLY_OPEN)?;
-        let scope_id = self.push_scope(TypeModifier::Mut, None);
         loop {
             self.skip_end_lines();
 
@@ -228,15 +232,13 @@ impl<'a> Parser<'a> {
                 Err(TryError::IsNotValue(_)) => break,
             }
         }
-        self.pop_scope();
         self.skip_end_lines();
         self.expect(&CURLY_CLOSE)?;
 
-        self.add_scope_type(signature.name.clone(), TypeSymbol::Trait(signature.name.clone()))?;
         Ok(Trait {
             signature,
             methods,
-            scope_id,
+            node_id: None,
         })
     }
 
@@ -336,7 +338,11 @@ impl<'a> Parser<'a> {
             .try_err()?;
 
         TryOk(Spanned::new(
-            Function { signature, block },
+            Function {
+                signature,
+                block,
+                node_id: None,
+            },
             self.new_span(start_span),
         ))
     }
@@ -385,7 +391,7 @@ impl<'a> Parser<'a> {
             self.bump();
             self.try_parse_type()?
         } else {
-            SoulType::none()
+            SoulType::none(self.token().span)
         };
 
         ty.modifier = Some(modifier);

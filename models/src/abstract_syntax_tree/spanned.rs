@@ -22,11 +22,18 @@ pub struct Spanned<T> {
 }
 impl<T> Spanned<T> {
     pub fn new(inner: T, span: Span) -> Self {
-        Self {node: inner, span, attributes: vec![]}
+        Self {
+            node: inner,
+            span,
+            attributes: vec![],
+        }
     }
 
     pub fn with_atribute(inner: T, span: Span, attributes: Vec<Attribute>) -> Self {
-        Self {node: inner, span, attributes}
+        Self {
+            node: inner,
+            span,
+            attributes,
+        }
     }
 }
-

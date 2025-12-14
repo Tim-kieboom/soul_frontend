@@ -88,8 +88,10 @@ impl<'a> Parser<'a> {
 
         let wrapper = self.get_type_wrappers()?;
         let mut ty = self.inner_get_base_type()?;
-
+        
         for (wrap, lifetime, size) in wrapper {
+            let span = ty.span;
+
             ty = match wrap {
                 TypeWrapper::ConstRef => SoulType::new(
                     None,
@@ -98,6 +100,7 @@ impl<'a> Parser<'a> {
                         lifetime,
                         mutable: false,
                     }),
+                    self.token().span.combine(span),
                 ),
                 TypeWrapper::MutRef => SoulType::new(
                     None,
@@ -106,16 +109,18 @@ impl<'a> Parser<'a> {
                         lifetime,
                         mutable: true,
                     }),
+                    self.token().span.combine(span),
                 ),
-                TypeWrapper::Pointer => SoulType::new(None, TypeKind::Pointer(Box::new(ty))),
+                TypeWrapper::Pointer => SoulType::new(None, TypeKind::Pointer(Box::new(ty)), self.token().span.combine(span)),
                 TypeWrapper::Array => SoulType::new(
                     None,
                     TypeKind::Array(ArrayType {
                         of_type: Box::new(ty),
                         size,
                     }),
+                    self.token().span.combine(span),
                 ),
-                TypeWrapper::Option => SoulType::new(None, TypeKind::Optional(Box::new(ty))),
+                TypeWrapper::Option => SoulType::new(None, TypeKind::Optional(Box::new(ty)), self.token().span.combine(span)),
             };
         }
 
@@ -127,23 +132,24 @@ impl<'a> Parser<'a> {
         const NONE_STR: &str = InternalPrimitiveTypes::None.as_str();
 
         match &self.token().kind {
-            TokenKind::Ident(val) if val == NONE_STR => return TryOk(SoulType::none()),
+            TokenKind::Ident(val) if val == NONE_STR => return TryOk(SoulType::none(self.token().span)),
             &ROUND_OPEN => {
                 return self
                     .parse_tuple_type()
-                    .map(|el| SoulType::new(None, TypeKind::Tuple(el)))
+                    .map(|el| SoulType::new(None, TypeKind::Tuple(el), self.token().span))
                     .try_err();
             }
             &CURLY_OPEN => {
                 const IS_NAMED_TUPLE: bool = false;
                 return self
                     .parse_named_tuple_type(IS_NAMED_TUPLE)
-                    .map(|(tuple, _this)| SoulType::new(None, TypeKind::NamedTuple(tuple)));
+                    .map(|(tuple, _this)| SoulType::new(None, TypeKind::NamedTuple(tuple), self.token().span));
             }
             _ => (),
         }
 
-        let name = match self.bump_consume().kind {
+        let token = self.bump_consume();
+        let name = match token.kind {
             TokenKind::Ident(val) => val,
             other => {
                 return TryNotValue(SoulError::new(
@@ -155,14 +161,21 @@ impl<'a> Parser<'a> {
         };
 
         if let Some(prim) = InternalPrimitiveTypes::from_str(&name) {
-            return TryOk(SoulType::new(None, TypeKind::Primitive(prim)));
+            return TryOk(SoulType::new(None, TypeKind::Primitive(prim), token.span));
         }
 
         if let Some(prim) = InternalComplexTypes::from_str(&name) {
-            return TryOk(SoulType::new(None, TypeKind::InternalComplex(prim)));
+            return TryOk(SoulType::new(None, TypeKind::InternalComplex(prim), token.span));
         }
 
-        TryOk(SoulType::new(None, TypeKind::Stub(name)))
+        TryOk(SoulType::new(
+            None,
+            TypeKind::Stub {
+                ident: name,
+                resolved: None,
+            },
+            token.span
+        ))
     }
 
     fn inner_parse_named_tuple_type(
@@ -190,16 +203,17 @@ impl<'a> Parser<'a> {
         let mut this = ThisCallee::Static;
         let mut types = vec![];
         loop {
-            let possible_this = if self.current_is(&CONST_REF) {
-                self.bump();
-                Some(ThisCallee::ConstRef)
-            } else if self.current_is(&MUT_REF) {
-                self.bump();
-                Some(ThisCallee::MutRef)
-            } else if self.current_is_ident("this") {
-                Some(ThisCallee::Consume)
-            } else {
-                None
+            let possible_this = match &self.token().kind {
+                &CONST_REF => {
+                    self.bump();
+                    Some(ThisCallee::ConstRef)
+                }
+                &MUT_REF => {
+                    self.bump();
+                    Some(ThisCallee::MutRef)
+                }
+                TokenKind::Ident(val) if val == "this" => Some(ThisCallee::Consume),
+                _ => None,
             };
 
             if let Some(callee) = possible_this {
@@ -243,7 +257,7 @@ impl<'a> Parser<'a> {
             self.bump();
             let ty = self.try_parse_type()?; // is probebly named_tuple expression 
 
-            types.push((name, ty));
+            types.push((name, ty, None));
             if self.current_is(close) {
                 break;
             }
@@ -259,7 +273,6 @@ impl<'a> Parser<'a> {
     fn get_type_wrappers(
         &mut self,
     ) -> TryResult<Vec<(TypeWrapper, String, Option<StackArrayKind>)>, SoulError> {
-        
         let mut wrapper = vec![];
         loop {
             let mut size = None;
@@ -267,9 +280,8 @@ impl<'a> Parser<'a> {
             let possible_wrap = match &self.token().kind {
                 &SQUARE_OPEN => {
                     self.bump();
-                    size = self.inner_get_stack_modifier()
-                        .try_not_value()?;
-                    
+                    size = self.inner_get_stack_modifier().try_not_value()?;
+
                     Some(TypeWrapper::Array)
                 }
                 TokenKind::Symbool(sym) => TypeWrapper::from_symbool(*sym),
@@ -288,13 +300,11 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn inner_get_stack_modifier(&mut self) -> SoulResult<Option<StackArrayKind>>{
+    fn inner_get_stack_modifier(&mut self) -> SoulResult<Option<StackArrayKind>> {
         let token = self.bump_consume();
         let size = match token.kind {
-            TokenKind::Ident(generic_type) => Some(StackArrayKind::Ident(generic_type)),
-            TokenKind::Number(Number::Uint(number)) => {
-                Some(StackArrayKind::Number(number))
-            }
+            TokenKind::Ident(generic_type) => Some(StackArrayKind::Ident{ident: generic_type, resolved: None}),
+            TokenKind::Number(Number::Uint(number)) => Some(StackArrayKind::Number(number)),
             other => {
                 return Err(SoulError::new(
                     format!(
@@ -308,8 +318,6 @@ impl<'a> Parser<'a> {
         };
 
         self.expect(&SQUARE_CLOSE)?;
-        Ok(
-            size
-        )
+        Ok(size)
     }
 }

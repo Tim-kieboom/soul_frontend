@@ -16,7 +16,6 @@ use models::{
         statment::{Assignment, Ident, Statement, StatementKind, Variable},
     },
     error::{SoulError, SoulErrorKind, SoulResult, Span},
-    scope::scope::ValueSymbol,
     soul_names::{self, AssignType, KeyWord, TypeModifier},
 };
 use std::{
@@ -134,9 +133,9 @@ impl<'a> Parser<'a> {
 
             let variable =
                 self.parse_variable_declaration(start_span, ident.clone(), assign_type, ty)?;
-            self.add_scope_value(ident.clone(), ValueSymbol::Variable(variable));
+
             Ok(Statement::new(
-                StatementKind::Variable(ident),
+                StatementKind::Variable(variable),
                 self.new_span(start_span),
             ))
         } else {
@@ -168,13 +167,14 @@ impl<'a> Parser<'a> {
             }
 
             if self.current_is_any(STAMENT_END_TOKENS) {
-                self.add_scope_value(
-                    name.clone(),
-                    ValueSymbol::new_variable(name.clone(), ty.unwrap_or(SoulType::none()), None),
-                );
-
+                let ty = ty.unwrap_or(SoulType::none(self.token().span));
                 return TryOk(Statement::new(
-                    StatementKind::Variable(name),
+                    StatementKind::Variable(Variable {
+                        name,
+                        ty,
+                        initialize_value: None,
+                        node_id: None,
+                    }),
                     self.new_span(start_span),
                 ));
             }
@@ -183,10 +183,9 @@ impl<'a> Parser<'a> {
                 let variable = self
                     .parse_variable_declaration(start_span, name.clone(), assign_type, ty)
                     .try_err()?;
-                self.add_scope_value(name.clone(), ValueSymbol::Variable(variable));
 
                 return TryOk(Statement::new(
-                    StatementKind::Variable(name),
+                    StatementKind::Variable(variable),
                     self.new_span(start_span),
                 ));
             } else {
@@ -381,11 +380,11 @@ impl<'a> Parser<'a> {
         };
 
         let variable = Variable {
-            ty: ty.unwrap_or(SoulType::none()),
+            ty: ty.unwrap_or(SoulType::none(self.token().span)),
             name: variable_name,
             initialize_value: Some(expression),
+            node_id: None,
         };
-        self.add_scope_value(variable.name.clone(), ValueSymbol::Variable(variable.clone()));
         Ok(variable)
     }
 }

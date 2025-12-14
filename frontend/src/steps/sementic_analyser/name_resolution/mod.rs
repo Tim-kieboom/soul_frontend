@@ -1,1 +1,2 @@
-pub mod name_resolution_analyser;
+pub mod name_resolver;
+pub mod name_resolver_analyse;

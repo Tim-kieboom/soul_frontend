@@ -3,14 +3,16 @@
 //! This module defines various enums for keywords, operators, type wrappers,
 //! and other language constructs used in the Soul programming language.
 
-use crate::{abstract_syntax_tree::operator::{BinaryOperatorKind, UnaryOperatorKind}, symbool_kind::SymboolKind};
+use crate::{
+    abstract_syntax_tree::{operator::{BinaryOperatorKind, UnaryOperatorKind}, statment::Ident}, sementic_models::scope::NodeId, symbool_kind::SymboolKind
+};
 
 #[macro_export]
 macro_rules! define_str_enum {
-    ( 
+    (
         $(#[$enum_doc:meta])*
         $vis:vis enum $enum_name:ident {
-            $( $(#[$attr:meta])* $name:ident => $symbol:expr ),* $(,)? 
+            $( $(#[$attr:meta])* $name:ident => $symbol:expr ),* $(,)?
         }
     ) => {
 
@@ -45,12 +47,12 @@ macro_rules! define_str_enum {
             }
         }
 
-        
+
     };
-    ( 
+    (
         $(#[$enum_doc:meta])*
         $vis:vis enum $enum_name:ident {
-            $( $(#[$attr:meta])* $name:ident => $symbol:expr, $precedence:expr ),* $(,)? 
+            $( $(#[$attr:meta])* $name:ident => $symbol:expr, $precedence:expr ),* $(,)?
         }
     ) => {
 
@@ -92,7 +94,7 @@ macro_rules! define_str_enum {
             }
         }
 
-        
+
     }
 }
 macro_rules! define_symbols {
@@ -102,7 +104,7 @@ macro_rules! define_symbols {
             $( $(#[$attr:meta])* $name:ident => $symbol:expr, $symkind:path ),* $(,)?
         }
     ) => {
-        
+
         $(#[$enum_doc])*
         #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
         $vis enum $enum_name {
@@ -159,7 +161,7 @@ macro_rules! define_symbols {
             $( $(#[$attr:meta])* $name:ident => $symbol:expr, $symkind:path, $precedence:expr ),* $(,)?
         }
     ) => {
-        
+
         $(#[$enum_doc])*
         #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
         $vis enum $enum_name {
@@ -218,7 +220,6 @@ macro_rules! define_symbols {
     }
 }
 
-
 define_symbols!(
     /// Type wrapper symbols that modify how types are referenced or stored.
     ///
@@ -241,7 +242,7 @@ define_symbols!(
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum StackArrayKind {
     Number(u64),
-    Ident(String),
+    Ident{ident: Ident, resolved: Option<NodeId>},
 }
 
 define_str_enum!(
@@ -250,7 +251,7 @@ define_str_enum!(
     /// These keywords modify the mutability and compile-time behavior of types.
     pub enum TypeModifier {
         /// Compile-time constant modifier (`literal`).
-        Literal => "literal", 
+        Literal => "literal",
         /// Immutable modifier (`const`).
         Const => "const",
         /// Mutable modifier (`mut`).
@@ -322,7 +323,6 @@ define_str_enum!(
     }
 );
 
-
 define_str_enum!(
     /// Internal complex types available in the Soul language.
     ///
@@ -367,7 +367,7 @@ define_symbols!(
         Sub => "-", SymboolKind::Minus, 5,
         /// constref
         ConstRef => "@", SymboolKind::ConstRef, 6,
-        
+
         /// smaller equals
         LessEq => "<=", SymboolKind::Ge, 4,
         /// bigger equals
@@ -380,7 +380,7 @@ define_symbols!(
         NotEq => "!=", SymboolKind::NotEq, 3,
         /// equal
         Eq => "==", SymboolKind::Eq, 3,
-        
+
         /// range (`begin..end`)
         Range => "..", SymboolKind::DoubleDot, 1,
 
@@ -398,9 +398,9 @@ define_symbols!(
 
     }
 );
-    
+
 define_symbols!(
-    
+
     /// Assignment operators for variable assignment and modification.
     ///
     /// These operators are used to assign values to variables, with various
@@ -408,7 +408,7 @@ define_symbols!(
     pub enum AssignType {
         /// Declaration assignment (`:=`).
         Declaration => ":=", SymboolKind::ColonAssign,
-        
+
         /// Simple assignment (`=`).
         Assign => "=", SymboolKind::Assign,
         AddAssign => "+=", SymboolKind::PlusEq,
@@ -443,27 +443,27 @@ define_str_enum!(
     pub enum KeyWord {
         If => "if", 5,
         Else => "else", 5,
-        
+
         For => "for", 5,
         InForLoop => "in", 0,
         While => "while", 5,
-        
+
         Return => "return", 0,
         Break => "break", 0,
         Continue => "continue", 0,
-        
+
         Struct => "struct", 0,
         Class => "class", 0,
         Trait => "trait", 0,
         Union => "union", 0,
         Enum => "enum", 0,
-        
+
         Match => "match", 5,
         GenericWhere => "where", 0,
-        
+
         Copy => "copy", 0,
         Await => "await", 0,
-        
+
         Use => "use", 0,
         Impl => "impl", 0,
         Dyn => "dyn", 0,
@@ -473,23 +473,20 @@ define_str_enum!(
 );
 
 impl Operator {
-
     pub fn to_unary(&self) -> Option<UnaryOperatorKind> {
-
         Some(match self {
             Operator::Not => UnaryOperatorKind::Not,
             Operator::Sub => UnaryOperatorKind::Neg,
             Operator::Mul => UnaryOperatorKind::DeRef,
             Operator::BitAnd => UnaryOperatorKind::MutRef,
             Operator::ConstRef => UnaryOperatorKind::ConstRef,
-            Operator::Incr => UnaryOperatorKind::Increment{before_var: true},
-            Operator::Decr => UnaryOperatorKind::Decrement{before_var: true},
-            _ => return None
+            Operator::Incr => UnaryOperatorKind::Increment { before_var: true },
+            Operator::Decr => UnaryOperatorKind::Decrement { before_var: true },
+            _ => return None,
         })
     }
 
     pub fn to_binary(&self) -> Option<BinaryOperatorKind> {
-
         Some(match self {
             Operator::Eq => BinaryOperatorKind::Eq,
             Operator::Mul => BinaryOperatorKind::Mul,
@@ -511,11 +508,7 @@ impl Operator {
             Operator::BitXor => BinaryOperatorKind::BitXor,
             Operator::LogAnd => BinaryOperatorKind::LogAnd,
 
-
-            Operator::Not |
-            Operator::Incr |
-            Operator::Decr |
-            Operator::ConstRef => return None,
+            Operator::Not | Operator::Incr | Operator::Decr | Operator::ConstRef => return None,
         })
     }
 }

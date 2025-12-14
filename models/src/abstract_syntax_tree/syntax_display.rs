@@ -4,9 +4,9 @@ pub trait SyntaxDisplay {
 }
 
 pub fn tree_prefix(tab: usize, is_last: bool) -> String {
-    let mut sb = String::new(); 
+    let mut sb = String::new();
     if tab == 0 {
-        return sb
+        return sb;
     }
 
     for _ in 0..tab - 1 {
@@ -18,9 +18,9 @@ pub fn tree_prefix(tab: usize, is_last: bool) -> String {
 }
 
 pub fn gap_prefix(tab: usize) -> String {
-    let mut sb = String::new(); 
+    let mut sb = String::new();
     if tab == 0 {
-        return sb
+        return sb;
     }
 
     for _ in 0..tab {

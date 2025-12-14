@@ -7,16 +7,17 @@ pub type SoulResult<T> = std::result::Result<T, SoulError>;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum SoulErrorKind {
     SourceReadError,
+    ScopeError,
 
     UnexpecedToken,
     UnexpecedFileEnd,
     UnexpecedStatmentStart,
-    
+
     InvalidAssignType,
     InvalidContext,
-    InvalidChar, 
+    InvalidChar,
     InvalidName,
-    InvalidIdent, 
+    InvalidIdent,
     InvalidNumber,
     InvalidOperator,
     InvalidStatment,
@@ -34,7 +35,7 @@ impl ExpansionId {
     /// Creates a new `ExpansionId` with the given value.
     pub fn new(value: usize) -> Self {
         Self(value)
-    } 
+    }
 
     /// Returns the underlying `usize` value.
     pub fn as_usize(&self) -> usize {
@@ -70,7 +71,11 @@ pub struct SoulError {
 
 impl SoulError {
     pub fn empty() -> Self {
-        Self { kind: SoulErrorKind::InvalidName, message: String::default(), span: None }
+        Self {
+            kind: SoulErrorKind::InvalidName,
+            message: String::default(),
+            span: None,
+        }
     }
 
     pub fn new<S: Into<String>>(message: S, kind: SoulErrorKind, span: Option<Span>) -> Self {
@@ -97,12 +102,12 @@ impl Span {
     ///
     /// Both start and end positions are set to the same line and offset.
     pub fn new_line(line: usize, offset: usize) -> Self {
-        Self { 
-            start_line: line, 
-            start_offset: offset, 
-            end_line: line, 
-            end_offset: offset, 
-            expansion_id: ExpansionId::default(), 
+        Self {
+            start_line: line,
+            start_offset: offset,
+            end_line: line,
+            end_offset: offset,
+            expansion_id: ExpansionId::default(),
         }
     }
 

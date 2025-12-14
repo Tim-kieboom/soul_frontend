@@ -11,7 +11,7 @@ use crate::{
 use models::{
     abstract_syntax_tree::{
         expression_groups::{Array, NamedTuple, Tuple},
-        soul_type::SoulType,
+        soul_type::SoulType, spanned::Spanned,
     },
     error::{SoulError, SoulErrorKind, SoulResult},
     symbool_kind::SymboolKind,
@@ -135,7 +135,7 @@ impl<'a> Parser<'a> {
                 .parse_expression(&[CURLY_CLOSE, COMMA])
                 .map_err(TryError::IsNotValue)?;
 
-            values.push((ident, element));
+            values.push((Spanned::new(ident, ident_token.span), element));
 
             self.skip_end_lines();
             if self.current_is(&CURLY_CLOSE) {

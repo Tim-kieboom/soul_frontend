@@ -1,28 +1,17 @@
 use std::str::Lines;
 
 use models::{
-    define_str_enum,
     error::{SoulError, Span},
 };
 
-use crate::utils::char_colors::*;
-
-define_str_enum!(
-
-    pub enum Level {
-        Warning => "warning",
-        Error => "error",
-        Debug => "debug",
-        Note => "note",
-    }
-);
+use crate::{steps::sementic_analyser::sementic_fault::SementicLevel, utils::char_colors::*};
 
 pub trait ToMessage {
-    fn to_message(self, level: Level, file_path: &str, source_file: &str) -> String;
+    fn to_message(self, level: SementicLevel, file_path: &str, source_file: &str) -> String;
 }
 
 impl ToMessage for SoulError {
-    fn to_message(self, level: Level, file_path: &str, source_file: &str) -> String {
+    fn to_message(self, level: SementicLevel, file_path: &str, source_file: &str) -> String {
         let start_line = self.span.map(|el| el.start_line).unwrap_or(0);
         let number_len = start_line.to_string().len();
         let begin_space = " ".repeat(number_len + 2);
@@ -59,12 +48,12 @@ impl ToMessage for SoulError {
     }
 }
 
-fn level_color(level: &Level) -> &'static str {
+fn level_color(level: &SementicLevel) -> &'static str {
     match level {
-        Level::Warning => YELLOW,
-        Level::Error => BRIGHT_RED,
-        Level::Debug => CYAN,
-        Level::Note => BLUE,
+        SementicLevel::Warning => YELLOW,
+        SementicLevel::Error => BRIGHT_RED,
+        SementicLevel::Debug => CYAN,
+        SementicLevel::Note => BLUE,
     }
 }
 

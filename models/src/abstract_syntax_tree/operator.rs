@@ -1,4 +1,7 @@
-use crate::abstract_syntax_tree::{expression::{BoxExpression, Expression}, spanned::Spanned};
+use crate::abstract_syntax_tree::{
+    expression::{BoxExpression, Expression},
+    spanned::Spanned,
+};
 
 /// A unary operator wrapped with source location information.
 pub type UnaryOperator = Spanned<UnaryOperatorKind>;
@@ -29,39 +32,39 @@ pub struct Binary {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum UnaryOperatorKind {
     Invalid,
-    Neg, // -
-    Not, // !
-    DeRef, // *
-    MutRef, // &
-    ConstRef, // @
-    Increment{before_var: bool}, // ++
-    Decrement{before_var: bool}, // --
+    Neg,                            // -
+    Not,                            // !
+    DeRef,                          // *
+    MutRef,                         // &
+    ConstRef,                       // @
+    Increment { before_var: bool }, // ++
+    Decrement { before_var: bool }, // --
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum BinaryOperatorKind {
     Invalid,
-    Add, // +
-    Sub, // -
-    Mul, // *
-    Div, // /
-    Log, // log
-    Pow, // **
-    Root, // </ 
-    Mod, // % 
+    Add,  // +
+    Sub,  // -
+    Mul,  // *
+    Div,  // /
+    Log,  // log
+    Pow,  // **
+    Root, // </
+    Mod,  // %
 
     BitAnd, // &
-    BitOr, // |
+    BitOr,  // |
     BitXor, // |
-    
+
     LogAnd, // &&
-    LogOr, // ||
-    Eq, // ==
-    NotEq, // !=
-    Lt, // <
-    Gt, // >
-    Le, // <=
-    Ge, // >=
+    LogOr,  // ||
+    Eq,     // ==
+    NotEq,  // !=
+    Lt,     // <
+    Gt,     // >
+    Le,     // <=
+    Ge,     // >=
 
     /// Range operator (`..`).
     Range,
@@ -71,20 +74,22 @@ pub enum BinaryOperatorKind {
 
 impl Binary {
     pub fn new(left: Expression, operator: BinaryOperator, right: Expression) -> Self {
-        Self { left: Box::new(left), operator, right: Box::new(right) }
+        Self {
+            left: Box::new(left),
+            operator,
+            right: Box::new(right),
+        }
     }
 }
 
 impl UnaryOperatorKind {
-
     pub const fn as_str(&self) -> &str {
-
         match self {
             UnaryOperatorKind::Invalid => "<invalid>",
             UnaryOperatorKind::Neg => "!",
             UnaryOperatorKind::Not => "-",
-            UnaryOperatorKind::Increment{..} => "++",
-            UnaryOperatorKind::Decrement{..} => "--",
+            UnaryOperatorKind::Increment { .. } => "++",
+            UnaryOperatorKind::Decrement { .. } => "--",
             UnaryOperatorKind::DeRef => "*",
             UnaryOperatorKind::MutRef => "&",
             UnaryOperatorKind::ConstRef => "@",
@@ -93,9 +98,7 @@ impl UnaryOperatorKind {
 }
 
 impl BinaryOperatorKind {
-
     pub const fn as_str(&self) -> &str {
-
         match self {
             BinaryOperatorKind::Invalid => "<invalid>",
             BinaryOperatorKind::Add => "+",

@@ -1,6 +1,18 @@
-use models::{abstract_syntax_tree::{spanned::Spanned, statment::{Statement, StatementKind}}, error::{SoulError, SoulErrorKind, SoulResult}, soul_names::KeyWord, soul_page_path::SoulPagePath, symbool_kind::SymboolKind};
+use models::{
+    abstract_syntax_tree::{
+        spanned::Spanned,
+        statment::{Statement, StatementKind},
+    },
+    error::{SoulError, SoulErrorKind, SoulResult},
+    soul_names::KeyWord,
+    soul_page_path::SoulPagePath,
+    symbool_kind::SymboolKind,
+};
 
-use crate::steps::{parse::{COMMA, SQUARE_CLOSE, SQUARE_OPEN, parser::Parser}, tokenize::token_stream::TokenKind};
+use crate::steps::{
+    parse::{COMMA, SQUARE_CLOSE, SQUARE_OPEN, parser::Parser},
+    tokenize::token_stream::TokenKind,
+};
 
 impl<'a> Parser<'a> {
     pub(crate) fn parse_import(&mut self) -> SoulResult<Spanned<StatementKind>> {
@@ -54,7 +66,7 @@ impl<'a> Parser<'a> {
 
                 let _ = bases.pop().is_none();
                 self.bump();
-                
+
                 while !bases.is_empty() && !self.current_is(&SQUARE_CLOSE) {
                     self.skip_end_lines();
                     self.expect(&SQUARE_CLOSE)?;

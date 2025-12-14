@@ -1,4 +1,7 @@
-use crate::{abstract_syntax_tree::statment::Ident, soul_names::{InternalComplexTypes, InternalPrimitiveTypes, TypeModifier}};
+use crate::{
+    abstract_syntax_tree::statment::Ident,
+    soul_names::{InternalComplexTypes, InternalPrimitiveTypes, TypeModifier},
+};
 
 /// A literal value in the Soul language.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -40,7 +43,7 @@ impl Literal {
             Literal::Bool(_) => LiteralType::Bool,
             Literal::Char(_) => LiteralType::Char,
             Literal::Str(_) => LiteralType::Str,
-            
+
             Literal::ProgramMemmory(_, ty) => LiteralType::ProgramMemmory(Box::new(ty.clone())),
         }
     }
@@ -79,7 +82,9 @@ impl Literal {
             Literal::Bool(val) => format!("{} {val}", get_type_name()),
             Literal::Char(val) => format!("{} {val}", get_type_name()),
             Literal::Str(val) => format!("{} \"{val}\"", get_type_name()),
-            Literal::ProgramMemmory(name, ty) => format!("ProgramMemmory({}: {name})", ty.type_to_string()),
+            Literal::ProgramMemmory(name, ty) => {
+                format!("ProgramMemmory({}: {name})", ty.type_to_string())
+            }
         }
     }
 }
@@ -95,13 +100,16 @@ impl LiteralType {
             LiteralType::Char => 1,
             LiteralType::Str => 1,
 
-            LiteralType::ProgramMemmory(inner) => inner.precedence()
+            LiteralType::ProgramMemmory(inner) => inner.precedence(),
         }
     }
 
     /// Returns whether this literal type is numeric.
     pub fn is_numeric(&self) -> bool {
-        matches!(self, LiteralType::Int | LiteralType::Uint | LiteralType::Float)
+        matches!(
+            self,
+            LiteralType::Int | LiteralType::Uint | LiteralType::Float
+        )
     }
 
     /// Returns a string representation of the literal type.
@@ -117,7 +125,9 @@ impl LiteralType {
             LiteralType::Int => format!("{LITERAL} {}", types::UntypedInt.as_str()),
             LiteralType::Uint => format!("{LITERAL} {}", types::UntypedUint.as_str()),
             LiteralType::Float => format!("{LITERAL} {}", types::UntypedFloat.as_str()),
-            LiteralType::ProgramMemmory(ty) => format!("{LITERAL} ProgramMemmory({})", ty.type_to_string()),
+            LiteralType::ProgramMemmory(ty) => {
+                format!("{LITERAL} ProgramMemmory({})", ty.type_to_string())
+            }
         }
     }
 }

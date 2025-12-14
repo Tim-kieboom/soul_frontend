@@ -1,10 +1,10 @@
-use crate::steps::{
-    parse::{self, parser::parse},
-    tokenize::{self, tokenizer::tokenize},
-};
+use crate::{steps::{
+    parse::{self, parser::parse}, sementic_analyser::{name_resolution::name_resolver::NameResolver}, tokenize::{self, tokenizer::tokenize}
+}};
 use models::{abstract_syntax_tree::AbstractSyntaxTree, error::SoulError};
 use std::io::{self};
 
+pub use crate::steps::sementic_analyser::sementic_fault::{SementicLevel, SementicFault};
 mod steps;
 pub mod utils;
 
@@ -23,7 +23,7 @@ pub fn parse_file(source_file: &str) -> io::Result<ParseResonse> {
     {
         use itertools::Itertools;
 
-        use crate::utils::convert_error_message::{Level, ToMessage};
+        use crate::{steps::sementic_analyser::sementic_fault::SementicLevel, utils::convert_error_message::ToMessage};
 
         match tokenize_response.token_stream.clone().to_vec().map(|vec| {
             vec.into_iter()
@@ -34,7 +34,7 @@ pub fn parse_file(source_file: &str) -> io::Result<ParseResonse> {
             Ok(tokens) => println!("[\n\t{tokens}\n]"),
             Err(err) => eprintln!(
                 "{}",
-                err.to_message(Level::Debug, "(filepath hardcoded) main.soul", source_file)
+                err.to_message(SementicLevel::Debug, "(filepath hardcoded) main.soul", source_file)
             ),
         }
     }
@@ -47,6 +47,8 @@ pub fn parse_file(source_file: &str) -> io::Result<ParseResonse> {
     })
 }
 
-pub fn sementic_analyse(_syntax_tree: &AbstractSyntaxTree) -> Vec<SoulError> {
-    todo!("impl sementic analyser")
+pub fn sementic_analyse(syntax_tree: &mut AbstractSyntaxTree) -> Vec<SementicFault> {
+    let mut resolver = NameResolver::new();
+    resolver.resolve_ast(syntax_tree);
+    resolver.consume_faults()
 }

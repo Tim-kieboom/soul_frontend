@@ -1,4 +1,15 @@
-use crate::{abstract_syntax_tree::{block::Block, expression::{BoxExpression}, expression_groups::{NamedTuple, Tuple}, soul_type::{FunctionType, GenericDeclare, NamedTupleType, SoulType, GenericDefine}, spanned::Spanned, statment::Ident}, scope::scope::ScopeId, soul_names::TypeModifier};
+use crate::{
+    abstract_syntax_tree::{
+        block::Block,
+        expression::BoxExpression,
+        expression_groups::{NamedTuple, Tuple},
+        soul_type::{FunctionType, GenericDeclare, GenericDefine, NamedTupleType, SoulType},
+        spanned::Spanned,
+        statment::Ident,
+    },
+    sementic_models::scope::NodeId,
+    soul_names::TypeModifier,
+};
 
 /// A function definition with a signature and body block.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -7,6 +18,7 @@ pub struct Function {
     pub signature: FunctionSignature,
     /// The function's body block.
     pub block: Block,
+    pub node_id: Option<NodeId>,
 }
 
 /// A function signature describing a function's interface.
@@ -53,6 +65,7 @@ pub struct FunctionCall {
     pub generics: Vec<GenericDefine>,
     /// Function arguments.
     pub arguments: Tuple,
+    pub candidates: Vec<NodeId>,
 }
 
 /// Information about a function's callee (for extension methods).
@@ -84,8 +97,6 @@ pub struct Lambda {
     /// The arguments passed to the lambda.
     pub arguments: Tuple,
     pub body: LamdbaBodyKind,
-    /// The scope identifier for the lambda's closure.
-    pub scope_id: ScopeId,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -96,8 +107,6 @@ pub enum LamdbaBodyKind {
 /// The signature of a lambda function.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct LambdaSignature {
-    /// The name of the lambda (if any).
-    pub name: Ident,
     /// The function type of the lambda.
     pub ty: FunctionType,
     /// The kind of body (block or expression).
@@ -127,18 +136,11 @@ pub struct Parameter {
 pub struct StaticMethod {
     /// The type the method is called on.
     pub callee: Spanned<SoulType>,
-    /// The method name.
-    pub name: Ident,
-    /// Generic type arguments.
-    pub generics: Vec<GenericDefine>,
-    /// Method arguments.
-    pub arguments: Tuple,
+    pub function: FunctionCall,
 }
 
 impl ThisCallee {
-
     pub fn display(&self) -> &'static str {
-
         match self {
             ThisCallee::Static => "",
             ThisCallee::MutRef => "&this",

@@ -1,4 +1,10 @@
-use crate::{abstract_syntax_tree::{expression::Expression, function::{Function, FunctionSignature}, soul_type::{GenericDeclare, SoulType}, spanned::Spanned, statment::{Ident, UseBlock}}, scope::scope::ScopeId};
+use crate::{abstract_syntax_tree::{
+    expression::Expression,
+    function::{Function, FunctionSignature},
+    soul_type::{GenericDeclare, SoulType},
+    spanned::Spanned,
+    statment::{Ident, UseBlock},
+}, sementic_models::scope::NodeId};
 
 /// A struct type definition.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -9,8 +15,7 @@ pub struct Struct {
     pub generics: Vec<GenericDeclare>,
     /// The fields of the struct.
     pub fields: Vec<Spanned<Field>>,
-    /// The scope identifier for this struct.
-    pub scope_id: ScopeId,
+    pub node_id: Option<NodeId>,
 }
 
 /// A class type definition.
@@ -22,8 +27,7 @@ pub struct Class {
     pub generics: Vec<GenericDeclare>,
     /// The members of the class (fields, methods, impl blocks).
     pub members: Vec<Spanned<ClassChild>>,
-    /// The scope identifier for this class.
-    pub scope_id: ScopeId,
+    pub node_id: Option<NodeId>,
 }
 
 /// A trait definition.
@@ -33,8 +37,7 @@ pub struct Trait {
     pub signature: TraitSignature,
     /// The method signatures defined in this trait.
     pub methods: Vec<Spanned<FunctionSignature>>,
-    /// The scope identifier for this trait.
-    pub scope_id: ScopeId,
+    pub node_id: Option<NodeId>,
 }
 
 /// The signature of a trait.
@@ -78,9 +81,9 @@ pub struct Field {
 #[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FieldAccess {
     /// Getter visibility. `None` means use default (e.g., public).
-    pub get: Option<Visibility>, 
+    pub get: Option<Visibility>,
     /// Setter visibility. `None` means disallow setting.
-    pub set: Option<Visibility>, 
+    pub set: Option<Visibility>,
 }
 
 /// Visibility modifier for fields and methods.
@@ -99,9 +102,7 @@ impl FieldAccess {
     pub const PRIVATE_SET: &str = "set";
 
     pub fn inner_display(&self, sb: &mut String) {
-        
         if let Some(get) = &self.get {
-
             let str = match get {
                 Visibility::Public => Self::PUBLIC_GET,
                 Visibility::Private => Self::PRIVATE_GET,

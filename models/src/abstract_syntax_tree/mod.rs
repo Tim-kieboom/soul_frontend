@@ -4,18 +4,18 @@
 //! including expressions, statements, types, functions, and control structures.
 
 pub mod block;
-pub mod spanned;
-pub mod objects;
-pub mod literal;
-pub mod statment;
-pub mod function;
-pub mod operator;
-pub mod enum_like;
-pub mod soul_type;
-pub mod expression;
 pub mod conditionals;
-pub mod syntax_display;
+pub mod enum_like;
+pub mod expression;
 pub mod expression_groups;
+pub mod function;
+pub mod literal;
+pub mod objects;
+pub mod operator;
+pub mod soul_type;
+pub mod spanned;
+pub mod statment;
+pub mod syntax_display;
 
 use crate::abstract_syntax_tree::block::Block;
 

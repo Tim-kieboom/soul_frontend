@@ -1,14 +1,22 @@
-use models::{abstract_syntax_tree::{block::Block, statment::UseBlock}, error::SoulResult, soul_names::{KeyWord, TypeModifier}};
+use models::{
+    abstract_syntax_tree::{block::Block, statment::UseBlock},
+    error::SoulResult,
+    soul_names::{KeyWord, TypeModifier},
+};
 
-use crate::{steps::{parse::{CURLY_CLOSE, CURLY_OPEN, SEMI_COLON, parser::Parser}, tokenize::token_stream::TokenKind}, utils::try_result::TryError};
+use crate::{
+    steps::{
+        parse::{CURLY_CLOSE, CURLY_OPEN, SEMI_COLON, parser::Parser},
+        tokenize::token_stream::TokenKind,
+    },
+    utils::try_result::TryError,
+};
 
 impl<'a> Parser<'a> {
     pub(crate) fn parse_block(&mut self, modifier: TypeModifier) -> SoulResult<Block> {
         const END_TOKENS: &[TokenKind] = &[CURLY_CLOSE, TokenKind::EndFile];
 
         let mut statments = vec![];
-
-        let scope_id = self.push_scope(modifier, None);
 
         self.expect(&CURLY_OPEN)?;
         while !self.current_is_any(END_TOKENS) {
@@ -32,7 +40,6 @@ impl<'a> Parser<'a> {
         Ok(Block {
             modifier,
             statments,
-            scope_id,
         })
     }
 

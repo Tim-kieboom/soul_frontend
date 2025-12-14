@@ -1,5 +1,10 @@
+use crate::{
+    abstract_syntax_tree::{
+        expression::{BoxExpression, Expression}, soul_type::SoulType, spanned::Spanned, statment::{Ident, Variable}, syntax_display::SyntaxDisplay
+    },
+    soul_names::KeyWord,
+};
 use itertools::Itertools;
-use crate::{abstract_syntax_tree::{expression::{BoxExpression, Expression}, soul_type::SoulType, statment::Ident, syntax_display::SyntaxDisplay}, scope::scope::ScopeId, soul_names::KeyWord};
 
 /// A grouped expression type, such as tuple, array, or named tuple.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -35,19 +40,17 @@ pub struct ArrayFiller {
     /// Expression that evaluates to the number of elements to create.
     pub amount: BoxExpression,
     /// Optional identifier for the index variable in the fill expression.
-    pub index: Option<Ident>,
+    pub index: Option<Box<Variable>>,
     /// Expression to evaluate for each element.
     pub fill_expr: BoxExpression,
-    /// The scope identifier for this array filler.
-    pub scope_id: ScopeId,
 }
 
 /// A named tuple, e.g., `{x: 1, y: 2}`.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct NamedTuple {
     /// Map of field names to their expression values.
-    pub values: Vec<(Ident, Expression)>,
-    
+    pub values: Vec<(Spanned<Ident>, Expression)>,
+
     /// Whether to insert default values for missing fields.
     ///
     /// When `true`, `Foo{field: 1, ..}` means all other fields use their default values.
@@ -58,7 +61,7 @@ pub struct NamedTuple {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Tuple {
     /// The tuple element expressions.
-    pub values: Vec<Expression>
+    pub values: Vec<Expression>,
 }
 
 impl SyntaxDisplay for ExpressionGroup {
@@ -70,24 +73,56 @@ impl SyntaxDisplay for ExpressionGroup {
 
     fn inner_display(&self, sb: &mut String, _tab: usize, _is_last: bool) {
         match self {
-            ExpressionGroup::Tuple(tuple) => sb.push_str(&format!("({})", tuple.values.iter().map(|el| el.node.display()).join(", "))),
+            ExpressionGroup::Tuple(tuple) => sb.push_str(&format!(
+                "({})",
+                tuple.values.iter().map(|el| el.node.display()).join(", ")
+            )),
             ExpressionGroup::Array(array) => sb.push_str(&format!(
-                "{}[{}{}]", 
-                array.collection_type.as_ref().map(|el| format!("{}:", el.display())).unwrap_or(String::new()),
-                array.element_type.as_ref().map(|el| format!("{}: ", el.display())).unwrap_or(String::new()),
+                "{}[{}{}]",
+                array
+                    .collection_type
+                    .as_ref()
+                    .map(|el| format!("{}:", el.display()))
+                    .unwrap_or(String::new()),
+                array
+                    .element_type
+                    .as_ref()
+                    .map(|el| format!("{}: ", el.display()))
+                    .unwrap_or(String::new()),
                 array.values.iter().map(|el| el.node.display()).join(", ")
             )),
-            ExpressionGroup::NamedTuple(named_tuple) => sb.push_str(
-                &format!("{{{}{}}}", named_tuple.values.iter().map(|(name, el)| format!("{}: {}", name, el.node.display())).join(", "), 
-                if named_tuple.insert_defaults {", .."} else {""}
+            ExpressionGroup::NamedTuple(named_tuple) => sb.push_str(&format!(
+                "{{{}{}}}",
+                named_tuple
+                    .values
+                    .iter()
+                    .map(|(name, el)| format!("{}: {}", name.node, el.node.display()))
+                    .join(", "),
+                if named_tuple.insert_defaults {
+                    ", .."
+                } else {
+                    ""
+                }
             )),
             ExpressionGroup::ArrayFiller(array_filler) => sb.push_str(&format!(
-                "{}[{}{} {}{} => {}]", 
-                array_filler.collection_type.as_ref().map(|el| el.display()).unwrap_or_default(),
-                array_filler.element_type.as_ref().map(|el| format!("{}: ", el.display())).unwrap_or_default(),
-                KeyWord::For.as_str(), 
-                array_filler.index.as_ref().map(|el| format!("{} {} ", el, KeyWord::InForLoop.as_str())).unwrap_or_default(), 
-                array_filler.amount.node.display(), 
+                "{}[{}{} {}{} => {}]",
+                array_filler
+                    .collection_type
+                    .as_ref()
+                    .map(|el| el.display())
+                    .unwrap_or_default(),
+                array_filler
+                    .element_type
+                    .as_ref()
+                    .map(|el| format!("{}: ", el.display()))
+                    .unwrap_or_default(),
+                KeyWord::For.as_str(),
+                array_filler
+                    .index
+                    .as_ref()
+                    .map(|el| format!("{} {} ", el.name, KeyWord::InForLoop.as_str()))
+                    .unwrap_or_default(),
+                array_filler.amount.node.display(),
                 array_filler.fill_expr.node.display(),
             )),
         }

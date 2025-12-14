@@ -1,5 +1,24 @@
+use crate::{
+    abstract_syntax_tree::{
+        block::Block,
+        conditionals::{
+            CaseDoKind, ElseKind, For, ForPattern, If, IfCaseKind, Match, Ternary, While,
+        },
+        expression_groups::ExpressionGroup,
+        function::{FunctionCall, Lambda, LamdbaBodyKind, StructConstructor},
+        literal::Literal,
+        operator::{Binary, Unary},
+        soul_type::SoulType,
+        spanned::Spanned,
+        statment::Ident,
+        syntax_display::{SyntaxDisplay, tree_prefix},
+    },
+    error::Span,
+    sementic_models::scope::NodeId,
+    soul_names::{KeyWord, TypeWrapper},
+    soul_page_path::SoulPagePath,
+};
 use itertools::Itertools;
-use crate::{abstract_syntax_tree::{block::Block, conditionals::{CaseDoKind, ElseKind, For, ForPattern, If, IfCaseKind, Match, Ternary, While}, expression_groups::ExpressionGroup, function::{FunctionCall, Lambda, LamdbaBodyKind, StaticMethod, StructConstructor}, literal::Literal, operator::{Binary, Unary}, soul_type::SoulType, spanned::Spanned, statment::Ident, syntax_display::{SyntaxDisplay, tree_prefix}}, error::Span, soul_names::{KeyWord, TypeWrapper}, soul_page_path::SoulPagePath};
 
 /// An expression in the Soul language, wrapped with source location information.
 pub type Expression = Spanned<ExpressionKind>;
@@ -14,7 +33,7 @@ pub enum ExpressionKind {
     Default,
     /// A literal value (number, string, etc.).
     Literal(Literal),
-    
+
     /// Indexing into a collection, e.g., `arr[i]`.
     Index(Index),
     /// A lambda `() => {}`.
@@ -28,11 +47,12 @@ pub enum ExpressionKind {
     FieldAccess(FieldAccess),
     /// Accessing a static field, e.g., `Type.field`.
     StaticFieldAccess(StaticFieldAccess),
-    /// Calling a static method, e.g., `Type.method()`.
-    StaticMethod(StaticMethod),
 
     /// Referring to a variable `var`.
-    Variable(Ident),
+    Variable {
+        ident: Ident,
+        resolved: Option<NodeId>,
+    },
     /// An external expression from another page/module `path.to.something.expression`.
     ExternalExpression(ExternalExpression),
 
@@ -55,7 +75,10 @@ pub enum ExpressionKind {
     /// A dereference, e.g., `*ptr`.
     Deref(BoxExpression),
     /// reference, e.g., `&x`(mut) or `@x`(const).
-    Ref{is_mutable: bool, expression: BoxExpression},
+    Ref {
+        is_mutable: bool,
+        expression: BoxExpression,
+    },
 
     /// A block of statements, returning the last expression `{/*stuff*/}`.
     Block(Block),
@@ -69,7 +92,7 @@ pub enum ExpressionKind {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ReturnLike {
     pub value: Option<BoxExpression>,
-    pub kind: ReturnKind
+    pub kind: ReturnKind,
 }
 /// The kind of return-like expression.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -125,13 +148,12 @@ impl Expression {
 }
 
 impl SyntaxDisplay for ExpressionKind {
-    
     fn display(&self) -> String {
         let mut sb = String::new();
         self.inner_display(&mut sb, 0, true);
         sb
     }
-    
+
     fn inner_display(&self, sb: &mut String, tab: usize, is_last: bool) {
         match self {
             ExpressionKind::Empty => sb.push_str("<empty>"),
@@ -142,63 +164,91 @@ impl SyntaxDisplay for ExpressionKind {
                 sb.push('[');
                 index.index.node.inner_display(sb, tab, is_last);
                 sb.push(']');
-            },
+            }
             ExpressionKind::Lambda(lambda) => {
                 sb.push('(');
-                sb.push_str(&lambda.arguments.values.iter().map(|el| el.node.display()).join(", "));
+                sb.push_str(
+                    &lambda
+                        .arguments
+                        .values
+                        .iter()
+                        .map(|el| el.node.display())
+                        .join(", "),
+                );
                 sb.push(')');
                 match &lambda.body {
-                    LamdbaBodyKind::Block(block) => block.inner_display(sb, tab+1, is_last),
-                    LamdbaBodyKind::Expression(spanned) => spanned.node.inner_display(sb, tab+1, is_last),
+                    LamdbaBodyKind::Block(block) => block.inner_display(sb, tab + 1, is_last),
+                    LamdbaBodyKind::Expression(spanned) => {
+                        spanned.node.inner_display(sb, tab + 1, is_last)
+                    }
                 }
-            },
+            }
             ExpressionKind::FunctionCall(function_call) => {
+                if !function_call.candidates.is_empty() {
+                    sb.push_str("|NodeId[");
+                    sb.push_str(&function_call.candidates.iter().map(|el| el.display()).join(","));
+                    sb.push_str("]| ");
+                }
                 sb.push_str(&function_call.name);
                 sb.push('(');
-                sb.push_str(&function_call.arguments.values.iter().map(|el| el.node.display()).join(", "));
+                sb.push_str(
+                    &function_call
+                        .arguments
+                        .values
+                        .iter()
+                        .map(|el| el.node.display())
+                        .join(", "),
+                );
                 sb.push(')');
             }
             ExpressionKind::StructConstructor(struct_constructor) => {
                 struct_constructor.calle.inner_display(sb, tab, is_last);
-                sb.push_str(&struct_constructor.arguments.values.iter().map(|(name, expr)| format!("{}: {}", name, expr.node.display())).join(", "));
-            },
+                sb.push_str(
+                    &struct_constructor
+                        .arguments
+                        .values
+                        .iter()
+                        .map(|(name, expr)| format!("{}: {}", name.node, expr.node.display()))
+                        .join(", "),
+                );
+            }
             ExpressionKind::FieldAccess(field_access) => {
                 field_access.object.node.inner_display(sb, tab, is_last);
                 sb.push('.');
                 sb.push_str(&field_access.field);
-            },
+            }
             ExpressionKind::StaticFieldAccess(static_field_access) => {
                 static_field_access.object.inner_display(sb, tab, is_last);
                 sb.push('.');
                 sb.push_str(&static_field_access.field);
-            },
-            ExpressionKind::StaticMethod(static_method) => {
-                static_method.callee.node.inner_display(sb, tab, is_last);
-                sb.push('.');
-                sb.push_str(&static_method.name);
-                sb.push('(');
-                sb.push_str(&static_method.arguments.values.iter().map(|el| el.node.display()).join(", "));
-                sb.push(')');
-            },
-            ExpressionKind::Variable(variable) => {
+            }
+            ExpressionKind::Variable{ident: variable, resolved} => {
+                if let Some(id) = resolved {
+                    sb.push_str("|NodeId(");
+                    sb.push_str(&id.display());
+                    sb.push_str(")|");
+                }
                 sb.push_str(&variable);
-            },
+            }
             ExpressionKind::ExternalExpression(external_expression) => {
                 sb.push_str(external_expression.path.as_str());
                 sb.push_str("::");
-                external_expression.expr.node.inner_display(sb, tab, is_last);
-            },
+                external_expression
+                    .expr
+                    .node
+                    .inner_display(sb, tab, is_last);
+            }
             ExpressionKind::Unary(unary) => {
                 sb.push_str(unary.operator.node.as_str());
                 unary.expression.node.inner_display(sb, tab, is_last);
-            },
+            }
             ExpressionKind::Binary(binary) => {
                 binary.left.node.inner_display(sb, tab, is_last);
                 sb.push(' ');
                 sb.push_str(binary.operator.node.as_str());
                 sb.push(' ');
                 binary.right.node.inner_display(sb, tab, is_last);
-            },
+            }
             ExpressionKind::If(_if) => {
                 sb.push_str(KeyWord::If.as_str());
                 sb.push(' ');
@@ -217,20 +267,19 @@ impl SyntaxDisplay for ExpressionKind {
                             sb.push(' ');
                             spanned.node.condition.node.inner_display(sb, tab, is_last);
                             spanned.node.block.inner_display(sb, tab, is_last);
-                        },
+                        }
                         ElseKind::Else(spanned) => {
                             sb.push_str(KeyWord::Else.as_str());
                             sb.push(' ');
                             spanned.node.inner_display(sb, tab, is_last);
-                        },
+                        }
                     }
                 }
-            },
+            }
             ExpressionKind::For(_for) => {
                 sb.push_str(KeyWord::For.as_str());
                 sb.push(' ');
                 if let Some(element) = &_for.element {
-
                     for_pattern_to_string(sb, element);
                     sb.push(' ');
                     sb.push_str(KeyWord::InForLoop.as_str());
@@ -238,40 +287,43 @@ impl SyntaxDisplay for ExpressionKind {
                 }
                 _for.collection.node.inner_display(sb, tab, is_last);
                 _for.block.inner_display(sb, tab, is_last);
-            },
+            }
             ExpressionKind::While(_while) => {
                 sb.push_str(KeyWord::While.as_str());
                 sb.push(' ');
-                
+
                 if let Some(condition) = &_while.condition {
                     condition.node.inner_display(sb, tab, is_last);
                     sb.push(' ');
                 }
                 _while.block.inner_display(sb, tab, is_last);
-            },
+            }
             ExpressionKind::Match(_match) => {
-                let prefix = tree_prefix(tab+1, is_last);
-                
+                let prefix = tree_prefix(tab + 1, is_last);
+
                 sb.push_str(KeyWord::While.as_str());
                 sb.push(' ');
-                
+
                 _match.condition.node.inner_display(sb, tab, is_last);
                 sb.push(' ');
                 for case in &_match.cases {
-                    
                     match &case.if_kind {
                         IfCaseKind::WildCard(ident) => {
                             sb.push('\n');
                             sb.push_str(&prefix);
-                            sb.push_str(ident.as_ref().unwrap_or(&String::new()));
+                            sb.push_str(
+                                ident.as_ref()
+                                    .map(|el| el.name.as_str())
+                                    .unwrap_or("_")
+                            );
                             sb.push_str(" => ");
-                        },
+                        }
                         IfCaseKind::Expression(spanned) => {
                             sb.push('\n');
                             sb.push_str(&prefix);
                             spanned.node.inner_display(sb, tab, is_last);
                             sb.push_str(" => ");
-                        },
+                        }
                         IfCaseKind::Variant { name, params } => {
                             sb.push('\n');
                             sb.push_str(&prefix);
@@ -283,21 +335,21 @@ impl SyntaxDisplay for ExpressionKind {
                             }
                             sb.push(')');
                             sb.push_str(" => ");
-                        },
+                        }
                         IfCaseKind::NamedVariant { name, params } => {
                             sb.push('\n');
                             sb.push_str(&prefix);
                             sb.push_str(&name);
                             sb.push('{');
                             for (name, value) in &params.values {
-                                sb.push_str(&name);
+                                sb.push_str(&name.node);
                                 sb.push_str(": ");
                                 value.node.inner_display(sb, tab, is_last);
                                 sb.push_str(", ");
                             }
                             sb.push('}');
                             sb.push_str(" => ");
-                        },
+                        }
                         IfCaseKind::Bind { name, condition } => {
                             sb.push('\n');
                             sb.push_str(&prefix);
@@ -307,31 +359,37 @@ impl SyntaxDisplay for ExpressionKind {
                             sb.push(' ');
                             condition.node.inner_display(sb, tab, is_last);
                             sb.push_str(" => ");
-                        },
+                        }
                     }
 
                     match &case.do_fn {
-                        CaseDoKind::Block(spanned) => spanned.node.inner_display(sb, tab+2, is_last),
-                        CaseDoKind::Expression(spanned) => spanned.node.inner_display(sb, tab, is_last),
+                        CaseDoKind::Block(spanned) => {
+                            spanned.node.inner_display(sb, tab + 2, is_last)
+                        }
+                        CaseDoKind::Expression(spanned) => {
+                            spanned.node.inner_display(sb, tab, is_last)
+                        }
                     }
                 }
-            },
+            }
             ExpressionKind::Ternary(ternary) => {
                 ternary.condition.node.inner_display(sb, tab, is_last);
                 sb.push_str(" ? ");
                 ternary.if_branch.node.inner_display(sb, tab, is_last);
                 sb.push_str(" : ");
                 ternary.else_branch.node.inner_display(sb, tab, is_last);
-            },
+            }
             ExpressionKind::Deref(spanned) => {
                 sb.push_str(TypeWrapper::Pointer.as_str());
                 spanned.node.inner_display(sb, tab, is_last);
-            },
-            ExpressionKind::Ref { is_mutable, expression } => {
+            }
+            ExpressionKind::Ref {
+                is_mutable,
+                expression,
+            } => {
                 if *is_mutable {
                     sb.push_str(TypeWrapper::MutRef.as_str());
-                }
-                else {
+                } else {
                     sb.push_str(TypeWrapper::ConstRef.as_str());
                 }
 
@@ -344,10 +402,12 @@ impl SyntaxDisplay for ExpressionKind {
                     sb.push(' ');
                     value.node.inner_display(sb, tab, is_last);
                 }
-            },
-            ExpressionKind::ExpressionGroup(expression_group) => expression_group.inner_display(sb, tab, is_last),
+            }
+            ExpressionKind::ExpressionGroup(expression_group) => {
+                expression_group.inner_display(sb, tab, is_last)
+            }
         }
-    } 
+    }
 }
 
 impl ReturnKind {
@@ -362,7 +422,7 @@ impl ReturnKind {
 
 fn for_pattern_to_string(sb: &mut String, el: &ForPattern) {
     match el {
-        ForPattern::Ident(ident) => sb.push_str(ident),
+        ForPattern::Ident{ident, ..} => sb.push_str(ident),
         ForPattern::Tuple(items) => {
             sb.push('(');
             for item in items {
@@ -370,16 +430,16 @@ fn for_pattern_to_string(sb: &mut String, el: &ForPattern) {
                 sb.push_str(", ");
             }
             sb.push(')');
-        },
+        }
         ForPattern::NamedTuple(items) => {
             sb.push('(');
             for (name, item) in items {
-                sb.push_str(&name);
+                sb.push_str(&name.node);
                 sb.push_str(": ");
                 for_pattern_to_string(sb, item);
                 sb.push_str(", ");
             }
             sb.push(')');
-        },
+        }
     }
 }

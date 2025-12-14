@@ -4,14 +4,8 @@ use crate::steps::{
 };
 use itertools::Itertools;
 use models::{
-    abstract_syntax_tree::{
-        AbstractSyntaxTree, block::Block, function::FunctionSignature, soul_type::SoulType, statment::Ident
-    },
+    abstract_syntax_tree::{AbstractSyntaxTree, block::Block},
     error::{SoulError, SoulErrorKind, SoulResult, Span},
-    scope::{
-        scope::{ScopeId, TypeSymbol, ValueSymbol},
-        scope_builder::ScopeBuilder,
-    },
     soul_names::TypeModifier,
 };
 
@@ -39,7 +33,6 @@ pub struct Parser<'a> {
 
     tokens: TokenStream<'a>,
     errors: Vec<SoulError>,
-    scopes: ScopeBuilder,
 }
 impl<'a> Parser<'a> {
     #[cfg(not(debug_assertions))]
@@ -59,7 +52,6 @@ impl<'a> Parser<'a> {
 
             tokens,
             errors: vec![],
-            scopes: ScopeBuilder::new(),
         }
     }
 
@@ -93,7 +85,6 @@ impl<'a> Parser<'a> {
             root: Block {
                 statments,
                 modifier: TypeModifier::Mut,
-                scope_id: self.scopes.current_scope().id,
             },
         }
     }
@@ -118,43 +109,6 @@ impl<'a> Parser<'a> {
             self.current = self.token().kind.clone();
             self.current_index = self.tokens.current_token_index();
         }
-    }
-
-    /// Pushes new scope onto scope stack. (used when opening a scope)
-    pub(crate) fn push_scope(
-        &mut self,
-        modifier: TypeModifier,
-        use_block: Option<SoulType>,
-    ) -> ScopeId {
-        self.scopes.push_scope(modifier, use_block)
-    }
-
-    /// Pops current scope from stack. (used at and of scope)
-    pub(crate) fn pop_scope(&mut self) {
-        self.scopes.pop_scope()
-    }
-
-    /// Adds value symbol to current scope.
-    pub(crate) fn add_scope_value(&mut self, name: Ident, symbol: ValueSymbol) {
-        self.scopes.insert_value(name, symbol);
-    }
-
-    /// Adds type symbol to current scope.
-    pub(crate) fn add_scope_type(
-        &mut self,
-        name: Ident,
-        symbol: TypeSymbol,
-    ) -> Result<(), SoulError> {
-        self.scopes.insert_type(name, symbol).map_err(|err| {
-            SoulError::new(err, SoulErrorKind::InvalidContext, Some(self.token().span))
-        })
-    }
-
-    pub(crate) fn add_function_delcaration(
-        &mut self,
-        symbol: FunctionSignature,
-    ) {
-        self.scopes.insert_function(symbol)
     }
 
     /// Records parse error.

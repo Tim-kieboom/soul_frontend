@@ -7,25 +7,25 @@ define_str_enum!(
     /// that can appear in source code.
     pub enum SymboolKind {
         /// `+`
-        Plus => "+", 
+        Plus => "+",
         /// `++`
         DoublePlus => "++",
         /// `-`
-        Minus => "-", 
+        Minus => "-",
         /// `--`
         DoubleMinus => "--",
         /// `*`
-        Star => "*", 
+        Star => "*",
         /// `/`
-        Slash => "/", 
+        Slash => "/",
         /// `**`
-        DoubleStar => "**", 
+        DoubleStar => "**",
         /// `</`
-        Root => "</", 
+        Root => "</",
         /// `%`
-        Mod => "%", 
+        Mod => "%",
         /// `&`
-        And => "&", 
+        And => "&",
         /// `@`
         ConstRef => "@",
         /// `$`
@@ -35,13 +35,13 @@ define_str_enum!(
         /// `^`
         Xor => "^",
         /// `&&`
-        DoubleAnd => "&&", 
+        DoubleAnd => "&&",
         /// `||`
-        DoubleOr => "||", 
+        DoubleOr => "||",
         /// `=`
-        Assign => "=", 
+        Assign => "=",
         /// `:=`
-        ColonAssign => ":=", 
+        ColonAssign => ":=",
         /// `+=`
         PlusEq => "+=",
         /// `-=`
@@ -61,7 +61,7 @@ define_str_enum!(
         /// `=>`
         LambdaArray => "=>",
         /// `==`
-        Eq => "==", 
+        Eq => "==",
         /// `!`
         Not => "!",
         /// `?`
@@ -69,23 +69,23 @@ define_str_enum!(
         /// `??`
         DoubleQuestion => "??",
         /// `!=`
-        NotEq => "!=", 
+        NotEq => "!=",
         /// `<`
-        LeftArray => "<", 
+        LeftArray => "<",
         /// `>`
-        RightArray => ">", 
+        RightArray => ">",
         /// `<=`
-        Le => "<=", 
+        Le => "<=",
         /// `>=`
-        Ge => ">=", 
+        Ge => ">=",
         /// `:`
-        Colon => ":", 
+        Colon => ":",
         /// `::`
-        DoubleColon => "::", 
+        DoubleColon => "::",
         /// `;`
-        SemiColon => ";", 
+        SemiColon => ";",
         /// `.`
-        Dot => ".", 
+        Dot => ".",
         /// `,`
         Comma => ",",
         /// `..`

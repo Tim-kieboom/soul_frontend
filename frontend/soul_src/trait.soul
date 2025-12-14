@@ -30,5 +30,5 @@ use B impl MySub {
 use A impl Other {}
 
 trait Ops1 impl MyAdd, MySub
-trait Ops2 typeof [A, B] // MyAdd and MySub both in A and B so 'impl MyAdd, MySub'
-trait Ops3 typeof [A, B] impl Other // 'impl MyAdd, MySub, Other'
+trait Ops2 typeof A, B // MyAdd and MySub both in A and B so 'impl MyAdd, MySub'
+trait Ops3 typeof A, B impl Other // 'impl MyAdd, MySub, Other'

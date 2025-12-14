@@ -1,15 +1,19 @@
-use std::collections::{BTreeMap};
-use crate::{abstract_syntax_tree::{expression::Expression, soul_type::{GenericDeclare, SoulType}, spanned::Spanned, statment::Ident}, scope::scope::ScopeId};
+use crate::{abstract_syntax_tree::{
+    expression::Expression,
+    soul_type::{GenericDeclare, SoulType},
+    spanned::Spanned,
+    statment::Ident,
+}, sementic_models::scope::NodeId};
+use std::collections::BTreeMap;
 
 /// A C-like enum definition (enumeration with integer values).
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Enum {
     /// The name of the enum.
     pub name: Ident,
-    /// The scope identifier for this enum.
-    pub scope_id: ScopeId,
     /// The enum variants.
     pub variants: Vec<EnumVariant>,
+    pub node_id: Option<NodeId>,
 }
 
 /// A Rust-like union/enum definition (sum type with data).
@@ -21,8 +25,7 @@ pub struct Union {
     pub generics: Vec<GenericDeclare>,
     /// The union variants.
     pub variants: Vec<Spanned<UnionVariant>>,
-    /// The scope identifier for this union.
-    pub scope_id: ScopeId,
+    pub node_id: Option<NodeId>,
 }
 
 /// A variant of a union type.
@@ -40,7 +43,7 @@ pub enum UnionVariantKind {
     /// A tuple variant with positional fields.
     Tuple(Vec<SoulType>),
     /// A named tuple variant with named fields.
-    NamedTuple(BTreeMap<Ident, SoulType>)
+    NamedTuple(BTreeMap<Ident, SoulType>),
 }
 
 /// A variant of a C-like enum.
@@ -60,4 +63,3 @@ pub enum EnumVariantsKind {
     /// An expression that evaluates to the variant's value.
     Expression(Expression),
 }
-

@@ -12,7 +12,10 @@ use models::{
         soul_type::{GenericDeclare, GenericDefine, SoulType},
         spanned::Spanned,
         statment::{Ident, Statement, StatementKind},
-    }, error::{SoulError, SoulErrorKind, SoulResult, Span}, soul_names::{KeyWord, TypeModifier}, symbool_kind::SymboolKind
+    },
+    error::{SoulError, SoulErrorKind, SoulResult, Span},
+    soul_names::{KeyWord, TypeModifier},
+    symbool_kind::SymboolKind,
 };
 
 impl<'a> Parser<'a> {
@@ -40,6 +43,7 @@ impl<'a> Parser<'a> {
                 callee: callee.map(|expr| Box::new(expr.clone())),
                 generics,
                 arguments,
+                candidates: vec![],
             },
             self.new_span(start_span),
         ))
@@ -76,9 +80,12 @@ impl<'a> Parser<'a> {
         } = self.try_parse_function_signature(start_span, modifier, extention_type, name)?;
         let block = self.parse_block(modifier).try_err()?;
 
-        self.add_function_delcaration(signature.clone());
         Ok(Statement::with_atribute(
-            StatementKind::Function(Function { signature, block }),
+            StatementKind::Function(Function {
+                signature,
+                block,
+                node_id: None,
+            }),
             span.combine(self.token().span),
             attributes,
         ))
@@ -164,7 +171,7 @@ impl<'a> Parser<'a> {
                 Err(TryError::IsNotValue(err)) => return TryNotValue((name, err)),
             }
         } else {
-            SoulType::none()
+            SoulType::none(self.new_span(start_span))
         };
 
         let callee = extention_type.map(|ty| {
@@ -173,7 +180,7 @@ impl<'a> Parser<'a> {
                     extention_type: ty,
                     this,
                 },
-                self.token().span,
+                self.new_span(start_span),
             )
         });
 

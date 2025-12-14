@@ -1,5 +1,16 @@
+use crate::{
+    abstract_syntax_tree::{
+        block::Block,
+        expression::{BoxExpression, Expression, ExpressionKind},
+        expression_groups::{ExpressionGroup, NamedTuple, Tuple},
+        soul_type::SoulType,
+        spanned::Spanned,
+        statment::{Ident, Variable},
+        syntax_display::SyntaxDisplay,
+    },
+    error::{SoulError, SoulErrorKind, SoulResult, Span}, sementic_models::scope::NodeId,
+};
 use itertools::Itertools;
-use crate::{abstract_syntax_tree::{block::Block, expression::{BoxExpression, Expression, ExpressionKind}, expression_groups::{ExpressionGroup, NamedTuple, Tuple}, soul_type::SoulType, spanned::Spanned, statment::Ident, syntax_display::SyntaxDisplay}, error::{SoulError, SoulErrorKind, SoulResult}, scope::scope::ScopeId};
 
 /// A ternary conditional expression, e.g., `cond ? a : b`.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -39,8 +50,6 @@ pub struct Match {
     pub condition: BoxExpression,
     /// The match cases/arms.
     pub cases: Vec<CaseSwitch>,
-    /// The scope identifier for this match expression.
-    pub scope_id: ScopeId,
 }
 
 /// A single case/arm in a `match` expression.
@@ -50,34 +59,32 @@ pub struct CaseSwitch {
     pub if_kind: IfCaseKind,
     /// The expression or block to execute if the pattern matches.
     pub do_fn: CaseDoKind,
-    /// The scope identifier for this case.
-    pub scope_id: ScopeId,
-} 
+}
 
 /// The kind of pattern in a match case.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum IfCaseKind {
     /// A wildcard pattern (`_`), optionally with a binding name.
-    WildCard(Option<Ident>),
+    WildCard(Option<Variable>),
     /// Match against a specific expression value.
     Expression(Expression),
     /// Match against a variant with tuple parameters.
-    Variant{name: Ident, params: Tuple},
+    Variant { name: Ident, params: Tuple },
     /// Match against a variant with named tuple parameters.
-    NamedVariant{name: Ident, params: NamedTuple},
+    NamedVariant { name: Ident, params: NamedTuple },
     /// Bind a value to a name, optionally with a condition.
-    Bind{name: Ident, condition: Expression},
+    Bind { name: Ident, condition: Expression },
 }
 
 /// A pattern used in `for` loops to destructure elements.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ForPattern {
     /// A simple identifier pattern.
-    Ident(Ident),
+    Ident{ident: Ident, resolved: Option<NodeId>, span: Span},
     /// A tuple pattern for destructuring tuples.
     Tuple(Vec<ForPattern>),
     /// A named tuple pattern for destructuring named tuples.
-    NamedTuple(Vec<(Ident, ForPattern)>),
+    NamedTuple(Vec<(Spanned<Ident>, ForPattern)>),
 }
 
 /// The body of a match case (block or expression).
@@ -106,7 +113,7 @@ pub enum ElseKind {
     /// An `else if` branch (another conditional).
     ElseIf(Box<Spanned<If>>),
     /// An `else` branch (unconditional).
-    Else(Spanned<Block>)
+    Else(Spanned<Block>),
 }
 
 /// A type comparison expression (`typeof`).
@@ -120,39 +127,46 @@ pub struct CompareTypeOf {
 
 impl ForPattern {
     pub fn from_expression(expression: Expression) -> SoulResult<Self> {
-
         match expression.node {
-            ExpressionKind::Variable(name) => Ok(ForPattern::Ident(name)),
+            ExpressionKind::Variable{ident, resolved} => Ok(ForPattern::Ident{ident, resolved, span: expression.span}),
             ExpressionKind::ExpressionGroup(ExpressionGroup::Tuple(tuple)) => {
                 let mut fors = Vec::with_capacity(tuple.values.len());
                 for el in tuple.values {
                     fors.push(ForPattern::from_expression(el)?);
-                } 
+                }
                 Ok(ForPattern::Tuple(fors))
-            },
+            }
             ExpressionKind::ExpressionGroup(ExpressionGroup::NamedTuple(named)) => {
                 let mut fors = Vec::with_capacity(named.values.len());
                 for (name, el) in named.values {
                     fors.push((name, ForPattern::from_expression(el)?));
-                } 
+                }
                 Ok(ForPattern::NamedTuple(fors))
-            },
-            _ => Err(
-                SoulError::new(
-                    format!("'{}' should be ident, tuple or named tuple", expression.node.display()),
-                    SoulErrorKind::InvalidExpression,
-                    Some(expression.span),
-                )
-            )
+            }
+            _ => Err(SoulError::new(
+                format!(
+                    "'{}' should be ident, tuple or named tuple",
+                    expression.node.display()
+                ),
+                SoulErrorKind::InvalidExpression,
+                Some(expression.span),
+            )),
         }
     }
 
     pub fn display(&self) -> String {
-
         match self {
-            ForPattern::Ident(ident) => ident.clone(),
-            ForPattern::Tuple(items) => format!("({})", items.iter().map(|el| el.display()).join(", ")),
-            ForPattern::NamedTuple(items) => format!("({})", items.iter().map(|(name, el)| format!("{}: {}", name, el.display())).join(", ")),
+            ForPattern::Ident{ident, ..} => ident.clone(),
+            ForPattern::Tuple(items) => {
+                format!("({})", items.iter().map(|el| el.display()).join(", "))
+            }
+            ForPattern::NamedTuple(items) => format!(
+                "({})",
+                items
+                    .iter()
+                    .map(|(name, el)| format!("{}: {}", name.node, el.display()))
+                    .join(", ")
+            ),
         }
     }
 }
