@@ -1,0 +1,36 @@
+
+├── NodeId(0) Variable >> f: none = Foo{..}
+├── NodeId(1) Function >> str<T: TODO|2|>(|NodeId(3)|any: 2): none
+├── NodeId(4) Function >> Println<T: TODO|5|>(|NodeId(6)|msg: 5): none
+├── NodeId(7) Function >> sum(|NodeId(8)|a: int, |NodeId(9)|b: int): int
+│   └── Expression >> return |NodeId(8)|a + |NodeId(9)|b
+│   │   
+├── NodeId(10) Function >> sum(|NodeId(11)|a: f32, |NodeId(12)|b: f32): f32
+│   └── Expression >> return |NodeId(11)|a + |NodeId(12)|b
+│   │   
+├── NodeId(13) Function >> sum<N: Number = int|14|>(|NodeId(15)|a: 14, |NodeId(16)|b: 14): 14
+│   └── Expression >> return |NodeId(15)|a + |NodeId(16)|b
+│   │   
+├── NodeId(19) Struct >> Foo
+│   ├── NodeId(17) Field >> field: const int 
+│   └── NodeId(18) Field >> foo: const int  = field
+│   │   
+├── NodeId(22) Class >> Bar
+│   ├── NodeId(20) Field >> field: const int 
+│   └── NodeId(21) Methode >> Bar print(@this, ): none
+│   │   │   └── Expression >> |NodeId[4]| Println("Bar{field: " + |NodeId[1]| str(|NodeId(20)|field) + "}")
+│   │   │   │   
+└── NodeId(23) Function >> main(): none
+│   ├── NodeId(24) Variable >> val: none = 1
+│   ├── Assignment >> |NodeId(24)|val = 0
+│   ├── Assignment >> |NodeId(24)|val = |NodeId[7,10,13]| sum(1, 2)
+│   ├── NodeId(25) Variable >> obj: none = Foo{field: 1, ..}
+│   ├── Block >> 
+│   │   │   └── NodeId(26) Variable >> bo: none = 1
+│   │   │   │   
+│   └── Expression >> if |NodeId(24)|val == 1
+│   │   ├── NodeId(27) Variable >> val: none = 1
+│   │   └── Assignment >> |NodeId(27)|val = 2
+│   │   │   
+│   │   
+│   

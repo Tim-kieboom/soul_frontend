@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::abstract_syntax_tree::{enum_like::{Enum, Union}, function::Function, objects::{Class, Struct, Trait}, statment::{Ident, Variable}};
+use crate::{abstract_syntax_tree::{enum_like::{Enum, Union}, function::Function, objects::{Class, Field, Struct, Trait}, soul_type::{GenericDeclare, GenericDeclareKind}, statment::{Ident, Variable}}, error::Span};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct NodeId(u32);
@@ -47,51 +47,60 @@ pub struct ScopeValueEntry {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScopeValueEntryKind {
+    Field,
     Function,
     Variable,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct ScopeTypeEntry {
+pub struct ScopeTypeEntry { 
+    pub span: Span,
     pub node_id: NodeId,
     pub kind: ScopeTypeEntryKind,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScopeTypeEntryKind {
-    Struct,
+    Enum,
     Class,
     Trait,
     Union,
-    Enum,
+    Struct,
+    LifeTime,
+    GenericType,
+    GenericExpression,
 }
 
 pub enum ScopeValueKind<'a> {
+    Field(&'a mut Field),
     Variable(&'a mut Variable),
-    Funtion(&'a mut Function),
+    Function(&'a mut Function),
 }
 impl<'a> ScopeValueKind<'a> {
     pub fn get_id_mut(&mut self) -> &mut Option<NodeId> {
 
         match self {
+            ScopeValueKind::Field(field) => &mut field.node_id,
             ScopeValueKind::Variable(variable) => &mut variable.node_id,
-            ScopeValueKind::Funtion(function) => &mut function.node_id,
+            ScopeValueKind::Function(function) => &mut function.node_id,
         } 
     }
 
     pub fn get_name(&self) -> &String {
 
         match self {
+            ScopeValueKind::Field(field) => &field.name,
             ScopeValueKind::Variable(variable) => &variable.name,
-            ScopeValueKind::Funtion(function) => &function.signature.name,
+            ScopeValueKind::Function(function) => &function.signature.node.name,
         }
     }
 
     pub fn to_entry_kind(&self) -> ScopeValueEntryKind {
 
         match self {
+            ScopeValueKind::Field(_) => ScopeValueEntryKind::Field,
             ScopeValueKind::Variable(_) => ScopeValueEntryKind::Variable,
-            ScopeValueKind::Funtion(_) => ScopeValueEntryKind::Function,
+            ScopeValueKind::Function(_) => ScopeValueEntryKind::Function,
         }
     }
 }
@@ -102,11 +111,13 @@ pub enum ScopeTypeKind<'a> {
     Trait(&'a mut Trait),
     Enum(&'a mut Enum),
     Union(&'a mut Union),
+    GenricDeclare(&'a mut GenericDeclare)
 }
 impl<'a> ScopeTypeKind<'a> {
     pub fn get_id_mut(&mut self) -> &mut Option<NodeId> {
 
         match self {
+            ScopeTypeKind::GenricDeclare(ty) => &mut ty.node_id,
             ScopeTypeKind::Struct(ty) => &mut ty.node_id,
             ScopeTypeKind::Class(ty) => &mut ty.node_id,
             ScopeTypeKind::Trait(ty) => &mut ty.node_id,
@@ -118,6 +129,11 @@ impl<'a> ScopeTypeKind<'a> {
     pub fn get_name(&self) -> &String {
 
         match self {
+            ScopeTypeKind::GenricDeclare(ty) => match &ty.kind {
+                GenericDeclareKind::Type{name, ..} => name,
+                GenericDeclareKind::Lifetime(ident) => ident,
+                GenericDeclareKind::Expression{name, ..} => name,
+            },
             ScopeTypeKind::Struct(ty) => &ty.name,
             ScopeTypeKind::Class(ty) => &ty.name,
             ScopeTypeKind::Trait(ty) => &ty.signature.name,
@@ -128,6 +144,13 @@ impl<'a> ScopeTypeKind<'a> {
 
     pub fn to_entry_kind(&self) -> ScopeTypeEntryKind {
         match self {
+            ScopeTypeKind::GenricDeclare(ty) => {
+                match &ty.kind {
+                    GenericDeclareKind::Type{..} => ScopeTypeEntryKind::GenericType,
+                    GenericDeclareKind::Lifetime(_) => ScopeTypeEntryKind::LifeTime,
+                    GenericDeclareKind::Expression{..} => ScopeTypeEntryKind::GenericExpression,
+                }
+            },
             ScopeTypeKind::Struct(_) => ScopeTypeEntryKind::Struct,
             ScopeTypeKind::Class(_) => ScopeTypeEntryKind::Class,
             ScopeTypeKind::Trait(_) => ScopeTypeEntryKind::Trait,

@@ -12,7 +12,7 @@ use models::{
     abstract_syntax_tree::{
         function::Function,
         objects::{
-            Class, ClassChild, Field, FieldAccess, Struct, Trait, TraitSignature, Visibility,
+            Class, ClassMember, Field, FieldAccess, Struct, Trait, TraitSignature, Visibility,
         },
         soul_type::{SoulType, TypeKind},
         spanned::Spanned,
@@ -64,7 +64,7 @@ impl<'a> Parser<'a> {
 
             match self.try_parse_methode(&this_type) {
                 Ok(val) => {
-                    members.push(Spanned::new(ClassChild::Method(val.node), val.span));
+                    members.push(Spanned::new(ClassMember::Method(val.node), val.span));
                     continue;
                 }
                 Err(TryError::IsNotValue(_)) => (),
@@ -73,7 +73,7 @@ impl<'a> Parser<'a> {
 
             match self.try_parse_field() {
                 Ok(val) => {
-                    members.push(Spanned::new(ClassChild::Field(val.node), val.span));
+                    members.push(Spanned::new(ClassMember::Field(val.node), val.span));
                     continue;
                 }
                 Err(TryError::IsErr(err)) | Err(TryError::IsNotValue(err)) => return Err(err),
@@ -328,7 +328,7 @@ impl<'a> Parser<'a> {
         );
 
         let signature = match result {
-            Ok(val) => val.node,
+            Ok(val) => val,
             Err(TryError::IsErr(err)) => return TryErr(err),
             Err(TryError::IsNotValue(_)) => return TryNotValue(()),
         };
@@ -400,13 +400,7 @@ impl<'a> Parser<'a> {
 
         if self.current_is_any(STAMENT_END_TOKENS) {
             return TryOk(Spanned::new(
-                Field {
-                    name,
-                    ty,
-                    default_value: None,
-                    vis: FieldAccess::default(),
-                    allignment: u32::default(),
-                },
+                Field::new(ty, name),
                 self.new_span(start_span),
             ));
         }
@@ -424,10 +418,11 @@ impl<'a> Parser<'a> {
 
         TryOk(Spanned::new(
             Field {
-                name,
                 ty,
-                default_value,
                 vis,
+                name,
+                default_value,
+                node_id: None,
                 allignment: u32::default(),
             },
             self.new_span(start_span),

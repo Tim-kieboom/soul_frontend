@@ -8,6 +8,7 @@ pub type SoulResult<T> = std::result::Result<T, SoulError>;
 pub enum SoulErrorKind {
     SourceReadError,
     ScopeError,
+    ScopeOverride(Span),
 
     UnexpecedToken,
     UnexpecedFileEnd,

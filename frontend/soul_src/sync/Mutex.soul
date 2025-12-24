@@ -47,10 +47,6 @@ class Mutex<T> {
     impl Sync{}
 }
 
-class PoisonFlag {
-    atomicCheck: AtomicBool
-}
-
 class Guard<'a, T> {
     mutex: @'a Mutex<T>,
 

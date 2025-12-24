@@ -12,6 +12,7 @@ use models::{
     abstract_syntax_tree::{
         expression::{Expression, ExpressionKind, FieldAccess, Index, ReturnKind, ReturnLike},
         expression_groups::ExpressionGroup,
+        function::StructConstructor,
         literal::Literal,
         operator::{Binary, BinaryOperator, Unary, UnaryOperator, UnaryOperatorKind},
         soul_type::{SoulType, TypeKind},
@@ -26,6 +27,7 @@ impl<'a> Parser<'a> {
         let expression = self.pratt_parse_precedence(0, end_tokens)?;
         Ok(expression)
     }
+
     pub(crate) fn parse_return_like(&mut self, kind: ReturnKind) -> SoulResult<Expression> {
         let start_span = self.token().span;
         self.expect_ident(kind.as_keyword().as_str())?;
@@ -135,68 +137,7 @@ impl<'a> Parser<'a> {
                 let right = self.parse_primary()?;
                 self.new_unary(start_span, unary, right)
             }
-            TokenKind::Ident(ident) => {
-                if ident == "true" || ident == "false" {
-                    let value = ident == "true";
-                    self.bump();
-                    Expression::new(
-                        ExpressionKind::Literal(Literal::Bool(value)),
-                        self.new_span(start_span),
-                    )
-                } else {
-                    match KeyWord::from_str(ident) {
-                        Some(KeyWord::If) => self.parse_if()?,
-                        Some(KeyWord::For) => self.parse_for()?,
-                        Some(KeyWord::While) => self.parse_while()?,
-                        Some(KeyWord::Match) => self.parse_match()?,
-                        Some(KeyWord::Break) => self.parse_return_like(ReturnKind::Break)?,
-                        Some(KeyWord::Return) => self.parse_return_like(ReturnKind::Return)?,
-                        Some(KeyWord::Continue) => self.parse_return_like(ReturnKind::Continue)?,
-                        _ => {
-                            let ident_token = self.bump_consume();
-                            let ident = match ident_token.kind {
-                                TokenKind::Ident(val) => val,
-                                _ => unreachable!(),
-                            };
-
-                            if self.current_is(&COLON) && self.peek().kind == SQUARE_OPEN {
-                                self.bump();
-                                let collection_type = SoulType::new(
-                                    None,
-                                    TypeKind::Stub {
-                                        ident,
-                                        resolved: None,
-                                    },
-                                    self.token().span,
-                                );
-                                let array = self.parse_array(Some(collection_type))?;
-                                Expression::new(
-                                    ExpressionKind::ExpressionGroup(ExpressionGroup::Array(array)),
-                                    self.new_span(start_span),
-                                )
-                            } else if self.current_is(&ROUND_OPEN) || self.current_is(&ARROW_LEFT) {
-                                let function_call = self
-                                    .try_parse_function_call(start_span, None, ident)
-                                    .merge_to_result()?;
-
-                                Expression::with_atribute(
-                                    ExpressionKind::FunctionCall(function_call.node),
-                                    self.new_span(start_span),
-                                    function_call.attributes,
-                                )
-                            } else {
-                                Expression::new(
-                                    ExpressionKind::Variable {
-                                        ident,
-                                        resolved: None,
-                                    },
-                                    self.new_span(start_span),
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+            TokenKind::Ident(_) => self.parse_primary_ident(start_span)?,
             TokenKind::CharLiteral(char) => {
                 let char = *char;
                 self.bump();
@@ -252,6 +193,99 @@ impl<'a> Parser<'a> {
         }
 
         Ok(expression)
+    }
+
+    fn parse_primary_ident(&mut self, start_span: Span) -> SoulResult<Expression> {
+        let text = match &self.token().kind {
+            TokenKind::Ident(val) => val,
+            _ => {
+                return Err(SoulError::new(
+                    "expected ident",
+                    SoulErrorKind::InvalidTokenKind,
+                    Some(self.token().span),
+                ));
+            }
+        };
+
+        if text == "true" || text == "false" {
+            let value = text == "true";
+            self.bump();
+            return Ok(Expression::new(
+                ExpressionKind::Literal(Literal::Bool(value)),
+                self.new_span(start_span),
+            ));
+        }
+
+        Ok(match KeyWord::from_str(text) {
+            Some(KeyWord::If) => self.parse_if()?,
+            Some(KeyWord::For) => self.parse_for()?,
+            Some(KeyWord::While) => self.parse_while()?,
+            Some(KeyWord::Match) => self.parse_match()?,
+            Some(KeyWord::Break) => self.parse_return_like(ReturnKind::Break)?,
+            Some(KeyWord::Return) => self.parse_return_like(ReturnKind::Return)?,
+            Some(KeyWord::Continue) => self.parse_return_like(ReturnKind::Continue)?,
+            _ => {
+                let ident_token = self.bump_consume();
+                let ident = match ident_token.kind {
+                    TokenKind::Ident(val) => val,
+                    _ => unreachable!(),
+                };
+
+                if self.current_is(&COLON) && self.peek().kind == SQUARE_OPEN {
+                    self.bump();
+                    let collection_type = SoulType::new(
+                        None,
+                        TypeKind::Stub {
+                            ident,
+                            resolved: None,
+                        },
+                        self.token().span,
+                    );
+                    let array = self.parse_array(Some(collection_type))?;
+                    Expression::new(
+                        ExpressionKind::ExpressionGroup(ExpressionGroup::Array(array)),
+                        self.new_span(start_span),
+                    )
+                } else if self.current_is(&ROUND_OPEN) || self.current_is(&ARROW_LEFT) {
+                    let function_call = self
+                        .try_parse_function_call(start_span, None, ident)
+                        .merge_to_result()?;
+
+                    Expression::with_atribute(
+                        ExpressionKind::FunctionCall(function_call.node),
+                        self.new_span(start_span),
+                        function_call.attributes,
+                    )
+                } else {
+                    if self.current_is(&CURLY_OPEN) {
+                        let ty = SoulType::new_stub(ident, self.token().span);
+                        return self.parse_struct_constructor(ty).map(|ctor| {
+                            Expression::new(
+                                ExpressionKind::StructConstructor(ctor),
+                                self.new_span(ident_token.span),
+                            )
+                        });
+                    }
+
+                    Expression::new(
+                        ExpressionKind::Variable {
+                            ident,
+                            resolved: None,
+                        },
+                        self.new_span(start_span),
+                    )
+                }
+            }
+        })
+    }
+
+    fn parse_struct_constructor(&mut self, ty: SoulType) -> SoulResult<StructConstructor> {
+        self.try_parse_named_tuple()
+            .merge_to_result()
+            .map(|el| StructConstructor {
+                calle: ty,
+                arguments: el,
+            })
     }
 
     fn parse_index(&mut self, start_span: Span, collection: Expression) -> SoulResult<Expression> {

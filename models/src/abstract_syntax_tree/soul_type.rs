@@ -59,13 +59,20 @@ pub enum TypeKind {
     /// Function type: (params) -> return
     Function(FunctionType),
     /// Generic type parameter
-    Generic{ident: Ident, resolved: Option<NodeId>},
+    Generic{node_id: NodeId, kind: GenericKind},
     /// Reference type: &T or &mut T
     Reference(ReferenceType),
     /// Pointer type: *T
     Pointer(Box<SoulType>),
     /// Optional type: T?
     Optional(Box<SoulType>),
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum GenericKind {
+    Type,
+    LifeTime,
+    Expression,
 }
 
 /// Array type
@@ -110,9 +117,50 @@ pub struct ReferenceType {
     pub mutable: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct GenericDeclare {
+    pub node_id: Option<NodeId>,
+    pub kind: GenericDeclareKind, 
+    pub span: Span,
+}
+impl GenericDeclare {
+    
+    pub fn new_lifetime(ident: Ident, span: Span) -> Self {
+        Self { 
+            span,
+            node_id: None, 
+            kind: GenericDeclareKind::Lifetime(ident),
+        }
+    }
+
+    pub fn new_type(name: Ident, traits: Vec<SoulType>, default: Option<SoulType>, span: Span) -> Self {
+        Self {
+            span,
+            node_id: None,
+            kind: GenericDeclareKind::Type{
+                name, 
+                traits, 
+                default,
+            },
+        }
+    }
+
+    pub fn new_expression(name: Ident, for_type: Option<SoulType>, default: Option<Expression>, span: Span) -> Self {
+        Self { 
+            span,
+            node_id: None, 
+            kind: GenericDeclareKind::Expression{
+                name, 
+                for_type, 
+                default
+            },
+        }
+    }
+}
+
 /// A generic parameter (lifetime or type).
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum GenericDeclare {
+pub enum GenericDeclareKind {
     /// A lifetime parameter.
     Lifetime(Ident),
     /// A type parameter.
@@ -159,6 +207,15 @@ impl SoulType {
             modifier,
             generics: vec![],
         }
+    }
+
+    /// Creates a `Stub` type (parser unknown type).
+    pub const fn new_stub(ident: Ident, span: Span) -> Self {
+        Self::new(
+            None, 
+            TypeKind::Stub{ident, resolved: None}, 
+            span,
+        )
     }
 
     /// Creates a `none` type (empty type).
@@ -232,7 +289,7 @@ impl TypeKind {
                 let inner = a.of_type.display();
                 match &a.size {
                     Some(StackArrayKind::Number(num)) => format!("[{}]{}", num, inner),
-                    Some(StackArrayKind::Ident{ident, resolved}) => format!("[{}]{}", ident, inner),
+                    Some(StackArrayKind::Ident{ident, resolved:_}) => format!("[{}]{}", ident, inner),
                     None => format!("[{}]", inner),
                 }
             }
@@ -252,7 +309,7 @@ impl TypeKind {
                 let params: Vec<String> = f.parameters.types.iter().map(|p| p.display()).collect();
                 format!("fn({}) -> {}", params.join(", "), f.return_type.display())
             }
-            TypeKind::Generic{ident, ..} => ident.clone(),
+            TypeKind::Generic{node_id, ..} => node_id.display(),
             TypeKind::Reference(r) => {
                 let ref_str = if r.mutable {
                     TypeWrapper::MutRef.as_str()

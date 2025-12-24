@@ -1,8 +1,6 @@
 use std::str::Lines;
 
-use models::{
-    error::{SoulError, Span},
-};
+use models::error::{SoulError, SoulErrorKind, Span};
 
 use crate::{steps::sementic_analyser::sementic_fault::SementicLevel, utils::char_colors::*};
 
@@ -27,16 +25,16 @@ impl ToMessage for SoulError {
         sb.push_str(&format!("\n{begin_space}├── "));
         sb.push_str(BLUE);
         sb.push_str(file_path);
+
         if let Some(span) = self.span {
-            sb.push(':');
-            sb.push_str(&format!("{}", span.start_line));
-            sb.push(':');
-            sb.push_str(&format!("{}", span.start_offset));
-            sb.push_str(" to ");
-            sb.push_str(&format!("{}", span.end_line));
-            sb.push(':');
-            sb.push_str(&format!("{}", span.end_offset));
+            display_span(&mut sb, span);
         }
+
+        if let SoulErrorKind::ScopeOverride(span) = self.kind {
+            sb.push_str(" overriden=");
+            display_span(&mut sb, span)
+        }
+
         sb.push_str(DEFAULT);
         sb.push_str(" ──");
         if let Some(span) = self.span {
@@ -115,4 +113,15 @@ fn get_source_snippet(out: &mut String, span: &Span, mut lines: Lines, begin_spa
 
     out.push_str(&format!("{begin_space}└──"));
     out.push_str(&"─".repeat(max_len))
+}
+
+fn display_span(sb: &mut String, span: Span) {
+    sb.push(':');
+    sb.push_str(&format!("{}", span.start_line));
+    sb.push(':');
+    sb.push_str(&format!("{}", span.start_offset));
+    sb.push_str(" to ");
+    sb.push_str(&format!("{}", span.end_line));
+    sb.push(':');
+    sb.push_str(&format!("{}", span.end_offset));
 }

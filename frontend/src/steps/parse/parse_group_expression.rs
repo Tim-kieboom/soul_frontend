@@ -11,7 +11,8 @@ use crate::{
 use models::{
     abstract_syntax_tree::{
         expression_groups::{Array, NamedTuple, Tuple},
-        soul_type::SoulType, spanned::Spanned,
+        soul_type::SoulType,
+        spanned::Spanned,
     },
     error::{SoulError, SoulErrorKind, SoulResult},
     symbool_kind::SymboolKind,

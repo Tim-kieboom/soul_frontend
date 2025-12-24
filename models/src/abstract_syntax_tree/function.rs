@@ -15,7 +15,7 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Function {
     /// The function's signature (name, parameters, return type, etc.).
-    pub signature: FunctionSignature,
+    pub signature: Spanned<FunctionSignature>,
     /// The function's body block.
     pub block: Block,
     pub node_id: Option<NodeId>,

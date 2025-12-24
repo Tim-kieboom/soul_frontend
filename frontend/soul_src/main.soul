@@ -1,13 +1,45 @@
+f := Foo{..}
+
+str<T: TODO>(any: T) {/*impl*/}
+Println<T: TODO>(msg: T) {/*internal*/}
+
 sum(a: int, b: int): int {
     return a + b
+}
+
+sum(a: f32, b: f32): f32 {
+    return a + b
+}
+
+sum<N: Number = int>(a: N, b: N): N {
+    return a + b
+}
+
+struct Foo {
+    field: int
+    foo: int = field
+}
+
+class Bar {
+    field: int
+
+    print(@this) {
+        Println("Bar{field: "+ str(field) +"}")
+    }
 }
 
 main() {
     val := 1
     val = 0
     val = sum(1, 2)
+    obj := Foo{field: 1, ..}
+
+    {
+        bo := 1
+    }
 
     if val == 1 {
+        val := 1
         val = 2
     }
 }

@@ -107,10 +107,12 @@ impl<'a> Parser<'a> {
             match result {
                 Ok(val) => Ok(val),
                 Err(TryError::IsErr(err)) => Err(err),
-                Err(TryError::IsNotValue((ident, _err))) => self
-                    .try_parse_function_call(start_span, None, ident)
-                    .merge_to_result()
-                    .map(Statement::from_function_call),
+                Err(TryError::IsNotValue(err)) => {
+                    let (ident, _ty) = (err.0, err.1);
+                    self.try_parse_function_call(start_span, None, ident)
+                        .merge_to_result()
+                        .map(Statement::from_function_call)
+                }
             }
         } else if DECLARATION_IDS.contains(&peek.kind) {
             let ident_token = self.bump_consume();

@@ -203,14 +203,20 @@ impl SyntaxDisplay for ExpressionKind {
             }
             ExpressionKind::StructConstructor(struct_constructor) => {
                 struct_constructor.calle.inner_display(sb, tab, is_last);
+                sb.push('{');
                 sb.push_str(
                     &struct_constructor
-                        .arguments
-                        .values
-                        .iter()
-                        .map(|(name, expr)| format!("{}: {}", name.node, expr.node.display()))
-                        .join(", "),
+                    .arguments
+                    .values
+                    .iter()
+                    .map(|(name, expr)| format!("{}: {}", name.node, expr.node.display()))
+                    .join(", "),
                 );
+                if struct_constructor.arguments.insert_defaults {
+                    let empty = struct_constructor.arguments.values.is_empty();
+                    sb.push_str(if empty {".."} else {", .."});
+                }
+                sb.push('}');
             }
             ExpressionKind::FieldAccess(field_access) => {
                 field_access.object.node.inner_display(sb, tab, is_last);
@@ -395,7 +401,7 @@ impl SyntaxDisplay for ExpressionKind {
 
                 expression.node.inner_display(sb, tab, is_last);
             }
-            ExpressionKind::Block(block) => block.inner_display(sb, tab, is_last),
+            ExpressionKind::Block(block) => block.inner_display(sb, tab+1, is_last),
             ExpressionKind::ReturnLike(return_like) => {
                 sb.push_str(return_like.kind.as_keyword().as_str());
                 if let Some(value) = &return_like.value {

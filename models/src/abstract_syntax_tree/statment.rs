@@ -6,8 +6,8 @@ use crate::{
         enum_like::{Enum, Union},
         expression::{Expression, ExpressionKind},
         function::{Function, FunctionCall, FunctionSignature},
-        objects::{Class, ClassChild, Field, Struct, Trait},
-        soul_type::{GenericDeclare, SoulType},
+        objects::{Class, ClassMember, Field, Struct, Trait},
+        soul_type::{GenericDeclare, GenericDeclareKind, SoulType},
         spanned::Spanned,
         syntax_display::{SyntaxDisplay, gap_prefix, tree_prefix},
     },
@@ -159,7 +159,8 @@ impl SyntaxDisplay for StatementKind {
             }
             StatementKind::Expression(spanned) => {
                 sb.push_str(&prefix);
-                sb.push_str("Expression >> ");
+                let tag = if matches!(spanned.node, ExpressionKind::Block(_)) {"Block >> "} else {"Expression >> "};
+                sb.push_str(tag);
                 spanned.node.inner_display(sb, tab, is_last);
             }
             StatementKind::Variable(var) => {
@@ -193,7 +194,7 @@ impl SyntaxDisplay for StatementKind {
                     sb.push_str(") ");
                 }
                 sb.push_str("Function >> ");
-                inner_display_function_declaration(sb, &function.signature, tab, is_last);
+                inner_display_function_declaration(sb, &function.signature.node, tab, is_last);
                 function.block.inner_display(sb, tab, is_last);
             }
             StatementKind::UseBlock(use_block) => {
@@ -312,12 +313,12 @@ fn inner_display_generic_parameters(sb: &mut String, parameters: &Vec<GenericDec
 
     sb.push('<');
     for parameter in parameters {
-        match parameter {
-            GenericDeclare::Lifetime(lifetime) => {
+        match &parameter.kind {
+            GenericDeclareKind::Lifetime(lifetime) => {
                 sb.push('\'');
                 sb.push_str(lifetime);
             }
-            GenericDeclare::Expression {
+            GenericDeclareKind::Expression {
                 name,
                 for_type,
                 default,
@@ -333,7 +334,7 @@ fn inner_display_generic_parameters(sb: &mut String, parameters: &Vec<GenericDec
                     expression.node.inner_display(sb, 0, false);
                 }
             }
-            GenericDeclare::Type {
+            GenericDeclareKind::Type {
                 name,
                 traits,
                 default,
@@ -350,37 +351,48 @@ fn inner_display_generic_parameters(sb: &mut String, parameters: &Vec<GenericDec
                 }
             }
         }
+
+        if let Some(node_id) = &parameter.node_id {
+            sb.push('|');
+            sb.push_str(&node_id.display());
+            sb.push('|');
+        }
     }
     sb.push('>');
 }
 
 fn inner_display_classchild(
     sb: &mut String,
-    kinds: &Vec<Spanned<ClassChild>>,
+    kinds: &Vec<Spanned<ClassMember>>,
     tab: usize,
     use_last: bool,
 ) {
-    fn get_tag(child: &Spanned<ClassChild>) -> &'static str {
+    fn get_tag(child: &Spanned<ClassMember>) -> &'static str {
         match &child.node {
-            ClassChild::Field(_) => "Field >> ",
-            ClassChild::Method(_) => "Methode >> ",
-            ClassChild::ImplBlock(_) => "ImplBlock >> ",
+            ClassMember::Field(_) => "Field >> ",
+            ClassMember::Method(_) => "Methode >> ",
+            ClassMember::ImplBlock(_) => "ImplBlock >> ",
         }
     }
 
     let lat_index = kinds.len() - 1;
 
-    for (i, child) in kinds.iter().enumerate() {
+    for (i, member) in kinds.iter().enumerate() {
         let is_last = use_last && lat_index == i;
         let prefix = tree_prefix(tab, is_last);
 
         sb.push('\n');
         sb.push_str(&prefix);
-        sb.push_str(get_tag(child));
-        match &child.node {
-            ClassChild::Field(field) => inner_display_field(sb, field, tab, is_last),
-            ClassChild::Method(function) => inner_display_methode(sb, function, tab, is_last),
-            ClassChild::ImplBlock(_) => todo!(),
+        if let Some(id) = member.node.try_get_node_id() {
+            sb.push_str("NodeId(");
+            sb.push_str(&id.display());
+            sb.push_str(") ");
+        }
+        sb.push_str(get_tag(member));
+        match &member.node {
+            ClassMember::Field(field) => inner_display_field(sb, field, tab, is_last),
+            ClassMember::Method(function) => inner_display_methode(sb, function, tab, is_last),
+            ClassMember::ImplBlock(_) => todo!(),
         }
     }
 }
@@ -417,6 +429,11 @@ fn inner_display_fields(sb: &mut String, fields: &Vec<Spanned<Field>>, tab: usiz
         let prefix = tree_prefix(tab, is_last);
         sb.push('\n');
         sb.push_str(&prefix);
+        if let Some(id) = field.node_id {
+            sb.push_str("NodeId(");
+            sb.push_str(&id.display());
+            sb.push_str(") ");
+        }
         sb.push_str("Field >> ");
         inner_display_field(sb, field, tab, is_last);
         if last_index == i {
@@ -427,7 +444,7 @@ fn inner_display_fields(sb: &mut String, fields: &Vec<Spanned<Field>>, tab: usiz
 }
 
 fn inner_display_methode(sb: &mut String, methode: &Function, tab: usize, is_last: bool) {
-    inner_display_methode_signature(sb, &methode.signature, tab, is_last);
+    inner_display_methode_signature(sb, &methode.signature.node, tab, is_last);
     methode.block.inner_display(sb, tab + 1, is_last);
 }
 

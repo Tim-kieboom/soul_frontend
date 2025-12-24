@@ -26,7 +26,7 @@ pub struct Class {
     /// Generic type parameters.
     pub generics: Vec<GenericDeclare>,
     /// The members of the class (fields, methods, impl blocks).
-    pub members: Vec<Spanned<ClassChild>>,
+    pub members: Vec<Spanned<ClassMember>>,
     pub node_id: Option<NodeId>,
 }
 
@@ -54,7 +54,7 @@ pub struct TraitSignature {
 
 /// A child element of a class (field, method, or impl block).
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum ClassChild {
+pub enum ClassMember {
     /// A field definition.
     Field(Field),
     /// A method definition.
@@ -75,6 +75,7 @@ pub struct Field {
     /// Field access visibility settings.
     pub vis: FieldAccess,
     pub allignment: u32,
+    pub node_id: Option<NodeId>,
 }
 
 /// Field access visibility and mutability settings.
@@ -93,6 +94,40 @@ pub enum Visibility {
     Public,
     /// Private visibility (only accessible within the same module/type).
     Private,
+}
+
+impl ClassMember {
+    pub fn try_get_node_id(&self) -> Option<NodeId>{
+        match self {
+            ClassMember::Field(field) => field.node_id,
+            ClassMember::Method(function) => function.node_id,
+            ClassMember::ImplBlock(_) => None,
+        }
+    }
+}
+
+impl Field {
+    pub fn new(ty: SoulType, name: String) -> Self {
+        Self {
+            ty,
+            name,
+            node_id: None,
+            default_value: None,
+            allignment: u32::default(),
+            vis: FieldAccess::default(),
+        }
+    }
+
+    pub fn from_visability(ty: SoulType, name: String, vis: FieldAccess) -> Self {
+        Self {
+            ty,
+            vis,
+            name,
+            node_id: None,
+            default_value: None,
+            allignment: u32::default(),
+        }
+    }
 }
 
 impl FieldAccess {

@@ -1,0 +1,36 @@
+
+├── Variable >> f: none = Foo{..}
+├── Function >> str<T: TODO>(any: T): none
+├── Function >> Println<T: TODO>(msg: T): none
+├── Function >> sum(a: int, b: int): int
+│   └── Expression >> return a + b
+│   │   
+├── Function >> sum(a: f32, b: f32): f32
+│   └── Expression >> return a + b
+│   │   
+├── Function >> sum<N: Number = int>(a: N, b: N): N
+│   └── Expression >> return a + b
+│   │   
+├── Struct >> Foo
+│   ├── Field >> field: const int 
+│   └── Field >> foo: const int  = field
+│   │   
+├── Class >> Bar
+│   ├── Field >> field: const int 
+│   └── Methode >> Bar print(@this, ): none
+│   │   │   └── Expression >> Println("Bar{field: " + str(field) + "}")
+│   │   │   │   
+└── Function >> main(): none
+│   ├── Variable >> val: none = 1
+│   ├── Assignment >> val = 0
+│   ├── Assignment >> val = sum(1, 2)
+│   ├── Variable >> obj: none = Foo{field: 1, ..}
+│   ├── Block >> 
+│   │   │   └── Variable >> bo: none = 1
+│   │   │   │   
+│   └── Expression >> if val == 1
+│   │   ├── Variable >> val: none = 1
+│   │   └── Assignment >> val = 2
+│   │   │   
+│   │   
+│   

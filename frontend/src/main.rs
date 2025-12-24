@@ -1,7 +1,10 @@
 extern crate frontend;
 use crate::frontend::utils::convert_error_message::ToMessage;
 use frontend::{ParseResonse, SementicLevel, parse_file, sementic_analyse};
-use models::{abstract_syntax_tree::{AbstractSyntaxTree, syntax_display::SyntaxDisplay}, error::SoulError};
+use models::{
+    abstract_syntax_tree::{AbstractSyntaxTree, syntax_display::SyntaxDisplay},
+    error::SoulError,
+};
 use std::{
     fs::File,
     io::{self, BufReader, Read, Write},
@@ -10,8 +13,8 @@ use std::{
 
 fn main() -> io::Result<()> {
     const RELATIVE_PATH: &str = "main.soul";
-    const AST_TREE: &str = "F:/Code/Github/soul_frontend/frontend/AST_tree.soulc";
-    const SEMENTIC_TREE: &str = "F:/Code/Github/soul_frontend/frontend/sementic_tree.soulc";
+    const AST_TREE: &str = "F:/Code/Github/soul_frontend/frontend/AST_parsed.soulc";
+    const SEMENTIC_TREE: &str = "F:/Code/Github/soul_frontend/frontend/AST_name_resolved.soulc";
     const MAIN_FILE: &str = "F:/Code/Github/soul_frontend/frontend/soul_src/main.soul";
 
     let source_file = get_source_file(MAIN_FILE)?;
@@ -27,10 +30,9 @@ fn main() -> io::Result<()> {
         }
     };
 
-    
     if !errors.is_empty() {
         report_parse_fail(errors, RELATIVE_PATH, &source_file);
-        return Err(fail_err())
+        return Err(fail_err());
     }
 
     print_syntax_tree(&syntax_tree, AST_TREE)?;
@@ -44,14 +46,17 @@ fn main() -> io::Result<()> {
         }
         eprintln!(
             "{}\n",
-            fault.consume_soul_error()
-                .to_message(SementicLevel::Error, RELATIVE_PATH, &source_file)
+            fault.consume_soul_error().to_message(
+                SementicLevel::Error,
+                RELATIVE_PATH,
+                &source_file
+            )
         );
     }
 
     if error_count > 0 {
         report_final_fail(error_count);
-        return Err(fail_err())
+        return Err(fail_err());
     }
 
     print_syntax_tree(&syntax_tree, SEMENTIC_TREE)?;

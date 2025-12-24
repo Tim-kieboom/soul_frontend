@@ -1,12 +1,14 @@
 import Std::Sync::[Mutex, Arc]
 
-class Shared<T> {
+class Share<T> {
     inner: Arc<Mutex<T>>
 
     This(value: T) {
         return This{inner: Arc(Mutex(value))}
     }
-
+    
+    impl Send{}
+    impl Sync{}
     impl CopyAuto {}
     impl ConstRef<T> {
         ConstRef(@'a this) -> @'a T 

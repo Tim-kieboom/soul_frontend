@@ -55,7 +55,7 @@ impl<'a> Parser<'a> {
         modifier: TypeModifier,
         extention_type: Option<SoulType>,
         name: Ident,
-    ) -> TryResult<Spanned<FunctionSignature>, (Ident, SoulError)> {
+    ) -> TryResult<Spanned<FunctionSignature>, Box<(Ident, SoulError)>> {
         let begin_position = self.current_position();
         let result =
             self.inner_try_parse_function_signature(start_span, modifier, extention_type, name);
@@ -72,22 +72,19 @@ impl<'a> Parser<'a> {
         modifier: TypeModifier,
         extention_type: Option<SoulType>,
         name: Ident,
-    ) -> TryResult<Statement, (Ident, SoulError)> {
-        let Spanned {
-            node: signature,
-            span,
-            attributes,
-        } = self.try_parse_function_signature(start_span, modifier, extention_type, name)?;
+    ) -> TryResult<Statement, Box<(Ident, SoulError)>> {
+        let signature =
+            self.try_parse_function_signature(start_span, modifier, extention_type, name)?;
         let block = self.parse_block(modifier).try_err()?;
 
-        Ok(Statement::with_atribute(
+        let span = signature.span;
+        Ok(Statement::new(
             StatementKind::Function(Function {
                 signature,
                 block,
                 node_id: None,
             }),
             span.combine(self.token().span),
-            attributes,
         ))
     }
 
@@ -115,7 +112,7 @@ impl<'a> Parser<'a> {
                 }
             };
 
-            let generic = self.inner_parse_generic_declare(name, is_lifetime)?;
+            let generic = self.inner_parse_generic_declare(name, is_lifetime, ident_token.span)?;
 
             generics.push(generic);
             if !self.current_is(&COMMA) {
@@ -139,9 +136,12 @@ impl<'a> Parser<'a> {
         modifier: TypeModifier,
         extention_type: Option<SoulType>,
         name: Ident,
-    ) -> TryResult<Spanned<FunctionSignature>, (Ident, SoulError)> {
+    ) -> TryResult<Spanned<FunctionSignature>, Box<(Ident, SoulError)>> {
         if !self.current_is_any(&[ROUND_OPEN, ARROW_LEFT]) {
-            return TryNotValue((name, self.get_expect_any_error(&[ROUND_OPEN, ARROW_LEFT])));
+            return TryNotValue(Box::new((
+                name,
+                self.get_expect_any_error(&[ROUND_OPEN, ARROW_LEFT]),
+            )));
         }
 
         let generics = if self.current_is(&ARROW_LEFT) {
@@ -158,7 +158,7 @@ impl<'a> Parser<'a> {
         let (parameters, this) = match self.parse_named_tuple_type(IS_FUNCTION) {
             Ok(val) => val,
             Err(TryError::IsNotValue(err)) => {
-                return TryNotValue((name, err));
+                return TryNotValue(Box::new((name, err)));
             }
             Err(TryError::IsErr(err)) => return TryErr(err),
         };
@@ -168,7 +168,7 @@ impl<'a> Parser<'a> {
             match self.try_parse_type() {
                 Ok(val) => val,
                 Err(TryError::IsErr(err)) => return TryErr(err),
-                Err(TryError::IsNotValue(err)) => return TryNotValue((name, err)),
+                Err(TryError::IsNotValue(err)) => return TryNotValue(Box::new((name, err))),
             }
         } else {
             SoulType::none(self.new_span(start_span))
@@ -201,12 +201,13 @@ impl<'a> Parser<'a> {
         &mut self,
         name: Ident,
         is_lifetime: bool,
+        span: Span,
     ) -> SoulResult<GenericDeclare> {
         const IMPL_STR: &str = KeyWord::Impl.as_str();
         const COLON_STR: &str = SymboolKind::Colon.as_str();
 
         if is_lifetime {
-            return Ok(GenericDeclare::Lifetime(name));
+            return Ok(GenericDeclare::new_lifetime(name, span));
         }
 
         if self.current_is(&COLON) {
@@ -241,11 +242,7 @@ impl<'a> Parser<'a> {
                 None
             };
 
-            return Ok(GenericDeclare::Type {
-                name,
-                traits,
-                default,
-            });
+            return Ok(GenericDeclare::new_type(name, traits, default, span));
         }
 
         if self.current_is_ident(KeyWord::Impl.as_str()) {
@@ -267,11 +264,12 @@ impl<'a> Parser<'a> {
                 None
             };
 
-            return Ok(GenericDeclare::Expression {
+            return Ok(GenericDeclare::new_expression(
                 name,
-                for_type: Some(ty),
+                Some(ty),
                 default,
-            });
+                span,
+            ));
         }
 
         Err(SoulError::new(
