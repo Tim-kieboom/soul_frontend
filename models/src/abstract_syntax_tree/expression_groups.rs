@@ -1,6 +1,6 @@
 use crate::{
     abstract_syntax_tree::{
-        expression::{BoxExpression, Expression}, soul_type::SoulType, spanned::Spanned, statment::{Ident, Variable}, syntax_display::SyntaxDisplay
+        expression::{BoxExpression, Expression}, soul_type::SoulType, spanned::Spanned, statment::{Ident, Variable}, syntax_display::{DisplayKind, SyntaxDisplay}
     },
     soul_names::KeyWord,
 };
@@ -65,38 +65,38 @@ pub struct Tuple {
 }
 
 impl SyntaxDisplay for ExpressionGroup {
-    fn display(&self) -> String {
+    fn display(&self, kind: DisplayKind) -> String {
         let mut sb = String::new();
-        self.inner_display(&mut sb, 0, true);
+        self.inner_display(&mut sb, kind, 0, true);
         sb
     }
 
-    fn inner_display(&self, sb: &mut String, _tab: usize, _is_last: bool) {
+    fn inner_display(&self, sb: &mut String, kind: DisplayKind, _tab: usize, _is_last: bool) {
         match self {
             ExpressionGroup::Tuple(tuple) => sb.push_str(&format!(
                 "({})",
-                tuple.values.iter().map(|el| el.node.display()).join(", ")
+                tuple.values.iter().map(|el| el.node.display(kind)).join(", ")
             )),
             ExpressionGroup::Array(array) => sb.push_str(&format!(
                 "{}[{}{}]",
                 array
                     .collection_type
                     .as_ref()
-                    .map(|el| format!("{}:", el.display()))
+                    .map(|el| format!("{}:", el.display(kind)))
                     .unwrap_or(String::new()),
                 array
                     .element_type
                     .as_ref()
-                    .map(|el| format!("{}: ", el.display()))
+                    .map(|el| format!("{}: ", el.display(kind)))
                     .unwrap_or(String::new()),
-                array.values.iter().map(|el| el.node.display()).join(", ")
+                array.values.iter().map(|el| el.node.display(kind)).join(", ")
             )),
             ExpressionGroup::NamedTuple(named_tuple) => sb.push_str(&format!(
                 "{{{}{}}}",
                 named_tuple
                     .values
                     .iter()
-                    .map(|(name, el)| format!("{}: {}", name.node, el.node.display()))
+                    .map(|(name, el)| format!("{}: {}", name.node, el.node.display(kind)))
                     .join(", "),
                 if named_tuple.insert_defaults {
                     ", .."
@@ -109,12 +109,12 @@ impl SyntaxDisplay for ExpressionGroup {
                 array_filler
                     .collection_type
                     .as_ref()
-                    .map(|el| el.display())
+                    .map(|el| el.display(kind))
                     .unwrap_or_default(),
                 array_filler
                     .element_type
                     .as_ref()
-                    .map(|el| format!("{}: ", el.display()))
+                    .map(|el| format!("{}: ", el.display(kind)))
                     .unwrap_or_default(),
                 KeyWord::For.as_str(),
                 array_filler
@@ -122,8 +122,8 @@ impl SyntaxDisplay for ExpressionGroup {
                     .as_ref()
                     .map(|el| format!("{} {} ", el.name, KeyWord::InForLoop.as_str()))
                     .unwrap_or_default(),
-                array_filler.amount.node.display(),
-                array_filler.fill_expr.node.display(),
+                array_filler.amount.node.display(kind),
+                array_filler.fill_expr.node.display(kind),
             )),
         }
     }

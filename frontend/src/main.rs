@@ -2,7 +2,7 @@ extern crate frontend;
 use crate::frontend::utils::convert_error_message::ToMessage;
 use frontend::{ParseResonse, SementicLevel, parse_file, sementic_analyse};
 use models::{
-    abstract_syntax_tree::{AbstractSyntaxTree, syntax_display::SyntaxDisplay},
+    abstract_syntax_tree::{AbstractSyntaxTree, syntax_display::{DisplayKind, SyntaxDisplay}},
     error::SoulError,
 };
 use std::{
@@ -35,7 +35,7 @@ fn main() -> io::Result<()> {
         return Err(fail_err());
     }
 
-    print_syntax_tree(&syntax_tree, AST_TREE)?;
+    print_syntax_tree(&syntax_tree, AST_TREE, DisplayKind::Parser)?;
 
     let mut error_count = 0;
     let faults = sementic_analyse(&mut syntax_tree);
@@ -59,7 +59,7 @@ fn main() -> io::Result<()> {
         return Err(fail_err());
     }
 
-    print_syntax_tree(&syntax_tree, SEMENTIC_TREE)?;
+    print_syntax_tree(&syntax_tree, SEMENTIC_TREE, DisplayKind::NameResolver)?;
     Ok(())
 }
 
@@ -93,8 +93,8 @@ fn fail_err() -> io::Error {
     )
 }
 
-fn print_syntax_tree(syntax_tree: &AbstractSyntaxTree, path: &str) -> io::Result<()> {
-    let tree_string = syntax_tree.root.display();
+fn print_syntax_tree(syntax_tree: &AbstractSyntaxTree, path: &str, kind: DisplayKind) -> io::Result<()> {
+    let tree_string = syntax_tree.root.display(kind);
     let mut out_file = File::create(path)?;
 
     let _write_amount = out_file.write(tree_string.as_bytes())?;

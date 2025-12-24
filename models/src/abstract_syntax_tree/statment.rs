@@ -9,7 +9,7 @@ use crate::{
         objects::{Class, ClassMember, Field, Struct, Trait},
         soul_type::{GenericDeclare, GenericDeclareKind, SoulType},
         spanned::Spanned,
-        syntax_display::{SyntaxDisplay, gap_prefix, tree_prefix},
+        syntax_display::{DisplayKind, SyntaxDisplay, gap_prefix, tree_prefix},
     },
     error::Span,
     sementic_models::scope::NodeId,
@@ -136,13 +136,13 @@ impl StatementKind {
 }
 
 impl SyntaxDisplay for StatementKind {
-    fn display(&self) -> String {
+    fn display(&self, kind: DisplayKind) -> String {
         let mut sb = String::new();
-        self.inner_display(&mut sb, 0, true);
+        self.inner_display(&mut sb, kind, 0, true);
         sb
     }
 
-    fn inner_display(&self, sb: &mut String, tab: usize, is_last: bool) {
+    fn inner_display(&self, sb: &mut String, kind: DisplayKind, tab: usize, is_last: bool) {
         let prefix = tree_prefix(tab, is_last);
         match self {
             StatementKind::EndFile => (),
@@ -161,107 +161,87 @@ impl SyntaxDisplay for StatementKind {
                 sb.push_str(&prefix);
                 let tag = if matches!(spanned.node, ExpressionKind::Block(_)) {"Block >> "} else {"Expression >> "};
                 sb.push_str(tag);
-                spanned.node.inner_display(sb, tab, is_last);
+                spanned.node.inner_display(sb, kind, tab, is_last);
             }
             StatementKind::Variable(var) => {
                 sb.push_str(&prefix);
-                if let Some(id) = var.node_id {
-                    sb.push_str("NodeId(");
-                    sb.push_str(&id.display());
-                    sb.push_str(") ");
-                }
+                try_display_node_id(sb, kind, var.node_id);
                 sb.push_str("Variable >> ");
                 sb.push_str(&var.name);
                 sb.push_str(": ");
-                var.ty.inner_display(sb, tab, is_last);
+                var.ty.inner_display(sb, kind, tab, is_last);
                 if let Some(val) = &var.initialize_value {
                     sb.push_str(" = ");
-                    val.node.inner_display(sb, tab, is_last);
+                    val.node.inner_display(sb, kind, tab, is_last);
                 }
             }
             StatementKind::Assignment(assignment) => {
                 sb.push_str(&prefix);
                 sb.push_str("Assignment >> ");
-                assignment.left.node.inner_display(sb, tab, is_last);
+                assignment.left.node.inner_display(sb, kind, tab, is_last);
                 sb.push_str(" = ");
-                assignment.right.node.inner_display(sb, tab, is_last);
+                assignment.right.node.inner_display(sb, kind, tab, is_last);
             }
             StatementKind::Function(function) => {
                 sb.push_str(&prefix);
-                if let Some(id) = function.node_id {
-                    sb.push_str("NodeId(");
-                    sb.push_str(&id.display());
-                    sb.push_str(") ");
-                }
+                try_display_node_id(sb, kind, function.node_id);
                 sb.push_str("Function >> ");
-                inner_display_function_declaration(sb, &function.signature.node, tab, is_last);
-                function.block.inner_display(sb, tab, is_last);
+                inner_display_function_declaration(sb, kind, &function.signature.node, tab, is_last);
+                function.block.inner_display(sb, kind, tab, is_last);
             }
             StatementKind::UseBlock(use_block) => {
                 sb.push_str(&prefix);
                 sb.push_str("UseBlock >> ");
-                use_block.ty.inner_display(sb, tab, is_last);
+                use_block.ty.inner_display(sb, kind, tab, is_last);
                 if let Some(impl_trait) = &use_block.impl_trait {
                     sb.push_str(" impl ");
-                    impl_trait.inner_display(sb, tab, is_last);
+                    impl_trait.inner_display(sb, kind, tab, is_last);
                 }
-                use_block.block.inner_display(sb, tab, is_last);
+                use_block.block.inner_display(sb, kind, tab, is_last);
             }
-            StatementKind::Struct(_struct) => {
+            StatementKind::Struct(r#struct) => {
                 const USE_LAST: bool = true;
                 sb.push_str(&prefix);
-                if let Some(id) = _struct.node_id {
-                    sb.push_str("NodeId(");
-                    sb.push_str(&id.display());
-                    sb.push_str(") ");
-                }
+                try_display_node_id(sb, kind, r#struct.node_id);
                 sb.push_str("Struct >> ");
-                sb.push_str(&_struct.name);
-                inner_display_generic_parameters(sb, &_struct.generics);
-                inner_display_fields(sb, &_struct.fields, tab + 1, USE_LAST);
+                sb.push_str(&r#struct.name);
+                inner_display_generic_parameters(sb, kind, &r#struct.generics);
+                inner_display_fields(sb, kind, &r#struct.fields, tab + 1, USE_LAST);
             }
-            StatementKind::Trait(_trait) => {
+            StatementKind::Trait(r#trait) => {
                 const USE_LAST: bool = true;
                 sb.push_str(&prefix);
-                if let Some(id) = _trait.node_id {
-                    sb.push_str("NodeId(");
-                    sb.push_str(&id.display());
-                    sb.push_str(") ");
-                }
+                try_display_node_id(sb, kind, r#trait.node_id);
                 sb.push_str("Trait >> ");
-                sb.push_str(&_trait.signature.name);
-                if !_trait.signature.for_types.is_empty() {
-                    let fors = _trait
+                sb.push_str(&r#trait.signature.name);
+                if !r#trait.signature.for_types.is_empty() {
+                    let fors = r#trait
                         .signature
                         .for_types
                         .iter()
-                        .map(|el| el.display())
+                        .map(|el| el.display(kind))
                         .join(", ");
                     sb.push_str(&format!(" {} [{}]", KeyWord::For.as_str(), fors));
                 }
-                if !_trait.signature.implements.is_empty() {
-                    let fors = _trait
+                if !r#trait.signature.implements.is_empty() {
+                    let fors = r#trait
                         .signature
                         .implements
                         .iter()
-                        .map(|el| el.display())
+                        .map(|el| el.display(kind))
                         .join(", ");
                     sb.push_str(&format!(" {} {}", KeyWord::Impl.as_str(), fors));
                 }
-                inner_display_methode_signatures(sb, &_trait.methods, tab + 1, USE_LAST);
+                inner_display_methode_signatures(sb, kind, &r#trait.methods, tab + 1, USE_LAST);
             }
             StatementKind::Class(class) => {
                 const USE_LAST: bool = true;
                 sb.push_str(&prefix);
-                if let Some(id) = class.node_id {
-                    sb.push_str("NodeId(");
-                    sb.push_str(&id.display());
-                    sb.push_str(") ");
-                }
+                try_display_node_id(sb, kind, class.node_id);
                 sb.push_str("Class >> ");
                 sb.push_str(&class.name);
-                inner_display_generic_parameters(sb, &class.generics);
-                inner_display_classchild(sb, &class.members, tab + 1, USE_LAST);
+                inner_display_generic_parameters(sb, kind, &class.generics);
+                inner_display_classchild(sb, kind, &class.members, tab + 1, USE_LAST);
             }
             StatementKind::Enum(_) => todo!(),
             StatementKind::Union(_) => todo!(),
@@ -272,6 +252,7 @@ impl SyntaxDisplay for StatementKind {
 
 fn inner_display_function_declaration(
     sb: &mut String,
+    kind: DisplayKind, 
     signature: &FunctionSignature,
     tab: usize,
     is_last: bool,
@@ -280,11 +261,11 @@ fn inner_display_function_declaration(
         &signature
             .callee
             .as_ref()
-            .map(|el| format!("{} ", el.node.extention_type.display()))
+            .map(|el| format!("{} ", el.node.extention_type.display(kind)))
             .unwrap_or_default(),
     );
     sb.push_str(&signature.name);
-    inner_display_generic_parameters(sb, &signature.generics);
+    inner_display_generic_parameters(sb, kind, &signature.generics);
     sb.push('(');
     sb.push_str(
         &signature
@@ -298,15 +279,15 @@ fn inner_display_function_declaration(
             .parameters
             .types
             .iter()
-            .map(|(name, el, node_id)| format!("{}{}: {}", node_id.map(|el| format!("|NodeId({})|", el.display())).unwrap_or(String::new()), name, el.display()))
+            .map(|(name, el, node_id)| format!("{}{}: {}", node_id_display(*node_id, kind), name, el.display(kind)))
             .join(", "),
     );
     sb.push(')');
     sb.push_str(": ");
-    signature.return_type.inner_display(sb, tab, is_last);
+    signature.return_type.inner_display(sb, kind, tab, is_last);
 }
 
-fn inner_display_generic_parameters(sb: &mut String, parameters: &Vec<GenericDeclare>) {
+fn inner_display_generic_parameters(sb: &mut String, kind: DisplayKind, parameters: &Vec<GenericDeclare>) {
     if parameters.is_empty() {
         return;
     }
@@ -326,12 +307,12 @@ fn inner_display_generic_parameters(sb: &mut String, parameters: &Vec<GenericDec
                 sb.push_str(&name);
                 if let Some(ty) = &for_type {
                     sb.push_str(" impl ");
-                    ty.inner_display(sb, 0, false);
+                    ty.inner_display(sb, kind, 0, false);
                 }
 
                 if let Some(expression) = &default {
                     sb.push_str(" = ");
-                    expression.node.inner_display(sb, 0, false);
+                    expression.node.inner_display(sb, kind, 0, false);
                 }
             }
             GenericDeclareKind::Type {
@@ -342,27 +323,24 @@ fn inner_display_generic_parameters(sb: &mut String, parameters: &Vec<GenericDec
                 sb.push_str(&name);
                 if !traits.is_empty() {
                     sb.push_str(": ");
-                    sb.push_str(&traits.iter().map(|el| el.display()).join(", "))
+                    sb.push_str(&traits.iter().map(|el| el.display(kind)).join(", "))
                 }
 
                 if let Some(ty) = &default {
                     sb.push_str(" = ");
-                    ty.inner_display(sb, 0, false);
+                    ty.inner_display(sb, kind, 0, false);
                 }
             }
         }
 
-        if let Some(node_id) = &parameter.node_id {
-            sb.push('|');
-            sb.push_str(&node_id.display());
-            sb.push('|');
-        }
+        try_display_node_id(sb, kind, parameter.node_id);
     }
     sb.push('>');
 }
 
 fn inner_display_classchild(
     sb: &mut String,
+    kind: DisplayKind, 
     kinds: &Vec<Spanned<ClassMember>>,
     tab: usize,
     use_last: bool,
@@ -383,15 +361,11 @@ fn inner_display_classchild(
 
         sb.push('\n');
         sb.push_str(&prefix);
-        if let Some(id) = member.node.try_get_node_id() {
-            sb.push_str("NodeId(");
-            sb.push_str(&id.display());
-            sb.push_str(") ");
-        }
+        try_display_node_id(sb, kind, member.node.try_get_node_id());
         sb.push_str(get_tag(member));
         match &member.node {
-            ClassMember::Field(field) => inner_display_field(sb, field, tab, is_last),
-            ClassMember::Method(function) => inner_display_methode(sb, function, tab, is_last),
+            ClassMember::Field(field) => inner_display_field(sb, kind, field, tab, is_last),
+            ClassMember::Method(function) => inner_display_methode(sb, kind, function, tab, is_last),
             ClassMember::ImplBlock(_) => todo!(),
         }
     }
@@ -399,6 +373,7 @@ fn inner_display_classchild(
 
 fn inner_display_methode_signatures(
     sb: &mut String,
+    kind: DisplayKind, 
     methods: &Vec<Spanned<FunctionSignature>>,
     tab: usize,
     use_last: bool,
@@ -416,11 +391,11 @@ fn inner_display_methode_signatures(
         sb.push('\n');
         sb.push_str(&prefix);
         sb.push_str("Methode >> ");
-        inner_display_methode_signature(sb, &methode.node, tab, is_last);
+        inner_display_methode_signature(sb, kind, &methode.node, tab, is_last);
     }
 }
 
-fn inner_display_fields(sb: &mut String, fields: &Vec<Spanned<Field>>, tab: usize, use_last: bool) {
+fn inner_display_fields(sb: &mut String, kind: DisplayKind, fields: &Vec<Spanned<Field>>, tab: usize, use_last: bool) {
     let last_index = fields.len() - 1;
 
     for (i, Spanned { node: field, .. }) in fields.iter().enumerate() {
@@ -429,13 +404,9 @@ fn inner_display_fields(sb: &mut String, fields: &Vec<Spanned<Field>>, tab: usiz
         let prefix = tree_prefix(tab, is_last);
         sb.push('\n');
         sb.push_str(&prefix);
-        if let Some(id) = field.node_id {
-            sb.push_str("NodeId(");
-            sb.push_str(&id.display());
-            sb.push_str(") ");
-        }
+        try_display_node_id(sb, kind, field.node_id);
         sb.push_str("Field >> ");
-        inner_display_field(sb, field, tab, is_last);
+        inner_display_field(sb, kind, field, tab, is_last);
         if last_index == i {
             sb.push('\n');
             sb.push_str(&gap_prefix(tab));
@@ -443,28 +414,56 @@ fn inner_display_fields(sb: &mut String, fields: &Vec<Spanned<Field>>, tab: usiz
     }
 }
 
-fn inner_display_methode(sb: &mut String, methode: &Function, tab: usize, is_last: bool) {
-    inner_display_methode_signature(sb, &methode.signature.node, tab, is_last);
-    methode.block.inner_display(sb, tab + 1, is_last);
+fn inner_display_methode(sb: &mut String, kind: DisplayKind, methode: &Function, tab: usize, is_last: bool) {
+    inner_display_methode_signature(sb, kind, &methode.signature.node, tab, is_last);
+    methode.block.inner_display(sb, kind, tab + 1, is_last);
 }
 
 fn inner_display_methode_signature(
     sb: &mut String,
+    kind: DisplayKind,
     methode: &FunctionSignature,
     tab: usize,
     is_last: bool,
 ) {
-    inner_display_function_declaration(sb, &methode, tab, is_last);
+    inner_display_function_declaration(sb, kind, &methode, tab, is_last);
 }
 
-fn inner_display_field(sb: &mut String, field: &Field, tab: usize, is_last: bool) {
+fn inner_display_field(sb: &mut String, kind: DisplayKind, field: &Field, tab: usize, is_last: bool) {
     sb.push_str(&field.name);
     sb.push_str(": ");
-    field.ty.inner_display(sb, tab, is_last);
+    field.ty.inner_display(sb, kind, tab, is_last);
     sb.push(' ');
     field.vis.inner_display(sb);
     if let Some(default) = &field.default_value {
         sb.push_str(" = ");
-        default.node.inner_display(sb, tab, is_last);
+        default.node.inner_display(sb, kind, tab, is_last);
     }
+}
+
+pub(crate) fn try_display_many_node_ids(sb: &mut String, kind: DisplayKind, node_ids: &Vec<NodeId>) {
+    if node_ids.is_empty() || kind != DisplayKind::NameResolver {
+        return
+    }
+
+    sb.push_str("\"|");
+    for node_id in node_ids {
+        sb.push_str(&node_id.display());
+        sb.push(',');
+    }
+    sb.push_str("|\"");
+}
+
+pub(crate) fn node_id_display(node_id: Option<NodeId>, kind: DisplayKind) -> String {
+    if kind != DisplayKind::NameResolver {
+        return String::default()
+    } 
+
+    node_id
+        .map(|el| format!("\"|{}|\"", el.display()))
+        .unwrap_or_default()
+}
+
+pub(crate) fn try_display_node_id(sb: &mut String, kind: DisplayKind, node_id: Option<NodeId>) {
+    sb.push_str(&node_id_display(node_id, kind));
 }

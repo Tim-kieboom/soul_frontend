@@ -1,6 +1,12 @@
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum DisplayKind {
+    Parser,
+    NameResolver,
+}
+
 pub trait SyntaxDisplay {
-    fn display(&self) -> String;
-    fn inner_display(&self, sb: &mut String, tab: usize, is_last: bool);
+    fn display(&self, kind: DisplayKind) -> String;
+    fn inner_display(&self, sb: &mut String, kind: DisplayKind, tab: usize, is_last: bool);
 }
 
 pub fn tree_prefix(tab: usize, is_last: bool) -> String {

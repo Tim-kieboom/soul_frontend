@@ -10,7 +10,7 @@ use crate::{
     abstract_syntax_tree::{
         expression::Expression,
         statment::Ident,
-        syntax_display::SyntaxDisplay,
+        syntax_display::{DisplayKind, SyntaxDisplay},
     }, error::Span, sementic_models::scope::NodeId, soul_names::{
         InternalComplexTypes, InternalPrimitiveTypes, StackArrayKind, TypeModifier, TypeWrapper,
     }
@@ -258,13 +258,13 @@ impl SoulType {
 }
 
 impl SyntaxDisplay for SoulType {
-    fn display(&self) -> String {
+    fn display(&self, kind: DisplayKind) -> String {
         let mut sb = String::new();
-        self.inner_display(&mut sb, 0, false);
+        self.inner_display(&mut sb, kind, 0, false);
         sb
     }
 
-    fn inner_display(&self, sb: &mut String, _tab: usize, _is_last: bool) {
+    fn inner_display(&self, sb: &mut String, _kind: DisplayKind, _tab: usize, _is_last: bool) {
         if let Some(modifier) = self.modifier {
             sb.push_str(modifier.as_str());
             sb.push(' ');
@@ -277,6 +277,7 @@ impl SyntaxDisplay for SoulType {
 impl TypeKind {
     /// Returns a string representation of the type kind
     pub fn display(&self) -> String {
+        let kind = DisplayKind::Parser;
         match self {
             TypeKind::Type => "Type".to_string(),
             TypeKind::InternalComplex(p) => p.as_str().to_string(),
@@ -286,7 +287,7 @@ impl TypeKind {
             TypeKind::Union(id) => id.display(),
             TypeKind::Trait(id) => id.display(),
             TypeKind::Array(a) => {
-                let inner = a.of_type.display();
+                let inner = a.of_type.display(kind);
                 match &a.size {
                     Some(StackArrayKind::Number(num)) => format!("[{}]{}", num, inner),
                     Some(StackArrayKind::Ident{ident, resolved:_}) => format!("[{}]{}", ident, inner),
@@ -294,20 +295,20 @@ impl TypeKind {
                 }
             }
             TypeKind::Tuple(tuple) => {
-                let elems: Vec<String> = tuple.types.iter().map(|t| t.display()).collect();
+                let elems: Vec<String> = tuple.types.iter().map(|t| t.display(kind)).collect();
                 format!("({})", elems.join(", "))
             }
             TypeKind::NamedTuple(map) => {
                 let elems: Vec<String> = map
                     .types
                     .iter()
-                    .map(|(k, v, _)| format!("{}: {}", k, v.display()))
+                    .map(|(k, v, _)| format!("{}: {}", k, v.display(kind)))
                     .collect();
                 format!("{{{}}}", elems.join(", "))
             }
             TypeKind::Function(f) => {
-                let params: Vec<String> = f.parameters.types.iter().map(|p| p.display()).collect();
-                format!("fn({}) -> {}", params.join(", "), f.return_type.display())
+                let params: Vec<String> = f.parameters.types.iter().map(|p| p.display(kind)).collect();
+                format!("fn({}) -> {}", params.join(", "), f.return_type.display(kind))
             }
             TypeKind::Generic{node_id, ..} => node_id.display(),
             TypeKind::Reference(r) => {
@@ -316,10 +317,10 @@ impl TypeKind {
                 } else {
                     TypeWrapper::ConstRef.as_str()
                 };
-                format!("{}{}", ref_str, r.inner.display())
+                format!("{}{}", ref_str, r.inner.display(kind))
             }
-            TypeKind::Pointer(inner) => format!("*{}", inner.display()),
-            TypeKind::Optional(inner) => format!("{}?", inner.display()),
+            TypeKind::Pointer(inner) => format!("*{}", inner.display(kind)),
+            TypeKind::Optional(inner) => format!("{}?", inner.display(kind)),
             TypeKind::Stub{ident, ..} => ident.clone(),
             TypeKind::None => "none".to_string(),
             TypeKind::Primitive(internal_primitive_types) => {

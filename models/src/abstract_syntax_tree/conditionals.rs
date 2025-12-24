@@ -6,7 +6,7 @@ use crate::{
         soul_type::SoulType,
         spanned::Spanned,
         statment::{Ident, Variable},
-        syntax_display::SyntaxDisplay,
+        syntax_display::{DisplayKind, SyntaxDisplay},
     },
     error::{SoulError, SoulErrorKind, SoulResult, Span}, sementic_models::scope::NodeId,
 };
@@ -146,7 +146,7 @@ impl ForPattern {
             _ => Err(SoulError::new(
                 format!(
                     "'{}' should be ident, tuple or named tuple",
-                    expression.node.display()
+                    expression.node.display(DisplayKind::Parser)
                 ),
                 SoulErrorKind::InvalidExpression,
                 Some(expression.span),
