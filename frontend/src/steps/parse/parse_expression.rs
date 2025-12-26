@@ -16,6 +16,7 @@ use models::{
         literal::Literal,
         operator::{Binary, BinaryOperator, Unary, UnaryOperator, UnaryOperatorKind},
         soul_type::{SoulType, TypeKind},
+        statment::Ident,
     },
     error::{SoulError, SoulErrorKind, SoulResult, Span},
     soul_names::{self, AccessType, KeyWord, Operator, TypeModifier},
@@ -226,10 +227,11 @@ impl<'a> Parser<'a> {
             Some(KeyWord::Continue) => self.parse_return_like(ReturnKind::Continue)?,
             _ => {
                 let ident_token = self.bump_consume();
-                let ident = match ident_token.kind {
+                let text = match ident_token.kind {
                     TokenKind::Ident(val) => val,
                     _ => unreachable!(),
                 };
+                let ident = Ident::new(text, ident_token.span);
 
                 if self.current_is(&COLON) && self.peek().kind == SQUARE_OPEN {
                     self.bump();
@@ -248,7 +250,7 @@ impl<'a> Parser<'a> {
                     )
                 } else if self.current_is(&ROUND_OPEN) || self.current_is(&ARROW_LEFT) {
                     let function_call = self
-                        .try_parse_function_call(start_span, None, ident)
+                        .try_parse_function_call(start_span, None, &ident)
                         .merge_to_result()?;
 
                     Expression::with_atribute(
@@ -303,7 +305,7 @@ impl<'a> Parser<'a> {
 
     fn parse_access(&mut self, start_span: Span, lvalue: Expression) -> SoulResult<Expression> {
         let token = self.bump_consume();
-        let ident = match token.kind {
+        let text = match token.kind {
             TokenKind::Ident(val) => val,
             other => {
                 return Err(SoulError::new(
@@ -313,6 +315,7 @@ impl<'a> Parser<'a> {
                 ));
             }
         };
+        let ident = Ident::new(text, token.span);
 
         match self.try_parse_function_call(start_span, Some(&lvalue), &ident) {
             Ok(methode) => {

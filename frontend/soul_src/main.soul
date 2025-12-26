@@ -1,5 +1,8 @@
 f := Foo{..}
 
+trait TODO{}
+trait Number{}
+
 str<T: TODO>(any: T) {/*impl*/}
 Println<T: TODO>(msg: T) {/*internal*/}
 
@@ -13,6 +16,10 @@ sum(a: f32, b: f32): f32 {
 
 sum<N: Number = int>(a: N, b: N): N {
     return a + b
+}
+
+func(foo: Foo) {
+    
 }
 
 struct Foo {

@@ -12,11 +12,11 @@ class Share<T> {
     impl CopyAuto {}
     impl ConstRef<T> {
         ConstRef(@'a this) -> @'a T 
-            => @this.inner.Lock()
+            => @inner.Lock()
     }
 
     impl MutRef<T> {
         MutRef(&'a this) -> &'a T 
-            => &this.inner.Lock()
+            => &inner.Lock()
     }
 }

@@ -14,6 +14,8 @@ use models::{
     abstract_syntax_tree::{
         function::ThisCallee,
         soul_type::{ArrayType, NamedTupleType, ReferenceType, SoulType, TupleType, TypeKind},
+        spanned::Spanned,
+        statment::Ident,
     },
     error::{SoulError, SoulErrorKind, SoulResult},
     soul_names::{
@@ -187,7 +189,7 @@ impl<'a> Parser<'a> {
         TryOk(SoulType::new(
             None,
             TypeKind::Stub {
-                ident: name,
+                ident: Ident::new(name, token.span),
                 resolved: None,
             },
             token.span,
@@ -256,7 +258,7 @@ impl<'a> Parser<'a> {
 
             let token = self.bump_consume();
             let name = match token.kind {
-                TokenKind::Ident(val) => val,
+                TokenKind::Ident(val) => Spanned::new(val, token.span),
                 other => {
                     return Err(TryError::IsNotValue(SoulError::new(
                         format!("'{}' should be ident", other.display()),
@@ -288,7 +290,7 @@ impl<'a> Parser<'a> {
 
     fn get_type_wrappers(
         &mut self,
-    ) -> TryResult<Vec<(TypeWrapper, String, Option<StackArrayKind>)>, SoulError> {
+    ) -> TryResult<Vec<(TypeWrapper, Ident, Option<StackArrayKind>)>, SoulError> {
         let mut wrapper = vec![];
         loop {
             let mut size = None;
@@ -312,7 +314,7 @@ impl<'a> Parser<'a> {
             if size.is_none() {
                 self.bump();
             }
-            wrapper.push((wrap, String::new(), size));
+            wrapper.push((wrap, Ident::new(String::default(), self.token().span), size));
         }
     }
 
@@ -320,7 +322,7 @@ impl<'a> Parser<'a> {
         let token = self.bump_consume();
         let size = match token.kind {
             TokenKind::Ident(generic_type) => Some(StackArrayKind::Ident {
-                ident: generic_type,
+                ident: Ident::new(generic_type, token.span),
                 resolved: None,
             }),
             TokenKind::Number(Number::Uint(number)) => Some(StackArrayKind::Number(number)),

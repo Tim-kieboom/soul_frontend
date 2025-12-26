@@ -1,4 +1,4 @@
-type A 
+type A
 type B
 
 trait Other

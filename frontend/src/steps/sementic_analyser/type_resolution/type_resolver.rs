@@ -1,14 +1,47 @@
+use crate::{
+    SementicFault,
+    steps::sementic_analyser::{SementicInfo, SementicPass},
+};
 use models::{
-    abstract_syntax_tree::soul_type::{GenericDeclare, GenericKind, SoulType, TypeKind},
+    abstract_syntax_tree::{
+        AbstractSyntaxTree,
+        block::Block,
+        soul_type::{GenericKind, SoulType, TypeKind},
+        statment::Ident,
+    },
     error::{SoulError, SoulErrorKind, Span},
-    sementic_models::scope::{ScopeTypeEntryKind, ScopeTypeKind},
+    sementic_models::scope::{NodeId, ScopeTypeEntry, ScopeTypeEntryKind},
     soul_names::StackArrayKind,
 };
 
-use crate::steps::sementic_analyser::name_resolution::name_resolver::NameResolver;
+pub struct TypeResolver<'a> {
+    pub info: &'a mut SementicInfo,
+}
 
-impl NameResolver {
-    pub(crate) fn resolve_type(&mut self, ty: &mut SoulType, span: Span) {
+impl<'a> SementicPass<'a> for TypeResolver<'a> {
+    fn new(info: &'a mut SementicInfo) -> Self {
+        Self { info }
+    }
+
+    fn run(&mut self, ast: &mut AbstractSyntaxTree) {
+        self.resolve_block(&mut ast.root);
+    }
+}
+
+impl<'a> TypeResolver<'a> {
+    pub(super) fn resolve_block(&mut self, block: &mut Block) {
+        for statment in &mut block.statments {
+            self.resolve_statement(statment);
+        }
+    }
+
+    fn lookup_type(&self, ident: &Ident) -> Option<ScopeTypeEntry> {
+        self.info.scopes.lookup_type(ident)
+    }
+
+    pub(super) fn resolve_type(&mut self, ty: &mut SoulType) {
+        let span = ty.span;
+
         match &mut ty.kind {
             TypeKind::Stub { ident, .. } => {
                 if let Some(entry) = self.lookup_type(ident) {
@@ -61,7 +94,7 @@ impl NameResolver {
                     }
                 } else {
                     self.log_error(SoulError::new(
-                        format!("type '{ident}' not found"),
+                        format!("type '{}' not found", ident.as_str()),
                         SoulErrorKind::ScopeError,
                         Some(ty.span),
                     ));
@@ -75,7 +108,7 @@ impl NameResolver {
             | TypeKind::Struct(_) => (),
 
             TypeKind::Array(array_type) => {
-                self.resolve_type(&mut array_type.of_type, span);
+                self.resolve_type(&mut array_type.of_type);
                 match &mut array_type.size {
                     Some(StackArrayKind::Number(_)) => (),
                     Some(StackArrayKind::Ident { ident, resolved }) => {
@@ -90,23 +123,23 @@ impl NameResolver {
             }
             TypeKind::Tuple(tuple_type) => {
                 for ty in &mut tuple_type.types {
-                    self.resolve_type(ty, span);
+                    self.resolve_type(ty);
                 }
             }
-            TypeKind::Pointer(soul_type) => self.resolve_type(soul_type, span),
-            TypeKind::Optional(soul_type) => self.resolve_type(soul_type, span),
+            TypeKind::Pointer(soul_type) => self.resolve_type(soul_type),
+            TypeKind::Optional(soul_type) => self.resolve_type(soul_type),
             TypeKind::Function(function_type) => {
                 for item in &mut function_type.parameters.types {
-                    self.resolve_type(item, span);
+                    self.resolve_type(item);
                 }
-                self.resolve_type(&mut function_type.return_type, span);
+                self.resolve_type(&mut function_type.return_type);
             }
             TypeKind::Reference(reference_type) => {
-                self.resolve_type(&mut reference_type.inner, span)
+                self.resolve_type(&mut reference_type.inner)
             }
             TypeKind::NamedTuple(named_tuple_type) => {
                 for (_name, ty, _node_id) in &mut named_tuple_type.types {
-                    self.resolve_type(ty, span);
+                    self.resolve_type(ty);
                 }
             }
 
@@ -117,10 +150,27 @@ impl NameResolver {
         }
     }
 
-    pub(super) fn resolve_generic_declares(&mut self, generics: &mut Vec<GenericDeclare>) {
-        for generic in generics {
-            let span = generic.span;
-            self.declare_type(ScopeTypeKind::GenricDeclare(generic), span);
+    pub(super) fn log_error(&mut self, err: SoulError) {
+        self.info.faults.push(SementicFault::error(err));
+    }
+
+    fn lookup_variable(&self, ident: &Ident) -> Option<NodeId> {
+        self.info.scopes.lookup_variable(ident)
+    }
+
+    pub(super) fn resolve_variable(
+        &mut self,
+        ident: &Ident,
+        resolved: &mut Option<NodeId>,
+        span: Span,
+    ) {
+        match self.lookup_variable(ident) {
+            Some(id) => *resolved = Some(id),
+            None => self.log_error(SoulError::new(
+                format!("variable '{}' is undefined in scope", ident.as_str()),
+                SoulErrorKind::ScopeError,
+                Some(span),
+            )),
         }
     }
 }

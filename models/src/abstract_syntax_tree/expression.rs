@@ -185,7 +185,7 @@ impl SyntaxDisplay for ExpressionKind {
             }
             ExpressionKind::FunctionCall(function_call) => {
                 try_display_many_node_ids(sb, kind, &function_call.candidates);
-                sb.push_str(&function_call.name);
+                sb.push_str(function_call.name.as_str());
                 sb.push('(');
                 sb.push_str(
                     &function_call
@@ -217,16 +217,16 @@ impl SyntaxDisplay for ExpressionKind {
             ExpressionKind::FieldAccess(field_access) => {
                 field_access.object.node.inner_display(sb, kind, tab, is_last);
                 sb.push('.');
-                sb.push_str(&field_access.field);
+                sb.push_str(field_access.field.as_str());
             }
             ExpressionKind::StaticFieldAccess(static_field_access) => {
                 static_field_access.object.inner_display(sb, kind, tab, is_last);
                 sb.push('.');
-                sb.push_str(&static_field_access.field);
+                sb.push_str(static_field_access.field.as_str());
             }
             ExpressionKind::Variable{ident: variable, resolved} => {
                 try_display_node_id(sb, kind, *resolved);
-                sb.push_str(&variable);
+                sb.push_str(variable.as_str());
             }
             ExpressionKind::ExternalExpression(external_expression) => {
                 sb.push_str(external_expression.path.as_str());
@@ -325,7 +325,7 @@ impl SyntaxDisplay for ExpressionKind {
                         IfCaseKind::Variant { name, params } => {
                             sb.push('\n');
                             sb.push_str(&prefix);
-                            sb.push_str(&name);
+                            sb.push_str(name.as_str());
                             sb.push('(');
                             for value in &params.values {
                                 value.node.inner_display(sb, kind, tab, is_last);
@@ -337,10 +337,10 @@ impl SyntaxDisplay for ExpressionKind {
                         IfCaseKind::NamedVariant { name, params } => {
                             sb.push('\n');
                             sb.push_str(&prefix);
-                            sb.push_str(&name);
+                            sb.push_str(name.as_str());
                             sb.push('{');
                             for (name, value) in &params.values {
-                                sb.push_str(&name.node);
+                                sb.push_str(name.as_str());
                                 sb.push_str(": ");
                                 value.node.inner_display(sb, kind, tab, is_last);
                                 sb.push_str(", ");
@@ -351,7 +351,7 @@ impl SyntaxDisplay for ExpressionKind {
                         IfCaseKind::Bind { name, condition } => {
                             sb.push('\n');
                             sb.push_str(&prefix);
-                            sb.push_str(&name);
+                            sb.push_str(name.as_str());
                             sb.push(' ');
                             sb.push_str(KeyWord::If.as_str());
                             sb.push(' ');
@@ -420,7 +420,7 @@ impl ReturnKind {
 
 fn for_pattern_to_string(sb: &mut String, el: &ForPattern) {
     match el {
-        ForPattern::Ident{ident, ..} => sb.push_str(ident),
+        ForPattern::Ident{ident, ..} => sb.push_str(ident.as_str()),
         ForPattern::Tuple(items) => {
             sb.push('(');
             for item in items {

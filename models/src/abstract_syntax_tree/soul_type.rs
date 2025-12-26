@@ -8,9 +8,7 @@
 //! Helpers are provided for checking modifiers, type categories, and displaying types.
 use crate::{
     abstract_syntax_tree::{
-        expression::Expression,
-        statment::Ident,
-        syntax_display::{DisplayKind, SyntaxDisplay},
+        expression::Expression, statment::Ident, syntax_display::{DisplayKind, SyntaxDisplay}
     }, error::Span, sementic_models::scope::NodeId, soul_names::{
         InternalComplexTypes, InternalPrimitiveTypes, StackArrayKind, TypeModifier, TypeWrapper,
     }
@@ -290,7 +288,7 @@ impl TypeKind {
                 let inner = a.of_type.display(kind);
                 match &a.size {
                     Some(StackArrayKind::Number(num)) => format!("[{}]{}", num, inner),
-                    Some(StackArrayKind::Ident{ident, resolved:_}) => format!("[{}]{}", ident, inner),
+                    Some(StackArrayKind::Ident{ident, resolved:_}) => format!("[{}]{}", ident.as_str(), inner),
                     None => format!("[{}]", inner),
                 }
             }
@@ -302,7 +300,7 @@ impl TypeKind {
                 let elems: Vec<String> = map
                     .types
                     .iter()
-                    .map(|(k, v, _)| format!("{}: {}", k, v.display(kind)))
+                    .map(|(k, v, _)| format!("{}: {}", k.as_str(), v.display(kind)))
                     .collect();
                 format!("{{{}}}", elems.join(", "))
             }
@@ -321,7 +319,7 @@ impl TypeKind {
             }
             TypeKind::Pointer(inner) => format!("*{}", inner.display(kind)),
             TypeKind::Optional(inner) => format!("{}?", inner.display(kind)),
-            TypeKind::Stub{ident, ..} => ident.clone(),
+            TypeKind::Stub{ident, ..} => ident.as_str().to_string(),
             TypeKind::None => "none".to_string(),
             TypeKind::Primitive(internal_primitive_types) => {
                 internal_primitive_types.as_str().to_string()

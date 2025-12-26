@@ -123,17 +123,21 @@ impl<'a> TokenStream<'a> {
 
     /// Consumes all remaining tokens into a Vec, including the current token.
     pub fn to_vec(&self) -> SoulResult<Vec<Token>> {
-        use std::mem::swap;
+        const DEFAULT_TOKEN: Token = Token::new(TokenKind::EndFile, Span::default_const());
+
+        fn take_token(current: &mut Token) -> Token {
+            let mut token = DEFAULT_TOKEN;
+            std::mem::swap(current, &mut token);
+            token
+        }
 
         let mut this = self.clone();
-        let mut token = Token::new(TokenKind::EndFile, Span::default());
-        swap(&mut this.current, &mut token);
-        let mut tokens = vec![token];
+        let first = take_token(&mut this.current);
 
+        let mut tokens = vec![first];
         loop {
             this.advance()?;
-            let mut token = Token::new(TokenKind::EndFile, Span::default());
-            swap(&mut this.current, &mut token);
+            let token = take_token(&mut this.current);
             let is_end = token.is_end_of_file();
             tokens.push(token);
             if is_end {

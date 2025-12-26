@@ -16,6 +16,7 @@ pub struct Block {
     pub modifier: TypeModifier,
     /// The statements contained in this block.
     pub statments: Vec<Statement>,
+    pub scope_id: usize,
 }
 
 impl SyntaxDisplay for Block {

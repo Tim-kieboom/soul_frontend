@@ -1,5 +1,7 @@
 
 ├── Variable >> f: none = Foo{..}
+├── Trait >> TODO
+├── Trait >> Number
 ├── Function >> str<T: TODO>(any: T): none
 ├── Function >> Println<T: TODO>(msg: T): none
 ├── Function >> sum(a: int, b: int): int
@@ -11,6 +13,7 @@
 ├── Function >> sum<N: Number = int>(a: N, b: N): N
 │   └── Expression >> return a + b
 │   │   
+├── Function >> func(foo: Foo): none
 ├── Struct >> Foo
 │   ├── Field >> field: const int 
 │   └── Field >> foo: const int  = field

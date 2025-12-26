@@ -1,6 +1,9 @@
 use crate::steps::{
     parse::{self, parser::parse},
-    sementic_analyser::name_resolution::name_resolver::NameResolver,
+    sementic_analyser::{
+        SementicInfo, SementicPass, name_resolution::name_resolver::NameResolver,
+        type_resolution::type_resolver::TypeResolver,
+    },
     tokenize::{self, tokenizer::tokenize},
 };
 use models::{abstract_syntax_tree::AbstractSyntaxTree, error::SoulError};
@@ -23,12 +26,8 @@ pub fn parse_file(source_file: &str) -> io::Result<ParseResonse> {
 
     #[cfg(debug_assertions)]
     {
+        use crate::utils::convert_error_message::ToMessage;
         use itertools::Itertools;
-
-        use crate::{
-            steps::sementic_analyser::sementic_fault::SementicLevel,
-            utils::convert_error_message::ToMessage,
-        };
 
         match tokenize_response.token_stream.clone().to_vec().map(|vec| {
             vec.into_iter()
@@ -57,7 +56,8 @@ pub fn parse_file(source_file: &str) -> io::Result<ParseResonse> {
 }
 
 pub fn sementic_analyse(syntax_tree: &mut AbstractSyntaxTree) -> Vec<SementicFault> {
-    let mut resolver = NameResolver::new();
-    resolver.resolve_ast(syntax_tree);
-    resolver.consume_faults()
+    let mut info = SementicInfo::new();
+    NameResolver::new(&mut info).run(syntax_tree);
+    TypeResolver::new(&mut info).run(syntax_tree);
+    info.consume_faults()
 }

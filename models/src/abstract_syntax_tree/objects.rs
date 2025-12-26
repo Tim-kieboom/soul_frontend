@@ -16,6 +16,7 @@ pub struct Struct {
     /// The fields of the struct.
     pub fields: Vec<Spanned<Field>>,
     pub node_id: Option<NodeId>,
+    pub scope_id: Option<usize>,
 }
 
 /// A class type definition.
@@ -28,6 +29,7 @@ pub struct Class {
     /// The members of the class (fields, methods, impl blocks).
     pub members: Vec<Spanned<ClassMember>>,
     pub node_id: Option<NodeId>,
+    pub scope_id: usize,
 }
 
 /// A trait definition.
@@ -38,6 +40,7 @@ pub struct Trait {
     /// The method signatures defined in this trait.
     pub methods: Vec<Spanned<FunctionSignature>>,
     pub node_id: Option<NodeId>,
+    pub scope_id: usize,
 }
 
 /// The signature of a trait.
@@ -107,7 +110,7 @@ impl ClassMember {
 }
 
 impl Field {
-    pub fn new(ty: SoulType, name: String) -> Self {
+    pub fn new(ty: SoulType, name: Ident) -> Self {
         Self {
             ty,
             name,
@@ -118,7 +121,7 @@ impl Field {
         }
     }
 
-    pub fn from_visability(ty: SoulType, name: String, vis: FieldAccess) -> Self {
+    pub fn from_visability(ty: SoulType, name: Ident, vis: FieldAccess) -> Self {
         Self {
             ty,
             vis,

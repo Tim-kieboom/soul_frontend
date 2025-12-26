@@ -30,7 +30,7 @@ pub enum SoulErrorKind {
 /// An identifier for macro expansion context.
 ///
 /// Used to track which macro expansion (if any) produced a particular piece of code.
-#[derive(Debug, Clone, Default, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ExpansionId(usize);
 impl ExpansionId {
     /// Creates a new `ExpansionId` with the given value.
@@ -48,7 +48,7 @@ impl ExpansionId {
 ///
 /// Tracks the start and end positions of code in the source file, along with
 /// any macro expansion context.
-#[derive(Debug, Clone, Default, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Span {
     /// The starting line number (1-indexed).
     pub start_line: usize,

@@ -96,10 +96,11 @@ impl<'a> Parser<'a> {
 
         if FUNCTION_IDS.contains(&peek.kind) {
             let ident_token = self.bump_consume();
-            let ident = match ident_token.kind {
+            let text = match ident_token.kind {
                 TokenKind::Ident(val) => val,
                 _ => unreachable!(),
             };
+            let ident = Ident::new(text, ident_token.span);
 
             let result =
                 self.try_parse_function_declaration(start_span, TypeModifier::Mut, None, ident);
@@ -109,17 +110,18 @@ impl<'a> Parser<'a> {
                 Err(TryError::IsErr(err)) => Err(err),
                 Err(TryError::IsNotValue(err)) => {
                     let (ident, _ty) = (err.0, err.1);
-                    self.try_parse_function_call(start_span, None, ident)
+                    self.try_parse_function_call(start_span, None, &ident)
                         .merge_to_result()
                         .map(Statement::from_function_call)
                 }
             }
         } else if DECLARATION_IDS.contains(&peek.kind) {
             let ident_token = self.bump_consume();
-            let ident = match ident_token.kind {
+            let text = match ident_token.kind {
                 TokenKind::Ident(val) => val,
                 _ => unreachable!(),
             };
+            let ident = Ident::new(text, ident_token.span);
 
             let (ty, assign_type) = if self.current_is(&COLON) {
                 self.bump();
@@ -133,8 +135,7 @@ impl<'a> Parser<'a> {
                 (None, AssignType::Assign)
             };
 
-            let variable =
-                self.parse_variable_declaration(start_span, ident.clone(), assign_type, ty)?;
+            let variable = self.parse_variable_declaration(start_span, ident, assign_type, ty)?;
 
             Ok(Statement::new(
                 StatementKind::Variable(variable),
@@ -339,13 +340,14 @@ impl<'a> Parser<'a> {
         let callee = Some(ty);
 
         let ident_token = self.bump_consume();
-        let name = match ident_token.kind {
+        let text = match ident_token.kind {
             TokenKind::Ident(val) => val,
             _ => {
                 self.go_to(begin_position);
                 return TryNotValue(());
             }
         };
+        let name = Ident::new(text, ident_token.span);
 
         match self.try_parse_function_declaration(start_span, modifier, callee, name) {
             Ok(val) => TryOk(val),

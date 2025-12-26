@@ -61,7 +61,12 @@ pub enum StatementKind {
 }
 
 /// An identifier (variable name, type name, etc.).
-pub type Ident = String;
+pub type Ident = Spanned<String>;
+impl Ident {
+    pub fn as_str(&self) -> &str {
+        &self.node
+    }
+}
 
 /// An assignment statement, e.g., `x = y + 1`.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -167,7 +172,7 @@ impl SyntaxDisplay for StatementKind {
                 sb.push_str(&prefix);
                 try_display_node_id(sb, kind, var.node_id);
                 sb.push_str("Variable >> ");
-                sb.push_str(&var.name);
+                sb.push_str(var.name.as_str());
                 sb.push_str(": ");
                 var.ty.inner_display(sb, kind, tab, is_last);
                 if let Some(val) = &var.initialize_value {
@@ -204,7 +209,7 @@ impl SyntaxDisplay for StatementKind {
                 sb.push_str(&prefix);
                 try_display_node_id(sb, kind, r#struct.node_id);
                 sb.push_str("Struct >> ");
-                sb.push_str(&r#struct.name);
+                sb.push_str(r#struct.name.as_str());
                 inner_display_generic_parameters(sb, kind, &r#struct.generics);
                 inner_display_fields(sb, kind, &r#struct.fields, tab + 1, USE_LAST);
             }
@@ -213,7 +218,7 @@ impl SyntaxDisplay for StatementKind {
                 sb.push_str(&prefix);
                 try_display_node_id(sb, kind, r#trait.node_id);
                 sb.push_str("Trait >> ");
-                sb.push_str(&r#trait.signature.name);
+                sb.push_str(r#trait.signature.name.as_str());
                 if !r#trait.signature.for_types.is_empty() {
                     let fors = r#trait
                         .signature
@@ -239,7 +244,7 @@ impl SyntaxDisplay for StatementKind {
                 sb.push_str(&prefix);
                 try_display_node_id(sb, kind, class.node_id);
                 sb.push_str("Class >> ");
-                sb.push_str(&class.name);
+                sb.push_str(class.name.as_str());
                 inner_display_generic_parameters(sb, kind, &class.generics);
                 inner_display_classchild(sb, kind, &class.members, tab + 1, USE_LAST);
             }
@@ -264,7 +269,7 @@ fn inner_display_function_declaration(
             .map(|el| format!("{} ", el.node.extention_type.display(kind)))
             .unwrap_or_default(),
     );
-    sb.push_str(&signature.name);
+    sb.push_str(signature.name.node.as_str());
     inner_display_generic_parameters(sb, kind, &signature.generics);
     sb.push('(');
     sb.push_str(
@@ -279,7 +284,7 @@ fn inner_display_function_declaration(
             .parameters
             .types
             .iter()
-            .map(|(name, el, node_id)| format!("{}{}: {}", node_id_display(*node_id, kind), name, el.display(kind)))
+            .map(|(name, el, node_id)| format!("{}{}: {}", node_id_display(*node_id, kind), name.node, el.display(kind)))
             .join(", "),
     );
     sb.push(')');
@@ -297,14 +302,14 @@ fn inner_display_generic_parameters(sb: &mut String, kind: DisplayKind, paramete
         match &parameter.kind {
             GenericDeclareKind::Lifetime(lifetime) => {
                 sb.push('\'');
-                sb.push_str(lifetime);
+                sb.push_str(lifetime.as_str());
             }
             GenericDeclareKind::Expression {
                 name,
                 for_type,
                 default,
             } => {
-                sb.push_str(&name);
+                sb.push_str(name.as_str());
                 if let Some(ty) = &for_type {
                     sb.push_str(" impl ");
                     ty.inner_display(sb, kind, 0, false);
@@ -320,7 +325,7 @@ fn inner_display_generic_parameters(sb: &mut String, kind: DisplayKind, paramete
                 traits,
                 default,
             } => {
-                sb.push_str(&name);
+                sb.push_str(name.as_str());
                 if !traits.is_empty() {
                     sb.push_str(": ");
                     sb.push_str(&traits.iter().map(|el| el.display(kind)).join(", "))
@@ -430,7 +435,7 @@ fn inner_display_methode_signature(
 }
 
 fn inner_display_field(sb: &mut String, kind: DisplayKind, field: &Field, tab: usize, is_last: bool) {
-    sb.push_str(&field.name);
+    sb.push_str(field.name.as_str());
     sb.push_str(": ");
     field.ty.inner_display(sb, kind, tab, is_last);
     sb.push(' ');

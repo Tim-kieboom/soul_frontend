@@ -1,7 +1,7 @@
 import Std::Sync::Atomic::[AtomicUint, Ordering]
 
 class Arc<T, Alloc = Global> {
-    ptr: *mut This.Inner<T>
+    ptr: *mut Inner<T>
     
     struct Inner<T> {
         mut value: T
@@ -10,7 +10,7 @@ class Arc<T, Alloc = Global> {
 
     This(value: T) { 
         
-        inner := This.Inner{value, refCount: AtomicUint(1)}
+        inner := Inner{value, refCount: AtomicUint(1)}
         return Arc {
             ptr: unsafe { Alloc.Unchecked.NewPtr(inner) }
         }
@@ -22,11 +22,9 @@ class Arc<T, Alloc = Global> {
         Copy(@this): This {
 
             unsafe { 
-                this.ptr.refCount.FetchAdd(1, Ordering::Relax) 
+                ptr.refCount.FetchAdd(1, Ordering::Relax) 
             }
-            return This { 
-                ptr: this.ptr
-            }
+            return This { ptr }
         }
     }
 
@@ -39,12 +37,12 @@ class Arc<T, Alloc = Global> {
         Drop(&this) {
 
             unsafe {
-                refCount := this.ptr.refCount.FetchSub(1, Ordering::AcqRel)
+                refCount := ptr.refCount.FetchSub(1, Ordering::AcqRel)
                 if refCount != 1 {
                     return
                 }
 
-                Alloc.Unchecked.Drop(this.ptr)
+                Alloc.Unchecked.Drop(ptr)
             }
         }
     }

@@ -59,6 +59,7 @@ pub struct CaseSwitch {
     pub if_kind: IfCaseKind,
     /// The expression or block to execute if the pattern matches.
     pub do_fn: CaseDoKind,
+    pub scope_id: usize,
 }
 
 /// The kind of pattern in a match case.
@@ -84,7 +85,7 @@ pub enum ForPattern {
     /// A tuple pattern for destructuring tuples.
     Tuple(Vec<ForPattern>),
     /// A named tuple pattern for destructuring named tuples.
-    NamedTuple(Vec<(Spanned<Ident>, ForPattern)>),
+    NamedTuple(Vec<(Ident, ForPattern)>),
 }
 
 /// The body of a match case (block or expression).
@@ -156,7 +157,7 @@ impl ForPattern {
 
     pub fn display(&self) -> String {
         match self {
-            ForPattern::Ident{ident, ..} => ident.clone(),
+            ForPattern::Ident{ident, ..} => ident.node.clone(),
             ForPattern::Tuple(items) => {
                 format!("({})", items.iter().map(|el| el.display()).join(", "))
             }

@@ -3,6 +3,7 @@ use models::{
         block::Block,
         function::Function,
         objects::ClassMember,
+        soul_type::GenericDeclare,
         spanned::Spanned,
         statment::{Ident, Statement, StatementKind, UseBlock},
     },
@@ -12,7 +13,7 @@ use models::{
 
 use crate::steps::sementic_analyser::name_resolution::name_resolver::NameResolver;
 
-impl NameResolver {
+impl<'a> NameResolver<'a> {
     pub(super) fn resolve_block(&mut self, block: &mut Block) {
         self.push_scope();
 
@@ -31,7 +32,6 @@ impl NameResolver {
         match &mut statment.node {
             StatementKind::Variable(variable) => {
                 let _id = self.declare_value(ScopeValueKind::Variable(variable));
-                self.resolve_type(&mut variable.ty, statment.span);
 
                 if let Some(value) = &mut variable.initialize_value {
                     self.resolve_expression(value);
@@ -97,9 +97,8 @@ impl NameResolver {
 
         self.push_scope();
         self.resolve_generic_declares(&mut signature.node.generics);
-        self.resolve_type(&mut signature.node.return_type, signature.span);
 
-        self.declare_parameters(&mut signature.node.parameters, signature.span);
+        self.declare_parameters(&mut signature.node.parameters);
         self.resolve_block(&mut function.block);
 
         self.pop_scope();
@@ -115,10 +114,17 @@ impl NameResolver {
         match self.lookup_variable(ident) {
             Some(id) => *resolved = Some(id),
             None => self.log_error(SoulError::new(
-                format!("variable '{}' is undefined in scope", ident),
+                format!("variable '{}' is undefined in scope", ident.as_str()),
                 SoulErrorKind::ScopeError,
                 Some(span),
             )),
+        }
+    }
+
+    fn resolve_generic_declares(&mut self, generics: &mut Vec<GenericDeclare>) {
+        for generic in generics {
+            let span = generic.span;
+            self.declare_type(ScopeTypeKind::GenricDeclare(generic), span);
         }
     }
 }

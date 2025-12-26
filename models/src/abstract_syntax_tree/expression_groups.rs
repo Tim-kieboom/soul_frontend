@@ -1,6 +1,6 @@
 use crate::{
     abstract_syntax_tree::{
-        expression::{BoxExpression, Expression}, soul_type::SoulType, spanned::Spanned, statment::{Ident, Variable}, syntax_display::{DisplayKind, SyntaxDisplay}
+        expression::{BoxExpression, Expression}, soul_type::SoulType, statment::{Ident, Variable}, syntax_display::{DisplayKind, SyntaxDisplay}
     },
     soul_names::KeyWord,
 };
@@ -49,7 +49,7 @@ pub struct ArrayFiller {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct NamedTuple {
     /// Map of field names to their expression values.
-    pub values: Vec<(Spanned<Ident>, Expression)>,
+    pub values: Vec<(Ident, Expression)>,
 
     /// Whether to insert default values for missing fields.
     ///
@@ -120,7 +120,7 @@ impl SyntaxDisplay for ExpressionGroup {
                 array_filler
                     .index
                     .as_ref()
-                    .map(|el| format!("{} {} ", el.name, KeyWord::InForLoop.as_str()))
+                    .map(|el| format!("{} {} ", el.name.node, KeyWord::InForLoop.as_str()))
                     .unwrap_or_default(),
                 array_filler.amount.node.display(kind),
                 array_filler.fill_expr.node.display(kind),

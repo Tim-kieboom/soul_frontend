@@ -29,7 +29,7 @@ impl<'a> Parser<'a> {
 
         let token = self.bump_consume();
         match token.kind {
-            TokenKind::Ident(ident) => Ok(Some(ident)),
+            TokenKind::Ident(ident) => Ok(Some(Ident::new(ident, token.span))),
             _ => Ok(None),
         }
     }

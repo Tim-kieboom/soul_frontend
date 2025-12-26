@@ -19,11 +19,11 @@ use models::{
 };
 
 impl<'a> Parser<'a> {
-    pub(crate) fn try_parse_function_call<S: Into<String>>(
+    pub(crate) fn try_parse_function_call(
         &mut self,
         start_span: Span,
         callee: Option<&Expression>,
-        name: S,
+        name: &Ident,
     ) -> TryResult<Spanned<FunctionCall>, SoulError> {
         if !self.current_is_any(&[ROUND_OPEN, ARROW_LEFT]) {
             return TryNotValue(self.get_expect_any_error(&[ROUND_OPEN, ARROW_LEFT]));
@@ -39,7 +39,7 @@ impl<'a> Parser<'a> {
 
         Ok(Spanned::new(
             FunctionCall {
-                name: name.into(),
+                name: name.clone(),
                 callee: callee.map(|expr| Box::new(expr.clone())),
                 generics,
                 arguments,
@@ -112,7 +112,11 @@ impl<'a> Parser<'a> {
                 }
             };
 
-            let generic = self.inner_parse_generic_declare(name, is_lifetime, ident_token.span)?;
+            let generic = self.inner_parse_generic_declare(
+                Ident::new(name, ident_token.span),
+                is_lifetime,
+                ident_token.span,
+            )?;
 
             generics.push(generic);
             if !self.current_is(&COMMA) {

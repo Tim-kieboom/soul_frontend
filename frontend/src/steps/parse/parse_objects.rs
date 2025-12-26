@@ -16,6 +16,7 @@ use models::{
         },
         soul_type::{SoulType, TypeKind},
         spanned::Spanned,
+        statment::Ident,
     },
     error::{SoulError, SoulErrorKind, SoulResult},
     soul_names::{KeyWord, TypeModifier},
@@ -26,7 +27,7 @@ impl<'a> Parser<'a> {
         self.expect_ident(KeyWord::Class.as_str())?;
 
         let ident_token = self.bump_consume();
-        let ident = match ident_token.kind {
+        let text = match ident_token.kind {
             TokenKind::Ident(val) => val,
             other => {
                 return Err(SoulError::new(
@@ -36,6 +37,7 @@ impl<'a> Parser<'a> {
                 ));
             }
         };
+        let ident = Ident::new(text, ident_token.span);
 
         let this_type = SoulType::new(
             None,
@@ -88,6 +90,7 @@ impl<'a> Parser<'a> {
             name: ident,
             generics,
             node_id: None,
+            scope_id: 0,
         };
         Ok(class)
     }
@@ -97,7 +100,7 @@ impl<'a> Parser<'a> {
         self.expect_ident(KeyWord::Struct.as_str())?;
 
         let ident_token = self.bump_consume();
-        let name = match ident_token.kind {
+        let text = match ident_token.kind {
             TokenKind::Ident(val) => val,
             other => {
                 return Err(SoulError::new(
@@ -107,6 +110,7 @@ impl<'a> Parser<'a> {
                 ));
             }
         };
+        let name = Ident::new(text, ident_token.span);
 
         let generics = if self.current_is(&ARROW_LEFT) {
             self.parse_generic_declare()?
@@ -135,6 +139,7 @@ impl<'a> Parser<'a> {
             name,
             generics,
             node_id: None,
+            scope_id: 0
         })
     }
 
@@ -143,7 +148,7 @@ impl<'a> Parser<'a> {
         self.expect_ident(KeyWord::Trait.as_str())?;
 
         let ident_token = self.bump_consume();
-        let name = match ident_token.kind {
+        let text = match ident_token.kind {
             TokenKind::Ident(val) => val,
             other => {
                 return Err(SoulError::new(
@@ -153,6 +158,7 @@ impl<'a> Parser<'a> {
                 ));
             }
         };
+        let name = Ident::new(text, ident_token.span);
 
         let generics = if self.current_is(&ARROW_LEFT) {
             self.parse_generic_declare()?
@@ -206,7 +212,7 @@ impl<'a> Parser<'a> {
             };
 
             let ident_token = self.bump_consume();
-            let name = match ident_token.kind {
+            let text = match ident_token.kind {
                 TokenKind::Ident(val) => val,
                 other => {
                     return Err(SoulError::new(
@@ -216,6 +222,7 @@ impl<'a> Parser<'a> {
                     ));
                 }
             };
+            let name = Ident::new(text, ident_token.span);
 
             let mut this = this_type.clone();
             this.modifier = modifier;
@@ -313,10 +320,11 @@ impl<'a> Parser<'a> {
         };
 
         let ident_token = self.bump_consume();
-        let name = match ident_token.kind {
+        let text = match ident_token.kind {
             TokenKind::Ident(val) => val,
             _ => return TryNotValue(()),
         };
+        let name = Ident::new(text, ident_token.span);
 
         let mut this_type = this_type.clone();
         this_type.modifier = modifier;
@@ -376,7 +384,7 @@ impl<'a> Parser<'a> {
         };
 
         let ident_token = self.bump_consume();
-        let name = match ident_token.kind {
+        let text = match ident_token.kind {
             TokenKind::Ident(val) => val,
             other => {
                 return TryNotValue(SoulError::new(
@@ -386,6 +394,7 @@ impl<'a> Parser<'a> {
                 ));
             }
         };
+        let name = Ident::new(text, ident_token.span);
 
         let mut ty = if self.current_is(&COLON) {
             self.bump();

@@ -2,7 +2,10 @@ extern crate frontend;
 use crate::frontend::utils::convert_error_message::ToMessage;
 use frontend::{ParseResonse, SementicLevel, parse_file, sementic_analyse};
 use models::{
-    abstract_syntax_tree::{AbstractSyntaxTree, syntax_display::{DisplayKind, SyntaxDisplay}},
+    abstract_syntax_tree::{
+        AbstractSyntaxTree,
+        syntax_display::{DisplayKind, SyntaxDisplay},
+    },
     error::SoulError,
 };
 use std::{
@@ -93,7 +96,11 @@ fn fail_err() -> io::Error {
     )
 }
 
-fn print_syntax_tree(syntax_tree: &AbstractSyntaxTree, path: &str, kind: DisplayKind) -> io::Result<()> {
+fn print_syntax_tree(
+    syntax_tree: &AbstractSyntaxTree,
+    path: &str,
+    kind: DisplayKind,
+) -> io::Result<()> {
     let tree_string = syntax_tree.root.display(kind);
     let mut out_file = File::create(path)?;
 

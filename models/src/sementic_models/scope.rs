@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap};
 
 use crate::{abstract_syntax_tree::{enum_like::{Enum, Union}, function::Function, objects::{Class, Field, Struct, Trait}, soul_type::{GenericDeclare, GenericDeclareKind}, statment::{Ident, Variable}}, error::Span};
 
@@ -25,10 +25,68 @@ impl NodeIdGenerator {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct ScopeId{index: usize, at_len: usize}
+
+#[derive(Debug)]
+pub struct ScopeBuilder {
+    scopes: Vec<Scope>,
+    current: usize,
+}
+impl ScopeBuilder {
+    pub fn new() -> Self {
+        let global = Scope::new();
+        Self { scopes: vec![global], current: 0 }    
+    }
+
+    pub(super) fn push_scope(&mut self) {
+        self.scopes.insert(self.current+1, Scope::new());
+    }
+
+    pub(super) fn pop_scope(&mut self) {
+        self.current -= 1
+    }
+
+    pub fn lookup_type(&self, ident: &Ident) -> Option<ScopeTypeEntry> {
+        for scope in self.scopes.iter().rev() {
+            if let Some(entry) = scope.types.get(ident.as_str()) {
+                return Some(*entry);
+            }
+        }
+        None
+    }
+
+    pub fn lookup_variable(&self, ident: &Ident) -> Option<NodeId> {
+        for scope in self.scopes.iter().rev() {
+            if let Some(ids) = scope.values.get(ident.as_str()) {
+                return ids.last().map(|el| el.node_id);
+            }
+        }
+
+        None
+    }
+
+    pub fn lookup_function_candidates(&self, ident: &Ident) -> Vec<NodeId> {
+        let mut candidates = Vec::new();
+
+        for scope in self.scopes.iter().rev() {
+            if let Some(ids) = scope.values.get(ident.as_str()) {
+                for id in ids {
+                    if id.kind == ScopeValueEntryKind::Function {
+                        candidates.push(id.node_id);
+                    }
+                }
+            }
+        }
+
+        candidates
+    }
+}
+
 #[derive(Debug)]
 pub struct Scope {
-    pub values: HashMap<Ident, Vec<ScopeValueEntry>>,
-    pub types: HashMap<Ident, ScopeTypeEntry>,
+    pub values: HashMap<String, Vec<ScopeValueEntry>>,
+    pub types: HashMap<String, ScopeTypeEntry>,
 }
 impl Scope {
     pub fn new() -> Self {
@@ -86,7 +144,7 @@ impl<'a> ScopeValueKind<'a> {
         } 
     }
 
-    pub fn get_name(&self) -> &String {
+    pub fn get_name(&self) -> &Ident {
 
         match self {
             ScopeValueKind::Field(field) => &field.name,
@@ -126,13 +184,13 @@ impl<'a> ScopeTypeKind<'a> {
         } 
     }
 
-    pub fn get_name(&self) -> &String {
+    pub fn get_name(&self) -> &Ident {
 
         match self {
             ScopeTypeKind::GenricDeclare(ty) => match &ty.kind {
-                GenericDeclareKind::Type{name, ..} => name,
-                GenericDeclareKind::Lifetime(ident) => ident,
-                GenericDeclareKind::Expression{name, ..} => name,
+                GenericDeclareKind::Type{name, ..} => &name,
+                GenericDeclareKind::Lifetime(ident) => &ident,
+                GenericDeclareKind::Expression{name, ..} => &name,
             },
             ScopeTypeKind::Struct(ty) => &ty.name,
             ScopeTypeKind::Class(ty) => &ty.name,

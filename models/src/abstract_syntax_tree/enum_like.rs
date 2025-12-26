@@ -43,7 +43,7 @@ pub enum UnionVariantKind {
     /// A tuple variant with positional fields.
     Tuple(Vec<SoulType>),
     /// A named tuple variant with named fields.
-    NamedTuple(BTreeMap<Ident, SoulType>),
+    NamedTuple(BTreeMap<String, SoulType>),
 }
 
 /// A variant of a C-like enum.
