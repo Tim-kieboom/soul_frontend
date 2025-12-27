@@ -14,8 +14,14 @@ use models::{
 use crate::steps::sementic_analyser::name_resolution::name_resolver::NameResolver;
 
 impl<'a> NameResolver<'a> {
+    pub(super) fn resolve_scopeless_block(&mut self, block: &mut Block) {
+        for statment in &mut block.statments {
+            self.resolve_statement(statment);
+        }
+    }
+
     pub(super) fn resolve_block(&mut self, block: &mut Block) {
-        self.push_scope();
+        self.push_scope(&mut block.scope_id);
 
         for statment in &mut block.statments {
             self.resolve_statement(statment);
@@ -46,11 +52,13 @@ impl<'a> NameResolver<'a> {
             }
             StatementKind::Enum(obj) => self.declare_type(ScopeTypeKind::Enum(obj), statment.span),
             StatementKind::Trait(obj) => {
+                self.push_scope(&mut obj.scope_id);
                 self.resolve_generic_declares(&mut obj.signature.generics);
                 self.declare_type(ScopeTypeKind::Trait(obj), statment.span);
+                self.pop_scope();
             }
             StatementKind::Class(obj) => {
-                self.push_scope();
+                self.push_scope(&mut obj.scope_id);
                 self.resolve_generic_declares(&mut obj.generics);
                 for Spanned { node: member, .. } in &mut obj.members {
                     match member {
@@ -70,7 +78,7 @@ impl<'a> NameResolver<'a> {
                 self.declare_type(ScopeTypeKind::Union(obj), statment.span);
             }
             StatementKind::Struct(obj) => {
-                self.push_scope();
+                self.push_scope(&mut obj.scope_id);
                 self.resolve_generic_declares(&mut obj.generics);
                 for Spanned { node: field, .. } in &mut obj.fields {
                     self.declare_value(ScopeValueKind::Field(field));
@@ -95,11 +103,11 @@ impl<'a> NameResolver<'a> {
         let prev = self.current_function;
         self.current_function = Some(id);
 
-        self.push_scope();
+        self.push_scope(&mut function.block.scope_id);
         self.resolve_generic_declares(&mut signature.node.generics);
 
         self.declare_parameters(&mut signature.node.parameters);
-        self.resolve_block(&mut function.block);
+        self.resolve_scopeless_block(&mut function.block);
 
         self.pop_scope();
         self.current_function = prev;
@@ -111,7 +119,7 @@ impl<'a> NameResolver<'a> {
         resolved: &mut Option<NodeId>,
         span: Span,
     ) {
-        match self.lookup_variable(ident) {
+        match self.info.scopes.lookup_variable(ident) {
             Some(id) => *resolved = Some(id),
             None => self.log_error(SoulError::new(
                 format!("variable '{}' is undefined in scope", ident.as_str()),

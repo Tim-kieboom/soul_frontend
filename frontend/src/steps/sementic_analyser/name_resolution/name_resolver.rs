@@ -1,5 +1,6 @@
 use crate::steps::sementic_analyser::{SementicInfo, SementicPass, sementic_fault::SementicFault};
 use models::abstract_syntax_tree::AbstractSyntaxTree;
+use models::sementic_models::scope::ScopeId;
 use models::{
     abstract_syntax_tree::{soul_type::NamedTupleType, statment::Ident},
     error::{SoulError, SoulErrorKind, Span},
@@ -31,9 +32,18 @@ impl<'a> SementicPass<'a> for NameResolver<'a> {
 }
 
 impl<'a> NameResolver<'a> {
+    pub(super) fn push_scope(&mut self, set_scope_id: &mut Option<ScopeId>) {
+        self.info.scopes.push_scope();
+        *set_scope_id = Some(self.info.scopes.current_scope_id());
+    }
 
+    pub(super) fn pop_scope(&mut self) {
+        self.info.scopes.pop_scope();
+    }
 
-    
+    pub(super) fn lookup_function_candidates(&mut self, ident: &Ident) -> Vec<NodeId> {
+        self.info.scopes.lookup_function_candidates(ident)
+    }
 
     pub(super) fn declare_parameters(&mut self, parameters: &mut NamedTupleType) {
         for (name, _ty, node_id) in &mut parameters.types {
@@ -112,6 +122,9 @@ impl<'a> NameResolver<'a> {
     }
 
     fn current_scope_mut(&mut self) -> &mut Scope {
-        .expect("resolver has no scope")
+        self.info
+            .scopes
+            .current_scope_mut()
+            .expect("resolver has no scope")
     }
 }

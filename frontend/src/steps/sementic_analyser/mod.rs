@@ -1,4 +1,4 @@
-use models::{abstract_syntax_tree::AbstractSyntaxTree, sementic_models::scope::{ScopeBuilder}};
+use models::{abstract_syntax_tree::AbstractSyntaxTree, sementic_models::scope::ScopeBuilder};
 
 use crate::SementicFault;
 

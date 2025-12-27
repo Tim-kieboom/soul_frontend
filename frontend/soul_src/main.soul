@@ -37,6 +37,7 @@ class Bar {
 
 main() {
     val := 1
+    val := 2
     val = 0
     val = sum(1, 2)
     obj := Foo{field: 1, ..}

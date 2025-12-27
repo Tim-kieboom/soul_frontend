@@ -29,7 +29,7 @@ pub type BoxExpression = Box<Expression>;
 pub enum ExpressionKind {
     /// An empty expression (placeholder).
     Empty,
-    /// A `default` literal or default value.
+    /// A `default` literal or default value e.g., '()'.
     Default,
     /// A literal value (number, string, etc.).
     Literal(Literal),
@@ -53,7 +53,7 @@ pub enum ExpressionKind {
         ident: Ident,
         resolved: Option<NodeId>,
     },
-    /// An external expression from another page/module `path.to.something.expression`.
+    /// An external expression from another page/module `path::to::something.expression`.
     ExternalExpression(ExternalExpression),
 
     /// A unary operation (negation, increment, etc.) `!1`.
@@ -61,13 +61,13 @@ pub enum ExpressionKind {
     /// A binary operation (addition, multiplication, comparison, etc.) `1 + 2`.
     Binary(Binary),
 
-    /// An `if` expression `if true {Println("is true")}`.
+    /// An `if` expression `if true {Println("is true")} else {Println("is else")}`.
     If(If),
-    /// A `for` loop `for i in 1..2 {Println(f"num:{i}")}`.
+    /// A `for` loop `for i in 1..2 {sum += i}`.
     For(For),
-    /// A `while` loop `while true {Println("loop")}`.
+    /// A conditional loop `while true {Println("loop")}`.
     While(While),
-    /// A `match` expression `match booleanVar {true => (), false => }`.
+    /// A `match` expression `match booleanVar {true => (), false => ()}`.
     Match(Match),
     /// A ternary expression `cond ? a : b`.
     Ternary(Ternary),
@@ -198,33 +198,43 @@ impl SyntaxDisplay for ExpressionKind {
                 sb.push(')');
             }
             ExpressionKind::StructConstructor(struct_constructor) => {
-                struct_constructor.calle.inner_display(sb, kind, tab, is_last);
+                struct_constructor
+                    .calle
+                    .inner_display(sb, kind, tab, is_last);
                 sb.push('{');
                 sb.push_str(
                     &struct_constructor
-                    .arguments
-                    .values
-                    .iter()
-                    .map(|(name, expr)| format!("{}: {}", name.node, expr.node.display(kind)))
-                    .join(", "),
+                        .arguments
+                        .values
+                        .iter()
+                        .map(|(name, expr)| format!("{}: {}", name.node, expr.node.display(kind)))
+                        .join(", "),
                 );
                 if struct_constructor.arguments.insert_defaults {
                     let empty = struct_constructor.arguments.values.is_empty();
-                    sb.push_str(if empty {".."} else {", .."});
+                    sb.push_str(if empty { ".." } else { ", .." });
                 }
                 sb.push('}');
             }
             ExpressionKind::FieldAccess(field_access) => {
-                field_access.object.node.inner_display(sb, kind, tab, is_last);
+                field_access
+                    .object
+                    .node
+                    .inner_display(sb, kind, tab, is_last);
                 sb.push('.');
                 sb.push_str(field_access.field.as_str());
             }
             ExpressionKind::StaticFieldAccess(static_field_access) => {
-                static_field_access.object.inner_display(sb, kind, tab, is_last);
+                static_field_access
+                    .object
+                    .inner_display(sb, kind, tab, is_last);
                 sb.push('.');
                 sb.push_str(static_field_access.field.as_str());
             }
-            ExpressionKind::Variable{ident: variable, resolved} => {
+            ExpressionKind::Variable {
+                ident: variable,
+                resolved,
+            } => {
                 try_display_node_id(sb, kind, *resolved);
                 sb.push_str(variable.as_str());
             }
@@ -263,7 +273,11 @@ impl SyntaxDisplay for ExpressionKind {
                             sb.push(' ');
                             sb.push_str(KeyWord::If.as_str());
                             sb.push(' ');
-                            spanned.node.condition.node.inner_display(sb, kind, tab, is_last);
+                            spanned
+                                .node
+                                .condition
+                                .node
+                                .inner_display(sb, kind, tab, is_last);
                             spanned.node.block.inner_display(sb, kind, tab, is_last);
                         }
                         ElseKind::Else(spanned) => {
@@ -309,11 +323,7 @@ impl SyntaxDisplay for ExpressionKind {
                         IfCaseKind::WildCard(ident) => {
                             sb.push('\n');
                             sb.push_str(&prefix);
-                            sb.push_str(
-                                ident.as_ref()
-                                    .map(|el| el.name.as_str())
-                                    .unwrap_or("_")
-                            );
+                            sb.push_str(ident.as_ref().map(|el| el.name.as_str()).unwrap_or("_"));
                             sb.push_str(" => ");
                         }
                         IfCaseKind::Expression(spanned) => {
@@ -375,7 +385,10 @@ impl SyntaxDisplay for ExpressionKind {
                 sb.push_str(" ? ");
                 ternary.if_branch.node.inner_display(sb, kind, tab, is_last);
                 sb.push_str(" : ");
-                ternary.else_branch.node.inner_display(sb, kind, tab, is_last);
+                ternary
+                    .else_branch
+                    .node
+                    .inner_display(sb, kind, tab, is_last);
             }
             ExpressionKind::Deref(spanned) => {
                 sb.push_str(TypeWrapper::Pointer.as_str());
@@ -393,7 +406,7 @@ impl SyntaxDisplay for ExpressionKind {
 
                 expression.node.inner_display(sb, kind, tab, is_last);
             }
-            ExpressionKind::Block(block) => block.inner_display(sb, kind, tab+1, is_last),
+            ExpressionKind::Block(block) => block.inner_display(sb, kind, tab + 1, is_last),
             ExpressionKind::ReturnLike(return_like) => {
                 sb.push_str(return_like.kind.as_keyword().as_str());
                 if let Some(value) = &return_like.value {
@@ -420,7 +433,7 @@ impl ReturnKind {
 
 fn for_pattern_to_string(sb: &mut String, el: &ForPattern) {
     match el {
-        ForPattern::Ident{ident, ..} => sb.push_str(ident.as_str()),
+        ForPattern::Ident { ident, .. } => sb.push_str(ident.as_str()),
         ForPattern::Tuple(items) => {
             sb.push('(');
             for item in items {

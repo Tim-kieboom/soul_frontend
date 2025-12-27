@@ -1,10 +1,13 @@
-use crate::{abstract_syntax_tree::{
-    expression::Expression,
-    function::{Function, FunctionSignature},
-    soul_type::{GenericDeclare, SoulType},
-    spanned::Spanned,
-    statment::{Ident, UseBlock},
-}, sementic_models::scope::NodeId};
+use crate::{
+    abstract_syntax_tree::{
+        expression::Expression,
+        function::{Function, FunctionSignature},
+        soul_type::{GenericDeclare, SoulType},
+        spanned::Spanned,
+        statment::{Ident, UseBlock},
+    },
+    sementic_models::scope::{NodeId, ScopeId},
+};
 
 /// A struct type definition.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -16,7 +19,7 @@ pub struct Struct {
     /// The fields of the struct.
     pub fields: Vec<Spanned<Field>>,
     pub node_id: Option<NodeId>,
-    pub scope_id: Option<usize>,
+    pub scope_id: Option<ScopeId>,
 }
 
 /// A class type definition.
@@ -29,7 +32,7 @@ pub struct Class {
     /// The members of the class (fields, methods, impl blocks).
     pub members: Vec<Spanned<ClassMember>>,
     pub node_id: Option<NodeId>,
-    pub scope_id: usize,
+    pub scope_id: Option<ScopeId>,
 }
 
 /// A trait definition.
@@ -40,7 +43,7 @@ pub struct Trait {
     /// The method signatures defined in this trait.
     pub methods: Vec<Spanned<FunctionSignature>>,
     pub node_id: Option<NodeId>,
-    pub scope_id: usize,
+    pub scope_id: Option<ScopeId>,
 }
 
 /// The signature of a trait.
@@ -100,7 +103,7 @@ pub enum Visibility {
 }
 
 impl ClassMember {
-    pub fn try_get_node_id(&self) -> Option<NodeId>{
+    pub fn try_get_node_id(&self) -> Option<NodeId> {
         match self {
             ClassMember::Field(field) => field.node_id,
             ClassMember::Method(function) => function.node_id,

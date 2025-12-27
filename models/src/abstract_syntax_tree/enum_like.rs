@@ -1,9 +1,12 @@
-use crate::{abstract_syntax_tree::{
-    expression::Expression,
-    soul_type::{GenericDeclare, SoulType},
-    spanned::Spanned,
-    statment::Ident,
-}, sementic_models::scope::NodeId};
+use crate::{
+    abstract_syntax_tree::{
+        expression::Expression,
+        soul_type::{GenericDeclare, SoulType},
+        spanned::Spanned,
+        statment::Ident,
+    },
+    sementic_models::scope::NodeId,
+};
 use std::collections::BTreeMap;
 
 /// A C-like enum definition (enumeration with integer values).

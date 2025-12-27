@@ -85,7 +85,7 @@ impl<'a> Parser<'a> {
             root: Block {
                 statments,
                 modifier: TypeModifier::Mut,
-                scope_id: 0,
+                scope_id: None,
             },
         }
     }

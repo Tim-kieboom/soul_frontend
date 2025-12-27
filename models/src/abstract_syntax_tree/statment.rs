@@ -164,7 +164,11 @@ impl SyntaxDisplay for StatementKind {
             }
             StatementKind::Expression(spanned) => {
                 sb.push_str(&prefix);
-                let tag = if matches!(spanned.node, ExpressionKind::Block(_)) {"Block >> "} else {"Expression >> "};
+                let tag = if matches!(spanned.node, ExpressionKind::Block(_)) {
+                    "Block >> "
+                } else {
+                    "Expression >> "
+                };
                 sb.push_str(tag);
                 spanned.node.inner_display(sb, kind, tab, is_last);
             }
@@ -191,7 +195,13 @@ impl SyntaxDisplay for StatementKind {
                 sb.push_str(&prefix);
                 try_display_node_id(sb, kind, function.node_id);
                 sb.push_str("Function >> ");
-                inner_display_function_declaration(sb, kind, &function.signature.node, tab, is_last);
+                inner_display_function_declaration(
+                    sb,
+                    kind,
+                    &function.signature.node,
+                    tab,
+                    is_last,
+                );
                 function.block.inner_display(sb, kind, tab, is_last);
             }
             StatementKind::UseBlock(use_block) => {
@@ -257,7 +267,7 @@ impl SyntaxDisplay for StatementKind {
 
 fn inner_display_function_declaration(
     sb: &mut String,
-    kind: DisplayKind, 
+    kind: DisplayKind,
     signature: &FunctionSignature,
     tab: usize,
     is_last: bool,
@@ -284,7 +294,14 @@ fn inner_display_function_declaration(
             .parameters
             .types
             .iter()
-            .map(|(name, el, node_id)| format!("{}{}: {}", node_id_display(*node_id, kind), name.node, el.display(kind)))
+            .map(|(name, el, node_id)| {
+                format!(
+                    "{}{}: {}",
+                    node_id_display(*node_id, kind),
+                    name.node,
+                    el.display(kind)
+                )
+            })
             .join(", "),
     );
     sb.push(')');
@@ -292,7 +309,11 @@ fn inner_display_function_declaration(
     signature.return_type.inner_display(sb, kind, tab, is_last);
 }
 
-fn inner_display_generic_parameters(sb: &mut String, kind: DisplayKind, parameters: &Vec<GenericDeclare>) {
+fn inner_display_generic_parameters(
+    sb: &mut String,
+    kind: DisplayKind,
+    parameters: &Vec<GenericDeclare>,
+) {
     if parameters.is_empty() {
         return;
     }
@@ -345,7 +366,7 @@ fn inner_display_generic_parameters(sb: &mut String, kind: DisplayKind, paramete
 
 fn inner_display_classchild(
     sb: &mut String,
-    kind: DisplayKind, 
+    kind: DisplayKind,
     kinds: &Vec<Spanned<ClassMember>>,
     tab: usize,
     use_last: bool,
@@ -370,7 +391,9 @@ fn inner_display_classchild(
         sb.push_str(get_tag(member));
         match &member.node {
             ClassMember::Field(field) => inner_display_field(sb, kind, field, tab, is_last),
-            ClassMember::Method(function) => inner_display_methode(sb, kind, function, tab, is_last),
+            ClassMember::Method(function) => {
+                inner_display_methode(sb, kind, function, tab, is_last)
+            }
             ClassMember::ImplBlock(_) => todo!(),
         }
     }
@@ -378,7 +401,7 @@ fn inner_display_classchild(
 
 fn inner_display_methode_signatures(
     sb: &mut String,
-    kind: DisplayKind, 
+    kind: DisplayKind,
     methods: &Vec<Spanned<FunctionSignature>>,
     tab: usize,
     use_last: bool,
@@ -400,7 +423,13 @@ fn inner_display_methode_signatures(
     }
 }
 
-fn inner_display_fields(sb: &mut String, kind: DisplayKind, fields: &Vec<Spanned<Field>>, tab: usize, use_last: bool) {
+fn inner_display_fields(
+    sb: &mut String,
+    kind: DisplayKind,
+    fields: &Vec<Spanned<Field>>,
+    tab: usize,
+    use_last: bool,
+) {
     let last_index = fields.len() - 1;
 
     for (i, Spanned { node: field, .. }) in fields.iter().enumerate() {
@@ -419,7 +448,13 @@ fn inner_display_fields(sb: &mut String, kind: DisplayKind, fields: &Vec<Spanned
     }
 }
 
-fn inner_display_methode(sb: &mut String, kind: DisplayKind, methode: &Function, tab: usize, is_last: bool) {
+fn inner_display_methode(
+    sb: &mut String,
+    kind: DisplayKind,
+    methode: &Function,
+    tab: usize,
+    is_last: bool,
+) {
     inner_display_methode_signature(sb, kind, &methode.signature.node, tab, is_last);
     methode.block.inner_display(sb, kind, tab + 1, is_last);
 }
@@ -434,7 +469,13 @@ fn inner_display_methode_signature(
     inner_display_function_declaration(sb, kind, &methode, tab, is_last);
 }
 
-fn inner_display_field(sb: &mut String, kind: DisplayKind, field: &Field, tab: usize, is_last: bool) {
+fn inner_display_field(
+    sb: &mut String,
+    kind: DisplayKind,
+    field: &Field,
+    tab: usize,
+    is_last: bool,
+) {
     sb.push_str(field.name.as_str());
     sb.push_str(": ");
     field.ty.inner_display(sb, kind, tab, is_last);
@@ -446,9 +487,13 @@ fn inner_display_field(sb: &mut String, kind: DisplayKind, field: &Field, tab: u
     }
 }
 
-pub(crate) fn try_display_many_node_ids(sb: &mut String, kind: DisplayKind, node_ids: &Vec<NodeId>) {
+pub(crate) fn try_display_many_node_ids(
+    sb: &mut String,
+    kind: DisplayKind,
+    node_ids: &Vec<NodeId>,
+) {
     if node_ids.is_empty() || kind != DisplayKind::NameResolver {
-        return
+        return;
     }
 
     sb.push_str("\"|");
@@ -461,8 +506,8 @@ pub(crate) fn try_display_many_node_ids(sb: &mut String, kind: DisplayKind, node
 
 pub(crate) fn node_id_display(node_id: Option<NodeId>, kind: DisplayKind) -> String {
     if kind != DisplayKind::NameResolver {
-        return String::default()
-    } 
+        return String::default();
+    }
 
     node_id
         .map(|el| format!("\"|{}|\"", el.display()))

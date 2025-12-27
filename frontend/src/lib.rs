@@ -1,3 +1,4 @@
+pub use crate::steps::sementic_analyser::sementic_fault::{SementicFault, SementicLevel};
 use crate::steps::{
     parse::{self, parser::parse},
     sementic_analyser::{
@@ -9,7 +10,6 @@ use crate::steps::{
 use models::{abstract_syntax_tree::AbstractSyntaxTree, error::SoulError};
 use std::io::{self};
 
-pub use crate::steps::sementic_analyser::sementic_fault::{SementicFault, SementicLevel};
 mod steps;
 pub mod utils;
 

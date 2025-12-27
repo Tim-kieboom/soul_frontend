@@ -1,6 +1,15 @@
-use std::collections::{HashMap};
+use std::collections::HashMap;
 
-use crate::{abstract_syntax_tree::{enum_like::{Enum, Union}, function::Function, objects::{Class, Field, Struct, Trait}, soul_type::{GenericDeclare, GenericDeclareKind}, statment::{Ident, Variable}}, error::Span};
+use crate::{
+    abstract_syntax_tree::{
+        enum_like::{Enum, Union},
+        function::Function,
+        objects::{Class, Field, Struct, Trait},
+        soul_type::{GenericDeclare, GenericDeclareKind},
+        statment::{Ident, Variable},
+    },
+    error::Span,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct NodeId(u32);
@@ -26,7 +35,10 @@ impl NodeIdGenerator {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct ScopeId{index: usize, at_len: usize}
+pub struct ScopeId {
+    index: usize,
+    at_len: usize,
+}
 
 #[derive(Debug)]
 pub struct ScopeBuilder {
@@ -36,15 +48,38 @@ pub struct ScopeBuilder {
 impl ScopeBuilder {
     pub fn new() -> Self {
         let global = Scope::new();
-        Self { scopes: vec![global], current: 0 }    
+        Self {
+            scopes: vec![global],
+            current: 0,
+        }
     }
 
-    pub(super) fn push_scope(&mut self) {
-        self.scopes.insert(self.current+1, Scope::new());
+    pub fn push_scope(&mut self) {
+        self.current += 1;
+        self.scopes.insert(self.current, Scope::new());
     }
 
-    pub(super) fn pop_scope(&mut self) {
-        self.current -= 1
+    pub fn pop_scope(&mut self) {
+        self.current = self.current.saturating_sub(1);
+    }
+
+    pub fn go_to(&mut self, scope_id: ScopeId) {
+        let ScopeId { index, at_len } = scope_id;
+
+        let delta_len = self.scopes.len() as i64 - at_len as i64;
+        let index = (index as i64 + delta_len) as usize;
+        self.current = index;
+    }
+
+    pub fn current_scope_id(&self) -> ScopeId {
+        ScopeId {
+            index: self.current,
+            at_len: self.scopes.len(),
+        }
+    }
+
+    pub fn current_scope_mut(&mut self) -> Option<&mut Scope> {
+        self.scopes.get_mut(self.current)
     }
 
     pub fn lookup_type(&self, ident: &Ident) -> Option<ScopeTypeEntry> {
@@ -111,7 +146,7 @@ pub enum ScopeValueEntryKind {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct ScopeTypeEntry { 
+pub struct ScopeTypeEntry {
     pub span: Span,
     pub node_id: NodeId,
     pub kind: ScopeTypeEntryKind,
@@ -136,16 +171,14 @@ pub enum ScopeValueKind<'a> {
 }
 impl<'a> ScopeValueKind<'a> {
     pub fn get_id_mut(&mut self) -> &mut Option<NodeId> {
-
         match self {
             ScopeValueKind::Field(field) => &mut field.node_id,
             ScopeValueKind::Variable(variable) => &mut variable.node_id,
             ScopeValueKind::Function(function) => &mut function.node_id,
-        } 
+        }
     }
 
     pub fn get_name(&self) -> &Ident {
-
         match self {
             ScopeValueKind::Field(field) => &field.name,
             ScopeValueKind::Variable(variable) => &variable.name,
@@ -154,7 +187,6 @@ impl<'a> ScopeValueKind<'a> {
     }
 
     pub fn to_entry_kind(&self) -> ScopeValueEntryKind {
-
         match self {
             ScopeValueKind::Field(_) => ScopeValueEntryKind::Field,
             ScopeValueKind::Variable(_) => ScopeValueEntryKind::Variable,
@@ -169,11 +201,10 @@ pub enum ScopeTypeKind<'a> {
     Trait(&'a mut Trait),
     Enum(&'a mut Enum),
     Union(&'a mut Union),
-    GenricDeclare(&'a mut GenericDeclare)
+    GenricDeclare(&'a mut GenericDeclare),
 }
 impl<'a> ScopeTypeKind<'a> {
     pub fn get_id_mut(&mut self) -> &mut Option<NodeId> {
-
         match self {
             ScopeTypeKind::GenricDeclare(ty) => &mut ty.node_id,
             ScopeTypeKind::Struct(ty) => &mut ty.node_id,
@@ -181,16 +212,15 @@ impl<'a> ScopeTypeKind<'a> {
             ScopeTypeKind::Trait(ty) => &mut ty.node_id,
             ScopeTypeKind::Enum(ty) => &mut ty.node_id,
             ScopeTypeKind::Union(ty) => &mut ty.node_id,
-        } 
+        }
     }
 
     pub fn get_name(&self) -> &Ident {
-
         match self {
             ScopeTypeKind::GenricDeclare(ty) => match &ty.kind {
-                GenericDeclareKind::Type{name, ..} => &name,
+                GenericDeclareKind::Type { name, .. } => &name,
                 GenericDeclareKind::Lifetime(ident) => &ident,
-                GenericDeclareKind::Expression{name, ..} => &name,
+                GenericDeclareKind::Expression { name, .. } => &name,
             },
             ScopeTypeKind::Struct(ty) => &ty.name,
             ScopeTypeKind::Class(ty) => &ty.name,
@@ -202,12 +232,10 @@ impl<'a> ScopeTypeKind<'a> {
 
     pub fn to_entry_kind(&self) -> ScopeTypeEntryKind {
         match self {
-            ScopeTypeKind::GenricDeclare(ty) => {
-                match &ty.kind {
-                    GenericDeclareKind::Type{..} => ScopeTypeEntryKind::GenericType,
-                    GenericDeclareKind::Lifetime(_) => ScopeTypeEntryKind::LifeTime,
-                    GenericDeclareKind::Expression{..} => ScopeTypeEntryKind::GenericExpression,
-                }
+            ScopeTypeKind::GenricDeclare(ty) => match &ty.kind {
+                GenericDeclareKind::Type { .. } => ScopeTypeEntryKind::GenericType,
+                GenericDeclareKind::Lifetime(_) => ScopeTypeEntryKind::LifeTime,
+                GenericDeclareKind::Expression { .. } => ScopeTypeEntryKind::GenericExpression,
             },
             ScopeTypeKind::Struct(_) => ScopeTypeEntryKind::Struct,
             ScopeTypeKind::Class(_) => ScopeTypeEntryKind::Class,

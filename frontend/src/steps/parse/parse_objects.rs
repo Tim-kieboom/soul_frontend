@@ -90,7 +90,7 @@ impl<'a> Parser<'a> {
             name: ident,
             generics,
             node_id: None,
-            scope_id: 0,
+            scope_id: None,
         };
         Ok(class)
     }
@@ -139,7 +139,7 @@ impl<'a> Parser<'a> {
             name,
             generics,
             node_id: None,
-            scope_id: 0
+            scope_id: None,
         })
     }
 
@@ -193,6 +193,7 @@ impl<'a> Parser<'a> {
                 signature,
                 methods,
                 node_id: None,
+                scope_id: None,
             });
         }
 
@@ -246,6 +247,7 @@ impl<'a> Parser<'a> {
             signature,
             methods,
             node_id: None,
+            scope_id: None,
         })
     }
 

@@ -1,6 +1,9 @@
 use crate::{
     abstract_syntax_tree::{
-        expression::{BoxExpression, Expression}, soul_type::SoulType, statment::{Ident, Variable}, syntax_display::{DisplayKind, SyntaxDisplay}
+        expression::{BoxExpression, Expression},
+        soul_type::SoulType,
+        statment::{Ident, Variable},
+        syntax_display::{DisplayKind, SyntaxDisplay},
     },
     soul_names::KeyWord,
 };
@@ -15,7 +18,7 @@ pub enum ExpressionGroup {
     Array(Array),
     /// A named tuple, e.g., `{x: 1, y: 2}`.
     NamedTuple(NamedTuple),
-    /// An array filler expression, e.g., `[5 => 1] //makes [1,1,1,1,1]`.
+    /// An array filler expression, e.g., `[for 5 => 1] //makes [1,1,1,1,1]`.
     ArrayFiller(ArrayFiller),
 }
 
@@ -75,7 +78,11 @@ impl SyntaxDisplay for ExpressionGroup {
         match self {
             ExpressionGroup::Tuple(tuple) => sb.push_str(&format!(
                 "({})",
-                tuple.values.iter().map(|el| el.node.display(kind)).join(", ")
+                tuple
+                    .values
+                    .iter()
+                    .map(|el| el.node.display(kind))
+                    .join(", ")
             )),
             ExpressionGroup::Array(array) => sb.push_str(&format!(
                 "{}[{}{}]",
@@ -89,7 +96,11 @@ impl SyntaxDisplay for ExpressionGroup {
                     .as_ref()
                     .map(|el| format!("{}: ", el.display(kind)))
                     .unwrap_or(String::new()),
-                array.values.iter().map(|el| el.node.display(kind)).join(", ")
+                array
+                    .values
+                    .iter()
+                    .map(|el| el.node.display(kind))
+                    .join(", ")
             )),
             ExpressionGroup::NamedTuple(named_tuple) => sb.push_str(&format!(
                 "{{{}{}}}",

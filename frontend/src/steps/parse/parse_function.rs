@@ -228,7 +228,9 @@ impl<'a> Parser<'a> {
 
                 if self.current_is_ident(IMPL_STR) {
                     return Err(SoulError::new(
-                        format!("can not have '{IMPL_STR}' and '{COLON_STR}' at the same time"),
+                        format!(
+                            "can not have '{IMPL_STR}' and '{COLON_STR}' at the same time"
+                        ),
                         SoulErrorKind::InvalidTokenKind,
                         Some(self.token().span),
                     ));

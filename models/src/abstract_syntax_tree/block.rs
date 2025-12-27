@@ -3,6 +3,7 @@ use crate::{
         statment::Statement,
         syntax_display::{DisplayKind, SyntaxDisplay, gap_prefix},
     },
+    sementic_models::scope::ScopeId,
     soul_names::TypeModifier,
 };
 
@@ -16,7 +17,7 @@ pub struct Block {
     pub modifier: TypeModifier,
     /// The statements contained in this block.
     pub statments: Vec<Statement>,
-    pub scope_id: usize,
+    pub scope_id: Option<ScopeId>,
 }
 
 impl SyntaxDisplay for Block {
@@ -35,7 +36,9 @@ impl SyntaxDisplay for Block {
 
         for (i, statment) in self.statments.iter().enumerate() {
             sb.push('\n');
-            statment.node.inner_display(sb, kind, tab + 1, i == last_index);
+            statment
+                .node
+                .inner_display(sb, kind, tab + 1, i == last_index);
 
             if i == last_index {
                 sb.push('\n');

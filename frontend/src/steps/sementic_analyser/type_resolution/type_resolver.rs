@@ -10,7 +10,7 @@ use models::{
         statment::Ident,
     },
     error::{SoulError, SoulErrorKind, Span},
-    sementic_models::scope::{NodeId, ScopeTypeEntry, ScopeTypeEntryKind},
+    sementic_models::scope::{NodeId, ScopeId, ScopeTypeEntry, ScopeTypeEntryKind},
     soul_names::StackArrayKind,
 };
 
@@ -30,8 +30,16 @@ impl<'a> SementicPass<'a> for TypeResolver<'a> {
 
 impl<'a> TypeResolver<'a> {
     pub(super) fn resolve_block(&mut self, block: &mut Block) {
+        self.try_go_to(block.scope_id);
         for statment in &mut block.statments {
             self.resolve_statement(statment);
+        }
+    }
+
+    pub(super) fn try_go_to(&mut self, scope_id: Option<ScopeId>) {
+        debug_assert!(scope_id.is_some());
+        if let Some(id) = scope_id {
+            self.info.scopes.go_to(id);
         }
     }
 
@@ -134,9 +142,7 @@ impl<'a> TypeResolver<'a> {
                 }
                 self.resolve_type(&mut function_type.return_type);
             }
-            TypeKind::Reference(reference_type) => {
-                self.resolve_type(&mut reference_type.inner)
-            }
+            TypeKind::Reference(reference_type) => self.resolve_type(&mut reference_type.inner),
             TypeKind::NamedTuple(named_tuple_type) => {
                 for (_name, ty, _node_id) in &mut named_tuple_type.types {
                     self.resolve_type(ty);

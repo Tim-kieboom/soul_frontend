@@ -8,7 +8,8 @@ use crate::{
         statment::{Ident, Variable},
         syntax_display::{DisplayKind, SyntaxDisplay},
     },
-    error::{SoulError, SoulErrorKind, SoulResult, Span}, sementic_models::scope::NodeId,
+    error::{SoulError, SoulErrorKind, SoulResult, Span},
+    sementic_models::scope::NodeId,
 };
 use itertools::Itertools;
 
@@ -81,7 +82,11 @@ pub enum IfCaseKind {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ForPattern {
     /// A simple identifier pattern.
-    Ident{ident: Ident, resolved: Option<NodeId>, span: Span},
+    Ident {
+        ident: Ident,
+        resolved: Option<NodeId>,
+        span: Span,
+    },
     /// A tuple pattern for destructuring tuples.
     Tuple(Vec<ForPattern>),
     /// A named tuple pattern for destructuring named tuples.
@@ -129,7 +134,11 @@ pub struct CompareTypeOf {
 impl ForPattern {
     pub fn from_expression(expression: Expression) -> SoulResult<Self> {
         match expression.node {
-            ExpressionKind::Variable{ident, resolved} => Ok(ForPattern::Ident{ident, resolved, span: expression.span}),
+            ExpressionKind::Variable { ident, resolved } => Ok(ForPattern::Ident {
+                ident,
+                resolved,
+                span: expression.span,
+            }),
             ExpressionKind::ExpressionGroup(ExpressionGroup::Tuple(tuple)) => {
                 let mut fors = Vec::with_capacity(tuple.values.len());
                 for el in tuple.values {
@@ -157,7 +166,7 @@ impl ForPattern {
 
     pub fn display(&self) -> String {
         match self {
-            ForPattern::Ident{ident, ..} => ident.node.clone(),
+            ForPattern::Ident { ident, .. } => ident.node.clone(),
             ForPattern::Tuple(items) => {
                 format!("({})", items.iter().map(|el| el.display()).join(", "))
             }

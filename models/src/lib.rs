@@ -4,6 +4,7 @@
 //! Soul language programs, including the Abstract Syntax Tree (AST), error types,
 //! scope management, and language keywords/symbols.
 
+pub mod define_enums;
 pub mod abstract_syntax_tree;
 pub mod error;
 pub mod sementic_models;

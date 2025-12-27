@@ -1,38 +1,40 @@
 
 ├── "|0|"Variable >> f: none = Foo{..}
 ├── "|1|"Trait >> TODO
-├── "|2|"Function >> str<T: TODO"|3|">("|4|"any: T): none
-├── "|5|"Function >> Println<T: TODO"|6|">("|7|"msg: T): none
-├── "|8|"Function >> sum("|9|"a: int, "|10|"b: int): int
-│   └── Expression >> return "|9|"a + "|10|"b
+├── "|2|"Trait >> Number
+├── "|3|"Function >> str<T: 1"|4|">("|5|"any: 4): none
+├── "|6|"Function >> Println<T: 1"|7|">("|8|"msg: 4): none
+├── "|9|"Function >> sum("|10|"a: int, "|11|"b: int): int
+│   └── Expression >> return "|10|"a + "|11|"b
 │   │   
-├── "|11|"Function >> sum("|12|"a: f32, "|13|"b: f32): f32
-│   └── Expression >> return "|12|"a + "|13|"b
+├── "|12|"Function >> sum("|13|"a: f32, "|14|"b: f32): f32
+│   └── Expression >> return "|10|"a + "|11|"b
 │   │   
-├── "|14|"Function >> sum<N: Number = int"|15|">("|16|"a: N, "|17|"b: N): N
-│   └── Expression >> return "|16|"a + "|17|"b
+├── "|15|"Function >> sum<N: 2 = int"|16|">("|17|"a: 16, "|18|"b: 16): 16
+│   └── Expression >> return "|10|"a + "|11|"b
 │   │   
-├── "|18|"Function >> func("|19|"foo: Foo): none
-├── "|22|"Struct >> Foo
-│   ├── "|20|"Field >> field: const int 
-│   └── "|21|"Field >> foo: const int  = field
+├── "|19|"Function >> func("|20|"foo: 23): none
+├── "|23|"Struct >> Foo
+│   ├── "|21|"Field >> field: const int 
+│   └── "|22|"Field >> foo: const int  = field
 │   │   
-├── "|25|"Class >> Bar
-│   ├── "|23|"Field >> field: const int 
-│   └── "|24|"Methode >> Bar print(@this, ): none
-│   │   │   └── Expression >> "|5,|"Println("Bar{field: " + "|2,|"str("|23|"field) + "}")
+├── "|26|"Class >> Bar
+│   ├── "|24|"Field >> field: const int 
+│   └── "|25|"Methode >> 26 print(@this, ): none
+│   │   │   └── Expression >> "|6,|"Println("Bar{field: " + "|3,|"str("|21|"field) + "}")
 │   │   │   │   
-└── "|26|"Function >> main(): none
-│   ├── "|27|"Variable >> val: none = 1
-│   ├── Assignment >> "|27|"val = 0
-│   ├── Assignment >> "|27|"val = "|8,11,14,|"sum(1, 2)
-│   ├── "|28|"Variable >> obj: none = Foo{field: 1, ..}
+└── "|27|"Function >> main(): none
+│   ├── "|28|"Variable >> val: none = 1
+│   ├── "|29|"Variable >> val: none = 2
+│   ├── Assignment >> "|29|"val = 0
+│   ├── Assignment >> "|29|"val = "|9,12,15,|"sum(1, 2)
+│   ├── "|30|"Variable >> obj: none = Foo{field: 1, ..}
 │   ├── Block >> 
-│   │   │   └── "|29|"Variable >> bo: none = 1
+│   │   │   └── "|31|"Variable >> bo: none = 1
 │   │   │   │   
-│   └── Expression >> if "|27|"val == 1
-│   │   ├── "|30|"Variable >> val: none = 1
-│   │   └── Assignment >> "|30|"val = 2
+│   └── Expression >> if "|29|"val == 1
+│   │   ├── "|32|"Variable >> val: none = 1
+│   │   └── Assignment >> "|32|"val = 2
 │   │   │   
 │   │   
 │   

@@ -4,221 +4,11 @@
 //! and other language constructs used in the Soul programming language.
 
 use crate::{
-    abstract_syntax_tree::{operator::{BinaryOperatorKind, UnaryOperatorKind}, statment::Ident}, sementic_models::scope::NodeId, symbool_kind::SymboolKind
+    abstract_syntax_tree::{
+        operator::{BinaryOperatorKind, UnaryOperatorKind},
+        statment::Ident,
+    }, define_str_enum, define_symbols, sementic_models::scope::NodeId, symbool_kind::SymboolKind
 };
-
-#[macro_export]
-macro_rules! define_str_enum {
-    (
-        $(#[$enum_doc:meta])*
-        $vis:vis enum $enum_name:ident {
-            $( $(#[$attr:meta])* $name:ident => $symbol:expr ),* $(,)?
-        }
-    ) => {
-
-        $(#[$enum_doc])*
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-        $vis enum $enum_name {
-            $(
-                $(#[$attr])*
-                $name,
-            )*
-        }
-
-        impl $enum_name {
-            #[allow(unused)]
-            pub const NAMES: &[$enum_name] = &[ $( $enum_name::$name, )* ];
-            #[allow(unused)]
-            pub const VALUES: &[&str] = &[ $($symbol,)* ];
-
-            #[allow(unused)]
-            pub const fn as_str(&self) -> &'static str {
-                match self {
-                    $( $enum_name::$name => $symbol, )*
-                }
-            }
-
-            #[allow(unused)]
-            pub fn from_str(s: &str) -> Option<Self> {
-                match s {
-                    $( $symbol => Some($enum_name::$name), )*
-                    _ => None,
-                }
-            }
-        }
-
-
-    };
-    (
-        $(#[$enum_doc:meta])*
-        $vis:vis enum $enum_name:ident {
-            $( $(#[$attr:meta])* $name:ident => $symbol:expr, $precedence:expr ),* $(,)?
-        }
-    ) => {
-
-        $(#[$enum_doc])*
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-        $vis enum $enum_name {
-            $(
-                $(#[$attr])*
-                $name,
-            )*
-        }
-
-        impl $enum_name {
-            #[allow(unused)]
-            pub const NAMES: &[$enum_name] = &[ $( $enum_name::$name, )* ];
-            #[allow(unused)]
-            pub const VALUES: &[&str] = &[ $($symbol,)* ];
-
-            #[allow(unused)]
-            pub const fn as_str(&self) -> &'static str {
-                match self {
-                    $( $enum_name::$name => $symbol, )*
-                }
-            }
-
-            #[allow(unused)]
-            pub fn from_str(s: &str) -> Option<Self> {
-                match s {
-                    $( $symbol => Some($enum_name::$name), )*
-                    _ => None,
-                }
-            }
-
-            #[allow(unused)]
-            pub const fn precedence(&self) -> usize {
-                match self {
-                    $( $enum_name::$name => $precedence, )*
-                }
-            }
-        }
-
-
-    }
-}
-macro_rules! define_symbols {
-    (
-        $(#[$enum_doc:meta])*
-        $vis:vis enum $enum_name:ident {
-            $( $(#[$attr:meta])* $name:ident => $symbol:expr, $symkind:path ),* $(,)?
-        }
-    ) => {
-
-        $(#[$enum_doc])*
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-        $vis enum $enum_name {
-            $(
-                $(#[$attr])*
-                $name,
-            )*
-        }
-
-        impl $enum_name {
-
-            pub const NAMES: &[$enum_name] = &[
-                $( $enum_name::$name, )*
-            ];
-
-            pub const VALUES: &[&str] = &[
-                $( $symbol, )*
-            ];
-
-            pub const SYMBOLS: &[SymboolKind] = &[
-                $( $symkind, )*
-            ];
-
-            pub const fn as_str(&self) -> &'static str {
-                match self {
-                    $( $enum_name::$name => $symbol, )*
-                }
-            }
-
-            pub fn from_str(s: &str) -> Option<Self> {
-                match s {
-                    $( $symbol => Some($enum_name::$name), )*
-                    _ => None,
-                }
-            }
-
-            pub const fn from_symbool(k: SymboolKind) -> Option<Self> {
-                match k {
-                    $( $symkind => Some($enum_name::$name), )*
-                    _ => None,
-                }
-            }
-        }
-
-        impl From<SymboolKind> for Option<$enum_name> {
-            fn from(k: SymboolKind) -> Self {
-                $enum_name::from_symbool(k)
-            }
-        }
-    };
-    (
-        $(#[$enum_doc:meta])*
-        $vis:vis enum $enum_name:ident {
-            $( $(#[$attr:meta])* $name:ident => $symbol:expr, $symkind:path, $precedence:expr ),* $(,)?
-        }
-    ) => {
-
-        $(#[$enum_doc])*
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-        $vis enum $enum_name {
-            $(
-                $(#[$attr])*
-                $name,
-            )*
-        }
-
-        impl $enum_name {
-
-            pub const NAMES: &[$enum_name] = &[
-                $( $enum_name::$name, )*
-            ];
-
-            pub const VALUES: &[&str] = &[
-                $( $symbol, )*
-            ];
-
-            pub const SYMBOLS: &[SymboolKind] = &[
-                $( $symkind, )*
-            ];
-
-            pub const fn as_str(&self) -> &'static str {
-                match self {
-                    $( $enum_name::$name => $symbol, )*
-                }
-            }
-
-            pub fn from_str(s: &str) -> Option<Self> {
-                match s {
-                    $( $symbol => Some($enum_name::$name), )*
-                    _ => None,
-                }
-            }
-
-            pub const fn from_symbool(k: SymboolKind) -> Option<Self> {
-                match k {
-                    $( $symkind => Some($enum_name::$name), )*
-                    _ => None,
-                }
-            }
-
-            pub const fn precedence(&self) -> usize {
-                match self {
-                    $( $enum_name::$name => $precedence, )*
-                }
-            }
-        }
-
-        impl From<SymboolKind> for Option<$enum_name> {
-            fn from(k: SymboolKind) -> Self {
-                $enum_name::from_symbool(k)
-            }
-        }
-    }
-}
 
 define_symbols!(
     /// Type wrapper symbols that modify how types are referenced or stored.
@@ -242,7 +32,10 @@ define_symbols!(
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum StackArrayKind {
     Number(u64),
-    Ident{ident: Ident, resolved: Option<NodeId>},
+    Ident {
+        ident: Ident,
+        resolved: Option<NodeId>,
+    },
 }
 
 define_str_enum!(
@@ -275,7 +68,7 @@ define_str_enum!(
         /// 64-bit character type
         Char64 => "char64",
 
-        /// empty type
+        /// empty type (also known as `void` in c like languages)
         None => "none",
         /// boolean (`true` or `false`) type
         Boolean => "bool",
@@ -312,8 +105,6 @@ define_str_enum!(
 
         /// undecided floating-point type
         UntypedFloat => "untypedFloat",
-        /// 8-bit floating-point type
-        Float8 => "f8",
         /// 16-bit floating-point type
         Float16 => "f16",
         /// 32-bit floating-point type

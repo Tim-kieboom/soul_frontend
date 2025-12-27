@@ -4,7 +4,7 @@ use crate::{
             ARROW_LEFT, COLON, CURLY_OPEN, DECREMENT, INCREMENT, ROUND_OPEN, SQUARE_CLOSE,
             SQUARE_OPEN, STAMENT_END_TOKENS, parser::Parser,
         },
-        tokenize::token_stream::{Number, TokenKind},
+        tokenize::token_stream::{Number, Token, TokenKind},
     },
     utils::try_result::{ToResult, TryError},
 };
@@ -392,13 +392,14 @@ impl<'a> Parser<'a> {
     }
 
     fn consume_expression_operator(&mut self, start_span: Span) -> SoulResult<ExpressionOperator> {
-        let get_invalid_error = || {
+        
+        fn get_invalid_error(token: &Token) -> SoulResult<ExpressionOperator> {
             Err(SoulError::new(
-                format!("'{}' is not a valid operator", self.token().kind.display()),
+                format!("'{}' is not a valid operator", token.kind.display()),
                 SoulErrorKind::InvalidOperator,
-                Some(self.token().span),
+                Some(token.span),
             ))
-        };
+        }
 
         match &self.token().kind {
             TokenKind::Symbool(sym) => {
@@ -415,10 +416,10 @@ impl<'a> Parser<'a> {
                     )));
                 }
 
-                get_invalid_error()
+                get_invalid_error(self.token())
             }
 
-            _ => get_invalid_error(),
+            _ => get_invalid_error(self.token()),
         }
     }
 

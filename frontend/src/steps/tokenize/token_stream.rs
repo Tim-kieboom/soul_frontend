@@ -187,12 +187,14 @@ impl Token {
 impl Number {
     /// Number display formatting with type annotation.
     pub fn display(&self) -> String {
+        const INT_STR: &str = InternalPrimitiveTypes::UntypedInt.as_str();
+        const UINT_STR: &str = InternalPrimitiveTypes::UntypedUint.as_str();
+        const FLOAT_STR: &str = InternalPrimitiveTypes::UntypedFloat.as_str();
+
         match self {
-            Number::Int(num) => format!("{num}: {}", InternalPrimitiveTypes::UntypedInt.as_str()),
-            Number::Uint(num) => format!("{num}: {}", InternalPrimitiveTypes::UntypedUint.as_str()),
-            Number::Float(num) => {
-                format!("{num}: {}", InternalPrimitiveTypes::UntypedFloat.as_str())
-            }
+            Number::Int(num) => format!("{num}: {INT_STR}"),
+            Number::Uint(num) => format!("{num}: {UINT_STR}"),
+            Number::Float(num) => format!("{num}: {FLOAT_STR}"),
         }
     }
 }

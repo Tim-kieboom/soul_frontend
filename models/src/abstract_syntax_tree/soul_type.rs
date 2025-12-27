@@ -8,10 +8,15 @@
 //! Helpers are provided for checking modifiers, type categories, and displaying types.
 use crate::{
     abstract_syntax_tree::{
-        expression::Expression, statment::Ident, syntax_display::{DisplayKind, SyntaxDisplay}
-    }, error::Span, sementic_models::scope::NodeId, soul_names::{
+        expression::Expression,
+        statment::Ident,
+        syntax_display::{DisplayKind, SyntaxDisplay},
+    },
+    error::Span,
+    sementic_models::scope::NodeId,
+    soul_names::{
         InternalComplexTypes, InternalPrimitiveTypes, StackArrayKind, TypeModifier, TypeWrapper,
-    }
+    },
 };
 
 /// Represents a type in the Soul language.
@@ -33,7 +38,10 @@ pub enum TypeKind {
     /// Represents the type of all types
     Type,
     /// stub type (used in parsing stage)
-    Stub{ident: Ident, resolved: Option<NodeId>},
+    Stub {
+        ident: Ident,
+        resolved: Option<NodeId>,
+    },
     /// Primitive types like int, bool, float
     InternalComplex(InternalComplexTypes),
     /// Primitive types like int, bool, float
@@ -57,7 +65,7 @@ pub enum TypeKind {
     /// Function type: (params) -> return
     Function(FunctionType),
     /// Generic type parameter
-    Generic{node_id: NodeId, kind: GenericKind},
+    Generic { node_id: NodeId, kind: GenericKind },
     /// Reference type: &T or &mut T
     Reference(ReferenceType),
     /// Pointer type: *T
@@ -118,39 +126,48 @@ pub struct ReferenceType {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct GenericDeclare {
     pub node_id: Option<NodeId>,
-    pub kind: GenericDeclareKind, 
+    pub kind: GenericDeclareKind,
     pub span: Span,
 }
 impl GenericDeclare {
-    
     pub fn new_lifetime(ident: Ident, span: Span) -> Self {
-        Self { 
+        Self {
             span,
-            node_id: None, 
+            node_id: None,
             kind: GenericDeclareKind::Lifetime(ident),
         }
     }
 
-    pub fn new_type(name: Ident, traits: Vec<SoulType>, default: Option<SoulType>, span: Span) -> Self {
+    pub fn new_type(
+        name: Ident,
+        traits: Vec<SoulType>,
+        default: Option<SoulType>,
+        span: Span,
+    ) -> Self {
         Self {
             span,
             node_id: None,
-            kind: GenericDeclareKind::Type{
-                name, 
-                traits, 
+            kind: GenericDeclareKind::Type {
+                name,
+                traits,
                 default,
             },
         }
     }
 
-    pub fn new_expression(name: Ident, for_type: Option<SoulType>, default: Option<Expression>, span: Span) -> Self {
-        Self { 
+    pub fn new_expression(
+        name: Ident,
+        for_type: Option<SoulType>,
+        default: Option<Expression>,
+        span: Span,
+    ) -> Self {
+        Self {
             span,
-            node_id: None, 
-            kind: GenericDeclareKind::Expression{
-                name, 
-                for_type, 
-                default
+            node_id: None,
+            kind: GenericDeclareKind::Expression {
+                name,
+                for_type,
+                default,
             },
         }
     }
@@ -210,8 +227,11 @@ impl SoulType {
     /// Creates a `Stub` type (parser unknown type).
     pub const fn new_stub(ident: Ident, span: Span) -> Self {
         Self::new(
-            None, 
-            TypeKind::Stub{ident, resolved: None}, 
+            None,
+            TypeKind::Stub {
+                ident,
+                resolved: None,
+            },
             span,
         )
     }
@@ -288,7 +308,9 @@ impl TypeKind {
                 let inner = a.of_type.display(kind);
                 match &a.size {
                     Some(StackArrayKind::Number(num)) => format!("[{}]{}", num, inner),
-                    Some(StackArrayKind::Ident{ident, resolved:_}) => format!("[{}]{}", ident.as_str(), inner),
+                    Some(StackArrayKind::Ident { ident, resolved: _ }) => {
+                        format!("[{}]{}", ident.as_str(), inner)
+                    }
                     None => format!("[{}]", inner),
                 }
             }
@@ -305,10 +327,15 @@ impl TypeKind {
                 format!("{{{}}}", elems.join(", "))
             }
             TypeKind::Function(f) => {
-                let params: Vec<String> = f.parameters.types.iter().map(|p| p.display(kind)).collect();
-                format!("fn({}) -> {}", params.join(", "), f.return_type.display(kind))
+                let params: Vec<String> =
+                    f.parameters.types.iter().map(|p| p.display(kind)).collect();
+                format!(
+                    "fn({}) -> {}",
+                    params.join(", "),
+                    f.return_type.display(kind)
+                )
             }
-            TypeKind::Generic{node_id, ..} => node_id.display(),
+            TypeKind::Generic { node_id, .. } => node_id.display(),
             TypeKind::Reference(r) => {
                 let ref_str = if r.mutable {
                     TypeWrapper::MutRef.as_str()
@@ -319,7 +346,7 @@ impl TypeKind {
             }
             TypeKind::Pointer(inner) => format!("*{}", inner.display(kind)),
             TypeKind::Optional(inner) => format!("{}?", inner.display(kind)),
-            TypeKind::Stub{ident, ..} => ident.as_str().to_string(),
+            TypeKind::Stub { ident, .. } => ident.as_str().to_string(),
             TypeKind::None => "none".to_string(),
             TypeKind::Primitive(internal_primitive_types) => {
                 internal_primitive_types.as_str().to_string()

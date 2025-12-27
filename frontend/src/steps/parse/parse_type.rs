@@ -269,7 +269,8 @@ impl<'a> Parser<'a> {
             };
 
             if !self.current_is(&COLON) {
-                return Err(TryError::IsNotValue(self.get_expect_error(&COLON))); // is probebly tuple
+                // is probebly tuple
+                return Err(TryError::IsNotValue(self.get_expect_error(&COLON)));
             }
 
             self.bump();

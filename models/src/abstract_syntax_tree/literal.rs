@@ -67,7 +67,9 @@ impl Literal {
             Literal::Bool(val) => format!("{}", val),
             Literal::Char(char) => format!("'{}'", char),
             Literal::Str(str) => format!("\"{}\"", str),
-            Literal::ProgramMemmory(name, ty) => format!("{}({})", name.as_str(), ty.type_to_string()),
+            Literal::ProgramMemmory(name, ty) => {
+                format!("{}({})", name.as_str(), ty.type_to_string())
+            }
         }
     }
 

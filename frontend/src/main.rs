@@ -16,9 +16,9 @@ use std::{
 
 fn main() -> io::Result<()> {
     const RELATIVE_PATH: &str = "main.soul";
-    const AST_TREE: &str = "F:/Code/Github/soul_frontend/frontend/AST_parsed.soulc";
-    const SEMENTIC_TREE: &str = "F:/Code/Github/soul_frontend/frontend/AST_name_resolved.soulc";
-    const MAIN_FILE: &str = "F:/Code/Github/soul_frontend/frontend/soul_src/main.soul";
+    const AST_TREE: &str = "D:/Code/Github/soul_frontend/frontend/AST_parsed.soulc";
+    const SEMENTIC_TREE: &str = "D:/Code/Github/soul_frontend/frontend/AST_name_resolved.soulc";
+    const MAIN_FILE: &str = "D:/Code/Github/soul_frontend/frontend/soul_src/main.soul";
 
     let source_file = get_source_file(MAIN_FILE)?;
 
