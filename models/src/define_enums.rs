@@ -30,7 +30,7 @@
 /// assert_eq!(Names::NAMES, &[Names::MyName, Names::BestLanguage]);
 /// assert_eq!(Names::VALUES, &["tim", "soul"]);
 ///
-/// const MY_NAME_STR: &str = Names::MyName.as_str(); // Const-time
+/// const MY_NAME_STR: &str = Names::MyName.as_str(); // const-time
 /// assert_eq!(MY_NAME_STR, "tim");
 ///
 /// let best_language = Names::from_str("soul"); // Runtime only
