@@ -1,17 +1,35 @@
-use models::abstract_syntax_tree::{
-    conditionals::IfCaseKind,
-    expression::{Expression, ExpressionKind},
-    expression_groups::ExpressionGroup,
-    function::LamdbaBodyKind,
+use models::{
+    abstract_syntax_tree::{
+        conditionals::{ForPattern, IfCaseKind},
+        expression::{Expression, ExpressionKind},
+        expression_groups::ExpressionGroup,
+        function::LamdbaBodyKind,
+    },
+    error::{SoulError, SoulErrorKind},
 };
 
-use crate::steps::sementic_analyser::type_resolution::type_resolver::TypeResolver;
+use crate::steps::sementic_analyser::name_resolution::name_resolver::NameResolver;
 
-impl<'a> TypeResolver<'a> {
+impl<'a> NameResolver<'a> {
     pub(super) fn resolve_expression(&mut self, expression: &mut Expression) {
         match &mut expression.node {
-            ExpressionKind::Variable { .. } => (),
+            ExpressionKind::Variable { ident, resolved } => {
+                self.resolve_variable(ident, resolved, expression.span)
+            }
             ExpressionKind::FunctionCall(function_call) => {
+                function_call.candidates = self.lookup_function_candidates(&function_call.name);
+
+                if function_call.candidates.is_empty() {
+                    self.log_error(SoulError::new(
+                        format!(
+                            "function '{}' is undefined in scope",
+                            function_call.name.as_str()
+                        ),
+                        SoulErrorKind::ScopeError,
+                        Some(expression.span),
+                    ))
+                }
+
                 for argument in &mut function_call.arguments.values {
                     self.resolve_expression(argument);
                 }
@@ -23,6 +41,16 @@ impl<'a> TypeResolver<'a> {
             }
             ExpressionKind::Unary(unary) => self.resolve_expression(&mut unary.expression),
             ExpressionKind::ReturnLike(return_like) => {
+                if self.current_function.is_none() {
+                    let keyword_str = return_like.kind.as_keyword().as_str();
+
+                    self.log_error(SoulError::new(
+                        format!("{keyword_str} can not be called while outside of function"),
+                        SoulErrorKind::ScopeError,
+                        Some(expression.span),
+                    ));
+                }
+
                 if let Some(value) = &mut return_like.value {
                     self.resolve_expression(value);
                 }
@@ -56,6 +84,9 @@ impl<'a> TypeResolver<'a> {
             ExpressionKind::For(r#for) => {
                 self.resolve_expression(&mut r#for.collection);
                 self.resolve_block(&mut r#for.block);
+                if let Some(el) = &mut r#for.element {
+                    self.resolve_for_pattern(el);
+                }
             }
             ExpressionKind::While(r#while) => {
                 if let Some(value) = &mut r#while.condition {
@@ -70,13 +101,21 @@ impl<'a> TypeResolver<'a> {
                         IfCaseKind::WildCard(_) => (),
                         IfCaseKind::Expression(spanned) => self.resolve_expression(spanned),
                         IfCaseKind::Variant { params, .. } => {
-                            for value in &mut params.values {
-                                self.resolve_expression(value);
+                            for value in params {
+                                self.resolve_variable(
+                                    &value.name,
+                                    &mut value.node_id,
+                                    expression.span,
+                                );
                             }
                         }
                         IfCaseKind::NamedVariant { params, .. } => {
-                            for (_name, value) in &mut params.values {
-                                self.resolve_expression(value);
+                            for (_name, value) in params {
+                                self.resolve_variable(
+                                    &value.name,
+                                    &mut value.node_id,
+                                    expression.span,
+                                );
                             }
                         }
                         IfCaseKind::Bind { condition, .. } => self.resolve_expression(condition),
@@ -124,6 +163,26 @@ impl<'a> TypeResolver<'a> {
             | ExpressionKind::Literal(_)
             | ExpressionKind::StaticFieldAccess(_)
             | ExpressionKind::ExternalExpression(_) => (),
+        }
+    }
+
+    fn resolve_for_pattern(&mut self, forpattern: &mut ForPattern) {
+        match forpattern {
+            ForPattern::Ident {
+                ident,
+                resolved,
+                span,
+            } => self.resolve_variable(ident, resolved, *span),
+            ForPattern::Tuple(items) => {
+                for value in items {
+                    self.resolve_for_pattern(value);
+                }
+            }
+            ForPattern::NamedTuple(items) => {
+                for (_name, value) in items {
+                    self.resolve_for_pattern(value);
+                }
+            }
         }
     }
 }

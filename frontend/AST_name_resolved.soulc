@@ -13,26 +13,26 @@
 ├── "|15|"Function >> sum<N: 2 = int"|16|">("|17|"a: 16, "|18|"b: 16): 16
 │   └── Expression >> return "|10|"a + "|11|"b
 │   │   
-├── "|19|"Function >> func("|20|"foo: 23): none
-├── "|23|"Struct >> Foo
-│   ├── "|21|"Field >> field: const int 
-│   └── "|22|"Field >> foo: const int  = field
+├── "|19|"Function >> func("|20|"foo: 21): none
+├── "|21|"Struct >> Foo
+│   ├── "|22|"Field >> field: const int 
+│   └── "|23|"Field >> foo: const int  = "|22|"field
 │   │   
-├── "|26|"Class >> Bar
-│   ├── "|24|"Field >> field: const int 
-│   └── "|25|"Methode >> 26 print(@this, ): none
-│   │   │   └── Expression >> "|6,|"Println("Bar{field: " + "|3,|"str("|21|"field) + "}")
+├── "|24|"Class >> Bar
+│   ├── "|25|"Field >> field: const int 
+│   └── "|26|"Methode >> 24 print(@this, ): none
+│   │   │   └── Expression >> "|6,|"Println("Bar{field: " + "|3,|"str("|22|"field) + "}")
 │   │   │   │   
 └── "|27|"Function >> main(): none
 │   ├── "|28|"Variable >> val: none = 1
 │   ├── "|29|"Variable >> val: none = 2
-│   ├── Assignment >> "|29|"val = 0
-│   ├── Assignment >> "|29|"val = "|9,12,15,|"sum(1, 2)
+│   ├── Assignment >> "|32|"val = 0
+│   ├── Assignment >> "|32|"val = "|9,12,15,|"sum(1, 2)
 │   ├── "|30|"Variable >> obj: none = Foo{field: 1, ..}
 │   ├── Block >> 
 │   │   │   └── "|31|"Variable >> bo: none = 1
 │   │   │   │   
-│   └── Expression >> if "|29|"val == 1
+│   └── Expression >> if "|32|"val == 1
 │   │   ├── "|32|"Variable >> val: none = 1
 │   │   └── Assignment >> "|32|"val = 2
 │   │   │   

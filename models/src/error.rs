@@ -6,6 +6,8 @@ pub type SoulResult<T> = std::result::Result<T, SoulError>;
 /// The kind of error that occurred during parsing or compilation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum SoulErrorKind {
+    InternalError,
+
     SourceReadError,
     ScopeError,
     ScopeOverride(Span),
@@ -14,6 +16,7 @@ pub enum SoulErrorKind {
     UnexpecedFileEnd,
     UnexpecedStatmentStart,
 
+    InvalidTypeKind,
     InvalidAssignType,
     InvalidContext,
     InvalidChar,

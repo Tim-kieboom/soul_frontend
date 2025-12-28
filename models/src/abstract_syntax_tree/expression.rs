@@ -337,8 +337,8 @@ impl SyntaxDisplay for ExpressionKind {
                             sb.push_str(&prefix);
                             sb.push_str(name.as_str());
                             sb.push('(');
-                            for value in &params.values {
-                                value.node.inner_display(sb, kind, tab, is_last);
+                            for value in params {
+                                sb.push_str(value.name.as_str());
                                 sb.push_str(", ");
                             }
                             sb.push(')');
@@ -349,19 +349,19 @@ impl SyntaxDisplay for ExpressionKind {
                             sb.push_str(&prefix);
                             sb.push_str(name.as_str());
                             sb.push('{');
-                            for (name, value) in &params.values {
+                            for (name, value) in params {
                                 sb.push_str(name.as_str());
                                 sb.push_str(": ");
-                                value.node.inner_display(sb, kind, tab, is_last);
+                                sb.push_str(value.name.as_str());
                                 sb.push_str(", ");
                             }
                             sb.push('}');
                             sb.push_str(" => ");
                         }
-                        IfCaseKind::Bind { name, condition } => {
+                        IfCaseKind::Bind { condition, variable } => {
                             sb.push('\n');
                             sb.push_str(&prefix);
-                            sb.push_str(name.as_str());
+                            sb.push_str(variable.name.as_str());
                             sb.push(' ');
                             sb.push_str(KeyWord::If.as_str());
                             sb.push(' ');

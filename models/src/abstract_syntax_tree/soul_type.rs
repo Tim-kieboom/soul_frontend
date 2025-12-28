@@ -56,7 +56,8 @@ pub enum TypeKind {
     Enum(NodeId),
     /// A union type
     Union(NodeId),
-    /// Array type: [T; N] or dynamic
+    UnionVariant{parent: NodeId, this: NodeId},
+    /// Array type: [N]T or dynamic []T
     Array(ArrayType),
     /// Tuple type: (T1, T2, ...)
     Tuple(TupleType),
@@ -70,7 +71,7 @@ pub enum TypeKind {
     Reference(ReferenceType),
     /// Pointer type: *T
     Pointer(Box<SoulType>),
-    /// Optional type: T?
+    /// Optional type: ?T
     Optional(Box<SoulType>),
 }
 
@@ -224,6 +225,15 @@ impl SoulType {
         }
     }
 
+    pub const fn new_literal_prim(prim: InternalPrimitiveTypes, span: Span) -> Self {
+        Self {
+            span,
+            generics: vec![],
+            kind: TypeKind::Primitive(prim),
+            modifier: Some(TypeModifier::Literal),
+        }
+    }
+
     /// Creates a `Stub` type (parser unknown type).
     pub const fn new_stub(ident: Ident, span: Span) -> Self {
         Self::new(
@@ -244,6 +254,28 @@ impl SoulType {
             modifier: None,
             generics: vec![],
         }
+    }
+
+    pub fn is_compatible(&self, other: &Self) -> bool {
+        if self.kind != other.kind || self.modifier != other.modifier {
+            return false;
+        }
+
+        if self.generics.len() != other.generics.len() {
+            return false;
+        }
+
+        for (a, b) in self.generics.iter().zip(other.generics.iter()) {
+            
+            match (a, b) {
+                (GenericDefine::Type(a_ty), GenericDefine::Type(b_ty)) => if !a_ty.is_compatible(b_ty) {return false},
+                (GenericDefine::Lifetime(a_life), GenericDefine::Lifetime(b_life)) => if a_life.as_str() != b_life.as_str() {return false},
+                (GenericDefine::Expression(a_expr), GenericDefine::Expression(b_expr)) => if a_expr.node != b_expr.node {return false},
+                _ => return false,
+            }
+        }
+
+        todo!()
     }
 
     /// Returns whether this type is optional (`T?`).
@@ -271,7 +303,7 @@ impl SoulType {
     }
     /// Returns whether this type is a primitive type.
     pub fn is_primitive(&self) -> bool {
-        matches!(self.kind, TypeKind::InternalComplex(_))
+        matches!(self.kind, TypeKind::Primitive(_))
     }
 }
 
@@ -293,11 +325,36 @@ impl SyntaxDisplay for SoulType {
 }
 
 impl TypeKind {
+    pub const fn display_variant(&self) -> &'static str {
+        match self {
+            TypeKind::None => "None",
+            TypeKind::Type => "Type",
+            TypeKind::Stub { .. } => "Stub",
+            TypeKind::InternalComplex(internal_complex_types) => internal_complex_types.as_str(),
+            TypeKind::Primitive(internal_primitive_types) => internal_primitive_types.as_str(),
+            TypeKind::Struct(_) => "struct",
+            TypeKind::Class(_) => "class",
+            TypeKind::Trait(_) => "trait",
+            TypeKind::Enum(_) => "enum",
+            TypeKind::Union(_) => "union",
+            TypeKind::UnionVariant { .. } => "unionVariant",
+            TypeKind::Array(_) => "array",
+            TypeKind::Tuple(_) => "tuple",
+            TypeKind::NamedTuple(_) => "namedTuple",
+            TypeKind::Function(_) => "function",
+            TypeKind::Generic { .. } => "generic",
+            TypeKind::Reference(_) => "reference",
+            TypeKind::Pointer(_) => "pointer",
+            TypeKind::Optional(_) => "optional",
+        }
+    }
+
     /// Returns a string representation of the type kind
     pub fn display(&self) -> String {
         let kind = DisplayKind::Parser;
         match self {
             TypeKind::Type => "Type".to_string(),
+            TypeKind::UnionVariant { parent, this } => format!("{}.{}", parent.display(), this.display()),
             TypeKind::InternalComplex(p) => p.as_str().to_string(),
             TypeKind::Struct(id) => id.display(),
             TypeKind::Class(id) => id.display(),

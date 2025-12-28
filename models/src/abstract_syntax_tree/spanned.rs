@@ -1,7 +1,9 @@
+use std::hash::Hash;
+
 use crate::{abstract_syntax_tree::statment::Ident, error::Span};
 
 /// An attribute identifier
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Attribute {
     pub name: Ident,
     pub values: Vec<Ident>,
@@ -19,6 +21,11 @@ pub struct Spanned<T> {
     pub span: Span,
     /// Additional attributes associated with this node.
     pub attributes: Vec<Attribute>,
+}
+impl<T: Hash> Hash for Spanned<T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.node.hash(state);
+    }
 }
 impl<T> Spanned<T> {
     pub fn new(inner: T, span: Span) -> Self {

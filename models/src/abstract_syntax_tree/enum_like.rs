@@ -5,7 +5,7 @@ use crate::{
         spanned::Spanned,
         statment::Ident,
     },
-    sementic_models::scope::NodeId,
+    sementic_models::scope::{NodeId, ScopeId},
 };
 use std::collections::BTreeMap;
 
@@ -29,6 +29,7 @@ pub struct Union {
     /// The union variants.
     pub variants: Vec<Spanned<UnionVariant>>,
     pub node_id: Option<NodeId>,
+    pub scope_id: Option<ScopeId>,
 }
 
 /// A variant of a union type.
@@ -38,6 +39,7 @@ pub struct UnionVariant {
     pub name: Ident,
     /// The kind of data this variant holds.
     pub field: UnionVariantKind,
+    pub node_id: Option<NodeId>,
 }
 
 /// The kind of data a union variant can hold.

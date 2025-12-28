@@ -1,20 +1,26 @@
-use models::{abstract_syntax_tree::AbstractSyntaxTree, sementic_models::scope::ScopeBuilder};
+use models::{
+    abstract_syntax_tree::{
+        AbstractSyntaxTree,
+    },
+    sementic_models::scope::ScopeBuilder,
+};
+use crate::{SementicFault, steps::sementic_analyser::trait_impl_store::TraitImplStore};
 
-use crate::SementicFault;
-
-pub mod name_resolution;
 pub mod sementic_fault;
-pub mod type_resolution;
+pub mod name_resolution;
+pub mod trait_impl_store;
 
-pub(crate) struct SementicInfo {
+pub(crate) struct SemanticInfo {
     scopes: ScopeBuilder,
     faults: Vec<SementicFault>,
+    trait_impls: TraitImplStore,
 }
-impl SementicInfo {
+impl SemanticInfo {
     pub fn new() -> Self {
         Self {
             scopes: ScopeBuilder::new(),
             faults: vec![],
+            trait_impls: TraitImplStore::new(),
         }
     }
 
@@ -24,6 +30,6 @@ impl SementicInfo {
 }
 
 pub(crate) trait SementicPass<'a> {
-    fn new(info: &'a mut SementicInfo) -> Self;
+    fn new(info: &'a mut SemanticInfo) -> Self;
     fn run(&mut self, ast: &mut AbstractSyntaxTree);
 }

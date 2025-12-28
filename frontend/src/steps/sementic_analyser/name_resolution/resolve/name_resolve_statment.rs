@@ -1,44 +1,37 @@
 use models::{
     abstract_syntax_tree::{
         block::Block,
+        enum_like::EnumVariantsKind,
         function::Function,
         objects::ClassMember,
-        soul_type::GenericDeclare,
         spanned::Spanned,
         statment::{Ident, Statement, StatementKind, UseBlock},
     },
     error::{SoulError, SoulErrorKind, Span},
-    sementic_models::scope::{NodeId, ScopeTypeKind, ScopeValueKind},
+    sementic_models::scope::NodeId,
 };
 
 use crate::steps::sementic_analyser::name_resolution::name_resolver::NameResolver;
 
 impl<'a> NameResolver<'a> {
-    pub(super) fn resolve_scopeless_block(&mut self, block: &mut Block) {
-        for statment in &mut block.statments {
-            self.resolve_statement(statment);
-        }
-    }
-
     pub(super) fn resolve_block(&mut self, block: &mut Block) {
-        self.push_scope(&mut block.scope_id);
+        self.try_go_to(block.scope_id);
 
         for statment in &mut block.statments {
             self.resolve_statement(statment);
         }
-
-        self.pop_scope();
     }
 
-    fn resolve_impl_block(&mut self, _block: &mut UseBlock) {
-        todo!()
+    fn resolve_impl_block(&mut self, use_block: &mut UseBlock) {
+        if let Some(impl_trait) = &mut use_block.impl_trait {
+            self.insert_trait_impl(impl_trait.clone(), use_block.ty.clone());
+        }
+        self.resolve_block(&mut use_block.block);
     }
 
     fn resolve_statement(&mut self, statment: &mut Statement) {
         match &mut statment.node {
             StatementKind::Variable(variable) => {
-                let _id = self.declare_value(ScopeValueKind::Variable(variable));
-
                 if let Some(value) = &mut variable.initialize_value {
                     self.resolve_expression(value);
                 }
@@ -50,66 +43,57 @@ impl<'a> NameResolver<'a> {
             StatementKind::Function(function) => {
                 self.resolves_function(function);
             }
-            StatementKind::Enum(obj) => self.declare_type(ScopeTypeKind::Enum(obj), statment.span),
-            StatementKind::Trait(obj) => {
-                self.push_scope(&mut obj.scope_id);
-                self.resolve_generic_declares(&mut obj.signature.generics);
-                self.declare_type(ScopeTypeKind::Trait(obj), statment.span);
-                self.pop_scope();
+            StatementKind::Enum(obj) => {
+                for variant in &mut obj.variants {
+                    match &mut variant.value {
+                        EnumVariantsKind::Int(_) => (),
+                        EnumVariantsKind::Expression(expression) => {
+                            self.resolve_expression(expression)
+                        }
+                    }
+                }
             }
             StatementKind::Class(obj) => {
-                self.push_scope(&mut obj.scope_id);
-                self.resolve_generic_declares(&mut obj.generics);
+                self.try_go_to(obj.scope_id);
                 for Spanned { node: member, .. } in &mut obj.members {
                     match member {
                         ClassMember::Field(field) => {
-                            _ = self.declare_value(ScopeValueKind::Field(field))
+                            if let Some(expression) = &mut field.default_value {
+                                self.resolve_expression(expression);
+                            }
                         }
                         ClassMember::Method(function) => self.resolves_function(function),
                         ClassMember::ImplBlock(use_block) => self.resolve_impl_block(use_block),
                     };
                 }
-
-                self.declare_type(ScopeTypeKind::Class(obj), statment.span);
-                self.pop_scope();
-            }
-            StatementKind::Union(obj) => {
-                self.resolve_generic_declares(&mut obj.generics);
-                self.declare_type(ScopeTypeKind::Union(obj), statment.span);
             }
             StatementKind::Struct(obj) => {
-                self.push_scope(&mut obj.scope_id);
-                self.resolve_generic_declares(&mut obj.generics);
+                self.try_go_to(obj.scope_id);
                 for Spanned { node: field, .. } in &mut obj.fields {
-                    self.declare_value(ScopeValueKind::Field(field));
+                    if let Some(expression) = &mut field.default_value {
+                        self.resolve_expression(expression);
+                    }
                 }
-
-                self.declare_type(ScopeTypeKind::Struct(obj), statment.span);
-                self.pop_scope();
             }
 
             StatementKind::Expression(value) => self.resolve_expression(value),
             StatementKind::UseBlock(use_block) => self.resolve_block(&mut use_block.block),
 
             StatementKind::Import(_) => (), // maybe later track imports
-            StatementKind::EndFile | StatementKind::CloseBlock => (),
+
+            StatementKind::Trait(_)
+            | StatementKind::EndFile
+            | StatementKind::Union(_)
+            | StatementKind::CloseBlock => (),
         }
     }
 
     fn resolves_function(&mut self, function: &mut Function) {
-        let id = self.declare_value(ScopeValueKind::Function(function));
-        let signature = &mut function.signature;
-
         let prev = self.current_function;
-        self.current_function = Some(id);
+        self.current_function = function.node_id;
 
-        self.push_scope(&mut function.block.scope_id);
-        self.resolve_generic_declares(&mut signature.node.generics);
-
-        self.declare_parameters(&mut signature.node.parameters);
-        self.resolve_scopeless_block(&mut function.block);
-
-        self.pop_scope();
+        self.try_go_to(function.block.scope_id);
+        self.resolve_block(&mut function.block);
         self.current_function = prev;
     }
 
@@ -126,13 +110,6 @@ impl<'a> NameResolver<'a> {
                 SoulErrorKind::ScopeError,
                 Some(span),
             )),
-        }
-    }
-
-    fn resolve_generic_declares(&mut self, generics: &mut Vec<GenericDeclare>) {
-        for generic in generics {
-            let span = generic.span;
-            self.declare_type(ScopeTypeKind::GenricDeclare(generic), span);
         }
     }
 }

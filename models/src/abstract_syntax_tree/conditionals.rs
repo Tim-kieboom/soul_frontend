@@ -2,14 +2,14 @@ use crate::{
     abstract_syntax_tree::{
         block::Block,
         expression::{BoxExpression, Expression, ExpressionKind},
-        expression_groups::{ExpressionGroup, NamedTuple, Tuple},
+        expression_groups::ExpressionGroup,
         soul_type::SoulType,
         spanned::Spanned,
         statment::{Ident, Variable},
         syntax_display::{DisplayKind, SyntaxDisplay},
     },
     error::{SoulError, SoulErrorKind, SoulResult, Span},
-    sementic_models::scope::NodeId,
+    sementic_models::scope::{NodeId, ScopeId},
 };
 use itertools::Itertools;
 
@@ -60,7 +60,7 @@ pub struct CaseSwitch {
     pub if_kind: IfCaseKind,
     /// The expression or block to execute if the pattern matches.
     pub do_fn: CaseDoKind,
-    pub scope_id: usize,
+    pub scope_id: Option<ScopeId>,
 }
 
 /// The kind of pattern in a match case.
@@ -71,11 +71,11 @@ pub enum IfCaseKind {
     /// Match against a specific expression value.
     Expression(Expression),
     /// Match against a variant with tuple parameters.
-    Variant { name: Ident, params: Tuple },
+    Variant { name: Ident, params: Vec<Variable> },
     /// Match against a variant with named tuple parameters.
-    NamedVariant { name: Ident, params: NamedTuple },
+    NamedVariant { name: Ident, params: Vec<(Ident, Variable)> },
     /// Bind a value to a name, optionally with a condition.
-    Bind { name: Ident, condition: Expression },
+    Bind { variable: Variable, condition: Expression },
 }
 
 /// A pattern used in `for` loops to destructure elements.

@@ -2,8 +2,7 @@ pub use crate::steps::sementic_analyser::sementic_fault::{SementicFault, Sementi
 use crate::steps::{
     parse::{self, parser::parse},
     sementic_analyser::{
-        SementicInfo, SementicPass, name_resolution::name_resolver::NameResolver,
-        type_resolution::type_resolver::TypeResolver,
+        SemanticInfo, SementicPass, name_resolution::name_resolver::NameResolver,
     },
     tokenize::{self, tokenizer::tokenize},
 };
@@ -56,8 +55,7 @@ pub fn parse_file(source_file: &str) -> io::Result<ParseResonse> {
 }
 
 pub fn sementic_analyse(syntax_tree: &mut AbstractSyntaxTree) -> Vec<SementicFault> {
-    let mut info = SementicInfo::new();
+    let mut info = SemanticInfo::new();
     NameResolver::new(&mut info).run(syntax_tree);
-    TypeResolver::new(&mut info).run(syntax_tree);
     info.consume_faults()
 }

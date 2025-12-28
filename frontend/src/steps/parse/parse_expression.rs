@@ -392,7 +392,6 @@ impl<'a> Parser<'a> {
     }
 
     fn consume_expression_operator(&mut self, start_span: Span) -> SoulResult<ExpressionOperator> {
-        
         fn get_invalid_error(token: &Token) -> SoulResult<ExpressionOperator> {
             Err(SoulError::new(
                 format!("'{}' is not a valid operator", token.kind.display()),

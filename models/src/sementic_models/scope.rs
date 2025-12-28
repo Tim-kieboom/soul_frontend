@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     abstract_syntax_tree::{
-        enum_like::{Enum, Union},
+        enum_like::{Enum, Union, UnionVariant},
         function::Function,
         objects::{Class, Field, Struct, Trait},
         soul_type::{GenericDeclare, GenericDeclareKind},
@@ -12,10 +12,24 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct NodeId(u32);
+pub struct NodeId(u32, NodeTag);
 impl NodeId {
     pub fn display(&self) -> String {
         format!("{}", self.0)
+    }
+
+    pub fn tag(&self) -> NodeTag {
+        self.1
+    }
+}
+impl Ord for NodeId{
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.cmp(&other.0)
+    }
+}
+impl PartialOrd for NodeId {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.0.partial_cmp(&other.0)
     }
 }
 
@@ -27,10 +41,41 @@ impl NodeIdGenerator {
         Self { next: 0 }
     }
 
-    pub fn new_id(&mut self) -> NodeId {
+    pub fn new_id(&mut self, tag: NodeTag) -> NodeId {
         let id = self.next;
         self.next += 1;
-        NodeId(id)
+        NodeId(id, tag)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum NodeTag {
+    Enum,
+    Field,
+    Class,
+    Trait,
+    Union,
+    Struct,
+    Variable,
+    Function,
+    UnionVariant,
+    GenricDeclare,
+}
+impl NodeTag {
+    pub fn is_traitable_type(&self) -> bool {
+        match self {
+            NodeTag::Enum 
+            | NodeTag::Class 
+            | NodeTag::Trait 
+            | NodeTag::Union 
+            | NodeTag::Struct => true,
+            
+            NodeTag::Field 
+            | NodeTag::Variable
+            | NodeTag::Function
+            | NodeTag::UnionVariant
+            | NodeTag::GenricDeclare => false,
+        }
     }
 }
 
@@ -149,6 +194,7 @@ pub enum ScopeValueEntryKind {
 pub struct ScopeTypeEntry {
     pub span: Span,
     pub node_id: NodeId,
+    pub trait_parent: Option<NodeId>,
     pub kind: ScopeTypeEntryKind,
 }
 
@@ -161,6 +207,7 @@ pub enum ScopeTypeEntryKind {
     Struct,
     LifeTime,
     GenericType,
+    UnionVariant,
     GenericExpression,
 }
 
@@ -193,6 +240,14 @@ impl<'a> ScopeValueKind<'a> {
             ScopeValueKind::Function(_) => ScopeValueEntryKind::Function,
         }
     }
+
+    pub fn to_node_tag(&self) -> NodeTag {
+        match self {
+            ScopeValueKind::Field(_) => NodeTag::Field,
+            ScopeValueKind::Variable(_) => NodeTag::Variable,
+            ScopeValueKind::Function(_) => NodeTag::Function,
+        }
+    }
 }
 
 pub enum ScopeTypeKind<'a> {
@@ -201,17 +256,32 @@ pub enum ScopeTypeKind<'a> {
     Trait(&'a mut Trait),
     Enum(&'a mut Enum),
     Union(&'a mut Union),
+    UnionVariant{ty: &'a mut UnionVariant, trait_id: NodeId},
     GenricDeclare(&'a mut GenericDeclare),
 }
 impl<'a> ScopeTypeKind<'a> {
     pub fn get_id_mut(&mut self) -> &mut Option<NodeId> {
         match self {
             ScopeTypeKind::GenricDeclare(ty) => &mut ty.node_id,
+            ScopeTypeKind::UnionVariant{ty, ..} => &mut ty.node_id,
             ScopeTypeKind::Struct(ty) => &mut ty.node_id,
             ScopeTypeKind::Class(ty) => &mut ty.node_id,
             ScopeTypeKind::Trait(ty) => &mut ty.node_id,
             ScopeTypeKind::Enum(ty) => &mut ty.node_id,
             ScopeTypeKind::Union(ty) => &mut ty.node_id,
+        }
+    }
+
+    pub fn get_parent_id_mut(&mut self) -> Option<&mut Option<NodeId>> {
+        match self {
+            ScopeTypeKind::UnionVariant{ty, ..} => Some(&mut ty.node_id),
+            
+            ScopeTypeKind::GenricDeclare(_) 
+            | ScopeTypeKind::Trait(_) 
+            | ScopeTypeKind::Struct(_) 
+            | ScopeTypeKind::Class(_) 
+            | ScopeTypeKind::Union(_) 
+            | ScopeTypeKind::Enum(_) => None,
         }
     }
 
@@ -222,6 +292,7 @@ impl<'a> ScopeTypeKind<'a> {
                 GenericDeclareKind::Lifetime(ident) => &ident,
                 GenericDeclareKind::Expression { name, .. } => &name,
             },
+            ScopeTypeKind::UnionVariant{ty, ..} => &ty.name,
             ScopeTypeKind::Struct(ty) => &ty.name,
             ScopeTypeKind::Class(ty) => &ty.name,
             ScopeTypeKind::Trait(ty) => &ty.signature.name,
@@ -237,11 +308,24 @@ impl<'a> ScopeTypeKind<'a> {
                 GenericDeclareKind::Lifetime(_) => ScopeTypeEntryKind::LifeTime,
                 GenericDeclareKind::Expression { .. } => ScopeTypeEntryKind::GenericExpression,
             },
+            ScopeTypeKind::UnionVariant{..} => ScopeTypeEntryKind::UnionVariant,
             ScopeTypeKind::Struct(_) => ScopeTypeEntryKind::Struct,
             ScopeTypeKind::Class(_) => ScopeTypeEntryKind::Class,
             ScopeTypeKind::Trait(_) => ScopeTypeEntryKind::Trait,
             ScopeTypeKind::Union(_) => ScopeTypeEntryKind::Union,
             ScopeTypeKind::Enum(_) => ScopeTypeEntryKind::Enum,
+        }
+    }
+
+    pub fn to_node_tag(&self) -> NodeTag {
+        match self {
+            ScopeTypeKind::Enum(_) => NodeTag::Enum,
+            ScopeTypeKind::Trait(_) => NodeTag::Trait,
+            ScopeTypeKind::Class(_) => NodeTag::Class,
+            ScopeTypeKind::Union(_) => NodeTag::Union,
+            ScopeTypeKind::Struct(_) => NodeTag::Struct,
+            ScopeTypeKind::UnionVariant{..} => NodeTag::UnionVariant,
+            ScopeTypeKind::GenricDeclare(_) => NodeTag::GenricDeclare,
         }
     }
 }

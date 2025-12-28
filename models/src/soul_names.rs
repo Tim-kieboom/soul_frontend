@@ -29,7 +29,7 @@ define_symbols!(
     }
 );
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum StackArrayKind {
     Number(u64),
     Ident {
@@ -42,6 +42,7 @@ define_str_enum!(
     /// Type modifiers that affect how values can be used or stored.
     ///
     /// These keywords modify the mutability and compile-time behavior of types.
+    #[derive(Hash)]
     pub enum TypeModifier {
         /// Compile-time constant modifier (`literal`).
         Literal => "literal",
@@ -56,6 +57,7 @@ define_str_enum!(
     /// Internal primitive types available in the Soul language.
     ///
     /// These are the built-in numeric, character, and boolean types.
+    #[derive(Hash)]
     pub enum InternalPrimitiveTypes {
         /// default-size character type
         Char => "char",
@@ -118,6 +120,7 @@ define_str_enum!(
     /// Internal complex types available in the Soul language.
     ///
     /// These are built-in complex types like strings and ranges.
+    #[derive(Hash)]
     pub enum InternalComplexTypes {
         /// Text/string type (`str`).
         String => "str",
