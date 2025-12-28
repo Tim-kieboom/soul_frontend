@@ -1,12 +1,10 @@
 extern crate frontend;
-use crate::frontend::utils::convert_error_message::ToMessage;
-use frontend::{ParseResonse, SementicLevel, parse_file, sementic_analyse};
-use models::{
+use frontend::{SementicFault, SementicLevel, parse_file, utils::{char_colors::sementic_level_color, convert_error_message::ToMessage}};
+use soul_ast::{
     abstract_syntax_tree::{
         AbstractSyntaxTree,
         syntax_display::{DisplayKind, SyntaxDisplay},
     },
-    error::SoulError,
 };
 use std::{
     fs::File,
@@ -15,17 +13,15 @@ use std::{
 };
 
 fn main() -> io::Result<()> {
+    const FATAL_LEVEL: SementicLevel = SementicLevel::Error;
+
     const RELATIVE_PATH: &str = "main.soul";
     const AST_TREE: &str = "D:/Code/Github/soul_frontend/frontend/AST_parsed.soulc";
     const SEMENTIC_TREE: &str = "D:/Code/Github/soul_frontend/frontend/AST_name_resolved.soulc";
     const MAIN_FILE: &str = "D:/Code/Github/soul_frontend/frontend/soul_src/main.soul";
 
     let source_file = get_source_file(MAIN_FILE)?;
-
-    let ParseResonse {
-        mut syntax_tree,
-        errors,
-    } = match parse_file(&source_file) {
+    let reponse = match parse_file(&source_file) {
         Ok(val) => val,
         Err(err) => {
             eprintln!("{err}");
@@ -33,52 +29,22 @@ fn main() -> io::Result<()> {
         }
     };
 
-    if !errors.is_empty() {
-        report_parse_fail(errors, RELATIVE_PATH, &source_file);
-        return Err(fail_err());
+    let fatal_count = reponse.get_fatal_count(FATAL_LEVEL);
+    for fault in &reponse.sementic_info.faults {
+        print_fault(fault, &source_file, RELATIVE_PATH);
     }
 
-    print_syntax_tree(&syntax_tree, AST_TREE, DisplayKind::Parser)?;
-
-    let mut error_count = 0;
-    let faults = sementic_analyse(&mut syntax_tree);
-    for fault in faults {
-        let level = fault.get_level();
-        if level == SementicLevel::Error {
-            error_count += 1;
-        }
-        eprintln!(
-            "{}\n",
-            fault.consume_soul_error().to_message(
-                SementicLevel::Error,
-                RELATIVE_PATH,
-                &source_file
-            )
-        );
+    if fatal_count > 0 {
+        report_final_fail(fatal_count);
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "compilation failed read io::stderr to learn more",
+        ));
     }
 
-    if error_count > 0 {
-        report_final_fail(error_count);
-        return Err(fail_err());
-    }
-
-    print_syntax_tree(&syntax_tree, SEMENTIC_TREE, DisplayKind::NameResolver)?;
+    print_syntax_tree(&reponse.syntax_tree, AST_TREE, DisplayKind::Parser)?;
+    print_syntax_tree(&reponse.syntax_tree, SEMENTIC_TREE, DisplayKind::NameResolver)?;
     Ok(())
-}
-
-fn report_parse_fail(errors: Vec<SoulError>, relative_path: &str, source_file: &str) {
-    use frontend::utils::char_colors::*;
-    let error_len = errors.len();
-    for error in errors {
-        eprintln!(
-            "{}\n",
-            error.to_message(SementicLevel::Error, relative_path, source_file)
-        );
-    }
-    eprintln!(
-        "{RED}code failed:{DEFAULT} code could not parse because of {BLUE}{error_len}{DEFAULT} {}",
-        if error_len == 1 { "error" } else { "errors" }
-    );
 }
 
 fn report_final_fail(error_len: usize) {
@@ -87,13 +53,6 @@ fn report_final_fail(error_len: usize) {
         "{RED}code failed:{DEFAULT} code could not compile because of {BLUE}{error_len}{DEFAULT} {}",
         if error_len == 1 { "error" } else { "errors" }
     );
-}
-
-fn fail_err() -> io::Error {
-    io::Error::new(
-        io::ErrorKind::InvalidData,
-        "compilation failed read io::stderr to learn more",
-    )
 }
 
 fn print_syntax_tree(
@@ -117,3 +76,19 @@ fn get_source_file(path: &str) -> io::Result<String> {
 
     Ok(source_file)
 }
+
+fn print_fault(fault: &SementicFault, source_file: &str, path: &str) {
+    use frontend::utils::char_colors::DEFAULT;
+    let level = fault.get_level();
+    let color = sementic_level_color(&level);
+    eprintln!(
+        "{color}{}:{DEFAULT} {}\n", 
+        level.as_str(),
+        fault.get_soul_error().to_message(
+            SementicLevel::Error,
+            path,
+            source_file
+        )
+    );
+}
+

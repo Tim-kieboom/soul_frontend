@@ -2,7 +2,7 @@ use crate::steps::{
     parse::{CURLY_OPEN, STAMENT_END_TOKENS, parser::Parser},
     tokenize::token_stream::TokenKind,
 };
-use models::{
+use soul_ast::{
     abstract_syntax_tree::{
         conditionals::{ElseKind, For, ForPattern, If, While},
         expression::{Expression, ExpressionKind},

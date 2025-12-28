@@ -1,5 +1,5 @@
 use crate::steps::sementic_analyser::name_resolution::name_resolver::NameResolver;
-use models::{
+use soul_ast::{
     abstract_syntax_tree::{
         block::Block,
         enum_like::EnumVariantsKind,

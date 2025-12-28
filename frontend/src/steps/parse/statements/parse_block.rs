@@ -1,4 +1,4 @@
-use models::{
+use soul_ast::{
     abstract_syntax_tree::{block::Block, statment::UseBlock},
     error::SoulResult,
     soul_names::{KeyWord, TypeModifier},

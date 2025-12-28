@@ -8,7 +8,7 @@ use crate::{
     },
     utils::try_result::{ToResult, TryError},
 };
-use models::{
+use soul_ast::{
     abstract_syntax_tree::{
         expression::{Expression, ExpressionKind, FieldAccess, Index, ReturnKind, ReturnLike},
         expression_groups::ExpressionGroup,

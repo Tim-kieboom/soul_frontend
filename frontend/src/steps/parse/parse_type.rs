@@ -10,7 +10,7 @@ use crate::{
         ResultTryErr, ResultTryNotValue, TryErr, TryError, TryNotValue, TryOk, TryResult,
     },
 };
-use models::{
+use soul_ast::{
     abstract_syntax_tree::{
         function::ThisCallee,
         soul_type::{ArrayType, NamedTupleType, ReferenceType, SoulType, TupleType, TypeKind},

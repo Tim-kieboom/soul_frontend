@@ -3,7 +3,7 @@ use crate::steps::{
     tokenize::token_stream::{Token, TokenKind, TokenStream, TokenStreamPosition},
 };
 use itertools::Itertools;
-use models::{
+use soul_ast::{
     abstract_syntax_tree::{AbstractSyntaxTree, block::Block},
     error::{SoulError, SoulErrorKind, SoulResult, Span},
     soul_names::TypeModifier,

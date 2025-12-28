@@ -1,5 +1,5 @@
 use crate::steps::{parse::parser::Parser, tokenize::token_stream::TokenKind};
-use models::{
+use soul_ast::{
     abstract_syntax_tree::statment::Ident,
     error::{SoulError, SoulErrorKind, SoulResult, Span},
     soul_names,

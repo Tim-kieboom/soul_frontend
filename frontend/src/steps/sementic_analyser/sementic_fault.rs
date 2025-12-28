@@ -1,12 +1,12 @@
-use models::{define_str_enum, error::SoulError};
+use soul_ast::{define_str_enum, error::SoulError};
 
 define_str_enum!(
 
     pub enum SementicLevel {
-        Warning => "warning",
-        Error => "error",
-        Debug => "debug",
-        Note => "note",
+        Error => "error", 0,
+        Warning => "warning", 1,
+        Debug => "debug", 2,
+        Note => "note", 3,
     }
 );
 pub struct SementicFault {
@@ -14,7 +14,7 @@ pub struct SementicFault {
     level: SementicLevel,
 }
 impl SementicFault {
-    pub fn error(err: SoulError) -> Self {
+    pub const fn error(err: SoulError) -> Self {
         Self {
             meessage: err,
             level: SementicLevel::Error,
@@ -24,10 +24,16 @@ impl SementicFault {
     pub fn consume_soul_error(self) -> SoulError {
         self.meessage
     }
-    pub fn get_soul_error(&self) -> &SoulError {
+
+    pub const fn get_soul_error(&self) -> &SoulError {
         &self.meessage
     }
-    pub fn get_level(&self) -> SementicLevel {
+
+    pub const fn get_level(&self) -> SementicLevel {
         self.level
+    }
+
+    pub const fn is_fatal(&self, fatal_level: SementicLevel) -> bool {
+        fatal_level.precedence() <= self.get_level().precedence()
     }
 }

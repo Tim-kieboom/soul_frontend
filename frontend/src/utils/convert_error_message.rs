@@ -1,15 +1,15 @@
 use std::str::Lines;
 
-use models::error::{SoulError, SoulErrorKind, Span};
+use soul_ast::error::{SoulError, SoulErrorKind, Span};
 
 use crate::{steps::sementic_analyser::sementic_fault::SementicLevel, utils::char_colors::*};
 
 pub trait ToMessage {
-    fn to_message(self, level: SementicLevel, file_path: &str, source_file: &str) -> String;
+    fn to_message(&self, level: SementicLevel, file_path: &str, source_file: &str) -> String;
 }
 
 impl ToMessage for SoulError {
-    fn to_message(self, level: SementicLevel, file_path: &str, source_file: &str) -> String {
+    fn to_message(&self, level: SementicLevel, file_path: &str, source_file: &str) -> String {
         let start_line = self.span.map(|el| el.start_line).unwrap_or(0);
         let number_len = start_line.to_string().len();
         let begin_space = " ".repeat(number_len + 2);

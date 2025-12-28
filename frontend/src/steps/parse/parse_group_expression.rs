@@ -8,7 +8,7 @@ use crate::{
     },
     utils::try_result::{ResultTryErr, TryErr, TryError, TryNotValue, TryResult},
 };
-use models::{
+use soul_ast::{
     abstract_syntax_tree::{
         expression_groups::{Array, NamedTuple, Tuple},
         soul_type::SoulType,

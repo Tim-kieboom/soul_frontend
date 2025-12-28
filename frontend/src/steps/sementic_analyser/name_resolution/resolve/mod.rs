@@ -1,4 +1,4 @@
-use models::{
+use soul_ast::{
     abstract_syntax_tree::{block::Block, soul_type::SoulType, statment::Ident},
     sementic_models::scope::{NodeId, ScopeId},
 };

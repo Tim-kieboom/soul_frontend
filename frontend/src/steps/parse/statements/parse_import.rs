@@ -1,4 +1,4 @@
-use models::{
+use soul_ast::{
     abstract_syntax_tree::{
         spanned::Spanned,
         statment::{Statement, StatementKind},

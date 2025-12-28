@@ -1,6 +1,6 @@
 use crate::steps::sementic_analyser::{SemanticInfo, SementicPass, sementic_fault::SementicFault};
-use models::abstract_syntax_tree::AbstractSyntaxTree;
-use models::{
+use soul_ast::abstract_syntax_tree::AbstractSyntaxTree;
+use soul_ast::{
     error::SoulError,
     sementic_models::scope::{NodeId, NodeIdGenerator},
 };

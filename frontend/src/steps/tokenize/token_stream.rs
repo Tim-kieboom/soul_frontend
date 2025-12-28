@@ -1,5 +1,5 @@
 use crate::steps::tokenize::tokenizer::Lexer;
-use models::{
+use soul_ast::{
     error::{SoulError, SoulResult, Span},
     soul_names::InternalPrimitiveTypes,
     symbool_kind::SymboolKind,
@@ -121,6 +121,7 @@ impl<'a> TokenStream<'a> {
         }
     }
 
+    #[allow(unused)] // allow unused because this is nice debug fn
     /// Consumes all remaining tokens into a Vec, including the current token.
     pub fn to_vec(&self) -> SoulResult<Vec<Token>> {
         const DEFAULT_TOKEN: Token = Token::new(TokenKind::EndFile, Span::default_const());

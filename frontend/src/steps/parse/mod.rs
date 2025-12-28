@@ -1,5 +1,5 @@
 use crate::steps::{parse::parser::Parser, tokenize::token_stream::TokenKind};
-use models::symbool_kind::SymboolKind;
+use soul_ast::symbool_kind::SymboolKind;
 
 pub mod parser;
 

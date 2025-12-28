@@ -5,7 +5,7 @@ use crate::{
     },
     utils::try_result::{ResultTryErr, ToResult, TryErr, TryError, TryNotValue, TryOk, TryResult},
 };
-use models::{
+use soul_ast::{
     abstract_syntax_tree::{
         expression::Expression,
         function::{Function, FunctionCall, FunctionCallee, FunctionSignature},

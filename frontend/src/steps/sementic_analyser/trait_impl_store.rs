@@ -1,17 +1,17 @@
 use std::collections::HashMap;
 
-use models::{
+use soul_ast::{
     abstract_syntax_tree::soul_type::{SoulType, TypeKind},
     error::{SoulError, SoulErrorKind, SoulResult},
     sementic_models::scope::NodeId,
 };
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-struct TraitImplEntry {
+pub struct TraitImplEntry {
     trait_type: SoulType,
     of_type: SoulType,
 }
-pub(crate) struct TraitImplStore {
+pub struct TraitImplStore {
     store: HashMap<NodeId, Vec<TraitImplEntry>>,
 }
 impl TraitImplStore {

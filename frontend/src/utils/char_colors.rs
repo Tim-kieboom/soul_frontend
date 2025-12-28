@@ -1,3 +1,5 @@
+use crate::SementicLevel;
+
 macro_rules! define_const_strs {
     ($($name:ident = $value:expr),*,) => {
         $(
@@ -26,3 +28,12 @@ define_const_strs!(
     BRIGHT_CYAN = "\x1b[96m",
     BRIGHT_WHITE = "\x1b[97m",
 );
+
+pub const fn sementic_level_color(level: &SementicLevel) -> &'static str {
+    match level {
+        SementicLevel::Error => RED,
+        SementicLevel::Warning => YELLOW,
+        SementicLevel::Debug => CYAN,
+        SementicLevel::Note => BLUE,
+    }
+}

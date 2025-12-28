@@ -1,4 +1,4 @@
-use models::{
+use soul_ast::{
     abstract_syntax_tree::{block::Block, soul_type::NamedTupleType, statment::Ident},
     error::{SoulError, SoulErrorKind, Span},
     sementic_models::scope::{
