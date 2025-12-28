@@ -1,15 +1,11 @@
-use soul_ast::{
-    abstract_syntax_tree::{
-        AbstractSyntaxTree,
-    },
-    sementic_models::scope::ScopeBuilder,
-};
 use crate::{SementicFault, steps::sementic_analyser::trait_impl_store::TraitImplStore};
+use soul_ast::{abstract_syntax_tree::AbstractSyntaxTree, sementic_models::scope::ScopeBuilder};
 
-pub mod sementic_fault;
 pub mod name_resolution;
+pub mod sementic_fault;
 pub mod trait_impl_store;
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SemanticInfo {
     pub scopes: ScopeBuilder,
     pub faults: Vec<SementicFault>,

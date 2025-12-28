@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug unit tests in library 'frontend'",
+            "name": "Debug unit tests in library 'ast_converter'",
             "type": "lldb",
             "request": "launch",
             "cargo": {
@@ -15,38 +15,38 @@
             }
         },
         {
-            "name": "Debug executable 'frontend'",
+            "name": "Debug executable 'ast_converter'",
             "type": "lldb",
             "request": "launch",
             "cargo": {
                 "args": [
                     "run",
-                    "--bin=frontend"
+                    "--bin=ast_converter"
                 ]
             },
             "args": []
         },
         {
-            "name": "Release executable 'frontend'",
+            "name": "Release executable 'ast_converter'",
             "type": "lldb",
             "request": "launch",
             "cargo": {
                 "args": [
                     "run",
-                    "--bin=frontend",
+                    "--bin=ast_converter",
                     "--release"
                 ]
             },
             "args": []
         },
         {
-            "name": "Debug unit tests in executable 'frontend'",
+            "name": "Debug unit tests in executable 'ast_converter'",
             "type": "lldb",
             "request": "launch",
             "cargo": {
                 "args": [
                     "test",
-                    "--bin=frontend"
+                    "--bin=ast_converter"
                 ]
             }
         }

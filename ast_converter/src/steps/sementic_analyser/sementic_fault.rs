@@ -9,6 +9,7 @@ define_str_enum!(
         Note => "note", 3,
     }
 );
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SementicFault {
     meessage: SoulError,
     level: SementicLevel,

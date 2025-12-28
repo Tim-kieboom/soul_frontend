@@ -85,7 +85,7 @@ pub struct ScopeId {
     at_len: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ScopeBuilder {
     scopes: Vec<Scope>,
     current: usize,
@@ -163,7 +163,7 @@ impl ScopeBuilder {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Scope {
     pub values: HashMap<String, Vec<ScopeValueEntry>>,
     pub types: HashMap<String, ScopeTypeEntry>,
@@ -177,20 +177,20 @@ impl Scope {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct ScopeValueEntry {
     pub node_id: NodeId,
     pub kind: ScopeValueEntryKind,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ScopeValueEntryKind {
     Field,
     Function,
     Variable,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct ScopeTypeEntry {
     pub span: Span,
     pub node_id: NodeId,
@@ -198,7 +198,7 @@ pub struct ScopeTypeEntry {
     pub kind: ScopeTypeEntryKind,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ScopeTypeEntryKind {
     Enum,
     Class,

@@ -11,6 +11,8 @@ pub struct TraitImplEntry {
     trait_type: SoulType,
     of_type: SoulType,
 }
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TraitImplStore {
     store: HashMap<NodeId, Vec<TraitImplEntry>>,
 }
