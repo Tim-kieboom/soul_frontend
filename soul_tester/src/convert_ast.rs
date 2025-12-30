@@ -1,17 +1,18 @@
 use anyhow::{Error, Result};
-use soul_ast::{abstract_syntax_tree::{AbstractSyntaxTree, syntax_display::{DisplayKind, SyntaxDisplay}}, sementic_models::sementic_fault::{SementicFault, SementicLevel}};
+use soul_ast::abstract_syntax_tree::{AbstractSyntaxTree, syntax_display::{DisplayKind, SyntaxDisplay}};
 use std::{fs::File, io::{BufReader, Read, Write}, process::exit};
 
-use crate::MY_PATH;
-use ast_converter::{ParseResonse, parse_file, utils::convert_error_message::ToMessage};
+use ast_converter::{ParseResonse, SementicFault, SementicLevel, parse_file, utils::convert_error_message::ToMessage};
 
 const RELATIVE_PATH: &str = "main.soul";
 const FATAL_LEVEL: SementicLevel = SementicLevel::Error;
 
-pub fn run() -> Result<()> {
-    let ast_tree = format!("{MY_PATH}/output/AST_parsed.soulc");
-    let sementic_tree = format!("{MY_PATH}/output/AST_name_resolved.soulc");
-    let main_file = format!("{MY_PATH}/soul_src/main.soul");
+pub fn run(path: &str) -> Result<()> {
+    let main_file = format!("{path}/soul_src/main.soul");
+    
+    let output_folder = format!("{path}/output");
+    let ast_tree = format!("{output_folder}/AST_parsed.soulc");
+    let sementic_tree = format!("{output_folder}/AST_name_resolved.soulc");
 
     let source_file = get_source_file(&main_file)?;
     let response = match parse_file(&source_file) {
@@ -43,32 +44,28 @@ pub fn run() -> Result<()> {
 
     use ast_converter::utils::char_colors::{GREEN, DEFAULT};
     println!("parse: {GREEN}successfull!!{DEFAULT}");   
-    write_to_output(&response)?;
+    write_to_output(
+        &response, 
+        &output_folder
+    )?;
     println!("write output: {GREEN}successfull!!{DEFAULT}");
     Ok(())
 }
 
 
-fn write_to_output(response: &ParseResonse) -> Result<()> {
-    let ast_out_file = format!("{MY_PATH}/output/main.soulAST");
-    let sem_out_file = format!("{MY_PATH}/output/main.soulSEM");
-    let ast_json_file = format!("{MY_PATH}/output/main.soulAST.json");
-    let sem_json_file = format!("{MY_PATH}/output/main.soulSEM.json");
+fn write_to_output(response: &ParseResonse, output_folder: &str) -> Result<()> {
+    std::fs::create_dir_all(output_folder)?;
 
-    let tree = serde_json::to_string_pretty(&response.syntax_tree)?;
-    let sementic = serde_json::to_string_pretty(&response.sementic_info)?;
+    let bin_path = format!("{output_folder}/main.soulAST");
+    let json_path = format!("{output_folder}/main.soulAST.json");
+    
+    let binary = serde_json::to_string_pretty(&response)?;
+    let mut out_file = File::create(json_path)?;
+    out_file.write(binary.as_bytes())?;
 
-    let mut tree_file = File::create(ast_json_file)?;
-    tree_file.write(tree.as_bytes())?;
-    let mut tree_file = File::create(sem_json_file)?;
-    tree_file.write(sementic.as_bytes())?;
-
-    let tree = serde_cbor::to_vec(&response.syntax_tree)?;
-    let sementic = serde_cbor::to_vec(&response.sementic_info)?;
-    let mut out_file = File::create(ast_out_file)?;
-    out_file.write(&tree)?;
-    let mut out_file = File::create(sem_out_file)?;
-    out_file.write(&sementic)?;
+    let binary = serde_cbor::to_vec(&response)?;
+    let mut out_file = File::create(bin_path)?;
+    out_file.write(&binary)?;
     Ok(())
 }
 
