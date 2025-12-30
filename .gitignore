@@ -8,3 +8,4 @@
 *.soulc
 *.soulAST
 *.soulAST.json
+soul_tester/path.json

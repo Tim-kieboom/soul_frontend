@@ -2,19 +2,17 @@ use anyhow::{Error, Result};
 use soul_ast::abstract_syntax_tree::{AbstractSyntaxTree, syntax_display::{DisplayKind, SyntaxDisplay}};
 use std::{fs::File, io::{BufReader, Read, Write}, process::exit};
 
-use crate::MY_PATH;
 use ast_converter::{ParseResonse, SementicFault, SementicLevel, parse_file, utils::convert_error_message::ToMessage};
 
 const RELATIVE_PATH: &str = "main.soul";
 const FATAL_LEVEL: SementicLevel = SementicLevel::Error;
 
-pub fn run() -> Result<()> {
-    let ast_tree = format!("{MY_PATH}/AST_parsed.soulc");
-    let sementic_tree = format!("{MY_PATH}/AST_name_resolved.soulc");
-    let main_file = format!("{MY_PATH}/soul_src/main.soul");
-
-    let output_file = format!("{MY_PATH}/output/main.soulAST");
-    let json_output_file = format!("{MY_PATH}/output/main.soulAST.json");
+pub fn run(path: &str) -> Result<()> {
+    let main_file = format!("{path}/soul_src/main.soul");
+    
+    let output_folder = format!("{path}/output");
+    let ast_tree = format!("{output_folder}/AST_parsed.soulc");
+    let sementic_tree = format!("{output_folder}/AST_name_resolved.soulc");
 
     let source_file = get_source_file(&main_file)?;
     let response = match parse_file(&source_file) {
@@ -48,22 +46,22 @@ pub fn run() -> Result<()> {
     println!("parse: {GREEN}successfull!!{DEFAULT}");   
     write_to_output(
         &response, 
-        &output_file,
-        Some(&json_output_file),
+        &output_folder
     )?;
     println!("write output: {GREEN}successfull!!{DEFAULT}");
     Ok(())
 }
 
 
-fn write_to_output(response: &ParseResonse, bin_path: &str, json_path: Option<&str>) -> Result<()> {
-    
-    if let Some(path) = json_path {
-        let binary = serde_json::to_string_pretty(&response)?;
+fn write_to_output(response: &ParseResonse, output_folder: &str) -> Result<()> {
+    std::fs::create_dir_all(output_folder)?;
 
-        let mut out_file = File::create(path)?;
-        out_file.write(binary.as_bytes())?;
-    }
+    let bin_path = format!("{output_folder}/main.soulAST");
+    let json_path = format!("{output_folder}/main.soulAST.json");
+    
+    let binary = serde_json::to_string_pretty(&response)?;
+    let mut out_file = File::create(json_path)?;
+    out_file.write(binary.as_bytes())?;
 
     let binary = serde_cbor::to_vec(&response)?;
     let mut out_file = File::create(bin_path)?;
