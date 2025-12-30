@@ -16,7 +16,7 @@ pub struct Block {
     /// The type modifier applied to this block.
     pub modifier: TypeModifier,
     /// The statements contained in this block.
-    pub statments: Vec<Statement>,
+    pub statements: Vec<Statement>,
     pub scope_id: Option<ScopeId>,
 }
 
@@ -28,13 +28,13 @@ impl SyntaxDisplay for Block {
     }
 
     fn inner_display(&self, sb: &mut String, kind: DisplayKind, tab: usize, _is_last: bool) {
-        if self.statments.is_empty() {
+        if self.statements.is_empty() {
             return;
         }
 
-        let last_index = self.statments.len() - 1;
+        let last_index = self.statements.len() - 1;
 
-        for (i, statment) in self.statments.iter().enumerate() {
+        for (i, statment) in self.statements.iter().enumerate() {
             sb.push('\n');
             statment
                 .node

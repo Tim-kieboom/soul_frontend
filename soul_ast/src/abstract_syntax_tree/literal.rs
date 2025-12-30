@@ -1,5 +1,4 @@
 use crate::{
-    abstract_syntax_tree::statment::Ident,
     soul_names::{InternalComplexTypes, InternalPrimitiveTypes, TypeModifier},
 };
 
@@ -13,9 +12,6 @@ pub enum Literal {
     Char(char),
     /// A string literal.
     Str(String),
-
-    /// A program memory literal (for complex literals and referencing basic literals).
-    ProgramMemmory(Ident, LiteralType),
 }
 
 /// The type of a literal value.
@@ -28,9 +24,6 @@ pub enum LiteralType {
     Char,
     /// String literal type.
     Str,
-
-    /// Program memory literal type (recursive).
-    ProgramMemmory(Box<LiteralType>),
 }
 
 impl Literal {
@@ -43,8 +36,6 @@ impl Literal {
             Literal::Bool(_) => LiteralType::Bool,
             Literal::Char(_) => LiteralType::Char,
             Literal::Str(_) => LiteralType::Str,
-
-            Literal::ProgramMemmory(_, ty) => LiteralType::ProgramMemmory(Box::new(ty.clone())),
         }
     }
 
@@ -67,9 +58,6 @@ impl Literal {
             Literal::Bool(val) => format!("{}", val),
             Literal::Char(char) => format!("'{}'", char),
             Literal::Str(str) => format!("\"{}\"", str),
-            Literal::ProgramMemmory(name, ty) => {
-                format!("{}({})", name.as_str(), ty.type_to_string())
-            }
         }
     }
 
@@ -84,9 +72,6 @@ impl Literal {
             Literal::Bool(val) => format!("{} {val}", get_type_name()),
             Literal::Char(val) => format!("{} {val}", get_type_name()),
             Literal::Str(val) => format!("{} \"{val}\"", get_type_name()),
-            Literal::ProgramMemmory(name, ty) => {
-                format!("ProgramMemmory({}: {})", name.as_str(), ty.type_to_string())
-            }
         }
     }
 }
@@ -101,8 +86,6 @@ impl LiteralType {
             LiteralType::Bool => 1,
             LiteralType::Char => 1,
             LiteralType::Str => 1,
-
-            LiteralType::ProgramMemmory(inner) => inner.precedence(),
         }
     }
 
@@ -127,9 +110,6 @@ impl LiteralType {
             LiteralType::Int => format!("{LITERAL} {}", types::UntypedInt.as_str()),
             LiteralType::Uint => format!("{LITERAL} {}", types::UntypedUint.as_str()),
             LiteralType::Float => format!("{LITERAL} {}", types::UntypedFloat.as_str()),
-            LiteralType::ProgramMemmory(ty) => {
-                format!("{LITERAL} ProgramMemmory({})", ty.type_to_string())
-            }
         }
     }
 }

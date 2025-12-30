@@ -44,7 +44,7 @@ pub enum ExpressionKind {
     StructConstructor(StructConstructor),
 
     /// Accessing a field on an instance, e.g., `obj.field`.
-    FieldAccess(FieldAccess),
+    FieldAccess(AccessField),
     /// Accessing a static field, e.g., `Type.field`.
     StaticFieldAccess(StaticFieldAccess),
 
@@ -125,7 +125,7 @@ pub struct StaticFieldAccess {
 
 /// A field access on an instance, e.g., `obj.field`.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct FieldAccess {
+pub struct AccessField {
     /// The object expression.
     pub object: BoxExpression,
     /// The field name.

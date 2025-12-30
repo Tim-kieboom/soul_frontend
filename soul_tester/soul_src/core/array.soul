@@ -1,0 +1,53 @@
+import Core::[
+    Mem::[
+        MallocArray, 
+        Unsafe::[
+            MemCpy,
+            ConsumeIndexPtr,
+            IndexPtr,
+            IndexPtrMut,
+        ]
+    ],
+    Operator::[
+        Index,
+        IndexMut,
+        ConsumeIndex,
+    ]
+]
+
+struct Array<T> {
+    mut ptr: ?*T,
+    mut cap: uint,
+    mut len: uint,
+
+    This(cap: uint) {
+        ptr := cap == 0 ? null : MallocArray<T>(cap)
+        return This{
+            ptr, cap, 0
+        }
+    }
+
+    impl ConsumeIndex<usize, T> {
+        ConsumeIndex(this, index: usize): ?T {
+            unsafe {
+                return index > len ? null : ConsumeIndexPtr(this.ptr, index)
+            }
+        }
+    }
+
+    impl Index<usize, T> {
+        Index(@this, index: usize): ?@T {
+            unsafe {
+                return index > len ? null : IndexPtr(this.ptr, index)
+            }
+        }
+    }
+
+    impl IndexMut<usize, T> {
+        Index(&this, index: usize): ?&T {
+            unsafe {
+                return index > len ? null : IndexPtrMut(this.ptr, index)
+            }
+        }
+    }
+}

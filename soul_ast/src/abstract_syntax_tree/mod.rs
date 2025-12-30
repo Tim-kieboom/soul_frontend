@@ -17,7 +17,19 @@ pub mod spanned;
 pub mod statment;
 pub mod syntax_display;
 
-use crate::abstract_syntax_tree::block::Block;
+pub use crate::abstract_syntax_tree::block::*;
+pub use crate::abstract_syntax_tree::conditionals::*;
+pub use crate::abstract_syntax_tree::enum_like::*;
+pub use crate::abstract_syntax_tree::expression::*;
+pub use crate::abstract_syntax_tree::expression_groups::*;
+pub use crate::abstract_syntax_tree::function::*;
+pub use crate::abstract_syntax_tree::literal::*;
+pub use crate::abstract_syntax_tree::objects::*;
+pub use crate::abstract_syntax_tree::operator::*;
+pub use crate::abstract_syntax_tree::soul_type::*;
+pub use crate::abstract_syntax_tree::spanned::*;
+pub use crate::abstract_syntax_tree::statment::*;
+pub use crate::abstract_syntax_tree::syntax_display::*;
 
 /// The root of an Abstract Syntax Tree representing a parsed Soul program.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

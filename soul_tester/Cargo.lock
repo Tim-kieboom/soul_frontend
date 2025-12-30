@@ -14,8 +14,6 @@ version = "0.1.0"
 dependencies = [
  "itertools",
  "serde",
- "serde_cbor",
- "serde_json",
  "soul_ast",
 ]
 

@@ -5,8 +5,5 @@ edition = "2024"
 
 [dependencies]
 itertools = "0.14.0"
-serde_cbor = "0.11.2"
 soul_ast = {path = "../soul_ast"}
 serde = {version = "1.0.228", features = ["derive"]}
-serde_json = "1.0.148"
-

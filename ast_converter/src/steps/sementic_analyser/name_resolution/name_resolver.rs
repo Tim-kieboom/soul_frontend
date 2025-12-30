@@ -1,5 +1,6 @@
-use crate::steps::sementic_analyser::{SemanticInfo, SementicPass, sementic_fault::SementicFault};
 use soul_ast::abstract_syntax_tree::AbstractSyntaxTree;
+use soul_ast::sementic_models::{ASTSemanticInfo, SementicPass};
+use soul_ast::sementic_models::sementic_fault::SementicFault;
 use soul_ast::{
     error::SoulError,
     sementic_models::scope::{NodeId, NodeIdGenerator},
@@ -7,13 +8,13 @@ use soul_ast::{
 
 pub struct NameResolver<'a> {
     pub ids: NodeIdGenerator,
-    pub info: &'a mut SemanticInfo,
+    pub info: &'a mut ASTSemanticInfo,
 
     pub current_function: Option<NodeId>,
 }
 
 impl<'a> SementicPass<'a> for NameResolver<'a> {
-    fn new(info: &'a mut SemanticInfo) -> Self {
+    fn new(info: &'a mut ASTSemanticInfo) -> Self {
         Self {
             info,
             current_function: None,

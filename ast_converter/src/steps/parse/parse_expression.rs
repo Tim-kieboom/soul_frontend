@@ -10,7 +10,7 @@ use crate::{
 };
 use soul_ast::{
     abstract_syntax_tree::{
-        expression::{Expression, ExpressionKind, FieldAccess, Index, ReturnKind, ReturnLike},
+        expression::{Expression, ExpressionKind, AccessField, Index, ReturnKind, ReturnLike},
         expression_groups::ExpressionGroup,
         function::StructConstructor,
         literal::Literal,
@@ -330,7 +330,7 @@ impl<'a> Parser<'a> {
         }
 
         Ok(Expression::new(
-            ExpressionKind::FieldAccess(FieldAccess {
+            ExpressionKind::FieldAccess(AccessField {
                 object: Box::new(lvalue),
                 field: ident,
             }),
