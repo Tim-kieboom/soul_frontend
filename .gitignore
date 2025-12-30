@@ -1,5 +1,10 @@
-/models/target
 /soul_ast/target
 /soul_ast/target
 /soul_hir/target
 /soul_tester/target
+
+# soul compiler outputs
+/soul_tester/output
+*.soulc
+*.soulAST
+*.soulAST.json
