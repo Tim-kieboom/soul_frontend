@@ -1,22 +1,24 @@
+mod paths;
+mod convert_hir;
 mod convert_ast;
 use anyhow::Result;
 
-static PATH: &[u8] = include_bytes!("../path.json");
+use crate::paths::Paths;
 
-fn main() -> Result<()> {
-    let path = from_raw_path(PATH)?;
-    run(&path)
+const MAIN_FILE: &str = "main.soul";
+static RAW_PATH_JSON: &[u8] = include_bytes!("../path.json");
+
+fn main() {
+    
+    if let Err(err) = run() {
+        eprintln!("{}", err)
+    }
 }
 
-fn run(path: &str) -> Result<()> {
-    convert_ast::run(path)?;
+fn run() -> Result<()> {
+    let path = Paths::new(RAW_PATH_JSON)?;
+
+    convert_ast::run(&path, MAIN_FILE)?;
+    convert_hir::run(&path, MAIN_FILE)?;
     Ok(())
 }
-
-fn from_raw_path(raw_path: &[u8]) -> Result<String> {
-    let JsonPath{path} = serde_json::from_slice(raw_path)?;
-    Ok(path)
-}
-
-#[derive(serde::Deserialize)]
-struct JsonPath {path: String}

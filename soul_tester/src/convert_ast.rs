@@ -1,20 +1,15 @@
+use crate::paths::Paths;
 use anyhow::{Error, Result};
-use soul_ast::abstract_syntax_tree::{AbstractSyntaxTree, syntax_display::{DisplayKind, SyntaxDisplay}};
 use std::{fs::File, io::{BufReader, Read, Write}, process::exit};
-
+use soul_ast::abstract_syntax_tree::{AbstractSyntaxTree, syntax_display::{DisplayKind, SyntaxDisplay}};
 use ast_converter::{ParseResonse, SementicFault, SementicLevel, parse_file, utils::convert_error_message::ToMessage};
 
-const RELATIVE_PATH: &str = "main.soul";
 const FATAL_LEVEL: SementicLevel = SementicLevel::Error;
 
-pub fn run(path: &str) -> Result<()> {
-    let main_file = format!("{path}/soul_src/main.soul");
-    
-    let output_folder = format!("{path}/output");
-    let ast_tree = format!("{output_folder}/AST_parsed.soulc");
-    let sementic_tree = format!("{output_folder}/AST_name_resolved.soulc");
+pub fn run(path: &Paths, file_name: &str) -> Result<()> {
 
-    let source_file = get_source_file(&main_file)?;
+    path.insure_paths_exist()?;
+    let source_file = get_source_file(&format!("{}/{file_name}", path.soul_src))?;
     let response = match parse_file(&source_file) {
         Ok(val) => val,
         Err(err) => {
@@ -25,7 +20,7 @@ pub fn run(path: &str) -> Result<()> {
 
     let fatal_count = response.get_fatal_count(FATAL_LEVEL);
     for fault in &response.sementic_info.faults {
-        print_fault(fault, &source_file, RELATIVE_PATH);
+        print_fault(fault, &source_file, &format!("{file_name}"));
     }
 
     if fatal_count > 0 {
@@ -35,10 +30,15 @@ pub fn run(path: &str) -> Result<()> {
         ));
     }
 
-    print_syntax_tree(&response.syntax_tree, &ast_tree, DisplayKind::Parser)?;
+    print_syntax_tree(
+        &response.syntax_tree, 
+        &format!("{}/{file_name}_AST.soulc", path.output_ast), 
+        DisplayKind::Parser,
+    )?;
+
     print_syntax_tree(
         &response.syntax_tree,
-        &sementic_tree,
+        &format!("{}/{file_name}_AST_resolved.soulc", path.output_ast),
         DisplayKind::NameResolver,
     )?;
 
@@ -46,26 +46,38 @@ pub fn run(path: &str) -> Result<()> {
     println!("parse: {GREEN}successfull!!{DEFAULT}");   
     write_to_output(
         &response, 
-        &output_folder
+        &path,
+        file_name
     )?;
     println!("write output: {GREEN}successfull!!{DEFAULT}");
     Ok(())
 }
 
 
-fn write_to_output(response: &ParseResonse, output_folder: &str) -> Result<()> {
-    std::fs::create_dir_all(output_folder)?;
+fn write_to_output(response: &ParseResonse, path: &Paths, file_name: &str) -> Result<()> {
+    use std::fs::File;
 
-    let bin_path = format!("{output_folder}/main.soulAST");
-    let json_path = format!("{output_folder}/main.soulAST.json");
-    
-    let binary = serde_json::to_string_pretty(&response)?;
-    let mut out_file = File::create(json_path)?;
-    out_file.write(binary.as_bytes())?;
+    let ast_path = path.get_ast_incremental_ast(file_name);
+    let meta_path = path.get_ast_incremental_ast_meta(file_name);
 
-    let binary = serde_cbor::to_vec(&response)?;
-    let mut out_file = File::create(bin_path)?;
-    out_file.write(&binary)?;
+    let ParseResonse { syntax_tree, sementic_info } = response;
+
+    let binary = serde_cbor::to_vec(syntax_tree)?;
+    File::create(&ast_path)?
+        .write(&binary)?;
+
+    let binary = serde_cbor::to_vec(sementic_info)?;
+    File::create(&meta_path)?
+        .write(&binary)?;
+
+    let json = serde_json::to_string_pretty(syntax_tree)?;
+    File::create(&format!("{ast_path}.json"))?
+        .write(json.as_bytes())?;
+
+    let json = serde_json::to_string_pretty(sementic_info)?;
+    File::create(&format!("{meta_path}.json"))?
+        .write(json.as_bytes())?;
+
     Ok(())
 }
 

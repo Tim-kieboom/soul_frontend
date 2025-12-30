@@ -57,7 +57,7 @@ Test test_list() {
     AssertEq!(emptyList.cap, 0)
 
     vec := [1, 2, 3]
-    filledList := List:[1, 2, 3]
+    filledList := List:[int: 1, 2, 3]
     AssertEq!(emptyList.len, 3)
     AssertEq!(emptyList.cap, vec.Cap())
 

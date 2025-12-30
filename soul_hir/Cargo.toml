@@ -4,5 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+<<<<<<< Updated upstream
 soul_ast = {path = "../soul_ast"}
 serde = {version = "1.0.228", features = ["derive"]}
+=======
+>>>>>>> Stashed changes

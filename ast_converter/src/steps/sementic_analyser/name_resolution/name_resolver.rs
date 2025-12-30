@@ -1,3 +1,7 @@
+<<<<<<< Updated upstream
+=======
+use crate::steps::sementic_analyser::{AstMetaData, SementicPass, sementic_fault::SementicFault};
+>>>>>>> Stashed changes
 use soul_ast::abstract_syntax_tree::AbstractSyntaxTree;
 use soul_ast::sementic_models::{ASTSemanticInfo, SementicPass};
 use soul_ast::sementic_models::sementic_fault::SementicFault;
@@ -8,13 +12,21 @@ use soul_ast::{
 
 pub struct NameResolver<'a> {
     pub ids: NodeIdGenerator,
+<<<<<<< Updated upstream
     pub info: &'a mut ASTSemanticInfo,
+=======
+    pub info: &'a mut AstMetaData,
+>>>>>>> Stashed changes
 
     pub current_function: Option<NodeId>,
 }
 
 impl<'a> SementicPass<'a> for NameResolver<'a> {
+<<<<<<< Updated upstream
     fn new(info: &'a mut ASTSemanticInfo) -> Self {
+=======
+    fn new(info: &'a mut AstMetaData) -> Self {
+>>>>>>> Stashed changes
         Self {
             info,
             current_function: None,

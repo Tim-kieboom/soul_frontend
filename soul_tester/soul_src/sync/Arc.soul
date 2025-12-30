@@ -1,6 +1,6 @@
 import Std::Sync::Atomic::[AtomicUint, Ordering]
 
-class Arc<T, Alloc = Global> {
+class Arc<T, Mem = Global> {
     ptr: *mut Inner<T>
     
     struct Inner<T> {
@@ -12,7 +12,7 @@ class Arc<T, Alloc = Global> {
         
         inner := Inner{value, refCount: AtomicUint(1)}
         return Arc {
-            ptr: unsafe { Alloc.Unchecked.NewPtr(inner) }
+            ptr: unsafe { Mem.Unchecked.NewPtr(inner) }
         }
     }
 
@@ -42,7 +42,7 @@ class Arc<T, Alloc = Global> {
                     return
                 }
 
-                Alloc.Unchecked.Drop(ptr)
+                Mem.Unchecked.Drop(ptr)
             }
         }
     }

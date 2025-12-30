@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 use std::collections::HashMap;
 use soul_ast::sementic_models::sementic_fault::SementicFault;
 
@@ -91,3 +92,5 @@ pub enum Body {
     Block(HirBlockId),
     Expression(ExpressionId),
 }
+=======
+>>>>>>> Stashed changes

@@ -130,6 +130,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "soul_hir"
+version = "0.1.0"
+
+[[package]]
 name = "soul_tester"
 version = "0.1.0"
 dependencies = [
@@ -139,6 +143,7 @@ dependencies = [
  "serde_cbor",
  "serde_json",
  "soul_ast",
+ "soul_hir",
 ]
 
 [[package]]
