@@ -7,15 +7,16 @@
 //!
 //! Helpers are provided for checking modifiers, type categories, and displaying types.
 use crate::{
-    abstract_syntax_tree::{
+    StackArrayKind, abstract_syntax_tree::{
         expression::Expression,
         statment::Ident,
         syntax_display::{DisplayKind, SyntaxDisplay},
-    },
-    error::Span,
-    sementic_models::scope::NodeId,
+    }, sementic_models::scope::NodeId
+};
+use soul_utils::{
+    Span,
     soul_names::{
-        InternalComplexTypes, InternalPrimitiveTypes, StackArrayKind, TypeModifier, TypeWrapper,
+        InternalComplexTypes, InternalPrimitiveTypes, TypeModifier, TypeWrapper,
     },
 };
 

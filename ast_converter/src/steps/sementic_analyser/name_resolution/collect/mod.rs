@@ -1,13 +1,12 @@
+use crate::steps::sementic_analyser::name_resolution::name_resolver::NameResolver;
 use soul_ast::{
     abstract_syntax_tree::{block::Block, soul_type::NamedTupleType, statment::Ident},
-    error::{SoulError, SoulErrorKind, Span},
     sementic_models::scope::{
         NodeId, NodeTag, Scope, ScopeId, ScopeTypeEntry, ScopeTypeKind, ScopeValueEntry,
         ScopeValueEntryKind, ScopeValueKind,
     },
 };
-
-use crate::steps::sementic_analyser::name_resolution::name_resolver::NameResolver;
+use soul_utils::{SoulError, SoulErrorKind, Span};
 
 mod name_collect_expression;
 mod name_collect_statment;

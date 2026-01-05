@@ -1,9 +1,9 @@
-use soul_ast::{
-    abstract_syntax_tree::statment::Ident, sementic_models::scope::ScopeId,
-    soul_names::TypeModifier, soul_page_path::SoulPagePath,
-};
+use soul_ast::abstract_syntax_tree::{Spanned, ThisCallee, Visibility, statment::Ident};
+use soul_utils::{SoulPagePath, VecMap, soul_names::TypeModifier};
 
-use crate::{ExpressionId, HirBlockId, HirBodyId, HirId, StatementId, hir_type::HirType};
+use crate::{
+    ExpressionId, HirBlockId, HirBodyId, HirId, ScopeId, Statement, StatementId, hir_type::HirType,
+};
 
 /// Top-level items in a Soul module.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -12,6 +12,7 @@ pub enum Item {
     Import(Import),
     /// Function declaration with body.
     Function(Function),
+    Contructor(Contructor),
     /// Scoped `use` block (Soul equivalent of Rust `impl`).
     UseBlock(UseBlock),
     /// Struct declaration (includes desugared Soul `class`).
@@ -34,12 +35,32 @@ pub struct Import {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Function {
     pub id: HirId,
-    pub name: Ident,
     pub body: HirBodyId,
-    pub params: Vec<Parameter>,
-    pub modifier: TypeModifier,
+    pub signature: FunctionSignature,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Contructor {
+    pub id: HirId,
+    pub ty: HirType,
+    pub vis: Visibility,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FunctionSignature {
+    pub name: Ident,
+    pub callee: Option<Spanned<FunctionCallee>>,
     pub return_type: HirType,
+    pub modifier: TypeModifier,
+    pub parameters: Vec<Parameter>,
     pub generics: Vec<GenericDeclare>,
+    pub vis: Visibility,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FunctionCallee {
+    pub ty: HirType,
+    pub this: ThisCallee,
 }
 
 /// Function parameter.
@@ -66,7 +87,7 @@ pub struct Block {
     pub id: HirId,
     pub scope_id: ScopeId,
     pub modifier: TypeModifier,
-    pub statements: Vec<StatementId>,
+    pub statements: VecMap<StatementId, Statement>,
 }
 
 /// Struct declaration (includes desugared Soul `class`es).
@@ -79,6 +100,7 @@ pub struct Struct {
     pub name: Ident,
     pub fields: Vec<HirId>,
     pub generics: Vec<GenericDeclare>,
+    pub vis: Visibility,
 }
 
 /// Trait declaration.
@@ -86,8 +108,16 @@ pub struct Struct {
 pub struct Trait {
     pub id: HirId,
     pub name: Ident,
-    pub methodes: Vec<HirId>,
+    pub methodes: Vec<TraitMethode>,
     pub generics: Vec<GenericDeclare>,
+    pub vis: Visibility,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TraitMethode {
+    pub id: HirId,
+    pub signature: FunctionSignature,
+    pub vis: Visibility,
 }
 
 /// Union type declaration (tagged enum, Rust-like).
@@ -97,6 +127,7 @@ pub struct Union {
     pub name: Ident,
     pub variants: Vec<UnionVariant>,
     pub generics: Vec<GenericDeclare>,
+    pub vis: Visibility,
 }
 
 /// Union variant (tuple or named fields).
@@ -115,6 +146,7 @@ pub struct Enum {
     pub name: Ident,
     pub variants: EnumVariants,
     pub generics: Vec<GenericDeclare>,
+    pub vis: Visibility,
 }
 
 /// Enum variants (units or associated expressions).
@@ -155,6 +187,7 @@ impl Item {
             Item::Struct(val) => val.id,
             Item::Function(val) => val.id,
             Item::UseBlock(val) => val.id,
+            Item::Contructor(contructor) => contructor.id,
         }
     }
 }

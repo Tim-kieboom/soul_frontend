@@ -8,17 +8,17 @@ use crate::{
     },
     utils::try_result::{ResultTryErr, TryErr, TryError, TryNotValue, TryOk, TryResult},
 };
-use soul_ast::{
-    abstract_syntax_tree::{
-        function::Function,
-        objects::{
-            Class, ClassMember, Field, FieldAccess, Struct, Trait, TraitSignature, Visibility,
-        },
-        soul_type::{SoulType, TypeKind},
-        spanned::Spanned,
-        statment::Ident,
+use soul_ast::abstract_syntax_tree::{
+    function::Function,
+    objects::{
+        Class, ClassMember, Field, FieldVisibility, Struct, Trait, TraitSignature, Visibility,
     },
-    error::{SoulError, SoulErrorKind, SoulResult},
+    soul_type::{SoulType, TypeKind},
+    spanned::Spanned,
+    statment::Ident,
+};
+use soul_utils::{
+    SoulError, SoulErrorKind, SoulResult,
     soul_names::{KeyWord, TypeModifier},
 };
 
@@ -73,7 +73,8 @@ impl<'a> Parser<'a> {
                 Err(TryError::IsErr(err)) => return Err(err),
             }
 
-            match self.try_parse_field() {
+            const IS_STRUCT: bool = false;
+            match self.try_parse_field(IS_STRUCT) {
                 Ok(val) => {
                     members.push(Spanned::new(ClassMember::Field(val.node), val.span));
                     continue;
@@ -127,7 +128,8 @@ impl<'a> Parser<'a> {
                 break;
             }
 
-            match self.try_parse_field() {
+            const IS_STRUCT: bool = true;
+            match self.try_parse_field(IS_STRUCT) {
                 Ok(val) => fields.push(val),
                 Err(TryError::IsErr(err)) | Err(TryError::IsNotValue(err)) => return Err(err),
             }
@@ -357,9 +359,9 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn try_parse_field(&mut self) -> TryResult<Spanned<Field>, SoulError> {
+    fn try_parse_field(&mut self, is_struct: bool) -> TryResult<Spanned<Field>, SoulError> {
         let begin_position = self.current_position();
-        let result = self.inner_parse_field();
+        let result = self.inner_parse_field(is_struct);
         if result.is_err() {
             self.go_to(begin_position);
         }
@@ -367,7 +369,7 @@ impl<'a> Parser<'a> {
         result
     }
 
-    fn inner_parse_field(&mut self) -> TryResult<Spanned<Field>, SoulError> {
+    fn inner_parse_field(&mut self, is_struct: bool) -> TryResult<Spanned<Field>, SoulError> {
         let start_span = self.token().span;
 
         self.skip_end_lines();
@@ -407,11 +409,11 @@ impl<'a> Parser<'a> {
 
         ty.modifier = Some(modifier);
 
-        let vis = self.parse_field_access();
+        let vis = self.parse_field_access(is_struct);
 
         if self.current_is_any(STAMENT_END_TOKENS) {
             return TryOk(Spanned::new(
-                Field::new(ty, name),
+                Field::new(ty, name, is_struct),
                 self.new_span(start_span),
             ));
         }
@@ -440,14 +442,14 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn parse_field_access(&mut self) -> FieldAccess {
-        let mut access = FieldAccess::default();
+    fn parse_field_access(&mut self, is_struct: bool) -> FieldVisibility {
+        let mut access = FieldVisibility::default(is_struct);
         loop {
             match self.token().kind.try_as_ident() {
-                Some(FieldAccess::PUBLIC_GET) => access.get = Some(Visibility::Public),
-                Some(FieldAccess::PUBLIC_SET) => access.set = Some(Visibility::Public),
-                Some(FieldAccess::PRIVATE_GET) => access.get = Some(Visibility::Private),
-                Some(FieldAccess::PRIVATE_SET) => access.set = Some(Visibility::Private),
+                Some(FieldVisibility::PUBLIC_GET) => access.get = Visibility::Public,
+                Some(FieldVisibility::PUBLIC_SET) => access.set = Visibility::Public,
+                Some(FieldVisibility::PRIVATE_GET) => access.get = Visibility::Private,
+                Some(FieldVisibility::PRIVATE_SET) => access.set = Visibility::Private,
                 _ => break,
             }
 

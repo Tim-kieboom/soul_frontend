@@ -1,6 +1,6 @@
-use soul_ast::{
-    abstract_syntax_tree::{block::Block, statment::UseBlock},
-    error::SoulResult,
+use soul_ast::abstract_syntax_tree::{block::Block, statment::UseBlock};
+use soul_utils::{
+    SoulResult,
     soul_names::{KeyWord, TypeModifier},
 };
 
@@ -16,7 +16,7 @@ impl<'a> Parser<'a> {
     pub(crate) fn parse_block(&mut self, modifier: TypeModifier) -> SoulResult<Block> {
         const END_TOKENS: &[TokenKind] = &[CURLY_CLOSE, TokenKind::EndFile];
 
-        let mut statments = vec![];
+        let mut statements = vec![];
 
         self.expect(&CURLY_OPEN)?;
         while !self.current_is_any(END_TOKENS) {
@@ -26,7 +26,7 @@ impl<'a> Parser<'a> {
             }
 
             match self.parse_statement() {
-                Ok(statment) => statments.push(statment),
+                Ok(statement) => statements.push(statement),
                 Err(err) => {
                     self.add_error(err);
                     self.skip_over_statement();
@@ -39,7 +39,7 @@ impl<'a> Parser<'a> {
         self.expect(&CURLY_CLOSE)?;
         Ok(Block {
             modifier,
-            statments,
+            statements,
             scope_id: None,
         })
     }

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
+use soul_utils::{SoulError, SoulErrorKind, SoulResult};
 use crate::{
     abstract_syntax_tree::soul_type::{SoulType, TypeKind},
-    error::{SoulError, SoulErrorKind, SoulResult},
     sementic_models::scope::NodeId,
 };
 

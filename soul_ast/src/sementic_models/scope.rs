@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use soul_utils::Span;
+
 use crate::{
     abstract_syntax_tree::{
         enum_like::{Enum, Union, UnionVariant},
@@ -8,7 +10,6 @@ use crate::{
         soul_type::{GenericDeclare, GenericDeclareKind},
         statment::{Ident, Variable},
     },
-    error::Span,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]

@@ -15,13 +15,19 @@ impl<'a> NameResolver<'a> {
             ExpressionKind::If(r#if) => {
                 self.collect_expression(&mut r#if.condition);
                 self.collect_block(&mut r#if.block);
-                for branch in &mut r#if.else_branchs {
+
+                let mut current = r#if.else_branchs.as_mut();
+                while let Some(branch) = current {
                     match &mut branch.node {
-                        ElseKind::Else(el) => self.collect_block(&mut el.node),
+                        ElseKind::Else(el) => {
+                            self.collect_block(&mut el.node);
+                            current = None;
+                        }
                         ElseKind::ElseIf(el) => {
                             self.collect_expression(&mut el.node.condition);
                             self.collect_block(&mut el.node.block);
-                            debug_assert!(el.node.else_branchs.is_empty());
+                            debug_assert!(el.node.else_branchs.is_none());
+                            current = el.node.else_branchs.as_mut();
                         }
                     }
                 }

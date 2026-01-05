@@ -1,6 +1,6 @@
 use std::hash::Hash;
-
-use crate::{abstract_syntax_tree::statment::Ident, error::Span};
+use soul_utils::Span;
+use crate::{abstract_syntax_tree::statment::Ident};
 
 /// An attribute identifier
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]

@@ -15,6 +15,7 @@ dependencies = [
  "itertools",
  "serde",
  "soul_ast",
+ "soul_utils",
 ]
 
 [[package]]
@@ -28,6 +29,15 @@ name = "half"
 version = "1.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b43ede17f21864e81be2fa654110bf1e793774238d86ef8555c37e6519c0403"
+
+[[package]]
+name = "hir_converter"
+version = "0.1.0"
+dependencies = [
+ "soul_ast",
+ "soul_hir",
+ "soul_utils",
+]
 
 [[package]]
 name = "itertools"
@@ -127,11 +137,17 @@ version = "0.1.0"
 dependencies = [
  "itertools",
  "serde",
+ "soul_utils",
 ]
 
 [[package]]
 name = "soul_hir"
 version = "0.1.0"
+dependencies = [
+ "serde",
+ "soul_ast",
+ "soul_utils",
+]
 
 [[package]]
 name = "soul_tester"
@@ -139,11 +155,18 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "ast_converter",
+ "hir_converter",
  "serde",
  "serde_cbor",
  "serde_json",
  "soul_ast",
- "soul_hir",
+]
+
+[[package]]
+name = "soul_utils"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

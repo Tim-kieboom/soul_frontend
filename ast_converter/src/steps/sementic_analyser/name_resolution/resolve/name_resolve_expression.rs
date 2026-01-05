@@ -1,12 +1,10 @@
-use soul_ast::{
-    abstract_syntax_tree::{
-        conditionals::{ForPattern, IfCaseKind},
-        expression::{Expression, ExpressionKind},
-        expression_groups::ExpressionGroup,
-        function::LamdbaBodyKind,
-    },
-    error::{SoulError, SoulErrorKind},
+use soul_ast::abstract_syntax_tree::{
+    conditionals::{ForPattern, IfCaseKind},
+    expression::{Expression, ExpressionKind},
+    expression_groups::ExpressionGroup,
+    function::LamdbaBodyKind,
 };
+use soul_utils::{SoulError, SoulErrorKind};
 
 use crate::steps::sementic_analyser::name_resolution::name_resolver::NameResolver;
 
@@ -171,8 +169,7 @@ impl<'a> NameResolver<'a> {
             ForPattern::Ident {
                 ident,
                 resolved,
-                span,
-            } => self.resolve_variable(ident, resolved, *span),
+            } => self.resolve_variable(ident, resolved, ident.span),
             ForPattern::Tuple(items) => {
                 for value in items {
                     self.resolve_for_pattern(value);

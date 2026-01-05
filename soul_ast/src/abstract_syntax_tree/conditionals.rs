@@ -8,9 +8,9 @@ use crate::{
         statment::{Ident, Variable},
         syntax_display::{DisplayKind, SyntaxDisplay},
     },
-    error::{SoulError, SoulErrorKind, SoulResult, Span},
     sementic_models::scope::{NodeId, ScopeId},
 };
+use soul_utils::{SoulError, SoulErrorKind, SoulResult, Span};
 use itertools::Itertools;
 
 /// A ternary conditional expression, e.g., `cond ? a : b`.
@@ -85,7 +85,6 @@ pub enum ForPattern {
     Ident {
         ident: Ident,
         resolved: Option<NodeId>,
-        span: Span,
     },
     /// A tuple pattern for destructuring tuples.
     Tuple(Vec<ForPattern>),
@@ -110,7 +109,24 @@ pub struct If {
     /// The block to execute if the condition is true.
     pub block: Block,
     /// Optional `else if` and `else` branches.
-    pub else_branchs: Vec<Spanned<ElseKind>>,
+    pub else_branchs: Option<IfArm>,
+}
+
+pub type IfArm = Box<Spanned<ElseKind>>;
+pub trait IfArmHelper{
+    fn new_arm(kind: ElseKind, span: Span) -> Self;
+    fn try_next_mut(&mut self) -> Option<&mut Option<IfArm>>;
+}
+impl IfArmHelper for IfArm {
+    fn new_arm(kind: ElseKind, span: Span) -> Self {
+        Self::new(Spanned::new(kind, span))
+    }
+    fn try_next_mut(&mut self) -> Option<&mut Option<IfArm>> {
+        match &mut self.node {
+            ElseKind::ElseIf(spanned) => Some(&mut spanned.node.else_branchs),
+            ElseKind::Else(_) => None,
+        }
+    }
 }
 
 /// The kind of else branch in an `if` statement.
@@ -137,7 +153,6 @@ impl ForPattern {
             ExpressionKind::Variable { ident, resolved } => Ok(ForPattern::Ident {
                 ident,
                 resolved,
-                span: expression.span,
             }),
             ExpressionKind::ExpressionGroup(ExpressionGroup::Tuple(tuple)) => {
                 let mut fors = Vec::with_capacity(tuple.values.len());

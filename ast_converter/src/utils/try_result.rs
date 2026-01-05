@@ -1,4 +1,4 @@
-use soul_ast::error::{SoulError, SoulResult};
+use soul_utils::{SoulError, SoulResult};
 /// - `TryError::IsNotValue(R)` is not of type (type: `R` is so that you could give ownership of value back if needed)
 /// - `TryError::IsErr(SoulError)` is of type but has error
 pub(crate) enum TryError<R> {

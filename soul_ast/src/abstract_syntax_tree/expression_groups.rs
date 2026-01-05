@@ -5,8 +5,8 @@ use crate::{
         statment::{Ident, Variable},
         syntax_display::{DisplayKind, SyntaxDisplay},
     },
-    soul_names::KeyWord,
 };
+use soul_utils::soul_names::KeyWord;
 use itertools::Itertools;
 
 /// A grouped expression type, such as tuple, array, or named tuple.

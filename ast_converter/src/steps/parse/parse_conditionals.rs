@@ -2,13 +2,14 @@ use crate::steps::{
     parse::{CURLY_OPEN, STAMENT_END_TOKENS, parser::Parser},
     tokenize::token_stream::TokenKind,
 };
-use soul_ast::{
-    abstract_syntax_tree::{
-        conditionals::{ElseKind, For, ForPattern, If, While},
-        expression::{Expression, ExpressionKind},
-        spanned::Spanned,
-    },
-    error::{SoulError, SoulErrorKind, SoulResult},
+use soul_ast::abstract_syntax_tree::{
+    IfArm, IfArmHelper,
+    conditionals::{ElseKind, For, ForPattern, If, While},
+    expression::{Expression, ExpressionKind},
+    spanned::Spanned,
+};
+use soul_utils::{
+    SoulError, SoulErrorKind, SoulResult,
     soul_names::{KeyWord, TypeModifier},
 };
 use std::sync::LazyLock;
@@ -27,12 +28,15 @@ impl<'a> Parser<'a> {
         let if_condition = self.parse_expression(&[CURLY_OPEN])?;
         let if_block = self.parse_block(TypeModifier::Mut)?;
 
+        let mut r#if = If {
+            condition: Box::new(if_condition),
+            block: if_block,
+            else_branchs: None,
+        };
+
+        self.parse_if_arms(&mut r#if.else_branchs)?;
         Ok(Expression::new(
-            ExpressionKind::If(If {
-                condition: Box::new(if_condition),
-                block: if_block,
-                else_branchs: self.parse_elses()?,
-            }),
+            ExpressionKind::If(r#if),
             self.new_span(start_span),
         ))
     }
@@ -95,8 +99,8 @@ impl<'a> Parser<'a> {
         todo!()
     }
 
-    fn parse_elses(&mut self) -> SoulResult<Vec<Spanned<ElseKind>>> {
-        let mut elses = vec![];
+    fn parse_if_arms(&mut self, head: &mut Option<IfArm>) -> SoulResult<()> {
+        let mut tail: &mut Option<IfArm> = head;
         let mut has_else = false;
 
         loop {
@@ -106,7 +110,7 @@ impl<'a> Parser<'a> {
             let start_span = self.token().span;
             if !self.current_is_ident(ELSE_STR) {
                 self.go_to(position);
-                break Ok(elses);
+                break Ok(());
             }
 
             if has_else {
@@ -132,7 +136,7 @@ impl<'a> Parser<'a> {
                     If {
                         condition: Box::new(condition),
                         block,
-                        else_branchs: vec![],
+                        else_branchs: None,
                     },
                     self.new_span(start_span),
                 )))
@@ -143,7 +147,11 @@ impl<'a> Parser<'a> {
                 ElseKind::Else(Spanned::new(block, self.new_span(start_span)))
             };
 
-            elses.push(Spanned::new(else_kind, self.new_span(else_span)));
+            *tail = Some(IfArm::new_arm(else_kind, self.new_span(else_span)));
+            tail = match tail.as_mut().expect("just made Some(_)").try_next_mut() {
+                Some(val) => val,
+                None => return Ok(()),
+            };
         }
     }
 }

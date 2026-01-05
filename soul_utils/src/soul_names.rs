@@ -3,12 +3,13 @@
 //! This module defines various enums for keywords, operators, type wrappers,
 //! and other language constructs used in the Soul programming language.
 
-use crate::{
-    abstract_syntax_tree::{
-        operator::{BinaryOperatorKind, UnaryOperatorKind},
-        statment::Ident,
-    }, define_str_enum, define_symbols, sementic_models::scope::NodeId, symbool_kind::SymboolKind
-};
+use crate::{define_str_enum, define_symbols, symbool_kind::SymboolKind};
+define_str_enum!(
+    /// the methode name of operators
+    pub enum OperatorMethodes {
+        Index => "index",
+    }
+);
 
 define_symbols!(
     /// Type wrapper symbols that modify how types are referenced or stored.
@@ -28,15 +29,6 @@ define_symbols!(
         Option => "?", SymboolKind::Question,
     }
 );
-
-#[derive(Debug, Clone, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
-pub enum StackArrayKind {
-    Number(u64),
-    Ident {
-        ident: Ident,
-        resolved: Option<NodeId>,
-    },
-}
 
 define_str_enum!(
     /// Type modifiers that affect how values can be used or stored.
@@ -242,8 +234,9 @@ define_str_enum!(
         InForLoop => "in", 0,
         While => "while", 5,
 
-        Return => "return", 0,
+        Fall => "fall", 0,
         Break => "break", 0,
+        Return => "return", 0,
         Continue => "continue", 0,
 
         Struct => "struct", 0,
@@ -266,43 +259,3 @@ define_str_enum!(
     }
 );
 
-impl Operator {
-    pub fn to_unary(&self) -> Option<UnaryOperatorKind> {
-        Some(match self {
-            Operator::Not => UnaryOperatorKind::Not,
-            Operator::Sub => UnaryOperatorKind::Neg,
-            Operator::Mul => UnaryOperatorKind::DeRef,
-            Operator::BitAnd => UnaryOperatorKind::MutRef,
-            Operator::ConstRef => UnaryOperatorKind::ConstRef,
-            Operator::Incr => UnaryOperatorKind::Increment { before_var: true },
-            Operator::Decr => UnaryOperatorKind::Decrement { before_var: true },
-            _ => return None,
-        })
-    }
-
-    pub fn to_binary(&self) -> Option<BinaryOperatorKind> {
-        Some(match self {
-            Operator::Eq => BinaryOperatorKind::Eq,
-            Operator::Mul => BinaryOperatorKind::Mul,
-            Operator::Div => BinaryOperatorKind::Div,
-            Operator::Mod => BinaryOperatorKind::Mod,
-            Operator::Add => BinaryOperatorKind::Add,
-            Operator::Sub => BinaryOperatorKind::Sub,
-            Operator::Root => BinaryOperatorKind::Root,
-            Operator::Power => BinaryOperatorKind::Pow,
-            Operator::LessEq => BinaryOperatorKind::Le,
-            Operator::GreatEq => BinaryOperatorKind::Ge,
-            Operator::LessThen => BinaryOperatorKind::Lt,
-            Operator::NotEq => BinaryOperatorKind::NotEq,
-            Operator::Range => BinaryOperatorKind::Range,
-            Operator::BitOr => BinaryOperatorKind::BitOr,
-            Operator::LogOr => BinaryOperatorKind::LogOr,
-            Operator::GreatThen => BinaryOperatorKind::Gt,
-            Operator::BitAnd => BinaryOperatorKind::BitAnd,
-            Operator::BitXor => BinaryOperatorKind::BitXor,
-            Operator::LogAnd => BinaryOperatorKind::LogAnd,
-
-            Operator::Not | Operator::Incr | Operator::Decr | Operator::ConstRef => return None,
-        })
-    }
-}

@@ -1,8 +1,7 @@
 use crate::steps::tokenize::from_lexer::FromLexer;
 use crate::steps::tokenize::token_stream::{Number, Token, TokenKind, TokenStream};
 use crate::steps::tokenize::{Request, Response};
-use soul_ast::error::{ExpansionId, SoulError, SoulErrorKind, SoulResult, Span};
-use soul_ast::symbool_kind::SymboolKind;
+use soul_utils::{ExpansionId, SoulError, SoulErrorKind, SoulResult, Span, SymboolKind};
 use std::iter::Peekable;
 use std::str::Chars;
 

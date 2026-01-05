@@ -10,3 +10,4 @@
 *.soulAST.json
 soul_tester/path.json
 /hir_converter/target
+/soul_utils/target

@@ -1,12 +1,10 @@
-use soul_ast::{
-    abstract_syntax_tree::{
-        spanned::Spanned,
-        statment::{Statement, StatementKind},
-    },
-    error::{SoulError, SoulErrorKind, SoulResult},
-    soul_names::KeyWord,
-    soul_page_path::SoulPagePath,
-    symbool_kind::SymboolKind,
+use soul_ast::abstract_syntax_tree::{
+    spanned::Spanned,
+    statment::{Statement, StatementKind},
+};
+
+use soul_utils::{
+    SoulError, SoulErrorKind, SoulPagePath, SoulResult, SymboolKind, soul_names::KeyWord,
 };
 
 use crate::steps::{

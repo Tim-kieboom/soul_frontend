@@ -1,9 +1,6 @@
 use crate::steps::{parse::parser::Parser, tokenize::token_stream::TokenKind};
-use soul_ast::{
-    abstract_syntax_tree::statment::Ident,
-    error::{SoulError, SoulErrorKind, SoulResult, Span},
-    soul_names,
-};
+use soul_ast::abstract_syntax_tree::statment::Ident;
+use soul_utils::{SoulError, SoulErrorKind, SoulResult, Span, soul_names};
 
 const ILIGAL_NAMES: &[&[&str]] = &[
     soul_names::KeyWord::VALUES,

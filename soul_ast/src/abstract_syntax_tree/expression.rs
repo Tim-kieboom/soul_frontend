@@ -13,10 +13,13 @@ use crate::{
         statment::{Ident, try_display_many_node_ids, try_display_node_id},
         syntax_display::{DisplayKind, SyntaxDisplay, tree_prefix},
     },
-    error::Span,
     sementic_models::scope::NodeId,
+};
+
+use soul_utils::{    
+    Span,
+    SoulPagePath,
     soul_names::{KeyWord, TypeWrapper},
-    soul_page_path::SoulPagePath,
 };
 use itertools::Itertools;
 
@@ -103,6 +106,7 @@ pub enum ReturnKind {
     Break,
     /// continue loop.
     Continue,
+    Fall,
 }
 
 /// An expression from an external page/module.
@@ -262,30 +266,35 @@ impl SyntaxDisplay for ExpressionKind {
                 sb.push(' ');
                 r#if.condition.node.inner_display(sb, kind, tab, is_last);
                 r#if.block.inner_display(sb, kind, tab, is_last);
-                for else_kind in &r#if.else_branchs {
+                
+                let mut current = r#if.else_branchs.as_ref();
+                while let Some(else_kind) = current {
                     sb.push('\n');
                     let prefix = tree_prefix(tab, is_last);
                     sb.push_str(&prefix);
 
                     match &else_kind.node {
-                        ElseKind::ElseIf(spanned) => {
+                        ElseKind::ElseIf(elif) => {
                             sb.push_str(KeyWord::Else.as_str());
                             sb.push(' ');
                             sb.push_str(KeyWord::If.as_str());
                             sb.push(' ');
-                            spanned
+                            elif
                                 .node
                                 .condition
                                 .node
                                 .inner_display(sb, kind, tab, is_last);
-                            spanned.node.block.inner_display(sb, kind, tab, is_last);
+                            elif.node.block.inner_display(sb, kind, tab, is_last);
+                            current = elif.node.else_branchs.as_ref();
                         }
-                        ElseKind::Else(spanned) => {
+                        ElseKind::Else(el) => {
                             sb.push_str(KeyWord::Else.as_str());
                             sb.push(' ');
-                            spanned.node.inner_display(sb, kind, tab, is_last);
+                            el.node.inner_display(sb, kind, tab, is_last);
+                            current = None; 
                         }
                     }
+
                 }
             }
             ExpressionKind::For(_for) => {
@@ -424,6 +433,7 @@ impl SyntaxDisplay for ExpressionKind {
 impl ReturnKind {
     pub fn as_keyword(&self) -> KeyWord {
         match self {
+            ReturnKind::Fall => KeyWord::Fall,
             ReturnKind::Break => KeyWord::Break,
             ReturnKind::Return => KeyWord::Return,
             ReturnKind::Continue => KeyWord::Continue,

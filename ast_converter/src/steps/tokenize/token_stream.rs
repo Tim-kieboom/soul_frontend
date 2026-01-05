@@ -1,9 +1,5 @@
 use crate::steps::tokenize::tokenizer::Lexer;
-use soul_ast::{
-    error::{SoulError, SoulResult, Span},
-    soul_names::InternalPrimitiveTypes,
-    symbool_kind::SymboolKind,
-};
+use soul_utils::{SoulError, SoulResult, Span, SymboolKind, soul_names::InternalPrimitiveTypes};
 
 /// This struct provides methods for token stream navigation, consumption, and
 /// conversion to a complete token vector. It supports save/restore positions

@@ -5,17 +5,16 @@ use crate::{
     },
     utils::try_result::{ResultTryErr, ToResult, TryErr, TryError, TryNotValue, TryOk, TryResult},
 };
-use soul_ast::{
-    abstract_syntax_tree::{
-        expression::Expression,
-        function::{Function, FunctionCall, FunctionCallee, FunctionSignature},
-        soul_type::{GenericDeclare, GenericDefine, SoulType},
-        spanned::Spanned,
-        statment::{Ident, Statement, StatementKind},
-    },
-    error::{SoulError, SoulErrorKind, SoulResult, Span},
+use soul_ast::abstract_syntax_tree::{
+    expression::Expression,
+    function::{Function, FunctionCall, FunctionCallee, FunctionSignature},
+    soul_type::{GenericDeclare, GenericDefine, SoulType},
+    spanned::Spanned,
+    statment::{Ident, Statement, StatementKind},
+};
+use soul_utils::{
+    SoulError, SoulErrorKind, SoulResult, Span, SymboolKind,
     soul_names::{KeyWord, TypeModifier},
-    symbool_kind::SymboolKind,
 };
 
 impl<'a> Parser<'a> {

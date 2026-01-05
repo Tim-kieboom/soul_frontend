@@ -71,6 +71,7 @@ version = "0.1.0"
 dependencies = [
  "itertools",
  "serde",
+ "soul_utils",
 ]
 
 [[package]]
@@ -79,6 +80,14 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "soul_ast",
+ "soul_utils",
+]
+
+[[package]]
+name = "soul_utils"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

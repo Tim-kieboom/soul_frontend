@@ -9,8 +9,9 @@ use crate::{
     utils::try_result::{ToResult, TryError},
 };
 use soul_ast::{
+    ConvertOperator,
     abstract_syntax_tree::{
-        expression::{Expression, ExpressionKind, AccessField, Index, ReturnKind, ReturnLike},
+        expression::{AccessField, Expression, ExpressionKind, Index, ReturnKind, ReturnLike},
         expression_groups::ExpressionGroup,
         function::StructConstructor,
         literal::Literal,
@@ -18,9 +19,10 @@ use soul_ast::{
         soul_type::{SoulType, TypeKind},
         statment::Ident,
     },
-    error::{SoulError, SoulErrorKind, SoulResult, Span},
+};
+use soul_utils::{
+    SoulError, SoulErrorKind, SoulResult, Span, SymboolKind,
     soul_names::{self, AccessType, KeyWord, Operator, TypeModifier},
-    symbool_kind::SymboolKind,
 };
 
 impl<'a> Parser<'a> {

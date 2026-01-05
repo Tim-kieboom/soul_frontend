@@ -1,22 +1,33 @@
-use soul_ast::{abstract_syntax_tree::statment::Ident, soul_names::TypeModifier};
+use soul_ast::abstract_syntax_tree::Ident;
+use soul_utils::soul_names::TypeModifier;
 
-use crate::HirId;
+use crate::{ExpressionId, HirId, LocalDefId};
 
 /// Resolved HIR type with generic arguments.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct HirType {
     /// Core type kind.
     pub kind: HirTypeKind,
     /// Generic arguments (for parameterized types).
-    pub generics: Vec<HirType>,
+    pub generics: Vec<GenericDefine>,
     pub modifier: Option<TypeModifier>,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum GenericDefine {
+    Type(HirType),
+    Lifetime(Ident),
+    Expression(ExpressionId),
+}
+
 /// Core type kinds in HIR.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum HirTypeKind {
     /// Stack-allocated array with known size.
-    StackArray { ty: Box<HirType>, size: HirId },
+    StackArray {
+        ty: Box<HirType>,
+        size: ExpressionId,
+    },
     /// Reference type (const=`@T` or mut=`&T`).
     Ref { ty: Box<HirType>, mutable: bool },
     /// Raw pointer (`*T`).
@@ -34,7 +45,7 @@ pub enum HirTypeKind {
     /// Empty type `none`.
     None,
     /// Unresolved generic parameter.
-    Generic(Ident),
+    Generic(LocalDefId),
 }
 
 /// Primitive types with size information.

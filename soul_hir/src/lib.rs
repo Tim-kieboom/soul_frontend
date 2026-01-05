@@ -1,6 +1,4 @@
-<<<<<<< Updated upstream
-use std::collections::HashMap;
-use soul_ast::sementic_models::sementic_fault::SementicFault;
+use soul_utils::SementicFault;
 
 pub mod expression;
 pub mod hir_type;
@@ -12,6 +10,8 @@ pub use hir_type::*;
 pub use item::*;
 pub use scope::*;
 pub use statement::*;
+
+use soul_utils::{AsIndex, VecMap};
 
 type Todo = u8;
 
@@ -42,13 +42,13 @@ pub struct Module {
     /// Next available HIR scope identifier for allocation.
     pub next_scope_id: ScopeId,
     /// Top-level items.
-    pub items: HashMap<HirId, Item>,
+    pub items: VecMap<HirId, Item>,
     /// Executable code bodies.
-    pub bodies: HashMap<HirId, Body>,
+    pub bodies: VecMap<HirId, Body>,
     /// Scope hierarchy for borrow checking and lifetime analysis.
-    pub scopes: HashMap<ScopeId, Scope>,
+    pub scopes: VecMap<ScopeId, Scope>,
     /// All expressions in the module, indexed by stable IDs.
-    pub expressions: HashMap<ExpressionId, Expression>,
+    pub expressions: VecMap<ExpressionId, Expression>,
 }
 
 /// Type alias for HIR body identifiers.
@@ -62,15 +62,18 @@ pub type ExpressionId = HirId;
 
 /// Stable identifier for all HIR nodes, stable across compilation passes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct HirId(u32);
+pub struct HirId(usize);
 impl HirId {
-    pub fn new(value: u32) -> Self {
+    pub fn increment(&mut self) {
+        self.0 += 1
+    }
+}
+impl AsIndex for HirId {
+    fn new(value: usize) -> Self {
         Self(value)
     }
-    pub fn increment(&mut self) {
-        self.0+=1
-    }
-    pub fn as_u32(&self) -> u32 {
+
+    fn index(&self) -> usize {
         self.0
     }
 }
@@ -87,10 +90,8 @@ pub struct LocalDefId {
 }
 
 /// Executable code body in HIR, either a block of statements or a single expression.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum Body {
-    Block(HirBlockId),
+    Block(Block),
     Expression(ExpressionId),
 }
-=======
->>>>>>> Stashed changes

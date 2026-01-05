@@ -1,13 +1,21 @@
 use crate::paths::Paths;
 use anyhow::{Error, Result};
-use std::{fs::File, io::{BufReader, Read, Write}, process::exit};
-use soul_ast::abstract_syntax_tree::{AbstractSyntaxTree, syntax_display::{DisplayKind, SyntaxDisplay}};
-use ast_converter::{ParseResonse, SementicFault, SementicLevel, parse_file, utils::convert_error_message::ToMessage};
+use ast_converter::{
+    ParseResonse, SementicFault, SementicLevel, parse_file, utils::convert_error_message::ToMessage,
+};
+use soul_ast::abstract_syntax_tree::{
+    AbstractSyntaxTree,
+    syntax_display::{DisplayKind, SyntaxDisplay},
+};
+use std::{
+    fs::File,
+    io::{BufReader, Read, Write},
+    process::exit,
+};
 
 const FATAL_LEVEL: SementicLevel = SementicLevel::Error;
 
 pub fn run(path: &Paths, file_name: &str) -> Result<()> {
-
     path.insure_paths_exist()?;
     let source_file = get_source_file(&format!("{}/{file_name}", path.soul_src))?;
     let response = match parse_file(&source_file) {
@@ -31,8 +39,8 @@ pub fn run(path: &Paths, file_name: &str) -> Result<()> {
     }
 
     print_syntax_tree(
-        &response.syntax_tree, 
-        &format!("{}/{file_name}_AST.soulc", path.output_ast), 
+        &response.syntax_tree,
+        &format!("{}/{file_name}_AST.soulc", path.output_ast),
         DisplayKind::Parser,
     )?;
 
@@ -42,17 +50,12 @@ pub fn run(path: &Paths, file_name: &str) -> Result<()> {
         DisplayKind::NameResolver,
     )?;
 
-    use ast_converter::utils::char_colors::{GREEN, DEFAULT};
-    println!("parse: {GREEN}successfull!!{DEFAULT}");   
-    write_to_output(
-        &response, 
-        &path,
-        file_name
-    )?;
+    use ast_converter::utils::char_colors::{DEFAULT, GREEN};
+    println!("parse: {GREEN}successfull!!{DEFAULT}");
+    write_to_output(&response, &path, file_name)?;
     println!("write output: {GREEN}successfull!!{DEFAULT}");
     Ok(())
 }
-
 
 fn write_to_output(response: &ParseResonse, path: &Paths, file_name: &str) -> Result<()> {
     use std::fs::File;
@@ -60,23 +63,22 @@ fn write_to_output(response: &ParseResonse, path: &Paths, file_name: &str) -> Re
     let ast_path = path.get_ast_incremental_ast(file_name);
     let meta_path = path.get_ast_incremental_ast_meta(file_name);
 
-    let ParseResonse { syntax_tree, sementic_info } = response;
+    let ParseResonse {
+        syntax_tree,
+        sementic_info,
+    } = response;
 
     let binary = serde_cbor::to_vec(syntax_tree)?;
-    File::create(&ast_path)?
-        .write(&binary)?;
+    File::create(&ast_path)?.write(&binary)?;
 
     let binary = serde_cbor::to_vec(sementic_info)?;
-    File::create(&meta_path)?
-        .write(&binary)?;
+    File::create(&meta_path)?.write(&binary)?;
 
     let json = serde_json::to_string_pretty(syntax_tree)?;
-    File::create(&format!("{ast_path}.json"))?
-        .write(json.as_bytes())?;
+    File::create(&format!("{ast_path}.json"))?.write(json.as_bytes())?;
 
     let json = serde_json::to_string_pretty(sementic_info)?;
-    File::create(&format!("{meta_path}.json"))?
-        .write(json.as_bytes())?;
+    File::create(&format!("{meta_path}.json"))?.write(json.as_bytes())?;
 
     Ok(())
 }

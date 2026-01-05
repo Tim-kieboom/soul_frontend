@@ -1,4 +1,4 @@
-use soul_ast::symbool_kind::SymboolKind;
+use soul_utils::SymboolKind;
 
 use crate::steps::tokenize::{
     Request,

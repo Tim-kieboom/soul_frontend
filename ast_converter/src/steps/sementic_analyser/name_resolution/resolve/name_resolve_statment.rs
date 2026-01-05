@@ -7,9 +7,9 @@ use soul_ast::{
         spanned::Spanned,
         statment::{Ident, Statement, StatementKind, UseBlock},
     },
-    error::{SoulError, SoulErrorKind, Span},
     sementic_models::scope::NodeId,
 };
+use soul_utils::{SoulError, SoulErrorKind, Span};
 
 use crate::steps::sementic_analyser::name_resolution::name_resolver::NameResolver;
 
@@ -17,7 +17,7 @@ impl<'a> NameResolver<'a> {
     pub(super) fn resolve_block(&mut self, block: &mut Block) {
         self.try_go_to(block.scope_id);
 
-        for statment in &mut block.statments {
+        for statment in &mut block.statements {
             self.resolve_statement(statment);
         }
     }

@@ -4,8 +4,8 @@ use crate::{
         syntax_display::{DisplayKind, SyntaxDisplay, gap_prefix},
     },
     sementic_models::scope::ScopeId,
-    soul_names::TypeModifier,
 };
+use soul_utils::soul_names::TypeModifier;
 
 /// A block of statements with an associated scope.
 ///

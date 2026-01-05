@@ -11,16 +11,17 @@ use crate::{
     },
 };
 use soul_ast::{
+    StackArrayKind,
     abstract_syntax_tree::{
         function::ThisCallee,
         soul_type::{ArrayType, NamedTupleType, ReferenceType, SoulType, TupleType, TypeKind},
         spanned::Spanned,
         statment::Ident,
     },
-    error::{SoulError, SoulErrorKind, SoulResult},
-    soul_names::{
-        InternalComplexTypes, InternalPrimitiveTypes, StackArrayKind, TypeModifier, TypeWrapper,
-    },
+};
+use soul_utils::{
+    SoulError, SoulErrorKind, SoulResult,
+    soul_names::{InternalComplexTypes, InternalPrimitiveTypes, TypeModifier, TypeWrapper},
 };
 
 impl<'a> Parser<'a> {

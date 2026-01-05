@@ -16,7 +16,7 @@ impl<'a> NameResolver<'a> {
     pub(super) fn collect_block(&mut self, block: &mut Block) {
         self.push_scope(&mut block.scope_id);
 
-        for statement in &mut block.statments {
+        for statement in &mut block.statements {
             self.collect_statement(statement);
         }
 
@@ -24,7 +24,7 @@ impl<'a> NameResolver<'a> {
     }
 
     fn collect_scopeless_block(&mut self, block: &mut Block) {
-        for statement in &mut block.statments {
+        for statement in &mut block.statements {
             self.collect_statement(statement);
         }
     }

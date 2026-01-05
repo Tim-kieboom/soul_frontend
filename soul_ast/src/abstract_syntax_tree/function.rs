@@ -8,8 +8,8 @@ use crate::{
         statment::Ident,
     },
     sementic_models::scope::NodeId,
-    soul_names::TypeModifier,
 };
+use soul_utils::soul_names::TypeModifier;
 
 /// A function definition with a signature and body block.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -77,7 +77,7 @@ pub struct FunctionCallee {
     pub this: ThisCallee,
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ThisCallee {
     /// `&this`
     MutRef,

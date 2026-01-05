@@ -8,16 +8,17 @@ use crate::{
     },
     utils::try_result::{ResultTryErr, ToResult, TryErr, TryError, TryNotValue, TryOk, TryResult},
 };
-use soul_ast::{
-    abstract_syntax_tree::{
-        expression::{Expression, ExpressionKind, ReturnKind},
-        operator::{Binary, BinaryOperator, BinaryOperatorKind},
-        soul_type::SoulType,
-        statment::{Assignment, Ident, Statement, StatementKind, Variable},
-    },
-    error::{SoulError, SoulErrorKind, SoulResult, Span},
+use soul_ast::abstract_syntax_tree::{
+    expression::{Expression, ExpressionKind, ReturnKind},
+    operator::{Binary, BinaryOperator, BinaryOperatorKind},
+    soul_type::SoulType,
+    statment::{Assignment, Ident, Statement, StatementKind, Variable},
+};
+use soul_utils::{
+    SoulError, SoulErrorKind, SoulResult, Span,
     soul_names::{self, AssignType, KeyWord, TypeModifier},
 };
+
 use std::{
     iter::{self},
     sync::LazyLock,
@@ -247,6 +248,9 @@ impl<'a> Parser<'a> {
             KeyWord::Break => {
                 Statement::from_expression(self.parse_return_like(ReturnKind::Break).try_err()?)
             }
+            KeyWord::Fall => {
+                Statement::from_expression(self.parse_return_like(ReturnKind::Fall).try_err()?)
+            }
             KeyWord::Else => {
                 return TryErr(SoulError::new(
                     format!(
@@ -258,7 +262,6 @@ impl<'a> Parser<'a> {
                     Some(self.new_span(start_span)),
                 ));
             }
-
             KeyWord::Import => self.parse_import().try_err()?,
             KeyWord::Typeof
             | KeyWord::Dyn

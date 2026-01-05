@@ -1,4 +1,4 @@
-use crate::{
+use soul_utils::{
     soul_names::{InternalComplexTypes, InternalPrimitiveTypes, TypeModifier},
 };
 

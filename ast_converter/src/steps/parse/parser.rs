@@ -3,11 +3,8 @@ use crate::steps::{
     tokenize::token_stream::{Token, TokenKind, TokenStream, TokenStreamPosition},
 };
 use itertools::Itertools;
-use soul_ast::{
-    abstract_syntax_tree::{AbstractSyntaxTree, block::Block},
-    error::{SoulError, SoulErrorKind, SoulResult, Span},
-    soul_names::TypeModifier,
-};
+use soul_ast::abstract_syntax_tree::{AbstractSyntaxTree, block::Block};
+use soul_utils::{SoulError, SoulErrorKind, SoulResult, Span, soul_names::TypeModifier};
 
 /// Main entry point for parsing token stream into Abstract Syntax Tree.
 ///
@@ -67,11 +64,11 @@ impl<'a> Parser<'a> {
         }
 
         self.skip_end_lines();
-        let mut statments = vec![];
+        let mut statements = vec![];
 
         while !self.current_is(&TokenKind::EndFile) {
             match self.parse_statement() {
-                Ok(statment) => statments.push(statment),
+                Ok(statment) => statements.push(statment),
                 Err(err) => {
                     self.add_error(err);
                     self.skip_over_statement();
@@ -83,9 +80,9 @@ impl<'a> Parser<'a> {
 
         AbstractSyntaxTree {
             root: Block {
-                statments,
-                modifier: TypeModifier::Mut,
+                statements,
                 scope_id: None,
+                modifier: TypeModifier::Mut,
             },
         }
     }

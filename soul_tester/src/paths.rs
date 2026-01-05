@@ -8,14 +8,14 @@ pub struct Paths {
 
 impl Paths {
     pub fn new(raw_json: &[u8]) -> serde_json::Result<Self> {
-        let JsonPath{path} = serde_json::from_slice(raw_json)?;
+        let JsonPath { path } = serde_json::from_slice(raw_json)?;
 
         let output_ast = format!("{path}/output/AST");
         let soul_src = format!("{path}/soul_src");
         let output = format!("{path}/output");
         let base = path;
 
-        Ok(Paths{
+        Ok(Paths {
             base,
             output,
             soul_src,
@@ -25,7 +25,7 @@ impl Paths {
 
     pub fn get_ast_incremental_ast(&self, file_name: &str) -> String {
         format!("{}/{file_name}.soulAST", self.output)
-    } 
+    }
 
     pub fn get_ast_incremental_ast_meta(&self, file_name: &str) -> String {
         format!("{}/{file_name}.soulASTMeta", self.output)
@@ -40,4 +40,6 @@ impl Paths {
 }
 
 #[derive(serde::Deserialize)]
-struct JsonPath {path: String}
+struct JsonPath {
+    path: String,
+}

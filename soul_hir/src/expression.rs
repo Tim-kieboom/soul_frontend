@@ -1,8 +1,8 @@
 use soul_ast::abstract_syntax_tree::{
-    literal::Literal, operator::BinaryOperator, spanned::Spanned, statment::Ident,
+    UnaryOperator, literal::Literal, operator::BinaryOperator, spanned::Spanned, statment::Ident,
 };
 
-use crate::{ExpressionId, HirBodyId, HirId, Todo, hir_type::HirType};
+use crate::{ExpressionId, HirBlockId, HirBodyId, HirId, Todo, hir_type::HirType};
 
 pub type Expression = Spanned<ExpressionKind>;
 
@@ -14,13 +14,13 @@ pub enum ExpressionKind {
     /// Reference creation (`&expr` or `@expr`).
     Ref(Ref),
     /// Block expression `{ ... }`.
-    Block(HirId),
+    Block(HirBodyId),
     /// Lambda expression `|params| body`.
     Lambda(Todo),
     /// Pattern matching.
     Match(Match),
-    /// For loop (desugared from Soul `while` or `for`).
-    For(For),
+    /// while loop (desugared from Soul `while` or `for`).
+    While(While),
     /// Binary operation.
     Binary(Binary),
     /// Unary operation.
@@ -33,10 +33,14 @@ pub enum ExpressionKind {
     ResolvedVariable(HirId),
     /// Field access `expr.field`.
     FieldAccess(FieldAccess),
+    StaticMethode(StaticMethode),
+    StaticFieldAccess(StaticFieldAccess),
     /// Function/method call.
     FunctionCall(FunctionCall),
     /// Struct literal `Type { field: expr, .. }`.
     StructContructor(StructContructor),
+    Array(Vec<ExpressionId>),
+    Tuple(Vec<(Ident, ExpressionId)>),
 }
 
 /// If expression (`if cond { then } else { else }`).
@@ -47,7 +51,13 @@ pub struct If {
     /// Then branch body.
     pub body: HirBodyId,
     /// Optional else branch.
-    pub else_arm: Option<HirId>,
+    pub else_arm: Option<Box<IfArm>>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum IfArm {
+    ElseIf(If),
+    Else(HirBodyId),
 }
 
 /// Reference expression details.
@@ -71,21 +81,33 @@ pub struct Match {
 /// Single match arm.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MatchArm {
-    /// Pattern/condition expression.
-    pub condition: ExpressionId,
-    /// Arm body.
-    pub body: HirBodyId,
+    pub pattern: MatchPattern,
+    pub guard: Option<ExpressionId>,
+    pub body: HirBlockId,
 }
 
-/// For loop expression (desugared iterator loop).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct For {
+pub enum MatchPattern {
+    Wildcard,
+    Bind(Ident),
+    Expression(ExpressionId),
+    Variant {
+        name: Ident,
+        bindings: Vec<Ident>,
+    },
+    NamedVariant {
+        name: Ident,
+        bindings: Vec<(Ident, Ident)>,
+    },
+}
+
+/// While loop expression (desugared iterator loop).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct While {
     /// Loop body.
     pub body: HirBodyId,
-    /// Loop variable binding.
-    pub element: HirId,
-    /// Iterator expression.
-    pub iterator: ExpressionId,
+    /// loop till condition.
+    pub condition: Option<ExpressionId>,
 }
 
 /// Binary operation.
@@ -103,7 +125,7 @@ pub struct Binary {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Unary {
     /// Unary operator.
-    pub operator: BinaryOperator,
+    pub operator: UnaryOperator,
     /// Operand.
     pub expression: ExpressionId,
 }
@@ -112,8 +134,16 @@ pub struct Unary {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct FunctionCall {
     /// Callee expression.
-    pub callee: ExpressionId,
+    pub callee: Option<ExpressionId>,
+    pub name: Ident,
     /// Argument expressions.
+    pub arguments: Vec<ExpressionId>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct StaticMethode {
+    pub name: Ident,
+    pub callee: HirType,
     pub arguments: Vec<ExpressionId>,
 }
 
@@ -126,13 +156,13 @@ pub struct FieldAccess {
     pub reciever: ExpressionId,
 }
 
-/// Static field access `Type::field`.
+/// Field access `receiver.field`.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct StaticFieldAccess {
     /// Field name.
     pub field: Ident,
-    /// Type receiver.
-    pub reciever: ExpressionId,
+    /// Receiver expression.
+    pub reciever: HirType,
 }
 
 /// Struct literal constructor.

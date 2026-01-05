@@ -1,5 +1,9 @@
 use itertools::Itertools;
-
+use soul_utils::{
+    Span,
+    soul_names::KeyWord,
+    SoulPagePath,
+};
 use crate::{
     abstract_syntax_tree::{
         block::Block,
@@ -11,10 +15,7 @@ use crate::{
         spanned::Spanned,
         syntax_display::{DisplayKind, SyntaxDisplay, gap_prefix, tree_prefix},
     },
-    error::Span,
     sementic_models::scope::NodeId,
-    soul_names::KeyWord,
-    soul_page_path::SoulPagePath,
 };
 
 /// A statement in the Soul language, wrapped with source location information.
@@ -137,6 +138,24 @@ impl StatementKind {
 
     pub fn new_block(block: Block, span: Span) -> Self {
         Self::new_expression(ExpressionKind::Block(block), span)
+    }
+
+    pub fn get_variant_name(&self) -> &'static str {
+        match self {
+            StatementKind::EndFile => "EndFile",
+            StatementKind::Enum(_) => "Enum",
+            StatementKind::Union(_) => "Union",
+            StatementKind::Class(_) => "Class",
+            StatementKind::Trait(_) => "Trait",
+            StatementKind::Struct(_) => "Struct",
+            StatementKind::Import(_) => "Import",
+            StatementKind::Variable(_) => "Variable",
+            StatementKind::Function(_) => "Function",
+            StatementKind::UseBlock(_) => "UseBlock",
+            StatementKind::Expression(_) => "Expression",
+            StatementKind::Assignment(_) => "Assignment",
+            StatementKind::CloseBlock => "CloseBlock",
+         }
     }
 }
 

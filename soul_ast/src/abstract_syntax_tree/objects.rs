@@ -79,22 +79,22 @@ pub struct Field {
     /// Optional default value for the field.
     pub default_value: Option<Expression>,
     /// Field access visibility settings.
-    pub vis: FieldAccess,
+    pub vis: FieldVisibility,
     pub allignment: u32,
     pub node_id: Option<NodeId>,
 }
 
 /// Field access visibility and mutability settings.
-#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct FieldAccess {
-    /// Getter visibility. `None` means use default (e.g., public).
-    pub get: Option<Visibility>,
-    /// Setter visibility. `None` means disallow setting.
-    pub set: Option<Visibility>,
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct FieldVisibility {
+    /// Getter visibility. 
+    pub get: Visibility,
+    /// Setter visibility. 
+    pub set: Visibility,
 }
 
 /// Visibility modifier for fields and methods.
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Visibility {
     /// Public visibility (accessible from anywhere).
     Public,
@@ -113,18 +113,21 @@ impl ClassMember {
 }
 
 impl Field {
-    pub fn new(ty: SoulType, name: Ident) -> Self {
+    pub fn new(ty: SoulType, name: Ident, is_struct: bool) -> Self {
+        let vis = if is_struct {FieldVisibility::from_struct(None, None)}
+        else {FieldVisibility::from_class(None, None)};
+
         Self {
             ty,
             name,
             node_id: None,
             default_value: None,
             allignment: u32::default(),
-            vis: FieldAccess::default(),
+            vis,
         }
     }
 
-    pub fn from_visability(ty: SoulType, name: Ident, vis: FieldAccess) -> Self {
+    pub fn from_visability(ty: SoulType, name: Ident, vis: FieldVisibility) -> Self {
         Self {
             ty,
             vis,
@@ -136,33 +139,45 @@ impl Field {
     }
 }
 
-impl FieldAccess {
+impl FieldVisibility {
     pub const PUBLIC_GET: &str = "Get";
     pub const PRIVATE_GET: &str = "get";
     pub const PUBLIC_SET: &str = "Set";
     pub const PRIVATE_SET: &str = "set";
 
+    pub fn default(is_struct: bool) -> Self {
+        if is_struct {Self::from_struct(None, None)}
+        else {Self::from_class(None, None)}
+    }
+
+    pub fn from_class(get: Option<Visibility>, set: Option<Visibility>) -> Self {
+        Self {
+            get: get.unwrap_or(Visibility::Private),
+            set: set.unwrap_or(Visibility::Private),
+        }
+    }
+
+    pub fn from_struct(get: Option<Visibility>, set: Option<Visibility>) -> Self {
+        Self {
+            get: get.unwrap_or(Visibility::Public),
+            set: set.unwrap_or(Visibility::Public),
+        }
+    }
+
     pub fn inner_display(&self, sb: &mut String) {
-        if let Some(get) = &self.get {
-            let str = match get {
-                Visibility::Public => Self::PUBLIC_GET,
-                Visibility::Private => Self::PRIVATE_GET,
-            };
+        let str = match self.get {
+            Visibility::Public => Self::PUBLIC_GET,
+            Visibility::Private => Self::PRIVATE_GET,
+        };
 
-            sb.push_str(str);
-        }
+        sb.push_str(str);
+        sb.push(' ');
 
-        if let Some(set) = &self.set {
-            if self.get.is_some() {
-                sb.push(' ');
-            }
+        let str = match self.set {
+            Visibility::Public => Self::PUBLIC_SET,
+            Visibility::Private => Self::PRIVATE_SET,
+        };
 
-            let str = match set {
-                Visibility::Public => Self::PUBLIC_SET,
-                Visibility::Private => Self::PRIVATE_SET,
-            };
-
-            sb.push_str(str);
-        }
+        sb.push_str(str);
     }
 }

@@ -1,5 +1,5 @@
 use crate::steps::tokenize::tokenizer::Lexer;
-use soul_ast::symbool_kind::SymboolKind;
+use soul_utils::SymboolKind;
 
 pub trait FromLexer
 where

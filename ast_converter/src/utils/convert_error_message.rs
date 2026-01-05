@@ -1,8 +1,8 @@
 use std::str::Lines;
 
-use soul_ast::{error::{SoulError, SoulErrorKind, Span}, sementic_models::sementic_fault::SementicLevel};
+use soul_utils::{SementicLevel, SoulError, SoulErrorKind, Span};
 
-use crate::{utils::char_colors::*};
+use crate::utils::char_colors::*;
 
 pub trait ToMessage {
     fn to_message(&self, level: SementicLevel, file_path: &str, source_file: &str) -> String;

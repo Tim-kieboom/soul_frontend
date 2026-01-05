@@ -1,20 +1,23 @@
 use std::collections::HashMap;
 
-use soul_ast::abstract_syntax_tree::{spanned::Spanned, statment::Ident};
-
-use crate::{ExpressionId, HirId, hir_type::HirType};
+use crate::{ExpressionId, HirId, LocalDefId, hir_type::HirType};
+use soul_ast::abstract_syntax_tree::spanned::Spanned;
+use soul_utils::{AsIndex, VecMap};
 
 /// Unique identifier for scopes in the HIR scope tree.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct ScopeId(u32);
+pub struct ScopeId(usize);
 impl ScopeId {
-    pub fn new(value: u32) -> Self {
+    pub fn increment(&mut self) {
+        self.0 += 1
+    }
+}
+impl AsIndex for ScopeId {
+    fn new(value: usize) -> Self {
         Self(value)
     }
-    pub fn increment(&mut self) {
-        self.0+=1
-    }
-    pub fn as_u32(&self) -> u32 {
+
+    fn index(&self) -> usize {
         self.0
     }
 }
@@ -25,35 +28,29 @@ impl ScopeId {
 /// Forms a tree structure via `parent` pointers for nested scope analysis.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Scope {
-    /// Nesting depth for debugging and analysis.
-    pub depth: u32,
-    /// All active borrows in this scope (tracked by borrow checker).
-    pub borrows: Vec<Borrow>,
-    /// Parent scope for lifetime chaining and lookup fallback.
     pub parent: Option<ScopeId>,
-    /// Mutability rules for this scope (affects borrow validity).
-    pub mutability: ScopeMutability,
-    /// Local variable bindings (name -> HIR ID).
-    pub locals: HashMap<String, HirId>,
-    /// Variables moved out of this scope (prevents use-after-move).
-    pub moves: HashMap<HirId, MoveInfo>,
-    /// Active borrows indexed by borrowed item for fast conflict detection.
-    pub active_borrows: HashMap<HirId, Vec<Borrow>>,
+    pub locals: HashMap<String, LocalDefId>,
+}
 
-    /// Generic type parameters declared in this scope.
-    pub type_parameters: Vec<Ident>,
-    /// Concrete type bindings for generic parameters.
-    pub type_bindings: HashMap<Ident, HirType>,
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct BorrowCheckResult {
+    pub borrows: VecMap<ExpressionId, BorrowInfo>,
+    pub moves: VecMap<ExpressionId, MoveInfo>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TypeCheckResult {
+    pub expression_types: VecMap<ExpressionId, HirType>,
 }
 
 /// Spanned borrow information for precise diagnostics.
-pub type Borrow = Spanned<InnerBorrow>;
+pub type BorrowInfo = Spanned<InnerBorrowInfo>;
 /// Spanned move information for use-after-move detection.
 pub type MoveInfo = Spanned<InnerMoveInfo>;
 
 /// Borrow details (what was borrowed, by whom, mutability).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct InnerBorrow {
+pub struct InnerBorrowInfo {
     /// HIR ID of the borrowed value/place.
     pub owner_id: HirId,
     /// Whether this is a mutable borrow.

@@ -8,15 +8,12 @@ use crate::{
     },
     utils::try_result::{ResultTryErr, TryErr, TryError, TryNotValue, TryResult},
 };
-use soul_ast::{
-    abstract_syntax_tree::{
-        expression_groups::{Array, NamedTuple, Tuple},
-        soul_type::SoulType,
-        spanned::Spanned,
-    },
-    error::{SoulError, SoulErrorKind, SoulResult},
-    symbool_kind::SymboolKind,
+use soul_ast::abstract_syntax_tree::{
+    expression_groups::{Array, NamedTuple, Tuple},
+    soul_type::SoulType,
+    spanned::Spanned,
 };
+use soul_utils::{SoulError, SoulErrorKind, SoulResult, SymboolKind};
 
 impl<'a> Parser<'a> {
     pub fn parse_tuple(&mut self) -> SoulResult<Tuple> {
