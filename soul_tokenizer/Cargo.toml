@@ -1,0 +1,8 @@
+[package]
+name = "soul_tokenizer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.100"
+soul_utils = {path = "../soul_utils"}

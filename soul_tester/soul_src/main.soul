@@ -1,3 +1,4 @@
 main() {
+    var := 1 + 2
     Println("hello world")
 }
