@@ -1,9 +1,0 @@
-[package]
-name = "hir_converter"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-soul_ast = { version = "0.1.0", path = "../soul_ast" }
-soul_hir = { version = "0.1.0", path = "../soul_hir" }
-soul_utils = { version = "0.1.0", path = "../soul_utils" }
