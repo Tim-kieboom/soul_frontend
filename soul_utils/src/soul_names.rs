@@ -34,6 +34,12 @@ define_str_enum!(
     }
 );
 
+impl Default for TypeModifier {
+    fn default() -> Self {
+        Self::Const
+    }
+}
+
 define_str_enum!(
     /// Internal primitive types available in the Soul language.
     ///

@@ -1,3 +1,6 @@
+use std::hash::Hash;
+use crate::Ident;
+
 /// Represents a source code location span.
 ///
 /// Tracks the start and end positions of code in the source file, along with
@@ -24,6 +27,27 @@ pub struct Span {
     pub end_line: usize,
     /// The ending column/offset within the line (1-indexed).
     pub end_offset: usize,
+}
+
+/// An attribute identifier
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct Attribute {
+    pub name: Ident,
+    pub values: Vec<Ident>,
+}
+
+/// A node wrapped with source location information and attributes.
+///
+/// All AST nodes are wrapped in `Spanned` to track their location in the
+/// source code for error reporting and debugging.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Spanned<T> {
+    /// The actual AST node.
+    pub node: T,
+    /// The source code span where this node appears.
+    pub span: Span,
+    /// Additional attributes associated with this node.
+    pub attributes: Vec<Attribute>,
 }
 
 impl Span {
@@ -66,6 +90,29 @@ impl Span {
             format!("{}:{}", self.start_line, self.start_offset)
         } else {
             format!("{}:{}-{}:{}", self.start_line, self.start_offset, self.end_line, self.end_offset)
+        }
+    }
+}
+
+impl<T: Hash> Hash for Spanned<T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.node.hash(state);
+    }
+}
+impl<T> Spanned<T> {
+    pub fn new(inner: T, span: Span) -> Self {
+        Self {
+            node: inner,
+            span,
+            attributes: vec![],
+        }
+    }
+
+    pub fn with_atribute(inner: T, span: Span, attributes: Vec<Attribute>) -> Self {
+        Self {
+            node: inner,
+            span,
+            attributes,
         }
     }
 }
