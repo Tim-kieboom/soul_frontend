@@ -1,4 +1,4 @@
-use crate::{BoxExpression, Expression};
+use crate::ast::{BoxExpression, Expression};
 use soul_utils::span::Spanned;
 
 /// A unary operator wrapped with source location information.

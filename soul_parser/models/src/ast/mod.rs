@@ -1,11 +1,11 @@
-mod block;
-mod expression;
-mod genaric_declare;
-mod group_expression;
-mod literal;
-mod operators;
-mod soul_type;
-mod statement;
+pub mod block;
+pub mod expression;
+pub mod genaric_declare;
+pub mod group_expression;
+pub mod literal;
+pub mod operators;
+pub mod soul_type;
+pub mod statement;
 pub mod syntax_display;
 
 pub use block::*;

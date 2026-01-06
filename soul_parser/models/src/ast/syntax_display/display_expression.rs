@@ -1,9 +1,11 @@
 use soul_utils::soul_names::{KeyWord, TypeWrapper};
 
 use crate::{
-    ElseKind, ExpressionKind, ReturnKind,
-    ast::syntax_display::try_display_node_id,
-    syntax_display::{DisplayKind, SyntaxDisplay, tree_prefix},
+    ast::{
+        ElseKind, ExpressionKind, ReturnKind,
+        syntax_display::{DisplayKind, try_display_node_id},
+    },
+    syntax_display::{SyntaxDisplay, tree_prefix},
 };
 
 impl SyntaxDisplay for ExpressionKind {

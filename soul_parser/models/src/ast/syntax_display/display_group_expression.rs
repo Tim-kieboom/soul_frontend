@@ -1,8 +1,8 @@
 use itertools::Itertools;
 
 use crate::{
-    ExpressionGroup,
-    syntax_display::{DisplayKind, SyntaxDisplay},
+    ast::{ExpressionGroup, syntax_display::DisplayKind},
+    syntax_display::SyntaxDisplay,
 };
 
 impl SyntaxDisplay for ExpressionGroup {

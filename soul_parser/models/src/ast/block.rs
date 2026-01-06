@@ -1,7 +1,7 @@
 use soul_utils::soul_names::TypeModifier;
 
 use crate::{
-    Statement,
+    ast::Statement,
     scope::ScopeId,
     syntax_display::{DisplayKind, SyntaxDisplay, gap_prefix},
 };

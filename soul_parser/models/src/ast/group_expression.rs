@@ -1,6 +1,6 @@
 use soul_utils::Ident;
 
-use crate::{Expression, SoulType};
+use crate::ast::{Expression, SoulType};
 
 /// A grouped expression type, such as tuple, array, or named tuple.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

@@ -1,7 +1,7 @@
 use soul_utils::{Ident, soul_import_path::SoulImportPath, span::Spanned};
 
-use crate::{Block, Expression, GenericDeclare, SoulType, scope::NodeId};
-
+use crate::ast::{Block, Expression, GenericDeclare, SoulType};
+use crate::scope::NodeId;
 /// A statement in the Soul language, wrapped with source location information.
 pub type Statement = Spanned<StatementKind>;
 

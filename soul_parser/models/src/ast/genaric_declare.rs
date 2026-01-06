@@ -1,6 +1,6 @@
 use soul_utils::{Ident, span::Span};
 
-use crate::{SoulType, scope::NodeId};
+use crate::{ast::SoulType, scope::NodeId};
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct GenericDeclare {

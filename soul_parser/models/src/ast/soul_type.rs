@@ -4,7 +4,8 @@ use soul_utils::{
     span::Span,
 };
 
-use crate::{Expression, scope::NodeId};
+use crate::ast::Expression;
+use crate::scope::NodeId;
 
 /// Represents a type in the Soul language.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

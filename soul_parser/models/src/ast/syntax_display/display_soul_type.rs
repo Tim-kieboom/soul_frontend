@@ -1,8 +1,8 @@
 use soul_utils::soul_names::TypeWrapper;
 
 use crate::{
-    SoulType, TypeKind,
-    syntax_display::{DisplayKind, SyntaxDisplay},
+    ast::{SoulType, TypeKind, syntax_display::DisplayKind},
+    syntax_display::SyntaxDisplay,
 };
 
 impl SyntaxDisplay for SoulType {

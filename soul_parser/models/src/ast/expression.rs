@@ -5,7 +5,8 @@ use soul_utils::{
 };
 
 use crate::{
-    Binary, Block, ExpressionGroup, GenericDefine, Literal, SoulType, Unary, scope::NodeId,
+    ast::{Binary, Block, ExpressionGroup, GenericDefine, Literal, SoulType, Unary},
+    scope::NodeId,
 };
 
 /// An expression in the Soul language, wrapped with source location information.

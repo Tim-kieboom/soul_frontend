@@ -1,7 +1,9 @@
 use crate::{
-    ExpressionKind, FunctionSignature, GenericDeclare, GenericDeclareKind, StatementKind,
-    ast::syntax_display::{try_display_node_id},
-    syntax_display::{DisplayKind, SyntaxDisplay, tree_prefix},
+    ast::{
+        ExpressionKind, FunctionSignature, GenericDeclare, GenericDeclareKind, StatementKind,
+        syntax_display::{DisplayKind, try_display_node_id},
+    },
+    syntax_display::{SyntaxDisplay, tree_prefix},
 };
 
 impl SyntaxDisplay for StatementKind {
