@@ -24,7 +24,10 @@ impl<'a> Parser<'a> {
 
         loop {
             self.skip_end_lines();
-
+            if self.current_is(&ROUND_CLOSE) {
+                break;
+            }
+            
             let element = self.parse_expression(&[ROUND_CLOSE, COMMA])?;
             values.push(element);
 
@@ -53,10 +56,11 @@ impl<'a> Parser<'a> {
         const DEFAULT_MODIFIER: TypeModifier = TypeModifier::Mut;
         let start_span = self.token().span;
         self.expect(&SQUARE_OPEN)?;
-
+        
         let element_type = match self.try_parse_type(DEFAULT_MODIFIER) {
             Ok(ty) => {
                 self.expect(&COLON)?;
+                self.skip_end_lines();
                 Some(ty)
             }
             Err(TryError::IsErr(err)) => return Err(err),
@@ -81,6 +85,7 @@ impl<'a> Parser<'a> {
             self.expect(&COMMA)?;
         }
 
+        self.skip_end_lines();
         self.expect(&SQUARE_CLOSE)?;
         self.expect_any(&[TokenKind::EndLine, SEMI_COLON])?;
         Ok(Spanned::new(
@@ -103,11 +108,15 @@ impl<'a> Parser<'a> {
         let mut insert_defaults = false;
         loop {
             self.skip_end_lines();
+            if self.current_is(&CURLY_CLOSE) {
+                break;
+            }
 
             if self.current_is(&INSERT_DEFAULTS) {
                 self.bump();
                 insert_defaults = true;
 
+                self.skip_end_lines();
                 if self.current_is(&CURLY_CLOSE) {
                     break;
                 }
@@ -137,6 +146,7 @@ impl<'a> Parser<'a> {
             self.expect(&COMMA).try_err()?;
         }
 
+        self.skip_end_lines();
         self.expect(&CURLY_CLOSE).try_err()?;
 
         self.expect_any(&[TokenKind::EndLine, SEMI_COLON])
