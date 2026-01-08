@@ -1,0 +1,8 @@
+[package]
+name = "soul_name_resolver"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+parser_models = { version = "0.1.0", path = "../../soul_parser/models" }
+soul_utils = { version = "0.1.0", path = "../../soul_utils" }

@@ -142,7 +142,7 @@ impl SyntaxDisplay for ExpressionKind {
             ExpressionKind::TypeNamespace(soul_type) => soul_type.inner_display(sb, kind, tab, is_last),
             ExpressionKind::StructConstructor(struct_constructor) => {
                 struct_constructor.ty.inner_display(sb, kind, tab, is_last);
-                struct_constructor.values.inner_display(sb, kind, tab, is_last);
+                struct_constructor.named_tuple.inner_display(sb, kind, tab, is_last);
             }
         }
     }

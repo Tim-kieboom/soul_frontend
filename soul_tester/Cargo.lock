@@ -106,6 +106,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "soul_name_resolver"
+version = "0.1.0"
+dependencies = [
+ "parser_models",
+ "soul_utils",
+]
+
+[[package]]
 name = "soul_parser"
 version = "0.1.0"
 dependencies = [
@@ -123,6 +131,7 @@ dependencies = [
  "parser_models",
  "serde",
  "serde_json",
+ "soul_name_resolver",
  "soul_parser",
  "soul_tokenizer",
  "soul_utils",

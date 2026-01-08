@@ -8,6 +8,8 @@ pub type SoulResult<T> = std::result::Result<T, SoulError>;
 pub enum SoulErrorKind {
     InternalError,
 
+    NotFoundInScope,
+
     InvalidIdent,
     InvalidNumber,
     InvalidContext,

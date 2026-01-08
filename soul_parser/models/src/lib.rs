@@ -9,3 +9,8 @@ pub struct AbstractSyntaxTree {
     /// The root block containing all top-level statements.
     pub root: ast::Block,
 }
+
+pub struct ParseResponse {
+    pub tree: AbstractSyntaxTree,
+    pub meta_data: crate::meta_data::AstMetadata,
+}

@@ -70,7 +70,7 @@ pub enum ExpressionKind {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StructConstructor {
     pub ty: SoulType,
-    pub values: NamedTuple,
+    pub named_tuple: NamedTuple,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

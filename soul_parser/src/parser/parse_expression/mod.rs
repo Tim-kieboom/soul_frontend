@@ -219,7 +219,7 @@ impl<'a> Parser<'a> {
                 self.go_to(ident_position);
                 let ctor = StructConstructor{
                     ty: self.try_parse_type(TypeModifier::Mut).merge_to_result()?,
-                    values: self.try_parse_named_tuple().merge_to_result()?.node,
+                    named_tuple: self.try_parse_named_tuple().merge_to_result()?.node,
                 };
                 Expression::new(
                     ExpressionKind::StructConstructor(ctor),

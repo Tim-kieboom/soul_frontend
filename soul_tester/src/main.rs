@@ -1,8 +1,9 @@
 use std::{fs::File, io::Read};
 
 use anyhow::Result;
-use soul_parser::{ParseResponse, parse};
-use parser_models::syntax_display::{DisplayKind, SyntaxDisplay};
+use soul_name_resolver::name_resolve;
+use soul_parser::{parse};
+use parser_models::{ParseResponse, syntax_display::{DisplayKind, SyntaxDisplay}};
 use soul_tokenizer::{TokenStream, tokenize};
 use soul_utils::sementic_level::{SementicFault};
 
@@ -26,7 +27,10 @@ fn main() -> Result<()> {
 
     paths.write_to_output(token_string, "tokenize.soulc")?;
 
-    let ParseResponse{tree, meta_data} = parse(token_stream);
+    let mut parse_response = parse(token_stream);
+    name_resolve(&mut parse_response);
+
+    let ParseResponse { tree, meta_data } = parse_response;
     for fault in &meta_data.faults {
         eprintln!("{}", fault.to_message(&"main.soul", &source_file));
     }

@@ -7,8 +7,23 @@ use crate::ast::{Function, GenericDeclare, GenericDeclareKind, Variable};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct NodeId(u32);
 impl NodeId {
+    pub fn internal_new(value: u32) -> Self {
+        Self(value)
+    }
     pub fn display(&self) -> String {
         format!("{}", self.0)
+    }
+}
+pub struct NodeIdGenerator(u32);
+impl NodeIdGenerator {
+    pub fn new() -> Self {
+        Self(0)
+    }
+
+    pub fn alloc(&mut self) -> NodeId {
+        let node = NodeId::internal_new(self.0);
+        self.0 += 1;
+        node
     }
 }
 
@@ -69,30 +84,23 @@ impl ScopeBuilder {
         None
     }
 
-    pub fn lookup_variable(&self, ident: &Ident) -> Option<NodeId> {
+    pub fn lookup_value(&self, ident: &Ident, kind: ScopeValueEntryKind) -> Option<NodeId> {
+        
         for scope in self.scopes.iter().rev() {
-            if let Some(ids) = scope.values.get(ident.as_str()) {
-                return ids.last().map(|el| el.node_id);
-            }
-        }
+            
+            let ids = match scope.values.get(ident.as_str()) {
+                Some(val) => val,
+                None => continue,
+            };
 
-        None
-    }
-
-    pub fn lookup_function_candidates(&self, ident: &Ident) -> Vec<NodeId> {
-        let mut candidates = Vec::new();
-
-        for scope in self.scopes.iter().rev() {
-            if let Some(ids) = scope.values.get(ident.as_str()) {
-                for id in ids {
-                    if id.kind == ScopeValueEntryKind::Function {
-                        candidates.push(id.node_id);
-                    }
+            for id in ids {
+                if id.kind == kind {
+                    return Some(id.node_id);
                 }
             }
         }
 
-        candidates
+        None
     }
 }
 impl Default for ScopeBuilder {
