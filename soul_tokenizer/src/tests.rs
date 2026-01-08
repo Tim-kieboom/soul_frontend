@@ -1,4 +1,4 @@
-use soul_utils::{symbool_kind::SymboolKind};
+use soul_utils::{symbool_kind::SymbolKind};
 
 use crate::{TokenKind, lexer::Lexer, token::Number};
 
@@ -57,7 +57,7 @@ fn lex_identifier_and_number() {
 
     let expected = vec![
         TokenKind::Ident("x".to_string()),
-        TokenKind::Symbol(SymboolKind::Assign),
+        TokenKind::Symbol(SymbolKind::Assign),
         TokenKind::Number(Number::Uint(42)),    
     ];
 
@@ -69,17 +69,17 @@ fn lex_symbols() {
     let tokens = lexer_to_vec("()+-*/{}[ ][]");
 
     let expected = [
-        TokenKind::Symbol(SymboolKind::RoundOpen),
-        TokenKind::Symbol(SymboolKind::RoundClose),
-        TokenKind::Symbol(SymboolKind::Plus),
-        TokenKind::Symbol(SymboolKind::Minus),
-        TokenKind::Symbol(SymboolKind::Star),
-        TokenKind::Symbol(SymboolKind::Slash),
-        TokenKind::Symbol(SymboolKind::CurlyOpen),
-        TokenKind::Symbol(SymboolKind::CurlyClose),
-        TokenKind::Symbol(SymboolKind::SquareOpen),
-        TokenKind::Symbol(SymboolKind::SquareClose),
-        TokenKind::Symbol(SymboolKind::Array),
+        TokenKind::Symbol(SymbolKind::RoundOpen),
+        TokenKind::Symbol(SymbolKind::RoundClose),
+        TokenKind::Symbol(SymbolKind::Plus),
+        TokenKind::Symbol(SymbolKind::Minus),
+        TokenKind::Symbol(SymbolKind::Star),
+        TokenKind::Symbol(SymbolKind::Slash),
+        TokenKind::Symbol(SymbolKind::CurlyOpen),
+        TokenKind::Symbol(SymbolKind::CurlyClose),
+        TokenKind::Symbol(SymbolKind::SquareOpen),
+        TokenKind::Symbol(SymbolKind::SquareClose),
+        TokenKind::Symbol(SymbolKind::Array),
     ];
 
     assert_eq!(tokens, expected);

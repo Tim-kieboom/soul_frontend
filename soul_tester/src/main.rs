@@ -1,13 +1,15 @@
 use std::{fs::File, io::Read};
 
 use anyhow::Result;
+use soul_parser::{ParseResponse, parse};
+use parser_models::syntax_display::{DisplayKind, SyntaxDisplay};
 use soul_tokenizer::{TokenStream, tokenize};
-use soul_utils::sementic_level::SementicLevel;
+use soul_utils::sementic_level::{SementicFault};
 
-use crate::{convert_soul_error::ToAnyhow, paths::Paths};
+use crate::{convert_soul_error::{ToAnyhow, ToMessage}, paths::{Paths}};
 
-pub mod paths;
-pub mod convert_soul_error;
+mod paths;
+mod convert_soul_error;
 
 static PATHS: &[u8] = include_bytes!("../paths.json");
 
@@ -24,6 +26,21 @@ fn main() -> Result<()> {
 
     paths.write_to_output(token_string, "tokenize.soulc")?;
 
+    let ParseResponse{tree, meta_data} = parse(token_stream);
+    for fault in &meta_data.faults {
+        eprintln!("{}", fault.to_message(&"main.soul", &source_file));
+    }
+
+    paths.write_to_output(
+        tree.root.display(DisplayKind::Parser), 
+        "ast.soulc",
+    )?;
+
+    if meta_data.faults.is_empty() {
+        use soul_utils::char_colors::{GREEN, DEFAULT};
+        println!("{GREEN}success!!{DEFAULT}")
+    }
+
     Ok(())
 }
 
@@ -36,15 +53,15 @@ fn pretty_format_tokenizer<'a>(
 
     for result in token_stream {
         let token = result.map_err(|err| {
-            err.to_anyhow(SementicLevel::Error, &paths.source_file, source_file)
+            SementicFault::error(err).to_anyhow(&paths.source_file, source_file)
         })?;
 
-        sb.push_str(&format!("Token({})", token.kind.display()));
+        sb.push_str(&format!("\tToken({})", token.kind.display()));
         sb.push_str(&format!(" >> Span({})", token.span.display()));
         sb.push_str(",\n");
     }
 
-    sb.push_str("\n]");
+    sb.push_str("]");
     Ok(sb)
 }
 

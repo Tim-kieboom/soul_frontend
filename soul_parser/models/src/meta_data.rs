@@ -8,15 +8,18 @@ pub struct AstMetadata {
     pub faults: Vec<SementicFault>,
 }
 impl AstMetadata {
-    pub fn new() -> Self {
+    pub fn new(faults: Vec<SementicFault>) -> Self {
         Self {
             scopes: ScopeBuilder::new(),
-            faults: vec![],
+            faults,
         }
     }
 }
 impl Default for AstMetadata {
     fn default() -> Self {
-        Self::new()
+        Self {
+            scopes: ScopeBuilder::new(),
+            faults: vec![],
+        }
     }
 }

@@ -15,8 +15,4 @@ impl Paths {
         file.write_all(output.as_bytes())?;
         Ok(())
     }
-
-    pub fn to_output_file(&self, relative_file: &str) -> String {
-        format!("{}/{relative_file}", self.output)
-    }
 }

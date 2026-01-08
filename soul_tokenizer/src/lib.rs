@@ -1,4 +1,4 @@
-pub use token::{Token, TokenKind};
+pub use token::{Token, TokenKind, Number};
 pub use token_stream::{TokenStream, TokenStreamPosition};
 
 mod lexer;

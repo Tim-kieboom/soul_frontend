@@ -5,7 +5,9 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.100"
+parser_models = { version = "0.1.0", path = "../soul_parser/models" }
 serde = {version = "1.0.228", features = ["derive"]}
 serde_json = "1.0.148"
+soul_parser = { version = "0.1.0", path = "../soul_parser" }
 soul_tokenizer = {path = "../soul_tokenizer"}
 soul_utils = {path = "../soul_utils"}

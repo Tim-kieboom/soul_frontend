@@ -2,59 +2,63 @@ use std::str::Lines;
 
 use soul_utils::error::{SoulError, SoulErrorKind};
 use soul_utils::char_colors::*;
-use soul_utils::sementic_level::SementicLevel;
+use soul_utils::sementic_level::{SementicFault, SementicLevel};
 use soul_utils::span::Span;
 
 pub trait ToAnyhow {
-    fn to_anyhow(&self, level: SementicLevel, file_path: &str, source_file: &str) -> anyhow::Error;
+    fn to_anyhow(&self, file_path: &str, source_file: &str) -> anyhow::Error;
 }
 
 pub trait ToMessage {
-    fn to_message(&self, level: SementicLevel, file_path: &str, source_file: &str) -> String;
+    fn to_message(&self, file_path: &str, source_file: &str) -> String;
 }
 
-impl ToAnyhow for SoulError {
-    fn to_anyhow(&self, level: SementicLevel, file_path: &str, source_file: &str) -> anyhow::Error {
-        anyhow::Error::msg(self.to_message(level, file_path, source_file))
+impl ToAnyhow for SementicFault {
+    fn to_anyhow(&self, file_path: &str, source_file: &str) -> anyhow::Error {
+        anyhow::Error::msg(self.to_message(file_path, source_file))
     }
 }
 
-impl ToMessage for SoulError {
-    fn to_message(&self, level: SementicLevel, file_path: &str, source_file: &str) -> String {
-        let start_line = self.span.map(|el| el.start_line).unwrap_or(0);
-        let number_len = start_line.to_string().len();
-        let begin_space = " ".repeat(number_len + 2);
-
-        let mut sb = String::new();
-
-        sb.push_str(level_color(&level));
-        sb.push_str(level.as_str());
-        sb.push_str(": ");
-        sb.push_str(DEFAULT);
-
-        sb.push_str(&self.message);
-        sb.push_str(&format!("\n{begin_space}├── "));
-        sb.push_str(BLUE);
-        sb.push_str(file_path);
-
-        if let Some(span) = self.span {
-            display_span(&mut sb, span);
-        }
-
-        if let SoulErrorKind::ScopeOverride(span) = self.kind {
-            sb.push_str(" overriden=");
-            display_span(&mut sb, span)
-        }
-
-        sb.push_str(DEFAULT);
-        sb.push_str(" ──");
-        if let Some(span) = self.span {
-            sb.push('\n');
-            get_source_snippet(&mut sb, &span, source_file.lines(), &begin_space);
-        }
-
-        sb
+impl ToMessage for SementicFault {
+    fn to_message(&self, file_path: &str, source_file: &str) -> String {
+        to_message(self.get_soul_error(), self.get_level(), file_path, source_file)
     }
+}
+
+fn to_message(err: &SoulError, level: SementicLevel, file_path: &str, source_file: &str) -> String {
+    let start_line = err.span.map(|el| el.start_line).unwrap_or(0);
+    let number_len = start_line.to_string().len();
+    let begin_space = " ".repeat(number_len + 2);
+
+    let mut sb = String::new();
+
+    sb.push_str(level_color(&level));
+    sb.push_str(level.as_str());
+    sb.push_str(": ");
+    sb.push_str(DEFAULT);
+
+    sb.push_str(&err.message);
+    sb.push_str(&format!("\n{begin_space}├── "));
+    sb.push_str(BLUE);
+    sb.push_str(file_path);
+
+    if let Some(span) = err.span {
+        display_span(&mut sb, span);
+    }
+
+    if let SoulErrorKind::ScopeOverride(span) = err.kind {
+        sb.push_str(" overriden=");
+        display_span(&mut sb, span)
+    }
+
+    sb.push_str(DEFAULT);
+    sb.push_str(" ──");
+    if let Some(span) = err.span {
+        sb.push('\n');
+        get_source_snippet(&mut sb, &span, source_file.lines(), &begin_space);
+    }
+
+    sb
 }
 
 fn level_color(level: &SementicLevel) -> &'static str {
@@ -75,7 +79,7 @@ fn get_source_snippet(out: &mut String, span: &Span, mut lines: Lines, begin_spa
         lines.next();
     }
 
-    let prev_line = lines.next();
+    let prev_line = if span.start_line == 1 {None} else {lines.next()};
     let current_line = match lines.next() {
         Some(val) => val,
         _ => return,
@@ -131,8 +135,11 @@ fn display_span(sb: &mut String, span: Span) {
     sb.push_str(&format!("{}", span.start_line));
     sb.push(':');
     sb.push_str(&format!("{}", span.start_offset));
-    sb.push_str(" to ");
-    sb.push_str(&format!("{}", span.end_line));
-    sb.push(':');
-    sb.push_str(&format!("{}", span.end_offset));
+
+    if span.start_line != span.end_line {
+        sb.push_str(" to ");
+        sb.push_str(&format!("{}", span.end_line));
+        sb.push(':');
+        sb.push_str(&format!("{}", span.end_offset));
+    }
 }

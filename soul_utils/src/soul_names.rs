@@ -1,4 +1,4 @@
-use crate::{define_str_enum, define_symbols, symbool_kind::SymboolKind};
+use crate::{define_str_enum, define_symbols, symbool_kind::SymbolKind};
 
 define_symbols!(
     /// Type wrapper symbols that modify how types are referenced or stored.
@@ -7,15 +7,15 @@ define_symbols!(
     /// pointers, arrays, and optionals.
     pub enum TypeWrapper {
         /// Immutable reference wrapper (`@`).
-        ConstRef => "@", SymboolKind::ConstRef,
+        ConstRef => "@", SymbolKind::ConstRef,
         /// Mutable reference wrapper (`&`).
-        MutRef => "&", SymboolKind::And,
+        MutRef => "&", SymbolKind::And,
         /// Pointer wrapper (`*`).
-        Pointer => "*", SymboolKind::Star,
+        Pointer => "*", SymbolKind::Star,
         /// Array wrapper (`[]`).
-        Array => "[]", SymboolKind::Array,
+        Array => "[]", SymbolKind::Array,
         /// Optional wrapper (`?`).
-        Option => "?", SymboolKind::Question,
+        Option => "?", SymbolKind::Question,
     }
 );
 
@@ -33,12 +33,6 @@ define_str_enum!(
         Mut => "mut",
     }
 );
-
-impl Default for TypeModifier {
-    fn default() -> Self {
-        Self::Const
-    }
-}
 
 define_str_enum!(
     /// Internal primitive types available in the Soul language.
@@ -111,18 +105,18 @@ define_symbols!(
     /// compound assignment forms.
     pub enum AssignType {
         /// Declaration assignment (`:=`).
-        Declaration => ":=", SymboolKind::ColonAssign,
+        Declaration => ":=", SymbolKind::ColonAssign,
 
         /// Simple assignment (`=`).
-        Assign => "=", SymboolKind::Assign,
-        AddAssign => "+=", SymboolKind::PlusEq,
-        SubAssign => "-=", SymboolKind::MinusEq,
-        MulAssign => "*=", SymboolKind::StarEq,
-        DivAssign => "/=", SymboolKind::SlashEq,
-        ModAssign => "%=", SymboolKind::ModEq,
-        BitAndAssign => "&=", SymboolKind::AndEq,
-        BitOrAssign => "|=", SymboolKind::OrEq,
-        BitXorAssign => "^=", SymboolKind::XorEq,
+        Assign => "=", SymbolKind::Assign,
+        AddAssign => "+=", SymbolKind::PlusEq,
+        SubAssign => "-=", SymbolKind::MinusEq,
+        MulAssign => "*=", SymbolKind::StarEq,
+        DivAssign => "/=", SymbolKind::SlashEq,
+        ModAssign => "%=", SymbolKind::ModEq,
+        BitAndAssign => "&=", SymbolKind::AndEq,
+        BitOrAssign => "|=", SymbolKind::OrEq,
+        BitXorAssign => "^=", SymbolKind::XorEq,
     }
 );
 
@@ -133,9 +127,9 @@ define_symbols!(
     /// indexed elements.
     pub enum AccessType {
         /// Access method or field of lvalue (`.`).
-        AccessThis => ".", SymboolKind::Dot, 60,
+        AccessThis => ".", SymbolKind::Dot, 60,
         /// Access element by index of lvalue (`[`).
-        AccessIndex => "[", SymboolKind::SquareOpen, 60,
+        AccessIndex => "[", SymbolKind::SquareOpen, 60,
     }
 );
 
@@ -176,3 +170,64 @@ define_str_enum!(
         Import => "import", 0,
     }
 );
+
+define_symbols!(
+    /// Binary and unary operators available in the Soul language.
+    ///
+    /// These operators are used in expressions for arithmetic, logical, bitwise,
+    /// and comparison operations.
+    pub enum Operator {
+        /// logical not
+        Not => "!", SymbolKind::Not, 8,
+        /// increment
+        Incr => "++", SymbolKind::DoublePlus, 8,
+        /// decrement
+        Decr => "--", SymbolKind::DoubleMinus, 8,
+        /// lvalue(base) power rvalue(exponent)
+        Power => "**", SymbolKind::DoubleStar, 7,
+        /// lvalue(exponent) root rvalue(base)
+        Root => "</", SymbolKind::Root, 7,
+        /// multiplication
+        Mul => "*", SymbolKind::Star, 6,
+        /// divide
+        Div => "/", SymbolKind::Slash, 6,
+        /// modulo
+        Mod => "%", SymbolKind::Mod, 6,
+        /// addition
+        Add => "+", SymbolKind::Plus, 5,
+        /// subtraction
+        Sub => "-", SymbolKind::Minus, 5,
+        /// constref
+        ConstRef => "@", SymbolKind::ConstRef, 6,
+
+        /// smaller equals
+        LessEq => "<=", SymbolKind::Ge, 4,
+        /// bigger equals
+        GreatEq => ">=", SymbolKind::Le, 4,
+        // smaller then
+        LessThen => "<", SymbolKind::LeftArray, 4,
+        // bigger then
+        GreatThen => ">", SymbolKind::RightArray, 4,
+        /// not equals
+        NotEq => "!=", SymbolKind::NotEq, 3,
+        /// equal
+        Eq => "==", SymbolKind::Eq, 3,
+
+        /// range (`begin..end`)
+        Range => "..", SymbolKind::DoubleDot, 1,
+
+        /// bitwise or
+        BitOr => "|", SymbolKind::Or, 1,
+        /// bitwise and
+        BitAnd => "&", SymbolKind::And, 1,
+        /// bitwise xor
+        BitXor => "^", SymbolKind::Xor, 2,
+
+        /// logical or
+        LogOr => "||", SymbolKind::DoubleOr, 0,
+        /// logical and
+        LogAnd => "&&", SymbolKind::DoubleAnd, 0,
+
+    }
+);
+

@@ -1,6 +1,6 @@
 use std::{iter::Peekable, str::Chars};
 
-use soul_utils::{error::{SoulError, SoulErrorKind, SoulResult}, span::Span, symbool_kind::SymboolKind};
+use soul_utils::{error::{SoulError, SoulErrorKind, SoulResult}, span::Span, symbool_kind::SymbolKind};
 
 use crate::{symbolkind_from_lexer::FromLexer, token::{Number, Token, TokenKind}};
 
@@ -71,7 +71,7 @@ impl<'a> Lexer<'a> {
             self.skip_whitespace();
         }
 
-        if let Some(symbool) = SymboolKind::from_lexer(self) {
+        if let Some(symbool) = SymbolKind::from_lexer(self) {
             self.next_char();
             return Ok(Token::new(
                 TokenKind::Symbol(symbool),

@@ -1,11 +1,9 @@
 use soul_utils::{
-    Ident,
-    soul_import_path::SoulImportPath,
-    span::{Span, Spanned},
+    Ident, soul_import_path::SoulImportPath, soul_names::KeyWord, span::{Span, Spanned}
 };
 
 use crate::{
-    ast::{Binary, Block, ExpressionGroup, GenericDefine, Literal, SoulType, Unary},
+    ast::{Array, Binary, BinaryOperator, Block, ExpressionGroup, GenericDefine, Literal, NamedTuple, SoulType, Unary, UnaryOperator},
     scope::NodeId,
 };
 
@@ -28,7 +26,7 @@ pub enum ExpressionKind {
     /// A function call, e.g., `foo(x, y)`.
     FunctionCall(FunctionCall),
 
-    MemberAccess(MemberAccess),
+    FieldAccess(FieldAccess),
 
     /// Referring to a variable `var`.
     Variable {
@@ -43,8 +41,10 @@ pub enum ExpressionKind {
     /// A binary operation (addition, multiplication, comparison, etc.) `1 + 2`.
     Binary(Binary),
 
-    /// type used as namespace `int.MAXVALUE`
-    Type(SoulType),
+    /// used for type as parent in FieldAccess `int.MAX_VALUE`
+    TypeNamespace(SoulType),
+
+    StructConstructor(StructConstructor),
 
     /// An `if` expression `if true {Println("is true")} else {Println("is else")}`.
     If(If),
@@ -64,6 +64,13 @@ pub enum ExpressionKind {
     ReturnLike(ReturnLike),
     /// A grouped expression, e.g., tuples, namedTuples or arrays.
     ExpressionGroup(ExpressionGroup),
+}
+
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct StructConstructor {
+    pub ty: SoulType,
+    pub values: NamedTuple,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -89,7 +96,7 @@ pub struct FunctionCall {
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct MemberAccess {
+pub struct FieldAccess {
     pub parent: BoxExpression,
     pub member: Ident,
 }
@@ -151,6 +158,17 @@ pub enum ReturnKind {
     Continue,
 }
 
+impl ReturnKind {
+    pub fn from_keyword(keyword: KeyWord) -> Option<Self> {
+        match keyword {
+            KeyWord::Break => Some(ReturnKind::Break),
+            KeyWord::Return => Some(ReturnKind::Return),
+            KeyWord::Continue => Some(ReturnKind::Continue),
+            _ => None,
+        }
+    }
+}
+
 pub trait IfArmHelper {
     fn new_arm(kind: ElseKind, span: Span) -> Self;
     fn try_next_mut(&mut self) -> Option<&mut Option<IfArm>>;
@@ -165,4 +183,67 @@ impl IfArmHelper for IfArm {
             ElseKind::Else(_) => None,
         }
     }
+}
+
+pub trait ExpressionHelpers {
+    fn from_named_tuple(named_tuple: Spanned<NamedTuple>) -> Expression;
+    fn from_array(array: Spanned<Array>) -> Expression;
+    fn new_block(block: Block, span: Span) -> Expression;
+    fn new_unary(op: UnaryOperator, rvalue: Expression, span: Span) -> Expression;
+    fn new_binary(lvalue: Expression, op: BinaryOperator, rvalue: Expression, span: Span) -> Expression;
+    fn new_literal(literal: Literal, span: Span) -> Expression;
+    fn from_function_call(function_call: Spanned<FunctionCall>) -> Expression;
+}
+impl ExpressionHelpers for Expression {
+    fn from_named_tuple(named_tuple: Spanned<NamedTuple>) -> Expression {
+        
+        Expression::with_atribute(
+            ExpressionKind::ExpressionGroup(
+                ExpressionGroup::NamedTuple(named_tuple.node)
+            ), 
+            named_tuple.span, 
+            named_tuple.attributes,
+        )
+    }
+    
+    
+    fn new_block(block: Block, span: Span) -> Expression {
+        Expression::new(ExpressionKind::Block(block), span)
+    }
+    
+    fn from_array(array: Spanned<Array>) -> Expression {
+        Expression::with_atribute(
+            ExpressionKind::ExpressionGroup(
+                ExpressionGroup::Array(Box::new(array.node))
+            ), 
+            array.span, 
+            array.attributes,
+        )
+    }
+    
+    fn new_unary(op: UnaryOperator, rvalue: Expression, span: Span) -> Expression {
+        let unary = Unary{
+            operator: op,
+            expression: Box::new(rvalue),
+        };
+        Expression::new(ExpressionKind::Unary(unary), span)
+    }
+    
+    fn new_binary(lvalue: Expression, op: BinaryOperator, rvalue: Expression, span: Span) -> Expression {
+        let binary = Binary {
+            left: Box::new(lvalue),
+            operator: op,
+            right: Box::new(rvalue),
+        };
+        Expression::new(ExpressionKind::Binary(binary), span)
+    }
+    
+    fn new_literal(literal: Literal, span: Span) -> Expression {
+        Expression::new(ExpressionKind::Literal(literal), span)
+    }
+    
+    fn from_function_call(function_call: Spanned<FunctionCall>) -> Expression {
+        Expression::with_atribute(ExpressionKind::FunctionCall(function_call.node), function_call.span, function_call.attributes)
+    }
+    
 }

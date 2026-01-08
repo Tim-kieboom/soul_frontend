@@ -43,7 +43,12 @@ impl SyntaxDisplay for StatementKind {
                 sb.push_str("Variable >> ");
                 sb.push_str(var.name.as_str());
                 sb.push_str(": ");
-                var.ty.inner_display(sb, kind, tab, is_last);
+                sb.push_str(
+                    &var.ty
+                        .as_ref()
+                        .map(|ty| ty.display(kind))
+                        .unwrap_or("/*type?*/".to_string())
+                );
                 if let Some(val) = &var.initialize_value {
                     sb.push_str(" = ");
                     val.node.inner_display(sb, kind, tab, is_last);
@@ -80,8 +85,9 @@ fn inner_display_function_declaration(
     tab: usize,
     is_last: bool,
 ) {
-    signature.callee_type.inner_display(sb, kind, tab, is_last);
-    if let Some(callee) = signature.callee_kind.display() {
+    signature.methode_type.inner_display(sb, kind, tab, is_last);
+    sb.push(' ');
+    if let Some(callee) = signature.function_kind.display() {
         sb.push(' ');
         sb.push_str(callee);
         sb.push(' ');
@@ -90,8 +96,8 @@ fn inner_display_function_declaration(
     inner_display_generic_parameters(sb, kind, &signature.generics);
 
     sb.push('(');
-    for (name, el) in &signature.parameters {
-        sb.push_str(&format!("{}: {}", name.as_str(), el.node.display(kind),));
+    for (name, el, _node_id) in &signature.parameters {
+        sb.push_str(&format!("{}: {}", name.as_str(), el.display(kind),));
         sb.push(',');
     }
     sb.push_str("): ");

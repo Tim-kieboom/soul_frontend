@@ -18,7 +18,6 @@ pub struct Block {
     pub statements: Vec<Statement>,
     pub scope_id: Option<ScopeId>,
 }
-
 impl SyntaxDisplay for Block {
     fn display(&self, kind: DisplayKind) -> String {
         let mut sb = String::new();

@@ -5,7 +5,7 @@ define_str_enum!(
     ///
     /// This enum covers operators, punctuation, brackets, and other symbols
     /// that can appear in source code.
-    pub enum SymboolKind {
+    pub enum SymbolKind {
         /// `+`
         Plus => "+",
         /// `++`

@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use soul_utils::soul_names::{KeyWord, TypeWrapper};
 
 use crate::{
@@ -19,7 +20,7 @@ impl SyntaxDisplay for ExpressionKind {
         match self {
             ExpressionKind::Empty => sb.push_str("<empty>"),
             ExpressionKind::Default => sb.push_str("<default>"),
-            ExpressionKind::Literal(literal) => sb.push_str(&literal.value_to_string()),
+            ExpressionKind::Literal(literal) => write!(sb, "{:?}", literal).expect("no write err"),
             ExpressionKind::Index(index) => {
                 index.collection.node.inner_display(sb, kind, tab, is_last);
                 sb.push('[');
@@ -51,7 +52,7 @@ impl SyntaxDisplay for ExpressionKind {
                     .node
                     .inner_display(sb, kind, tab, is_last);
             }
-            ExpressionKind::MemberAccess(access) => {
+            ExpressionKind::FieldAccess(access) => {
                 access.parent.node.inner_display(sb, kind, tab, is_last);
                 sb.push('.');
                 sb.push_str(access.member.as_str());
@@ -138,7 +139,11 @@ impl SyntaxDisplay for ExpressionKind {
             ExpressionKind::ExpressionGroup(expression_group) => {
                 expression_group.inner_display(sb, kind, tab, is_last)
             }
-            ExpressionKind::Type(soul_type) => soul_type.inner_display(sb, kind, tab, is_last),
+            ExpressionKind::TypeNamespace(soul_type) => soul_type.inner_display(sb, kind, tab, is_last),
+            ExpressionKind::StructConstructor(struct_constructor) => {
+                struct_constructor.ty.inner_display(sb, kind, tab, is_last);
+                struct_constructor.values.inner_display(sb, kind, tab, is_last);
+            }
         }
     }
 }

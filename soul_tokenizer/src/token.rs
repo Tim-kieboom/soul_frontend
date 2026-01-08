@@ -1,4 +1,6 @@
-use soul_utils::{soul_names::InternalPrimitiveTypes, span::Span, symbool_kind::SymboolKind};
+use anyhow::Result;
+use soul_utils::{soul_names::InternalPrimitiveTypes, span::Span, symbool_kind::SymbolKind};
+use std::fmt::Write;
 
 /// A single token containing its kind and source span information.
 #[derive(Debug, Clone, PartialEq)]
@@ -25,13 +27,13 @@ pub enum TokenKind {
     /// Character literal, e.g. `'a'`.
     CharLiteral(char),
     /// Symbol/operator token with associated kind.
-    Symbol(SymboolKind),
+    Symbol(SymbolKind),
     /// String literal, e.g. `"hello"`.
     StringLiteral(String),
 }
 
 /// Represents different numeric literal kinds parsed from source code.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Number {
     /// Signed integer literal, e.g. `-42`.
     Int(i64),
@@ -44,16 +46,27 @@ pub enum Number {
 impl TokenKind {
     /// Returns a display string representation of the token kind.
     pub fn display(&self) -> String {
+        let mut sb = String::new();
+        self.inner_display(&mut sb).expect("write should not fail");
+        sb
+    }
+
+    pub fn write_display(&self, sb: &mut String) {
+        self.inner_display(sb).expect("write should not fail");
+    }
+
+    fn inner_display(&self, sb: &mut String) -> Result<()> {
         match self {
-            TokenKind::Ident(ident) => format!("\"{ident}\""),
-            TokenKind::Unknown(char) => format!("'{char}'"),
-            TokenKind::EndFile => "<end of file>".to_string(),
-            TokenKind::EndLine => "<end of line>".to_string(),
-            TokenKind::CharLiteral(char) => format!("r#'{char}'"),
-            TokenKind::Number(number) => number.display(),
-            TokenKind::StringLiteral(str) => format!("r#\"{str}\""),
-            TokenKind::Symbol(symbool_kind) => format!("'{}'", symbool_kind.as_str()),
-        }
+            TokenKind::Number(number) => number.inner_display(sb)?,
+            TokenKind::EndFile => write!(sb, "<end of file>")?,
+            TokenKind::EndLine => write!(sb, "<end of line>")?,
+            TokenKind::Unknown(char) => write!(sb, "{char}")?,
+            TokenKind::Ident(ident) => write!(sb, "\"{ident}\"")?,
+            TokenKind::CharLiteral(char) => write!(sb, "r#'{char}'")?,
+            TokenKind::StringLiteral(str) => write!(sb, "r#\"{str}\"")?,
+            TokenKind::Symbol(symbool_kind) => write!(sb, "{}", symbool_kind.as_str())?,
+        };
+        Ok(())
     }
 
     /// Attempts to extract the string value if this is an Ident token.
@@ -79,14 +92,26 @@ impl Token {
 impl Number {
     /// Number display formatting with type annotation.
     pub fn display(&self) -> String {
+        let mut sb = String::new();
+        self.inner_display(&mut sb).expect("write should not fail");
+        sb
+    }
+
+    pub fn write_display(&self, sb: &mut String) {
+        self.inner_display(sb).expect("write should not fail");
+    }
+
+    fn inner_display(&self, sb: &mut String) -> Result<()> {
+        
         const INT_STR: &str = InternalPrimitiveTypes::UntypedInt.as_str();
         const UINT_STR: &str = InternalPrimitiveTypes::UntypedUint.as_str();
         const FLOAT_STR: &str = InternalPrimitiveTypes::UntypedFloat.as_str();
 
         match self {
-            Number::Int(num) => format!("{num}: {INT_STR}"),
-            Number::Uint(num) => format!("{num}: {UINT_STR}"),
-            Number::Float(num) => format!("{num}: {FLOAT_STR}"),
-        }
+            Number::Int(num) => write!(sb, "{num}: {INT_STR}"),
+            Number::Uint(num) => write!(sb, "{num}: {UINT_STR}"),
+            Number::Float(num) => write!(sb, "{num}: {FLOAT_STR}"),
+        }?;
+        Ok(())
     }
 }

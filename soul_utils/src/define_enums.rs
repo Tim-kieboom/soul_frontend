@@ -231,7 +231,7 @@ macro_rules! define_symbols {
                 $( $symbol, )*
             ];
 
-            pub const SYMBOLS: &[SymboolKind] = &[
+            pub const SYMBOLS: &[SymbolKind] = &[
                 $( $symkind, )*
             ];
 
@@ -241,7 +241,7 @@ macro_rules! define_symbols {
                 }
             }
 
-            pub const fn as_symbool(&self) -> SymboolKind {
+            pub const fn as_symbool(&self) -> SymbolKind {
                 match self {
                     $( $enum_name::$name => $symkind, )*
                 }
@@ -254,7 +254,7 @@ macro_rules! define_symbols {
                 }
             }
 
-            pub const fn from_symbool(k: SymboolKind) -> Option<Self> {
+            pub const fn from_symbool(k: SymbolKind) -> Option<Self> {
                 match k {
                     $( $symkind => Some($enum_name::$name), )*
                     _ => None,
@@ -288,7 +288,7 @@ macro_rules! define_symbols {
                 $( $symbol, )*
             ];
 
-            pub const SYMBOLS: &[SymboolKind] = &[
+            pub const SYMBOLS: &[SymbolKind] = &[
                 $( $symkind, )*
             ];
 
@@ -305,7 +305,7 @@ macro_rules! define_symbols {
                 }
             }
 
-            pub const fn from_symbool(k: SymboolKind) -> Option<Self> {
+            pub const fn from_symbool(k: SymbolKind) -> Option<Self> {
                 match k {
                     $( $symkind => Some($enum_name::$name), )*
                     _ => None,

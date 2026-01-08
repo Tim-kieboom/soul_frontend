@@ -1,6 +1,6 @@
 use std::str::Split;
 
-use crate::symbool_kind::SymboolKind;
+use crate::symbool_kind::SymbolKind;
 
 /// A path to a Soul page/module.
 ///
@@ -10,7 +10,7 @@ use crate::symbool_kind::SymboolKind;
     Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
 )]
 pub struct SoulImportPath(String);
-const PATH_SYMBOOL: &str = SymboolKind::DoubleColon.as_str();
+const PATH_SYMBOOL: &str = SymbolKind::DoubleColon.as_str();
 
 impl SoulImportPath {
     pub fn new() -> Self {

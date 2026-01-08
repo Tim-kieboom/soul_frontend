@@ -1,9 +1,9 @@
-use std::fmt::Display;
+use std::fmt::{Debug};
 
 use soul_utils::soul_names::{InternalPrimitiveTypes, TypeModifier};
 
 /// A literal value in the Soul language.
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Literal {
     Int(i64),
     Uint(u64),
@@ -60,17 +60,17 @@ impl Literal {
     }
 }
 
-impl Display for Literal {
+impl Debug for Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let get_type_name = || self.get_literal_type().type_to_string();
 
         match self {
-            Literal::Int(val) => write!(f, "{} {val}", get_type_name()),
-            Literal::Uint(val) => write!(f, "{} {val}", get_type_name()),
-            Literal::Float(val) => write!(f, "{} {val}", get_type_name()),
-            Literal::Bool(val) => write!(f, "{} {val}", get_type_name()),
-            Literal::Char(val) => write!(f, "{} {val}", get_type_name()),
-            Literal::Str(val) => write!(f, "{} \"{val}\"", get_type_name()),
+            Literal::Int(val) => write!(f, "{val}: {}", get_type_name()),
+            Literal::Uint(val) => write!(f, "{val}: {}", get_type_name()),
+            Literal::Float(val) => write!(f, "{val}: {}", get_type_name()),
+            Literal::Bool(val) => write!(f, "{val}"),
+            Literal::Char(val) => write!(f, "'{val}'"),
+            Literal::Str(val) => write!(f, "\"{val}\""),
         }
     }
 }

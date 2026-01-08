@@ -1,4 +1,19 @@
+sum(a: int, b: int): int {
+    return a + b
+}
+
 main() {
-    var := 1 + 2
+    godecl := 1 + -2
+    decl: int = 2.0
+    mut mutdecl: int = 1
+
+    array: []int = [1,2,3,4,5]
+    tuple: (int, f32, bool) = (1, 1.0, true)
+    namedtuple: {num: int, float: f32, bool: bool} = {num: 1, float: 2, bool: bool}
+
+    mut sum := 1
+    sum = sum(1, 2)
+ 
+    const immut = 2
     Println("hello world")
 }

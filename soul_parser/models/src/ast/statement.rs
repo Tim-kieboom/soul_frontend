@@ -1,6 +1,7 @@
+use soul_utils::span::Span;
 use soul_utils::{Ident, soul_import_path::SoulImportPath, span::Spanned};
 
-use crate::ast::{Block, Expression, GenericDeclare, SoulType};
+use crate::ast::{Block, Expression, ExpressionKind, FunctionCall, GenericDeclare, NamedTupleType, SoulType};
 use crate::scope::NodeId;
 /// A statement in the Soul language, wrapped with source location information.
 pub type Statement = Spanned<StatementKind>;
@@ -41,19 +42,19 @@ pub struct Function {
 pub struct FunctionSignature {
     /// The name of the function.
     pub name: Ident,
-    pub callee_type: SoulType,
-    pub callee_kind: CalleKind,
+    pub methode_type: SoulType,
+    pub function_kind: FunctionKind,
     /// Generic type parameters.
     pub generics: Vec<GenericDeclare>,
     /// Function parameters.
-    pub parameters: Vec<(Ident, Expression)>,
+    pub parameters: NamedTupleType,
     /// Return type, if specified.
     pub return_type: SoulType,
 }
 
 /// Optional `this` parameter type.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum CalleKind {
+pub enum FunctionKind {
     /// `&this`
     MutRef,
     /// ``
@@ -63,13 +64,13 @@ pub enum CalleKind {
     /// `@this`
     ConstRef,
 }
-impl CalleKind {
+impl FunctionKind {
     pub fn display(&self) -> Option<&'static str> {
         match self {
-            CalleKind::Static => None,
-            CalleKind::MutRef => Some("&this"),
-            CalleKind::Consume => Some("this"),
-            CalleKind::ConstRef => Some("@this"),
+            FunctionKind::Static => None,
+            FunctionKind::MutRef => Some("&this"),
+            FunctionKind::Consume => Some("this"),
+            FunctionKind::ConstRef => Some("@this"),
         }
     }
 }
@@ -80,7 +81,7 @@ pub struct Variable {
     /// The name of the variable.
     pub name: Ident,
     /// The type of the variable.
-    pub ty: SoulType,
+    pub ty: Option<SoulType>,
     /// Optional initial value expression.
     pub initialize_value: Option<Expression>,
 
@@ -94,4 +95,53 @@ pub struct Assignment {
     pub left: Expression,
     /// The right-hand side expression (the value being assigned).
     pub right: Expression,
+}
+
+pub trait StatementHelpers {
+    fn new_block(block: Block, span: Span) -> Self;
+    fn from_expression(expression: Expression) -> Self;
+    fn from_function(function: Spanned<Function>) -> Self;
+    fn new_variable(variable: Variable, span: Span) -> Self;
+    fn from_function_call(function: Spanned<FunctionCall>) -> Self;
+}
+impl StatementHelpers for Statement {
+    fn new_block(block: Block, span: Span) -> Self {
+        let expr = Expression::new(
+            ExpressionKind::Block(block), 
+            span,
+        );
+
+        Self::new(
+            StatementKind::Expression(expr), 
+            span,
+        )
+    }
+    
+    fn from_expression(expression: Expression) -> Self {
+        let span = expression.span;
+        let attributes = expression.attributes.clone();
+        Self::with_atribute(StatementKind::Expression(expression), span, attributes)
+    }
+    
+    fn from_function_call(function: Spanned<FunctionCall>) -> Self {
+        Self::with_atribute(
+            StatementKind::Expression(
+                Expression::new(ExpressionKind::FunctionCall(function.node), function.span), 
+            ),
+            function.span,
+            function.attributes,
+        )
+    }
+
+    fn from_function(function: Spanned<Function>) -> Self {
+        Self::with_atribute(
+            StatementKind::Function(function.node),
+            function.span,
+            function.attributes,
+        )
+    }
+
+    fn new_variable(variable: Variable, span: Span) -> Self {
+        Self::new(StatementKind::Variable(variable), span)
+    }
 }

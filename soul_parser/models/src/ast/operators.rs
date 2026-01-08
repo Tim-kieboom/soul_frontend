@@ -30,39 +30,65 @@ pub struct Binary {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum UnaryOperatorKind {
     Invalid,
-    Neg,                            // -
-    Not,                            // !
-    DeRef,                          // *
-    MutRef,                         // &
-    ConstRef,                       // @
-    Increment { before_var: bool }, // ++
-    Decrement { before_var: bool }, // --
+    /// `-`
+    Neg,                            
+    /// `!`
+    Not,                            
+    /// `*`
+    DeRef,                          
+    /// `&`
+    MutRef,                         
+    /// `@`
+    ConstRef,                       
+    /// `++`
+    Increment { before_var: bool }, 
+    /// `--`
+    Decrement { before_var: bool }, 
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum BinaryOperatorKind {
     Invalid,
-    Add,  // +
-    Sub,  // -
-    Mul,  // *
-    Div,  // /
-    Log,  // log
-    Pow,  // **
-    Root, // </
-    Mod,  // %
+    /// `+`
+    Add,  
+    /// `-`
+    Sub,  
+    /// `*`
+    Mul,  
+    /// `/`
+    Div,  
+    /// `log`
+    Log,  
+    /// `**`
+    Pow,  
+    /// `</`
+    Root, 
+    /// `%`
+    Mod,  
 
-    BitAnd, // &
-    BitOr,  // |
-    BitXor, // |
+    /// `&`
+    BitAnd, 
+    /// `|`
+    BitOr,  
+    /// `^`
+    BitXor, 
 
-    LogAnd, // &&
-    LogOr,  // ||
-    Eq,     // ==
-    NotEq,  // !=
-    Lt,     // <
-    Gt,     // >
-    Le,     // <=
-    Ge,     // >=
+    /// `&&`    
+    LogAnd, 
+    /// `||`
+    LogOr,  
+    /// `==`
+    Eq,     
+    /// `!=`
+    NotEq,  
+    /// `<`
+    Lt,     
+    /// `>`
+    Gt,     
+    /// `<=`
+    Le,     
+    /// `>=`
+    Ge,     
 
     /// Range operator (`..`).
     Range,
@@ -84,8 +110,8 @@ impl UnaryOperatorKind {
     pub const fn as_str(&self) -> &str {
         match self {
             UnaryOperatorKind::Invalid => "<invalid>",
-            UnaryOperatorKind::Neg => "!",
-            UnaryOperatorKind::Not => "-",
+            UnaryOperatorKind::Neg => "-",
+            UnaryOperatorKind::Not => "!",
             UnaryOperatorKind::Increment { .. } => "++",
             UnaryOperatorKind::Decrement { .. } => "--",
             UnaryOperatorKind::DeRef => "*",

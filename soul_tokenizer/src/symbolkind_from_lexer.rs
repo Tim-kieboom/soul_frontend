@@ -1,4 +1,4 @@
-use soul_utils::symbool_kind::SymboolKind;
+use soul_utils::symbool_kind::SymbolKind;
 
 use crate::lexer::Lexer;
 
@@ -9,92 +9,92 @@ where
     fn from_lexer<'a>(lexer: &mut Lexer<'a>) -> Option<Self>;
 }
 
-impl FromLexer for SymboolKind {
+impl FromLexer for SymbolKind {
     fn from_lexer<'a>(lexer: &mut Lexer<'a>) -> Option<Self> {
         let current = lexer.current_char()?;
 
         match current {
-            '@' => Some(SymboolKind::ConstRef),
-            '$' => Some(SymboolKind::Money),
+            '@' => Some(SymbolKind::ConstRef),
+            '$' => Some(SymbolKind::Money),
             '+' => {
                 let peek = lexer.peek_char();
                 if peek == Some('=') {
                     lexer.next_char();
-                    Some(SymboolKind::PlusEq)
+                    Some(SymbolKind::PlusEq)
                 } else if peek == Some('+') {
                     lexer.next_char();
-                    Some(SymboolKind::DoublePlus)
+                    Some(SymbolKind::DoublePlus)
                 } else {
-                    Some(SymboolKind::Plus)
+                    Some(SymbolKind::Plus)
                 }
             }
             '-' => {
                 let peek = lexer.peek_char();
                 if peek == Some('=') {
                     lexer.next_char();
-                    Some(SymboolKind::MinusEq)
+                    Some(SymbolKind::MinusEq)
                 } else if peek == Some('-') {
                     lexer.next_char();
-                    Some(SymboolKind::DoubleMinus)
+                    Some(SymbolKind::DoubleMinus)
                 } else {
-                    Some(SymboolKind::Minus)
+                    Some(SymbolKind::Minus)
                 }
             }
             '%' => {
                 let peek = lexer.peek_char();
                 if peek == Some('=') {
                     lexer.next_char();
-                    Some(SymboolKind::ModEq)
+                    Some(SymbolKind::ModEq)
                 } else {
-                    Some(SymboolKind::Mod)
+                    Some(SymbolKind::Mod)
                 }
             }
             '*' => {
                 let peek = lexer.peek_char();
                 if peek == Some('*') {
                     lexer.next_char();
-                    Some(SymboolKind::DoubleStar)
+                    Some(SymbolKind::DoubleStar)
                 } else if peek == Some('=') {
                     lexer.next_char();
-                    Some(SymboolKind::StarEq)
+                    Some(SymbolKind::StarEq)
                 } else {
-                    Some(SymboolKind::Star)
+                    Some(SymbolKind::Star)
                 }
             }
             '/' => {
                 let peek = lexer.peek_char();
                 if peek == Some('<') {
                     lexer.next_char();
-                    Some(SymboolKind::Root)
+                    Some(SymbolKind::Root)
                 } else if peek == Some('=') {
                     lexer.next_char();
-                    Some(SymboolKind::SlashEq)
+                    Some(SymbolKind::SlashEq)
                 } else {
-                    Some(SymboolKind::Slash)
+                    Some(SymbolKind::Slash)
                 }
             }
             '&' => {
                 let peek = lexer.peek_char();
                 if peek == Some('&') {
                     lexer.next_char();
-                    Some(SymboolKind::DoubleAnd)
+                    Some(SymbolKind::DoubleAnd)
                 } else if peek == Some('=') {
                     lexer.next_char();
-                    Some(SymboolKind::AndEq)
+                    Some(SymbolKind::AndEq)
                 } else {
-                    Some(SymboolKind::And)
+                    Some(SymbolKind::And)
                 }
             }
             '|' => {
                 let peek = lexer.peek_char();
                 if peek == Some('|') {
                     lexer.next_char();
-                    Some(SymboolKind::DoubleOr)
+                    Some(SymbolKind::DoubleOr)
                 } else if peek == Some('=') {
                     lexer.next_char();
-                    Some(SymboolKind::OrEq)
+                    Some(SymbolKind::OrEq)
                 } else {
-                    Some(SymboolKind::Or)
+                    Some(SymbolKind::Or)
                 }
             }
             '^' => {
@@ -102,94 +102,94 @@ impl FromLexer for SymboolKind {
                 if peek == Some('=') {
                     Some(Self::XorEq)
                 } else {
-                    Some(SymboolKind::Xor)
+                    Some(SymbolKind::Xor)
                 }
             }
             '=' => {
                 let peek = lexer.peek_char();
                 if peek == Some('=') {
                     lexer.next_char();
-                    Some(SymboolKind::Eq)
+                    Some(SymbolKind::Eq)
                 } else if peek == Some('>') {
                     lexer.next_char();
-                    Some(SymboolKind::LambdaArray)
+                    Some(SymbolKind::LambdaArray)
                 } else {
-                    Some(SymboolKind::Assign)
+                    Some(SymbolKind::Assign)
                 }
             }
             '!' => {
                 let peek = lexer.peek_char();
                 if peek == Some('=') {
                     lexer.next_char();
-                    Some(SymboolKind::NotEq)
+                    Some(SymbolKind::NotEq)
                 } else {
-                    Some(SymboolKind::Not)
+                    Some(SymbolKind::Not)
                 }
             }
             '?' => {
                 let peek = lexer.peek_char();
                 if peek == Some('?') {
                     lexer.next_char();
-                    Some(SymboolKind::DoubleQuestion)
+                    Some(SymbolKind::DoubleQuestion)
                 } else {
-                    Some(SymboolKind::Question)
+                    Some(SymbolKind::Question)
                 }
             }
             '<' => {
                 let peek = lexer.peek_char();
                 if peek == Some('=') {
                     lexer.next_char();
-                    Some(SymboolKind::Le)
+                    Some(SymbolKind::Le)
                 } else {
-                    Some(SymboolKind::LeftArray)
+                    Some(SymbolKind::LeftArray)
                 }
             }
             '>' => {
                 let peek = lexer.peek_char();
                 if peek == Some('=') {
                     lexer.next_char();
-                    Some(SymboolKind::Ge)
+                    Some(SymbolKind::Ge)
                 } else {
-                    Some(SymboolKind::RightArray)
+                    Some(SymbolKind::RightArray)
                 }
             }
             ':' => {
                 let peek = lexer.peek_char();
                 if peek == Some(':') {
                     lexer.next_char();
-                    Some(SymboolKind::DoubleColon)
+                    Some(SymbolKind::DoubleColon)
                 } else if peek == Some('=') {
                     lexer.next_char();
-                    Some(SymboolKind::ColonAssign)
+                    Some(SymbolKind::ColonAssign)
                 } else {
-                    Some(SymboolKind::Colon)
+                    Some(SymbolKind::Colon)
                 }
             }
-            ';' => Some(SymboolKind::SemiColon),
+            ';' => Some(SymbolKind::SemiColon),
             '.' => {
                 let peek = lexer.peek_char();
                 if peek == Some('.') {
                     lexer.next_char();
-                    Some(SymboolKind::DoubleDot)
+                    Some(SymbolKind::DoubleDot)
                 } else {
-                    Some(SymboolKind::Dot)
+                    Some(SymbolKind::Dot)
                 }
             }
-            ',' => Some(SymboolKind::Comma),
+            ',' => Some(SymbolKind::Comma),
             '[' => {
                 let peek = lexer.peek_char();
                 if peek == Some(']') {
                     lexer.next_char();
-                    Some(SymboolKind::Array)
+                    Some(SymbolKind::Array)
                 } else {
-                    Some(SymboolKind::SquareOpen)
+                    Some(SymbolKind::SquareOpen)
                 }
             }
-            ']' => Some(SymboolKind::SquareClose),
-            '(' => Some(SymboolKind::RoundOpen),
-            ')' => Some(SymboolKind::RoundClose),
-            '{' => Some(SymboolKind::CurlyOpen),
-            '}' => Some(SymboolKind::CurlyClose),
+            ']' => Some(SymbolKind::SquareClose),
+            '(' => Some(SymbolKind::RoundOpen),
+            ')' => Some(SymbolKind::RoundClose),
+            '{' => Some(SymbolKind::CurlyOpen),
+            '}' => Some(SymbolKind::CurlyClose),
             _ => None,
         }
     }
