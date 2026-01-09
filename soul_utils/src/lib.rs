@@ -1,5 +1,6 @@
 pub mod span;
 pub mod error;
+pub mod vec_map;
 pub mod try_result;
 pub mod soul_names;
 pub mod char_colors; 

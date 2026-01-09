@@ -12,7 +12,7 @@ use soul_utils::{
 
 use crate::parser::{
     Parser,
-    parse_utils::{ARROW_LEFT, COLON, CURLY_OPEN, DECREMENT, INCREMENT, ROUND_OPEN, SQUARE_OPEN},
+    parse_utils::{ARROW_LEFT, COLON, CURLY_OPEN, DECREMENT, INCREMENT, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN},
 };
 
 mod parse_condition;
@@ -56,20 +56,21 @@ impl<'a> Parser<'a> {
                 break;
             }
 
-            let operator = match self.consume_expression_operator(start_span)? {
-                ExpressionOperator::Binary(spanned) => spanned,
+            match self.consume_expression_operator(start_span)? {
+                ExpressionOperator::Binary(operator) => {
+                    let next_min_precedence = precedence + 1;
+                    let right = self.pratt_parse_expression(next_min_precedence, end_tokens)?;
+                    left = Expression::new_binary(left, operator, right, self.span_combine(start_span))
+                }
                 ExpressionOperator::Access(AccessType::AccessThis) => {
                     todo!("impl access this")
                 }
                 ExpressionOperator::Access(AccessType::AccessIndex) => {
-                    todo!("impl index")
+                    let index = self.parse_expression(&[SQUARE_CLOSE, TokenKind::EndLine, TokenKind::EndFile])?;
+                    self.expect(&SQUARE_CLOSE)?;
+                    left = Expression::new_index(left, index, self.span_combine(start_span))                    
                 }
-            };
-
-            let next_min_precedence = precedence + 1;
-            let right = self.pratt_parse_expression(next_min_precedence, end_tokens)?;
-
-            left = Expression::new_binary(left, operator, right, self.span_combine(start_span))
+            }
         }
 
         Ok(left)

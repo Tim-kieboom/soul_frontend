@@ -11,7 +11,7 @@ fn node_id_display(node_id: Option<NodeId>, kind: DisplayKind) -> String {
     }
 
     node_id
-        .map(|el| format!("\"|{}|\"", el.display()))
+        .map(|el| format!("/*{}*/", el.display()))
         .unwrap_or_default()
 }
 

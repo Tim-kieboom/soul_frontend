@@ -9,10 +9,12 @@ main() {
     mut mutdecl: int = 1
 
     array: []int = [1,2,3,4,5]
+    element := array[0]
+
     tuple: (int, f32, bool) = (1, 1.0, true)
     namedtuple: {num: int, float: f32, bool: bool} = {
-        num: 1, 
-        float: 2, 
+        num: mutdecl, 
+        float: decl, 
         bool: true,
     }
 

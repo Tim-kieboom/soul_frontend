@@ -186,13 +186,15 @@ impl IfArmHelper for IfArm {
 }
 
 pub trait ExpressionHelpers {
+    fn from_function_call(function_call: Spanned<FunctionCall>) -> Expression;
     fn from_named_tuple(named_tuple: Spanned<NamedTuple>) -> Expression;
     fn from_array(array: Spanned<Array>) -> Expression;
+
     fn new_block(block: Block, span: Span) -> Expression;
-    fn new_unary(op: UnaryOperator, rvalue: Expression, span: Span) -> Expression;
-    fn new_binary(lvalue: Expression, op: BinaryOperator, rvalue: Expression, span: Span) -> Expression;
     fn new_literal(literal: Literal, span: Span) -> Expression;
-    fn from_function_call(function_call: Spanned<FunctionCall>) -> Expression;
+    fn new_unary(op: UnaryOperator, rvalue: Expression, span: Span) -> Expression;
+    fn new_index(collection: Expression, index: Expression, span: Span) -> Expression;
+    fn new_binary(lvalue: Expression, op: BinaryOperator, rvalue: Expression, span: Span) -> Expression;
 }
 impl ExpressionHelpers for Expression {
     fn from_named_tuple(named_tuple: Spanned<NamedTuple>) -> Expression {
@@ -245,5 +247,16 @@ impl ExpressionHelpers for Expression {
     fn from_function_call(function_call: Spanned<FunctionCall>) -> Expression {
         Expression::with_atribute(ExpressionKind::FunctionCall(function_call.node), function_call.span, function_call.attributes)
     }
+    
+    fn new_index(collection: Expression, index: Expression, span: Span) -> Expression {
+        Expression::new(
+            ExpressionKind::Index(Index { 
+                collection: Box::new(collection), 
+                index: Box::new(index),
+            }), 
+            span,
+        )
+    }
+
     
 }

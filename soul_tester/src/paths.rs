@@ -1,5 +1,5 @@
-use std::{fs::File, io::Write};
 use anyhow::Result;
+use std::{fs::File, io::Write};
 
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]

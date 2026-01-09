@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use soul_utils::{Ident, span::Span};
+use soul_utils::{Ident, span::Span, vec_map::AsIndex};
 
 use crate::ast::{Function, GenericDeclare, GenericDeclareKind, Variable};
 
@@ -14,6 +14,16 @@ impl NodeId {
         format!("{}", self.0)
     }
 }
+impl AsIndex for NodeId {
+    fn new(value: usize) -> Self {
+        Self(value as u32)
+    }
+
+    fn index(&self) -> usize {
+        self.0 as usize
+    }
+}
+
 pub struct NodeIdGenerator(u32);
 impl NodeIdGenerator {
     pub fn new() -> Self {
