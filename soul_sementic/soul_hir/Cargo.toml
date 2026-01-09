@@ -1,0 +1,8 @@
+[package]
+name = "soul_hir"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+hir_model = { version = "0.1.0", path = "hir_model" }
+parser_models = { version = "0.1.0", path = "../../soul_parser/models" }
