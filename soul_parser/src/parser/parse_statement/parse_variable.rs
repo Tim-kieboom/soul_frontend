@@ -1,4 +1,4 @@
-use parser_models::ast::{Statement, StatementHelpers, Variable};
+use parser_models::ast::{Statement, StatementHelpers, VarTypeKind, Variable};
 use soul_tokenizer::TokenKind;
 use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},
@@ -26,9 +26,9 @@ impl<'a> Parser<'a> {
                     self.get_expect_any_error(&[COLON_ASSIGN, ASSIGN])
                 )
             }
-            Some(ty)
+            VarTypeKind::NonInveredType(ty)
         } else {
-            None
+            VarTypeKind::InveredType(DEFAULT_MODIFIER)
         };
 
         let assign_type = match &self.token().kind {

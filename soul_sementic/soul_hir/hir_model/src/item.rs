@@ -1,19 +1,28 @@
 use parser_models::{ast::FunctionKind, scope::NodeId};
 use soul_utils::{
-    Ident, soul_import_path::SoulImportPath, soul_names::TypeModifier, vec_map::VecMap,
+    Ident,
+    soul_import_path::SoulImportPath,
+    soul_names::TypeModifier,
+    span::{Attribute, Span, Spanned},
+    vec_map::VecMap,
 };
 
 use crate::{
-    BodyId, ExpressionId, StatementId, hir_type::HirType, scope::ScopeId, statement::Statement,
+    BodyId, ExpressionId, NamedTupleType, StatementId, Variable, hir_type::HirType, scope::ScopeId,
+    statement::Statement,
 };
+
+pub type Item = Spanned<ItemKind>;
 
 /// Top-level items in a Soul module.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub enum Item {
+pub enum ItemKind {
     /// Module import (`import path::to::module`).
     Import(Import),
     /// Function declaration with body.
     Function(Box<Function>),
+    /// global variable
+    Variable(Variable),
 }
 
 /// Block of statements with associated scope.
@@ -45,17 +54,9 @@ pub struct FunctionSignature {
     pub methode_type: HirType,
     pub function_kind: FunctionKind,
     pub return_type: HirType,
-    pub parameters: Vec<Parameter>,
+    pub parameters: NamedTupleType,
     pub generics: Vec<GenericDeclare>,
     pub vis: Visibility,
-}
-
-/// Function parameter.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct Parameter {
-    pub id: NodeId,
-    pub name: Ident,
-    pub ty: HirType,
 }
 
 /// A generic parameter (lifetime or type).
@@ -81,4 +82,38 @@ pub enum GenericDeclare {
 pub enum Visibility {
     Public,
     Private,
+}
+
+impl Visibility {
+    pub fn from_name(name: &Ident) -> Self {
+        let first = match name.as_str().chars().next() {
+            Some(val) => val,
+            None => return Self::Private,
+        };
+
+        if first.is_uppercase() {
+            Self::Public
+        } else {
+            Self::Private
+        }
+    }
+}
+
+pub trait ItemHelper {
+    fn new_variable(variable: Variable, span: Span, attributes: Vec<Attribute>) -> Item;
+    fn new_function(function: Function, span: Span, attributes: Vec<Attribute>) -> Item;
+    fn new_import(import: Import, span: Span) -> Item;
+}
+impl ItemHelper for Item {
+    fn new_variable(variable: Variable, span: Span, attributes: Vec<Attribute>) -> Item {
+        Item::with_atribute(ItemKind::Variable(variable), span, attributes)
+    }
+
+    fn new_import(import: Import, span: Span) -> Item {
+        Item::new(ItemKind::Import(import), span)
+    }
+
+    fn new_function(function: Function, span: Span, attributes: Vec<Attribute>) -> Item {
+        Item::with_atribute(ItemKind::Function(Box::new(function)), span, attributes)
+    }
 }

@@ -3,6 +3,7 @@ pub mod scope;
 pub mod meta_data;
 pub mod syntax_display;
 
+
 /// The root of an Abstract Syntax Tree representing a parsed Soul program.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AbstractSyntaxTree {

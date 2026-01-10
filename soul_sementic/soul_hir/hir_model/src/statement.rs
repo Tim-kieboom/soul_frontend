@@ -1,26 +1,25 @@
-use parser_models::{ast::ReturnKind, scope::NodeId};
-use soul_utils::{Ident, span::Spanned};
+use parser_models::scope::NodeId;
+use soul_utils::{
+    Ident,
+    soul_names::TypeModifier,
+    span::{Attribute, Span, Spanned},
+};
 
-use crate::{ExpressionId, hir_type::HirType, item::Visibility};
+use crate::{ExpressionId, Function, Import, hir_type::HirType, item::Visibility};
 
 pub type Statement = Spanned<StatementKind>;
 
 /// Kinds of statements in HIR (desugared from AST).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum StatementKind {
+    Import(Import),
     /// Assignment to a place (`x = expression`).
     Assign(Assign),
     /// Variable binding/declaration (`modifier x: T = expression`).
     Variable(Box<Variable>),
     /// Expression statement.
     Expression(StatementExpression),
-    /// `fall` statement (return from first block).
-    Fall(ReturnLike),
-    /// `break` statement (exits/return enclosing loop).
-    Break(ReturnLike),
-    /// `return` statement (returns from enclosing function).
-    Return(ReturnLike),
-    Continue(ReturnLike),
+    Function(Function),
 }
 
 /// Expression statement (`expression`).
@@ -28,14 +27,6 @@ pub enum StatementKind {
 pub struct StatementExpression {
     pub id: NodeId,
     pub expression: ExpressionId,
-}
-
-/// ReturnLike statement (`<return|break|fall|continue> value`).
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ReturnLike {
-    pub id: NodeId,
-    pub kind: ReturnKind,
-    pub value: Option<ExpressionId>,
 }
 
 /// Assignment statement (`left = right`).
@@ -50,8 +41,55 @@ pub struct Assign {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Variable {
     pub id: NodeId,
-    pub ty: HirType,
+    pub ty: VarTypeKind,
     pub name: Ident,
     pub vis: Visibility,
     pub value: Option<ExpressionId>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum VarTypeKind {
+    NonInveredType(HirType),
+    InveredType(TypeModifier),
+}
+
+pub trait StatementHelper {
+    fn new_expression(
+        expression: StatementExpression,
+        span: Span,
+        attributes: Vec<Attribute>,
+    ) -> Statement;
+    fn new_variable(variable: Variable, span: Span, attributes: Vec<Attribute>) -> Statement;
+    fn new_function(function: Function, span: Span, attributes: Vec<Attribute>) -> Statement;
+    fn new_import(import: Import, span: Span, attributes: Vec<Attribute>) -> Statement;
+    fn new_assign(assign: Assign, span: Span, attributes: Vec<Attribute>) -> Statement;
+}
+impl StatementHelper for Statement {
+    fn new_variable(variable: Variable, span: Span, attributes: Vec<Attribute>) -> Statement {
+        Statement::with_atribute(
+            StatementKind::Variable(Box::new(variable)),
+            span,
+            attributes,
+        )
+    }
+
+    fn new_function(function: Function, span: Span, attributes: Vec<Attribute>) -> Statement {
+        Statement::with_atribute(StatementKind::Function(function), span, attributes)
+    }
+
+    fn new_import(import: Import, span: Span, attributes: Vec<Attribute>) -> Statement {
+        Statement::with_atribute(StatementKind::Import(import), span, attributes)
+    }
+
+    fn new_assign(assign: Assign, span: Span, attributes: Vec<Attribute>) -> Statement {
+        Statement::with_atribute(StatementKind::Assign(assign), span, attributes)
+    }
+
+    fn new_expression(
+        expression: StatementExpression,
+        span: Span,
+        attributes: Vec<Attribute>,
+    ) -> Statement {
+        Statement::with_atribute(StatementKind::Expression(expression), span, attributes)
+    }
 }

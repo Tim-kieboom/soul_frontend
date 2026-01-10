@@ -6,39 +6,51 @@ impl<'a> NameResolver<'a> {
 
         match &mut expression.node {
 
-            ExpressionKind::If(r#if) => self.collect_if(r#if),
+            ExpressionKind::If(r#if) => {
+                r#if.id = Some(self.alloc_id());
+                self.collect_if(r#if);
+            }
             ExpressionKind::While(r#while) => {
+                r#while.id = Some(self.alloc_id());
                 if let Some(condition) = &mut r#while.condition {
                     self.collect_expression(condition);
                 }
                 self.collect_block(&mut r#while.block);
             }
             ExpressionKind::Index(index) => {
+                index.id = Some(self.alloc_id());
                 self.collect_expression(&mut index.collection);
                 self.collect_expression(&mut index.index);
             }
             ExpressionKind::Unary(unary) => {
+                unary.id = Some(self.alloc_id());
                 self.collect_expression(&mut unary.expression);
             }
             ExpressionKind::Block(block) => {
+                block.node_id = Some(self.alloc_id());
                 self.collect_block(block);
             }
             ExpressionKind::Binary(binary) => {
+                binary.id = Some(self.alloc_id());
                 self.collect_expression(&mut binary.left);
                 self.collect_expression(&mut binary.right);
             }
-            ExpressionKind::Deref(spanned) => {
-                self.collect_expression(spanned);
+            ExpressionKind::Deref { inner, id } => {
+                *id = Some(self.alloc_id());
+                self.collect_expression(inner);
             }
             ExpressionKind::ReturnLike(return_like) => {
+                return_like.id = Some(self.alloc_id());
                 if let Some(value) = &mut return_like.value {
                     self.collect_expression(value);
                 } 
             }
             ExpressionKind::FieldAccess(field_access) => {
+                field_access.id = Some(self.alloc_id());
                 self.collect_expression(&mut field_access.parent);
             }
             ExpressionKind::FunctionCall(function_call) => {
+                function_call.id = Some(self.alloc_id());
                 for arg in &mut function_call.arguments {
                     self.collect_expression(arg);
                 }
@@ -46,13 +58,16 @@ impl<'a> NameResolver<'a> {
                     self.collect_expression(callee);
                 }
             }
-            ExpressionKind::Ref { expression, .. } => {
+            ExpressionKind::Ref { expression, id, .. } => {
+                *id = Some(self.alloc_id());
                 self.collect_expression(expression);
             }
-            ExpressionKind::ExpressionGroup(expression_group) => {
-                self.collect_expression_group(expression_group);
+            ExpressionKind::ExpressionGroup{ id, group } => {
+                *id = Some(self.alloc_id());
+                self.collect_expression_group(group);
             }
             ExpressionKind::StructConstructor(struct_constructor) => {
+                struct_constructor.id = Some(self.alloc_id());
                 for (_name, item) in &mut struct_constructor.named_tuple.values {
                     self.collect_expression(item);
                 }
@@ -60,10 +75,9 @@ impl<'a> NameResolver<'a> {
             ExpressionKind::TypeNamespace(_) => todo!("typeNamespace"),
             ExpressionKind::ExternalExpression(_) => todo!("impl external expressions"),
 
-            ExpressionKind::Empty 
-            | ExpressionKind::Default 
-            | ExpressionKind::Literal(_) 
-            | ExpressionKind::Variable { .. } => (),
+            ExpressionKind::Default(id) => *id = Some(self.alloc_id()),
+            ExpressionKind::Literal((id, _)) => *id = Some(self.alloc_id()), 
+            ExpressionKind::Variable { id, .. } => *id = Some(self.alloc_id()),
         }
     }
 

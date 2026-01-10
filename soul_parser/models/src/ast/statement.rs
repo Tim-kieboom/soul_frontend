@@ -1,3 +1,4 @@
+use soul_utils::soul_names::TypeModifier;
 use soul_utils::span::Span;
 use soul_utils::{Ident, soul_import_path::SoulImportPath, span::Spanned};
 
@@ -13,10 +14,10 @@ pub type Statement = Spanned<StatementKind>;
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum StatementKind {
     /// Imported paths
-    Import(Vec<SoulImportPath>),
+    Import(Import),
 
     /// A standalone expression.
-    Expression(Expression),
+    Expression{id: Option<NodeId>, expression: Expression},
 
     /// A variable declaration.
     Variable(Variable),
@@ -25,6 +26,13 @@ pub enum StatementKind {
 
     /// A function declaration (with body block).
     Function(Function),
+}
+
+/// Imported paths
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Import {
+    pub id: Option<NodeId>,
+    pub paths: Vec<SoulImportPath>
 }
 
 /// A function definition with a signature and body block.
@@ -53,7 +61,7 @@ pub struct FunctionSignature {
 }
 
 /// Optional `this` parameter type.
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum FunctionKind {
     /// `&this`
     MutRef,
@@ -80,21 +88,37 @@ impl FunctionKind {
 pub struct Variable {
     /// The name of the variable.
     pub name: Ident,
-    /// The type of the variable.
-    pub ty: Option<SoulType>,
+    /// The type of the variable (if type unknown typemodifier instead).
+    pub ty: VarTypeKind,
     /// Optional initial value expression.
     pub initialize_value: Option<Expression>,
 
     pub node_id: Option<NodeId>,
 }
 
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum VarTypeKind {
+    NonInveredType(SoulType),
+    InveredType(TypeModifier),
+}
+
 /// An assignment statement, e.g., `x = y + 1`.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Assignment {
+    pub node_id: Option<NodeId>,
     /// The left-hand side expression (the variable being assigned to).
     pub left: Expression,
     /// The right-hand side expression (the value being assigned).
     pub right: Expression,
+}
+
+impl VarTypeKind {
+    pub fn get_modifier(&self) -> TypeModifier {
+        match self {
+            VarTypeKind::NonInveredType(soul_type) => soul_type.modifier,
+            VarTypeKind::InveredType(type_modifier) => *type_modifier,
+        }
+    }
 }
 
 pub trait StatementHelpers {
@@ -106,13 +130,13 @@ pub trait StatementHelpers {
 }
 impl StatementHelpers for Statement {
     fn new_block(block: Block, span: Span) -> Self {
-        let expr = Expression::new(
+        let expression = Expression::new(
             ExpressionKind::Block(block), 
             span,
         );
 
         Self::new(
-            StatementKind::Expression(expr), 
+            StatementKind::Expression{id: None, expression}, 
             span,
         )
     }
@@ -120,14 +144,15 @@ impl StatementHelpers for Statement {
     fn from_expression(expression: Expression) -> Self {
         let span = expression.span;
         let attributes = expression.attributes.clone();
-        Self::with_atribute(StatementKind::Expression(expression), span, attributes)
+        Self::with_atribute(StatementKind::Expression{id: None, expression}, span, attributes)
     }
     
     fn from_function_call(function: Spanned<FunctionCall>) -> Self {
         Self::with_atribute(
-            StatementKind::Expression(
-                Expression::new(ExpressionKind::FunctionCall(function.node), function.span), 
-            ),
+            StatementKind::Expression{
+                id: None, 
+                expression: Expression::new(ExpressionKind::FunctionCall(function.node), function.span), 
+            },
             function.span,
             function.attributes,
         )

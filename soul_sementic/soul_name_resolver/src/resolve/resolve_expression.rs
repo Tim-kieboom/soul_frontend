@@ -12,9 +12,9 @@ impl<'a> NameResolver<'a> {
                 self.resolve_expression(&mut index.index);
             }
             ExpressionKind::FunctionCall(function_call) => {
-                function_call.node_id = self.lookup_function(&function_call.name);
+                function_call.id = self.lookup_function(&function_call.name);
                 
-                if function_call.node_id.is_none() {
+                if function_call.id.is_none() {
                     self.log_error(SoulError::new(
                         format!(
                             "function '{}' is undefined in scope",
@@ -32,7 +32,7 @@ impl<'a> NameResolver<'a> {
             ExpressionKind::FieldAccess(field_access) => {
                 self.resolve_expression(&mut field_access.parent);
             }
-            ExpressionKind::Variable { ident, resolved } => {
+            ExpressionKind::Variable { id:_, ident, resolved } => {
                 self.resolve_variable(ident, resolved, expression.span);
             }
             ExpressionKind::Unary(unary) => {
@@ -57,8 +57,8 @@ impl<'a> NameResolver<'a> {
                 }
                 self.resolve_block(&mut r#while.block);
             }
-            ExpressionKind::Deref(spanned) => {
-                self.resolve_expression(spanned);
+            ExpressionKind::Deref{ id:_, inner } => {
+                self.resolve_expression(inner);
             }
             ExpressionKind::Ref { expression, .. } => {
                 self.resolve_expression(expression);
@@ -71,13 +71,12 @@ impl<'a> NameResolver<'a> {
                     self.resolve_expression(value);
                 }
             }
-            ExpressionKind::ExpressionGroup(expression_group) => {
-                self.resolve_expression_group(expression_group);
+            ExpressionKind::ExpressionGroup { id:_, group } => {
+                self.resolve_expression_group(group);
             }
             ExpressionKind::TypeNamespace(_) => todo!("impl typeNamespace"),
 
-            ExpressionKind::Empty 
-            | ExpressionKind::Default 
+            ExpressionKind::Default(_) 
             | ExpressionKind::Literal(_) 
             | ExpressionKind::ExternalExpression(_) => (),
         }

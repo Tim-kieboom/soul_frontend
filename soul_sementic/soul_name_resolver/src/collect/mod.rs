@@ -4,6 +4,7 @@ use soul_utils::{error::{SoulError, SoulErrorKind}, span::Span};
 use crate::NameResolver;
 mod collect_statement;
 mod collect_expression;
+mod collect_type;
 
 impl<'a> NameResolver<'a> {
     pub(crate) fn collect_declarations(&mut self, block: &mut Block) {

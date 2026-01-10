@@ -14,12 +14,10 @@ pub type BoxExpression = Box<Expression>;
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ExpressionKind {
-    /// An empty expression (placeholder).
-    Empty,
     /// A `default` literal or default value e.g., '()'.
-    Default,
+    Default(Option<NodeId>),
     /// A literal value (number, string, etc.).
-    Literal(Literal),
+    Literal((Option<NodeId>, Literal)),
 
     /// Indexing into a collection, e.g., `arr[i]`.
     Index(Index),
@@ -30,6 +28,7 @@ pub enum ExpressionKind {
 
     /// Referring to a variable `var`.
     Variable {
+        id: Option<NodeId>,
         ident: Ident,
         resolved: Option<NodeId>,
     },
@@ -51,9 +50,10 @@ pub enum ExpressionKind {
     /// A conditional loop `while true {Println("loop")}`.
     While(While),
     /// A dereference, e.g., `*ptr`.
-    Deref(BoxExpression),
+    Deref{id: Option<NodeId>, inner: BoxExpression},
     /// reference, e.g., `&x`(mut) or `@x`(const).
     Ref {
+        id: Option<NodeId>,
         is_mutable: bool,
         expression: BoxExpression,
     },
@@ -63,18 +63,20 @@ pub enum ExpressionKind {
     /// Return-like expressions (`return`, `break`) `return 1`.
     ReturnLike(ReturnLike),
     /// A grouped expression, e.g., tuples, namedTuples or arrays.
-    ExpressionGroup(ExpressionGroup),
+    ExpressionGroup{id: Option<NodeId>, group: ExpressionGroup},
 }
 
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StructConstructor {
+    pub id: Option<NodeId>,
     pub ty: SoulType,
     pub named_tuple: NamedTuple,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Index {
+    pub id: Option<NodeId>,
     /// The collection being indexed.
     pub collection: BoxExpression,
     /// The index expression.
@@ -92,18 +94,20 @@ pub struct FunctionCall {
     pub generics: Vec<GenericDefine>,
     /// Function arguments.
     pub arguments: Vec<Expression>,
-    pub node_id: Option<NodeId>,
+    pub id: Option<NodeId>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FieldAccess {
+    pub id: Option<NodeId>,
     pub parent: BoxExpression,
-    pub member: Ident,
+    pub field: Ident,
 }
 
 /// An expression from an external page/module.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ExternalExpression {
+    pub id: Option<NodeId>,
     /// The path to the external page/module.
     pub path: SoulImportPath,
     /// The expression being accessed.
@@ -113,6 +117,7 @@ pub struct ExternalExpression {
 /// An `if` statement or expression.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct If {
+    pub id: Option<NodeId>,
     /// The condition expression.
     pub condition: BoxExpression,
     /// The block to execute if the condition is true.
@@ -135,6 +140,7 @@ pub enum ElseKind {
 /// A `while` loop statement.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct While {
+    pub id: Option<NodeId>,
     /// Optional condition expression. If `None`, the loop runs indefinitely.
     pub condition: Option<BoxExpression>,
     /// The loop body block.
@@ -144,11 +150,12 @@ pub struct While {
 /// A `return`, `fall`, or `break`-like expression.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ReturnLike {
+    pub id: Option<NodeId>,
     pub value: Option<BoxExpression>,
     pub kind: ReturnKind,
 }
 /// The kind of return-like expression.
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ReturnKind {
     /// A returns function.
     Return,
@@ -200,9 +207,10 @@ impl ExpressionHelpers for Expression {
     fn from_named_tuple(named_tuple: Spanned<NamedTuple>) -> Expression {
         
         Expression::with_atribute(
-            ExpressionKind::ExpressionGroup(
-                ExpressionGroup::NamedTuple(named_tuple.node)
-            ), 
+            ExpressionKind::ExpressionGroup{
+                id: None,
+                group: ExpressionGroup::NamedTuple(named_tuple.node)
+            }, 
             named_tuple.span, 
             named_tuple.attributes,
         )
@@ -215,9 +223,10 @@ impl ExpressionHelpers for Expression {
     
     fn from_array(array: Spanned<Array>) -> Expression {
         Expression::with_atribute(
-            ExpressionKind::ExpressionGroup(
-                ExpressionGroup::Array(Box::new(array.node))
-            ), 
+            ExpressionKind::ExpressionGroup{
+                id: None,
+                group: ExpressionGroup::Array(Box::new(array.node))
+            }, 
             array.span, 
             array.attributes,
         )
@@ -225,6 +234,7 @@ impl ExpressionHelpers for Expression {
     
     fn new_unary(op: UnaryOperator, rvalue: Expression, span: Span) -> Expression {
         let unary = Unary{
+            id: None,
             operator: op,
             expression: Box::new(rvalue),
         };
@@ -233,6 +243,7 @@ impl ExpressionHelpers for Expression {
     
     fn new_binary(lvalue: Expression, op: BinaryOperator, rvalue: Expression, span: Span) -> Expression {
         let binary = Binary {
+            id: None,
             left: Box::new(lvalue),
             operator: op,
             right: Box::new(rvalue),
@@ -241,7 +252,7 @@ impl ExpressionHelpers for Expression {
     }
     
     fn new_literal(literal: Literal, span: Span) -> Expression {
-        Expression::new(ExpressionKind::Literal(literal), span)
+        Expression::new(ExpressionKind::Literal((None, literal)), span)
     }
     
     fn from_function_call(function_call: Spanned<FunctionCall>) -> Expression {
@@ -250,7 +261,8 @@ impl ExpressionHelpers for Expression {
     
     fn new_index(collection: Expression, index: Expression, span: Span) -> Expression {
         Expression::new(
-            ExpressionKind::Index(Index { 
+            ExpressionKind::Index(Index {
+                id: None,  
                 collection: Box::new(collection), 
                 index: Box::new(index),
             }), 

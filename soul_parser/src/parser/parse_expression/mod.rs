@@ -92,9 +92,9 @@ impl<'a> Parser<'a> {
             &ROUND_OPEN => {
                 let tuple = self.parse_tuple()?;
                 let kind = if tuple.is_empty() {
-                    ExpressionKind::Default
+                    ExpressionKind::Default(None)
                 } else {
-                    ExpressionKind::ExpressionGroup(ExpressionGroup::Tuple(tuple))
+                    ExpressionKind::ExpressionGroup{id: None, group: ExpressionGroup::Tuple(tuple)}
                 };
 
                 Expression::new(kind, self.span_combine(start_span))
@@ -219,6 +219,7 @@ impl<'a> Parser<'a> {
             &CURLY_OPEN => {
                 self.go_to(ident_position);
                 let ctor = StructConstructor{
+                    id: None,
                     ty: self.try_parse_type(TypeModifier::Mut).merge_to_result()?,
                     named_tuple: self.try_parse_named_tuple().merge_to_result()?.node,
                 };
@@ -234,6 +235,7 @@ impl<'a> Parser<'a> {
                     ExpressionKind::Variable {
                         ident,
                         resolved: None,
+                        id: None,
                     },
                     span,
                 )

@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::{fmt::DebugList, marker::PhantomData};
 
 pub trait AsIndex {
     fn new(value: usize) -> Self;
@@ -10,11 +10,11 @@ pub struct VecMap<I: AsIndex, T> {
     pub vec: Vec<Option<T>>, 
     _marker: PhantomData<I>,
 }
-impl<I: AsIndex, T: Clone> VecMap<I, T> {
+impl<I: AsIndex + Clone, T: Clone> VecMap<I, T> {
     pub fn from_slice(slice: &[(I, T)]) -> Self {
         let mut this = Self::new();
-        for (index, value) in slice {
-            this.raw_insert(index.index(), Some(value.clone()));
+        for (index, value) in slice.iter().cloned() {
+            this.insert(index, value);
         }
         this
     }
@@ -31,7 +31,7 @@ impl<I: AsIndex, T> VecMap<I, T> {
     pub fn from_vec(vec: Vec<(I, T)>) -> Self {
         let mut this = Self::new();
         for (index, value) in vec {
-            this.raw_insert(index.index(), Some(value));
+            this.insert(index, value);
         }
         this
     }
@@ -59,22 +59,32 @@ impl<I: AsIndex, T> VecMap<I, T> {
         Iter: Iterator<Item = (I, T)>
     {
         for (index, value) in vec {
-            self.raw_insert(index.index(), Some(value));
+            self.insert(index, value);
         }
     }
 
-    pub fn insert(&mut self, index: I, value: T) -> Option<T> {
-        self.raw_insert(index.index(), Some(value))
+    pub fn insert(&mut self, index: I, value: T) {
+        
+        let index = index.index();
+        let mut entry = Some(value);
+        if let Some(option_value) = self.vec.get_mut(index) {
+            std::mem::swap(&mut entry, option_value);
+        } else {
+            let len = self.vec.len();
+            if index > len {
+                self.vec.resize_with(index+1, Default::default);
+            }
+            self.vec.insert(index, entry);
+        }
     }
 
     pub fn remove(&mut self, index: I) -> Option<T> {
-        self.raw_insert(index.index(), None)
-    }
-
-    fn raw_insert(&mut self, index: usize, mut value: Option<T>) -> Option<T> {
-        if let Some(option_value) = self.vec.get_mut(index) {
-            std::mem::swap(&mut value, option_value);
+        
+        let mut entry = None;
+        if let Some(option_value) = self.vec.get_mut(index.index()) {
+            std::mem::swap(&mut entry, option_value);
         }
-        value
+
+        entry
     }
 }

@@ -26,6 +26,10 @@ impl AsIndex for NodeId {
 
 pub struct NodeIdGenerator(u32);
 impl NodeIdGenerator {
+    pub fn from_last(last: NodeId) -> Self {
+        Self(last.0+1)
+    }
+
     pub fn new() -> Self {
         Self(0)
     }

@@ -1,20 +1,24 @@
 use parser_models::{
-    ast::{BinaryOperator, Literal, UnaryOperator},
+    ast::{BinaryOperator, Literal, ReturnKind, UnaryOperator},
     scope::NodeId,
 };
-use soul_utils::Ident;
+use soul_utils::{Ident, span::Spanned};
 
-use crate::{BodyId, ExpressionId, hir_type::HirType};
+use crate::{BodyId, ExpressionId, GenericDefine, hir_type::HirType};
+
+pub type Expression = Spanned<ExpressionKind>;
 
 /// Expression kinds in HIR (desugared and resolved).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum ExpressionKind {
+    Default,
     /// Conditional expression.
     If(If),
     /// Reference creation (`&expr` or `@expr`).
     Ref(Ref),
     /// Block expression `{ ... }`.
     Block(BodyId),
+    Index(Index),
     /// while loop (desugared from Soul `while` or `for`).
     While(While),
     /// Binary operation.
@@ -37,10 +41,35 @@ pub enum ExpressionKind {
     FunctionCall(FunctionCall),
     /// Struct literal `Type { field: expr, .. }`.
     StructContructor(StructContructor),
+    /// array and tuple
+    ExpressionGroup(ExpressionGroup),
+    /// `fall` statement (return from first block).
+    Fall(ReturnLike),
+    /// `break` statement (exits/return enclosing loop).
+    Break(ReturnLike),
+    /// `return` statement (returns from enclosing function).
+    Return(ReturnLike),
+    /// `break` statement (continue enclosing loop).
+    Continue(ReturnLike),
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum ExpressionGroup {
     /// Array '[expr,expr,expr]'
     Array(Vec<ExpressionId>),
     /// Tuple '(0: expr, 1: expr)' NamedTuple '(name: expr, name: expr)'
-    Tuple(Vec<(Ident, ExpressionId)>),
+    Tuple {
+        values: Vec<(Ident, ExpressionId)>,
+        insert_defaults: bool,
+    },
+}
+
+/// ReturnLike statement (`<return|break|fall|continue> value`).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ReturnLike {
+    pub id: NodeId,
+    pub kind: ReturnKind,
+    pub value: Option<ExpressionId>,
 }
 
 /// If expression (`if cond { then } else { else }`).
@@ -78,6 +107,15 @@ pub struct While {
     pub condition: Option<ExpressionId>,
 }
 
+/// index operation.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Index {
+    /// Left operand.
+    pub collection: ExpressionId,
+    /// Right operand.
+    pub index: ExpressionId,
+}
+
 /// Binary operation.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Binary {
@@ -105,6 +143,7 @@ pub struct FunctionCall {
     pub name: Ident,
     /// Argument expressions.
     pub arguments: Vec<ExpressionId>,
+    pub generics: Vec<GenericDefine>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -120,7 +159,7 @@ pub struct FieldAccess {
     /// Field name.
     pub field: Ident,
     /// Receiver expression.
-    pub reciever: ExpressionId,
+    pub parent: ExpressionId,
 }
 
 /// Field access `receiver.field`.

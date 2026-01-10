@@ -38,6 +38,7 @@ fn to_message(err: &SoulError, level: SementicLevel, file_path: &str, source_fil
     let mut sb = String::new();
 
     sb.push_str(level_color(&level));
+    sb.push_str(&format!("{:?}\n", err.kind));
     sb.push_str(level.as_str());
     sb.push_str(": ");
     sb.push_str(DEFAULT);

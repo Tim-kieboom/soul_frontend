@@ -2,7 +2,7 @@ use crate::parser::{
     Parser,
     parse_utils::{ARROW_LEFT, COLON, CURLY_OPEN, ROUND_OPEN, STAMENT_END_TOKENS},
 };
-use parser_models::ast::{SoulType, Statement, StatementHelpers, Variable};
+use parser_models::ast::{SoulType, Statement, StatementHelpers, VarTypeKind, Variable};
 use soul_tokenizer::TokenKind;
 use soul_utils::{
     Ident,
@@ -49,10 +49,12 @@ impl<'a> Parser<'a> {
         }
 
         const DEFAULT_VARIABLE_MODIFIER: TypeModifier = TypeModifier::Const;
-        let mut ty = None;
+        let mut ty = VarTypeKind::InveredType(DEFAULT_VARIABLE_MODIFIER);
         if self.current_is(&COLON) {
             self.bump();
-            ty = Some(self.try_parse_type(DEFAULT_VARIABLE_MODIFIER)?);
+            ty = VarTypeKind::NonInveredType(
+                self.try_parse_type(DEFAULT_VARIABLE_MODIFIER)?
+            );
         }
 
         if self.current_is_any(STAMENT_END_TOKENS) {

@@ -65,6 +65,7 @@ impl<'a> Parser<'a> {
         Ok(Block {
             modifier,
             statements,
+            node_id: None,
             scope_id: None,
         })
     }

@@ -1,7 +1,6 @@
 use crate::{
     ast::{
-        ExpressionKind, FunctionSignature, GenericDeclare, GenericDeclareKind, StatementKind,
-        syntax_display::{DisplayKind, try_display_node_id},
+        ExpressionKind, FunctionSignature, GenericDeclare, GenericDeclareKind, StatementKind, VarTypeKind, syntax_display::{DisplayKind, try_display_node_id}
     },
     syntax_display::{SyntaxDisplay, tree_prefix},
 };
@@ -20,22 +19,23 @@ impl SyntaxDisplay for StatementKind {
                 sb.push_str(&prefix);
                 sb.push_str("Import >> ");
                 let prefix = tree_prefix(tab + 1, is_last);
-                for path in paths {
+                for path in &paths.paths {
                     sb.push('\n');
                     sb.push_str(&prefix);
                     sb.push_str("Path >> ");
                     sb.push_str(path.as_str());
                 }
             }
-            StatementKind::Expression(spanned) => {
+            StatementKind::Expression{id, expression} => {
                 sb.push_str(&prefix);
-                let tag = if matches!(spanned.node, ExpressionKind::Block(_)) {
+                try_display_node_id(sb, kind, *id);
+                let tag = if matches!(expression.node, ExpressionKind::Block(_)) {
                     "Block >> "
                 } else {
                     "Expression >> "
                 };
                 sb.push_str(tag);
-                spanned.node.inner_display(sb, kind, tab, is_last);
+                expression.node.inner_display(sb, kind, tab, is_last);
             }
             StatementKind::Variable(var) => {
                 sb.push_str(&prefix);
@@ -43,12 +43,14 @@ impl SyntaxDisplay for StatementKind {
                 sb.push_str("Variable >> ");
                 sb.push_str(var.name.as_str());
                 sb.push_str(": ");
-                sb.push_str(
-                    &var.ty
-                        .as_ref()
-                        .map(|ty| ty.display(kind))
-                        .unwrap_or("/*type?*/".to_string())
-                );
+                match &var.ty {
+                    VarTypeKind::NonInveredType(soul_type) => soul_type.inner_display(sb, kind, tab, is_last),
+                    VarTypeKind::InveredType(type_modifier) => {
+                        sb.push_str(type_modifier.as_str());
+                        sb.push(' ');
+                        sb.push_str("/*type?*/");
+                    }
+                }
                 if let Some(val) = &var.initialize_value {
                     sb.push_str(" = ");
                     val.node.inner_display(sb, kind, tab, is_last);

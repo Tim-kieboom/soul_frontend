@@ -39,7 +39,7 @@ pub enum TypeKind {
     /// Named tuple / record type
     NamedTuple(NamedTupleType),
     /// Generic type parameter
-    Generic { node_id: NodeId, kind: GenericKind },
+    Generic { node_id: Option<NodeId>, kind: GenericKind },
     /// Reference type: &T or &mut T
     Reference(ReferenceType),
     /// Pointer type: *T

@@ -1,4 +1,4 @@
-use crate::ast::{BoxExpression, Expression};
+use crate::{ast::{BoxExpression, Expression}, scope::NodeId};
 use soul_utils::span::Spanned;
 
 /// A unary operator wrapped with source location information.
@@ -9,6 +9,7 @@ pub type BinaryOperator = Spanned<BinaryOperatorKind>;
 /// A unary operation expression.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Unary {
+    pub id: Option<NodeId>,
     /// The unary operator.
     pub operator: UnaryOperator,
     /// The operand expression.
@@ -18,6 +19,7 @@ pub struct Unary {
 /// A binary operation expression.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Binary {
+    pub id: Option<NodeId>,
     /// The left-hand side expression.
     pub left: BoxExpression,
     /// The binary operator.
@@ -99,6 +101,7 @@ pub enum BinaryOperatorKind {
 impl Binary {
     pub fn new(left: Expression, operator: BinaryOperator, right: Expression) -> Self {
         Self {
+            id: None,
             left: Box::new(left),
             operator,
             right: Box::new(right),

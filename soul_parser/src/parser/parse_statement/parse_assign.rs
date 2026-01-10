@@ -57,6 +57,7 @@ impl<'a> Parser<'a> {
 
         let assignment = Assignment {
             left: lvalue,
+            node_id: None,
             right: resolved_rvalue,
         };
 

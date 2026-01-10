@@ -59,7 +59,7 @@ impl TypeKind {
                     .collect();
                 format!("{{{}}}", elems.join(", "))
             }
-            TypeKind::Generic { node_id, .. } => node_id.display(),
+            TypeKind::Generic { node_id, .. } => node_id.map(|el| el.display()).unwrap_or_default(),
             TypeKind::Reference(r) => {
                 let ref_str = if r.mutable {
                     TypeWrapper::MutRef.as_str()

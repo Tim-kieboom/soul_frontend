@@ -1,4 +1,4 @@
-use parser_models::ast::{Statement, StatementKind};
+use parser_models::ast::{Import, Statement, StatementKind};
 use soul_tokenizer::TokenKind;
 use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},
@@ -91,7 +91,7 @@ impl<'a> Parser<'a> {
 
         self.expect(&SQUARE_CLOSE)?;
         Ok(Statement::new(
-            StatementKind::Import(paths),
+            StatementKind::Import(Import{id: None, paths}),
             self.token().span,
         ))
     }

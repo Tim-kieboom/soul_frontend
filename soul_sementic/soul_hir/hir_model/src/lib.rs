@@ -1,8 +1,4 @@
-use crate::{
-    item::{Block, Item},
-    scope::{Scope, ScopeId},
-};
-use parser_models::{ast::Expression, scope::NodeId};
+use parser_models::scope::NodeId;
 use soul_utils::{sementic_level::SementicFault, vec_map::VecMap};
 
 mod expression;
@@ -10,6 +6,12 @@ mod hir_type;
 mod item;
 mod scope;
 mod statement;
+
+pub use expression::*;
+pub use hir_type::*;
+pub use item::*;
+pub use scope::*;
+pub use statement::*;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct HirResponse {

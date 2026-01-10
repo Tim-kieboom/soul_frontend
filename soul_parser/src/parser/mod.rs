@@ -66,6 +66,7 @@ impl<'a> Parser<'a> {
                         modifier: TypeModifier::Mut,
                         statements: vec![],
                         scope_id: None,
+                        node_id: None,
                     },
                 }, 
                 this.faults,
@@ -85,6 +86,7 @@ impl<'a> Parser<'a> {
                     statements,
                     scope_id: None,
                     modifier: TypeModifier::Mut,
+                    node_id: None,
                 },
             },
             this.faults

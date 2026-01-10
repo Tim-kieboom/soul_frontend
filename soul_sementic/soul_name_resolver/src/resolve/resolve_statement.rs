@@ -26,7 +26,7 @@ impl<'a> NameResolver<'a> {
             StatementKind::Function(function) => {
                 self.resolves_function(function);
             }
-            StatementKind::Expression(value) => self.resolve_expression(value),
+            StatementKind::Expression{id:_, expression} => self.resolve_expression(expression),
             StatementKind::Import(_) => (), // maybe later track imports
         }
     }

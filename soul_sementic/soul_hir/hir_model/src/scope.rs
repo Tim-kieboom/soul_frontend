@@ -31,3 +31,18 @@ pub struct Scope {
     pub parent: Option<ScopeId>,
     pub locals: HashMap<String, LocalDefId>,
 }
+impl Scope {
+    pub fn new_global() -> Self {
+        Self {
+            parent: None,
+            locals: HashMap::default(),
+        }
+    }
+
+    pub fn new_child(parent: ScopeId) -> Self {
+        Self {
+            parent: Some(parent),
+            locals: HashMap::default(),
+        }
+    }
+}

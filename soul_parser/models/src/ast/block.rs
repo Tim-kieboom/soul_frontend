@@ -2,7 +2,7 @@ use soul_utils::soul_names::TypeModifier;
 
 use crate::{
     ast::Statement,
-    scope::ScopeId,
+    scope::{NodeId, ScopeId},
     syntax_display::{DisplayKind, SyntaxDisplay, gap_prefix},
 };
 
@@ -17,6 +17,7 @@ pub struct Block {
     /// The statements contained in this block.
     pub statements: Vec<Statement>,
     pub scope_id: Option<ScopeId>,
+    pub node_id: Option<NodeId>,
 }
 impl SyntaxDisplay for Block {
     fn display(&self, kind: DisplayKind) -> String {

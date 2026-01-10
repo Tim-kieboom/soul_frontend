@@ -89,6 +89,7 @@ version = "0.1.0"
 dependencies = [
  "hir_model",
  "parser_models",
+ "soul_utils",
 ]
 
 [[package]]

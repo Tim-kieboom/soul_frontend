@@ -26,6 +26,7 @@ impl<'a> Parser<'a> {
             condition: Box::new(if_condition),
             block: if_block,
             else_branchs: None,
+            id: None,
         };
 
         self.parse_if_arms(&mut r#if.else_branchs)?;
@@ -48,7 +49,7 @@ impl<'a> Parser<'a> {
 
         let block = self.parse_block(TypeModifier::Mut)?;
         Ok(Expression::new(
-            ExpressionKind::While(While { condition, block }),
+            ExpressionKind::While(While { condition, block, id: None }),
             self.span_combine(start_span),
         ))
     }
@@ -91,6 +92,7 @@ impl<'a> Parser<'a> {
                         condition: Box::new(condition),
                         block,
                         else_branchs: None,
+                        id: None,
                     },
                     self.span_combine(start_span),
                 )))

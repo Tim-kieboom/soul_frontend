@@ -15,6 +15,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48c757948c5ede0e46177b7add2e67155f70e33c07fea8284df6576da70b3719"
 
 [[package]]
+name = "hir_model"
+version = "0.1.0"
+dependencies = [
+ "parser_models",
+ "serde",
+ "soul_utils",
+]
+
+[[package]]
 name = "itertools"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -106,6 +115,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "soul_hir"
+version = "0.1.0"
+dependencies = [
+ "hir_model",
+ "parser_models",
+ "soul_utils",
+]
+
+[[package]]
 name = "soul_name_resolver"
 version = "0.1.0"
 dependencies = [
@@ -128,9 +146,11 @@ name = "soul_tester"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "hir_model",
  "parser_models",
  "serde",
  "serde_json",
+ "soul_hir",
  "soul_name_resolver",
  "soul_parser",
  "soul_tokenizer",

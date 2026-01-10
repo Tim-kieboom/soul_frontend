@@ -1,10 +1,12 @@
 use std::{fs::File, io::Read};
 
 use anyhow::Result;
+use hir_model::HirResponse;
 use parser_models::{
     ParseResponse,
     syntax_display::{DisplayKind, SyntaxDisplay},
 };
+use soul_hir::lower_to_hir;
 use soul_name_resolver::name_resolve;
 use soul_parser::parse;
 use soul_tokenizer::{TokenStream, tokenize};
@@ -32,7 +34,10 @@ fn main() -> Result<()> {
     let mut parse_response = parse(token_stream);
     name_resolve(&mut parse_response);
 
-    let ParseResponse { tree, meta_data } = parse_response;
+    let HirResponse{ hir, faults } = lower_to_hir(&parse_response);
+    let ParseResponse { tree, mut meta_data } = parse_response;
+    meta_data.faults.extend(faults);
+
     for fault in &meta_data.faults {
         eprintln!("{}", fault.to_message(&"main.soul", &source_file));
     }
@@ -42,6 +47,11 @@ fn main() -> Result<()> {
     paths.write_to_output(
         tree.root.display(DisplayKind::NameResolver),
         "ast_name_resolved.soulc",
+    )?;
+
+    paths.write_to_output(
+        serde_json::to_string_pretty(&hir)?, 
+        "hir.soulc"
     )?;
 
     if meta_data.faults.is_empty() {
