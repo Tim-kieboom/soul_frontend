@@ -71,10 +71,17 @@ impl<'a> Lexer<'a> {
             self.skip_whitespace();
         }
 
-        if let Some(symbool) = SymbolKind::from_lexer(self) {
-            self.next_char();
+        if let Some(symbol) = SymbolKind::from_lexer(self) {
+            
+            let kind = if self.is_negative_number(symbol) {
+                TokenKind::Number(self.get_number(start_line, start_offset)?)
+            } else {
+                self.next_char();
+                TokenKind::Symbol(symbol)
+            };
+
             return Ok(Token::new(
-                TokenKind::Symbol(symbool),
+                kind,
                 self.new_span(start_line, start_offset),
             ));
         }
@@ -128,12 +135,24 @@ impl<'a> Lexer<'a> {
                 None => TokenKind::Unknown('\''),
             },
             ch if is_ident(ch) => TokenKind::Ident(self.get_ident()),
+
             ch if is_number(ch) => TokenKind::Number(self.get_number(start_line, start_offset)?),
             _ => {
                 self.next_char();
                 TokenKind::Unknown(char)
             }
         })
+    }
+
+    fn is_negative_number(&mut self, symbol: SymbolKind) -> bool {
+        if symbol != SymbolKind::Minus {
+            return false
+        }
+
+        match self.peek_char() {
+            Some(char) => is_number(char),
+            None => false,
+        }
     }
 
     fn skip_line_comment(&mut self) {

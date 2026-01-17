@@ -1,11 +1,10 @@
-use parser_models::ast::{ElseKind, Expression, ExpressionGroup, ExpressionKind, If};
+use parser_models::ast::{ElseKind, Expression, ExpressionKind, If};
 use crate::NameResolver;
 
 impl<'a> NameResolver<'a> {
     pub(super) fn collect_expression(&mut self, expression: &mut Expression) {
 
         match &mut expression.node {
-
             ExpressionKind::If(r#if) => {
                 r#if.id = Some(self.alloc_id());
                 self.collect_if(r#if);
@@ -45,10 +44,6 @@ impl<'a> NameResolver<'a> {
                     self.collect_expression(value);
                 } 
             }
-            ExpressionKind::FieldAccess(field_access) => {
-                field_access.id = Some(self.alloc_id());
-                self.collect_expression(&mut field_access.parent);
-            }
             ExpressionKind::FunctionCall(function_call) => {
                 function_call.id = Some(self.alloc_id());
                 for arg in &mut function_call.arguments {
@@ -62,42 +57,16 @@ impl<'a> NameResolver<'a> {
                 *id = Some(self.alloc_id());
                 self.collect_expression(expression);
             }
-            ExpressionKind::ExpressionGroup{ id, group } => {
-                *id = Some(self.alloc_id());
-                self.collect_expression_group(group);
-            }
-            ExpressionKind::StructConstructor(struct_constructor) => {
-                struct_constructor.id = Some(self.alloc_id());
-                for (_name, item) in &mut struct_constructor.named_tuple.values {
-                    self.collect_expression(item);
-                }
-            }
-            ExpressionKind::TypeNamespace(_) => todo!("typeNamespace"),
             ExpressionKind::ExternalExpression(_) => todo!("impl external expressions"),
-
             ExpressionKind::Default(id) => *id = Some(self.alloc_id()),
-            ExpressionKind::Literal((id, _)) => *id = Some(self.alloc_id()), 
+            ExpressionKind::Literal((id, _)) => *id = Some(self.alloc_id()),
             ExpressionKind::Variable { id, .. } => *id = Some(self.alloc_id()),
-        }
-    }
-
-    fn collect_expression_group(&mut self, group: &mut ExpressionGroup) {
-        match group {
-            ExpressionGroup::Array(array) => {
-                for item in &mut array.values {
-                    self.collect_expression(item);
+            ExpressionKind::Array(array) => {
+                array.id = Some(self.alloc_id());
+                for value in &mut array.values {
+                    self.collect_expression(value);
                 }
-            }
-            ExpressionGroup::Tuple(spanneds) => {
-                for item in spanneds {
-                    self.collect_expression(item);
-                }
-            }
-            ExpressionGroup::NamedTuple(named_tuple) => {
-                for (_name, item) in &mut named_tuple.values {
-                    self.collect_expression(item);
-                }
-            }
+            },
         }
     }
 

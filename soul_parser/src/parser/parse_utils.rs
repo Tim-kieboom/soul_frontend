@@ -157,9 +157,8 @@ impl<'a> Parser<'a> {
 
         Ok(Ident::new(text, token.span))
     }
-    
-    pub(crate) fn try_token_as_ident_str(&mut self) -> SoulResult<&str> {
 
+    pub(crate) fn try_token_as_ident_str(&mut self) -> SoulResult<&str> {
         let token = &self.token();
         match &token.kind {
             TokenKind::Ident(val) => Ok(val),

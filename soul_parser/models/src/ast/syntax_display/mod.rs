@@ -5,8 +5,8 @@ pub mod display_group_expression;
 pub mod display_soul_type;
 pub mod display_statment;
 
-fn node_id_display(node_id: Option<NodeId>, kind: DisplayKind) -> String {
-    if kind != DisplayKind::NameResolver {
+fn node_id_display(node_id: Option<NodeId>, kind: &DisplayKind) -> String {
+    if kind != &DisplayKind::NameResolver {
         return String::default();
     }
 
@@ -15,6 +15,6 @@ fn node_id_display(node_id: Option<NodeId>, kind: DisplayKind) -> String {
         .unwrap_or_default()
 }
 
-fn try_display_node_id(sb: &mut String, kind: DisplayKind, node_id: Option<NodeId>) {
+fn try_display_node_id(sb: &mut String, kind: &DisplayKind, node_id: Option<NodeId>) {
     sb.push_str(&node_id_display(node_id, kind));
 }

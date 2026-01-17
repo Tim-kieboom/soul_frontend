@@ -1,7 +1,12 @@
 use parser_models::ast::{Block, Statement, StatementHelpers};
 use soul_tokenizer::TokenKind;
 use soul_utils::{
-    error::{SoulError, SoulErrorKind, SoulResult}, soul_names::{KeyWord, TypeModifier}, span::Span, try_result::{ResultTryErr, ResultTryNotValue, TryErr, TryError, TryNotValue, TryOk, TryResult}
+    error::{SoulError, SoulErrorKind, SoulResult},
+    soul_names::{KeyWord, TypeModifier},
+    span::Span,
+    try_result::{
+        ResultTryErr, ResultTryNotValue, TryErr, TryError, TryNotValue, TryOk, TryResult,
+    },
 };
 
 use crate::parser::{
@@ -40,6 +45,7 @@ impl<'a> Parser<'a> {
 
     pub(crate) fn parse_block(&mut self, modifier: TypeModifier) -> SoulResult<Block> {
         const END_TOKENS: &[TokenKind] = &[CURLY_CLOSE, TokenKind::EndFile];
+        let start_span = self.token().span;
 
         let mut statements = vec![];
 
@@ -67,6 +73,7 @@ impl<'a> Parser<'a> {
             statements,
             node_id: None,
             scope_id: None,
+            span: self.span_combine(start_span),
         })
     }
 
@@ -166,12 +173,15 @@ impl<'a> Parser<'a> {
     }
 
     fn inner_parse_methode(&mut self, start_span: Span) -> TryResult<Statement, ()> {
-        const DEFAULT_MODIFIER: TypeModifier = TypeModifier::Mut;
-        let methode_type = match self.try_parse_type(DEFAULT_MODIFIER) {
+        let mut methode_type = match self.try_parse_type() {
             Ok(val) => val,
             Err(TryError::IsErr(err)) => return TryErr(err),
             _ => return TryNotValue(()),
         };
+
+        if methode_type.modifier.is_none() {
+            methode_type.modifier = Some(TypeModifier::Mut);
+        }
 
         let name = self.try_bump_consume_ident().try_not_value()?;
         match self.try_parse_function_declaration(start_span, methode_type, name) {

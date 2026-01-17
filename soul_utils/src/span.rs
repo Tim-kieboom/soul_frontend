@@ -44,6 +44,11 @@ pub struct Attribute {
 pub struct Spanned<T> {
     /// The actual AST node.
     pub node: T,
+    meta_data: NodeMetaData
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct NodeMetaData {
     /// The source code span where this node appears.
     pub span: Span,
     /// Additional attributes associated with this node.
@@ -103,16 +108,30 @@ impl<T> Spanned<T> {
     pub fn new(inner: T, span: Span) -> Self {
         Self {
             node: inner,
-            span,
-            attributes: vec![],
+            meta_data: NodeMetaData { span, attributes: vec![] }
         }
     }
 
-    pub fn with_atribute(inner: T, span: Span, attributes: Vec<Attribute>) -> Self {
+    pub fn with_meta_data(inner: T, meta_data: NodeMetaData) -> Self {
         Self {
             node: inner,
-            span,
-            attributes,
+            meta_data
         }
+    }
+
+    pub fn get_span(&self) -> Span {
+        self.meta_data.span
+    }
+
+    pub fn get_meta_data(&self) -> &NodeMetaData {
+        &self.meta_data
+    }
+
+    pub fn get_meta_data_mut(&mut self) -> &mut NodeMetaData {
+        &mut self.meta_data
+    }
+
+    pub fn consume(self) -> (T, NodeMetaData) {
+        (self.node, self.meta_data)
     }
 }

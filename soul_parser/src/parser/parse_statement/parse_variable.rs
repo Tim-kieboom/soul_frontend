@@ -14,17 +14,19 @@ use crate::parser::{
 impl<'a> Parser<'a> {
     pub(crate) fn parse_variable(&mut self) -> SoulResult<Statement> {
         let name = self.try_bump_consume_ident()?;
-        let name_span = name.span;
+        let name_span = name.get_span();
 
         const DEFAULT_MODIFIER: TypeModifier = TypeModifier::Const;
         let ty = if self.current_is(&COLON) {
             self.bump();
-            let ty = self.try_parse_type(DEFAULT_MODIFIER).merge_to_result()?;
-            
+            let mut ty = self.try_parse_type().merge_to_result()?;
+
             if !self.current_is_any(&[COLON_ASSIGN, ASSIGN]) {
-                return Err(
-                    self.get_expect_any_error(&[COLON_ASSIGN, ASSIGN])
-                )
+                return Err(self.get_expect_any_error(&[COLON_ASSIGN, ASSIGN]));
+            }
+
+            if ty.modifier.is_none() {
+                ty.modifier = Some(DEFAULT_MODIFIER);
             }
             VarTypeKind::NonInveredType(ty)
         } else {

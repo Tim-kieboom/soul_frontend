@@ -2,9 +2,9 @@ use parser_models::{
     ast::{BinaryOperator, Literal, ReturnKind, UnaryOperator},
     scope::NodeId,
 };
-use soul_utils::{Ident, span::Spanned};
+use soul_utils::{Ident, span::{Span, Spanned}};
 
-use crate::{BodyId, ExpressionId, GenericDefine, hir_type::HirType};
+use crate::{BodyId, ExpressionId, hir_type::HirType};
 
 pub type Expression = Spanned<ExpressionKind>;
 
@@ -19,6 +19,7 @@ pub enum ExpressionKind {
     /// Block expression `{ ... }`.
     Block(BodyId),
     Index(Index),
+    Array(Array),
     /// while loop (desugared from Soul `while` or `for`).
     While(While),
     /// Binary operation.
@@ -31,18 +32,8 @@ pub enum ExpressionKind {
     DeRef(ExpressionId),
     /// Resolved variable reference.
     ResolvedVariable(NodeId),
-    /// Field access `expr.field`.
-    FieldAccess(FieldAccess),
-    /// Methode call `Type.func()`.
-    StaticMethode(StaticMethode),
-    /// Field access `Type.field`.
-    StaticFieldAccess(StaticFieldAccess),
     /// Function'func()'/method'expr.func()' call.
     FunctionCall(FunctionCall),
-    /// Struct literal `Type { field: expr, .. }`.
-    StructContructor(StructContructor),
-    /// array and tuple
-    ExpressionGroup(ExpressionGroup),
     /// `fall` statement (return from first block).
     Fall(ReturnLike),
     /// `break` statement (exits/return enclosing loop).
@@ -50,18 +41,13 @@ pub enum ExpressionKind {
     /// `return` statement (returns from enclosing function).
     Return(ReturnLike),
     /// `break` statement (continue enclosing loop).
-    Continue(ReturnLike),
+    Continue(NodeId),
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub enum ExpressionGroup {
-    /// Array '[expr,expr,expr]'
-    Array(Vec<ExpressionId>),
-    /// Tuple '(0: expr, 1: expr)' NamedTuple '(name: expr, name: expr)'
-    Tuple {
-        values: Vec<(Ident, ExpressionId)>,
-        insert_defaults: bool,
-    },
+pub struct Array {
+    pub id: NodeId,
+    pub values: Vec<(ExpressionId, Span)>,
 }
 
 /// ReturnLike statement (`<return|break|fall|continue> value`).
@@ -143,7 +129,7 @@ pub struct FunctionCall {
     pub name: Ident,
     /// Argument expressions.
     pub arguments: Vec<ExpressionId>,
-    pub generics: Vec<GenericDefine>,
+    pub resolved: NodeId,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

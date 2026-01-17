@@ -4,7 +4,6 @@ use soul_utils::{
     span::Span,
 };
 
-use crate::ast::Expression;
 use crate::scope::NodeId;
 
 /// Represents a type in the Soul language.
@@ -13,8 +12,7 @@ pub struct SoulType {
     /// The kind of type (primitive, complex, array, etc.).
     pub kind: TypeKind,
     /// Optional type modifier (const, mut, literal).
-    pub modifier: TypeModifier,
-    pub generics: Vec<GenericDefine>,
+    pub modifier: Option<TypeModifier>,
     pub span: Span,
 }
 
@@ -25,45 +23,15 @@ pub enum TypeKind {
     None,
     /// Represents the type of all types
     Type,
-    /// stub type (used in parsing stage)
-    Stub {
-        ident: Ident,
-        resolved: Option<NodeId>,
-    },
     /// Primitive types like int, bool, float
     Primitive(InternalPrimitiveTypes),
-    /// Array type: [N]T or dynamic []T
-    Array(ArrayType),
-    /// Tuple type: (T1, T2, ...)
-    Tuple(TupleType),
-    /// Named tuple / record type
-    NamedTuple(NamedTupleType),
-    /// Generic type parameter
-    Generic { node_id: Option<NodeId>, kind: GenericKind },
+    Array(Box<SoulType>),
     /// Reference type: &T or &mut T
     Reference(ReferenceType),
     /// Pointer type: *T
     Pointer(Box<SoulType>),
     /// Optional type: ?T
     Optional(Box<SoulType>),
-}
-
-/// A generic argument (type, lifetime, or expression).
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum GenericDefine {
-    /// A type argument.
-    Type(SoulType),
-    /// A lifetime argument.
-    Lifetime(Ident),
-    /// An expression argument (for const generics).
-    Expression(Expression),
-}
-
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum GenericKind {
-    Type,
-    LifeTime,
-    Expression,
 }
 
 /// Array type
@@ -116,25 +84,20 @@ impl ReferenceType {
 }
 
 impl SoulType {
-    pub fn new(modifier: TypeModifier, kind: TypeKind, span: Span) -> Self {
-        Self { kind, modifier, generics: vec![], span }
+    pub fn new(modifier: Option<TypeModifier>, kind: TypeKind, span: Span) -> Self {
+        Self { kind, modifier, span }
     }
 
-    pub fn none(span: Span) -> Self {
+    pub const fn none(span: Span) -> Self {
         Self {
             span,
-            generics: vec![],
             kind: TypeKind::None,
-            modifier: TypeModifier::Const,
+            modifier: None,
         }
     }
 
-    pub fn none_mut(span: Span) -> Self {
-        Self {
-            span,
-            generics: vec![],
-            kind: TypeKind::None,
-            modifier: TypeModifier::Mut,
-        }
+    pub const fn with_modifier(mut self, modifier: Option<TypeModifier>) -> Self {
+        self.modifier = modifier;
+        self
     }
 }

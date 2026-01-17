@@ -23,7 +23,7 @@ impl HirLowerer {
         self.pop_scope(prev_scope);
 
         let body_id = body.id;
-        self.push_block(body);
+        self.push_block(body, r#while.block.span);
 
         Some((
             id,
@@ -47,7 +47,7 @@ impl HirLowerer {
         self.pop_scope(prev_scope);
 
         let body_id = body.id;
-        self.push_block(body);
+        self.push_block(body, r#if.block.span);
 
         Some((
             id,
@@ -92,7 +92,7 @@ impl HirLowerer {
                     self.log_error(SoulError::new(
                         "tryed to add ifArm after Else",
                         SoulErrorKind::InternalError,
-                        Some(arm.span),
+                        Some(arm.get_span()),
                     ));
                     return None;
                 }
@@ -108,10 +108,10 @@ impl HirLowerer {
 
     fn lower_elseif(&mut self, elif: &Box<Spanned<ast::If>>) -> Option<Box<hir::IfArm>> {
         let prev_body = self.push_scope();
-        let body = self.lower_block(&elif.node.block, elif.span)?;
+        let body = self.lower_block(&elif.node.block, elif.get_span())?;
         self.pop_scope(prev_body);
         let body_id = body.id;
-        self.push_block(body);
+        self.push_block(body, elif.get_span());
 
         Some(Box::new(hir::IfArm::ElseIf(hir::If {
             body: body_id,
@@ -122,10 +122,10 @@ impl HirLowerer {
 
     fn lower_else(&mut self, el: &Spanned<ast::Block>) -> Option<Box<hir::IfArm>> {
         let prev_body = self.push_scope();
-        let body = self.lower_block(&el.node, el.span)?;
+        let body = self.lower_block(&el.node, el.get_span())?;
         self.pop_scope(prev_body);
         let body_id = body.id;
-        self.push_block(body);
+        self.push_block(body, el.get_span());
 
         Some(Box::new(hir::IfArm::Else(body_id)))
     }

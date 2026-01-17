@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use soul_utils::{Ident, span::Span, vec_map::AsIndex};
+use soul_utils::{Ident, span::Span, vec_map::VecMapIndex};
 
-use crate::ast::{Function, GenericDeclare, GenericDeclareKind, Variable};
+use crate::ast::{Function, Variable};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct NodeId(u32);
@@ -13,9 +13,13 @@ impl NodeId {
     pub fn display(&self) -> String {
         format!("{}", self.0)
     }
+    pub fn write(&self, sb: &mut String) {
+        use std::fmt::Write;
+        write!(sb, "{}", self.0).expect("should not give write error")
+    }
 }
-impl AsIndex for NodeId {
-    fn new(value: usize) -> Self {
+impl VecMapIndex for NodeId {
+    fn new_index(value: usize) -> Self {
         Self(value as u32)
     }
 
@@ -184,39 +188,6 @@ impl<'a> ScopeValueKind<'a> {
         match self {
             ScopeValueKind::Variable(_) => ScopeValueEntryKind::Variable,
             ScopeValueKind::Function(_) => ScopeValueEntryKind::Function,
-        }
-    }
-}
-
-pub enum ScopeTypeKind<'a> {
-    GenricDeclare(&'a mut GenericDeclare),
-}
-impl<'a> ScopeTypeKind<'a> {
-    pub fn get_id_mut(&mut self) -> &mut Option<NodeId> {
-        match self {
-            ScopeTypeKind::GenricDeclare(ty) => &mut ty.node_id,
-        }
-    }
-
-    pub fn get_parent_id_mut(&mut self) -> Option<&mut Option<NodeId>> {
-        None
-    }
-
-    pub fn get_name(&self) -> &Ident {
-        match self {
-            ScopeTypeKind::GenricDeclare(ty) => match &ty.kind {
-                GenericDeclareKind::Type { name, .. } => name,
-                GenericDeclareKind::Lifetime(name) => name,
-            },
-        }
-    }
-
-    pub fn to_entry_kind(&self) -> ScopeTypeEntryKind {
-        match self {
-            ScopeTypeKind::GenricDeclare(ty) => match &ty.kind {
-                GenericDeclareKind::Type { .. } => ScopeTypeEntryKind::GenericType,
-                GenericDeclareKind::Lifetime(_) => ScopeTypeEntryKind::LifeTime,
-            },
         }
     }
 }

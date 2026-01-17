@@ -2,7 +2,7 @@ use parser_models::scope::NodeId;
 use soul_utils::{
     Ident,
     soul_names::TypeModifier,
-    span::{Attribute, Span, Spanned},
+    span::{NodeMetaData, Spanned},
 };
 
 use crate::{ExpressionId, Function, Import, hir_type::HirType, item::Visibility};
@@ -56,40 +56,37 @@ pub enum VarTypeKind {
 pub trait StatementHelper {
     fn new_expression(
         expression: StatementExpression,
-        span: Span,
-        attributes: Vec<Attribute>,
+        meta: NodeMetaData
     ) -> Statement;
-    fn new_variable(variable: Variable, span: Span, attributes: Vec<Attribute>) -> Statement;
-    fn new_function(function: Function, span: Span, attributes: Vec<Attribute>) -> Statement;
-    fn new_import(import: Import, span: Span, attributes: Vec<Attribute>) -> Statement;
-    fn new_assign(assign: Assign, span: Span, attributes: Vec<Attribute>) -> Statement;
+    fn new_variable(variable: Variable, meta: NodeMetaData) -> Statement;
+    fn new_function(function: Function, meta: NodeMetaData) -> Statement;
+    fn new_import(import: Import, meta: NodeMetaData) -> Statement;
+    fn new_assign(assign: Assign, meta: NodeMetaData) -> Statement;
 }
 impl StatementHelper for Statement {
-    fn new_variable(variable: Variable, span: Span, attributes: Vec<Attribute>) -> Statement {
-        Statement::with_atribute(
+    fn new_variable(variable: Variable, meta: NodeMetaData) -> Statement {
+        Statement::with_meta_data(
             StatementKind::Variable(Box::new(variable)),
-            span,
-            attributes,
+            meta
         )
     }
 
-    fn new_function(function: Function, span: Span, attributes: Vec<Attribute>) -> Statement {
-        Statement::with_atribute(StatementKind::Function(function), span, attributes)
+    fn new_function(function: Function, meta: NodeMetaData) -> Statement {
+        Statement::with_meta_data(StatementKind::Function(function), meta)
     }
 
-    fn new_import(import: Import, span: Span, attributes: Vec<Attribute>) -> Statement {
-        Statement::with_atribute(StatementKind::Import(import), span, attributes)
+    fn new_import(import: Import, meta: NodeMetaData) -> Statement {
+        Statement::with_meta_data(StatementKind::Import(import), meta)
     }
 
-    fn new_assign(assign: Assign, span: Span, attributes: Vec<Attribute>) -> Statement {
-        Statement::with_atribute(StatementKind::Assign(assign), span, attributes)
+    fn new_assign(assign: Assign, meta: NodeMetaData) -> Statement {
+        Statement::with_meta_data(StatementKind::Assign(assign), meta)
     }
 
     fn new_expression(
         expression: StatementExpression,
-        span: Span,
-        attributes: Vec<Attribute>,
+        meta: NodeMetaData
     ) -> Statement {
-        Statement::with_atribute(StatementKind::Expression(expression), span, attributes)
+        Statement::with_meta_data(StatementKind::Expression(expression), meta)
     }
 }

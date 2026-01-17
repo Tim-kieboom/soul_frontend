@@ -2,7 +2,7 @@ use soul_utils::soul_names::TypeModifier;
 use soul_utils::span::Span;
 use soul_utils::{Ident, soul_import_path::SoulImportPath, span::Spanned};
 
-use crate::ast::{Block, Expression, ExpressionKind, FunctionCall, GenericDeclare, NamedTupleType, SoulType};
+use crate::ast::{Block, Expression, ExpressionKind, FunctionCall, NamedTupleType, SoulType};
 use crate::scope::NodeId;
 /// A statement in the Soul language, wrapped with source location information.
 pub type Statement = Spanned<StatementKind>;
@@ -52,8 +52,6 @@ pub struct FunctionSignature {
     pub name: Ident,
     pub methode_type: SoulType,
     pub function_kind: FunctionKind,
-    /// Generic type parameters.
-    pub generics: Vec<GenericDeclare>,
     /// Function parameters.
     pub parameters: NamedTupleType,
     /// Return type, if specified.
@@ -113,10 +111,10 @@ pub struct Assignment {
 }
 
 impl VarTypeKind {
-    pub fn get_modifier(&self) -> TypeModifier {
+    pub fn get_modifier(&self) -> Option<TypeModifier> {
         match self {
             VarTypeKind::NonInveredType(soul_type) => soul_type.modifier,
-            VarTypeKind::InveredType(type_modifier) => *type_modifier,
+            VarTypeKind::InveredType(type_modifier) => Some(*type_modifier),
         }
     }
 }
@@ -142,27 +140,27 @@ impl StatementHelpers for Statement {
     }
     
     fn from_expression(expression: Expression) -> Self {
-        let span = expression.span;
-        let attributes = expression.attributes.clone();
-        Self::with_atribute(StatementKind::Expression{id: None, expression}, span, attributes)
+        let (node, meta_data) = expression.consume();
+        let expression = Expression::new(node, meta_data.span);
+        Self::with_meta_data(StatementKind::Expression{id: None, expression}, meta_data)
     }
     
     fn from_function_call(function: Spanned<FunctionCall>) -> Self {
-        Self::with_atribute(
+        let (node, meta_data) = function.consume();
+        Self::with_meta_data(
             StatementKind::Expression{
                 id: None, 
-                expression: Expression::new(ExpressionKind::FunctionCall(function.node), function.span), 
+                expression: Expression::new(ExpressionKind::FunctionCall(node), meta_data.span), 
             },
-            function.span,
-            function.attributes,
+            meta_data
         )
     }
 
     fn from_function(function: Spanned<Function>) -> Self {
-        Self::with_atribute(
-            StatementKind::Function(function.node),
-            function.span,
-            function.attributes,
+        let (node, meta_data) = function.consume();
+        Self::with_meta_data(
+            StatementKind::Function(node),
+            meta_data
         )
     }
 

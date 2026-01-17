@@ -1,3 +1,5 @@
+use soul_utils::sementic_level::SementicFault;
+
 pub mod ast;
 pub mod scope;
 pub mod meta_data;
@@ -14,4 +16,15 @@ pub struct AbstractSyntaxTree {
 pub struct ParseResponse {
     pub tree: AbstractSyntaxTree,
     pub meta_data: crate::meta_data::AstMetadata,
+    pub faults: Vec<SementicFault>,
+}
+
+impl ParseResponse {
+    pub fn extend_faults<I: IntoIterator<Item = SementicFault>>(&mut self, faults: I) {
+        self.faults.extend(faults);
+    }
+
+    pub fn take_faults(&mut self) -> Vec<SementicFault> {
+        std::mem::take(&mut self.faults)
+    }
 }

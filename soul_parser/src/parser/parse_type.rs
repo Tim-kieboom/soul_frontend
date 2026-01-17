@@ -1,40 +1,30 @@
-use parser_models::ast::{
-    ArrayType, FunctionKind, GenericDeclare, GenericDefine, NamedTupleType, ReferenceType,
-    SoulType, TupleType, TypeKind,
-};
-use soul_tokenizer::{Number, TokenKind};
+use parser_models::ast::{FunctionKind, NamedTupleType, ReferenceType, SoulType, TypeKind};
+use soul_tokenizer::TokenKind;
 use soul_utils::{
-    error::{SoulError, SoulErrorKind, SoulResult},
+    error::{SoulError, SoulErrorKind},
     soul_names::{InternalPrimitiveTypes, TypeModifier, TypeWrapper},
     try_result::{
-        ResultTryErr, ResultTryNotValue, ToResult, TryErr, TryError, TryNotValue, TryOk, TryResult,
+        ResultTryErr, ResultTryNotValue, TryErr, TryError, TryNotValue, TryOk, TryResult,
     },
 };
 
 use crate::parser::{
     Parser,
     parse_utils::{
-        ARRAY, COLON, COMMA, CONST_REF, CURLY_CLOSE, CURLY_OPEN, MUT_REF, OPTIONAL, POINTER, ROUND_CLOSE, ROUND_OPEN, SQUARE_OPEN
+        ARRAY, COLON, COMMA, CONST_REF, CURLY_OPEN, MUT_REF, OPTIONAL, POINTER, ROUND_CLOSE,
+        ROUND_OPEN,
     },
 };
 
 impl<'a> Parser<'a> {
-    pub(crate) fn try_parse_type(&mut self, default_modifier: TypeModifier) -> TryResult<SoulType, SoulError> {
+    pub(crate) fn try_parse_type(&mut self) -> TryResult<SoulType, SoulError> {
         let begin = self.current_position();
-        let result = self.inner_parse_type(default_modifier);
+        let result = self.inner_parse_type();
         if result.is_err() {
             self.go_to(begin);
         }
 
         result
-    }
-
-    pub(crate) fn parse_generic_declare(&mut self) -> SoulResult<Vec<GenericDeclare>> {
-        todo!()
-    }
-
-    pub(crate) fn parse_generic_define(&mut self) -> SoulResult<Vec<GenericDefine>> {
-        todo!()
     }
 
     pub(crate) fn try_parse_parameters(
@@ -50,103 +40,36 @@ impl<'a> Parser<'a> {
         result
     }
 
-    pub(crate) fn try_parse_named_tuple_type(&mut self) -> TryResult<NamedTupleType, SoulError> {
-        let begin = self.current_position();
-
-        let result = self.inner_parse_named_tuple_kinds(NamedTupleKinds::NamedTuple);
-        if result.is_err() {
-            self.go_to(begin);
-        }
-
-        result.map(|(types, _)| types)
-    }
-
-    pub(crate) fn parse_tuple_type(&mut self) -> SoulResult<TupleType> {
-        self.expect(&ROUND_OPEN)?;
-
-        let mut types = TupleType::new();
-        if self.current_is(&ROUND_CLOSE) {
-            self.bump();
-            return Ok(types);
-        }
-
-        const DEFAULT_MODIFIER: TypeModifier = TypeModifier::Mut;
-        loop {
-            let ty = self.try_parse_type(DEFAULT_MODIFIER).merge_to_result()?;
-            types.push(ty);
-
-            if self.current_is(&ROUND_CLOSE) {
-                break;
-            }
-
-            self.expect(&COMMA)?;
-        }
-
-        self.expect(&ROUND_CLOSE)?;
-        Ok(types)
-    }
-
-    fn inner_parse_type(&mut self, modifier: TypeModifier) -> TryResult<SoulType, SoulError> {
+    fn inner_parse_type(&mut self) -> TryResult<SoulType, SoulError> {
         let wrapper = self.get_type_wrapper()?;
         let mut ty = self.get_base_type()?;
 
-        const INNER_MODIFIER: TypeModifier = TypeModifier::Mut;
-
         const CONST: bool = false;
         const MUT: bool = true;
-        for (wrap, size) in wrapper {
+        for wrap in wrapper {
             let span = self.token().span.combine(ty.span);
 
             ty = match wrap {
                 TypeWrapper::ConstRef => SoulType::new(
-                    INNER_MODIFIER,
+                    None,
                     TypeKind::Reference(ReferenceType::new(ty, CONST)),
                     span,
                 ),
-                TypeWrapper::MutRef => SoulType::new(
-                    INNER_MODIFIER,
-                    TypeKind::Reference(ReferenceType::new(ty, MUT)),
-                    span,
-                ),
-                TypeWrapper::Pointer => {
-                    SoulType::new(INNER_MODIFIER, TypeKind::Pointer(Box::new(ty)), span)
+                TypeWrapper::MutRef => {
+                    SoulType::new(None, TypeKind::Reference(ReferenceType::new(ty, MUT)), span)
                 }
-                TypeWrapper::Array => {
-                    SoulType::new(INNER_MODIFIER, TypeKind::Array(ArrayType::new(ty, size)), span)
-                }
-                TypeWrapper::Option => {
-                    SoulType::new(INNER_MODIFIER, TypeKind::Optional(Box::new(ty)), span)
-                }
+                TypeWrapper::Pointer => SoulType::new(None, TypeKind::Pointer(Box::new(ty)), span),
+                TypeWrapper::Array => SoulType::new(None, TypeKind::Array(Box::new(ty)), span),
+                TypeWrapper::Option => SoulType::new(None, TypeKind::Optional(Box::new(ty)), span),
             };
         }
-
-        ty.modifier = modifier;
         Ok(ty)
     }
 
-    fn get_type_wrapper(&mut self) -> TryResult<Vec<(TypeWrapper, Option<u64>)>, SoulError> {
+    fn get_type_wrapper(&mut self) -> TryResult<Vec<TypeWrapper>, SoulError> {
         let mut wrappers = vec![];
         loop {
-
-            let mut size = None;
             let possible_wrap = match &self.token().kind {
-                &SQUARE_OPEN => {
-                    self.bump();
-                    match &self.token().kind {
-                        TokenKind::Number(Number::Uint(num)) => size = Some(*num),
-                        _ => {
-                            return TryNotValue(SoulError::new(
-                                format!(
-                                    "expected literal number got '{}'",
-                                    self.token().kind.display()
-                                ),
-                                SoulErrorKind::InvalidNumber,
-                                Some(self.token().span),
-                            ));
-                        }
-                    }
-                    Some(TypeWrapper::Array)
-                }
                 &ARRAY => Some(TypeWrapper::Array),
                 &CONST_REF => Some(TypeWrapper::ConstRef),
                 &MUT_REF => Some(TypeWrapper::MutRef),
@@ -160,33 +83,31 @@ impl<'a> Parser<'a> {
                 None => return TryOk(wrappers),
             };
 
-            if size.is_none() {
-                self.bump();
-            }
-            wrappers.push((wrap, size));
+            self.bump();
+            wrappers.push(wrap);
         }
     }
 
     fn get_base_type(&mut self) -> TryResult<SoulType, SoulError> {
         const NONE_STR: &str = InternalPrimitiveTypes::None.as_str();
-        const MODIFIER: TypeModifier = TypeModifier::Mut;
 
         match &self.token().kind {
             TokenKind::Ident(val) if val == NONE_STR => {
                 return TryOk(SoulType::none(self.token().span));
             }
             &ROUND_OPEN => {
-                let span = self.token().span;
-                return self
-                    .parse_tuple_type()
-                    .map(|types| SoulType::new(MODIFIER, TypeKind::Tuple(types), span))
-                    .try_err();
+                return TryNotValue(SoulError::new(
+                    "tuple type not impl",
+                    SoulErrorKind::InternalError,
+                    Some(self.token().span),
+                ));
             }
             &CURLY_OPEN => {
-                let span = self.token().span;
-                return self
-                    .try_parse_named_tuple_type()
-                    .map(|types| SoulType::new(MODIFIER, TypeKind::NamedTuple(types), span));
+                return TryNotValue(SoulError::new(
+                    "namedtuple type not impl",
+                    SoulErrorKind::InternalError,
+                    Some(self.token().span),
+                ));
             }
             _ => (),
         };
@@ -195,16 +116,13 @@ impl<'a> Parser<'a> {
 
         if let Some(prim) = InternalPrimitiveTypes::from_str(ident.as_str()) {
             let span = self.token().span;
-            return TryOk(SoulType::new(MODIFIER, TypeKind::Primitive(prim), span));
+            return TryOk(SoulType::new(None, TypeKind::Primitive(prim), span));
         }
 
-        TryOk(SoulType::new(
-            MODIFIER,
-            TypeKind::Stub {
-                ident,
-                resolved: None,
-            },
-            self.token().span,
+        TryNotValue(SoulError::new(
+            "Stub type not impl",
+            SoulErrorKind::InternalError,
+            Some(self.token().span),
         ))
     }
 
@@ -214,7 +132,6 @@ impl<'a> Parser<'a> {
     ) -> TryResult<(NamedTupleType, FunctionKind), SoulError> {
         let (open, close, can_have_this) = match kind {
             NamedTupleKinds::Function => (&ROUND_OPEN, &ROUND_CLOSE, true),
-            NamedTupleKinds::NamedTuple => (&CURLY_OPEN, &CURLY_CLOSE, false),
         };
 
         self.expect(open).try_err()?;
@@ -233,13 +150,14 @@ impl<'a> Parser<'a> {
                 Loop::Continue => continue,
             }
 
-            
             let modifier = match self.try_token_as_ident_str().map(TypeModifier::from_str) {
                 Ok(Some(modifier)) => {
                     self.bump();
-                    modifier
+                    Some(modifier)
                 }
-                _ => TypeModifier::Const,
+                _ => match kind {
+                    NamedTupleKinds::Function => Some(TypeModifier::Const),
+                },
             };
 
             let name = self.try_bump_consume_ident().try_not_value()?;
@@ -250,7 +168,8 @@ impl<'a> Parser<'a> {
             }
             self.bump();
 
-            let ty = self.try_parse_type(modifier)?; // if not value is probebly named_tuple expression 
+            let mut ty = self.try_parse_type()?; // if not value is probebly named_tuple expression 
+            ty.modifier = modifier;
 
             types.push((name, ty, None));
             if self.current_is(close) {
@@ -325,5 +244,4 @@ enum Loop {
 
 enum NamedTupleKinds {
     Function,
-    NamedTuple,
 }

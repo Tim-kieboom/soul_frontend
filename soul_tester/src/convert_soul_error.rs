@@ -37,8 +37,13 @@ fn to_message(err: &SoulError, level: SementicLevel, file_path: &str, source_fil
 
     let mut sb = String::new();
 
+    sb.push_str("-----");
     sb.push_str(level_color(&level));
-    sb.push_str(&format!("{:?}\n", err.kind));
+    sb.push_str(&format!("{:?}", err.kind));
+    sb.push_str(DEFAULT);
+    sb.push_str("-----\n");
+
+    sb.push_str(level_color(&level));
     sb.push_str(level.as_str());
     sb.push_str(": ");
     sb.push_str(DEFAULT);
@@ -64,6 +69,7 @@ fn to_message(err: &SoulError, level: SementicLevel, file_path: &str, source_fil
         get_source_snippet(&mut sb, &span, source_file.lines(), &begin_space);
     }
 
+    sb.push('\n');
     sb
 }
 

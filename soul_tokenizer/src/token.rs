@@ -64,7 +64,7 @@ impl TokenKind {
             TokenKind::Ident(ident) => write!(sb, "\"{ident}\"")?,
             TokenKind::CharLiteral(char) => write!(sb, "r#'{char}'")?,
             TokenKind::StringLiteral(str) => write!(sb, "r#\"{str}\"")?,
-            TokenKind::Symbol(symbool_kind) => write!(sb, "{}", symbool_kind.as_str())?,
+            TokenKind::Symbol(symbool_kind) => write!(sb, "Symbol('{}')", symbool_kind.as_str())?,
         };
         Ok(())
     }

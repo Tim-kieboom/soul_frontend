@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use soul_utils::vec_map::AsIndex;
+use soul_utils::vec_map::VecMapIndex;
 
 use crate::LocalDefId;
 
@@ -11,9 +11,13 @@ impl ScopeId {
     pub fn increment(&mut self) {
         self.0 += 1
     }
+    pub fn write(&self, sb: &mut String) {
+        use std::fmt::Write;
+        write!(sb, "{}", self.0).expect("should not have write")
+    }
 }
-impl AsIndex for ScopeId {
-    fn new(value: usize) -> Self {
+impl VecMapIndex for ScopeId {
+    fn new_index(value: usize) -> Self {
         Self(value)
     }
 

@@ -26,11 +26,11 @@ define_str_enum!(
     #[derive(Hash)]
     pub enum TypeModifier {
         /// Compile-time constant modifier (`literal`).
-        Literal => "literal",
+        Literal => "literal", 0,
         /// Immutable modifier (`const`).
-        Const => "const",
+        Const => "const", 1,
         /// Mutable modifier (`mut`).
-        Mut => "mut",
+        Mut => "mut", 2,
     }
 );
 

@@ -4,19 +4,13 @@ sum(a: int, b: int): int {
 }
 
 main() {
+    uinterger := 1
     godecl := 1 + -2
-    decl: int = 2.0
+    decl: int = 2
     mut mutdecl: int = 1
 
     array: []int = [1,2,3,4,5]
-    element := array[0]
-
-    tuple: (int, f32, bool) = (1, 1.0, true)
-    namedtuple: {num: int, float: f32, bool: bool} = {
-        num: mutdecl, 
-        float: decl, 
-        bool: true,
-    }
+    element := array[1]
 
     mut sum := 1
     sum = sum(1, 2)

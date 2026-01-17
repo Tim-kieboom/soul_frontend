@@ -3,12 +3,12 @@ use soul_utils::{
     Ident,
     soul_import_path::SoulImportPath,
     soul_names::TypeModifier,
-    span::{Attribute, Span, Spanned},
+    span::{NodeMetaData, Span, Spanned},
     vec_map::VecMap,
 };
 
 use crate::{
-    BodyId, ExpressionId, NamedTupleType, StatementId, Variable, hir_type::HirType, scope::ScopeId,
+    BodyId, NamedTupleType, StatementId, Variable, hir_type::HirType, scope::ScopeId,
     statement::Statement,
 };
 
@@ -55,36 +55,22 @@ pub struct FunctionSignature {
     pub function_kind: FunctionKind,
     pub return_type: HirType,
     pub parameters: NamedTupleType,
-    pub generics: Vec<GenericDeclare>,
     pub vis: Visibility,
 }
 
-/// A generic parameter (lifetime or type).
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub enum GenericDeclare {
-    /// A lifetime parameter.
-    Lifetime(Ident),
-    /// A type parameter.
-    Type {
-        name: Ident,
-        traits: Vec<HirType>,
-        default: Option<HirType>,
-    },
-    /// A type parameter.
-    Expression {
-        name: Ident,
-        for_type: Option<HirType>,
-        default: Option<ExpressionId>,
-    },
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Visibility {
     Public,
     Private,
 }
 
 impl Visibility {
+    pub fn display_variant(&self) -> &'static str {
+        match self {
+            Visibility::Public => "pub",
+            Visibility::Private => "priv",
+        }
+    }
     pub fn from_name(name: &Ident) -> Self {
         let first = match name.as_str().chars().next() {
             Some(val) => val,
@@ -100,20 +86,20 @@ impl Visibility {
 }
 
 pub trait ItemHelper {
-    fn new_variable(variable: Variable, span: Span, attributes: Vec<Attribute>) -> Item;
-    fn new_function(function: Function, span: Span, attributes: Vec<Attribute>) -> Item;
+    fn new_variable(variable: Variable, meta: NodeMetaData) -> Item;
+    fn new_function(function: Function, meta: NodeMetaData) -> Item;
     fn new_import(import: Import, span: Span) -> Item;
 }
 impl ItemHelper for Item {
-    fn new_variable(variable: Variable, span: Span, attributes: Vec<Attribute>) -> Item {
-        Item::with_atribute(ItemKind::Variable(variable), span, attributes)
+    fn new_variable(variable: Variable, meta: NodeMetaData) -> Item {
+        Item::with_meta_data(ItemKind::Variable(variable), meta)
     }
 
     fn new_import(import: Import, span: Span) -> Item {
         Item::new(ItemKind::Import(import), span)
     }
 
-    fn new_function(function: Function, span: Span, attributes: Vec<Attribute>) -> Item {
-        Item::with_atribute(ItemKind::Function(Box::new(function)), span, attributes)
+    fn new_function(function: Function, meta: NodeMetaData) -> Item {
+        Item::with_meta_data(ItemKind::Function(Box::new(function)), meta)
     }
 }

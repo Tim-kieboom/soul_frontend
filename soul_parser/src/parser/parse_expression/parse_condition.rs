@@ -49,7 +49,11 @@ impl<'a> Parser<'a> {
 
         let block = self.parse_block(TypeModifier::Mut)?;
         Ok(Expression::new(
-            ExpressionKind::While(While { condition, block, id: None }),
+            ExpressionKind::While(While {
+                condition,
+                block,
+                id: None,
+            }),
             self.span_combine(start_span),
         ))
     }

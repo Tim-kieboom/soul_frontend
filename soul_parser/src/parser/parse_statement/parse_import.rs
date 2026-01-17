@@ -91,7 +91,7 @@ impl<'a> Parser<'a> {
 
         self.expect(&SQUARE_CLOSE)?;
         Ok(Statement::new(
-            StatementKind::Import(Import{id: None, paths}),
+            StatementKind::Import(Import { id: None, paths }),
             self.token().span,
         ))
     }

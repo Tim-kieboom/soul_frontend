@@ -1,14 +1,14 @@
 use crate::HirLowerer;
 use hir_model::{self as hir};
 use parser_models::{ast, scope::NodeId};
-use soul_utils::{Ident, span::Span, vec_map::VecMap};
+use soul_utils::{error::{SoulError, SoulErrorKind}, span::Span, vec_map::VecMap};
 
 impl HirLowerer {
     pub(crate) fn lower_expression(
         &mut self,
         expression: &ast::Expression,
     ) -> Option<hir::ExpressionId> {
-        let span = expression.span;
+        let span = expression.get_span();
         let (id, kind) = match &expression.node {
             ast::ExpressionKind::Default(node_id) => {
                 let id = self.expect_node_id(*node_id, span)?;
@@ -35,8 +35,16 @@ impl HirLowerer {
             ast::ExpressionKind::FunctionCall(function_call) => {
                 self.lower_function_call(function_call, span)?
             }
-            ast::ExpressionKind::FieldAccess(field_access) => {
-                self.lower_field_access(field_access, span)?
+            ast::ExpressionKind::Array(array) => {
+                let id = self.expect_node_id(array.id, span)?;
+                let mut nodes = Vec::with_capacity(array.values.len());
+                for value in &array.values {
+                    nodes.push((self.lower_expression(value)?, value.get_span()));
+                }
+                (id, hir::ExpressionKind::Array(hir::Array{
+                    id,
+                    values: nodes,
+                }))
             }
             ast::ExpressionKind::Variable {
                 id,
@@ -44,7 +52,7 @@ impl HirLowerer {
                 resolved,
             } => {
                 let id = self.expect_node_id(*id, span)?;
-                let resolved = self.expect_node_id(*resolved, expression.span)?;
+                let resolved = self.expect_node_id(*resolved, expression.get_span())?;
                 (id, hir::ExpressionKind::ResolvedVariable(resolved))
             }
             ast::ExpressionKind::If(r#if) => self.lower_if(r#if, span)?,
@@ -56,7 +64,7 @@ impl HirLowerer {
                 self.pop_scope(prev_scope);
 
                 let body_id = body.id;
-                self.push_block(body);
+                self.push_block(body, block.span);
                 (id, hir::ExpressionKind::Block(body_id))
             }
             ast::ExpressionKind::Unary(unary) => {
@@ -102,7 +110,16 @@ impl HirLowerer {
                 let kind = match return_like.kind {
                     ast::ReturnKind::Break => hir::ExpressionKind::Break(hir_return_like),
                     ast::ReturnKind::Return => hir::ExpressionKind::Return(hir_return_like),
-                    ast::ReturnKind::Continue => hir::ExpressionKind::Continue(hir_return_like),
+                    ast::ReturnKind::Continue => {
+                        if value.is_some() {
+                            self.log_error(SoulError::new(
+                                "continue should not have an expression", 
+                                SoulErrorKind::InvalidContext, 
+                                Some(expression.get_span()),
+                            ));
+                        }
+                        hir::ExpressionKind::Continue(id)
+                    }
                 };
                 (id, kind)
             }
@@ -120,16 +137,10 @@ impl HirLowerer {
                     }),
                 )
             }
-            ast::ExpressionKind::ExpressionGroup { id, group } => {
-                let id = self.expect_node_id(*id, span)?;
-                (id, self.lower_group_expression(group)?)
-            }
-            ast::ExpressionKind::TypeNamespace(_) => todo!("impl TytpeNamespace"),
-            ast::ExpressionKind::StructConstructor(_) => todo!("impl struct constructor"),
             ast::ExpressionKind::ExternalExpression(_) => todo!("impl externalExpression"),
         };
 
-        let expression = hir::Expression::with_atribute(kind, span, expression.attributes.clone());
+        let expression = hir::Expression::with_meta_data(kind, expression.get_meta_data().clone());
 
         self.push_expression(id, expression);
         Some(id)
@@ -154,65 +165,12 @@ impl HirLowerer {
         })
     }
 
-    fn lower_group_expression(
-        &mut self,
-        expression_group: &ast::ExpressionGroup,
-    ) -> Option<hir::ExpressionKind> {
-        let group = match expression_group {
-            ast::ExpressionGroup::Array(array) => {
-                let mut nodes = Vec::with_capacity(array.values.len());
-                for value in &array.values {
-                    nodes.push(self.lower_expression(value)?);
-                }
-                hir::ExpressionGroup::Array(nodes)
-            }
-            ast::ExpressionGroup::Tuple(tuple) => {
-                let mut values = Vec::with_capacity(tuple.len());
-                for (i, value) in tuple.iter().enumerate() {
-                    let ident = Ident::new(i.to_string(), value.span);
-                    values.push((ident, self.lower_expression(value)?));
-                }
-                hir::ExpressionGroup::Tuple {
-                    values,
-                    insert_defaults: false,
-                }
-            }
-            ast::ExpressionGroup::NamedTuple(named_tuple) => {
-                let mut values = Vec::with_capacity(named_tuple.values.len());
-                for (ident, value) in &named_tuple.values {
-                    values.push((ident.clone(), self.lower_expression(value)?));
-                }
-                hir::ExpressionGroup::Tuple {
-                    values,
-                    insert_defaults: named_tuple.insert_defaults,
-                }
-            }
-        };
-
-        Some(hir::ExpressionKind::ExpressionGroup(group))
-    }
-
-    fn lower_tuple(&mut self, tuple: &ast::Tuple) -> Option<Vec<NodeId>> {
+    fn lower_tuple(&mut self, tuple: &Vec<ast::Expression>) -> Option<Vec<NodeId>> {
         let mut nodes = Vec::with_capacity(tuple.len());
         for value in tuple {
             nodes.push(self.lower_expression(value)?);
         }
         Some(nodes)
-    }
-
-    fn lower_field_access(
-        &mut self,
-        access_field: &ast::FieldAccess,
-        span: Span,
-    ) -> Option<(NodeId, hir::ExpressionKind)> {
-        let id = self.expect_node_id(access_field.id, span)?;
-        Some((
-            id,
-            hir::ExpressionKind::FieldAccess(hir::FieldAccess {
-                field: access_field.field.clone(),
-                parent: self.lower_expression(&access_field.parent)?,
-            }),
-        ))
     }
 
     fn lower_function_call(
@@ -221,6 +179,7 @@ impl HirLowerer {
         span: Span,
     ) -> Option<(NodeId, hir::ExpressionKind)> {
         let id = self.expect_node_id(function_call.id, span)?;
+        let resolved = self.expect_node_id(function_call.resolved, span)?;
 
         let callee = match &function_call.callee {
             Some(val) => Some(self.lower_expression(val)?),
@@ -233,7 +192,7 @@ impl HirLowerer {
                 name: function_call.name.clone(),
                 callee,
                 arguments: self.lower_tuple(&function_call.arguments)?,
-                generics: self.lower_generic_define(&function_call.generics)?,
+                resolved: resolved,
             }),
         ))
     }

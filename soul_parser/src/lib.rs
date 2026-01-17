@@ -9,6 +9,7 @@ pub fn parse<'a>(tokens: TokenStream<'a>) -> ParseResponse {
 
     ParseResponse {
         tree,
-        meta_data: AstMetadata::new(faults),
+        faults,
+        meta_data: AstMetadata::new(),
     }
 }

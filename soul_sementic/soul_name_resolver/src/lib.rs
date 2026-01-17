@@ -5,19 +5,21 @@ mod collect;
 mod resolve;
 
 pub fn name_resolve(request: &mut ParseResponse) {
-    let mut resolver = NameResolver::new(&mut request.meta_data);
+    let mut resolver = NameResolver::new(&mut request.meta_data, &mut request.faults);
     resolver.run(&mut request.tree);
 }
 
 struct NameResolver<'a>  {
     id_generator: NodeIdGenerator,
     info: &'a mut AstMetadata,
+    faults: &'a mut Vec<SementicFault>,
     current_function: Option<NodeId>,
 }
 impl<'a> NameResolver<'a> {
-    fn new(info: &'a mut AstMetadata) -> Self {
+    fn new(info: &'a mut AstMetadata, faults: &'a mut Vec<SementicFault>) -> Self {
         Self {
             info,
+            faults,
             current_function: None,
             id_generator: NodeIdGenerator::new(),
         }
@@ -29,6 +31,6 @@ impl<'a> NameResolver<'a> {
     }
 
     fn log_error(&mut self, error: SoulError) {
-        self.info.faults.push(SementicFault::error(error));
+        self.faults.push(SementicFault::error(error));
     }
 }

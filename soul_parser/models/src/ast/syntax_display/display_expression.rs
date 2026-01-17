@@ -10,16 +10,39 @@ use crate::{
 };
 
 impl SyntaxDisplay for ExpressionKind {
-    fn display(&self, kind: DisplayKind) -> String {
+    fn display(&self, kind: &DisplayKind) -> String {
         let mut sb = String::new();
         self.inner_display(&mut sb, kind, 0, true);
         sb
     }
 
-    fn inner_display(&self, sb: &mut String, kind: DisplayKind, tab: usize, is_last: bool) {
+    fn inner_display(&self, sb: &mut String, kind: &DisplayKind, tab: usize, is_last: bool) {
         match self {
             ExpressionKind::Default(_) => sb.push_str("<default>"),
-            ExpressionKind::Literal(literal) => write!(sb, "{:?}", literal).expect("no write err"),
+            ExpressionKind::Literal((id, literal)) => {
+                try_display_node_id(sb, kind, *id);
+                write!(sb, "{:?}", literal).expect("no write err");
+            }
+            ExpressionKind::Array(array) => {
+                if let Some(ty) = &array.collection_type {
+                    ty.inner_display(sb, kind, tab, is_last)
+                }
+                sb.push('[');
+                if let Some(ty) = &array.element_type {
+                    ty.inner_display(sb, kind, tab, is_last);
+                    sb.push_str(": ");
+                }
+                
+                let last_index = array.values.len().saturating_sub(1);
+                for (i, value) in array.values.iter().enumerate() {
+                    value.node.inner_display(sb, kind, tab, is_last);
+                    if i != last_index {
+                        sb.push_str(", ");
+                    }
+                }
+
+                sb.push(']');
+            }
             ExpressionKind::Index(index) => {
                 index.collection.node.inner_display(sb, kind, tab, is_last);
                 sb.push('[');
@@ -27,12 +50,16 @@ impl SyntaxDisplay for ExpressionKind {
                 sb.push(']');
             }
             ExpressionKind::FunctionCall(function_call) => {
-                try_display_node_id(sb, kind, function_call.id);
+                try_display_node_id(sb, kind, function_call.resolved);
                 sb.push_str(function_call.name.as_str());
                 sb.push('(');
-                for argument in &function_call.arguments {
+
+                let last_index = function_call.arguments.len().saturating_sub(1);
+                for (i, argument) in function_call.arguments.iter().enumerate() {
                     argument.node.inner_display(sb, kind, tab, is_last);
-                    sb.push(',');
+                    if i != last_index {
+                        sb.push_str(", ");
+                    }
                 }
                 sb.push(')');
             }
@@ -51,11 +78,6 @@ impl SyntaxDisplay for ExpressionKind {
                     .expr
                     .node
                     .inner_display(sb, kind, tab, is_last);
-            }
-            ExpressionKind::FieldAccess(access) => {
-                access.parent.node.inner_display(sb, kind, tab, is_last);
-                sb.push('.');
-                sb.push_str(access.field.as_str());
             }
             ExpressionKind::Unary(unary) => {
                 sb.push_str(unary.operator.node.as_str());
@@ -136,14 +158,6 @@ impl SyntaxDisplay for ExpressionKind {
                     sb.push(' ');
                     value.node.inner_display(sb, kind, tab, is_last);
                 }
-            }
-            ExpressionKind::ExpressionGroup{group, ..} => {
-                group.inner_display(sb, kind, tab, is_last)
-            }
-            ExpressionKind::TypeNamespace(soul_type) => soul_type.inner_display(sb, kind, tab, is_last),
-            ExpressionKind::StructConstructor(struct_constructor) => {
-                struct_constructor.ty.inner_display(sb, kind, tab, is_last);
-                struct_constructor.named_tuple.inner_display(sb, kind, tab, is_last);
             }
         }
     }

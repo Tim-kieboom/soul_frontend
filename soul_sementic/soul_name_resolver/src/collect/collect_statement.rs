@@ -1,4 +1,4 @@
-use parser_models::{ast::{Block, Function, GenericDeclare, Statement, StatementKind, VarTypeKind}, scope::{ScopeTypeKind, ScopeValueKind}};
+use parser_models::{ast::{Block, Function, Statement, StatementKind, VarTypeKind}, scope::{ScopeValueKind}};
 
 use crate::NameResolver;
 
@@ -57,18 +57,10 @@ impl<'a> NameResolver<'a> {
         self.collect_type(&mut signature.return_type);
 
         self.push_scope(&mut function.block.scope_id);
-        self.collect_generic_declares(&mut function.signature.node.generics);
         self.declare_parameters(&mut function.signature.node.parameters);
         self.collect_scopeless_block(&mut function.block);
         self.pop_scope();
 
         self.current_function = prev;
-    }
-
-    fn collect_generic_declares(&mut self, generics: &mut Vec<GenericDeclare>) {
-        for generic in generics {
-            let span = generic.span;
-            self.declare_type(ScopeTypeKind::GenricDeclare(generic), span);
-        }
     }
 }

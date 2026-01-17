@@ -4,14 +4,14 @@ use parser_models::{ast, scope::NodeId};
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
     soul_names::TypeModifier,
-    span::{Attribute, Span},
+    span::{NodeMetaData, Span},
 };
 
 impl HirLowerer {
     pub(crate) fn lower_globals_statements(&mut self, statement: &ast::Statement) -> Option<()> {
         const IS_GLOBAL: bool = true;
 
-        let span = statement.span;
+        let span = statement.get_span();
         let (id, item) = match &statement.node {
             ast::StatementKind::Import(import) => {
                 let ast::Import { id, paths } = import.clone();
@@ -22,14 +22,14 @@ impl HirLowerer {
                 let (id, var) = self.lower_variable(IS_GLOBAL, variable, span)?;
                 (
                     id,
-                    hir::Item::new_variable(var, span, statement.attributes.clone()),
+                    hir::Item::new_variable(var, statement.get_meta_data().clone()),
                 )
             }
             ast::StatementKind::Function(function) => {
                 let (id, func) = self.lower_function(IS_GLOBAL, function, span)?;
                 (
                     id,
-                    hir::Item::new_function(func, span, statement.attributes.clone()),
+                    hir::Item::new_function(func, statement.get_meta_data().clone()),
                 )
             }
             ast::StatementKind::Expression { .. } => {
@@ -60,7 +60,7 @@ impl HirLowerer {
     ) -> Option<(NodeId, hir::Statement)> {
         const IS_GLOBAL: bool = false;
 
-        let span = statement.span;
+        let span = statement.get_span();
         match &statement.node {
             ast::StatementKind::Import(import) => {
                 let ast::Import { id, paths } = import.clone();
@@ -69,8 +69,7 @@ impl HirLowerer {
                     id,
                     hir::Statement::new_import(
                         hir::Import { id, paths },
-                        span,
-                        statement.attributes.clone(),
+                        statement.get_meta_data().clone()
                     ),
                 ))
             }
@@ -79,7 +78,7 @@ impl HirLowerer {
                     .map(|(id, var)| {
                         (
                             id,
-                            hir::Statement::new_variable(var, span, statement.attributes.clone()),
+                            hir::Statement::new_variable(var, statement.get_meta_data().clone()),
                         )
                     })?,
             ),
@@ -88,11 +87,11 @@ impl HirLowerer {
                 .map(|(id, func)| {
                     (
                         id,
-                        hir::Statement::new_function(func, span, statement.attributes.clone()),
+                        hir::Statement::new_function(func, statement.get_meta_data().clone()),
                     )
                 }),
             ast::StatementKind::Assignment(assignment) => {
-                self.lower_assignment(assignment, span, statement.attributes.clone())
+                self.lower_assignment(assignment, statement.get_meta_data().clone())
             }
             ast::StatementKind::Expression { id, expression } => {
                 let id = self.expect_node_id(*id, span)?;
@@ -105,8 +104,7 @@ impl HirLowerer {
                     id,
                     hir::Statement::new_expression(
                         statement_expr,
-                        span,
-                        statement.attributes.clone(),
+                        statement.get_meta_data().clone()
                     ),
                 ))
             }
@@ -116,10 +114,9 @@ impl HirLowerer {
     fn lower_assignment(
         &mut self,
         assignment: &ast::Assignment,
-        span: Span,
-        attribute: Vec<Attribute>,
+        meta: NodeMetaData
     ) -> Option<(NodeId, hir::Statement)> {
-        let id = self.expect_node_id(assignment.node_id, span)?;
+        let id = self.expect_node_id(assignment.node_id, meta.span)?;
 
         Some((
             id,
@@ -129,8 +126,7 @@ impl HirLowerer {
                     left: self.lower_expression(&assignment.left)?,
                     right: self.lower_expression(&assignment.right)?,
                 },
-                span,
-                attribute,
+                meta
             ),
         ))
     }
@@ -144,7 +140,7 @@ impl HirLowerer {
         let id = self.expect_node_id(variable.node_id, span)?;
 
         if global {
-            if variable.ty.get_modifier() == TypeModifier::Mut {
+            if variable.ty.get_modifier() == Some(TypeModifier::Mut) {
                 self.log_error(SoulError::new(
                     format!(
                         "global variables can not be '{}'",
@@ -197,13 +193,14 @@ impl HirLowerer {
         }
 
         let signature = self.lower_function_signature(&function.signature.node)?;
+        self.module.functions.insert(id, signature.clone());
 
         let prev_scope = self.push_scope();
         let block = self.lower_block(&function.block, span)?;
         self.pop_scope(prev_scope);
 
         let body_id = block.id;
-        self.push_block(block);
+        self.push_block(block, function.block.span);
 
         if global {
             self.current_item = None;
@@ -228,9 +225,26 @@ impl HirLowerer {
             methode_type: self.lower_type(&function_signature.methode_type)?,
             function_kind: function_signature.function_kind,
             return_type: self.lower_type(&function_signature.return_type)?,
-            parameters: self.lower_named_tuple_type(&function_signature.parameters)?,
-            generics: self.lower_generic_declare(&function_signature.generics)?,
+            parameters: self.lower_parameter(&function_signature.parameters)?,
             vis: Visibility::from_name(&function_signature.name),
         })
+    }
+
+     fn lower_parameter(
+        &mut self,
+        types: &ast::NamedTupleType,
+    ) -> Option<hir::NamedTupleType> {
+        let mut tuple = hir::NamedTupleType::with_capacity(types.len());
+        for (name, ty, id) in types {
+            let id = self.expect_node_id(*id, ty.span)?;
+            tuple.push(hir::FieldType::new(
+                id,
+                name.clone(),
+                self.lower_type(ty)?,
+                Visibility::Public,
+            ));
+        }
+
+        Some(tuple)
     }
 }

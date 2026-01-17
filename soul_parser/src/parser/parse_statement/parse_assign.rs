@@ -74,7 +74,7 @@ fn resolve_assign_type(
     span: Span,
     rvalue: Expression,
 ) -> Expression {
-    let full_span = span.combine(rvalue.span);
+    let full_span = span.combine(rvalue.get_span());
 
     let operator = match assign {
         AssignType::AddAssign => BinaryOperator::new(BinaryOperatorKind::Add, span),

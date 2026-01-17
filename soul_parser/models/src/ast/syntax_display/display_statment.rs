@@ -1,18 +1,18 @@
 use crate::{
     ast::{
-        ExpressionKind, FunctionSignature, GenericDeclare, GenericDeclareKind, StatementKind, VarTypeKind, syntax_display::{DisplayKind, try_display_node_id}
+        ExpressionKind, FunctionSignature, StatementKind, VarTypeKind, Variable, syntax_display::{DisplayKind, try_display_node_id}
     },
     syntax_display::{SyntaxDisplay, tree_prefix},
 };
 
 impl SyntaxDisplay for StatementKind {
-    fn display(&self, kind: DisplayKind) -> String {
+    fn display(&self, kind: &DisplayKind) -> String {
         let mut sb = String::new();
         self.inner_display(&mut sb, kind, 0, true);
         sb
     }
 
-    fn inner_display(&self, sb: &mut String, kind: DisplayKind, tab: usize, is_last: bool) {
+    fn inner_display(&self, sb: &mut String, kind: &DisplayKind, tab: usize, is_last: bool) {
         let prefix = tree_prefix(tab, is_last);
         match self {
             StatementKind::Import(paths) => {
@@ -46,9 +46,12 @@ impl SyntaxDisplay for StatementKind {
                 match &var.ty {
                     VarTypeKind::NonInveredType(soul_type) => soul_type.inner_display(sb, kind, tab, is_last),
                     VarTypeKind::InveredType(type_modifier) => {
-                        sb.push_str(type_modifier.as_str());
-                        sb.push(' ');
-                        sb.push_str("/*type?*/");
+                        
+                        if !try_display_infered_type(sb, var, kind) {
+                            sb.push_str(type_modifier.as_str());
+                            sb.push(' ');
+                            sb.push_str("/*type?*/");
+                        }
                     }
                 }
                 if let Some(val) = &var.initialize_value {
@@ -82,7 +85,7 @@ impl SyntaxDisplay for StatementKind {
 
 fn inner_display_function_declaration(
     sb: &mut String,
-    kind: DisplayKind,
+    kind: &DisplayKind,
     signature: &FunctionSignature,
     tab: usize,
     is_last: bool,
@@ -95,10 +98,9 @@ fn inner_display_function_declaration(
         sb.push(' ');
     }
     sb.push_str(signature.name.as_str());
-    inner_display_generic_parameters(sb, kind, &signature.generics);
-
     sb.push('(');
-    for (name, el, _node_id) in &signature.parameters {
+    for (name, el, node_id) in &signature.parameters {
+        try_display_node_id(sb, kind, *node_id);
         sb.push_str(&format!("{}: {}", name.as_str(), el.display(kind),));
         sb.push(',');
     }
@@ -107,33 +109,24 @@ fn inner_display_function_declaration(
     signature.return_type.inner_display(sb, kind, tab, is_last);
 }
 
-fn inner_display_generic_parameters(
-    sb: &mut String,
-    kind: DisplayKind,
-    parameters: &Vec<GenericDeclare>,
-) {
-    if parameters.is_empty() {
-        return;
-    }
+fn try_display_infered_type(sb: &mut String, var: &Variable, kind: &DisplayKind) -> bool {
+    let type_map = match kind {
+        DisplayKind::TypeContext(val) => val,
+        _ => return false,
+    };
 
-    sb.push('<');
-    for parameter in parameters {
-        match &parameter.kind {
-            GenericDeclareKind::Lifetime(lifetime) => {
-                sb.push('\'');
-                sb.push_str(lifetime.as_str());
-            }
-            GenericDeclareKind::Type { name, default } => {
-                sb.push_str(name.as_str());
+    let node_id = match var.node_id {
+        Some(val) => val,
+        None => return false,
+    };
 
-                if let Some(ty) = &default {
-                    sb.push_str(" = ");
-                    ty.inner_display(sb, kind, 0, false);
-                }
-            }
-        }
+    let type_str = match type_map.get(node_id) {
+        Some(val) => val,
+        None => return false,
+    };
 
-        try_display_node_id(sb, kind, parameter.node_id);
-    }
-    sb.push('>');
+    sb.push_str("/*");
+    sb.push_str(type_str);
+    sb.push_str("*/");
+    true
 }

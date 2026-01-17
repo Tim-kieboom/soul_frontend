@@ -1,4 +1,4 @@
-use soul_utils::soul_names::TypeModifier;
+use soul_utils::{soul_names::TypeModifier, span::Span};
 
 use crate::{
     ast::Statement,
@@ -18,15 +18,16 @@ pub struct Block {
     pub statements: Vec<Statement>,
     pub scope_id: Option<ScopeId>,
     pub node_id: Option<NodeId>,
+    pub span: Span,
 }
 impl SyntaxDisplay for Block {
-    fn display(&self, kind: DisplayKind) -> String {
+    fn display(&self, kind: &DisplayKind) -> String {
         let mut sb = String::new();
         self.inner_display(&mut sb, kind, 0, true);
         sb
     }
 
-    fn inner_display(&self, sb: &mut String, kind: DisplayKind, tab: usize, _is_last: bool) {
+    fn inner_display(&self, sb: &mut String, kind: &DisplayKind, tab: usize, _is_last: bool) {
         if self.statements.is_empty() {
             return;
         }

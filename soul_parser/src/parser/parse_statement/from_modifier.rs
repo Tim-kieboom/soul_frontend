@@ -33,13 +33,13 @@ impl<'a> Parser<'a> {
         };
 
         if self.current_is_any(&[ROUND_OPEN, ARROW_LEFT]) {
-            let mut methode_type = match self.try_parse_type(modifier) {
+            let mut methode_type = match self.try_parse_type() {
                 Ok(val) => val,
                 Err(TryError::IsNotValue(_)) => SoulType::none(self.token().span),
                 Err(TryError::IsErr(err)) => return TryErr(err),
             };
 
-            methode_type.modifier = modifier;
+            methode_type.modifier = Some(modifier);
             return self
                 .try_parse_function_declaration(start_span, methode_type, name)
                 .map(Statement::from_function)
@@ -52,9 +52,7 @@ impl<'a> Parser<'a> {
         let mut ty = VarTypeKind::InveredType(DEFAULT_VARIABLE_MODIFIER);
         if self.current_is(&COLON) {
             self.bump();
-            ty = VarTypeKind::NonInveredType(
-                self.try_parse_type(DEFAULT_VARIABLE_MODIFIER)?
-            );
+            ty = VarTypeKind::NonInveredType(self.try_parse_type()?);
         }
 
         if self.current_is_any(STAMENT_END_TOKENS) {
@@ -74,11 +72,11 @@ impl<'a> Parser<'a> {
             }
             _ => return TryErr(self.invalid_assign()),
         };
-        
+
         if assign != AssignType::Assign && assign != AssignType::Declaration {
             return TryErr(self.invalid_assign());
         }
-        
+
         self.bump();
         let value = self.parse_expression(STAMENT_END_TOKENS).try_err()?;
         let variable = Variable {
@@ -106,7 +104,7 @@ impl<'a> Parser<'a> {
             return Err(SoulError::new(
                 format!("ident '{}', is not allowed as name", ident.as_str()),
                 SoulErrorKind::InvalidIdent,
-                Some(ident.span),
+                Some(ident.get_span()),
             ));
         }
 

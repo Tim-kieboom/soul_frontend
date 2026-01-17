@@ -32,7 +32,11 @@ impl<'a> Parser<'a> {
                     ))
                 };
 
-                let return_like = ReturnLike { value, kind, id: None };
+                let return_like = ReturnLike {
+                    value,
+                    kind,
+                    id: None,
+                };
                 Statement::from_expression(Expression::new(
                     ExpressionKind::ReturnLike(return_like),
                     self.span_combine(start_span),

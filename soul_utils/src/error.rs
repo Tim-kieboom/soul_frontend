@@ -10,6 +10,11 @@ pub enum SoulErrorKind {
 
     NotFoundInScope,
 
+    
+    UnifyTypeError,
+    PlaceTypeError,
+    TypeInferenceError,
+
     InvalidIdent,
     InvalidNumber,
     InvalidContext,

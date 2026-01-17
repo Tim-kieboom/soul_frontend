@@ -1,5 +1,6 @@
 use parser_models::ast::{
-    BinaryOperator, BinaryOperatorKind, Expression, ExpressionGroup, ExpressionHelpers, ExpressionKind, Literal, SoulType, StructConstructor, TypeKind, UnaryOperator, UnaryOperatorKind
+    BinaryOperator, BinaryOperatorKind, Expression, ExpressionHelpers, ExpressionKind, Literal,
+    UnaryOperator, UnaryOperatorKind,
 };
 use soul_tokenizer::{Number, Token, TokenKind};
 use soul_utils::{
@@ -7,12 +8,14 @@ use soul_utils::{
     soul_names::{AccessType, KeyWord, Operator, TypeModifier},
     span::Span,
     symbool_kind::SymbolKind,
-    try_result::{ToResult, TryError},
+    try_result::ToResult,
 };
 
 use crate::parser::{
     Parser,
-    parse_utils::{ARROW_LEFT, COLON, CURLY_OPEN, DECREMENT, INCREMENT, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN},
+    parse_utils::{
+        ARROW_LEFT, COLON, CURLY_OPEN, DECREMENT, INCREMENT, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN,
+    },
 };
 
 mod parse_condition;
@@ -60,15 +63,20 @@ impl<'a> Parser<'a> {
                 ExpressionOperator::Binary(operator) => {
                     let next_min_precedence = precedence + 1;
                     let right = self.pratt_parse_expression(next_min_precedence, end_tokens)?;
-                    left = Expression::new_binary(left, operator, right, self.span_combine(start_span))
+                    left =
+                        Expression::new_binary(left, operator, right, self.span_combine(start_span))
                 }
                 ExpressionOperator::Access(AccessType::AccessThis) => {
                     todo!("impl access this")
                 }
                 ExpressionOperator::Access(AccessType::AccessIndex) => {
-                    let index = self.parse_expression(&[SQUARE_CLOSE, TokenKind::EndLine, TokenKind::EndFile])?;
+                    let index = self.parse_expression(&[
+                        SQUARE_CLOSE,
+                        TokenKind::EndLine,
+                        TokenKind::EndFile,
+                    ])?;
                     self.expect(&SQUARE_CLOSE)?;
-                    left = Expression::new_index(left, index, self.span_combine(start_span))                    
+                    left = Expression::new_index(left, index, self.span_combine(start_span))
                 }
             }
         }
@@ -80,24 +88,20 @@ impl<'a> Parser<'a> {
         let start_span = self.token().span;
 
         let expression = match &self.token().kind {
-            &CURLY_OPEN => match self.try_parse_named_tuple() {
-                Ok(val) => Expression::from_named_tuple(val),
-                Err(TryError::IsErr(err)) => return Err(err),
-                Err(TryError::IsNotValue(_is_block)) => {
-                    let block = self.parse_block(TypeModifier::Mut)?;
-                    Expression::new_block(block, self.span_combine(start_span))
-                }
-            },
-            &SQUARE_OPEN => self.parse_array(None).map(Expression::from_array)?,
+            &CURLY_OPEN => {
+                let block = self.parse_block(TypeModifier::Mut)?;
+                Expression::new_block(block, self.span_combine(start_span))
+            }
+            &SQUARE_OPEN => {
+                let array = self.parse_array(None)?;
+                Expression::from_array(array)
+            }
             &ROUND_OPEN => {
-                let tuple = self.parse_tuple()?;
-                let kind = if tuple.is_empty() {
-                    ExpressionKind::Default(None)
-                } else {
-                    ExpressionKind::ExpressionGroup{id: None, group: ExpressionGroup::Tuple(tuple)}
-                };
-
-                Expression::new(kind, self.span_combine(start_span))
+                return Err(SoulError::new(
+                    "tuple not yet impl",
+                    SoulErrorKind::InternalError,
+                    Some(start_span),
+                ));
             }
             TokenKind::Symbol(symbol) => {
                 let unary = self.expect_unary(start_span, *symbol)?;
@@ -163,12 +167,14 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_primary_ident(&mut self, start_span: Span) -> SoulResult<Expression> {
-
         let str = self.try_token_as_ident_str()?;
         if str == "true" || str == "false" {
             let value = str == "true";
             self.bump();
-            return Ok(Expression::new_literal(Literal::Bool(value), self.token().span));
+            return Ok(Expression::new_literal(
+                Literal::Bool(value),
+                self.token().span,
+            ));
         }
 
         match KeyWord::from_str(str) {
@@ -189,24 +195,16 @@ impl<'a> Parser<'a> {
             _ => (),
         };
 
-        let ident_position = self.current_position();
         let ident = self.try_bump_consume_ident()?;
 
         let peek = self.peek();
         Ok(match &self.token().kind {
             &COLON if peek.kind == SQUARE_OPEN => {
-                self.bump();
-                let collection_type = SoulType::new(
-                    TypeModifier::Mut,
-                    TypeKind::Stub {
-                        ident,
-                        resolved: None,
-                    },
-                    self.token().span,
-                );
-
-                let array = self.parse_array(Some(collection_type))?;
-                Expression::from_array(array)
+                return Err(SoulError::new(
+                    "collectionType array not yet impl",
+                    SoulErrorKind::InternalError,
+                    Some(ident.get_span()),
+                ));
             }
             &ROUND_OPEN | &ARROW_LEFT => {
                 let function_call = self
@@ -216,21 +214,8 @@ impl<'a> Parser<'a> {
                 Expression::from_function_call(function_call)
             }
 
-            &CURLY_OPEN => {
-                self.go_to(ident_position);
-                let ctor = StructConstructor{
-                    id: None,
-                    ty: self.try_parse_type(TypeModifier::Mut).merge_to_result()?,
-                    named_tuple: self.try_parse_named_tuple().merge_to_result()?.node,
-                };
-                Expression::new(
-                    ExpressionKind::StructConstructor(ctor),
-                    self.span_combine(start_span),
-                )
-            }
-
             _ => {
-                let span = ident.span;
+                let span = ident.get_span();
                 Expression::new(
                     ExpressionKind::Variable {
                         ident,

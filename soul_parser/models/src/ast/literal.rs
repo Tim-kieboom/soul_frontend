@@ -96,6 +96,17 @@ impl LiteralType {
         )
     }
 
+    pub fn to_internal_primitive_type(&self) -> TypeResult {
+        TypeResult::Primitive(match self {
+            LiteralType::Int => InternalPrimitiveTypes::UntypedInt,
+            LiteralType::Uint => InternalPrimitiveTypes::UntypedUint,
+            LiteralType::Float => InternalPrimitiveTypes::UntypedFloat,
+            LiteralType::Bool => InternalPrimitiveTypes::Boolean,
+            LiteralType::Char => InternalPrimitiveTypes::Char,
+            LiteralType::Str => return TypeResult::Str,
+        })
+    }
+
     /// Returns a string representation of the literal type.
     pub fn type_to_string(&self) -> String {
         const LITERAL: &str = TypeModifier::Literal.as_str();
@@ -110,4 +121,9 @@ impl LiteralType {
             LiteralType::Float => format!("{LITERAL} {}", types::UntypedFloat.as_str()),
         }
     }
+}
+
+pub enum TypeResult {
+    Primitive(InternalPrimitiveTypes),
+    Str,
 }

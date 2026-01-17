@@ -3,13 +3,13 @@ use std::collections::HashMap;
 use hir_model::{self as hir, ExpressionId, HirResponse};
 use parser_models::{
     ParseResponse,
-    scope::{NodeId, NodeIdGenerator},
+    scope::NodeId,
 };
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
     sementic_level::SementicFault,
     span::Span,
-    vec_map::{AsIndex, VecMap},
+    vec_map::{VecMapIndex, VecMap},
 };
 
 mod lower_condition;
@@ -23,7 +23,6 @@ pub fn lower_to_hir(request: &ParseResponse) -> HirResponse {
 }
 
 struct HirLowerer {
-    id_generator: NodeIdGenerator,
     module: hir::Module,
 
     current_scope: hir::ScopeId,
@@ -34,8 +33,8 @@ struct HirLowerer {
 
 impl HirLowerer {
     pub(crate) fn lower_ast(request: &ParseResponse) -> HirResponse {
-        let ParseResponse { tree, meta_data } = request;
-        let mut this = Self::new(meta_data.last_node_id);
+        let ParseResponse { tree, .. } = request;
+        let mut this = Self::new();
 
         for statement in &tree.root.statements {
             this.lower_globals_statements(statement);
@@ -47,37 +46,37 @@ impl HirLowerer {
         }
     }
 
-    fn new(last_node_id: NodeId) -> Self {
+    fn new() -> Self {
         let mut scopes = VecMap::new();
-        scopes.insert(hir::ScopeId::new(0), hir::Scope::new_global());
+        scopes.insert(hir::ScopeId::new_index(0), hir::Scope::new_global());
 
         Self {
             module: hir::Module {
-                next_scope_id: hir::ScopeId::new(1),
+                next_scope_id: hir::ScopeId::new_index(1),
                 expressions: VecMap::new(),
+                functions: VecMap::new(),
                 bodies: VecMap::new(),
                 items: VecMap::new(),
                 scopes,
             },
             faults: vec![],
             current_item: None,
-            current_scope: hir::ScopeId::new(0),
-            id_generator: NodeIdGenerator::from_last(last_node_id),
+            current_scope: hir::ScopeId::new_index(0),
         }
     }
 
-    fn push_block(&mut self, body: hir::Block) {
+    fn push_block(&mut self, body: hir::Block, span: Span) {
         self.module
             .bodies
-            .insert(body.id, hir::Body::Block(body))
+            .insert(body.id, hir::Body::Block(body, span));
     }
 
     fn push_item(&mut self, id: NodeId, entry: hir::Item)  {
-        self.module.items.insert(id, entry)
+        self.module.items.insert(id, entry);
     }
 
     fn push_expression(&mut self, id: ExpressionId, entry: hir::Expression)  {
-        self.module.expressions.insert(id, entry)
+        self.module.expressions.insert(id, entry);
     }
 
     fn push_scope(&mut self) -> hir::ScopeId {
@@ -107,6 +106,7 @@ impl HirLowerer {
 
     /// logs error if Option<NodeId> == None, just return same value
     fn expect_node_id(&mut self, id: Option<NodeId>, span: Span) -> Option<NodeId> {
+
         if id.is_none() {
             self.log_error(SoulError::new(
                 "AbstractSyntaxTree Node does not have NodeId",

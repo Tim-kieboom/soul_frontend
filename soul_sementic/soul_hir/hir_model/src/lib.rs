@@ -1,5 +1,5 @@
 use parser_models::scope::NodeId;
-use soul_utils::{sementic_level::SementicFault, vec_map::VecMap};
+use soul_utils::{sementic_level::SementicFault, span::Span, vec_map::VecMap};
 
 mod expression;
 mod hir_type;
@@ -37,6 +37,7 @@ pub struct HirTree {
 pub struct Module {
     /// Next available HIR scope identifier for allocation.
     pub next_scope_id: ScopeId,
+    pub functions: VecMap<NodeId, FunctionSignature>,
     /// Top-level items.
     pub items: VecMap<NodeId, Item>,
     /// Executable code bodies.
@@ -66,10 +67,27 @@ pub struct LocalDefId {
     /// Local counter within the owner.
     pub local_id: u32,
 }
+impl LocalDefId {
+    pub fn write(&self, sb: &mut String) {
+        sb.push_str("LocalDefId{");
+        sb.push_str("owner: ");
+        self.owner.write(sb);
+        sb.push_str(&format!(", local_id: {}", self.local_id));
+        sb.push('}');
+    } 
+}
 
 /// Executable code body in HIR, either a block of statements or a single expression.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum Body {
-    Block(Block),
-    Expression(ExpressionId),
+    Block(Block, Span),
+    Expression(ExpressionId, Span),
+}
+impl Body {
+    pub fn span(&self) -> Span {
+        match self {
+            Body::Block(_, span) => *span,
+            Body::Expression(_, span) => *span,
+        } 
+    }
 }

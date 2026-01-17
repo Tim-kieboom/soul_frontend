@@ -3,7 +3,7 @@ use soul_utils::{
 };
 
 use crate::{
-    ast::{Array, Binary, BinaryOperator, Block, ExpressionGroup, GenericDefine, Literal, NamedTuple, SoulType, Unary, UnaryOperator},
+    ast::{Array, Binary, BinaryOperator, Block, Literal, Unary, UnaryOperator},
     scope::NodeId,
 };
 
@@ -24,8 +24,6 @@ pub enum ExpressionKind {
     /// A function call, e.g., `foo(x, y)`.
     FunctionCall(FunctionCall),
 
-    FieldAccess(FieldAccess),
-
     /// Referring to a variable `var`.
     Variable {
         id: Option<NodeId>,
@@ -39,12 +37,7 @@ pub enum ExpressionKind {
     Unary(Unary),
     /// A binary operation (addition, multiplication, comparison, etc.) `1 + 2`.
     Binary(Binary),
-
-    /// used for type as parent in FieldAccess `int.MAX_VALUE`
-    TypeNamespace(SoulType),
-
-    StructConstructor(StructConstructor),
-
+    Array(Array),
     /// An `if` expression `if true {Println("is true")} else {Println("is else")}`.
     If(If),
     /// A conditional loop `while true {Println("loop")}`.
@@ -62,16 +55,6 @@ pub enum ExpressionKind {
     Block(Block),
     /// Return-like expressions (`return`, `break`) `return 1`.
     ReturnLike(ReturnLike),
-    /// A grouped expression, e.g., tuples, namedTuples or arrays.
-    ExpressionGroup{id: Option<NodeId>, group: ExpressionGroup},
-}
-
-
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct StructConstructor {
-    pub id: Option<NodeId>,
-    pub ty: SoulType,
-    pub named_tuple: NamedTuple,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -90,18 +73,10 @@ pub struct FunctionCall {
     pub name: Ident,
     /// Optional callee expression (for method calls).
     pub callee: Option<BoxExpression>,
-    /// Generic type arguments.
-    pub generics: Vec<GenericDefine>,
     /// Function arguments.
     pub arguments: Vec<Expression>,
     pub id: Option<NodeId>,
-}
-
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct FieldAccess {
-    pub id: Option<NodeId>,
-    pub parent: BoxExpression,
-    pub field: Ident,
+    pub resolved: Option<NodeId>,
 }
 
 /// An expression from an external page/module.
@@ -194,7 +169,6 @@ impl IfArmHelper for IfArm {
 
 pub trait ExpressionHelpers {
     fn from_function_call(function_call: Spanned<FunctionCall>) -> Expression;
-    fn from_named_tuple(named_tuple: Spanned<NamedTuple>) -> Expression;
     fn from_array(array: Spanned<Array>) -> Expression;
 
     fn new_block(block: Block, span: Span) -> Expression;
@@ -204,32 +178,14 @@ pub trait ExpressionHelpers {
     fn new_binary(lvalue: Expression, op: BinaryOperator, rvalue: Expression, span: Span) -> Expression;
 }
 impl ExpressionHelpers for Expression {
-    fn from_named_tuple(named_tuple: Spanned<NamedTuple>) -> Expression {
-        
-        Expression::with_atribute(
-            ExpressionKind::ExpressionGroup{
-                id: None,
-                group: ExpressionGroup::NamedTuple(named_tuple.node)
-            }, 
-            named_tuple.span, 
-            named_tuple.attributes,
-        )
-    }
-    
     
     fn new_block(block: Block, span: Span) -> Expression {
         Expression::new(ExpressionKind::Block(block), span)
     }
-    
+ 
     fn from_array(array: Spanned<Array>) -> Expression {
-        Expression::with_atribute(
-            ExpressionKind::ExpressionGroup{
-                id: None,
-                group: ExpressionGroup::Array(Box::new(array.node))
-            }, 
-            array.span, 
-            array.attributes,
-        )
+        let (array, meta_data) = array.consume();
+        Expression::with_meta_data(ExpressionKind::Array(array), meta_data)
     }
     
     fn new_unary(op: UnaryOperator, rvalue: Expression, span: Span) -> Expression {
@@ -256,7 +212,8 @@ impl ExpressionHelpers for Expression {
     }
     
     fn from_function_call(function_call: Spanned<FunctionCall>) -> Expression {
-        Expression::with_atribute(ExpressionKind::FunctionCall(function_call.node), function_call.span, function_call.attributes)
+        let (node, meta_data) = function_call.consume();
+        Expression::with_meta_data(ExpressionKind::FunctionCall(node), meta_data)
     }
     
     fn new_index(collection: Expression, index: Expression, span: Span) -> Expression {
@@ -269,6 +226,4 @@ impl ExpressionHelpers for Expression {
             span,
         )
     }
-
-    
 }

@@ -67,8 +67,9 @@ impl<'a> Parser<'a> {
                         statements: vec![],
                         scope_id: None,
                         node_id: None,
+                        span: this.token().span,
                     },
-                }, 
+                },
                 this.faults,
             );
         }
@@ -87,9 +88,10 @@ impl<'a> Parser<'a> {
                     scope_id: None,
                     modifier: TypeModifier::Mut,
                     node_id: None,
+                    span: this.token().span,
                 },
             },
-            this.faults
+            this.faults,
         )
     }
 }
