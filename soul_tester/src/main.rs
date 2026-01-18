@@ -81,32 +81,21 @@ fn handle_output<'a>(paths: &Paths, output: Ouput<'a>) -> Result<()> {
         typed_context,
     } = output;
 
-    paths.write_to_output(
-        typed_context_to_string(&typed_context),
-        "typedContext.soulc",
-    )?;
+    let typed_strings = typed_context
+        .entries()
+        .map(|(id, ty)| (id, ty.display()))
+        .collect::<VecMap<_, _>>();
+
+    paths.write_multiple_outputs([
+        (ast.root.display(&DisplayKind::Parser), "ast.soulc"),
+        (ast.root.display(&DisplayKind::NameResolver), "ast_NameResolved.soulc"),
+        (display_hir(&hir), "hir.soulc"),
+        (ast.root.display(&DisplayKind::TypeContext(typed_strings)), "ast_TypeContext.soulc"),
+    ])?;
 
     for fault in &faults {
         eprintln!("{}", fault.to_message("main.soul", source_file));
     }
-
-    paths.write_to_output(ast.root.display(&DisplayKind::Parser), "ast.soulc")?;
-
-    paths.write_to_output(
-        ast.root.display(&DisplayKind::NameResolver),
-        "ast_NameResolved.soulc",
-    )?;
-
-    paths.write_to_output(display_hir(&hir), "hir.soulc")?;
-
-    let typed_strings = VecMap::from_vec(
-        typed_context.entries().map(|(id, ty)| (id, ty.display())).collect::<Vec<_>>()
-    );
-
-    paths.write_to_output(
-        ast.root.display(&DisplayKind::TypeContext(typed_strings)),
-        "ast_TypeContext.soulc",
-    )?;
 
     if faults.is_empty() {
         use soul_utils::char_colors::{DEFAULT, GREEN};
@@ -142,20 +131,4 @@ fn get_source_file(source_path: &String) -> Result<String> {
     file.read_to_string(&mut source_file)?;
 
     Ok(source_file)
-}
-
-fn typed_context_to_string(types: &VecMap<NodeId, HirType>) -> String {
-    let mut sb = String::new();
-
-    let last_index = types.len().saturating_sub(1);
-    for (i, (id, ty)) in types.entries().enumerate() {
-        sb.push_str(&id.display());
-        sb.push_str(" >> ");
-        ty.inner_display(&mut sb);
-        if i != last_index {
-            sb.push('\n');
-        }
-    }
-
-    sb
 }

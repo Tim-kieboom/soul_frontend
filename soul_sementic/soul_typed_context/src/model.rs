@@ -53,6 +53,14 @@ pub(crate) enum InferType {
     Known(HirType),
     Variable(TypeVariable, Span),
 }
+impl InferType {
+    pub fn contains_variable(&self, variable: TypeVariable) -> bool {
+        match self {
+            InferType::Known(_) => false,
+            InferType::Variable(type_variable, _) => *type_variable == variable,
+        }   
+    }
+}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) enum Place {

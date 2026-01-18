@@ -44,7 +44,10 @@ impl SyntaxDisplay for StatementKind {
                 sb.push_str(var.name.as_str());
                 sb.push_str(": ");
                 match &var.ty {
-                    VarTypeKind::NonInveredType(soul_type) => soul_type.inner_display(sb, kind, tab, is_last),
+                    VarTypeKind::NonInveredType(soul_type) => {
+                        soul_type.inner_display(sb, kind, tab, is_last);
+                        try_display_infered_type(sb, var, kind);
+                    }
                     VarTypeKind::InveredType(type_modifier) => {
                         
                         if !try_display_infered_type(sb, var, kind) {

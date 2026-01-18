@@ -48,7 +48,13 @@ impl<'a> TypedContext<'a> {
         match (lsolve, rsolve) {
             (InferType::Variable(variable, _), ty)
             | (ty, InferType::Variable(variable, _)) => {
-                
+                if ty.contains_variable(variable) {
+                    self.log_error(SoulError::new(
+                        "contains recurive type", 
+                        SoulErrorKind::TypeInferenceError,
+                        Some(span),
+                    ));
+                }
                 self.environment.insert_substitution(variable, ty);
             }
 

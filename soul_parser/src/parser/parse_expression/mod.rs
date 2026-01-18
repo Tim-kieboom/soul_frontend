@@ -104,11 +104,16 @@ impl<'a> Parser<'a> {
                 ));
             }
             TokenKind::Symbol(symbol) => {
-                let unary = self.expect_unary(start_span, *symbol)?;
+                let unary = self.expect_unary_kind(start_span, *symbol)?;
                 self.bump();
 
                 let rvalue = self.parse_primary()?;
-                Expression::new_unary(unary, rvalue, self.span_combine(start_span))
+                let span = self.span_combine(start_span);
+                match unary {
+                    UnaryKinds::UnaryOperator(unary) => Expression::new_unary(unary, rvalue, span),
+                    UnaryKinds::Ref { mutable } => Expression::new_ref(mutable, rvalue, span),
+                    UnaryKinds::Deref => Expression::new_deref(rvalue, span),
+                }
             }
             TokenKind::Ident(_) => self.parse_primary_ident(start_span)?,
             TokenKind::CharLiteral(char) => {
@@ -228,24 +233,34 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn expect_unary(&self, start_span: Span, symbool: SymbolKind) -> SoulResult<UnaryOperator> {
-        match Operator::from_symbool(symbool) {
-            Some(op) => {
-                if let Some(unary) = op.to_unary() {
-                    Ok(UnaryOperator::new(unary, self.span_combine(start_span)))
-                } else {
-                    Err(SoulError::new(
-                        format!("'{}' is not a valid unary operator", op.as_str()),
-                        SoulErrorKind::InvalidOperator,
-                        Some(self.span_combine(start_span)),
-                    ))
-                }
-            }
-            None => Err(SoulError::new(
+    fn expect_unary_kind(&self, start_span: Span, symbool: SymbolKind) -> SoulResult<UnaryKinds> {
+        let op = match Operator::from_symbool(symbool) {
+            Some(val) => val,
+            None => return Err(SoulError::new(
                 format!("'{}' is not a valid operator", symbool.as_str()),
                 SoulErrorKind::InvalidOperator,
                 Some(self.span_combine(start_span)),
-            )),
+            ))
+        };
+
+        match op.to_unary() {
+            Some(unary) => {
+                return Ok(UnaryKinds::UnaryOperator(
+                    UnaryOperator::new(unary, self.span_combine(start_span))
+                ))
+            }
+            None => (),
+        }
+
+        match op {
+            Operator::Mul => Ok(UnaryKinds::Deref),
+            Operator::BitAnd => Ok(UnaryKinds::Ref { mutable: true }),
+            Operator::ConstRef => Ok(UnaryKinds::Ref { mutable: false }),
+            _ => Err(SoulError::new(
+                format!("'{}' is not a valid unary operator", op.as_str()),
+                SoulErrorKind::InvalidOperator,
+                Some(self.span_combine(start_span)),
+            ))
         }
     }
 
@@ -303,6 +318,12 @@ impl<'a> Parser<'a> {
     }
 }
 
+enum UnaryKinds {
+    UnaryOperator(UnaryOperator),
+    Ref{mutable: bool},
+    Deref,
+}
+
 enum ExpressionOperator {
     Binary(BinaryOperator),
     Access(AccessType),
@@ -317,9 +338,6 @@ impl ConvertOperator for Operator {
         Some(match self {
             Operator::Not => UnaryOperatorKind::Not,
             Operator::Sub => UnaryOperatorKind::Neg,
-            Operator::Mul => UnaryOperatorKind::DeRef,
-            Operator::BitAnd => UnaryOperatorKind::MutRef,
-            Operator::ConstRef => UnaryOperatorKind::ConstRef,
             Operator::Incr => UnaryOperatorKind::Increment { before_var: true },
             Operator::Decr => UnaryOperatorKind::Decrement { before_var: true },
             _ => return None,

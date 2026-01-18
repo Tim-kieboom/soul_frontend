@@ -32,23 +32,6 @@ pub struct VecMap<I: VecMapIndex, T> {
     pub vec: Vec<Option<T>>, 
     _marker: PhantomData<I>,
 }
-impl<I: VecMapIndex, T> Default for VecMap<I, T> {
-    fn default() -> Self {
-        Self::const_default()
-    }
-}
-impl<I: VecMapIndex + Clone, T: Clone> VecMap<I, T> {
-    /// Constructs a [`VecMap`] from a slice of index-value pairs.
-    ///
-    /// Each `(I, T)` pair is inserted into the map, resizing the underlying vector as needed.
-    pub fn from_slice(slice: &[(I, T)]) -> Self {
-        let mut this = Self::new();
-        for (index, value) in slice.iter().cloned() {
-            this.insert(index, value);
-        }
-        this
-    }
-}
 impl<I: VecMapIndex, T> VecMap<I, T> {
     
     pub fn new() -> Self {
@@ -190,6 +173,32 @@ impl<I: VecMapIndex, T> IndexMut<I> for VecMap<I, T> {
         self.vec[index.index()]
             .as_mut()
             .expect("expected value to be Some(_)")
+    }
+}
+impl<I: VecMapIndex, T> FromIterator<(I, T)> for VecMap<I, T> {
+    fn from_iter<Iter: IntoIterator<Item = (I, T)>>(iter: Iter) -> Self {
+        let mut store = VecMap::new();
+        for (index, value) in iter {
+            store.insert(index, value);
+        }
+        store
+    }
+}
+impl<I: VecMapIndex, T> Default for VecMap<I, T> {
+    fn default() -> Self {
+        Self::const_default()
+    }
+}
+impl<I: VecMapIndex + Clone, T: Clone> VecMap<I, T> {
+    /// Constructs a [`VecMap`] from a slice of index-value pairs.
+    ///
+    /// Each `(I, T)` pair is inserted into the map, resizing the underlying vector as needed.
+    pub fn from_slice(slice: &[(I, T)]) -> Self {
+        let mut this = Self::new();
+        for (index, value) in slice.iter().cloned() {
+            this.insert(index, value);
+        }
+        this
     }
 }
 

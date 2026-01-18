@@ -18,3 +18,27 @@ fn node_id_display(node_id: Option<NodeId>, kind: &DisplayKind) -> String {
 fn try_display_node_id(sb: &mut String, kind: &DisplayKind, node_id: Option<NodeId>) {
     sb.push_str(&node_id_display(node_id, kind));
 }
+
+fn try_display_infered_type(sb: &mut String, kind: &DisplayKind, node_id: Option<NodeId>) {
+    let types_store = match kind {
+        DisplayKind::TypeContext(val) => val,
+        _ => return,
+    };
+
+    let id = match node_id {
+        Some(val) => val,
+        None => return,
+    };
+    
+    let type_str = match types_store.get(id) {
+        Some(val) => val,
+        None => {
+            sb.push_str("/*!!node id not found!!*/");
+            return;
+        }
+    };
+
+    sb.push_str("/*");
+    sb.push_str(type_str);
+    sb.push_str("*/");
+}

@@ -1,20 +1,23 @@
 Println() {/*compiler build in*/}
 sum(a: int, b: int): int {
-    return a + b
+    mut result := a + b
+    return result
 }
 
 main() {
-    uinterger := 1
+    mut uinterger := 1
     godecl := 1 + -2
-    decl: int = 2
+    decl: int = 1
     mut mutdecl: int = 1
 
     array: []int = [1,2,3,4,5]
+    index: uint = 1
+    el := array[index]
     element := array[1]
 
     mut sum := 1
     sum = sum(1, 2)
- 
+
     const immut = 2
     Println("hello world")
 }

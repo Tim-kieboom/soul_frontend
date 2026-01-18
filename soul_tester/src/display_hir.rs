@@ -32,7 +32,7 @@ impl<'a> Displayer<'a> {
             display_node_id(id, sb);
             match &item.node {
                 hir_model::ItemKind::Import(import) => {
-                    self.display_import(&import, sb);
+                    self.display_import(import, sb);
                 }
                 hir_model::ItemKind::Function(function) => {
                     self.display_function(function, sb);
@@ -232,7 +232,7 @@ impl<'a> Displayer<'a> {
         sb.push_str(variable.name.as_str());
         sb.push_str(": ");
 
-        match ty { 
+        match ty {
             Ok(ty) => ty.inner_display(sb),
             Err(modifier) => {
                 sb.push_str("/*");

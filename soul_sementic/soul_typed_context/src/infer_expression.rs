@@ -1,6 +1,6 @@
-use std::iter::zip;
+use std::{iter::zip};
 
-use hir_model::{Array, ExpressionId, ExpressionKind, HirType, HirTypeKind, If, IfArm, Primitive, ReturnLike};
+use hir_model::{Array, ExpressionId, ExpressionKind, HirType, HirTypeKind, If, IfArm, Primitive, PrimitiveSize, ReturnLike};
 use parser_models::scope::NodeId;
 use soul_utils::{error::{SoulError, SoulErrorKind, SoulResult}, sementic_level::SementicFault, span::Span};
 
@@ -23,7 +23,7 @@ impl<'a> TypedContext<'a> {
                 let mut condition = self.infer_rvalue(r#if.condition);
                 self.unify(&mut condition, &known_bool(None, condition_span), condition_span);
 
-                let mut then_ty = self.infer_block(r#if.body, None);
+                let mut then_ty = self.infer_block(r#if.body);
                 self.infer_if_arms(r#if, &mut then_ty);
 
                 then_ty 
@@ -35,10 +35,10 @@ impl<'a> TypedContext<'a> {
                     self.unify(&mut condition, &known_bool(None, span), span);
                 }
 
-                self.infer_block(r#while.body, None);
+                self.infer_block(r#while.body);
                 known_none(span)
             }
-            ExpressionKind::Block(block_id) => self.infer_block(*block_id, None),
+            ExpressionKind::Block(block_id) => self.infer_block(*block_id),
             ExpressionKind::Binary(binary) => {
                 let ltype = self.infer_rvalue(binary.left);
                 let rtype = self.infer_rvalue(binary.right);
@@ -63,10 +63,12 @@ impl<'a> TypedContext<'a> {
             }
             ExpressionKind::Continue(_) => known_none(span),
             ExpressionKind::Array(array) => self.infer_array(array, span),
-            ExpressionKind::Fall(return_like) => self.infer_return_like(return_like, span),
-            ExpressionKind::Break(return_like) => self.infer_return_like(return_like, span),
-            ExpressionKind::Return(return_like) => self.infer_return_like(return_like, span),
             
+            ExpressionKind::Fall(return_like) 
+            | ExpressionKind::Break(return_like) 
+            | ExpressionKind::Return(return_like) => {
+                self.infer_return_like(return_like, span)
+            }
             ExpressionKind::Ref(r#ref) => {
                 let infer = self.infer_rvalue(r#ref.expression);
                 let mut ty = match expect_known_type(infer) {
@@ -112,7 +114,7 @@ impl<'a> TypedContext<'a> {
                 InferType::Known(deref_ty)
             }
             ExpressionKind::Index(index) => {
-                const UINT: Primitive = hir_model::Primitive::Uint(hir_model::PrimitiveSize::SystemSize);
+                const UINT: Primitive = Primitive::Uint(PrimitiveSize::SystemSize);
                 fn uint(span: Span) -> HirType {
                     primitive_ty(UINT, None, span)
                 }
@@ -182,11 +184,27 @@ impl<'a> TypedContext<'a> {
     }
 
     fn infer_return_like(&mut self, return_like: &ReturnLike, span: Span) -> InferType {
-        if let Some(value) = return_like.value {
-            self.infer_rvalue(value)
-        } else {
-            known_none(span)
-        }
+        
+        self.current_return_count += 1;
+        let expected_type = match &self.current_return_type {
+            Some(val) => val.clone(),
+            None => {
+                self.log_error(SoulError::new(
+                    format!("trying to {} in a scope without return type", return_like.kind.as_keyword().as_str()),
+                    SoulErrorKind::UnifyTypeError,
+                    Some(span),
+                ));
+                return known_none(span)
+            }
+        }; 
+
+        let return_type = match return_like.value {
+            Some(value) => self.infer_rvalue(value),
+            None => known_none(span),
+        };
+
+        self.unify(&return_type, &expected_type, span);
+        return_type
     }
 
     fn infer_array(&mut self, array: &Array, span: Span) -> InferType {
@@ -229,15 +247,15 @@ impl<'a> TypedContext<'a> {
                 IfArm::Else(body_id) => {
                     current = None;
                     span = self.get_body(*body_id).span();
-                    self.infer_block(*body_id, None)
+                    self.infer_block(*body_id)
                 }
                 IfArm::ElseIf(elif) => {
                     span = self.get_expression(elif.condition).get_span();
                     let mut condition = self.infer_rvalue(elif.condition);
-                    self.unify(&mut condition, &known_none(span), span);
+                    self.unify(&mut condition, &known_bool(None, span), span);
 
                     current = elif.else_arm.as_ref();
-                    self.infer_block(elif.body, None)
+                    self.infer_block(elif.body)
                 }
             };
 

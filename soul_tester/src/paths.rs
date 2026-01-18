@@ -9,6 +9,13 @@ pub struct Paths {
 }
 
 impl Paths {
+    pub fn write_multiple_outputs<const N: usize>(&self, ouputs: [(String, &str); N]) -> Result<()> {
+        for (text, file) in ouputs {
+            self.write_to_output(text, file)?;
+        }
+        Ok(())
+    }
+
     pub fn write_to_output(&self, output: String, relative_file: &str) -> Result<()> {
         std::fs::create_dir_all(&self.output)?;
         let mut file = File::create(format!("{}/{relative_file}", self.output))?;

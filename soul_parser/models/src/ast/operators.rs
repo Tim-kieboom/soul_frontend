@@ -35,13 +35,7 @@ pub enum UnaryOperatorKind {
     /// `-`
     Neg,                            
     /// `!`
-    Not,                            
-    /// `*`
-    DeRef,                          
-    /// `&`
-    MutRef,                         
-    /// `@`
-    ConstRef,                       
+    Not,                                                                       
     /// `++`
     Increment { before_var: bool }, 
     /// `--`
@@ -117,9 +111,6 @@ impl UnaryOperatorKind {
             UnaryOperatorKind::Not => "!",
             UnaryOperatorKind::Increment { .. } => "++",
             UnaryOperatorKind::Decrement { .. } => "--",
-            UnaryOperatorKind::DeRef => "*",
-            UnaryOperatorKind::MutRef => "&",
-            UnaryOperatorKind::ConstRef => "@",
         }
     }
 }

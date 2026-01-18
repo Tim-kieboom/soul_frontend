@@ -48,11 +48,12 @@ impl<'a> Parser<'a> {
                 .try_err();
         }
 
-        const DEFAULT_VARIABLE_MODIFIER: TypeModifier = TypeModifier::Const;
-        let mut ty = VarTypeKind::InveredType(DEFAULT_VARIABLE_MODIFIER);
+        let mut ty = VarTypeKind::InveredType(modifier);
         if self.current_is(&COLON) {
             self.bump();
-            ty = VarTypeKind::NonInveredType(self.try_parse_type()?);
+            let mut var_type = self.try_parse_type()?;
+            var_type.modifier = Some(modifier);
+            ty = VarTypeKind::NonInveredType(var_type);
         }
 
         if self.current_is_any(STAMENT_END_TOKENS) {

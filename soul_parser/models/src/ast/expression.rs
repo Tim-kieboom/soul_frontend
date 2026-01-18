@@ -173,6 +173,8 @@ pub trait ExpressionHelpers {
 
     fn new_block(block: Block, span: Span) -> Expression;
     fn new_literal(literal: Literal, span: Span) -> Expression;
+    fn new_deref(expression: Expression, span: Span) -> Expression;
+    fn new_ref(mutable: bool, expression: Expression, span: Span) -> Expression;
     fn new_unary(op: UnaryOperator, rvalue: Expression, span: Span) -> Expression;
     fn new_index(collection: Expression, index: Expression, span: Span) -> Expression;
     fn new_binary(lvalue: Expression, op: BinaryOperator, rvalue: Expression, span: Span) -> Expression;
@@ -225,5 +227,19 @@ impl ExpressionHelpers for Expression {
             }), 
             span,
         )
+    }
+    
+    fn new_ref(mutable: bool, expression: Expression, span: Span) -> Expression {
+        let (kind, mut meta_data) = expression.consume();
+        let new_ref = ExpressionKind::Ref { id: None, is_mutable:mutable, expression: Box::new(Expression::new(kind, meta_data.span)) };
+        meta_data.span = span;
+        Expression::with_meta_data(new_ref, meta_data)
+    }
+
+    fn new_deref(expression: Expression, span: Span) -> Expression {
+        let (kind, mut meta_data) = expression.consume();
+        let deref = ExpressionKind::Deref { id: None, inner: Box::new(Expression::new(kind, meta_data.span)) };
+        meta_data.span = span;
+        Expression::with_meta_data(deref, meta_data)
     }
 }

@@ -69,6 +69,8 @@ pub struct TypedContext<'a> {
     environment: TypeEnvironment,
 
     faults: Vec<SementicFault>,
+    current_return_type: Option<InferType>,
+    current_return_count: usize,
 }
 impl<'a> TypedContext<'a> {
 
@@ -76,7 +78,7 @@ impl<'a> TypedContext<'a> {
         
         let mut faults = std::mem::take(&mut self.faults);
         let mut types = VecMap::with_capacity(self.locals.cap());
-        for (node_id, infer_type) in self.locals.into_entries() {
+        for (node_id, infer_type) in self.locals.into_entries().chain(self.expression_types.into_entries()) {
             
             match infer_type {
                 InferType::Known(hir_type) => _ = types.insert(node_id, hir_type),
@@ -111,8 +113,10 @@ impl<'a> TypedContext<'a> {
             tree,
             faults: vec![],
             locals: VecMap::new(),
+            current_return_type: None,
             expression_types: VecMap::new(),
             environment: TypeEnvironment::default(),
+            current_return_count: 0,
         }
     }
 }

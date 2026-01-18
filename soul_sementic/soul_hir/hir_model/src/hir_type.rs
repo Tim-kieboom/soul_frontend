@@ -292,7 +292,8 @@ impl Primitive {
 
             let a = self.number_precedence(); 
             let b = should_be.number_precedence();
-            if a <= b {
+            let both_numbers = a.is_some() && b.is_some();
+            if both_numbers && a <= b {
                 return true
             }
         }
@@ -308,15 +309,15 @@ impl Primitive {
         } 
     }
 
-    pub fn number_precedence(&self) -> u8 {
+    pub fn number_precedence(&self) -> Option<u8> {
         match self {
             Primitive::Nil 
             | Primitive::Boolean 
-            | Primitive::Char(_) => 0,
+            | Primitive::Char(_) => None,
 
-            Primitive::Float(_) | Primitive::UntypedFloat => 1,
-            Primitive::Int(_) | Primitive::UntypedInt => 2,
-            Primitive::Uint(_) | Primitive::UntypedUint => 3,
+            Primitive::Float(_) | Primitive::UntypedFloat => Some(1),
+            Primitive::Int(_) | Primitive::UntypedInt => Some(2),
+            Primitive::Uint(_) | Primitive::UntypedUint => Some(3),
         }
     }
 
