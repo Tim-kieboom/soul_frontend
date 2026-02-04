@@ -3,7 +3,7 @@ use soul_utils::{
 };
 
 use crate::{
-    ast::{Array, Binary, BinaryOperator, Block, Literal, Unary, UnaryOperator},
+    ast::{Array, Binary, BinaryOperator, Block, Literal, SoulType, Unary, UnaryOperator},
     scope::NodeId,
 };
 
@@ -14,6 +14,8 @@ pub type BoxExpression = Box<Expression>;
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ExpressionKind {
+    /// `null`
+    Null(Option<NodeId>),
     /// A `default` literal or default value e.g., '()'.
     Default(Option<NodeId>),
     /// A literal value (number, string, etc.).
@@ -50,11 +52,18 @@ pub enum ExpressionKind {
         is_mutable: bool,
         expression: BoxExpression,
     },
-
+    As(Box<AsTypeCast>),
     /// A block of statements, returning the last expression `{/*stuff*/}`.
     Block(Block),
     /// Return-like expressions (`return`, `break`) `return 1`.
     ReturnLike(ReturnLike),
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct AsTypeCast {
+    pub id: Option<NodeId>,
+    pub left: Expression,
+    pub type_cast: SoulType, 
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -241,5 +250,32 @@ impl ExpressionHelpers for Expression {
         let deref = ExpressionKind::Deref { id: None, inner: Box::new(Expression::new(kind, meta_data.span)) };
         meta_data.span = span;
         Expression::with_meta_data(deref, meta_data)
+    }
+}
+
+impl ExpressionKind {
+    pub fn variant_str(&self) -> &'static str {
+        match self {
+            ExpressionKind::Null(_) => "Null",
+            ExpressionKind::Default(_) => "Default",
+            ExpressionKind::Literal(_) => "Literal",
+
+            ExpressionKind::Index(_) => "Index",
+            ExpressionKind::FunctionCall(_) => "FunctionCall",
+
+            ExpressionKind::Variable { .. } => "Variable",
+            ExpressionKind::ExternalExpression(_) => "ExternalExpression",
+
+            ExpressionKind::Unary(_) => "Unary",
+            ExpressionKind::Binary(_) => "Binary",
+            ExpressionKind::Array(_) => "Array",
+            ExpressionKind::If(_) => "If",
+            ExpressionKind::While(_) => "While",
+            ExpressionKind::Deref { .. } => "Deref",
+            ExpressionKind::Ref { .. } => "Ref",
+            ExpressionKind::As(_) => "As",
+            ExpressionKind::Block(_) => "Block",
+            ExpressionKind::ReturnLike(_) => "ReturnLike",
+        }
     }
 }

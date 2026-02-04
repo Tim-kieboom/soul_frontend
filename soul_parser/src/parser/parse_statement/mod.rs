@@ -1,4 +1,4 @@
-use parser_models::ast::{Block, Statement, StatementHelpers};
+use parser_models::ast::{Block, ExpressionKind, Statement, StatementHelpers};
 use soul_tokenizer::TokenKind;
 use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},
@@ -13,7 +13,7 @@ use crate::parser::{
     Parser,
     parse_utils::{
         ARROW_LEFT, COLON, COLON_ASSIGN, CURLY_CLOSE, CURLY_OPEN, ROUND_OPEN, SEMI_COLON,
-        STAMENT_END_TOKENS,
+        STAMENT_END_TOKENS, STAR,
     },
 };
 
@@ -84,18 +84,23 @@ impl<'a> Parser<'a> {
         self.skip_till(STAMENT_END_TOKENS);
 
         let possible_kind = match &self.token().kind {
-            TokenKind::Ident(_) => self.try_parse_from_ident(start_span),
+            TokenKind::Ident(_) => {
+                self.try_parse_from_ident(start_span)
+            }
             &CURLY_OPEN => TryOk(Statement::new_block(
                 self.parse_block(TypeModifier::Mut)?,
                 self.span_combine(start_span),
             )),
+            &STAR => {
+                return self.parse_assign(start_span)
+            }
             TokenKind::Unknown(char) => {
                 return Err(SoulError::new(
                     format!("unknown character: '{char}'"),
                     SoulErrorKind::UnexpectedCharacter,
                     Some(start_span),
                 ));
-            }
+            }            
             _ => TryNotValue(SoulError::empty()),
         };
 
@@ -106,7 +111,32 @@ impl<'a> Parser<'a> {
         };
 
         match self.parse_expression(STAMENT_END_TOKENS) {
-            Ok(val) => Ok(Statement::from_expression(val)),
+            Ok(val) => {
+                match &val.node {
+                    ExpressionKind::Null(_)
+                    | ExpressionKind::Index(_)
+                    | ExpressionKind::Unary(_)
+                    | ExpressionKind::Array(_)
+                    | ExpressionKind::Binary(_)
+                    | ExpressionKind::Default(_)
+                    | ExpressionKind::Literal(_)
+                    | ExpressionKind::Ref { .. }
+                    | ExpressionKind::Deref { .. }
+                    | ExpressionKind::ExternalExpression(_) => {
+                        self.go_to(begin_position);
+                        Err(SoulError::new(
+                            format!(
+                                "{} expression can not be used as statement", 
+                                val.node.variant_str(),
+                            ),
+                            SoulErrorKind::InvalidContext,
+                            Some(start_span),
+                        ))
+                    }
+
+                    _ => Ok(Statement::from_expression(val))
+                }
+            }
             Err(err) => {
                 self.go_to(begin_position);
                 Err(err)

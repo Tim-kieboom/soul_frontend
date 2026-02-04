@@ -1,4 +1,4 @@
-use parser_models::{ast::{Block, Function, Statement, StatementKind}, scope::{NodeId, ScopeValueEntryKind}};
+use parser_models::{ast::{Block, Function, Statement, StatementKind}, scope::{NodeId}};
 use soul_utils::{Ident, error::{SoulError, SoulErrorKind}, span::Span};
 
 use crate::NameResolver;
@@ -46,7 +46,7 @@ impl<'a> NameResolver<'a> {
         resolved: &mut Option<NodeId>,
         span: Span,
     ) {
-        match self.info.scopes.lookup_value(name, ScopeValueEntryKind::Variable) {
+        match self.check_variable(name) {
             Some(id) => *resolved = Some(id),
             None => self.log_error(SoulError::new(
                 format!("variable '{}' is undefined in scope", name.as_str()),

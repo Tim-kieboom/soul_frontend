@@ -1,11 +1,11 @@
-use soul_utils::vec_map::VecMap;
+use soul_utils::vec_map::{VecMap, VecSet};
 use crate::scope::NodeId;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum DisplayKind {
     Parser,
     NameResolver,
-    TypeContext(VecMap<NodeId, String>),
+    TypeContext(VecMap<NodeId, String>, VecSet<NodeId>),
 }
 
 pub trait SyntaxDisplay {

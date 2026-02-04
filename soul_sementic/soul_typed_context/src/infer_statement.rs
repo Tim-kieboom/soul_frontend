@@ -8,8 +8,23 @@ impl<'a> TypedContext<'a> {
             StatementKind::Import(_) => todo!("impl infer import"),
             StatementKind::Assign(assign) => {
                 let lplace = self.infer_place(assign.left);
-                let rtype = self.infer_rvalue(assign.right);
-                self.unify(lplace.get_type(), &rtype, statement.get_span());
+                let mut rtype = self.infer_rvalue(assign.right);
+                self.unify(
+                    assign.right,
+                    &rtype,
+                    lplace.get_type(),
+                    statement.get_span(),
+                );
+
+                if matches!(rtype, InferType::Known(_)) {
+                    self.try_resolve_untyped_number(&mut rtype, None, statement.get_span());
+                    match &rtype {
+                        InferType::Known(hir_type) => {
+                            self.try_resolve_untyped_var(&lplace, hir_type)
+                        }
+                        _ => unreachable!(),
+                    };
+                }
                 None
             }
             StatementKind::Variable(variable) => {
@@ -20,9 +35,7 @@ impl<'a> TypedContext<'a> {
                 self.infer_function(function);
                 None
             }
-            StatementKind::Expression(expression) => {
-                Some(self.infer_rvalue(expression.expression))
-            }
+            StatementKind::Expression(expression) => Some(self.infer_rvalue(expression.expression)),
         }
     }
 }

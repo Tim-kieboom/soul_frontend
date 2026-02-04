@@ -1,8 +1,11 @@
-use parser_models::ast::{FunctionKind, NamedTupleType, ReferenceType, SoulType, TypeKind};
-use soul_tokenizer::TokenKind;
+use parser_models::ast::{
+    ArrayKind, ArrayType, FunctionKind, NamedTupleType, ReferenceType, SoulType, TypeKind,
+};
+use soul_tokenizer::{Number, TokenKind};
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
-    soul_names::{InternalPrimitiveTypes, TypeModifier, TypeWrapper},
+    soul_error_internal,
+    soul_names::{InternalPrimitiveTypes, TypeModifier},
     try_result::{
         ResultTryErr, ResultTryNotValue, TryErr, TryError, TryNotValue, TryOk, TryResult,
     },
@@ -12,7 +15,7 @@ use crate::parser::{
     Parser,
     parse_utils::{
         ARRAY, COLON, COMMA, CONST_REF, CURLY_OPEN, MUT_REF, OPTIONAL, POINTER, ROUND_CLOSE,
-        ROUND_OPEN,
+        ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN,
     },
 };
 
@@ -50,42 +53,89 @@ impl<'a> Parser<'a> {
             let span = self.token().span.combine(ty.span);
 
             ty = match wrap {
-                TypeWrapper::ConstRef => SoulType::new(
+                ParseWrappers::ConstRef => SoulType::new(
                     None,
                     TypeKind::Reference(ReferenceType::new(ty, CONST)),
                     span,
                 ),
-                TypeWrapper::MutRef => {
+                ParseWrappers::MutRef => {
                     SoulType::new(None, TypeKind::Reference(ReferenceType::new(ty, MUT)), span)
                 }
-                TypeWrapper::Pointer => SoulType::new(None, TypeKind::Pointer(Box::new(ty)), span),
-                TypeWrapper::Array => SoulType::new(None, TypeKind::Array(Box::new(ty)), span),
-                TypeWrapper::Option => SoulType::new(None, TypeKind::Optional(Box::new(ty)), span),
+                ParseWrappers::Pointer => {
+                    SoulType::new(None, TypeKind::Pointer(Box::new(ty)), span)
+                }
+                ParseWrappers::Option => {
+                    SoulType::new(None, TypeKind::Optional(Box::new(ty)), span)
+                }
+                ParseWrappers::Array(kind) => {
+                    let array = ArrayType {
+                        of_type: Box::new(ty),
+                        kind,
+                    };
+                    SoulType::new(None, TypeKind::Array(array), span)
+                }
             };
         }
         Ok(ty)
     }
 
-    fn get_type_wrapper(&mut self) -> TryResult<Vec<TypeWrapper>, SoulError> {
+    fn get_type_wrapper(&mut self) -> TryResult<Vec<ParseWrappers>, SoulError> {
         let mut wrappers = vec![];
         loop {
             let possible_wrap = match &self.token().kind {
-                &ARRAY => Some(TypeWrapper::Array),
-                &CONST_REF => Some(TypeWrapper::ConstRef),
-                &MUT_REF => Some(TypeWrapper::MutRef),
-                &POINTER => Some(TypeWrapper::Pointer),
-                &OPTIONAL => Some(TypeWrapper::Option),
+                &CONST_REF => Some(ParseWrappers::ConstRef),
+                &MUT_REF => Some(ParseWrappers::MutRef),
+                &POINTER => Some(ParseWrappers::Pointer),
+                &OPTIONAL => Some(ParseWrappers::Option),
+                &SQUARE_OPEN => Some(ParseWrappers::Array(self.get_array_type_wrapper()?)),
+                &ARRAY => {
+                    return TryNotValue(SoulError::new(
+                        "empty array kind (so `[]`) is not allowed use `[<number>]` or `[*]` or `[@] or `[&]`",
+                        SoulErrorKind::InvalidTokenKind,
+                        Some(self.token().span),
+                    ));
+                }
                 _ => None,
             };
 
             let wrap = match possible_wrap {
                 Some(val) => val,
-                None => return TryOk(wrappers),
+                None => break,
             };
 
             self.bump();
             wrappers.push(wrap);
         }
+
+        wrappers.reverse();
+        TryOk(wrappers)
+    }
+
+    fn get_array_type_wrapper(&mut self) -> TryResult<ArrayKind, SoulError> {
+        self.bump();
+        let kind = match &self.token().kind {
+            &CONST_REF => ArrayKind::ConstSlice,
+            &MUT_REF => ArrayKind::MutSlice,
+            &POINTER => ArrayKind::HeapArray,
+            TokenKind::Number(Number::Uint(size)) => ArrayKind::StackArray(*size),
+            other => {
+                return TryNotValue(SoulError::new(
+                    format!(
+                        "token '{}' not allowed in array typeWrapper",
+                        other.display()
+                    ),
+                    SoulErrorKind::InvalidTokenKind,
+                    Some(self.token().span),
+                ));
+            }
+        };
+
+        self.bump();
+        if self.token().kind != SQUARE_CLOSE {
+            return TryNotValue(self.get_expect_error(&SQUARE_CLOSE));
+        }
+
+        Ok(kind)
     }
 
     fn get_base_type(&mut self) -> TryResult<SoulType, SoulError> {
@@ -96,17 +146,15 @@ impl<'a> Parser<'a> {
                 return TryOk(SoulType::none(self.token().span));
             }
             &ROUND_OPEN => {
-                return TryNotValue(SoulError::new(
+                return TryNotValue(soul_error_internal!(
                     "tuple type not impl",
-                    SoulErrorKind::InternalError,
-                    Some(self.token().span),
+                    Some(self.token().span)
                 ));
             }
             &CURLY_OPEN => {
-                return TryNotValue(SoulError::new(
-                    "namedtuple type not impl",
-                    SoulErrorKind::InternalError,
-                    Some(self.token().span),
+                return TryNotValue(soul_error_internal!(
+                    "nametuple type not impl",
+                    Some(self.token().span)
                 ));
             }
             _ => (),
@@ -119,10 +167,9 @@ impl<'a> Parser<'a> {
             return TryOk(SoulType::new(None, TypeKind::Primitive(prim), span));
         }
 
-        TryNotValue(SoulError::new(
+        TryNotValue(soul_error_internal!(
             "Stub type not impl",
-            SoulErrorKind::InternalError,
-            Some(self.token().span),
+            Some(self.token().span)
         ))
     }
 
@@ -234,6 +281,14 @@ impl<'a> Parser<'a> {
 
         Ok(Loop::None)
     }
+}
+
+enum ParseWrappers {
+    ConstRef,
+    MutRef,
+    Pointer,
+    Option,
+    Array(ArrayKind),
 }
 
 enum Loop {

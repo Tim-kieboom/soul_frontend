@@ -70,6 +70,16 @@ impl<'a> Displayer<'a> {
     fn display_expression(&self, id: ExpressionId, sb: &mut String) {
         let expression = &self.hir.root.expressions[id];
         match &expression.node {
+            hir_model::ExpressionKind::Null => {
+                sb.push_str(KeyWord::Null.as_str());
+            }
+            hir_model::ExpressionKind::AsCastType(type_cast) => {
+                display_node_id(type_cast.id, sb);
+                sb.push(' ');
+                display_node_id(type_cast.left, sb);
+                sb.push_str(" as ");
+                type_cast.cast_type.inner_display(sb);
+            }
             hir_model::ExpressionKind::Default => sb.push_str("()"),
             hir_model::ExpressionKind::If(r#if) => {
                 sb.push_str(KeyWord::If.as_str());
@@ -151,9 +161,9 @@ impl<'a> Displayer<'a> {
                 sb.push(' ');
                 display_node_id(binary.right, sb);
             }
-            hir_model::ExpressionKind::DeRef(node_id) => {
+            hir_model::ExpressionKind::DeRef(deref) => {
                 sb.push('*');
-                display_node_id(*node_id, sb);
+                display_node_id(deref.id, sb);
             }
             hir_model::ExpressionKind::Literal(literal) => {
                 sb.push_str(&literal.value_to_string());
@@ -181,15 +191,15 @@ impl<'a> Displayer<'a> {
                 sb.push_str("/*resolved:");
                 function_call.resolved.write(sb);
                 sb.push_str("*/");
-                if let Some(callee) = function_call.callee {
-                    display_node_id(callee, sb);
+                if let Some(callee) = &function_call.callee {
+                    display_node_id(callee.node, sb);
                     sb.push('.');
                 }
                 sb.push_str(function_call.name.as_str());
                 sb.push('(');
                 let last_index = function_call.arguments.len().saturating_sub(1);
                 for (i, arg) in function_call.arguments.iter().enumerate() {
-                    display_node_id(*arg, sb);
+                    display_node_id(arg.node, sb);
                     if i != last_index {
                         sb.push_str(", ");
                     }

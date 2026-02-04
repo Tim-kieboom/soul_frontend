@@ -113,8 +113,8 @@ fn inner_display_function_declaration(
 }
 
 fn try_display_infered_type(sb: &mut String, var: &Variable, kind: &DisplayKind) -> bool {
-    let type_map = match kind {
-        DisplayKind::TypeContext(val) => val,
+    let (type_map, auto_copy) = match kind {
+        DisplayKind::TypeContext(a, b) => (a, b),
         _ => return false,
     };
 
@@ -123,6 +123,8 @@ fn try_display_infered_type(sb: &mut String, var: &Variable, kind: &DisplayKind)
         None => return false,
     };
 
+    
+    let copy = auto_copy.contains(node_id);
     let type_str = match type_map.get(node_id) {
         Some(val) => val,
         None => return false,
@@ -130,6 +132,9 @@ fn try_display_infered_type(sb: &mut String, var: &Variable, kind: &DisplayKind)
 
     sb.push_str("/*");
     sb.push_str(type_str);
+    if copy {
+        sb.push_str(".copy");
+    }
     sb.push_str("*/");
     true
 }

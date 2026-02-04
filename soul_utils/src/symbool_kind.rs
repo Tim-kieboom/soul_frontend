@@ -18,8 +18,6 @@ define_str_enum!(
         Star => "*",
         /// `/`
         Slash => "/",
-        /// `**`
-        DoubleStar => "**",
         /// `</`
         Root => "</",
         /// `%`
@@ -34,8 +32,6 @@ define_str_enum!(
         Or => "|",
         /// `^`
         Xor => "^",
-        /// `&&`
-        DoubleAnd => "&&",
         /// `||`
         DoubleOr => "||",
         /// `=`

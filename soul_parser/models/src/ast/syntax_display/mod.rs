@@ -20,8 +20,8 @@ fn try_display_node_id(sb: &mut String, kind: &DisplayKind, node_id: Option<Node
 }
 
 fn try_display_infered_type(sb: &mut String, kind: &DisplayKind, node_id: Option<NodeId>) {
-    let types_store = match kind {
-        DisplayKind::TypeContext(val) => val,
+    let (types_store, auto_copys) = match kind {
+        DisplayKind::TypeContext(a, b) => (a, b),
         _ => return,
     };
 
@@ -30,15 +30,19 @@ fn try_display_infered_type(sb: &mut String, kind: &DisplayKind, node_id: Option
         None => return,
     };
     
+    let copy = auto_copys.contains(id);
     let type_str = match types_store.get(id) {
         Some(val) => val,
         None => {
-            sb.push_str("/*!!node id not found!!*/");
+            sb.push_str(&format!("/*!!type of nodeId({}) not found!!*/", id.display()));
             return;
         }
     };
 
     sb.push_str("/*");
     sb.push_str(type_str);
+    if copy {
+        sb.push_str(".copy");
+    }
     sb.push_str("*/");
 }

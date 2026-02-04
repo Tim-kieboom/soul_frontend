@@ -1,14 +1,14 @@
 use hir_model::HirType;
 use parser_models::scope::NodeId;
-use soul_utils::vec_map::{VecMapIndex, VecMap};
-use soul_utils::span::{Span};
+use soul_utils::span::Span;
+use soul_utils::vec_map::{VecMap, VecMapIndex};
 /// A type variable used during type inference in Hindley-Milner style type checking.
 ///
-/// In your typed HIR type system, `TypeVariable` represents an **unknown type** 
+/// In your typed HIR type system, `TypeVariable` represents an **unknown type**
 /// that the inference algorithm will later solve to a concrete `HirType`.
 ///
 /// ## Why Type Variables?
-/// 
+///
 /// Consider this program:
 /// ```soul
 /// x := 42;
@@ -58,7 +58,7 @@ impl InferType {
         match self {
             InferType::Known(_) => false,
             InferType::Variable(type_variable, _) => *type_variable == variable,
-        }   
+        }
     }
 }
 
@@ -67,6 +67,11 @@ pub(crate) enum Place {
     Local(NodeId, InferType),
 }
 impl Place {
+    pub fn get_id(&self) -> NodeId {
+        match self {
+            Place::Local(node_id, _) => *node_id,
+        }
+    }
     pub fn get_type(&self) -> &InferType {
         match self {
             Place::Local(_, infer_type) => infer_type,
@@ -91,8 +96,6 @@ pub(crate) struct TypeEnvironment {
     substitutions: VecMap<TypeVariable, InferType>,
 }
 impl TypeEnvironment {
-
-
     /// Allocates a fresh type variable and returns it as an `InferType::Var`.
     ///
     /// Each call returns a distinct variable that can later be unified
@@ -110,7 +113,6 @@ impl TypeEnvironment {
     /// - A concrete `Known` type is reached, or
     /// - An unbound `Var` is found.
     pub(crate) fn resolve(&self, ty: &InferType) -> InferType {
-        
         match ty {
             InferType::Variable(variable, _) => {
                 if let Some(infer_type) = self.substitutions.get(*variable) {
@@ -123,7 +125,11 @@ impl TypeEnvironment {
         }
     }
 
-    pub(crate) fn insert_substitution(&mut self, id: TypeVariable, ty: InferType) -> Option<InferType> {
+    pub(crate) fn insert_substitution(
+        &mut self,
+        id: TypeVariable,
+        ty: InferType,
+    ) -> Option<InferType> {
         self.substitutions.insert(id, ty)
-    } 
+    }
 }

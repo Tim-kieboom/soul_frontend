@@ -3,7 +3,7 @@ use std::fmt::Write;
 use soul_utils::soul_names::TypeWrapper;
 
 use crate::{
-    ast::{SoulType, TypeKind, syntax_display::DisplayKind},
+    ast::{ArrayType, SoulType, TypeKind, syntax_display::DisplayKind},
     syntax_display::SyntaxDisplay,
 };
 
@@ -42,7 +42,6 @@ impl TypeKind {
         sb
     }
 
-    /// Returns a string representation of the type kind
     pub fn inner_display(&self, sb: &mut String) {
         let kind = &DisplayKind::Parser;
         match self {
@@ -57,7 +56,7 @@ impl TypeKind {
             }
             TypeKind::Pointer(inner) => _ = write!(sb, "*{}", inner.display(kind)),
             TypeKind::Optional(inner) => _ = write!(sb, "?{}", inner.display(kind)),
-            TypeKind::Array(array) => _ = write!(sb, "[]{}", array.display(kind)),
+            TypeKind::Array(array) => _ = array.inner_display(sb),
             TypeKind::None => sb.push_str("none"),
             TypeKind::Primitive(internal_primitive_types) => {
                 sb.push_str(
@@ -65,5 +64,23 @@ impl TypeKind {
                 )
             }
         }
+    }
+}
+
+impl ArrayType {
+    pub fn display(&self) -> String {
+        let mut sb = String::new();
+        self.inner_display(&mut sb);
+        sb
+    }
+
+    pub fn inner_display(&self, sb: &mut String) {
+        match self.kind {
+            crate::ast::ArrayKind::HeapArray => sb.push_str("[*]"),
+            crate::ast::ArrayKind::MutSlice => sb.push_str("[&]"),
+            crate::ast::ArrayKind::ConstSlice => sb.push_str("[@]"),
+            crate::ast::ArrayKind::StackArray(number) => sb.push_str(&format!("[{number}]")),
+        }
+        self.of_type.inner_display(sb, &DisplayKind::Parser, 0, false);
     }
 }

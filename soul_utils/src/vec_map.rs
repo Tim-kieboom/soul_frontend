@@ -33,7 +33,7 @@ pub struct VecMap<I: VecMapIndex, T> {
     _marker: PhantomData<I>,
 }
 impl<I: VecMapIndex, T> VecMap<I, T> {
-    
+
     pub fn new() -> Self {
         Self::default()
     }
@@ -44,6 +44,18 @@ impl<I: VecMapIndex, T> VecMap<I, T> {
             _marker: PhantomData,
         }
     } 
+
+    /// Inserts or replaces a value at the specified index.
+    ///
+    /// If the index exceeds the current vector length, the internal vector
+    /// automatically grows to accommodate it.
+    pub fn insert(&mut self, index: I, value: T) -> Option<T> {
+        let index = index.index();
+        if index >= self.vec.len() {
+            self.vec.resize_with(index + 1, || None);
+        }
+        self.vec[index].replace(value)
+    }
 
     pub fn clear(&mut self) {
         self.vec.clear();
@@ -69,7 +81,7 @@ impl<I: VecMapIndex, T> VecMap<I, T> {
 
     /// returns amount of entries 
     pub fn len(&self) -> usize {
-    self.vec.iter().filter(|o| o.is_some()).count()
+        self.vec.iter().filter(|o| o.is_some()).count()
     }
     
     /// Creates a [`VecMap`] from a vector of index-value pairs.
@@ -110,18 +122,6 @@ impl<I: VecMapIndex, T> VecMap<I, T> {
         for (index, value) in vec {
             self.insert(index, value);
         }
-    }
-
-    /// Inserts or replaces a value at the specified index.
-    ///
-    /// If the index exceeds the current vector length, the internal vector
-    /// automatically grows to accommodate it.
-    pub fn insert(&mut self, index: I, value: T) -> Option<T> {
-        let index = index.index();
-        if index >= self.vec.len() {
-            self.vec.resize_with(index + 1, || None);
-        }
-        self.vec[index].replace(value)
     }
 
     /// Removes and returns the value at the specified index, if present.
@@ -197,6 +197,70 @@ impl<I: VecMapIndex + Clone, T: Clone> VecMap<I, T> {
         let mut this = Self::new();
         for (index, value) in slice.iter().cloned() {
             this.insert(index, value);
+        }
+        this
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct VecSet<I: VecMapIndex> {
+    map: VecMap<I, ()>
+}
+impl<I: VecMapIndex> VecSet<I> {
+    pub fn new() -> Self {
+        Self { map: VecMap::new() }
+    }
+
+    pub fn insert(&mut self, index: I) -> Option<()> {
+        self.map.insert(index, ())
+    }
+
+    pub fn contains(&self, index: I) -> bool {
+        self.map.contains(index)
+    }
+
+    pub fn remove(&mut self, index: I) -> Option<()> {
+        self.map.remove(index)
+    }
+
+    pub fn entries(&self) -> impl Iterator<Item = I> {
+        self.map.keys()
+    }
+}
+impl<I: VecMapIndex> Index<I> for VecSet<I> {
+    type Output = bool;
+
+    fn index(&self, index: I) -> &Self::Output {
+        
+        if self.map.contains(index) {
+            &true
+        } else {
+            &false
+        }
+    }
+}
+impl<I: VecMapIndex> FromIterator<I> for VecSet<I> {
+    fn from_iter<Iter: IntoIterator<Item = I>>(iter: Iter) -> Self {
+        let mut set = Self::new(); 
+        for i in iter {
+            set.insert(i);
+        }
+        set
+    }
+}
+impl<I: VecMapIndex> Default for VecSet<I> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+impl<I: VecMapIndex + Clone> VecSet<I> {
+    /// Constructs a [`VecSet`] from a slice of index-value pairs.
+    ///
+    /// Each `I` is inserted into the map, resizing the underlying vector as needed.
+    pub fn from_slice(slice: &[I]) -> Self {
+        let mut this = Self::new();
+        for index in slice.iter().cloned() {
+            this.insert(index);
         }
         this
     }

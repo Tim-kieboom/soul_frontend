@@ -1,4 +1,5 @@
 # soul compiler outputs
+*.VSCodeCounter
 /soul_tester/output
 *.soulc
 *.soulAST

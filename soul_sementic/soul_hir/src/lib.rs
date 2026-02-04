@@ -5,8 +5,10 @@ use parser_models::{
     ParseResponse,
     scope::NodeId,
 };
+#[cfg(debug_assertions)]
+use soul_utils::soul_error_internal;
 use soul_utils::{
-    error::{SoulError, SoulErrorKind},
+    error::SoulError,
     sementic_level::SementicFault,
     span::Span,
     vec_map::{VecMapIndex, VecMap},
@@ -108,11 +110,11 @@ impl HirLowerer {
     fn expect_node_id(&mut self, id: Option<NodeId>, span: Span) -> Option<NodeId> {
 
         if id.is_none() {
-            self.log_error(SoulError::new(
-                "AbstractSyntaxTree Node does not have NodeId",
-                SoulErrorKind::InternalError,
-                Some(span),
-            ));
+
+            #[cfg(debug_assertions)]
+            self.log_error(
+                soul_error_internal!("AbstractSyntaxTree Node does not have NodeId", Some(span))
+            );
         }
 
         id

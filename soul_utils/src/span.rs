@@ -90,12 +90,19 @@ impl Span {
     }
 
     pub fn display(&self) -> String {
+        let mut sb = String::new();
+        self.inner_display(&mut sb);
+        sb        
+    }
+
+    pub fn inner_display(&self, sb: &mut String) {
+        use std::fmt::Write;
 
         if self.is_single_line() {
-            format!("{}:{}", self.start_line, self.start_offset)
+            write!(sb, "{}:{}", self.start_line, self.start_offset)
         } else {
-            format!("{}:{}-{}:{}", self.start_line, self.start_offset, self.end_line, self.end_offset)
-        }
+            write!(sb, "{}:{}-{}:{}", self.start_line, self.start_offset, self.end_line, self.end_offset)
+        }.expect("write should not give error")
     }
 }
 

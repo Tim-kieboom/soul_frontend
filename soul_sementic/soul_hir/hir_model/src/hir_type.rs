@@ -1,6 +1,6 @@
 use std::u8;
 
-use parser_models::scope::NodeId;
+use parser_models::{ast::ArrayKind, scope::NodeId};
 use soul_utils::{Ident, error::{SoulError, SoulErrorKind, SoulResult}, soul_names::{InternalPrimitiveTypes, TypeModifier, TypeWrapper}, span::Span};
 
 use crate::{Visibility};
@@ -9,7 +9,7 @@ const BIT8: PrimitiveSize = PrimitiveSize::Bit8;
 const BIT16: PrimitiveSize = PrimitiveSize::Bit16;
 const BIT32: PrimitiveSize = PrimitiveSize::Bit32;
 const BIT64: PrimitiveSize = PrimitiveSize::Bit64;
-const BIT124: PrimitiveSize = PrimitiveSize::Bit124;
+const BIT124: PrimitiveSize = PrimitiveSize::Bit128;
 
 const SYSTEM_SIZE: PrimitiveSize = PrimitiveSize::SystemSize;
 /// Resolved HIR type with generic arguments.
@@ -34,13 +34,22 @@ pub enum HirTypeKind {
     },
     Type,
     Str,
+    /// can be null (`?T`).
+    Optional(Box<HirType>),
     /// Raw pointer (`*T`).
     Pointer(Box<HirType>),
     /// Primitive type.
     Primitive(Primitive),
-    Array(Box<HirType>),
+    Array(ArrayType),
     /// Empty type `none`.
     None,
+    Untyped,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ArrayType {
+    pub type_of: Box<HirType>,
+    pub kind: ArrayKind,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -94,11 +103,92 @@ pub enum PrimitiveSize {
     Bit32 = 32,
     /// 64-bit.
     Bit64 = 64,
-    /// 64-bit.
-    Bit124 = 124,
+    /// 128-bit.
+    Bit128 = 128,
 }
 
+pub enum UnifyResult {
+    /// fully unifyable
+    Ok,
+    /// error if auto copy not impl 
+    AutoCopy,
+}
 impl HirType {
+    pub fn new_priority(&self, other: &Self) -> Self {
+        match self.inner_priority(other) {
+            Priority::This => self.clone(),
+            Priority::Other => other.clone(),
+        }
+    }
+
+    pub fn consume_new_priority(self, other: &Self) -> Self {
+        match self.inner_priority(other) {
+            Priority::This => self,
+            Priority::Other => other.clone(),
+        }
+    }
+
+    fn inner_priority(&self, other: &Self) -> Priority {
+        fn number_precendence(ty: &HirType) -> Option<u8> {
+            match &ty.kind {
+                HirTypeKind::Primitive(val) => val.number_precedence(),
+                _ => None,
+            }
+        }
+        
+        if self.is_untyped_primitive() && other.is_untyped_primitive() {
+
+            if number_precendence(self) < number_precendence(other) {
+                Priority::This
+            } else {
+                Priority::Other
+            }
+        }
+        else if self.is_untyped_primitive() || self.kind.is_untyped() {
+            Priority::Other
+        } else {
+            Priority::This
+        }
+
+    }
+
+    pub fn new_optional(inner: HirType, span: Span) -> Self {
+        Self {
+            kind: HirTypeKind::Optional(
+                Box::new(inner)
+            ),
+            modifier: None,
+            span,
+        }
+    }
+    
+    pub fn new_untyped(span: Span) -> Self {
+        Self {
+            kind: HirTypeKind::Untyped,
+            modifier: None,
+            span,
+        }
+    }
+
+    pub fn is_primitive(&self) -> bool {
+        match &self.kind {
+            HirTypeKind::Primitive(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_pointer(&self) -> bool {
+        self.kind.is_pointer()
+    }
+
+    pub fn is_any_ref(&self) -> bool {
+        self.kind.is_any_ref()
+    }
+
+    pub fn is_untyped_primitive(&self) -> bool {
+        self.kind.is_untyped_primitive()
+    }
+
     pub fn display(&self) -> String {
         let mut sb = String::new();
         self.inner_display(&mut sb);
@@ -113,34 +203,55 @@ impl HirType {
         self.kind.inner_display(sb);
     }
 
-    pub fn try_deref(self) -> SoulResult<Self> {
+    pub fn try_deref(self, span: Span) -> SoulResult<Self> {
         match self.kind {
             HirTypeKind::Ref { ty, .. } => Ok(*ty),
             HirTypeKind::Pointer(hir_type) => Ok(*hir_type),
             other => {
-                Err(SoulError::new(
+                Err(
+                    SoulError::new(
                     format!("type {} can not be derefed", other.display()),
-                    SoulErrorKind::InternalError,
-                    Some(self.span),
+                    SoulErrorKind::TypeInferenceError,
+                    Some(span), 
                 ))
             }
         }
     }
 
-    pub fn unify_compatible(&self, should_be: &Self) -> Result<(), String> {
+    pub fn unify_compatible(&self, should_be: &Self) -> Result<UnifyResult, String> {
         
-        match (self.modifier, should_be.modifier) {
-            (Some(self_modifier), Some(other_modifier)) => {
-                if self_modifier.precedence() < other_modifier.precedence() {
-                    return Err(
-                        format!("'{}' is not compatible with '{}'", self_modifier.as_str(), other_modifier.as_str())
-                    )
+        let result = match (self.modifier, should_be.modifier) {
+
+            (Some(self_modifier), Some(should_be_modifier)) => {
+                if !modifier_compatible(self_modifier, should_be_modifier) {
+                    Some(UnifyResult::AutoCopy)
+                } else {
+                    None
                 }
             }
-            _ => (),
+            _ => None,
+        };
+
+        self.kind.unify_compatible(&should_be.kind)?;
+        Ok(result.unwrap_or(UnifyResult::Ok))
+    }
+
+    pub fn unify_primitive_cast(&self, should_be: &Self) -> Result<(), String> {
+        fn err_non_primitive(ty: &HirType) -> String {
+            format!(
+                "can only use primitive types for casting '{}' is not primitve",
+                ty.display(),
+            )
+        }
+        
+        if !self.is_primitive() {
+            return Err(err_non_primitive(self))
+        }
+        if !should_be.is_primitive() {
+            return Err(err_non_primitive(should_be))
         }
 
-        self.kind.unify_compatible(&should_be.kind)
+        Ok(())
     }
 
     pub fn resolve_untyped(&mut self, should_be: &Self) {
@@ -154,9 +265,11 @@ impl HirType {
 }
 impl HirTypeKind {
 
-    pub fn unify_compatible(&self, should_be: &Self) -> Result<(), String> {
+    pub fn unify_compatible(&self, should_be: &Self) -> Result<UnifyResult, String> {
         
-        match (self, should_be) {
+        Ok(match (self, should_be) {
+            (_, HirTypeKind::Untyped) => UnifyResult::Ok,
+
             (HirTypeKind::Ref { ty: a, mutable: mut_a }, HirTypeKind::Ref { ty: b, mutable: mut_b }) => {
                 a.unify_compatible(b)?;
                 if mut_a != mut_b {
@@ -165,9 +278,30 @@ impl HirTypeKind {
                         format!("'{}' is not compatible with '{}'", display(mut_a), display(mut_b))
                     )
                 }
+                
+                UnifyResult::Ok
             }
-            (HirTypeKind::Array(a), HirTypeKind::Array(b))
-            | (HirTypeKind::Pointer(a), HirTypeKind::Pointer(b)) => a.unify_compatible(b)?,
+            (HirTypeKind::Array(a), HirTypeKind::Array(b)) => {
+                if matches!(b.type_of.kind, HirTypeKind::Untyped) 
+                    || matches!(a.type_of.kind, HirTypeKind::Untyped)
+                {
+                    return Ok(UnifyResult::Ok)
+                }
+
+                if let Some(msg) = arraykind_compatible(a.kind, b.kind) {
+                    return Err(msg)
+                } 
+                a.type_of.unify_compatible(&b.type_of)?
+            }
+
+            (HirTypeKind::Pointer(a), HirTypeKind::Pointer(b))
+            | (HirTypeKind::Optional(a), HirTypeKind::Optional(b)) => {
+                if matches!(a.kind, HirTypeKind::Untyped) {
+                    return Ok(UnifyResult::Ok)
+                }
+
+                a.unify_compatible(b)?
+            }
             
             (HirTypeKind::Primitive(a), HirTypeKind::Primitive(b)) => {
                 if !a.compatible(b) {
@@ -175,16 +309,110 @@ impl HirTypeKind {
                         format!("'{}' is not compatibe with '{}'", a.display(), b.display())
                     )
                 }
+
+                UnifyResult::Ok
             }
             (HirTypeKind::Str, HirTypeKind::Str)
             | (HirTypeKind::None, HirTypeKind::None)
-            | (HirTypeKind::Type, HirTypeKind::Type) => (),
+            | (HirTypeKind::Type, HirTypeKind::Type) => UnifyResult::Ok,
+
+            (a, HirTypeKind::Optional(b)) => {
+                if matches!(a, HirTypeKind::Untyped) {
+                    return Ok(UnifyResult::Ok)
+                }
+
+                a.unify_compatible(&b.kind)?
+            }
             _ => return Err(
                 format!("typekind '{}' not compatible with typekind '{}'", self.display_variant(), should_be.display_variant())
             ),
-        }
+        })
 
-        Ok(())
+    }
+
+    pub fn unify_primitive_cast(&self, should_be: &Self, is_in_unsafe: bool) -> Result<(), String> {
+        
+        Ok(match (self, should_be) {
+            (HirTypeKind::Ref { ty: a, mutable: mut_a }, HirTypeKind::Ref { ty: b, mutable: mut_b }) => {
+                a.unify_primitive_cast(b)?;
+                if mut_a != mut_b {
+                    let display = |bool: &bool| if *bool {TypeWrapper::MutRef.as_str()} else {TypeWrapper::ConstRef.as_str()};
+                    return Err(
+                        format!("'{}' can not be bast to '{}'", display(mut_a), display(mut_b))
+                    )
+                }
+                
+            
+            }
+            (HirTypeKind::Array(_), HirTypeKind::Array(_)) => {
+                return Err("can only type cast primitive types".to_string())
+            }
+
+            (HirTypeKind::Pointer(a), HirTypeKind::Pointer(b)) => {
+                if !is_in_unsafe {
+                    return Err("can only type cast pointers in unsafe".to_string())
+                }
+                
+                if matches!(a.kind, HirTypeKind::Untyped) {
+                    return Ok(())
+                }
+
+                a.unify_primitive_cast(b)?
+            }
+            
+            (HirTypeKind::Optional(a), HirTypeKind::Optional(b)) => {
+                if matches!(a.kind, HirTypeKind::Untyped) {
+                    return Ok(())
+                }
+
+                a.unify_primitive_cast(b)?
+            }
+            
+            (HirTypeKind::Str, HirTypeKind::Str)
+            | (HirTypeKind::None, HirTypeKind::None)
+            | (HirTypeKind::Type, HirTypeKind::Type) 
+            | (HirTypeKind::Primitive(_), HirTypeKind::Primitive(_)) => (),
+
+            | (a, HirTypeKind::Optional(b)) => {
+                if matches!(a, HirTypeKind::Untyped) {
+                    return Ok(())
+                }
+
+                a.unify_primitive_cast(&b.kind, is_in_unsafe)?
+            }
+            _ => return Err(
+                format!("typekind '{}' not compatible with typekind '{}'", self.display_variant(), should_be.display_variant())
+            ),
+        })
+
+    }
+
+    pub fn is_any_ref(&self) -> bool {
+        match self {
+            HirTypeKind::Ref { .. } => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_pointer(&self) -> bool {
+        match self {
+            HirTypeKind::Pointer(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_untyped(&self) -> bool {
+        match self {
+            HirTypeKind::Untyped => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_untyped_primitive(&self) -> bool {
+        match self {
+            HirTypeKind::Primitive(primitive) => primitive.is_untyped(),
+            _ => false,
+        }
     }
 
     pub fn display(&self) -> String {
@@ -208,6 +436,10 @@ impl HirTypeKind {
             },
             HirTypeKind::Type => sb.push_str("Type"),
             HirTypeKind::Str => sb.push_str("str"),
+            HirTypeKind::Optional(hir_type) => {
+                sb.push('?');
+                hir_type.inner_display(sb);
+            }
             HirTypeKind::Pointer(hir_type) => {
                 sb.push('*');
                 hir_type.inner_display(sb);
@@ -215,10 +447,11 @@ impl HirTypeKind {
             HirTypeKind::Primitive(primitive) => sb.push_str(
                 primitive.to_internal_primitive().map(|el| el.as_str()).unwrap_or("<unkown>")
             ),
-            HirTypeKind::Array(hir_type) => {
-                sb.push_str("[]");
-                hir_type.inner_display(sb);
+            HirTypeKind::Array(array) => {
+                sb.push_str(&array.kind.to_string());
+                array.type_of.inner_display(sb);
             }
+            HirTypeKind::Untyped => sb.push_str("<untyped>"),
             HirTypeKind::None => sb.push_str("none"),
         }
     }
@@ -230,7 +463,9 @@ impl HirTypeKind {
             HirTypeKind::None => "none",
             HirTypeKind::Ref { .. } => "<ref>",
             HirTypeKind::Array(_) => "<array>",
+            HirTypeKind::Untyped => "<untyped>",
             HirTypeKind::Pointer(_) => "<pointer>",
+            HirTypeKind::Optional(_) => "<optional>", 
             HirTypeKind::Primitive(primitive) => primitive.display(),
         }
     }
@@ -285,15 +520,15 @@ impl Primitive {
     }
 
     pub fn compatible(&self, should_be: &Self) -> bool {
-        if should_be.is_untyped() {
-            if self.is_untyped() {
+        if self.is_untyped() || should_be.is_untyped() {
+            if should_be.is_untyped() && should_be.is_untyped() {
                 return true
             }
 
             let a = self.number_precedence(); 
             let b = should_be.number_precedence();
             let both_numbers = a.is_some() && b.is_some();
-            if both_numbers && a <= b {
+            if both_numbers && a >= b {
                 return true
             }
         }
@@ -393,4 +628,43 @@ impl Primitive {
             _ => return None
         })
     }
+}
+
+fn modifier_compatible(this: TypeModifier, should_be: TypeModifier) -> bool {
+    match (this, should_be) {
+        (TypeModifier::Mut, TypeModifier::Const)
+        | (TypeModifier::Mut, TypeModifier::Literal)
+        | (TypeModifier::Const, TypeModifier::Literal) => false,
+        _ => true,
+    }
+}
+
+fn arraykind_compatible(is: ArrayKind, should_be: ArrayKind) -> Option<String> {
+    let default_format = |a: ArrayKind, b: ArrayKind| {
+        format!(
+            "arraykind '{}' is not compatible with arraykind '{}'", 
+            a.to_string(), 
+            b.to_string(),
+        )
+    };
+
+    match (is, should_be) {
+        (ArrayKind::MutSlice, ArrayKind::MutSlice) 
+        | (ArrayKind::HeapArray, ArrayKind::HeapArray) 
+        | (ArrayKind::ConstSlice, ArrayKind::ConstSlice) => None,
+
+        (ArrayKind::StackArray(a_num), ArrayKind::StackArray(b_num)) => if a_num != b_num {
+            Some(default_format(is, should_be))
+        } else {
+            None
+        },
+        (ArrayKind::StackArray(_), ArrayKind::HeapArray) => Some(
+            format!("{} (maybe try 'HeapArray:[_]')", default_format(is, should_be))
+        ),
+        _ => Some(default_format(is, should_be)),
+    }
+}
+enum Priority {
+    This,
+    Other,
 }

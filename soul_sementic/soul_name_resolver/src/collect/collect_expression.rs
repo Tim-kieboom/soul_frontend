@@ -1,10 +1,19 @@
 use parser_models::ast::{ElseKind, Expression, ExpressionKind, If};
+use soul_utils::error::{SoulError, SoulErrorKind};
 use crate::NameResolver;
 
 impl<'a> NameResolver<'a> {
     pub(super) fn collect_expression(&mut self, expression: &mut Expression) {
 
         match &mut expression.node {
+            ExpressionKind::Null(node_id) => {
+                *node_id = Some(self.alloc_id());
+            }
+            ExpressionKind::As(type_cast) => {
+                type_cast.id = Some(self.alloc_id());
+                self.collect_expression(&mut type_cast.left);
+                self.collect_type(&mut type_cast.type_cast);
+            }
             ExpressionKind::If(r#if) => {
                 r#if.id = Some(self.alloc_id());
                 self.collect_if(r#if);
@@ -60,7 +69,22 @@ impl<'a> NameResolver<'a> {
             ExpressionKind::ExternalExpression(_) => todo!("impl external expressions"),
             ExpressionKind::Default(id) => *id = Some(self.alloc_id()),
             ExpressionKind::Literal((id, _)) => *id = Some(self.alloc_id()),
-            ExpressionKind::Variable { id, .. } => *id = Some(self.alloc_id()),
+            ExpressionKind::Variable { id, ident, .. } => {
+                
+                let variable_id = match self.check_variable(ident) {
+                    Some(id) => id,
+                    _ => {
+                        self.log_error(SoulError::new(
+                            format!("variable '{}' not found in scope", ident.as_str()),
+                            SoulErrorKind::NotFoundInScope,
+                            Some(ident.get_span()),
+                        ));
+                        self.alloc_id()
+                    }
+                };
+
+                *id = Some(variable_id);
+            }
             ExpressionKind::Array(array) => {
                 array.id = Some(self.alloc_id());
                 for value in &mut array.values {

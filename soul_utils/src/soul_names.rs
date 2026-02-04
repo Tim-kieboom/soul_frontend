@@ -163,9 +163,14 @@ define_str_enum!(
         Copy => "copy", 0,
         Await => "await", 0,
 
+        True => "true", 0,
+        False => "false", 0,
+        Null => "null", 0,
+
+        As => "as", 0,
         Use => "use", 0,
-        Impl => "impl", 0,
         Dyn => "dyn", 0,
+        Impl => "impl", 0,
         Typeof => "typeof", 0,
         Import => "import", 0,
     }
@@ -183,8 +188,6 @@ define_symbols!(
         Incr => "++", SymbolKind::DoublePlus, 8,
         /// decrement
         Decr => "--", SymbolKind::DoubleMinus, 8,
-        /// lvalue(base) power rvalue(exponent)
-        Power => "**", SymbolKind::DoubleStar, 7,
         /// lvalue(exponent) root rvalue(base)
         Root => "</", SymbolKind::Root, 7,
         /// multiplication
@@ -225,9 +228,6 @@ define_symbols!(
 
         /// logical or
         LogOr => "||", SymbolKind::DoubleOr, 0,
-        /// logical and
-        LogAnd => "&&", SymbolKind::DoubleAnd, 0,
-
     }
 );
 

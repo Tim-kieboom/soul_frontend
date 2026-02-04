@@ -3,12 +3,14 @@ use soul_utils::{
     Ident,
     error::{SoulError, SoulErrorKind, SoulResult},
     sementic_level::SementicFault,
+    soul_names::KeyWord,
     span::Span,
     symbool_kind::SymbolKind,
 };
 
 use crate::parser::Parser;
 
+pub const STAR: TokenKind = TokenKind::Symbol(SymbolKind::Star);
 pub const MUT_REF: TokenKind = TokenKind::Symbol(SymbolKind::And);
 pub const COMMA: TokenKind = TokenKind::Symbol(SymbolKind::Comma);
 pub const ARRAY: TokenKind = TokenKind::Symbol(SymbolKind::Array);
@@ -60,6 +62,13 @@ impl<'a> Parser<'a> {
     pub(super) fn current_is_ident(&self, expected: &str) -> bool {
         match &self.token().kind {
             TokenKind::Ident(ident) => expected == ident,
+            _ => false,
+        }
+    }
+
+    pub(crate) fn current_keyword(&self, expected: KeyWord) -> bool {
+        match &self.token().kind {
+            TokenKind::Ident(ident) => KeyWord::from_str(ident.as_str()) == Some(expected),
             _ => false,
         }
     }
@@ -180,16 +189,6 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// Expects any token from given kinds.
-    pub(crate) fn expect_any(&mut self, kinds: &[TokenKind]) -> SoulResult<()> {
-        if self.current_is_any(kinds) {
-            self.bump();
-            Ok(())
-        } else {
-            Err(self.get_expect_any_error(kinds))
-        }
-    }
-
     /// Expects specific identifier name.
     pub(crate) fn expect_ident(&mut self, expected: &str) -> SoulResult<()> {
         if let TokenKind::Ident(ident) = &self.token().kind {
@@ -225,8 +224,13 @@ impl<'a> Parser<'a> {
     /// Creates error for expected token from set.
     pub(super) fn get_expect_any_error(&self, expected: &[TokenKind]) -> SoulError {
         let mut tokens_string = String::new();
-        for token in expected {
-            token.write_display(&mut tokens_string)
+
+        let last_index = expected.len().saturating_sub(1);
+        for (i, token) in expected.iter().enumerate() {
+            token.write_display(&mut tokens_string);
+            if i != last_index {
+                tokens_string.push_str("', '");
+            }
         }
 
         let message = format!(

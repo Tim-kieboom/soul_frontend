@@ -18,6 +18,14 @@ impl SyntaxDisplay for ExpressionKind {
 
     fn inner_display(&self, sb: &mut String, kind: &DisplayKind, tab: usize, is_last: bool) {
         match self {
+            ExpressionKind::Null(_) => {
+                sb.push_str(KeyWord::Null.as_str());
+            }
+            ExpressionKind::As(type_cast) => {
+                type_cast.left.node.inner_display(sb, kind, tab, is_last);
+                sb.push_str(" as ");
+                type_cast.type_cast.inner_display(sb, kind, tab, is_last);
+            }
             ExpressionKind::Default(id) => {
                 try_display_infered_type(sb, kind, *id);
                 sb.push_str("<default>");
@@ -91,12 +99,14 @@ impl SyntaxDisplay for ExpressionKind {
                 unary.expression.node.inner_display(sb, kind, tab, is_last);
             }
             ExpressionKind::Binary(binary) => {
+                sb.push('(');
                 try_display_infered_type(sb, kind, binary.id);
                 binary.left.node.inner_display(sb, kind, tab, is_last);
                 sb.push(' ');
                 sb.push_str(binary.operator.node.as_str());
                 sb.push(' ');
                 binary.right.node.inner_display(sb, kind, tab, is_last);
+                sb.push(')');
             }
             ExpressionKind::If(r#if) => {
                 try_display_infered_type(sb, kind, r#if.id);

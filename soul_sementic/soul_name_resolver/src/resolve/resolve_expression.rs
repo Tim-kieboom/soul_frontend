@@ -4,9 +4,14 @@ use soul_utils::error::{SoulError, SoulErrorKind};
 use crate::NameResolver;
 
 impl<'a> NameResolver<'a> {
+
     pub(super) fn resolve_expression(&mut self, expression: &mut Expression) {
+        
         let span = expression.get_span();
         match &mut expression.node {
+            ExpressionKind::As(type_cast) => {
+                self.resolve_expression(&mut type_cast.left);
+            }
             ExpressionKind::Index(index) => {
                 self.resolve_expression(&mut index.collection);
                 self.resolve_expression(&mut index.index);
@@ -14,7 +19,7 @@ impl<'a> NameResolver<'a> {
             ExpressionKind::FunctionCall(function_call) => {
                 function_call.resolved = self.lookup_function(&function_call.name);
     
-                if function_call.id.is_none() {
+                if function_call.resolved.is_none() {
                     self.log_error(SoulError::new(
                         format!(
                             "function '{}' is undefined in scope",
@@ -70,7 +75,8 @@ impl<'a> NameResolver<'a> {
                 }
             }
 
-            ExpressionKind::Default(_) 
+            ExpressionKind::Null(_) 
+            | ExpressionKind::Default(_) 
             | ExpressionKind::Literal(_) 
             | ExpressionKind::ExternalExpression(_) => (),
         }

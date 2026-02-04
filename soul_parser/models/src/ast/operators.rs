@@ -29,7 +29,7 @@ pub struct Binary {
 }
 
 /// The kind of unary operator.
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum UnaryOperatorKind {
     Invalid,
     /// `-`
@@ -42,7 +42,7 @@ pub enum UnaryOperatorKind {
     Decrement { before_var: bool }, 
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum BinaryOperatorKind {
     Invalid,
     /// `+`
@@ -140,6 +140,34 @@ impl BinaryOperatorKind {
             BinaryOperatorKind::Ge => ">",
             BinaryOperatorKind::Range => "..",
             BinaryOperatorKind::TypeOf => "typeof",
+        }
+    }
+
+    pub const fn is_boolean_operator(&self) -> bool {
+        match self {
+            BinaryOperatorKind::Eq
+            | BinaryOperatorKind::Lt
+            | BinaryOperatorKind::Gt
+            | BinaryOperatorKind::Le
+            | BinaryOperatorKind::Ge 
+            | BinaryOperatorKind::NotEq
+            | BinaryOperatorKind::LogOr
+            | BinaryOperatorKind::LogAnd => true,
+
+            BinaryOperatorKind::Add
+            | BinaryOperatorKind::Sub
+            | BinaryOperatorKind::Mul
+            | BinaryOperatorKind::Div
+            | BinaryOperatorKind::Log
+            | BinaryOperatorKind::Pow
+            | BinaryOperatorKind::Mod
+            | BinaryOperatorKind::Root
+            | BinaryOperatorKind::BitOr
+            | BinaryOperatorKind::Range
+            | BinaryOperatorKind::BitAnd
+            | BinaryOperatorKind::BitXor
+            | BinaryOperatorKind::TypeOf
+            | BinaryOperatorKind::Invalid => false,
         }
     }
 }

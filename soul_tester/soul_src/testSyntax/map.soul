@@ -1,0 +1,90 @@
+class Map<K, V, Mem = Malloc>
+where
+    K: Hash + Eq,
+    Mem: Allocator 
+{
+    struct Bucket {
+        key: K
+        mut value: V
+        mut next: ?*Bucket = null 
+    }
+
+    mut entries: List<?Bucket, Mem>
+
+    This(capacity: uint = 1000) {
+        return This{entries: List(capacity)}
+    }
+
+    This:[(K, V)](array) {
+        mut self = This()
+        for (key, value) in array {
+            self.Insert(key, value)
+        }
+
+        return self
+    }
+
+    Contains(@this, key: @K): bool {
+        hash := getKeyIndex(key)
+
+        entry := @entries[hash].catch{return false}
+        findEntry(entry, key) != null
+    }
+
+    Insert(&this, key: K, value: V) {
+        hash := getKeyIndex(@key)
+
+        if entries[hash] == null {
+            entries[hash] = Bucket{key, value, ..}
+            return   
+        }
+
+        mut entry = findEntryMut(entry, @key) ?? return
+        entry.next = new<Mem>(Bucket{key, value, ..})
+    }
+
+    Get(@this, key: @K): ?@V {
+        return @findEntry(key)?.value
+    }
+
+    GetMut(&this, key: @K): ?&V {
+        return &findEntryMut(key)?.value
+    }
+
+    Remove(&this, key: @K): ?V {
+        hash := getKeyIndex(key)
+        mut entry = &entries[hash].catch{return null}
+
+        while entry.key != key {
+            entry = entry.next.pass
+        }
+
+        return entry
+    }
+
+    findEntry(@this, key: @K): ?@Bucket {
+        hash := getKeyIndex(key)
+        mut entry = @entries[hash].catch{return null}
+
+        while entry.key != key {
+            entry = entry.next.pass
+        }
+
+        return entry
+    }
+
+    findEntryMut(&this, key: @K): ?&Bucket {
+        hash := getKeyIndex(key)
+        mut entry = &entries[hash].catch{return null}
+
+        while entry.key != key {
+            entry = entry.next.pass
+        }
+
+        return entry
+    }
+
+    getKeyIndex(@this, key: @K) -> uint {
+        return key.Hash() % entries.Len()
+    }
+}

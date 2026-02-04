@@ -1,15 +1,35 @@
 use crate::HirLowerer;
-use hir_model::{self as hir};
+use hir_model::{self as hir, DeRef};
 use parser_models::{ast, scope::NodeId};
-use soul_utils::{error::{SoulError, SoulErrorKind}, span::Span, vec_map::VecMap};
+use soul_utils::{error::{SoulError, SoulErrorKind}, span::{Span, Spanned}, vec_map::VecMap};
 
 impl HirLowerer {
+
     pub(crate) fn lower_expression(
         &mut self,
         expression: &ast::Expression,
     ) -> Option<hir::ExpressionId> {
+
         let span = expression.get_span();
         let (id, kind) = match &expression.node {
+            ast::ExpressionKind::Null(node_id) => {
+                let id = self.expect_node_id(*node_id, span)?;
+                (id, hir::ExpressionKind::Null)
+            }
+            ast::ExpressionKind::As(type_cast) => {
+                let id = self.expect_node_id(type_cast.id, span)?;
+                let left = self.lower_expression(&type_cast.left)?;
+                let cast_type = self.lower_type(&type_cast.type_cast)?;
+
+                (
+                    id, 
+                    hir::ExpressionKind::AsCastType( hir::AsCastType{
+                        id,
+                        left,
+                        cast_type,
+                    })
+                )
+            }
             ast::ExpressionKind::Default(node_id) => {
                 let id = self.expect_node_id(*node_id, span)?;
                 (id, hir::ExpressionKind::Default)
@@ -27,6 +47,7 @@ impl HirLowerer {
                 (
                     id,
                     hir::ExpressionKind::Index(hir::Index {
+                        id,
                         collection: self.lower_expression(collection)?,
                         index: self.lower_expression(index)?,
                     }),
@@ -41,8 +62,15 @@ impl HirLowerer {
                 for value in &array.values {
                     nodes.push((self.lower_expression(value)?, value.get_span()));
                 }
+
+                let element_type = match &array.element_type {
+                    Some(ty) => self.lower_type(ty),
+                    None => None,
+                };
+
                 (id, hir::ExpressionKind::Array(hir::Array{
                     id,
+                    element_type,
                     values: nodes,
                 }))
             }
@@ -81,7 +109,10 @@ impl HirLowerer {
                 let id = self.expect_node_id(*id, span)?;
                 (
                     id,
-                    hir::ExpressionKind::DeRef(self.lower_expression(inner)?),
+                    hir::ExpressionKind::DeRef(DeRef{
+                        id,
+                        inner: self.lower_expression(inner)?,
+                    }),
                 )
             }
             ast::ExpressionKind::Binary(binary) => {
@@ -165,10 +196,13 @@ impl HirLowerer {
         })
     }
 
-    fn lower_tuple(&mut self, tuple: &Vec<ast::Expression>) -> Option<Vec<NodeId>> {
+    fn lower_tuple(&mut self, tuple: &Vec<ast::Expression>) -> Option<Vec<Spanned<NodeId>>> {
         let mut nodes = Vec::with_capacity(tuple.len());
         for value in tuple {
-            nodes.push(self.lower_expression(value)?);
+            nodes.push(Spanned::new(
+                self.lower_expression(value)?,
+                value.get_span(),
+            ));
         }
         Some(nodes)
     }
@@ -182,7 +216,10 @@ impl HirLowerer {
         let resolved = self.expect_node_id(function_call.resolved, span)?;
 
         let callee = match &function_call.callee {
-            Some(val) => Some(self.lower_expression(val)?),
+            Some(val) => Some(Spanned::new(
+                self.lower_expression(val)?,
+                val.get_span(),
+            )),
             None => None,
         };
 

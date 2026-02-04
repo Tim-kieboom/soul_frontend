@@ -91,7 +91,7 @@ impl HirLowerer {
                 hir::IfArm::Else(_) => {
                     self.log_error(SoulError::new(
                         "tryed to add ifArm after Else",
-                        SoulErrorKind::InternalError,
+                        SoulErrorKind::InternalError(file!().to_string(), line!()),
                         Some(arm.get_span()),
                     ));
                     return None;

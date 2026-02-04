@@ -1,10 +1,9 @@
 use parser_models::ast::{Array, SoulType};
-use soul_tokenizer::TokenKind;
 use soul_utils::{error::SoulResult, span::Spanned, try_result::TryError};
 
 use crate::parser::{
     Parser,
-    parse_utils::{COLON, COMMA, SEMI_COLON, SQUARE_CLOSE, SQUARE_OPEN},
+    parse_utils::{COLON, COMMA, SQUARE_CLOSE, SQUARE_OPEN},
 };
 
 impl<'a> Parser<'a> {
@@ -42,7 +41,6 @@ impl<'a> Parser<'a> {
 
         self.skip_end_lines();
         self.expect(&SQUARE_CLOSE)?;
-        self.expect_any(&[TokenKind::EndLine, SEMI_COLON])?;
         Ok(Spanned::new(
             Array {
                 collection_type: ty,

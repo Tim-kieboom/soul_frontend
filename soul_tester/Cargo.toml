@@ -13,5 +13,5 @@ parser_models = { version = "0.1.0", path = "../soul_parser/models" }
 soul_hir = { version = "0.1.0", path = "../soul_sementic/soul_hir" }
 soul_tokenizer = { version = "0.1.0", path = "../soul_tokenizer" }
 soul_parser = { version = "0.1.0", path = "../soul_parser" }
-soul_utils = { version = "0.1.0", path = "../soul_utils" }
+soul_utils = { version = "0.1.0", path = "../soul_utils", features=["absolute_internal_error_path"]}
 soul_typed_context = { version = "0.1.0", path = "../soul_sementic/soul_typed_context" }

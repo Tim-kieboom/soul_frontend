@@ -9,7 +9,7 @@ impl<'a> NameResolver<'a> {
             parser_models::ast::TypeKind::None => (),
             parser_models::ast::TypeKind::Type => (),
             parser_models::ast::TypeKind::Primitive(_) => (),
-            parser_models::ast::TypeKind::Array(array_type) => self.collect_type(array_type),
+            parser_models::ast::TypeKind::Array(array_type) => self.collect_type(&mut array_type.of_type),
             parser_models::ast::TypeKind::Reference(reference_type) => self.collect_type(&mut reference_type.inner),
             parser_models::ast::TypeKind::Pointer(soul_type) => self.collect_type(soul_type),
             parser_models::ast::TypeKind::Optional(soul_type) => self.collect_type(soul_type),

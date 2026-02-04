@@ -40,12 +40,24 @@ impl<'a> Parser<'a> {
         methode_type: SoulType,
         name: Ident,
     ) -> FuncResult<Spanned<Function>> {
-        let modifier = methode_type.modifier;
+        
+        let begin = self.current_position();
+        let modifier = methode_type
+            .modifier
+            .unwrap_or(TypeModifier::Mut);
+
         let signature = self.try_parse_function_signature(start_span, methode_type, name)?;
 
-        let block = self
-            .parse_block(modifier.unwrap_or(TypeModifier::Mut))
-            .try_err()?;
+        let block = match self.parse_block(modifier) {
+            Ok(val) => val,
+            Err(err) => if signature.node.parameters.is_empty() {
+                self.go_to(begin);
+                return TryNotValue((signature.node.name, Box::new(err)))
+            } else {
+                return TryErr(err)
+            },
+        };
+
         let span = signature.get_span();
         Ok(Spanned::new(
             Function {

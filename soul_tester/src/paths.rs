@@ -9,7 +9,10 @@ pub struct Paths {
 }
 
 impl Paths {
-    pub fn write_multiple_outputs<const N: usize>(&self, ouputs: [(String, &str); N]) -> Result<()> {
+    pub fn write_multiple_outputs<const N: usize>(
+        &self,
+        ouputs: [(String, &str); N],
+    ) -> Result<()> {
         for (text, file) in ouputs {
             self.write_to_output(text, file)?;
         }

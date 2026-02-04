@@ -1,5 +1,5 @@
-use parser_models::{AbstractSyntaxTree, ParseResponse, meta_data::AstMetadata, scope::{NodeId, NodeIdGenerator}};
-use soul_utils::{error::SoulError, sementic_level::SementicFault};
+use parser_models::{AbstractSyntaxTree, ParseResponse, meta_data::AstMetadata, scope::{NodeId, NodeIdGenerator, ScopeValueEntryKind}};
+use soul_utils::{Ident, error::SoulError, sementic_level::SementicFault};
 
 mod collect;
 mod resolve;
@@ -32,5 +32,9 @@ impl<'a> NameResolver<'a> {
 
     fn log_error(&mut self, error: SoulError) {
         self.faults.push(SementicFault::error(error));
+    }
+
+    fn check_variable(&mut self, name: &Ident) -> Option<NodeId> {
+        self.info.scopes.lookup_value(name, ScopeValueEntryKind::Variable)
     }
 }

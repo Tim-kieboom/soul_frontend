@@ -25,7 +25,7 @@ pub enum TypeKind {
     Type,
     /// Primitive types like int, bool, float
     Primitive(InternalPrimitiveTypes),
-    Array(Box<SoulType>),
+    Array(ArrayType),
     /// Reference type: &T or &mut T
     Reference(ReferenceType),
     /// Pointer type: *T
@@ -40,7 +40,29 @@ pub struct ArrayType {
     /// The element type of the array.
     pub of_type: Box<SoulType>,
     /// Compile-time size, or `None` for dynamic arrays.
-    pub size: Option<u64>,
+    pub kind: ArrayKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum ArrayKind {
+    /// stackArray `[2]int` set size same as C stackArray 
+    StackArray(u64),
+    /// heapArray `[*]int` runtime sized array that lifes on the heap
+    HeapArray,
+    /// MutRefSlice `[&]int` a Mutable Refrence to any Array kind (can also be part of an array like `slice: [&]int = &array[0..1]`)
+    MutSlice,
+    /// ConstRefSlice `[@]int` a Inmutable Refrence to any Array kind (can also be part of an array `slice: [@]int = @array[0..1]`)
+    ConstSlice,
+}
+impl ArrayKind {
+    pub fn to_string(&self) -> String {
+        match self {
+            ArrayKind::StackArray(num) => format!("[{num}]"),
+            ArrayKind::HeapArray => "[*]".to_string(),
+            ArrayKind::MutSlice => "[&]".to_string(),
+            ArrayKind::ConstSlice => "[@]".to_string(),
+        }
+    }
 }
 
 pub type TupleType = Vec<SoulType>;
@@ -57,10 +79,10 @@ pub struct ReferenceType {
 }
 
 impl ArrayType {
-    pub fn new(ty: SoulType, size: Option<u64>) -> Self {
+    pub fn new(ty: SoulType, kind: ArrayKind) -> Self {
         Self { 
             of_type: Box::new(ty), 
-            size,
+            kind,
         }
     }
 }

@@ -1,0 +1,130 @@
+union MaybeInit<T> {
+    Init(T),
+    Uninit,
+}
+
+class List<T, Mem = Malloc> 
+where
+    Mem: Allocator
+{
+    mut buffer: [*]MaybeInit<T> = []
+    mut len: uint = 0
+
+    This(capacity: uint = 0) {
+        TryNew(capacity).catch{Panic}
+    }
+
+    This:[T](array) {
+        TryFromArray(array).catch{Panic}        
+    }
+
+    TryFromArray(array: [_]T): Res<This> {
+        mut self = TryNew(array.Len()).pass
+        self.ExtendArray(array).pass
+        return self
+    }
+
+    TryNew(capacity: uint): Res<This> {
+        mut self = This{..}
+        self.Reserve(capacity).pass
+        return self
+    }
+
+    Len(@this): uint {
+        return len
+    }
+
+    Cap(@this): uint {
+        return buffer.Len()
+    }
+
+    ExtendArray(&this, array: [_]T): Res {
+        ReserveAtLeast(array.Len()).pass
+        for el in array {
+            Push(el)
+        }
+    }
+
+    Push(&this, el: T) {
+        TryPush(el).catch{Panic}
+    }
+
+    TryPush(&this, el: T): Res {
+        if len+1 > Cap() {
+            grow().pass
+        }
+
+        buffer[len++].pass = MaybeInit.Init(el)
+    }
+
+    Pop(&this): ?T {
+        TryPop().catch{Panic}
+    }
+
+    TryPop(&this): Res<?T> {
+        if len == 0 {
+            return null
+        }
+
+        mut temp = MaybeInit.Uninit
+        Swap(&buffer[--len].pass, &temp)
+
+        return temp ?? error.@str("Pop element is somehow Uninit")
+    }
+
+    Reserve(&this, toCapacity: uint): Res {
+        import std::mem::Swap;
+
+        old := buffer
+        buffer = new<Mem>:[for toCapacity => MaybeInit<T>.Uninit].pass
+
+        minLen := len.min(toCapacity)
+        for i in 0..minLen {
+            Swap(&buffer[i].pass, &old[i].pass)
+        }
+
+        buffer = tempPtr
+    }
+
+    Resize(&this, toCapacity: uint, default: T): Res {
+        import std::mem::Swap;
+        
+        old := buffer
+        buffer = new<Mem>:[for toCapacity => MaybeInit<T>.Init(default)].pass
+
+        minLen := len.min(toCapacity)
+        for i in 0..minLen {
+            Swap(&buffer[i].pass, &old[i].pass)
+        }
+
+        buffer = tempPtr
+    }
+
+    ReserveAtLeast(len: uint): Res {
+        capNeeded := len + Len()
+        while Cap() < capNeeded {
+            grow().pass
+        }
+    }
+
+    grow(): Res {
+        newCap := match Cap() {
+            0 => 1,
+            cap => cap * 2
+        }
+
+        return Reserve(newCap)
+    }
+
+    impl OpuaqeIndex<T> {
+        index(this, index: uint): Res<T> {
+            use core::err::OutOfBounds;
+            
+            if index < len {
+                return error.OutOfBounds(len, index)
+            }
+
+            return buffer[index]
+        }
+    }
+}

@@ -1,12 +1,13 @@
 use parser_models::ast::{
-    BinaryOperator, BinaryOperatorKind, Expression, ExpressionHelpers, ExpressionKind, Literal,
-    UnaryOperator, UnaryOperatorKind,
+    Array, AsTypeCast, BinaryOperator, BinaryOperatorKind, Expression, ExpressionHelpers,
+    ExpressionKind, Literal, UnaryOperator, UnaryOperatorKind,
 };
 use soul_tokenizer::{Number, Token, TokenKind};
 use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},
+    soul_error_internal,
     soul_names::{AccessType, KeyWord, Operator, TypeModifier},
-    span::Span,
+    span::{Span, Spanned},
     symbool_kind::SymbolKind,
     try_result::ToResult,
 };
@@ -14,7 +15,8 @@ use soul_utils::{
 use crate::parser::{
     Parser,
     parse_utils::{
-        ARROW_LEFT, COLON, CURLY_OPEN, DECREMENT, INCREMENT, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN,
+        ARRAY, ARROW_LEFT, COLON, CURLY_OPEN, DECREMENT, INCREMENT, ROUND_OPEN, SQUARE_CLOSE,
+        SQUARE_OPEN,
     },
 };
 
@@ -97,11 +99,17 @@ impl<'a> Parser<'a> {
                 Expression::from_array(array)
             }
             &ROUND_OPEN => {
-                return Err(SoulError::new(
-                    "tuple not yet impl",
-                    SoulErrorKind::InternalError,
-                    Some(start_span),
-                ));
+                return Err(soul_error_internal!("tuple not yet impl", Some(start_span)));
+            }
+            &ARRAY => {
+                self.bump();
+                let arr = Array {
+                    id: None,
+                    collection_type: None,
+                    element_type: None,
+                    values: vec![],
+                };
+                Expression::from_array(Spanned::new(arr, start_span))
             }
             TokenKind::Symbol(symbol) => {
                 let unary = self.expect_unary_kind(start_span, *symbol)?;
@@ -168,23 +176,38 @@ impl<'a> Parser<'a> {
             ));
         }
 
+        if self.current_keyword(KeyWord::As) {
+            return self.parse_as_typecast(expression, start_span)
+        }
+
         Ok(expression)
     }
 
     fn parse_primary_ident(&mut self, start_span: Span) -> SoulResult<Expression> {
+        
         let str = self.try_token_as_ident_str()?;
-        if str == "true" || str == "false" {
-            let value = str == "true";
-            self.bump();
-            return Ok(Expression::new_literal(
-                Literal::Bool(value),
-                self.token().span,
-            ));
-        }
 
         match KeyWord::from_str(str) {
             Some(KeyWord::If) => return self.parse_if(),
             Some(KeyWord::While) => return self.parse_while(),
+
+            Some(KeyWord::True)
+            | Some(KeyWord::False) => {
+                let value = str == "true";
+                self.bump();
+                return Ok(Expression::new_literal(
+                    Literal::Bool(value),
+                    self.token().span,
+                ));
+            }
+
+            Some(KeyWord::Null) => {
+                self.bump();
+                return Ok(Expression::new(
+                    ExpressionKind::Null(None), 
+                    self.token().span,
+                ));
+            }
 
             Some(KeyWord::Fall)
             | Some(KeyWord::Break)
@@ -205,10 +228,9 @@ impl<'a> Parser<'a> {
         let peek = self.peek();
         Ok(match &self.token().kind {
             &COLON if peek.kind == SQUARE_OPEN => {
-                return Err(SoulError::new(
+                return Err(soul_error_internal!(
                     "collectionType array not yet impl",
-                    SoulErrorKind::InternalError,
-                    Some(ident.get_span()),
+                    Some(ident.get_span())
                 ));
             }
             &ROUND_OPEN | &ARROW_LEFT => {
@@ -233,21 +255,38 @@ impl<'a> Parser<'a> {
         })
     }
 
+    fn parse_as_typecast(&mut self, left: Expression, start_span: Span) -> SoulResult<Expression> {
+        self.expect_ident(KeyWord::As.as_str())?;
+
+        let as_type_cast = Box::new(AsTypeCast {
+            left,
+            id: None,
+            type_cast: self.try_parse_type().merge_to_result()?,
+        });
+        Ok(Expression::new(
+            ExpressionKind::As(as_type_cast),
+            self.span_combine(start_span),
+        ))
+    }
+
     fn expect_unary_kind(&self, start_span: Span, symbool: SymbolKind) -> SoulResult<UnaryKinds> {
         let op = match Operator::from_symbool(symbool) {
             Some(val) => val,
-            None => return Err(SoulError::new(
-                format!("'{}' is not a valid operator", symbool.as_str()),
-                SoulErrorKind::InvalidOperator,
-                Some(self.span_combine(start_span)),
-            ))
+            None => {
+                return Err(SoulError::new(
+                    format!("'{}' is not a valid operator", symbool.as_str()),
+                    SoulErrorKind::InvalidOperator,
+                    Some(self.span_combine(start_span)),
+                ));
+            }
         };
 
         match op.to_unary() {
             Some(unary) => {
-                return Ok(UnaryKinds::UnaryOperator(
-                    UnaryOperator::new(unary, self.span_combine(start_span))
-                ))
+                return Ok(UnaryKinds::UnaryOperator(UnaryOperator::new(
+                    unary,
+                    self.span_combine(start_span),
+                )));
             }
             None => (),
         }
@@ -260,7 +299,7 @@ impl<'a> Parser<'a> {
                 format!("'{}' is not a valid unary operator", op.as_str()),
                 SoulErrorKind::InvalidOperator,
                 Some(self.span_combine(start_span)),
-            ))
+            )),
         }
     }
 
@@ -295,15 +334,24 @@ impl<'a> Parser<'a> {
             ))
         }
 
+        fn try_binary(symbol: &SymbolKind) -> Option<BinaryOperatorKind> {
+            match Operator::from_symbool(*symbol)
+                .map(|el| el.to_binary())
+            {
+                Some(Some(val)) => Some(val),
+                _ => None,
+            }
+        }
+
         match &self.token().kind {
             TokenKind::Symbol(sym) => {
                 if let Some(access) = AccessType::from_symbool(*sym) {
                     self.bump();
                     return Ok(ExpressionOperator::Access(access));
-                } else if let Some(Some(binary)) =
-                    Operator::from_symbool(*sym).map(|el| el.to_binary())
-                {
+                } else if let Some(mut binary) = try_binary(sym) {
                     self.bump();
+                    binary = self.try_multi_binary(binary);
+
                     return Ok(ExpressionOperator::Binary(BinaryOperator::new(
                         binary,
                         self.span_combine(start_span),
@@ -316,11 +364,38 @@ impl<'a> Parser<'a> {
             _ => get_invalid_error(self.token()),
         }
     }
+
+    fn try_multi_binary(&mut self, binary: BinaryOperatorKind) -> BinaryOperatorKind {
+        let symbol = match &self.token().kind {
+            TokenKind::Symbol(val) => *val,
+            _ => return binary,
+        };
+
+        match binary {
+            BinaryOperatorKind::Mul => {
+                if let Some(Operator::Mul) = Operator::from_symbool(symbol) {
+                    self.bump();
+                    BinaryOperatorKind::Pow
+                } else {
+                    binary
+                }
+            }
+            BinaryOperatorKind::BitAnd => {
+                if let Some(Operator::BitAnd) = Operator::from_symbool(symbol) {
+                    self.bump();
+                    BinaryOperatorKind::LogAnd
+                } else {
+                    binary
+                }
+            },
+            _ => binary,
+        }
+    }
 }
 
 enum UnaryKinds {
     UnaryOperator(UnaryOperator),
-    Ref{mutable: bool},
+    Ref { mutable: bool },
     Deref,
 }
 
@@ -353,7 +428,6 @@ impl ConvertOperator for Operator {
             Operator::Add => BinaryOperatorKind::Add,
             Operator::Sub => BinaryOperatorKind::Sub,
             Operator::Root => BinaryOperatorKind::Root,
-            Operator::Power => BinaryOperatorKind::Pow,
             Operator::LessEq => BinaryOperatorKind::Le,
             Operator::GreatEq => BinaryOperatorKind::Ge,
             Operator::LessThen => BinaryOperatorKind::Lt,
@@ -364,7 +438,6 @@ impl ConvertOperator for Operator {
             Operator::GreatThen => BinaryOperatorKind::Gt,
             Operator::BitAnd => BinaryOperatorKind::BitAnd,
             Operator::BitXor => BinaryOperatorKind::BitXor,
-            Operator::LogAnd => BinaryOperatorKind::LogAnd,
 
             Operator::Not | Operator::Incr | Operator::Decr | Operator::ConstRef => return None,
         })

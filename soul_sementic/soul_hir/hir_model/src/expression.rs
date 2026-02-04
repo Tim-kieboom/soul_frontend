@@ -11,6 +11,7 @@ pub type Expression = Spanned<ExpressionKind>;
 /// Expression kinds in HIR (desugared and resolved).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum ExpressionKind {
+    Null,
     Default,
     /// Conditional expression.
     If(If),
@@ -29,7 +30,7 @@ pub enum ExpressionKind {
     /// Literal value.
     Literal(Literal),
     /// Dereference `*expr`.
-    DeRef(ExpressionId),
+    DeRef(DeRef),
     /// Resolved variable reference.
     ResolvedVariable(NodeId),
     /// Function'func()'/method'expr.func()' call.
@@ -42,11 +43,26 @@ pub enum ExpressionKind {
     Return(ReturnLike),
     /// `break` statement (continue enclosing loop).
     Continue(NodeId),
+    AsCastType(AsCastType),
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct DeRef {
+    pub id: NodeId,
+    pub inner: ExpressionId,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct AsCastType {
+    pub id: NodeId,
+    pub left: ExpressionId,
+    pub cast_type: HirType,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Array {
     pub id: NodeId,
+    pub element_type: Option<HirType>,
     pub values: Vec<(ExpressionId, Span)>,
 }
 
@@ -96,6 +112,7 @@ pub struct While {
 /// index operation.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Index {
+    pub id: NodeId, 
     /// Left operand.
     pub collection: ExpressionId,
     /// Right operand.
@@ -125,10 +142,10 @@ pub struct Unary {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct FunctionCall {
     /// Callee expression.
-    pub callee: Option<ExpressionId>,
+    pub callee: Option<Spanned<ExpressionId>>,
     pub name: Ident,
     /// Argument expressions.
-    pub arguments: Vec<ExpressionId>,
+    pub arguments: Vec<Spanned<ExpressionId>>,
     pub resolved: NodeId,
 }
 

@@ -51,10 +51,7 @@ impl FromLexer for SymbolKind {
             }
             '*' => {
                 let peek = lexer.peek_char();
-                if peek == Some('*') {
-                    lexer.next_char();
-                    Some(SymbolKind::DoubleStar)
-                } else if peek == Some('=') {
+                if peek == Some('=') {
                     lexer.next_char();
                     Some(SymbolKind::StarEq)
                 } else {
@@ -75,10 +72,7 @@ impl FromLexer for SymbolKind {
             }
             '&' => {
                 let peek = lexer.peek_char();
-                if peek == Some('&') {
-                    lexer.next_char();
-                    Some(SymbolKind::DoubleAnd)
-                } else if peek == Some('=') {
+                if peek == Some('=') {
                     lexer.next_char();
                     Some(SymbolKind::AndEq)
                 } else {

@@ -23,19 +23,24 @@
 
 use hir_model::{ExpressionId, HirTree, HirType};
 use parser_models::scope::NodeId;
-use soul_utils::{error::{SoulError, SoulErrorKind}, sementic_level::SementicFault, vec_map::VecMap};
+use soul_utils::{
+    error::{SoulError, SoulErrorKind},
+    sementic_level::SementicFault,
+    vec_map::{VecMap, VecSet},
+};
 
 use crate::model::{InferType, TypeEnvironment};
 
-mod utils;
-mod model;
 mod handle_type;
+mod infer_expression;
 mod infer_item;
 mod infer_statement;
-mod infer_expression;
+mod model;
+mod utils;
 
 pub struct TypedHirResponse {
     pub typed_context: VecMap<NodeId, HirType>,
+    pub auto_copys: VecSet<ExpressionId>,
     pub faults: Vec<SementicFault>,
 }
 
@@ -47,8 +52,8 @@ pub struct TypedHirResponse {
 ///
 /// The actual inferred types are stored internally in `TypedContext`
 /// and can be extended later to be exposed if needed.
-pub fn get_typed_context<'a>(tree: &'a HirTree) -> TypedHirResponse {
-    TypedContext::infer_types(tree).to_response()
+pub fn get_typed_context(tree: &HirTree) -> TypedHirResponse {
+    TypedContext::infer_types(tree).convert_to_response()
 }
 
 /// Type-checking context for a single HIR tree.
@@ -60,6 +65,8 @@ pub fn get_typed_context<'a>(tree: &'a HirTree) -> TypedHirResponse {
 /// - Any faults found during inference.
 pub struct TypedContext<'a> {
     tree: &'a HirTree,
+
+    auto_copys: VecSet<ExpressionId>,
 
     /// Inferred types for each expression node in the HIR.
     expression_types: VecMap<ExpressionId, InferType>,
@@ -73,28 +80,30 @@ pub struct TypedContext<'a> {
     current_return_count: usize,
 }
 impl<'a> TypedContext<'a> {
-
-    fn to_response(mut self) -> TypedHirResponse {
-        
+    fn convert_to_response(mut self) -> TypedHirResponse {
         let mut faults = std::mem::take(&mut self.faults);
         let mut types = VecMap::with_capacity(self.locals.cap());
-        for (node_id, infer_type) in self.locals.into_entries().chain(self.expression_types.into_entries()) {
-            
+        for (node_id, infer_type) in self
+            .locals
+            .into_entries()
+            .chain(self.expression_types.into_entries())
+        {
             match infer_type {
                 InferType::Known(hir_type) => _ = types.insert(node_id, hir_type),
                 InferType::Variable(_, span) => {
                     faults.push(SementicFault::error(SoulError::new(
                         "type was not resolved",
-                        SoulErrorKind::InternalError,
+                        SoulErrorKind::InternalError(file!().to_string(), line!()),
                         Some(span),
                     )));
                 }
             };
         }
 
-        TypedHirResponse { 
-            typed_context: types, 
+        TypedHirResponse {
             faults,
+            typed_context: types,
+            auto_copys: self.auto_copys,
         }
     }
 
@@ -106,7 +115,7 @@ impl<'a> TypedContext<'a> {
         }
 
         this
-    } 
+    }
 
     fn new(tree: &'a HirTree) -> Self {
         Self {
@@ -117,6 +126,7 @@ impl<'a> TypedContext<'a> {
             expression_types: VecMap::new(),
             environment: TypeEnvironment::default(),
             current_return_count: 0,
+            auto_copys: VecSet::new(),
         }
     }
 }

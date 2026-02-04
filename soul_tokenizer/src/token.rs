@@ -1,6 +1,6 @@
 use anyhow::Result;
 use soul_utils::{soul_names::InternalPrimitiveTypes, span::Span, symbool_kind::SymbolKind};
-use std::fmt::Write;
+use std::{fmt::Write};
 
 /// A single token containing its kind and source span information.
 #[derive(Debug, Clone, PartialEq)]
@@ -44,6 +44,9 @@ pub enum Number {
 }
 
 impl TokenKind {
+    const END_FILE_STR: &str = "<end of file>";
+    const END_LINE_STR: &str = "<end of line>";
+
     /// Returns a display string representation of the token kind.
     pub fn display(&self) -> String {
         let mut sb = String::new();
@@ -55,18 +58,35 @@ impl TokenKind {
         self.inner_display(sb).expect("write should not fail");
     }
 
-    fn inner_display(&self, sb: &mut String) -> Result<()> {
+    pub fn inner_display(&self, sb: &mut String) -> Result<usize> {
+        let old = sb.len();
         match self {
-            TokenKind::Number(number) => number.inner_display(sb)?,
-            TokenKind::EndFile => write!(sb, "<end of file>")?,
-            TokenKind::EndLine => write!(sb, "<end of line>")?,
-            TokenKind::Unknown(char) => write!(sb, "{char}")?,
+            TokenKind::Number(number) => _ = number.inner_display(sb)?,
+            TokenKind::EndFile => sb.push_str(Self::END_FILE_STR),
+            TokenKind::EndLine => sb.push_str(Self::END_LINE_STR),
+            TokenKind::Unknown(char) => write!(sb, "Unknown('{char}')")?,
             TokenKind::Ident(ident) => write!(sb, "\"{ident}\"")?,
-            TokenKind::CharLiteral(char) => write!(sb, "r#'{char}'")?,
-            TokenKind::StringLiteral(str) => write!(sb, "r#\"{str}\"")?,
-            TokenKind::Symbol(symbool_kind) => write!(sb, "Symbol('{}')", symbool_kind.as_str())?,
+            TokenKind::CharLiteral(char) => write!(sb, "char('{char}')")?,
+            TokenKind::StringLiteral(str) => write!(sb, "str(\"{str}\")")?,
+            TokenKind::Symbol(symbool_kind) => write!(sb, "'{}'", symbool_kind.as_str())?,
         };
-        Ok(())
+        Ok(sb.len().saturating_sub(old))
+    }
+
+    pub fn display_len(&self) -> usize {
+        match self {
+            TokenKind::EndFile => Self::END_FILE_STR.len(),
+            TokenKind::EndLine => Self::END_LINE_STR.len(),
+            TokenKind::Ident(ident) => "\"".len() + ident.len() + "\"".len(),
+            TokenKind::Unknown(_) => "Unknown('".len() + 1 + "')".len(),
+            TokenKind::Number(number) => {
+                number.inner_display(&mut String::new())
+                    .expect("no write error")
+            }
+            TokenKind::CharLiteral(_) => "char(".len() + 3 + "')".len(),
+            TokenKind::Symbol(symbol_kind) => "\"".len() + symbol_kind.as_str().len() + "\"".len(),
+            TokenKind::StringLiteral(str) => "str(\"".len() + str.len() + "\")".len(),
+        }
     }
 
     /// Attempts to extract the string value if this is an Ident token.
@@ -101,17 +121,18 @@ impl Number {
         self.inner_display(sb).expect("write should not fail");
     }
 
-    fn inner_display(&self, sb: &mut String) -> Result<()> {
+    fn inner_display(&self, sb: &mut String) -> Result<usize> {
         
         const INT_STR: &str = InternalPrimitiveTypes::UntypedInt.as_str();
         const UINT_STR: &str = InternalPrimitiveTypes::UntypedUint.as_str();
         const FLOAT_STR: &str = InternalPrimitiveTypes::UntypedFloat.as_str();
-
+        
+        let len = sb.len();
         match self {
             Number::Int(num) => write!(sb, "{num}: {INT_STR}"),
             Number::Uint(num) => write!(sb, "{num}: {UINT_STR}"),
             Number::Float(num) => write!(sb, "{num}: {FLOAT_STR}"),
         }?;
-        Ok(())
+        Ok(sb.len().saturating_sub(len))
     }
 }

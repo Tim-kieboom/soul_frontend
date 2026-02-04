@@ -1,5 +1,5 @@
 use crate::HirLowerer;
-use hir_model::{self as hir, HirType, Primitive};
+use hir_model::{self as hir, ArrayType, HirType, Primitive};
 use parser_models::ast::{self, SoulType};
 
 impl HirLowerer {
@@ -13,8 +13,10 @@ impl HirLowerer {
                 )
             }
             ast::TypeKind::Array(array_type) => {
-                hir::HirTypeKind::Array(
-                    Box::new(self.lower_type(array_type)?)
+                hir::HirTypeKind::Array(ArrayType{
+                        type_of: Box::new(self.lower_type(&array_type.of_type)?),
+                        kind: array_type.kind,
+                    }
                 )
             },
             ast::TypeKind::Reference(reference_type) => {
@@ -30,7 +32,7 @@ impl HirLowerer {
                 )
             }
             ast::TypeKind::Optional(soul_type) => {
-                hir::HirTypeKind::Pointer(
+                hir::HirTypeKind::Optional(
                     Box::new(self.lower_type(soul_type)?)
                 )
             }
