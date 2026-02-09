@@ -36,23 +36,29 @@ pub struct Attribute {
     pub values: Vec<Ident>,
 }
 
-/// A node wrapped with source location information and attributes.
-///
 /// All AST nodes are wrapped in `Spanned` to track their location in the
 /// source code for error reporting and debugging.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Spanned<T> {
     /// The actual AST node.
     pub node: T,
-    meta_data: NodeMetaData
+    pub span: Span,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct NodeMetaData {
-    /// The source code span where this node appears.
-    pub span: Span,
+#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+pub struct ItemMetaData {
     /// Additional attributes associated with this node.
     pub attributes: Vec<Attribute>,
+}
+
+impl ItemMetaData {
+    pub const fn default_const() -> Self {
+        Self::new(vec![])
+    }
+
+    pub const fn new(attributes: Vec<Attribute>) -> Self {
+        Self { attributes }
+    } 
 }
 
 impl Span {
@@ -115,30 +121,7 @@ impl<T> Spanned<T> {
     pub fn new(inner: T, span: Span) -> Self {
         Self {
             node: inner,
-            meta_data: NodeMetaData { span, attributes: vec![] }
+            span,
         }
-    }
-
-    pub fn with_meta_data(inner: T, meta_data: NodeMetaData) -> Self {
-        Self {
-            node: inner,
-            meta_data
-        }
-    }
-
-    pub fn get_span(&self) -> Span {
-        self.meta_data.span
-    }
-
-    pub fn get_meta_data(&self) -> &NodeMetaData {
-        &self.meta_data
-    }
-
-    pub fn get_meta_data_mut(&mut self) -> &mut NodeMetaData {
-        &mut self.meta_data
-    }
-
-    pub fn consume(self) -> (T, NodeMetaData) {
-        (self.node, self.meta_data)
     }
 }
