@@ -1,4 +1,4 @@
-use ast_model::{ParseResponse, meta_data::AstMetadata};
+use ast::{ParseResponse, meta_data::AstMetadata};
 use soul_tokenizer::TokenStream;
 
 use crate::parser::Parser;

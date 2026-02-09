@@ -1,12 +1,12 @@
 use std::{fs::File, io::Read};
 
 use anyhow::Result;
-use parser_models::{
+use ast::{
     AbstractSyntaxTree,
     syntax_display::{DisplayKind, SyntaxDisplay},
 };
 use soul_name_resolver::name_resolve;
-use soul_parser::parse;
+use ast_parser::parse;
 use soul_tokenizer::{TokenStream, tokenize};
 use soul_utils::{sementic_level::SementicFault};
 

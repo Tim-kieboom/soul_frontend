@@ -1,8 +1,7 @@
 use std::{iter, sync::LazyLock};
 
-use ast_model::ast::{
-    Assignment, Binary, BinaryOperator, BinaryOperatorKind, Expression, Statement,
-    StatementKind,
+use ast::ast::{
+    Assignment, Binary, BinaryOperator, BinaryOperatorKind, Expression, ExpressionKind, Statement, StatementKind
 };
 use soul_tokenizer::TokenKind;
 use soul_utils::{
@@ -89,7 +88,7 @@ fn resolve_assign_type(
     };
 
     Expression::new(
-        ast_model::ast::ExpressionKind::Binary(Binary::new(lvalue.clone(), operator, rvalue)),
+        ExpressionKind::Binary(Binary::new(lvalue.clone(), operator, rvalue)),
         full_span,
     )
 }

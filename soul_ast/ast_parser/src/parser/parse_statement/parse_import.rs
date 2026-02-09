@@ -1,4 +1,4 @@
-use ast_model::ast::{Import, Statement, StatementKind};
+use ast::ast::{Import, Statement, StatementKind};
 use soul_tokenizer::TokenKind;
 use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},

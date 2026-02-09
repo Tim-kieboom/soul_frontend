@@ -1,4 +1,4 @@
-use parser_models::ast::{Expression, ExpressionKind};
+use ast::ast::{Expression, ExpressionKind};
 use soul_utils::error::{SoulError, SoulErrorKind};
 
 use crate::NameResolver;
@@ -7,7 +7,7 @@ impl<'a> NameResolver<'a> {
 
     pub(super) fn resolve_expression(&mut self, expression: &mut Expression) {
         
-        let span = expression.get_span();
+        let span = expression.span;
         match &mut expression.node {
             ExpressionKind::As(type_cast) => {
                 self.resolve_expression(&mut type_cast.left);

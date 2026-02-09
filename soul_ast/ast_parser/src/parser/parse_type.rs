@@ -1,4 +1,4 @@
-use ast_model::ast::{
+use ast::ast::{
     ArrayKind, ArrayType, FunctionKind, NamedTupleType, ReferenceType, SoulType, TypeKind,
 };
 use soul_tokenizer::{Number, TokenKind};

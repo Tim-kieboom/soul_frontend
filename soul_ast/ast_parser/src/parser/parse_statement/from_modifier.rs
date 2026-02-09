@@ -2,7 +2,7 @@ use crate::parser::{
     Parser,
     parse_utils::{ARROW_LEFT, COLON, CURLY_OPEN, ROUND_OPEN, STAMENT_END_TOKENS},
 };
-use ast_model::ast::{SoulType, Statement, VarTypeKind, Variable};
+use ast::ast::{SoulType, Statement, VarTypeKind, Variable};
 use soul_tokenizer::TokenKind;
 use soul_utils::{
     Ident,

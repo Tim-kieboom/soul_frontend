@@ -1,4 +1,4 @@
-use parser_models::{ast::Block, scope::{NodeId, ScopeId, ScopeValueEntryKind}};
+use ast::{ast::Block, scope::{NodeId, ScopeId, ScopeValueEntryKind}};
 use soul_utils::Ident;
 
 use crate::NameResolver;

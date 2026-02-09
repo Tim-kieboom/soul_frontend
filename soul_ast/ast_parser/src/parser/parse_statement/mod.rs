@@ -1,4 +1,4 @@
-use ast_model::ast::{Block, ExpressionKind, Statement};
+use ast::ast::{Block, ExpressionKind, Statement};
 use soul_tokenizer::TokenKind;
 use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},

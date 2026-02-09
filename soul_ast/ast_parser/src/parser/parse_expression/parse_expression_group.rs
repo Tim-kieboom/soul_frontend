@@ -1,4 +1,4 @@
-use ast_model::ast::{Array, SoulType};
+use ast::ast::{Array, SoulType};
 use soul_utils::{error::SoulResult, span::Spanned, try_result::TryError};
 
 use crate::parser::{

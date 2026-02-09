@@ -1,4 +1,4 @@
-use parser_models::{AbstractSyntaxTree, ParseResponse, meta_data::AstMetadata, scope::{NodeId, NodeIdGenerator, ScopeValueEntryKind}};
+use ast::{AbstractSyntaxTree, ParseResponse, meta_data::AstMetadata, scope::{NodeId, NodeIdGenerator, ScopeValueEntryKind}};
 use soul_utils::{Ident, error::SoulError, sementic_level::SementicFault};
 
 mod collect;

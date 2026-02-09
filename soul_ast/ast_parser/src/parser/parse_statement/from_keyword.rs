@@ -1,4 +1,4 @@
-use ast_model::ast::{
+use ast::ast::{
     Expression, ExpressionKind, ReturnKind, ReturnLike, Statement,
 };
 use soul_utils::{

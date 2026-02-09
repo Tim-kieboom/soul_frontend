@@ -1,4 +1,4 @@
-use parser_models::{ast::{Block, Function, Statement, StatementKind}, scope::{NodeId}};
+use ast::{ast::{Block, Function, Statement, StatementKind}, scope::{NodeId}};
 use soul_utils::{Ident, error::{SoulError, SoulErrorKind}, span::Span};
 
 use crate::NameResolver;

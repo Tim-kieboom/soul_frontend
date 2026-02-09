@@ -9,6 +9,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a23eb6b1614318a8071c9b2521f36b424b2c83db5eb3a0fead4a6c0809af6e61"
 
 [[package]]
+name = "ast"
+version = "0.1.0"
+dependencies = [
+ "itertools",
+ "serde",
+ "soul_utils",
+]
+
+[[package]]
+name = "ast_parser"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ast",
+ "soul_tokenizer",
+ "soul_utils",
+]
+
+[[package]]
 name = "either"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -34,15 +53,6 @@ name = "memchr"
 version = "2.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
-
-[[package]]
-name = "parser_models"
-version = "0.1.0"
-dependencies = [
- "itertools",
- "serde",
- "soul_utils",
-]
 
 [[package]]
 name = "proc-macro2"
@@ -109,17 +119,7 @@ dependencies = [
 name = "soul_name_resolver"
 version = "0.1.0"
 dependencies = [
- "parser_models",
- "soul_utils",
-]
-
-[[package]]
-name = "soul_parser"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "parser_models",
- "soul_tokenizer",
+ "ast",
  "soul_utils",
 ]
 
@@ -128,11 +128,11 @@ name = "soul_tester"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "parser_models",
+ "ast",
+ "ast_parser",
  "serde",
  "serde_json",
  "soul_name_resolver",
- "soul_parser",
  "soul_tokenizer",
  "soul_utils",
 ]

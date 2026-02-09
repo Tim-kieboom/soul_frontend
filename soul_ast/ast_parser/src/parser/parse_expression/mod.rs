@@ -1,4 +1,4 @@
-use ast_model::ast::{
+use ast::ast::{
     Array, AsTypeCast, BinaryOperator, BinaryOperatorKind, Expression, ExpressionHelpers,
     ExpressionKind, Literal, UnaryOperator, UnaryOperatorKind,
 };

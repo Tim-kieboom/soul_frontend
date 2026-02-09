@@ -1,4 +1,4 @@
-use ast_model::{AbstractSyntaxTree, ast::Block};
+use ast::{AbstractSyntaxTree, ast::Block};
 #[cfg(debug_assertions)]
 use soul_tokenizer::Token;
 use soul_tokenizer::{TokenStream};

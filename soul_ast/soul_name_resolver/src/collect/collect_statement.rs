@@ -1,4 +1,4 @@
-use parser_models::{ast::{Block, Function, Statement, StatementKind, VarTypeKind}, scope::{ScopeValueKind}};
+use ast::{ast::{Block, Function, Statement, StatementKind, VarTypeKind}, scope::{ScopeValueKind}};
 
 use crate::NameResolver;
 

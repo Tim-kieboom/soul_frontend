@@ -1,4 +1,4 @@
-use parser_models::{ast::{Block, NamedTupleType}, scope::{NodeId, Scope, ScopeId, ScopeValueEntry, ScopeValueEntryKind, ScopeValueKind}};
+use ast::{ast::{Block, NamedTupleType}, scope::{NodeId, Scope, ScopeId, ScopeValueEntry, ScopeValueEntryKind, ScopeValueKind}};
 
 use crate::NameResolver;
 mod collect_statement;

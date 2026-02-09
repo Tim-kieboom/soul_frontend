@@ -1,4 +1,4 @@
-use parser_models::ast::{ElseKind, Expression, ExpressionKind, If};
+use ast::ast::{ElseKind, Expression, ExpressionKind, If};
 use soul_utils::error::{SoulError, SoulErrorKind};
 use crate::NameResolver;
 
@@ -77,7 +77,7 @@ impl<'a> NameResolver<'a> {
                         self.log_error(SoulError::new(
                             format!("variable '{}' not found in scope", ident.as_str()),
                             SoulErrorKind::NotFoundInScope,
-                            Some(ident.get_span()),
+                            Some(ident.span),
                         ));
                         self.alloc_id()
                     }

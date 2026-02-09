@@ -4,5 +4,5 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-parser_models = { version = "0.1.0", path = "../../soul_parser/models" }
+ast = { version = "0.1.0", path = "../../soul_ast/ast_model" }
 soul_utils = { version = "0.1.0", path = "../../soul_utils" }

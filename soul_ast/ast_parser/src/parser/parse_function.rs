@@ -1,4 +1,4 @@
-use ast_model::ast::{
+use ast::ast::{
     Expression, Function, FunctionCall, FunctionSignature, SoulType, Statement,
 };
 use soul_utils::{

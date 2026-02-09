@@ -1,4 +1,4 @@
-use ast_model::ast::{Statement, VarTypeKind, Variable};
+use ast::ast::{Statement, VarTypeKind, Variable};
 use soul_tokenizer::TokenKind;
 use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},

@@ -1,4 +1,4 @@
-use ast_model::ast::{ElseKind, Expression, ExpressionKind, If, IfArm, IfArmHelper, While};
+use ast::ast::{ElseKind, Expression, ExpressionKind, If, IfArm, IfArmHelper, While};
 use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},
     soul_names::{KeyWord, TypeModifier},
