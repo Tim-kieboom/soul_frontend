@@ -9,7 +9,7 @@ use soul_utils::{
 };
 
 use crate::{
-    TypedContext,
+    TypedContextAnalyser,
     model::{InferType, Place},
     utils::{
         empty_array_ty, known_bool, known_none, kown_from_literal, none_ty, primitive_ty,
@@ -17,7 +17,7 @@ use crate::{
     },
 };
 
-impl<'a> TypedContext<'a> {
+impl<'a> TypedContextAnalyser<'a> {
     pub(crate) fn infer_rvalue(&mut self, expression_id: ExpressionId) -> InferType {
         if let Some(ty) = self.expression_types.get(expression_id) {
             return ty.clone();
@@ -220,7 +220,7 @@ impl<'a> TypedContext<'a> {
     }
 
     pub(crate) fn infer_place(&mut self, expression_id: ExpressionId) -> Place {
-        fn empty_place<'a>(this: &mut TypedContext<'a>, span: Span) -> Place {
+        fn empty_place<'a>(this: &mut TypedContextAnalyser<'a>, span: Span) -> Place {
             Place::Local(
                 NodeId::internal_new(0),
                 this.environment.alloc_variable(span),

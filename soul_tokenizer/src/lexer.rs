@@ -97,7 +97,13 @@ impl<'a> Lexer<'a> {
         };
 
         let kind = self.get_token_kind(char, start_line, start_offset)?;
-        Ok(Token::new(kind, self.new_span(start_line, start_offset)))
+        let span = if kind == TokenKind::EndLine {
+            Span::new_line(start_line, start_offset+1)
+        } else {
+            self.new_span(start_line, start_offset)
+        };
+
+        Ok(Token::new(kind, span))
     }
 
     /// Advances to the next character, updating line/offset tracking.

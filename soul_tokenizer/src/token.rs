@@ -45,7 +45,7 @@ pub enum Number {
 
 impl TokenKind {
     const END_FILE_STR: &str = "<end of file>";
-    const END_LINE_STR: &str = "<end of line>";
+    const END_LINE_STR: &str = "'\\n'";
 
     /// Returns a display string representation of the token kind.
     pub fn display(&self) -> String {

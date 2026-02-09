@@ -659,7 +659,7 @@ fn arraykind_compatible(is: ArrayKind, should_be: ArrayKind) -> Option<String> {
             None
         },
         (ArrayKind::StackArray(_), ArrayKind::HeapArray) => Some(
-            format!("{} (maybe try 'HeapArray:[_]')", default_format(is, should_be))
+            format!("{} (maybe try 'new:[....]')", default_format(is, should_be))
         ),
         _ => Some(default_format(is, should_be)),
     }

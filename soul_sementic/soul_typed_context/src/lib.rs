@@ -39,9 +39,13 @@ mod model;
 mod utils;
 
 pub struct TypedHirResponse {
-    pub typed_context: VecMap<NodeId, HirType>,
-    pub auto_copys: VecSet<ExpressionId>,
+    pub typed_context: TypedContext,
     pub faults: Vec<SementicFault>,
+}
+
+pub struct TypedContext {
+    pub types: VecMap<NodeId, HirType>,
+    pub auto_copys: VecSet<ExpressionId>,
 }
 
 /// Perform type inference on the given HIR tree.
@@ -53,7 +57,7 @@ pub struct TypedHirResponse {
 /// The actual inferred types are stored internally in `TypedContext`
 /// and can be extended later to be exposed if needed.
 pub fn get_typed_context(tree: &HirTree) -> TypedHirResponse {
-    TypedContext::infer_types(tree).convert_to_response()
+    TypedContextAnalyser::infer_types(tree).convert_to_response()
 }
 
 /// Type-checking context for a single HIR tree.
@@ -63,7 +67,7 @@ pub fn get_typed_context(tree: &HirTree) -> TypedHirResponse {
 /// - Maps from expressions and locals to their inferred types.
 /// - The global type inference environment.
 /// - Any faults found during inference.
-pub struct TypedContext<'a> {
+pub struct TypedContextAnalyser<'a> {
     tree: &'a HirTree,
 
     auto_copys: VecSet<ExpressionId>,
@@ -79,7 +83,7 @@ pub struct TypedContext<'a> {
     current_return_type: Option<InferType>,
     current_return_count: usize,
 }
-impl<'a> TypedContext<'a> {
+impl<'a> TypedContextAnalyser<'a> {
     fn convert_to_response(mut self) -> TypedHirResponse {
         let mut faults = std::mem::take(&mut self.faults);
         let mut types = VecMap::with_capacity(self.locals.cap());
@@ -102,8 +106,10 @@ impl<'a> TypedContext<'a> {
 
         TypedHirResponse {
             faults,
-            typed_context: types,
-            auto_copys: self.auto_copys,
+            typed_context: TypedContext { 
+                types, 
+                auto_copys: self.auto_copys,
+            }
         }
     }
 

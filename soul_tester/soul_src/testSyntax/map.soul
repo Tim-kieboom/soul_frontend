@@ -28,7 +28,7 @@ where
         hash := getKeyIndex(key)
 
         entry := @entries[hash].catch{return false}
-        findEntry(entry, key) != null
+        return findEntry(entry, key) != null
     }
 
     Insert(&this, key: K, value: V) {

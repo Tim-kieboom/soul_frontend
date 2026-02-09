@@ -10,9 +10,9 @@ use soul_utils::{
     error::SoulError, sementic_level::SementicFault, soul_names::TypeModifier, span::Span
 };
 
-use crate::{TypedContext, model::InferType};
+use crate::{TypedContextAnalyser, model::InferType};
 
-impl<'a> TypedContext<'a> {
+impl<'a> TypedContextAnalyser<'a> {
     pub(crate) fn get_expression(&mut self, id: ExpressionId) -> &'a Expression {
         &self.tree.root.expressions[id]
     }

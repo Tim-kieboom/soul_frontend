@@ -18,6 +18,19 @@
             "args": []
         },
         {
+            "name": "Release executable 'soul_tester'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "run",
+                    "--release",
+                    "--bin=soul_tester"
+                ]
+            },
+            "args": []
+        },
+        {
             "name": "Debug unit tests in executable 'soul_tester'",
             "type": "lldb",
             "request": "launch",

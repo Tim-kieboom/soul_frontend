@@ -10,9 +10,16 @@ pub mod sementic_level;
 pub mod print_breakpoint;
 pub mod soul_import_path;
 
+#[cfg(test)]
+mod vec_map_tests;
+
 pub type Ident = crate::span::Spanned<String>;
 impl Ident {
     pub fn as_str(&self) -> &str {
         &self.node
+    }
+    
+    pub fn to_string(&self) -> String {
+        self.node.clone()
     }
 }

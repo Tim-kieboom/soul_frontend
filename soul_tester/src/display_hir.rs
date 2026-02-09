@@ -1,6 +1,6 @@
 use hir_model::{
-    BodyId, ExpressionId, FieldType, Function, HirTree, Import, Item, ReturnLike, Scope, ScopeId,
-    VarTypeKind, Variable, Visibility,
+    BodyId, ExpressionId, FieldType, Function, HirTree, Import, Item, ItemKind, ReturnLike, Scope,
+    ScopeId, VarTypeKind, Variable, Visibility,
 };
 use parser_models::scope::NodeId;
 use soul_utils::{
@@ -31,13 +31,13 @@ impl<'a> Displayer<'a> {
             sb.push('\t');
             display_node_id(id, sb);
             match &item.node {
-                hir_model::ItemKind::Import(import) => {
+                ItemKind::Import(import) => {
                     self.display_import(import, sb);
                 }
-                hir_model::ItemKind::Function(function) => {
+                ItemKind::Function(function) => {
                     self.display_function(function, sb);
                 }
-                hir_model::ItemKind::Variable(variable) => {
+                ItemKind::Variable(variable) => {
                     self.display_variable(variable, sb);
                 }
             }
@@ -59,12 +59,16 @@ impl<'a> Displayer<'a> {
     }
 
     fn display_scope(&self, scope: &Scope, sb: &mut String) {
-        for (name, local) in scope.locals.iter() {
+        let mut locals = scope.locals.iter().collect::<Vec<_>>();
+
+        locals.sort_by_key(|(_, local)| local.local_id);
+        for (name, local) in locals {
+            sb.push_str("\n\t\t\"");
             sb.push_str(name.as_str());
-            sb.push_str(": ");
+            sb.push_str("\" => ");
             local.write(sb);
-            sb.push('\n');
         }
+        sb.push_str("\n\t");
     }
 
     fn display_expression(&self, id: ExpressionId, sb: &mut String) {

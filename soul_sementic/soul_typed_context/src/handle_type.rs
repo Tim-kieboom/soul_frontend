@@ -9,11 +9,11 @@ use soul_utils::{
 };
 
 use crate::{
-    TypedContext,
+    TypedContextAnalyser,
     model::{InferType, Place}, utils::{bool_ty, none_ty},
 };
 
-impl<'a> TypedContext<'a> {
+impl<'a> TypedContextAnalyser<'a> {
     pub(crate) fn try_resolve_untyped_var(&mut self, place: &Place, should_be: &HirType) -> bool {
         let known_type = match place.get_type() {
             InferType::Known(hir_type) => hir_type,

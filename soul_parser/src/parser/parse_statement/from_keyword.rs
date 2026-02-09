@@ -53,7 +53,8 @@ impl<'a> Parser<'a> {
             }
             KeyWord::Import => self.parse_import().try_err()?,
 
-            KeyWord::For
+            KeyWord::New
+            | KeyWord::For
             | KeyWord::Use
             | KeyWord::Dyn
             | KeyWord::Fall

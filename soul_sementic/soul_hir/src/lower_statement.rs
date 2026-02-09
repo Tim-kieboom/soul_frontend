@@ -163,6 +163,8 @@ impl HirLowerer {
             }
         };
 
+        self.push_local(variable.name.to_string(), id);
+
         let value = match &variable.initialize_value {
             Some(val) => Some(self.lower_expression(val)?),
             None => None,
@@ -196,6 +198,11 @@ impl HirLowerer {
         self.module.functions.insert(id, signature.clone());
 
         let prev_scope = self.push_scope();
+        
+        for field in &signature.parameters {
+            self.push_local(field.name.to_string(), field.id);
+        }
+
         let block = self.lower_block(&function.block, span)?;
         self.pop_scope(prev_scope);
 

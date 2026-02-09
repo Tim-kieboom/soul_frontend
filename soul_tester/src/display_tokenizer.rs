@@ -1,6 +1,6 @@
 use anyhow::Result;
-use soul_tokenizer::TokenStream;
-use soul_utils::sementic_level::SementicFault;
+use soul_tokenizer::{Token, TokenStream};
+use soul_utils::{error::SoulResult, sementic_level::SementicFault};
 
 use crate::{convert_soul_error::ToAnyhow, paths::Paths};
 
@@ -9,12 +9,15 @@ pub fn display_tokens<'a>(
     source_file: &str,
     token_stream: TokenStream<'a>,
 ) -> Result<String> {
-    let mut sb = "[\n".to_string();
+    fn get_token_len(token: SoulResult<Token>) -> usize {
+        token.map(|el| el.kind.display_len()).unwrap_or(0)
+    }
 
+    let mut sb = "[\n".to_string();
     let max = token_stream
         .clone()
         .into_iter()
-        .map(|result| result.map(|el| el.kind.display_len()).unwrap_or(0))
+        .map(get_token_len)
         .max()
         .unwrap_or(0);
 

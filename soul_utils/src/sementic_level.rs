@@ -11,23 +11,23 @@ define_str_enum!(
 );
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SementicFault {
-    meessage: SoulError,
+    message: SoulError,
     level: SementicLevel,
 }
 impl SementicFault {
     pub const fn error(err: SoulError) -> Self {
         Self {
-            meessage: err,
+            message: err,
             level: SementicLevel::Error,
         }
     }
 
     pub fn consume_soul_error(self) -> SoulError {
-        self.meessage
+        self.message
     }
 
     pub const fn get_soul_error(&self) -> &SoulError {
-        &self.meessage
+        &self.message
     }
 
     pub const fn get_level(&self) -> SementicLevel {

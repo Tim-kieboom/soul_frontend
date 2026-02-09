@@ -153,9 +153,22 @@ dependencies = [
  "soul_hir",
  "soul_name_resolver",
  "soul_parser",
+ "soul_thir",
  "soul_tokenizer",
  "soul_typed_context",
  "soul_utils",
+ "thir_model",
+]
+
+[[package]]
+name = "soul_thir"
+version = "0.1.0"
+dependencies = [
+ "hir_model",
+ "parser_models",
+ "soul_typed_context",
+ "soul_utils",
+ "thir_model",
 ]
 
 [[package]]
@@ -193,6 +206,16 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "thir_model"
+version = "0.1.0"
+dependencies = [
+ "hir_model",
+ "parser_models",
+ "serde",
+ "soul_utils",
 ]
 
 [[package]]

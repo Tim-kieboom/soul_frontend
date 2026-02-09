@@ -1,7 +1,7 @@
 use parser_models::{AbstractSyntaxTree, ast::Block};
 #[cfg(debug_assertions)]
 use soul_tokenizer::Token;
-use soul_tokenizer::{TokenKind, TokenStream};
+use soul_tokenizer::{TokenStream};
 use soul_utils::{sementic_level::SementicFault, soul_names::TypeModifier};
 
 mod parse_expression;
@@ -36,13 +36,14 @@ impl<'a> Parser<'a> {
     fn new(tokens: TokenStream<'a>) -> Self {
         Self {
             tokens,
-            errors: vec![],
+            faults: vec![],
         }
     }
 
     #[cfg(debug_assertions)]
     fn new(tokens: TokenStream<'a>) -> Self {
         use soul_utils::span::Span;
+        use soul_tokenizer::TokenKind;
 
         let debug = DebugViewer {
             current: Token::new(TokenKind::EndLine, Span::default_const()),

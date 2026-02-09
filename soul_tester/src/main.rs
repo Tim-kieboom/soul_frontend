@@ -1,21 +1,19 @@
 use std::{fs::File, io::Read};
 
 use anyhow::Result;
-use hir_model::{HirResponse, HirTree, HirType};
+use hir_model::{HirResponse, HirTree};
 use parser_models::{
-    AbstractSyntaxTree, ParseResponse,
-    scope::NodeId,
+    AbstractSyntaxTree,
     syntax_display::{DisplayKind, SyntaxDisplay},
 };
 use soul_hir::lower_to_hir;
 use soul_name_resolver::name_resolve;
 use soul_parser::parse;
+use soul_thir::lower_to_thir;
 use soul_tokenizer::{TokenStream, tokenize};
-use soul_typed_context::{TypedHirResponse, get_typed_context};
-use soul_utils::{
-    sementic_level::SementicFault,
-    vec_map::{VecMap, VecSet},
-};
+use soul_typed_context::{TypedContext, get_typed_context};
+use soul_utils::{sementic_level::SementicFault, vec_map::VecMap};
+use thir_model::{ThirResponse, ThirTree};
 
 use crate::{
     convert_soul_error::ToMessage, display_hir::display_hir, display_tokenizer::display_tokens,
@@ -31,12 +29,12 @@ static PATHS: &[u8] = include_bytes!("../paths.json");
 
 struct Ouput<'a> {
     hir: HirTree,
+    thir: ThirTree,
     source_file: &'a str,
     ast: AbstractSyntaxTree,
     faults: Vec<SementicFault>,
+    typed_context: TypedContext,
     token_stream: TokenStream<'a>,
-    auto_copys: VecSet<NodeId>,
-    typed_context: VecMap<NodeId, HirType>,
 }
 
 fn main() -> Result<()> {
@@ -51,27 +49,21 @@ fn main() -> Result<()> {
     let HirResponse { hir, faults } = lower_to_hir(&parse_response);
     parse_response.extend_faults(faults);
 
-    let TypedHirResponse {
-        typed_context,
-        auto_copys,
-        faults,
-    } = get_typed_context(&hir);
-    parse_response.extend_faults(faults);
+    let thir_response = get_typed_context(&hir);
+    let typed_context = thir_response.typed_context;
+    parse_response.extend_faults(thir_response.faults);
 
-    let ParseResponse {
-        faults,
-        tree: ast,
-        meta_data: _,
-    } = parse_response;
+    let ThirResponse { tree: thir, faults } = lower_to_thir(&hir, &typed_context);
+    parse_response.extend_faults(faults);
 
     let output = Ouput {
         hir,
-        ast,
-        faults,
+        thir,
         token_stream,
-        auto_copys,
+        ast: parse_response.tree,
         source_file: &source_file,
-        typed_context,
+        faults: parse_response.faults,
+        typed_context: typed_context,
     };
 
     handle_output(&paths, output)
@@ -82,6 +74,7 @@ fn handle_output<'a>(paths: &Paths, output: Ouput<'a>) -> Result<()> {
     let tokens_string = display_tokens(&paths, &output.source_file, output.token_stream)?;
     let typed_strings = output
         .typed_context
+        .types
         .entries()
         .map(|(id, ty)| (id, ty.display()))
         .collect::<VecMap<_, _>>();
@@ -95,7 +88,10 @@ fn handle_output<'a>(paths: &Paths, output: Ouput<'a>) -> Result<()> {
         ),
         (display_hir(&output.hir), "hir.soulc"),
         (
-            root.display(&DisplayKind::TypeContext(typed_strings, output.auto_copys)),
+            root.display(&DisplayKind::TypeContext(
+                typed_strings,
+                output.typed_context.auto_copys,
+            )),
             "ast_TypeContext.soulc",
         ),
     ])?;

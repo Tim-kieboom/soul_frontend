@@ -1,8 +1,8 @@
 use hir_model::{Statement, StatementKind};
 
-use crate::{TypedContext, model::InferType};
+use crate::{TypedContextAnalyser, model::InferType};
 
-impl<'a> TypedContext<'a> {
+impl<'a> TypedContextAnalyser<'a> {
     pub(crate) fn infer_statement(&mut self, statement: &Statement) -> Option<InferType> {
         match &statement.node {
             StatementKind::Import(_) => todo!("impl infer import"),

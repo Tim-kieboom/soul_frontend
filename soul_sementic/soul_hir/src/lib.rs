@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use hir_model::{self as hir, ExpressionId, HirResponse};
+use hir_model::{self as hir, ExpressionId, HirResponse, LocalDefId};
 use parser_models::{
     ParseResponse,
     scope::NodeId,
@@ -81,6 +81,12 @@ impl HirLowerer {
         self.module.expressions.insert(id, entry);
     }
 
+    fn push_local(&mut self, name: String, owner: NodeId) {
+        let scope = &mut self.module.scopes[self.current_scope];
+        let local_id = scope.locals.len() as u32;
+        scope.locals.insert(name, LocalDefId{ owner, local_id });
+    }
+
     fn push_scope(&mut self) -> hir::ScopeId {
         let scope_id = self.module.next_scope_id;
         self.module.next_scope_id.increment();
@@ -107,13 +113,13 @@ impl HirLowerer {
     }
 
     /// logs error if Option<NodeId> == None, just return same value
-    fn expect_node_id(&mut self, id: Option<NodeId>, span: Span) -> Option<NodeId> {
+    fn expect_node_id(&mut self, id: Option<NodeId>, _span: Span) -> Option<NodeId> {
 
         if id.is_none() {
 
             #[cfg(debug_assertions)]
             self.log_error(
-                soul_error_internal!("AbstractSyntaxTree Node does not have NodeId", Some(span))
+                soul_error_internal!("AbstractSyntaxTree Node does not have NodeId", Some(_span))
             );
         }
 

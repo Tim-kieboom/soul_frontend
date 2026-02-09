@@ -1,13 +1,9 @@
-union MaybeInit<T> {
-    Init(T),
-    Uninit,
-}
-
 class List<T, Mem = Malloc> 
 where
     Mem: Allocator
 {
-    mut buffer: [*]MaybeInit<T> = []
+    literal INCREASE_FACTOR: f64 = 2.0
+    mut buffer: [*]?T = []
     mut len: uint = 0
 
     This(capacity: uint = 0) {
@@ -18,13 +14,13 @@ where
         TryFromArray(array).catch{Panic}        
     }
 
-    TryFromArray(array: [_]T): Res<This> {
+    TryFromArray(array: [_]T): Err<This> {
         mut self = TryNew(array.Len()).pass
         self.ExtendArray(array).pass
         return self
     }
 
-    TryNew(capacity: uint): Res<This> {
+    TryNew(capacity: uint): Err<This> {
         mut self = This{..}
         self.Reserve(capacity).pass
         return self
@@ -38,45 +34,45 @@ where
         return buffer.Len()
     }
 
-    ExtendArray(&this, array: [_]T): Res {
+    ExtendArray(&this, array: [_]T): Err {
         ReserveAtLeast(array.Len()).pass
-        for el in array {
-            Push(el)
+        for value in array {
+            Push(value)
         }
     }
 
-    Push(&this, el: T) {
-        TryPush(el).catch{Panic}
+    Push(&this, value: T) {
+        TryPush(value).catch{Panic}
     }
 
-    TryPush(&this, el: T): Res {
+    TryPush(&this, value: T): Err {
         if len+1 > Cap() {
             grow().pass
         }
 
-        buffer[len++].pass = MaybeInit.Init(el)
+        buffer[len++].pass = value
     }
 
     Pop(&this): ?T {
         TryPop().catch{Panic}
     }
 
-    TryPop(&this): Res<?T> {
+    TryPop(&this): Err<?T> {
         if len == 0 {
             return null
         }
 
-        mut temp = MaybeInit.Uninit
+        mut temp = null
         Swap(&buffer[--len].pass, &temp)
 
         return temp ?? error.@str("Pop element is somehow Uninit")
     }
 
-    Reserve(&this, toCapacity: uint): Res {
-        import std::mem::Swap;
+    Reserve(&this, toCapacity: uint): Err {
+        import std::mem::Swap
 
         old := buffer
-        buffer = new<Mem>:[for toCapacity => MaybeInit<T>.Uninit].pass
+        buffer = new<Mem>:[for toCapacity => null].pass
 
         minLen := len.min(toCapacity)
         for i in 0..minLen {
@@ -86,11 +82,11 @@ where
         buffer = tempPtr
     }
 
-    Resize(&this, toCapacity: uint, default: T): Res {
-        import std::mem::Swap;
-        
+    Resize(&this, toCapacity: uint, default: T): Err {
+        import std::mem::Swap
+
         old := buffer
-        buffer = new<Mem>:[for toCapacity => MaybeInit<T>.Init(default)].pass
+        buffer = new<Mem>:[for toCapacity => default.copy].pass
 
         minLen := len.min(toCapacity)
         for i in 0..minLen {
@@ -100,31 +96,31 @@ where
         buffer = tempPtr
     }
 
-    ReserveAtLeast(len: uint): Res {
-        capNeeded := len + Len()
-        while Cap() < capNeeded {
-            grow().pass
+    ReserveAtLeast(len: uint): Err {
+        mut capReserve := f64(Cap().Min(1))
+        capNeeded := f64(len + Len())
+        while capReserve < capNeeded {
+            capReserve = capReserve * INCREASE_FACTOR
         }
+
+        return Reserve(uint(capReserve))
     }
 
-    grow(): Res {
-        newCap := match Cap() {
-            0 => 1,
-            cap => cap * 2
-        }
-
-        return Reserve(newCap)
+    grow(): Err {
+        oldCap := f64(Cap().Min(1))
+        cap := uint(oldCap * INCREASE_FACTOR)
+        return Reserve(cap)
     }
 
     impl OpuaqeIndex<T> {
-        index(this, index: uint): Res<T> {
+        index(mut this, index: uint): Err<&T, OutOfBounds> {
             use core::err::OutOfBounds;
             
             if index < len {
                 return error.OutOfBounds(len, index)
             }
 
-            return buffer[index]
+            return &buffer[index]
         }
     }
 }

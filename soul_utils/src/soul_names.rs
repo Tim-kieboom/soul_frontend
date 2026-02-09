@@ -168,6 +168,7 @@ define_str_enum!(
         Null => "null", 0,
 
         As => "as", 0,
+        New => "new", 0,
         Use => "use", 0,
         Dyn => "dyn", 0,
         Impl => "impl", 0,

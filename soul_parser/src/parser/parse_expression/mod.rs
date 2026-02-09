@@ -228,6 +228,13 @@ impl<'a> Parser<'a> {
         let peek = self.peek();
         Ok(match &self.token().kind {
             &COLON if peek.kind == SQUARE_OPEN => {
+                if ident.as_str() == KeyWord::New.as_str() {
+                    return Err(soul_error_internal!(
+                        "heap array alloc not yet impl",
+                        Some(ident.get_span())
+                    ));
+                }
+                
                 return Err(soul_error_internal!(
                     "collectionType array not yet impl",
                     Some(ident.get_span())

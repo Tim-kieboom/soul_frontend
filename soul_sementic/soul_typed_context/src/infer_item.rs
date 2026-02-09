@@ -4,9 +4,9 @@ use soul_utils::{
     span::Span,
 };
 
-use crate::{TypedContext, model::InferType, utils::none_ty};
+use crate::{TypedContextAnalyser, model::InferType, utils::none_ty};
 
-impl<'a> TypedContext<'a> {
+impl<'a> TypedContextAnalyser<'a> {
     pub(crate) fn infer_item(&mut self, item: &Item) {
         match &item.node {
             ItemKind::Function(function) => self.infer_function(function),

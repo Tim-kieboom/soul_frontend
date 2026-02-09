@@ -164,7 +164,6 @@ impl SyntaxDisplay for ExpressionKind {
                 expression,
             } => {
                 try_display_infered_type(sb, kind, *id);
-                sb.push_str("/*ref*/");
                 if *is_mutable {
                     sb.push_str(TypeWrapper::MutRef.as_str());
                 } else {
