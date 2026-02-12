@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+enum_variant_name_const = "0.1.1"
 itertools = "0.14.0"
 serde = { version = "1.0.228", features = ["derive"] }
 soul_utils = {path = "../../soul_utils"}

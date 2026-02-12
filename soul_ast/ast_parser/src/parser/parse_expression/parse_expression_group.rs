@@ -1,4 +1,4 @@
-use ast::ast::{Array, SoulType};
+use ast::{Array, SoulType};
 use soul_utils::{error::SoulResult, span::Spanned, try_result::TryError};
 
 use crate::parser::{
@@ -6,7 +6,7 @@ use crate::parser::{
     parse_utils::{COLON, COMMA, SQUARE_CLOSE, SQUARE_OPEN},
 };
 
-impl<'a> Parser<'a> {
+impl<'a, 'f> Parser<'a, 'f> {
     pub fn parse_array(&mut self, ty: Option<SoulType>) -> SoulResult<Spanned<Array>> {
         let start_span = self.token().span;
         self.expect(&SQUARE_OPEN)?;

@@ -1,5 +1,5 @@
-use crate::{Block, ExpressionId, FunctionId, LocalId, Place, TypeId};
-use ast::ast::{BinaryOperator, Literal, UnaryOperator};
+use crate::{BlockId, ExpressionId, FunctionId, LocalId, Place, TypeId};
+use ast::{BinaryOperator, Literal, UnaryOperator};
 
 /// A typed HIR expression.
 ///
@@ -19,7 +19,10 @@ pub struct Expression {
 /// and their source locations are stored externally in the `SpanMap`.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum ExpressionKind {
-    // --- Values ---
+    // --- Values --- 
+    /// `null` value
+    Null,
+    
     /// A literal value (integer, float, string, etc.).
     Literal(Literal),
 
@@ -44,6 +47,8 @@ pub enum ExpressionKind {
     /// Dereferences a pointer or reference expression.
     DeRef(ExpressionId),
 
+    InnerRawStackArray{ty: TypeId, len: ExpressionId},
+
     // --- Operators ---
     /// A unary operation.
     Unary {
@@ -64,18 +69,20 @@ pub enum ExpressionKind {
     /// The expression evaluates the condition and executes either
     /// the `then_block` or the optional `else_block`.
     If {
-        cond: ExpressionId,
-        then_block: Block,
-        else_block: Option<Block>,
+        condition: ExpressionId,
+        then_block: BlockId,
+        else_block: Option<BlockId>,
     },
 
     /// A `while` loop expression.
     ///
     /// If `cond` is `None`, the loop is infinite.
     While {
-        cond: Option<ExpressionId>,
-        body: Block,
+        condition: Option<ExpressionId>,
+        body: BlockId,
     },
+
+    Block(BlockId),
 
     // --- Calls ---
     /// A function or method call.

@@ -4,3 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+ast = { version = "0.1.0", path = "../../soul_ast/ast_model" }
+enum_variant_name_const = "0.1.1"
+hir = { version = "0.1.0", path = "../hir_model" }
+soul_utils = { version = "0.1.0", path = "../../soul_utils" }

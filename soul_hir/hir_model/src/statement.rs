@@ -1,4 +1,4 @@
-use crate::{Expression, Place, Variable};
+use crate::{ExpressionId, Place, Variable};
 
 /// A HIR statement.
 ///
@@ -10,23 +10,26 @@ pub enum Statement {
     Variable(Variable),
 
     /// Assignment to a place.
-    Assign {
-        place: Place,
-        value: Expression,
-    },
+    Assign(Assign),
 
     /// Standalone expression statement.
-    Expression(Expression),
+    Expression{value: ExpressionId, ends_semicolon: bool},
 
     /// Fall-through statement with an optional value.
-    Fall(Option<Expression>),
+    Fall(Option<ExpressionId>),
 
     /// Breaks out of the current loop, optionally yielding a value.
-    Break(Option<Expression>),
+    Break(Option<ExpressionId>),
 
     /// Returns from the current function, optionally yielding a value.
-    Return(Option<Expression>),
+    Return(Option<ExpressionId>),
 
     /// Continues execution of the current loop.
     Continue,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Assign {
+    pub place: Place,
+    pub value: ExpressionId,
 }

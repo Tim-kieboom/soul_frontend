@@ -1,4 +1,4 @@
-use ast::{ast::{Block, Function, Statement, StatementKind}, scope::{NodeId}};
+use ast::{Block, Function, Statement, StatementKind, scope::{NodeId}};
 use soul_utils::{Ident, error::{SoulError, SoulErrorKind}, span::Span};
 
 use crate::NameResolver;
@@ -26,7 +26,7 @@ impl<'a> NameResolver<'a> {
             StatementKind::Function(function) => {
                 self.resolves_function(function);
             }
-            StatementKind::Expression{id:_, expression} => self.resolve_expression(expression),
+            StatementKind::Expression{id:_, expression, ends_semicolon:_} => self.resolve_expression(expression),
             StatementKind::Import(_) => (), // maybe later track imports
         }
     }

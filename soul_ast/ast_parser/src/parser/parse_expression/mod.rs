@@ -1,4 +1,4 @@
-use ast::ast::{
+use ast::{
     Array, AsTypeCast, BinaryOperator, BinaryOperatorKind, Expression, ExpressionHelpers,
     ExpressionKind, Literal, UnaryOperator, UnaryOperatorKind,
 };
@@ -23,7 +23,7 @@ use crate::parser::{
 mod parse_condition;
 mod parse_expression_group;
 
-impl<'a> Parser<'a> {
+impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_expression(&mut self, end_tokens: &[TokenKind]) -> SoulResult<Expression> {
         self.pratt_parse_expression(0, end_tokens)
     }

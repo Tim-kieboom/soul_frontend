@@ -1,3 +1,4 @@
+use enum_variant_name_const::EnumVariantNameConst;
 use soul_utils::soul_names::TypeModifier;
 use soul_utils::span::{ItemMetaData, Span};
 use soul_utils::{Ident, soul_import_path::SoulImportPath, span::Spanned};
@@ -16,13 +17,13 @@ pub struct Statement {
 ///
 /// Each variant corresponds to a syntactic construct, ranging from expressions
 /// to type definitions and control structures.
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, EnumVariantNameConst)]
 pub enum StatementKind {
     /// Imported paths
     Import(Import),
 
     /// A standalone expression.
-    Expression{id: Option<NodeId>, expression: Expression},
+    Expression{id: Option<NodeId>, expression: Expression, ends_semicolon: bool},
 
     /// A variable declaration.
     Variable(Variable),
@@ -37,7 +38,25 @@ pub enum StatementKind {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Import {
     pub id: Option<NodeId>,
-    pub paths: Vec<SoulImportPath>
+    pub paths: Vec<ImportPath>
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ImportPath {
+    pub module: SoulImportPath,
+    pub kind: ImportKind,
+}
+impl ImportPath {
+    pub fn new() -> Self {
+        Self { module: SoulImportPath::new(), kind: ImportKind::This }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum ImportKind {
+    All,
+    This,
+    Items(Vec<Ident>),
 }
 
 /// A function definition with a signature and body block.
@@ -133,30 +152,31 @@ impl Statement {
         Self { node, span, meta_data }
     }
 
-    pub fn new_block(block: Block, span: Span) -> Self {
+    pub fn new_block(block: Block, span: Span, ends_semicolon: bool) -> Self {
         let expression = Expression::new(
             ExpressionKind::Block(block), 
             span,
         );
 
         Self::new(
-            StatementKind::Expression{id: None, expression}, 
+            StatementKind::Expression{id: None, expression, ends_semicolon}, 
             span,
         )
     }
     
-    pub fn from_expression(expression: Expression) -> Self {
-        let Spanned{node, span} = expression;
+    pub fn from_expression(expression: Expression, ends_semicolon: bool) -> Self {
+        let Expression{node, span} = expression;
         let expression = Expression::new(node, span);
-        Self::new(StatementKind::Expression{id: None, expression}, span)
+        Self::new(StatementKind::Expression{id: None, expression, ends_semicolon}, span)
     }
     
-    pub fn from_function_call(function: Spanned<FunctionCall>) -> Self {
+    pub fn from_function_call(function: Spanned<FunctionCall>, ends_semicolon: bool) -> Self {
         let Spanned{node, span} = function;
         Self::new(
             StatementKind::Expression{
                 id: None, 
-                expression: Expression::new(ExpressionKind::FunctionCall(node), span), 
+                expression: Expression::new(ExpressionKind::FunctionCall(node), span),
+                ends_semicolon, 
             },
             span,
         )

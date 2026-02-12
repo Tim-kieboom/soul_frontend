@@ -23,10 +23,25 @@ impl SyntaxDisplay for StatementKind {
                     sb.push('\n');
                     sb.push_str(&prefix);
                     sb.push_str("Path >> ");
-                    sb.push_str(path.as_str());
+                    sb.push_str(path.module.as_str());
+                    match &path.kind {
+                        crate::ImportKind::All => sb.push('*'),
+                        crate::ImportKind::This => sb.push_str("::this"),
+                        crate::ImportKind::Items(items) => {
+                            sb.push('[');
+                            let last_index = items.len().saturating_sub(1);
+                            for (i, item) in items.iter().enumerate() {
+                                sb.push_str(item.as_str());
+                                if i != last_index {
+                                    sb.push_str(", ");
+                                }
+                            }
+                            sb.push(']');
+                        }
+                    }
                 }
             }
-            StatementKind::Expression{id, expression} => {
+            StatementKind::Expression{id, expression, ends_semicolon} => {
                 sb.push_str(&prefix);
                 try_display_node_id(sb, kind, *id);
                 let tag = if matches!(expression.node, ExpressionKind::Block(_)) {
@@ -36,6 +51,9 @@ impl SyntaxDisplay for StatementKind {
                 };
                 sb.push_str(tag);
                 expression.node.inner_display(sb, kind, tab, is_last);
+                if *ends_semicolon {
+                    sb.push(';');
+                }
             }
             StatementKind::Variable(var) => {
                 sb.push_str(&prefix);

@@ -8,7 +8,18 @@ use crate::{
 };
 
 /// An expression in the Soul language, wrapped with source location information.
-pub type Expression = Spanned<ExpressionKind>;
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Expression {
+    pub node: ExpressionKind,
+    pub span: Span,
+}
+impl Expression {
+    pub fn new(node: ExpressionKind, span: Span) -> Self {
+        Self { node, span }
+    }
+
+}
+
 /// A boxed expression (used to avoid deep recursion in the AST).
 pub type BoxExpression = Box<Expression>;
 
@@ -239,13 +250,13 @@ impl ExpressionHelpers for Expression {
     }
     
     fn new_ref(mutable: bool, expression: Expression, new_span: Span) -> Expression {
-        let Spanned { node, span } = expression;
+        let Expression { node, span } = expression;
         let new_ref = ExpressionKind::Ref { id: None, is_mutable:mutable, expression: Box::new(Expression::new(node, span)) };
         Expression::new(new_ref, new_span)
     }
 
     fn new_deref(expression: Expression, new_span: Span) -> Expression {
-        let Spanned { node, span } = expression;
+        let Expression { node, span } = expression;
         let deref = ExpressionKind::Deref { id: None, inner: Box::new(Expression::new(node, span)) };
         Expression::new(deref, new_span)
     }

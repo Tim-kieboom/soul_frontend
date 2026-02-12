@@ -1,15 +1,16 @@
-use ast::{ParseResponse, meta_data::AstMetadata};
+use ast::{DeclareStore, ParseResponse, meta_data::AstMetadata};
 use soul_tokenizer::TokenStream;
+use soul_utils::sementic_level::SementicFault;
 
 use crate::parser::Parser;
 mod parser;
 
-pub fn parse<'a>(tokens: TokenStream<'a>) -> ParseResponse {
-    let (tree, faults) = Parser::parse(tokens);
+pub fn parse<'a, 'f>(tokens: TokenStream<'a>, faults: &'f mut Vec<SementicFault>) -> ParseResponse {
+    let tree = Parser::parse(tokens, faults);
 
     ParseResponse {
         tree,
-        faults,
+        store: DeclareStore::new(),
         meta_data: AstMetadata::new(),
     }
 }

@@ -41,61 +41,159 @@ define_str_enum!(
     #[derive(Hash)]
     pub enum InternalPrimitiveTypes {
         /// default-size character type
-        Char => "char",
+        Char => "char", 0,
         /// 8-bit character type
-        Char8 => "char8",
+        Char8 => "char8", 8,
         /// 16-bit character type
-        Char16 => "char16",
+        Char16 => "char16", 16,
         /// 32-bit character type
-        Char32 => "char32",
+        Char32 => "char32", 32,
         /// 64-bit character type
-        Char64 => "char64",
+        Char64 => "char64", 64,
 
         /// empty type (also known as `void` in c like languages)
-        None => "none",
+        None => "none", 0,
         /// boolean (`true` or `false`) type
-        Boolean => "bool",
+        Boolean => "bool", 8,
 
         /// undecided integer type
-        UntypedInt => "untypedInt",
+        UntypedInt => "untypedInt", 0,
         /// default-size integer type
-        Int => "int",
+        Int => "int", 0,
         /// 8-bit integer type
-        Int8 => "i8",
+        Int8 => "i8", 8,
         /// 16-bit integer type
-        Int16 => "i16",
+        Int16 => "i16", 16,
         /// 32-bit integer type
-        Int32 => "i32",
+        Int32 => "i32", 32,
         /// 64-bit integer type
-        Int64 => "i64",
+        Int64 => "i64", 64,
         /// 128-bit integer type
-        Int128 => "i128",
+        Int128 => "i128", 128,
 
         /// undecided unsigned integer type
-        UntypedUint => "untypedUint",
+        UntypedUint => "untypedUint", 0,
         /// default-size unsigned integer type
-        Uint => "uint",
+        Uint => "uint", 0,
         /// 8-bit unsigned integer type
-        Uint8 => "u8",
+        Uint8 => "u8", 8,
         /// 16-bit unsigned integer type
-        Uint16 => "u16",
+        Uint16 => "u16", 16,
         /// 32-bit unsigned integer type
-        Uint32 => "u32",
+        Uint32 => "u32", 32,
         /// 64-bit unsigned integer type
-        Uint64 => "u64",
+        Uint64 => "u64", 64,
         /// 128-bit unsigned integer type
-        Uint128 => "u128",
+        Uint128 => "u128", 128,
 
         /// undecided floating-point type
-        UntypedFloat => "untypedFloat",
+        UntypedFloat => "untypedFloat", 0,
         /// 16-bit floating-point type
-        Float16 => "f16",
+        Float16 => "f16", 16,
         /// 32-bit floating-point type
-        Float32 => "f32",
+        Float32 => "f32", 32,
         /// 64-bit floating-point type
-        Float64 => "f64",
+        Float64 => "f64", 64,
     }
 );
+impl InternalPrimitiveTypes {
+    pub fn is_numeric(&self) -> bool {
+        match self {
+            InternalPrimitiveTypes::UntypedInt
+            | InternalPrimitiveTypes::Int
+            | InternalPrimitiveTypes::Int8
+            | InternalPrimitiveTypes::Int16
+            | InternalPrimitiveTypes::Int32
+            | InternalPrimitiveTypes::Int64
+            | InternalPrimitiveTypes::Int128
+            | InternalPrimitiveTypes::UntypedUint
+            | InternalPrimitiveTypes::Uint
+            | InternalPrimitiveTypes::Uint8
+            | InternalPrimitiveTypes::Uint16
+            | InternalPrimitiveTypes::Uint32
+            | InternalPrimitiveTypes::Uint64
+            | InternalPrimitiveTypes::Uint128
+            | InternalPrimitiveTypes::UntypedFloat
+            | InternalPrimitiveTypes::Float16
+            | InternalPrimitiveTypes::Float32
+            | InternalPrimitiveTypes::Float64 => true,
+
+            _ => false,
+        }
+    }
+
+    pub fn is_fixed_point(&self) -> bool {
+        match self {
+            InternalPrimitiveTypes::UntypedInt
+            | InternalPrimitiveTypes::Int
+            | InternalPrimitiveTypes::Int8
+            | InternalPrimitiveTypes::Int16
+            | InternalPrimitiveTypes::Int32
+            | InternalPrimitiveTypes::Int64
+            | InternalPrimitiveTypes::Int128
+            | InternalPrimitiveTypes::UntypedUint
+            | InternalPrimitiveTypes::Uint
+            | InternalPrimitiveTypes::Uint8
+            | InternalPrimitiveTypes::Uint16
+            | InternalPrimitiveTypes::Uint32
+            | InternalPrimitiveTypes::Uint64
+            | InternalPrimitiveTypes::Uint128 => true,
+
+            _ => false,
+        }
+    }
+
+    pub fn is_float(&self) -> bool {
+        match self {
+            InternalPrimitiveTypes::UntypedFloat
+            | InternalPrimitiveTypes::Float16
+            | InternalPrimitiveTypes::Float32
+            | InternalPrimitiveTypes::Float64 => true,
+            
+            _ => false,
+        }
+    }
+
+    pub fn is_unsigned_interger(&self) -> bool {
+        match self {
+            InternalPrimitiveTypes::UntypedUint
+            | InternalPrimitiveTypes::Uint
+            | InternalPrimitiveTypes::Uint8
+            | InternalPrimitiveTypes::Uint16
+            | InternalPrimitiveTypes::Uint32
+            | InternalPrimitiveTypes::Uint64
+            | InternalPrimitiveTypes::Uint128 => true,
+            
+            _ => false,
+        }
+    }
+
+    pub fn is_signed_interger(&self) -> bool {
+        match self {
+            InternalPrimitiveTypes::UntypedInt
+            | InternalPrimitiveTypes::Int
+            | InternalPrimitiveTypes::Int8
+            | InternalPrimitiveTypes::Int16
+            | InternalPrimitiveTypes::Int32
+            | InternalPrimitiveTypes::Int64
+            | InternalPrimitiveTypes::Int128 => true,
+            
+            _ => false,
+        }
+    }
+
+    pub fn is_character(&self) -> bool {
+        match self {
+            InternalPrimitiveTypes::Char
+            | InternalPrimitiveTypes::Char8
+            | InternalPrimitiveTypes::Char16
+            | InternalPrimitiveTypes::Char32
+            | InternalPrimitiveTypes::Char64 => true,
+            
+            _ => false,
+        }
+    }
+}
 
 define_symbols!(
 

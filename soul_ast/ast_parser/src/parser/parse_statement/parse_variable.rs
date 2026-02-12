@@ -1,4 +1,4 @@
-use ast::ast::{Statement, VarTypeKind, Variable};
+use ast::{Statement, VarTypeKind, Variable};
 use soul_tokenizer::TokenKind;
 use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},
@@ -11,7 +11,7 @@ use crate::parser::{
     parse_utils::{ASSIGN, COLON, COLON_ASSIGN, STAMENT_END_TOKENS},
 };
 
-impl<'a> Parser<'a> {
+impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_variable(&mut self) -> SoulResult<Statement> {
         let name = self.try_bump_consume_ident()?;
         let name_span = name.span;

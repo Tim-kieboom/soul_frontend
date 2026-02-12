@@ -1,4 +1,4 @@
-use ast::ast::{
+use ast::{
     ArrayKind, ArrayType, FunctionKind, NamedTupleType, ReferenceType, SoulType, TypeKind,
 };
 use soul_tokenizer::{Number, TokenKind};
@@ -19,7 +19,7 @@ use crate::parser::{
     },
 };
 
-impl<'a> Parser<'a> {
+impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn try_parse_type(&mut self) -> TryResult<SoulType, SoulError> {
         let begin = self.current_position();
         let result = self.inner_parse_type();

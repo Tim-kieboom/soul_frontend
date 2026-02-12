@@ -1,8 +1,10 @@
-use ast::{AbstractSyntaxTree, ast::Block};
+use ast::{AbstractSyntaxTree, Block};
 #[cfg(debug_assertions)]
 use soul_tokenizer::Token;
-use soul_tokenizer::{TokenStream};
+use soul_tokenizer::{TokenKind, TokenStream};
 use soul_utils::{sementic_level::SementicFault, soul_names::TypeModifier};
+
+use crate::parser::parse_utils::SEMI_COLON;
 
 mod parse_expression;
 mod parse_function;
@@ -23,15 +25,15 @@ pub(crate) struct DebugViewer {
 /// Manages token consumption, error recovery, scope tracking, and debug
 /// information (debug builds only). Supports position save/restore for
 /// backtracking during parsing.
-#[derive(Debug, Clone)]
-pub(crate) struct Parser<'a> {
+#[derive(Debug)]
+pub(crate) struct Parser<'a, 'f> {
     #[cfg(debug_assertions)]
     debug: DebugViewer,
 
     tokens: TokenStream<'a>,
-    faults: Vec<SementicFault>,
+    faults: &'f mut Vec<SementicFault>,
 }
-impl<'a> Parser<'a> {
+impl<'a, 'f> Parser<'a, 'f> {
     #[cfg(not(debug_assertions))]
     fn new(tokens: TokenStream<'a>) -> Self {
         Self {
@@ -41,7 +43,7 @@ impl<'a> Parser<'a> {
     }
 
     #[cfg(debug_assertions)]
-    fn new(tokens: TokenStream<'a>) -> Self {
+    fn new(tokens: TokenStream<'a>, faults: &'f mut Vec<SementicFault>) -> Self {
         use soul_utils::span::Span;
         use soul_tokenizer::TokenKind;
 
@@ -53,26 +55,23 @@ impl<'a> Parser<'a> {
         Self {
             debug,
             tokens,
-            faults: vec![],
+            faults,
         }
     }
 
-    pub fn parse(tokens: TokenStream<'a>) -> (AbstractSyntaxTree, Vec<SementicFault>) {
-        let mut this = Self::new(tokens);
+    pub fn parse(tokens: TokenStream<'a>, faults: &'f mut Vec<SementicFault>) -> AbstractSyntaxTree {
+        let mut this = Self::new(tokens, faults);
         if let Err(err) = this.tokens.initialize() {
             this.add_error(err);
-            return (
-                AbstractSyntaxTree {
-                    root: Block {
-                        modifier: TypeModifier::Mut,
-                        statements: vec![],
-                        scope_id: None,
-                        node_id: None,
-                        span: this.token().span,
-                    },
+            return AbstractSyntaxTree {
+                root: Block {
+                    modifier: TypeModifier::Mut,
+                    statements: vec![],
+                    scope_id: None,
+                    node_id: None,
+                    span: this.token().span,
                 },
-                this.faults,
-            );
+            }
         }
 
         #[cfg(debug_assertions)]
@@ -82,17 +81,19 @@ impl<'a> Parser<'a> {
         }
 
         let statements = this.parse_global_statments();
-        (
-            AbstractSyntaxTree {
-                root: Block {
-                    statements,
-                    scope_id: None,
-                    modifier: TypeModifier::Mut,
-                    node_id: None,
-                    span: this.token().span,
-                },
+        AbstractSyntaxTree {
+            root: Block {
+                statements,
+                scope_id: None,
+                modifier: TypeModifier::Mut,
+                node_id: None,
+                span: this.token().span,
             },
-            this.faults,
-        )
+        }
+    }
+
+    /// checked if node is end of line and ends with a semicolon
+    fn ends_semicolon(&mut self) -> bool {
+        self.current_is(&SEMI_COLON) && self.peek().kind == TokenKind::EndLine
     }
 }

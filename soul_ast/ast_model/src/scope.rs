@@ -82,6 +82,10 @@ impl ScopeBuilder {
         self.current = index;
     }
 
+    pub fn get_scope(&self, scope_id: ScopeId) -> Option<&Scope> {
+        self.scopes.get(scope_id.index)
+    }
+
     pub fn current_scope_id(&self) -> ScopeId {
         ScopeId {
             index: self.current,

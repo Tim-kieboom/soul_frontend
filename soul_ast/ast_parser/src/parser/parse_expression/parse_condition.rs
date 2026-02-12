@@ -1,4 +1,4 @@
-use ast::ast::{ElseKind, Expression, ExpressionKind, If, IfArm, IfArmHelper, While};
+use ast::{ElseKind, Expression, ExpressionKind, If, IfArm, IfArmHelper, While};
 use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},
     soul_names::{KeyWord, TypeModifier},
@@ -14,7 +14,7 @@ const IF_STR: &str = KeyWord::If.as_str();
 const ELSE_STR: &str = KeyWord::Else.as_str();
 const WHILE_STR: &str = KeyWord::While.as_str();
 
-impl<'a> Parser<'a> {
+impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_if(&mut self) -> SoulResult<Expression> {
         let start_span = self.token().span;
         self.expect_ident(IF_STR)?;

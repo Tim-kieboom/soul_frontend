@@ -1,5 +1,7 @@
 use std::{marker::PhantomData, ops::{Index, IndexMut}};
 
+use serde::{Serialize, Serializer, ser::SerializeMap};
+
 /// A trait representing a type that can act as an index into a [`VecMap`].
 ///
 /// Implementers of this trait define how to create a new index from a raw `usize`
@@ -27,7 +29,7 @@ impl VecMapIndex for usize {
 /// by numeric-like types while maintaining the flexibility of a `HashMap`-like interface.
 ///
 /// Internally, the structure stores a `Vec<Option<T>>`, expanding as needed.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize)]
 pub struct VecMap<I: VecMapIndex, T> {
     pub vec: Vec<Option<T>>, 
     _marker: PhantomData<I>,
@@ -44,6 +46,10 @@ impl<I: VecMapIndex, T> VecMap<I, T> {
             _marker: PhantomData,
         }
     } 
+
+    pub const fn is_empty(&self) -> bool {
+        self.vec.is_empty()
+    }
 
     /// Creates a new [`VecMap`] with a given capacity of `cap`.
     ///
@@ -278,5 +284,22 @@ impl<I: VecMapIndex + Clone> VecSet<I> {
             this.insert(index);
         }
         this
+    }
+}
+
+impl<I, T> serde::Serialize for VecMap<I, T> 
+where    
+    I: Serialize + VecMapIndex,
+    T: Serialize,
+{
+
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where S: Serializer 
+    {
+        let mut map = serializer.serialize_map(Some(self.vec.len()))?;
+        for (idx, value) in self.entries() {
+            map.serialize_entry(&idx, value)?;
+        }
+        map.end()
     }
 }

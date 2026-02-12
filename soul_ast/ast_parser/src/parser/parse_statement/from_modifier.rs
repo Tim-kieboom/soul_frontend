@@ -1,8 +1,8 @@
 use crate::parser::{
     Parser,
-    parse_utils::{ARROW_LEFT, COLON, CURLY_OPEN, ROUND_OPEN, STAMENT_END_TOKENS},
+    parse_utils::{ARROW_LEFT, COLON, CURLY_OPEN, ROUND_OPEN, SEMI_COLON, STAMENT_END_TOKENS},
 };
-use ast::ast::{SoulType, Statement, VarTypeKind, Variable};
+use ast::{SoulType, Statement, VarTypeKind, Variable};
 use soul_tokenizer::TokenKind;
 use soul_utils::{
     Ident,
@@ -14,7 +14,7 @@ use soul_utils::{
 
 const ILIGAL_NAMES: &[&[&str]] = &[KeyWord::VALUES, TypeModifier::VALUES];
 
-impl<'a> Parser<'a> {
+impl<'a, 'f> Parser<'a, 'f> {
     pub(super) fn try_parse_from_modifier(
         &mut self,
         start_span: Span,
@@ -24,7 +24,7 @@ impl<'a> Parser<'a> {
 
         if self.current_is(&CURLY_OPEN) {
             let block = self.parse_block(modifier).try_err()?;
-            return TryOk(Statement::new_block(block, self.span_combine(start_span)));
+            return TryOk(Statement::new_block(block, self.span_combine(start_span), self.current_is(&SEMI_COLON)));
         }
 
         let name = match self.try_consume_name().try_err()? {

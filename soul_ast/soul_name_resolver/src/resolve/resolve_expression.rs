@@ -1,4 +1,4 @@
-use ast::ast::{Expression, ExpressionKind};
+use ast::{Expression, ExpressionKind};
 use soul_utils::error::{SoulError, SoulErrorKind};
 
 use crate::NameResolver;

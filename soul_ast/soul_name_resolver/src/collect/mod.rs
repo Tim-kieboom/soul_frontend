@@ -1,4 +1,4 @@
-use ast::{ast::{Block, NamedTupleType}, scope::{NodeId, Scope, ScopeId, ScopeValueEntry, ScopeValueEntryKind, ScopeValueKind}};
+use ast::{Block, NamedTupleType, VarTypeKind, scope::{NodeId, Scope, ScopeId, ScopeValueEntry, ScopeValueEntryKind, ScopeValueKind}};
 
 use crate::NameResolver;
 mod collect_statement;
@@ -25,9 +25,11 @@ impl<'a> NameResolver<'a> {
 
     fn declare_parameters(&mut self, types: &mut NamedTupleType) {
 
-        for (name, _ty, node_id) in types {
+        for (name, ty, node_id) in types {
             let id = self.alloc_id();
             *node_id = Some(id);
+
+            self.store.insert_variable_type(id, VarTypeKind::NonInveredType(ty.clone()));
 
             self.insert_value(
                 name.as_str(),

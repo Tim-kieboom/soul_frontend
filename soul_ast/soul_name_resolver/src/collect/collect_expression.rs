@@ -1,4 +1,4 @@
-use ast::ast::{ElseKind, Expression, ExpressionKind, If};
+use ast::{ElseKind, Expression, ExpressionKind, If};
 use soul_utils::error::{SoulError, SoulErrorKind};
 use crate::NameResolver;
 
@@ -99,7 +99,8 @@ impl<'a> NameResolver<'a> {
         self.collect_block(&mut r#if.block);
 
         let mut current = r#if.else_branchs.as_mut();
-            while let Some(branch) = current {
+
+        while let Some(branch) = current {
             match &mut branch.node {
                 ElseKind::Else(el) => {
                     self.collect_block(&mut el.node);
@@ -108,7 +109,7 @@ impl<'a> NameResolver<'a> {
                 ElseKind::ElseIf(el) => {
                     self.collect_expression(&mut el.node.condition);
                     self.collect_block(&mut el.node.block);
-                    debug_assert!(el.node.else_branchs.is_none());
+                    debug_assert!(el.node.else_branchs.is_some());
                     current = el.node.else_branchs.as_mut();
                 }
             }

@@ -43,7 +43,7 @@ pub struct ArrayType {
     pub kind: ArrayKind,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ArrayKind {
     /// stackArray `[2]int` set size same as C stackArray 
     StackArray(u64),
@@ -56,11 +56,19 @@ pub enum ArrayKind {
 }
 impl ArrayKind {
     pub fn to_string(&self) -> String {
+        let mut sb = String::new();
+        self.write_to_string(&mut sb).expect("expect no format errors");
+        sb
+    }
+
+    pub fn write_to_string(&self, sb: &mut String) -> std::fmt::Result {
+        use std::fmt::Write;
+
         match self {
-            ArrayKind::StackArray(num) => format!("[{num}]"),
-            ArrayKind::HeapArray => "[*]".to_string(),
-            ArrayKind::MutSlice => "[&]".to_string(),
-            ArrayKind::ConstSlice => "[@]".to_string(),
+            ArrayKind::StackArray(num) => write!(sb, "[{num}]"),
+            ArrayKind::MutSlice => write!(sb, "[&]"),
+            ArrayKind::HeapArray => write!(sb, "[*]"),
+            ArrayKind::ConstSlice => write!(sb, "[@]"),
         }
     }
 }

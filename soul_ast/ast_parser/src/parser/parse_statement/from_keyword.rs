@@ -1,4 +1,4 @@
-use ast::ast::{
+use ast::{
     Expression, ExpressionKind, ReturnKind, ReturnLike, Statement,
 };
 use soul_utils::{
@@ -9,9 +9,9 @@ use soul_utils::{
     try_result::{ResultTryErr, TryErr, TryOk, TryResult},
 };
 
-use crate::parser::{Parser, parse_utils::STAMENT_END_TOKENS};
+use crate::parser::{Parser, parse_utils::{SEMI_COLON, STAMENT_END_TOKENS}};
 
-impl<'a> Parser<'a> {
+impl<'a, 'f> Parser<'a, 'f> {
     pub(super) fn try_parse_from_keyword(
         &mut self,
         start_span: Span,
@@ -24,7 +24,8 @@ impl<'a> Parser<'a> {
             | KeyWord::Else 
             | KeyWord::False
             | KeyWord::While => {
-                Statement::from_expression(self.parse_expression(STAMENT_END_TOKENS).try_err()?)
+                let value = self.parse_expression(STAMENT_END_TOKENS).try_err()?;
+                Statement::from_expression(value, self.current_is(&SEMI_COLON))
             }
 
             KeyWord::Break 
@@ -46,10 +47,13 @@ impl<'a> Parser<'a> {
                     kind,
                     id: None,
                 };
-                Statement::from_expression(Expression::new(
-                    ExpressionKind::ReturnLike(return_like),
-                    self.span_combine(start_span),
-                ))
+                Statement::from_expression(
+                    Expression::new(
+                        ExpressionKind::ReturnLike(return_like),
+                        self.span_combine(start_span),
+                    ), 
+                    self.current_is(&SEMI_COLON),
+                )
             }
             KeyWord::Import => self.parse_import().try_err()?,
 

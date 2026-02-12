@@ -37,7 +37,7 @@ pub const STAMENT_END_TOKENS: &[TokenKind] = &[
     TokenKind::Symbol(SymbolKind::SemiColon),
 ];
 
-impl<'a> Parser<'a> {
+impl<'a, 'f> Parser<'a, 'f> {
     /// Returns reference to current token.
     pub(super) fn token(&self) -> &Token {
         self.tokens.current()

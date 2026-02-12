@@ -12,3 +12,5 @@ soul_name_resolver = { version = "0.1.0", path = "../soul_ast/soul_name_resolver
 ast_parser = { version = "0.1.0", path = "../soul_ast/ast_parser" }
 ast = { version = "0.1.0", path = "../soul_ast/ast_model" }
 soul_tokenizer = { version = "0.1.0", path = "../soul_tokenizer" }
+hir_parser = { version = "0.1.0", path = "../soul_hir/hir_parser" }
+hir = { version = "0.1.0", path = "../soul_hir/hir_model" }

@@ -1,12 +1,9 @@
-use ast::ast::{Block, ExpressionKind, Statement};
+use ast::{Block, Statement, StatementKind};
 use soul_tokenizer::TokenKind;
 use soul_utils::{
-    error::{SoulError, SoulErrorKind, SoulResult},
-    soul_names::{KeyWord, TypeModifier},
-    span::Span,
-    try_result::{
+    error::{SoulError, SoulErrorKind, SoulResult}, soul_names::{KeyWord, TypeModifier}, span::Span, symbool_kind::SymbolKind, try_result::{
         ResultTryErr, ResultTryNotValue, TryErr, TryError, TryNotValue, TryOk, TryResult,
-    },
+    }
 };
 
 use crate::parser::{
@@ -23,7 +20,7 @@ mod parse_assign;
 mod parse_import;
 mod parse_variable;
 
-impl<'a> Parser<'a> {
+impl<'a, 'f> Parser<'a,'f> {
     pub(crate) fn parse_global_statments(&mut self) -> Vec<Statement> {
         self.skip_end_lines();
         let mut global_statements = vec![];
@@ -78,6 +75,18 @@ impl<'a> Parser<'a> {
     }
 
     pub(crate) fn parse_statement(&mut self) -> SoulResult<Statement> {
+        let statement = self.inner_parse_statement()?;
+        if !matches!(statement.node, StatementKind::Expression { .. }) && self.ends_semicolon() {
+            self.add_error(SoulError::new(
+                format!("'{}' at the end of a line can only be used for expressions at the end of a block", SymbolKind::SemiColon.as_str()),
+                SoulErrorKind::InvalidEscapeSequence,
+                Some(self.token().span),
+            ));
+        }
+        Ok(statement)
+    }
+
+    fn inner_parse_statement(&mut self) -> SoulResult<Statement> {
         let begin_position = self.current_position();
         let start_span = self.token().span;
 
@@ -90,6 +99,7 @@ impl<'a> Parser<'a> {
             &CURLY_OPEN => TryOk(Statement::new_block(
                 self.parse_block(TypeModifier::Mut)?,
                 self.span_combine(start_span),
+                self.ends_semicolon(),
             )),
             &STAR => {
                 return self.parse_assign(start_span)
@@ -112,30 +122,7 @@ impl<'a> Parser<'a> {
 
         match self.parse_expression(STAMENT_END_TOKENS) {
             Ok(val) => {
-                match &val.node {
-                    ExpressionKind::Null(_)
-                    | ExpressionKind::Index(_)
-                    | ExpressionKind::Unary(_)
-                    | ExpressionKind::Array(_)
-                    | ExpressionKind::Binary(_)
-                    | ExpressionKind::Default(_)
-                    | ExpressionKind::Literal(_)
-                    | ExpressionKind::Ref { .. }
-                    | ExpressionKind::Deref { .. }
-                    | ExpressionKind::ExternalExpression(_) => {
-                        self.go_to(begin_position);
-                        Err(SoulError::new(
-                            format!(
-                                "{} expression can not be used as statement", 
-                                val.node.variant_str(),
-                            ),
-                            SoulErrorKind::InvalidContext,
-                            Some(start_span),
-                        ))
-                    }
-
-                    _ => Ok(Statement::from_expression(val))
-                }
+               Ok(Statement::from_expression(val, self.ends_semicolon()))
             }
             Err(err) => {
                 self.go_to(begin_position);

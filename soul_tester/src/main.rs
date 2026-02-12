@@ -5,23 +5,26 @@ use ast::{
     AbstractSyntaxTree,
     syntax_display::{DisplayKind, SyntaxDisplay},
 };
-use soul_name_resolver::name_resolve;
 use ast_parser::parse;
+use display_hir::display_hir;
+use hir::HirTree;
+use hir_parser::hir_lower;
+use paths::Paths;
+use soul_name_resolver::name_resolve;
 use soul_tokenizer::{TokenStream, tokenize};
-use soul_utils::{sementic_level::SementicFault};
+use soul_utils::sementic_level::SementicFault;
 
-use crate::{
-    convert_soul_error::ToMessage, display_tokenizer::display_tokens,
-    paths::Paths,
-};
+use crate::{convert_soul_error::ToMessage, display_tokenizer::display_tokens};
 
 mod convert_soul_error;
+mod display_hir;
 mod display_tokenizer;
 mod paths;
 
 static PATHS: &[u8] = include_bytes!("../paths.json");
 
 struct Ouput<'a> {
+    hir: HirTree,
     source_file: &'a str,
     ast: AbstractSyntaxTree,
     faults: Vec<SementicFault>,
@@ -34,14 +37,18 @@ fn main() -> Result<()> {
 
     let token_stream = tokenize(&source_file);
 
-    let mut parse_response = parse(token_stream.clone());
-    name_resolve(&mut parse_response);
+    let mut faults = vec![];
+    let mut parse_response = parse(token_stream.clone(), &mut faults);
+    name_resolve(&mut parse_response, &mut faults);
+
+    let hir = hir_lower(&parse_response, &mut faults);
 
     let output = Ouput {
+        hir,
+        faults,
         token_stream,
         ast: parse_response.tree,
         source_file: &source_file,
-        faults: parse_response.faults,
     };
 
     handle_output(&paths, output)
@@ -56,16 +63,9 @@ fn handle_output<'a>(paths: &Paths, output: Ouput<'a>) -> Result<()> {
         (root.display(&DisplayKind::Parser), "ast.soulc"),
         (
             root.display(&DisplayKind::NameResolver),
-            "ast_NameResolved.soulc",
+            "NameResolved.soulc",
         ),
-        // (display_hir(&output.hir), "hir.soulc"),
-        // (
-        //     root.display(&DisplayKind::TypeContext(
-        //         typed_strings,
-        //         output.typed_context.auto_copys,
-        //     )),
-        //     "ast_TypeContext.soulc",
-        // ),
+        (display_hir(&output.hir), "hir.soulc"),
     ])?;
 
     for fault in &output.faults {

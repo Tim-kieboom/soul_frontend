@@ -1,6 +1,7 @@
+use ast::FunctionKind;
 use soul_utils::Ident;
 
-use crate::{Block, FunctionId, LocalId, TypeId};
+use crate::{BlockId, FunctionId, LocalId, TypeId};
 
 /// A function definition in HIR.
 ///
@@ -25,7 +26,7 @@ pub struct Function {
     pub return_type: TypeId,
 
     /// Body of the function.
-    pub body: Block,
+    pub body: BlockId,
 }
 
 /// A function parameter.
@@ -38,29 +39,4 @@ pub struct Parameter {
 
     /// Type of the parameter.
     pub ty: TypeId,
-}
-
-/// Describes how a function receives its implicit `this` parameter.
-///
-/// This controls ownership and mutability semantics for method calls.
-#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum FunctionKind {
-    /// `&this`
-    MutRef,
-    /// ``
-    Static,
-    /// `this`
-    Consume,
-    /// `@this`
-    ConstRef,
-}
-impl FunctionKind {
-    pub fn display(&self) -> Option<&'static str> {
-        match self {
-            FunctionKind::Static => None,
-            FunctionKind::MutRef => Some("&this"),
-            FunctionKind::Consume => Some("this"),
-            FunctionKind::ConstRef => Some("@this"),
-        }
-    }
 }

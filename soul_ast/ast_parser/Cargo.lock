@@ -12,6 +12,7 @@ checksum = "a23eb6b1614318a8071c9b2521f36b424b2c83db5eb3a0fead4a6c0809af6e61"
 name = "ast"
 version = "0.1.0"
 dependencies = [
+ "enum_variant_name_const",
  "itertools",
  "serde",
  "soul_utils",
@@ -32,6 +33,17 @@ name = "either"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48c757948c5ede0e46177b7add2e67155f70e33c07fea8284df6576da70b3719"
+
+[[package]]
+name = "enum_variant_name_const"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0eba510fd553d27a8ee0fd4f954a2c7da67ca36db38e72e9dbbec11cd98237d5"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "itertools"

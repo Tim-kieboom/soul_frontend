@@ -1,4 +1,4 @@
-use ast::ast::{
+use ast::{
     Expression, Function, FunctionCall, FunctionSignature, SoulType, Statement,
 };
 use soul_utils::{
@@ -11,11 +11,11 @@ use soul_utils::{
 
 use crate::parser::{
     Parser,
-    parse_utils::{ARROW_LEFT, COLON, COMMA, ROUND_CLOSE, ROUND_OPEN},
+    parse_utils::{ARROW_LEFT, COLON, COMMA, ROUND_CLOSE, ROUND_OPEN, SEMI_COLON},
 };
 
 type FuncResult<T> = TryResult<T, (Ident, Box<SoulError>)>;
-impl<'a> Parser<'a> {
+impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_any_function(&mut self) -> SoulResult<Statement> {
         fn default_methode_type(span: Span) -> SoulType {
             SoulType::none(span).with_modifier(Some(TypeModifier::Mut))
@@ -30,7 +30,7 @@ impl<'a> Parser<'a> {
             Err(TryError::IsNotValue((ident, _err))) => self
                 .try_parse_function_call(span, None, &ident)
                 .merge_to_result()
-                .map(Statement::from_function_call),
+                .map(|el| Statement::from_function_call(el, self.current_is(&SEMI_COLON))),
         }
     }
 

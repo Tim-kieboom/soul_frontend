@@ -2,6 +2,9 @@ use soul_utils::vec_map::VecMapIndex;
 
 /// used for internal idGenerator
 pub trait IdAlloc {
+    /// unique error Id always the same
+    fn error() -> Self;
+
     /// Returns the initial value for the ID generator.
     fn begin() -> Self;
 
@@ -16,7 +19,7 @@ pub trait IdAlloc {
 macro_rules! impl_ids {
     ($($ty:ident),*) => {
         $(
-            #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+            #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
             pub struct $ty(usize);
 
             impl VecMapIndex for $ty {
@@ -30,8 +33,13 @@ macro_rules! impl_ids {
             }
 
             impl IdAlloc for $ty {
-                fn begin() -> Self {
+
+                fn error() -> Self {
                     Self(0)
+                }
+
+                fn begin() -> Self {
+                    Self(1)
                 }
 
                 fn alloc(&mut self) -> Self {
@@ -45,11 +53,13 @@ macro_rules! impl_ids {
 }
 
 impl_ids!(
+    TypeId,
+    BlockId,
+    FieldId,
+    LocalId,
     ModuleId,
     FunctionId,
-    FieldId,
-    TypeId,
-    LocalId,
+    InferVarId,
     StatementId,
     ExpressionId
 );
@@ -58,6 +68,7 @@ impl_ids!(
 ///
 /// Each generator instance produces a monotonically increasing
 /// sequence of IDs of a single type.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct IdGenerator<Id: IdAlloc> {
     current: Id,
 }
@@ -72,5 +83,10 @@ impl<Id: IdAlloc> IdGenerator<Id> {
     /// Allocates and returns a fresh ID.
     pub fn alloc(&mut self) -> Id {
         self.current.alloc()
+    }
+}
+impl<Id: IdAlloc> Default for IdGenerator<Id> {
+    fn default() -> Self {
+        Self { current: Id::begin() }
     }
 }

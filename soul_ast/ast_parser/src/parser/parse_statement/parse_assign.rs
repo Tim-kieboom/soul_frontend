@@ -1,6 +1,6 @@
 use std::{iter, sync::LazyLock};
 
-use ast::ast::{
+use ast::{
     Assignment, Binary, BinaryOperator, BinaryOperatorKind, Expression, ExpressionKind, Statement, StatementKind
 };
 use soul_tokenizer::TokenKind;
@@ -25,11 +25,11 @@ static ASSIGNMENT_TOKENS: LazyLock<Vec<TokenKind>> = LazyLock::new(|| {
         .collect()
 });
 
-impl<'a> Parser<'a> {
+impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_assign(&mut self, start_span: Span) -> SoulResult<Statement> {
         let lvalue = self.parse_expression(&ASSIGNMENT_TOKENS)?;
         if self.current_is_any(STAMENT_END_TOKENS) {
-            return Ok(Statement::from_expression(lvalue));
+            return Ok(Statement::from_expression(lvalue, self.current_is(&SEMI_COLON)));
         }
 
         let assign_token = self.bump_consume();
