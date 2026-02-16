@@ -1,10 +1,15 @@
 use std::{collections::HashMap, hash::Hash};
 
 use soul_utils::{
-    soul_import_path::SoulImportPath, span::{ItemMetaData, Span}, vec_map::{VecMap, VecMapIndex}
+    soul_import_path::SoulImportPath,
+    soul_names::TypeModifier,
+    span::{ItemMetaData, Span},
+    vec_map::{VecMap, VecMapIndex},
 };
 
-use crate::{ExpressionId, HirType, IdAlloc, IdGenerator, ModuleId, StatementId, TypeId};
+use crate::{
+    BlockId, ExpressionId, HirType, HirTypeKind, IdAlloc, IdGenerator, InferTypeId, ModuleId, StatementId, TypeId
+};
 
 /// Maps HIR node IDs to their original source code spans.
 ///
@@ -18,6 +23,9 @@ pub struct SpanMap {
 
     /// Source spans for statements.
     pub statements: VecMap<StatementId, Span>,
+
+    /// Source spans for blocks.
+    pub blocks: VecMap<BlockId, Span>,
 }
 
 /// Auxiliary semantic metadata attached to HIR statements.
@@ -32,18 +40,20 @@ pub struct MetaDataMap {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct TypedContext {
+pub struct TypesMap {
     map: BiMap<TypeId, HirType>,
+    type_generator: IdGenerator<TypeId>,
+    infer_generator: IdGenerator<InferTypeId>,
 }
-impl TypedContext {
+impl TypesMap {
     pub fn new() -> Self {
-        let mut this = Self { map: BiMap::new() };
-        this.map.force_insert(this.error_type(), HirType::error_ty());
-        this
-    }
-
-    pub fn error_type(&self) -> TypeId {
-        TypeId::error()
+        Self {
+            type_generator: IdGenerator::new(),
+            infer_generator: IdGenerator::new(),
+            map: BiMap::from_array([
+                (TypeId::error(), HirType::error_type())
+            ]),
+        }
     }
 
     pub fn get_type(&self, id: TypeId) -> Option<&HirType> {
@@ -54,8 +64,28 @@ impl TypedContext {
         self.map.get_key(ty)
     }
 
-    pub fn insert(&mut self, alloc: &mut IdGenerator<TypeId>, ty: HirType) -> TypeId {
-        self.map.insert(alloc, ty)
+    pub fn get_id_from_typekind(&self, ty: HirTypeKind) -> Option<TypeId> {
+        self.map.get_key(&HirType { kind: ty, modifier: None })
+    }
+
+    pub fn insert(&mut self, ty: HirType) -> TypeId {
+        self.map.insert(&mut self.type_generator, ty)
+    }
+
+    pub fn new_infertype(&mut self, modifier: Option<TypeModifier>) -> TypeId {
+        let infer = self.infer_generator.alloc();
+        self.insert(HirType {
+            kind: crate::HirTypeKind::InferType(infer),
+            modifier,
+        })
+    }
+
+    pub fn iter_types(&self) -> impl Iterator<Item = &HirType> {
+        self.map.key_to_value.values()
+    }
+
+    pub fn last_infertype(&self) -> InferTypeId {
+        self.infer_generator.last()
     }
 }
 
@@ -86,9 +116,9 @@ struct BiMap<K: VecMapIndex, V: Hash + PartialEq + Eq> {
     key_to_value: VecMap<K, V>,
     value_to_key: HashMap<V, K>,
 }
-impl<K, V> BiMap<K, V> 
+impl<K, V> BiMap<K, V>
 where
-    K: VecMapIndex + IdAlloc + Copy, 
+    K: VecMapIndex + IdAlloc + Copy,
     V: Hash + Clone + PartialEq + Eq,
 {
     pub fn new() -> Self {
@@ -96,6 +126,15 @@ where
             key_to_value: VecMap::new(),
             value_to_key: HashMap::new(),
         }
+    }
+
+    pub fn from_array<const N: usize>(vec: [(K, V); N]) -> Self {
+        let mut this = Self::new();
+
+        for (key, value) in vec {
+            this.force_insert(key, value)
+        }
+        this
     }
 
     pub fn insert(&mut self, alloc: &mut IdGenerator<K>, value: V) -> K {
@@ -123,13 +162,16 @@ where
         self.value_to_key.get(value).copied()
     }
 }
-impl<K, V> Default for BiMap<K, V> 
+impl<K, V> Default for BiMap<K, V>
 where
-    K: VecMapIndex + IdAlloc + Copy, 
+    K: VecMapIndex + IdAlloc + Copy,
     V: Hash + Clone + PartialEq + Eq,
 {
     fn default() -> Self {
-        Self { key_to_value: Default::default(), value_to_key: Default::default() }
+        Self {
+            key_to_value: Default::default(),
+            value_to_key: Default::default(),
+        }
     }
 }
 
@@ -139,7 +181,8 @@ where
     V: serde::Serialize + Hash + Clone + PartialEq + Eq,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where S: serde::Serializer 
+    where
+        S: serde::Serializer,
     {
         self.key_to_value.serialize(serializer)
     }

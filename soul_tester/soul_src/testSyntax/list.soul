@@ -15,7 +15,7 @@ where
     }
 
     TryFromArray(array: [_]T): Err<This> {
-        mut self = TryNew(array.Len()).pass
+        mut self = TryNew(0).pass
         self.ExtendArray(array).pass
         return self
     }

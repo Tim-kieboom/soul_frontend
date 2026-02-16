@@ -1,45 +1,39 @@
-use hir::{HirType, HirTypeKind, IdAlloc, TypeId, TypedContext};
+use hir::{HirType, HirTypeKind, IdAlloc, TypeId, TypesMap};
 use soul_utils::{
     soul_error_internal,
-    soul_names::{InternalPrimitiveTypes, TypeModifier},
+    soul_names::{PrimitiveTypes, TypeModifier},
     span::Span,
 };
 
 use crate::HirContext;
 
-const CHAR: HirType = HirType::new(hir::HirTypeKind::Primitive(InternalPrimitiveTypes::Char));
+const CHAR: HirType = HirType::new(hir::HirTypeKind::Primitive(PrimitiveTypes::Char));
 
 impl<'a> HirContext<'a> {
     /// this function is needed is the borrow checker does not validate self.lower_type
-    pub(crate) fn convert_type(
-        ty: &ast::SoulType,
-        types: &mut TypedContext,
-        alloc: &mut hir::IdGenerator<TypeId>,
-    ) -> hir::TypeId {
+    pub(crate) fn convert_type(ty: &ast::SoulType, types: &mut TypesMap) -> hir::TypeId {
         let ty = match &ty.kind {
             ast::TypeKind::None => HirTypeKind::None,
             ast::TypeKind::Type => HirTypeKind::Type,
-            ast::TypeKind::Pointer(inner) => {
-                HirTypeKind::Pointer(Self::convert_type(inner, types, alloc))
-            }
+            ast::TypeKind::Pointer(inner) => HirTypeKind::Pointer(Self::convert_type(inner, types)),
             ast::TypeKind::Optional(inner) => {
-                HirTypeKind::Optional(Self::convert_type(inner, types, alloc))
+                HirTypeKind::Optional(Self::convert_type(inner, types))
             }
             ast::TypeKind::Array(array) => HirTypeKind::Array {
-                element: Self::convert_type(&array.of_type, types, alloc),
+                element: Self::convert_type(&array.of_type, types),
                 kind: array.kind,
             },
             ast::TypeKind::Reference(reference) => HirTypeKind::Ref {
-                of_type: Self::convert_type(&reference.inner, types, alloc),
+                of_type: Self::convert_type(&reference.inner, types),
                 mutable: reference.mutable,
             },
             ast::TypeKind::Primitive(prim) => HirTypeKind::Primitive(*prim),
         };
-        types.insert(alloc, HirType::new(ty))
+        types.insert(HirType::new(ty))
     }
 
     pub(crate) fn lower_type(&mut self, ty: &ast::SoulType) -> hir::TypeId {
-        Self::convert_type(ty, &mut self.hir.types, &mut self.id_generator.ty)
+        Self::convert_type(ty, &mut self.hir.types)
     }
 
     pub(crate) fn type_from_literal(&mut self, literal: &ast::Literal) -> TypeId {
@@ -74,22 +68,14 @@ impl<'a> HirContext<'a> {
     }
 
     pub(crate) fn new_infer_type(&mut self) -> TypeId {
-        let id = self.id_generator.alloc_infer();
-        self.hir.types.insert(
-            &mut self.id_generator.ty,
-            HirType::new(hir::HirTypeKind::Infer(id)),
-        )
+        self.hir.types.new_infertype(None)
     }
 
     pub(crate) fn new_infer_with_modifier(&mut self, modifier: TypeModifier) -> TypeId {
-        let id = self.id_generator.alloc_infer();
-        self.hir.types.insert(
-            &mut self.id_generator.ty,
-            HirType::new(hir::HirTypeKind::Infer(id)).with_modifier(modifier),
-        )
+        self.hir.types.new_infertype(Some(modifier))
     }
 
     pub(crate) fn add_type(&mut self, ty: HirType) -> TypeId {
-        self.hir.types.insert(&mut self.id_generator.ty, ty)
+        self.hir.types.insert(ty)
     }
 }

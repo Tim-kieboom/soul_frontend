@@ -1,5 +1,5 @@
-use std::hash::Hash;
 use crate::Ident;
+use std::{hash::Hash};
 
 /// Represents a source code location span.
 ///
@@ -58,7 +58,7 @@ impl ItemMetaData {
 
     pub const fn new(attributes: Vec<Attribute>) -> Self {
         Self { attributes }
-    } 
+    }
 }
 
 impl Span {
@@ -83,14 +83,6 @@ impl Span {
         }
     }
 
-    pub fn combine(mut self, other: Self) -> Self {
-        self.start_line = self.start_line.min(other.start_line);
-        self.start_offset = self.start_offset.min(other.start_offset);
-        self.end_line = self.end_line.max(other.end_line);
-        self.end_offset = self.end_offset.max(other.end_offset);
-        self
-    }
-
     pub fn is_single_line(&self) -> bool {
         self.end_line == self.start_line
     }
@@ -98,7 +90,7 @@ impl Span {
     pub fn display(&self) -> String {
         let mut sb = String::new();
         self.inner_display(&mut sb);
-        sb        
+        sb
     }
 
     pub fn inner_display(&self, sb: &mut String) {
@@ -107,8 +99,52 @@ impl Span {
         if self.is_single_line() {
             write!(sb, "{}:{}", self.start_line, self.start_offset)
         } else {
-            write!(sb, "{}:{}-{}:{}", self.start_line, self.start_offset, self.end_line, self.end_offset)
-        }.expect("write should not give error")
+            write!(
+                sb,
+                "{}:{}-{}:{}",
+                self.start_line, self.start_offset, self.end_line, self.end_offset
+            )
+        }
+        .expect("write should not give error")
+    }
+
+    pub fn combine(self, other: Self) -> Self {
+        let start_line = self.start_line.min(other.start_line);
+        let start_offset = self.combine_start_offset(&other);
+        
+        let end_line = self.end_line.max(other.end_line);
+        let end_offset = self.combine_end_offset(&other);
+
+        Self {
+            start_line,
+            start_offset,
+            end_line, 
+            end_offset,
+        }
+    }
+
+    fn combine_start_offset(&self, other: &Self) -> usize {
+        if self.start_line == other.start_line {
+            return self.start_offset.min(other.start_offset)
+        }
+        
+        if self.start_line < other.start_line {
+            self.start_offset
+        } else {
+            other.start_offset
+        }
+    }
+
+    fn combine_end_offset(&self, other: &Self) -> usize {
+        if self.end_line == other.end_line {
+            return self.end_offset.max(other.end_offset)
+        }
+        
+        if self.end_line > other.end_line {
+            self.end_offset
+        } else {
+            other.end_offset
+        }
     }
 }
 
@@ -119,9 +155,6 @@ impl<T: Hash> Hash for Spanned<T> {
 }
 impl<T> Spanned<T> {
     pub fn new(inner: T, span: Span) -> Self {
-        Self {
-            node: inner,
-            span,
-        }
+        Self { node: inner, span }
     }
 }

@@ -1,5 +1,5 @@
 use anyhow::Result;
-use std::{fs::File, io::Write};
+use std::{fs::File, io::Write, path::PathBuf};
 
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,8 +20,11 @@ impl Paths {
     }
 
     pub fn write_to_output(&self, output: String, relative_file: &str) -> Result<()> {
-        std::fs::create_dir_all(&self.output)?;
-        let mut file = File::create(format!("{}/{relative_file}", self.output))?;
+        let path = PathBuf::from(format!("{}/{relative_file}", self.output));
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let mut file = File::create(path)?;
         file.write_all(output.as_bytes())?;
         Ok(())
     }

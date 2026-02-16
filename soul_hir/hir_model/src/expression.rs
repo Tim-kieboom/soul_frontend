@@ -19,10 +19,10 @@ pub struct Expression {
 /// and their source locations are stored externally in the `SpanMap`.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum ExpressionKind {
-    // --- Values --- 
+    // --- Values ---
     /// `null` value
     Null,
-    
+
     /// A literal value (integer, float, string, etc.).
     Literal(Literal),
 
@@ -42,12 +42,18 @@ pub enum ExpressionKind {
     ///
     /// The `mutable` flag indicates whether this is a mutable (`&`)
     /// or immutable (`@`) reference.
-    Ref { place: Place, mutable: bool },
+    Ref {
+        place: Place,
+        mutable: bool,
+    },
 
     /// Dereferences a pointer or reference expression.
     DeRef(ExpressionId),
 
-    InnerRawStackArray{ty: TypeId, len: ExpressionId},
+    InnerRawStackArray {
+        ty: TypeId,
+        len: ExpressionId,
+    },
 
     // --- Operators ---
     /// A unary operation.

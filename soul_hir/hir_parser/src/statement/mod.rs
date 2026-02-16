@@ -1,5 +1,5 @@
 use crate::{CurrentBody, HirContext};
-use hir::Assign;
+use hir::{Assign, StatementId};
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
     soul_names::KeyWord,
@@ -16,6 +16,7 @@ impl<'a> HirContext<'a> {
         let hir_global = match &global.node {
             ast::StatementKind::Variable(variable) => {
                 let hir_variable = self.lower_variable(variable);
+                self.insert_local(&variable.name, hir_variable.local, hir_variable.ty);
                 hir::Global::Variable(hir_variable, id)
             }
             ast::StatementKind::Function(function) => {
@@ -58,12 +59,12 @@ impl<'a> HirContext<'a> {
             }
             ast::StatementKind::Variable(variable) => {
                 let hir_variable = self.lower_variable(variable);
-                hir::Statement::Variable(hir_variable)
+                hir::Statement::Variable(hir_variable, id)
             }
             ast::StatementKind::Assignment(assignment) => hir::Statement::Assign(Assign {
                 place: self.lower_place(&assignment.left),
                 value: self.lower_expression(&assignment.right),
-            }),
+            }, id),
             ast::StatementKind::Expression {
                 id: _,
                 expression,
@@ -72,9 +73,10 @@ impl<'a> HirContext<'a> {
                 use ast::ExpressionKind::ReturnLike;
 
                 if let ReturnLike(return_like) = &expression.node {
-                    self.lower_return_like(return_like)
+                    self.lower_return_like(return_like, id)
                 } else {
                     hir::Statement::Expression {
+                        id,
                         value: self.lower_expression(expression),
                         ends_semicolon: *ends_semicolon,
                     }
@@ -98,7 +100,7 @@ impl<'a> HirContext<'a> {
             terminator: None,
             imports: vec![],
         };
-        self.hir.blocks.insert(id, block);
+        self.insert_block(id, block, body.span);
 
         let mut last_expression = None;
 
@@ -109,6 +111,7 @@ impl<'a> HirContext<'a> {
             };
 
             if let hir::Statement::Expression {
+                id:_,
                 value,
                 ends_semicolon,
             } = &hir_statement
@@ -126,7 +129,7 @@ impl<'a> HirContext<'a> {
                 last_expression = Some((*value, *ends_semicolon, statement.span));
             }
 
-            self.hir.blocks[id].statements.push(hir_statement);
+            self.insert_in_block(id, hir_statement);
         }
 
         self.pop_scope();
@@ -140,15 +143,15 @@ impl<'a> HirContext<'a> {
         id
     }
 
-    fn lower_return_like(&mut self, return_like: &ast::ReturnLike) -> hir::Statement {
+    fn lower_return_like(&mut self, return_like: &ast::ReturnLike, id: StatementId) -> hir::Statement {
         let value = match &return_like.value {
             Some(val) => Some(self.lower_expression(val)),
             None => None,
         };
 
         match return_like.kind {
-            ast::ReturnKind::Return => hir::Statement::Return(value),
-            ast::ReturnKind::Break => hir::Statement::Break(value),
+            ast::ReturnKind::Return => hir::Statement::Return(value, id),
+            ast::ReturnKind::Break => hir::Statement::Break(value, id),
             ast::ReturnKind::Continue => {
                 if let Some(value) = &return_like.value {
                     self.log_error(SoulError::new(
@@ -157,7 +160,7 @@ impl<'a> HirContext<'a> {
                         Some(value.span),
                     ));
                 }
-                hir::Statement::Continue
+                hir::Statement::Continue(id)
             }
         }
     }

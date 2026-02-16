@@ -1,0 +1,125 @@
+literal $chars: [5]type = type[
+    char,
+    char8,
+    char16,
+    char32,
+    char64,
+]
+
+literal $floatingPoint: [4]type = type[
+    untypedFloat,
+    f16,
+    f32, 
+    f64,
+]
+
+literal $signedIntergers: [7]type = type[
+    untypedInt, 
+    int, 
+    i8, 
+    i16, 
+    i32, 
+    i64, 
+    i128,
+]
+
+literal $unsignedIntergers: [7]type = type[
+    untypedUint,
+    uint, 
+    u8, 
+    u16, 
+    u32, 
+    u64, 
+    u128,
+]
+
+literal $primitiveTypes: [23]type = type[
+    bool,
+    
+    char,
+    char8,
+    char16,
+    char32,
+    char64,
+
+    untypedFloat,
+    f16,
+    f32, 
+    f64,
+
+    untypedInt, 
+    int, 
+    i8, 
+    i16, 
+    i32, 
+    i64, 
+    i128,
+
+    untypedUint,
+    uint, 
+    u8, 
+    u16, 
+    u32, 
+    u64, 
+    u128,
+]
+
+trait PrimitiveType {}
+
+literal $emptyImpl($prims: [_]type, $traitType: type): syntax {
+    
+    literal $impls = syntax{}
+    for $prim in $prims {
+        
+        $impls.Append(syntax{
+            use $prim impl $traitType {} 
+        })
+    }
+    $impls
+}
+
+literal $implInts($intergers: [_]type): syntax {   
+    
+    literal $impls = syntax{}
+    for $interger in $intergers {
+        
+        $impls.Append(
+            $implInt($interger)
+        )
+    }
+    $impls
+}
+
+literal $implInt($ty: type): syntax {
+    literal interger = $ty.toInterger()
+        .catch{literalPanic}
+
+    literal bytes = $ty.sizeof
+    literal bits = bytes * 8
+    literal isSigned = interger.isSigned()
+    literal max = if isSigned {(bits/2) ** 2 - 1} else {bits ** 2 - 1} 
+    literal min = if isSigned {(bits/2) ** 2 * -1} else {0}
+    syntax{
+        use $ty {
+            literal MAX = max
+            literal MIN = min
+
+            This(num: impl PrimitiveType) {
+                num as This
+            }
+
+            impl Sized {
+                ByteSize(): uint {bytes}
+            }
+        }
+    }
+}
+
+$emptyImpl(
+    $primitiveTypes,
+    PrimitiveType
+)
+$implInts([
+    $signedIntergers,
+    $unsignedIntergers,
+])

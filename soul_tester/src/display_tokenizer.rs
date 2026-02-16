@@ -2,7 +2,7 @@ use anyhow::Result;
 use soul_tokenizer::{Token, TokenStream};
 use soul_utils::{error::SoulResult, sementic_level::SementicFault};
 
-use crate::{convert_soul_error::ToAnyhow, paths::Paths};
+use crate::{ERROR_BACKTRACE, convert_soul_error::ToAnyhow, paths::Paths};
 
 pub fn display_tokens<'a>(
     paths: &Paths,
@@ -24,7 +24,7 @@ pub fn display_tokens<'a>(
     let len = max + 4;
     for result in token_stream {
         let token = result
-            .map_err(|err| SementicFault::error(err).to_anyhow(&paths.source_file, source_file))?;
+            .map_err(|err| SementicFault::error(err).to_anyhow(&paths.source_file, source_file, ERROR_BACKTRACE))?;
 
         sb.push('\t');
         let kind_len = token.kind.inner_display(&mut sb)?;

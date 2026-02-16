@@ -1,8 +1,8 @@
 mod id_generator;
 use ast::{DeclareStore, ParseResponse};
-use hir::{BlockId, FunctionId, HirTree, LocalId};
+use hir::{BlockId, FunctionId, HirTree, LocalId, TypeId};
 use id_generator::IdGenerator;
-use soul_utils::{Ident, error::SoulError, sementic_level::SementicFault, soul_error_internal};
+use soul_utils::{Ident, error::SoulError, sementic_level::SementicFault, soul_error_internal, span::Span};
 use std::collections::HashMap;
 
 mod expression;
@@ -87,7 +87,11 @@ impl<'a> HirContext<'a> {
         None
     }
 
-    fn insert_local(&mut self, name: &Ident, local: LocalId) {
+    fn insert_local_type(&mut self, local: LocalId, ty: TypeId) {
+        self.hir.locals.insert(local, ty);
+    }
+
+    fn insert_local(&mut self, name: &Ident, local: LocalId, ty: TypeId) {
         let scope = match self.scopes.last_mut() {
             Some(val) => val,
             None => {
@@ -100,6 +104,20 @@ impl<'a> HirContext<'a> {
         };
 
         scope.locals.insert(name.to_string(), local);
+        self.insert_local_type(local, ty);
+    }
+
+    fn insert_block(&mut self, id: BlockId, block: hir::Block, span: Span) {
+        self.hir.blocks.insert(id, block);
+        self.hir.spans.blocks.insert(id, span);
+    }
+
+    fn insert_in_block(&mut self, id: BlockId, statement: hir::Statement) {
+        self.hir.blocks[id].statements.push(statement);
+    }
+
+    fn insert_block_terminator(&mut self, id: BlockId, terminator: hir::ExpressionId) {
+        self.hir.blocks[id].terminator = Some(terminator)
     }
 
     fn insert_function(&mut self, name: &Ident, function: FunctionId) {

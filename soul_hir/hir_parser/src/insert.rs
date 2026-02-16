@@ -32,6 +32,8 @@ impl<'a> HirContext<'a> {
     }
 
     pub(crate) fn insert_desugar_variable(&mut self, variable: hir::Variable, span: Span) {
+        self.insert_local_type(variable.local, variable.ty);
+        
         match self.current_body {
             crate::CurrentBody::Global => {
                 let id = self.alloc_statement(&ItemMetaData::default_const(), span);
@@ -39,9 +41,9 @@ impl<'a> HirContext<'a> {
                 self.hir.root.globals.push(global);
             }
             crate::CurrentBody::Block(block_id) => {
-                let _ = self.alloc_statement(&ItemMetaData::default_const(), span);
-                let statement = hir::Statement::Variable(variable);
-                self.hir.blocks[block_id].statements.push(statement);
+                let id = self.alloc_statement(&ItemMetaData::default_const(), span);
+                let statement = hir::Statement::Variable(variable, id);
+                self.insert_in_block(block_id, statement);
             }
         }
     }
@@ -54,9 +56,9 @@ impl<'a> HirContext<'a> {
                 self.hir.root.globals.push(global);
             }
             crate::CurrentBody::Block(block_id) => {
-                let _ = self.alloc_statement(&ItemMetaData::default_const(), span);
-                let statement = hir::Statement::Assign(assign);
-                self.hir.blocks[block_id].statements.push(statement);
+                let id = self.alloc_statement(&ItemMetaData::default_const(), span);
+                let statement = hir::Statement::Assign(assign, id);
+                self.insert_in_block(block_id, statement);
             }
         }
     }

@@ -74,7 +74,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     /// Records parse error.
-    pub(super) fn add_error(&mut self, err: SoulError) {
+    pub(super) fn log_error(&mut self, err: SoulError) {
         self.faults.push(SementicFault::error(err));
     }
 
@@ -109,7 +109,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     /// Advances to next token.
     pub(super) fn bump(&mut self) {
         if let Err(err) = self.tokens.advance() {
-            self.add_error(err);
+            self.log_error(err);
         }
 
         #[cfg(debug_assertions)]
@@ -124,7 +124,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         match self.tokens.peek() {
             Ok(val) => val,
             Err(err) => {
-                self.add_error(err);
+                self.log_error(err);
                 self.token().clone()
             }
         }
@@ -135,7 +135,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let token = match self.tokens.consume_advance() {
             (token, None) => token,
             (token, Some(err)) => {
-                self.add_error(err);
+                self.log_error(err);
                 token
             }
         };

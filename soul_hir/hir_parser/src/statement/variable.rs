@@ -15,7 +15,7 @@ impl<'a> HirContext<'a> {
         };
 
         let local = self.id_generator.alloc_local();
-        self.insert_local(&variable.name, local);
+        self.insert_local(&variable.name, local, ty);
 
         hir::Variable { ty, value, local }
     }

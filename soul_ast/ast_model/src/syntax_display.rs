@@ -1,4 +1,4 @@
-use soul_utils::vec_map::{VecMap, VecSet};
+use soul_utils::{vec_map::VecMap, vec_set::VecSet};
 use crate::scope::NodeId;
 
 #[derive(Debug, Clone, PartialEq)]

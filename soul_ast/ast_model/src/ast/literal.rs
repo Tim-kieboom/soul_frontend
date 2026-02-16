@@ -1,6 +1,6 @@
 use std::fmt::{Debug};
 
-use soul_utils::soul_names::{InternalPrimitiveTypes, TypeModifier};
+use soul_utils::soul_names::{PrimitiveTypes, TypeModifier};
 
 /// A literal value in the Soul language.
 #[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -98,11 +98,11 @@ impl LiteralType {
 
     pub fn to_internal_primitive_type(&self) -> TypeResult {
         TypeResult::Primitive(match self {
-            LiteralType::Int => InternalPrimitiveTypes::UntypedInt,
-            LiteralType::Uint => InternalPrimitiveTypes::UntypedUint,
-            LiteralType::Float => InternalPrimitiveTypes::UntypedFloat,
-            LiteralType::Bool => InternalPrimitiveTypes::Boolean,
-            LiteralType::Char => InternalPrimitiveTypes::Char,
+            LiteralType::Int => PrimitiveTypes::UntypedInt,
+            LiteralType::Uint => PrimitiveTypes::UntypedUint,
+            LiteralType::Float => PrimitiveTypes::UntypedFloat,
+            LiteralType::Bool => PrimitiveTypes::Boolean,
+            LiteralType::Char => PrimitiveTypes::Char,
             LiteralType::Str => return TypeResult::Str,
         })
     }
@@ -110,20 +110,19 @@ impl LiteralType {
     /// Returns a string representation of the literal type.
     pub fn type_to_string(&self) -> String {
         const LITERAL: &str = TypeModifier::Literal.as_str();
-        use InternalPrimitiveTypes as types;
-
+        
         match self {
             LiteralType::Str => format!("{LITERAL} {}", "str"),
-            LiteralType::Char => format!("{LITERAL} {}", types::Char.as_str()),
-            LiteralType::Bool => format!("{LITERAL} {}", types::Boolean.as_str()),
-            LiteralType::Int => format!("{LITERAL} {}", types::UntypedInt.as_str()),
-            LiteralType::Uint => format!("{LITERAL} {}", types::UntypedUint.as_str()),
-            LiteralType::Float => format!("{LITERAL} {}", types::UntypedFloat.as_str()),
+            LiteralType::Char => format!("{LITERAL} {}", PrimitiveTypes::Char.as_str()),
+            LiteralType::Bool => format!("{LITERAL} {}", PrimitiveTypes::Boolean.as_str()),
+            LiteralType::Int => format!("{LITERAL} {}", PrimitiveTypes::UntypedInt.as_str()),
+            LiteralType::Uint => format!("{LITERAL} {}", PrimitiveTypes::UntypedUint.as_str()),
+            LiteralType::Float => format!("{LITERAL} {}", PrimitiveTypes::UntypedFloat.as_str()),
         }
     }
 }
 
 pub enum TypeResult {
-    Primitive(InternalPrimitiveTypes),
+    Primitive(PrimitiveTypes),
     Str,
 }

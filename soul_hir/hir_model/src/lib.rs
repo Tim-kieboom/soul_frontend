@@ -1,17 +1,17 @@
 mod expression;
 mod function;
+mod hir_type;
 mod ids;
 mod meta_data_maps;
 mod place;
-mod hir_type;
 mod statement;
-pub use hir_type::*;
 pub use expression::*;
 pub use function::*;
+pub use hir_type::*;
 pub use ids::*;
 pub use meta_data_maps::*;
 pub use place::*;
-use soul_utils::{vec_map::VecMap};
+use soul_utils::vec_map::VecMap;
 pub use statement::*;
 
 /// High-level Intermediate Representation (HIR) tree.
@@ -25,35 +25,42 @@ pub use statement::*;
 pub struct HirTree {
     /// Root module of the HIR.
     pub root: Module,
-    
+
     /// Side-table containing all types
     /// for HIR nodes.
-    pub types: TypedContext,
-    
+    pub types: TypesMap,
+
     /// Side-table containing source spans
     /// for HIR nodes.
     pub spans: SpanMap,
-    
+
     /// Side-table containing auxiliary metadata
     /// for HIR nodes.
     pub meta_data: MetaDataMap,
-    
+
     pub imports: ImportMap,
     pub blocks: VecMap<BlockId, Block>,
+    pub locals: VecMap<LocalId, TypeId>,
+    pub functions: VecMap<FunctionId, Function>,
     pub expressions: VecMap<ExpressionId, Expression>,
 }
-
 
 impl HirTree {
     pub fn new(root_id: ModuleId) -> Self {
         Self {
-            imports: ImportMap::new(),
-            blocks: VecMap::default(),
+            types: TypesMap::new(),
             spans: SpanMap::default(),
-            types: TypedContext::new(),
+            blocks: VecMap::default(),
+            locals: VecMap::default(),
+            imports: ImportMap::new(),
+            functions: VecMap::default(),
             expressions: VecMap::default(),
             meta_data: MetaDataMap::default(),
-            root: Module { id: root_id, imports: vec![], globals: vec![] },
+            root: Module {
+                id: root_id,
+                imports: vec![],
+                globals: vec![],
+            },
         }
     }
 }
@@ -73,7 +80,7 @@ pub struct Import {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum Global {
-    Function(Function, StatementId),
+    Function(FunctionId, StatementId),
     Variable(Variable, StatementId),
 
     /// only allowed to be used by hir lowerer not user

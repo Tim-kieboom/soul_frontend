@@ -1,5 +1,5 @@
 use anyhow::Result;
-use soul_utils::{soul_names::InternalPrimitiveTypes, span::Span, symbool_kind::SymbolKind};
+use soul_utils::{soul_names::PrimitiveTypes, span::Span, symbool_kind::SymbolKind};
 use std::{fmt::Write};
 
 /// A single token containing its kind and source span information.
@@ -123,9 +123,9 @@ impl Number {
 
     fn inner_display(&self, sb: &mut String) -> Result<usize> {
         
-        const INT_STR: &str = InternalPrimitiveTypes::UntypedInt.as_str();
-        const UINT_STR: &str = InternalPrimitiveTypes::UntypedUint.as_str();
-        const FLOAT_STR: &str = InternalPrimitiveTypes::UntypedFloat.as_str();
+        const INT_STR: &str = PrimitiveTypes::UntypedInt.as_str();
+        const UINT_STR: &str = PrimitiveTypes::UntypedUint.as_str();
+        const FLOAT_STR: &str = PrimitiveTypes::UntypedFloat.as_str();
         
         let len = sb.len();
         match self {

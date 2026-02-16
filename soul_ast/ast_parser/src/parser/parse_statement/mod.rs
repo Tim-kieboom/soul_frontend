@@ -29,12 +29,15 @@ impl<'a, 'f> Parser<'a,'f> {
             match self.parse_statement() {
                 Ok(val) => global_statements.push(val),
                 Err(err) => {
-                    self.add_error(err);
+                    self.log_error(err);
                     self.skip_over_statement();
                 }
             }
 
-            self.skip_till(&[SEMI_COLON, TokenKind::EndFile]);
+            if self.current_is(&SEMI_COLON) {
+                self.bump();
+            }
+            self.skip_end_lines();
         }
 
         global_statements
@@ -56,7 +59,7 @@ impl<'a, 'f> Parser<'a,'f> {
             match self.parse_statement() {
                 Ok(statement) => statements.push(statement),
                 Err(err) => {
-                    self.add_error(err);
+                    self.log_error(err);
                     self.skip_over_statement();
                 }
             }
@@ -77,7 +80,7 @@ impl<'a, 'f> Parser<'a,'f> {
     pub(crate) fn parse_statement(&mut self) -> SoulResult<Statement> {
         let statement = self.inner_parse_statement()?;
         if !matches!(statement.node, StatementKind::Expression { .. }) && self.ends_semicolon() {
-            self.add_error(SoulError::new(
+            self.log_error(SoulError::new(
                 format!("'{}' at the end of a line can only be used for expressions at the end of a block", SymbolKind::SemiColon.as_str()),
                 SoulErrorKind::InvalidEscapeSequence,
                 Some(self.token().span),

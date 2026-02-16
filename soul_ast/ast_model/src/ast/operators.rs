@@ -84,7 +84,7 @@ pub enum BinaryOperatorKind {
     /// `<=`
     Le,     
     /// `>=`
-    Ge,     
+    Ge,
 
     /// Range operator (`..`).
     Range,

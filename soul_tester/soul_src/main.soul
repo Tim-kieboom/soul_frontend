@@ -16,7 +16,7 @@ returnNone() {
 }
 
 variable() {
-    literal text := "hello world"
+    literal chars = "hello world"
 
     constTyped: int = 1
     constInfer := 1 + -2
@@ -47,11 +47,14 @@ variable() {
     mutSlice: [&]int = &heap
     mut array2D: [2][1]int := [[1], [2]]
 
-    mut cast := 1 as uint
+    mut cast := 1 as int
     cast = sum(1, 2)
 
     const lateInfer
     lateInfer = 1
+
+    mut inferArray = @[]
+    inferArray = @[1]
 }
 
 conditionals() {

@@ -1,4 +1,6 @@
-use std::{marker::PhantomData, ops::{Index, IndexMut}};
+use std::{
+    fmt::Debug, marker::PhantomData, ops::{Index, IndexMut}
+};
 
 use serde::{Serialize, Serializer, ser::SerializeMap};
 
@@ -29,13 +31,12 @@ impl VecMapIndex for usize {
 /// by numeric-like types while maintaining the flexibility of a `HashMap`-like interface.
 ///
 /// Internally, the structure stores a `Vec<Option<T>>`, expanding as needed.
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone)]
 pub struct VecMap<I: VecMapIndex, T> {
-    pub vec: Vec<Option<T>>, 
+    pub vec: Vec<Option<T>>,
     _marker: PhantomData<I>,
 }
 impl<I: VecMapIndex, T> VecMap<I, T> {
-
     pub const fn new() -> Self {
         Self::const_default()
     }
@@ -45,7 +46,7 @@ impl<I: VecMapIndex, T> VecMap<I, T> {
             vec: vec![],
             _marker: PhantomData,
         }
-    } 
+    }
 
     pub const fn is_empty(&self) -> bool {
         self.vec.is_empty()
@@ -58,9 +59,9 @@ impl<I: VecMapIndex, T> VecMap<I, T> {
         let mut vec = Vec::with_capacity(cap);
         vec.resize_with(cap, || None);
 
-        Self { 
-            vec, 
-            _marker: PhantomData, 
+        Self {
+            vec,
+            _marker: PhantomData,
         }
     }
 
@@ -85,18 +86,15 @@ impl<I: VecMapIndex, T> VecMap<I, T> {
         self.vec.len()
     }
 
-    /// returns amount of entries 
+    /// returns amount of entries
     pub fn len(&self) -> usize {
         self.vec.iter().filter(|o| o.is_some()).count()
     }
-    
+
     /// Creates a [`VecMap`] from a vector of index-value pairs.
     pub fn from_vec(entries: Vec<(I, T)>) -> Self {
-        let max_index = entries.iter()
-            .map(|(i, _)| i.index())
-            .max()
-            .unwrap_or(0);
-        
+        let max_index = entries.iter().map(|(i, _)| i.index()).max().unwrap_or(0);
+
         let mut this = Self::with_capacity(max_index);
         for (index, value) in entries {
             this.insert(index, value);
@@ -126,9 +124,9 @@ impl<I: VecMapIndex, T> VecMap<I, T> {
     }
 
     /// Extends this map by inserting multiple `(index, value)` pairs from an iterator.
-    pub fn extend<Iter>(&mut self, vec: Iter) 
-    where 
-        Iter: Iterator<Item = (I, T)>
+    pub fn extend<Iter>(&mut self, vec: Iter)
+    where
+        Iter: Iterator<Item = (I, T)>,
     {
         for (index, value) in vec {
             self.insert(index, value);
@@ -138,24 +136,30 @@ impl<I: VecMapIndex, T> VecMap<I, T> {
     /// Removes and returns the value at the specified index, if present.
     pub fn remove(&mut self, index: I) -> Option<T> {
         self.vec.get_mut(index.index()).and_then(|slot| slot.take())
-    }  
+    }
 
     /// Returns an iterator over existing `index`.
     pub fn keys(&self) -> impl Iterator<Item = I> {
-        self.vec.iter().enumerate().filter(|(_, el)| el.is_some()).map(|(i, _)| I::new_index(i))
+        self.vec
+            .iter()
+            .enumerate()
+            .filter(|(_, el)| el.is_some())
+            .map(|(i, _)| I::new_index(i))
     }
 
     /// Returns an iterator over existing `(index, &value)` pairs.
     pub fn entries(&self) -> impl Iterator<Item = (I, &T)> {
-        self.vec.iter().enumerate().flat_map(|(i, el)| {
-            el.as_ref().map(|val| (I::new_index(i), val))
-        })
+        self.vec
+            .iter()
+            .enumerate()
+            .flat_map(|(i, el)| el.as_ref().map(|val| (I::new_index(i), val)))
     }
     /// Consumes the map and returns an iterator over `(index, value)` pairs.
     pub fn into_entries(self) -> impl Iterator<Item = (I, T)> {
-        self.vec.into_iter().enumerate().flat_map(|(i, el)| {
-            el.map(|val| (I::new_index(i), val))
-        })
+        self.vec
+            .into_iter()
+            .enumerate()
+            .flat_map(|(i, el)| el.map(|val| (I::new_index(i), val)))
     }
 
     /// Returns an iterator over references to all existing values.
@@ -173,27 +177,27 @@ impl<I: VecMapIndex, T: PartialEq> PartialEq for VecMap<I, T> {
         fn index_to_usize<I: VecMapIndex, T>(tuple: (I, &T)) -> (usize, &T) {
             (tuple.0.index(), tuple.1)
         }
-        
+
         let self_iter = self.entries().map(index_to_usize);
         let other_iter = other.entries().map(index_to_usize);
         self_iter.eq(other_iter)
     }
 }
 impl<I: VecMapIndex, T: Eq> Eq for VecMap<I, T> {}
-impl<I: VecMapIndex, T> Index<I> for VecMap<I, T> {
+impl<I: VecMapIndex + Debug, T> Index<I> for VecMap<I, T> {
     type Output = T;
 
     fn index(&self, index: I) -> &Self::Output {
         self.vec[index.index()]
             .as_ref()
-            .expect(&format!("entry in VecMap[{}] not found", index.index()))
+            .expect(&format!("entry in VecMap[{:?}] not found", index))
     }
 }
-impl<I: VecMapIndex, T> IndexMut<I> for VecMap<I, T> {
+impl<I: VecMapIndex + Debug, T> IndexMut<I> for VecMap<I, T> {
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
         self.vec[index.index()]
             .as_mut()
-            .expect(&format!("entry in VecMap[{}] not found", index.index()))
+            .expect(&format!("entry in VecMap[{:?}] not found", index))
     }
 }
 impl<I: VecMapIndex, T> FromIterator<(I, T)> for VecMap<I, T> {
@@ -223,83 +227,68 @@ impl<I: VecMapIndex + Clone, T: Clone> VecMap<I, T> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct VecSet<I: VecMapIndex> {
-    map: VecMap<I, ()>
-}
-impl<I: VecMapIndex> VecSet<I> {
-    pub const fn new() -> Self {
-        Self { map: VecMap::new() }
-    }
-
-    pub fn insert(&mut self, index: I) -> Option<()> {
-        self.map.insert(index, ())
-    }
-
-    pub fn contains(&self, index: I) -> bool {
-        self.map.contains(index)
-    }
-
-    pub fn remove(&mut self, index: I) -> Option<()> {
-        self.map.remove(index)
-    }
-
-    pub fn entries(&self) -> impl Iterator<Item = I> {
-        self.map.keys()
-    }
-}
-impl<I: VecMapIndex> Index<I> for VecSet<I> {
-    type Output = bool;
-
-    fn index(&self, index: I) -> &Self::Output {
-        
-        if self.map.contains(index) {
-            &true
-        } else {
-            &false
-        }
-    }
-}
-impl<I: VecMapIndex> FromIterator<I> for VecSet<I> {
-    fn from_iter<Iter: IntoIterator<Item = I>>(iter: Iter) -> Self {
-        let mut set = Self::new(); 
-        for i in iter {
-            set.insert(i);
-        }
-        set
-    }
-}
-impl<I: VecMapIndex> Default for VecSet<I> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-impl<I: VecMapIndex + Clone> VecSet<I> {
-    /// Constructs a [`VecSet`] from a slice of index-value pairs.
-    ///
-    /// Each `I` is inserted into the map, resizing the underlying vector as needed.
-    pub fn from_slice(slice: &[I]) -> Self {
-        let mut this = Self::new();
-        for index in slice.iter().cloned() {
-            this.insert(index);
-        }
-        this
-    }
-}
-
-impl<I, T> serde::Serialize for VecMap<I, T> 
-where    
+impl<I, T> serde::Serialize for VecMap<I, T>
+where
     I: Serialize + VecMapIndex,
     T: Serialize,
 {
-
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer 
+    where
+        S: Serializer,
     {
         let mut map = serializer.serialize_map(Some(self.vec.len()))?;
         for (idx, value) in self.entries() {
             map.serialize_entry(&idx, value)?;
         }
         map.end()
+    }
+}
+
+impl<'de, I, T> serde::Deserialize<'de> for VecMap<I, T>
+where
+    I: serde::Deserialize<'de> + VecMapIndex,
+    T: serde::Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_map(VecMapVisitor::new())
+    }
+}
+
+struct VecMapVisitor<I: VecMapIndex, T> {
+    marker: PhantomData<fn() -> VecMap<I, T>>,
+}
+
+impl<I: VecMapIndex, T> VecMapVisitor<I, T> {
+    fn new() -> Self {
+        VecMapVisitor {
+            marker: PhantomData,
+        }
+    }
+}
+
+impl<'de, I, T> serde::de::Visitor<'de> for VecMapVisitor<I, T>
+where
+    I: serde::Deserialize<'de> + VecMapIndex,
+    T: serde::Deserialize<'de>,
+{
+    type Value = VecMap<I, T>;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("a map with VecMap indices")
+    }
+
+    fn visit_map<M>(self, mut map: M) -> Result<VecMap<I, T>, M::Error>
+    where
+        M: serde::de::MapAccess<'de>,
+    {
+        let mut vecmap: VecMap<I, T> = VecMap::new();
+
+        while let Some((idx, value)) = map.next_entry::<I, T>()? {
+            vecmap.insert(idx, value);
+        }
+        Ok(vecmap)
     }
 }

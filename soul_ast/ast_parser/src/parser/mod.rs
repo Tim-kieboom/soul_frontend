@@ -62,7 +62,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     pub fn parse(tokens: TokenStream<'a>, faults: &'f mut Vec<SementicFault>) -> AbstractSyntaxTree {
         let mut this = Self::new(tokens, faults);
         if let Err(err) = this.tokens.initialize() {
-            this.add_error(err);
+            this.log_error(err);
             return AbstractSyntaxTree {
                 root: Block {
                     modifier: TypeModifier::Mut,

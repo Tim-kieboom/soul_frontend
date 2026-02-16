@@ -9,7 +9,7 @@ where
         mut next: ?*Bucket = null 
     }
 
-    mut entries: List<?Bucket, Mem>
+    mut entries: List<Bucket, Mem>
 
     This(capacity: uint = 1000) {
         return This{entries: List(capacity)}

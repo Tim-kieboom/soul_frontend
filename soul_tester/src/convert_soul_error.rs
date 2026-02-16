@@ -6,37 +6,40 @@ use soul_utils::sementic_level::{SementicFault, SementicLevel};
 use soul_utils::span::Span;
 
 pub trait ToAnyhow {
-    fn to_anyhow(&self, file_path: &str, source_file: &str) -> anyhow::Error;
+    fn to_anyhow(&self, file_path: &str, source_file: &str, backtrace: bool) -> anyhow::Error;
 }
 
 pub trait ToMessage {
-    fn to_message(&self, file_path: &str, source_file: &str) -> String;
+    fn to_message(&self, file_path: &str, source_file: &str, backtrace: bool) -> String;
 }
 
 impl ToAnyhow for SementicFault {
-    fn to_anyhow(&self, file_path: &str, source_file: &str) -> anyhow::Error {
-        anyhow::Error::msg(self.to_message(file_path, source_file))
+    fn to_anyhow(&self, file_path: &str, source_file: &str, backtrace: bool) -> anyhow::Error {
+        anyhow::Error::msg(self.to_message(file_path, source_file, backtrace))
     }
 }
 
 impl ToMessage for SementicFault {
-    fn to_message(&self, file_path: &str, source_file: &str) -> String {
+    fn to_message(&self, file_path: &str, source_file: &str, backtrace: bool) -> String {
         to_message(
             self.get_soul_error(),
             self.get_level(),
             file_path,
             source_file,
+            backtrace
         )
     }
 }
 
-fn to_message(err: &SoulError, level: SementicLevel, file_path: &str, source_file: &str) -> String {
+fn to_message(err: &SoulError, level: SementicLevel, file_path: &str, source_file: &str, backtrace: bool) -> String {
     let start_line = err.span.map(|el| el.start_line).unwrap_or(0);
     let number_len = start_line.to_string().len();
     let begin_space = " ".repeat(number_len + 2);
 
     let mut sb = String::new();
-
+    if backtrace {
+        sb.push_str(&err.backtrace.to_string());
+    }
     sb.push_str("-----");
     sb.push_str(level_color(&level));
     sb.push_str(&format!("{:?}", err.kind));
@@ -83,7 +86,9 @@ fn level_color(level: &SementicLevel) -> &'static str {
 }
 
 fn get_source_snippet(out: &mut String, span: &Span, mut lines: Lines, begin_space: &str) {
-    if span.start_line == 0 {
+    use std::fmt::Write;
+    
+    if span.start_line == 0 || span.end_line == 0 {
         return;
     }
 
@@ -96,54 +101,63 @@ fn get_source_snippet(out: &mut String, span: &Span, mut lines: Lines, begin_spa
     } else {
         lines.next()
     };
-    let current_line = match lines.next() {
-        Some(val) => val,
-        _ => return,
-    };
-    let next_line = lines.next();
+
+    let mut all_remaining_lines = Vec::new();
+    while let Some(line) = lines.next() {
+        all_remaining_lines.push(line);
+    }
+
+    let start_idx = 0;
+    let end_idx = (span.end_line.saturating_sub(span.start_line)).min(all_remaining_lines.len().saturating_sub(1));
+    let span_lines: Vec<_> = all_remaining_lines[start_idx..=end_idx].to_vec();
+    let next_line = all_remaining_lines.get(end_idx + 1).cloned();
 
     let max_len = [
         prev_line.as_ref().map(|s| s.len()).unwrap_or(0),
-        current_line.len(),
+        span_lines.iter().map(|s| s.len()).max().unwrap_or(0),
         next_line.as_ref().map(|s| s.len()).unwrap_or(0),
-    ]
-    .into_iter()
-    .max()
-    .unwrap_or(0);
+    ].into_iter().max().unwrap_or(0);
 
-    if let Some(line) = prev_line {
-        let begin = format!("{}.", span.start_line - 1);
+    if let Some(line) = &prev_line {
+        let begin = format!("{}.", span.start_line.saturating_sub(1));
         let len = (begin.len() as i64 - begin_space.len() as i64).unsigned_abs() as usize;
         let spaces = " ".repeat(len);
-        out.push_str(&format!("{spaces}{begin}│ {}\n", line))
-    };
+        writeln!(out, "{spaces}{begin}│ {}", line).unwrap();
+    }
 
-    let begin = format!("{}.", span.start_line);
-    let len = (begin.len() as i64 - begin_space.len() as i64).unsigned_abs() as usize;
-    let spaces = " ".repeat(len);
-    out.push_str(&format!("{spaces}{begin}│ {}\n", current_line));
+    for (i, line) in span_lines.iter().enumerate() {
+        let line_num = span.start_line + i;
+        let begin = format!("{}.", line_num);
+        let len = (begin.len() as i64 - begin_space.len() as i64).unsigned_abs() as usize;
+        let spaces = " ".repeat(len);
+        
+        writeln!(out, "{spaces}{begin}│ {}", line).unwrap();
 
-    let start_col = span.start_offset.max(1);
-    let end_col = if span.end_line == span.start_line {
-        span.end_offset.max(start_col)
-    } else {
-        start_col
-    };
-
-    let spaces = " ".repeat(start_col.saturating_sub(1));
-    let carets = "^".repeat((end_col.saturating_sub(start_col)).max(1));
-
-    out.push_str(&format!("{begin_space}│ {spaces}{carets}\n"));
+        if i == 0 {
+            let start_col = span.start_offset.max(1);
+            let spaces_before = " ".repeat(start_col.saturating_sub(1));
+            let carets = "^".repeat(line.len().saturating_sub(start_col).max(1));
+            writeln!(out, "{begin_space}│ {spaces_before}{carets}").unwrap();
+        }
+        else if i < span_lines.len().saturating_sub(1) {
+            let carets = "^".repeat(line.len());
+            writeln!(out, "{begin_space}│ {carets}").unwrap();
+        }
+        else {
+            let end_col = span.end_offset.max(1);
+            let carets = "^".repeat(end_col.saturating_sub(1).max(1));
+            writeln!(out, "{begin_space}│ {carets}").unwrap();
+        }
+    }
 
     if let Some(line) = next_line {
-        let begin = format!("{}.", span.start_line + 1);
+        let begin = format!("{}.", span.end_line + 1);
         let len = (begin.len() as i64 - begin_space.len() as i64).unsigned_abs() as usize;
         let spaces = " ".repeat(len);
-        out.push_str(&format!("{spaces}{begin}│ {}\n", line))
-    };
+        writeln!(out, "{spaces}{begin}│ {}", line).unwrap();
+    }
 
-    out.push_str(&format!("{begin_space}└──"));
-    out.push_str(&"─".repeat(max_len))
+    writeln!(out, "{begin_space}└──{:─<1$}", "", max_len).unwrap();
 }
 
 fn display_span(sb: &mut String, span: Span) {

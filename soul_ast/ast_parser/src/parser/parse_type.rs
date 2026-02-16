@@ -5,7 +5,7 @@ use soul_tokenizer::{Number, TokenKind};
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
     soul_error_internal,
-    soul_names::{InternalPrimitiveTypes, TypeModifier},
+    soul_names::{PrimitiveTypes, TypeModifier},
     try_result::{
         ResultTryErr, ResultTryNotValue, TryErr, TryError, TryNotValue, TryOk, TryResult,
     },
@@ -139,7 +139,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     fn get_base_type(&mut self) -> TryResult<SoulType, SoulError> {
-        const NONE_STR: &str = InternalPrimitiveTypes::None.as_str();
+        const NONE_STR: &str = PrimitiveTypes::None.as_str();
 
         match &self.token().kind {
             TokenKind::Ident(val) if val == NONE_STR => {
@@ -162,7 +162,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let ident = self.try_bump_consume_ident().try_not_value()?;
 
-        if let Some(prim) = InternalPrimitiveTypes::from_str(ident.as_str()) {
+        if let Some(prim) = PrimitiveTypes::from_str(ident.as_str()) {
             let span = self.token().span;
             return TryOk(SoulType::new(None, TypeKind::Primitive(prim), span));
         }

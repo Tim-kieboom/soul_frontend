@@ -1,6 +1,5 @@
 use crate::error::{SoulError, SoulResult};
 
-
 /// - `TryError::IsNotValue(R)` is not of type (type: `R` is so that you could give ownership of value back if needed)
 /// - `TryError::IsErr(SoulError)` is of type but has error
 pub enum TryError<R> {
@@ -87,7 +86,7 @@ impl<T, R, V> ResultMapNotValue<T, R, V> for TryResult<T, R> {
         match self {
             Ok(val) => TryOk(val),
             Err(TryError::IsErr(err)) => TryErr(err),
-            Err(TryError::IsNotValue(err)) => TryNotValue(func(err)), 
+            Err(TryError::IsNotValue(err)) => TryNotValue(func(err)),
         }
     }
 }

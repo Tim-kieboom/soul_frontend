@@ -1,6 +1,6 @@
 use soul_utils::{
     Ident,
-    soul_names::{InternalPrimitiveTypes, TypeModifier},
+    soul_names::{PrimitiveTypes, TypeModifier},
     span::Span,
 };
 
@@ -24,7 +24,7 @@ pub enum TypeKind {
     /// Represents the type of all types
     Type,
     /// Primitive types like int, bool, float
-    Primitive(InternalPrimitiveTypes),
+    Primitive(PrimitiveTypes),
     Array(ArrayType),
     /// Reference type: &T or &mut T
     Reference(ReferenceType),

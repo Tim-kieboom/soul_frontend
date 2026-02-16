@@ -39,7 +39,7 @@ define_str_enum!(
     ///
     /// These are the built-in numeric, character, and boolean types.
     #[derive(Hash)]
-    pub enum InternalPrimitiveTypes {
+    pub enum PrimitiveTypes {
         /// default-size character type
         Char => "char", 0,
         /// 8-bit character type
@@ -96,100 +96,109 @@ define_str_enum!(
         Float64 => "f64", 64,
     }
 );
-impl InternalPrimitiveTypes {
-    pub fn is_numeric(&self) -> bool {
+impl PrimitiveTypes {
+    pub const fn is_numeric(&self) -> bool {
         match self {
-            InternalPrimitiveTypes::UntypedInt
-            | InternalPrimitiveTypes::Int
-            | InternalPrimitiveTypes::Int8
-            | InternalPrimitiveTypes::Int16
-            | InternalPrimitiveTypes::Int32
-            | InternalPrimitiveTypes::Int64
-            | InternalPrimitiveTypes::Int128
-            | InternalPrimitiveTypes::UntypedUint
-            | InternalPrimitiveTypes::Uint
-            | InternalPrimitiveTypes::Uint8
-            | InternalPrimitiveTypes::Uint16
-            | InternalPrimitiveTypes::Uint32
-            | InternalPrimitiveTypes::Uint64
-            | InternalPrimitiveTypes::Uint128
-            | InternalPrimitiveTypes::UntypedFloat
-            | InternalPrimitiveTypes::Float16
-            | InternalPrimitiveTypes::Float32
-            | InternalPrimitiveTypes::Float64 => true,
+            PrimitiveTypes::UntypedInt
+            | PrimitiveTypes::Int
+            | PrimitiveTypes::Int8
+            | PrimitiveTypes::Int16
+            | PrimitiveTypes::Int32
+            | PrimitiveTypes::Int64
+            | PrimitiveTypes::Int128
+            | PrimitiveTypes::UntypedUint
+            | PrimitiveTypes::Uint
+            | PrimitiveTypes::Uint8
+            | PrimitiveTypes::Uint16
+            | PrimitiveTypes::Uint32
+            | PrimitiveTypes::Uint64
+            | PrimitiveTypes::Uint128
+            | PrimitiveTypes::UntypedFloat
+            | PrimitiveTypes::Float16
+            | PrimitiveTypes::Float32
+            | PrimitiveTypes::Float64 => true,
 
             _ => false,
         }
     }
 
-    pub fn is_fixed_point(&self) -> bool {
+    pub const fn is_any_interger(&self) -> bool {
         match self {
-            InternalPrimitiveTypes::UntypedInt
-            | InternalPrimitiveTypes::Int
-            | InternalPrimitiveTypes::Int8
-            | InternalPrimitiveTypes::Int16
-            | InternalPrimitiveTypes::Int32
-            | InternalPrimitiveTypes::Int64
-            | InternalPrimitiveTypes::Int128
-            | InternalPrimitiveTypes::UntypedUint
-            | InternalPrimitiveTypes::Uint
-            | InternalPrimitiveTypes::Uint8
-            | InternalPrimitiveTypes::Uint16
-            | InternalPrimitiveTypes::Uint32
-            | InternalPrimitiveTypes::Uint64
-            | InternalPrimitiveTypes::Uint128 => true,
+            PrimitiveTypes::UntypedInt
+            | PrimitiveTypes::Int
+            | PrimitiveTypes::Int8
+            | PrimitiveTypes::Int16
+            | PrimitiveTypes::Int32
+            | PrimitiveTypes::Int64
+            | PrimitiveTypes::Int128
+            | PrimitiveTypes::UntypedUint
+            | PrimitiveTypes::Uint
+            | PrimitiveTypes::Uint8
+            | PrimitiveTypes::Uint16
+            | PrimitiveTypes::Uint32
+            | PrimitiveTypes::Uint64
+            | PrimitiveTypes::Uint128 => true,
 
             _ => false,
         }
     }
 
-    pub fn is_float(&self) -> bool {
+    pub const fn is_float(&self) -> bool {
         match self {
-            InternalPrimitiveTypes::UntypedFloat
-            | InternalPrimitiveTypes::Float16
-            | InternalPrimitiveTypes::Float32
-            | InternalPrimitiveTypes::Float64 => true,
-            
+            PrimitiveTypes::UntypedFloat
+            | PrimitiveTypes::Float16
+            | PrimitiveTypes::Float32
+            | PrimitiveTypes::Float64 => true,
+
             _ => false,
         }
     }
 
-    pub fn is_unsigned_interger(&self) -> bool {
+    pub const fn is_unsigned_interger(&self) -> bool {
         match self {
-            InternalPrimitiveTypes::UntypedUint
-            | InternalPrimitiveTypes::Uint
-            | InternalPrimitiveTypes::Uint8
-            | InternalPrimitiveTypes::Uint16
-            | InternalPrimitiveTypes::Uint32
-            | InternalPrimitiveTypes::Uint64
-            | InternalPrimitiveTypes::Uint128 => true,
-            
+            PrimitiveTypes::UntypedUint
+            | PrimitiveTypes::Uint
+            | PrimitiveTypes::Uint8
+            | PrimitiveTypes::Uint16
+            | PrimitiveTypes::Uint32
+            | PrimitiveTypes::Uint64
+            | PrimitiveTypes::Uint128 => true,
+
             _ => false,
         }
     }
 
-    pub fn is_signed_interger(&self) -> bool {
+    pub const fn is_signed_interger(&self) -> bool {
         match self {
-            InternalPrimitiveTypes::UntypedInt
-            | InternalPrimitiveTypes::Int
-            | InternalPrimitiveTypes::Int8
-            | InternalPrimitiveTypes::Int16
-            | InternalPrimitiveTypes::Int32
-            | InternalPrimitiveTypes::Int64
-            | InternalPrimitiveTypes::Int128 => true,
-            
+            PrimitiveTypes::UntypedInt
+            | PrimitiveTypes::Int
+            | PrimitiveTypes::Int8
+            | PrimitiveTypes::Int16
+            | PrimitiveTypes::Int32
+            | PrimitiveTypes::Int64
+            | PrimitiveTypes::Int128 => true,
+
             _ => false,
         }
     }
 
-    pub fn is_character(&self) -> bool {
+    pub const fn is_character(&self) -> bool {
         match self {
-            InternalPrimitiveTypes::Char
-            | InternalPrimitiveTypes::Char8
-            | InternalPrimitiveTypes::Char16
-            | InternalPrimitiveTypes::Char32
-            | InternalPrimitiveTypes::Char64 => true,
-            
+            PrimitiveTypes::Char
+            | PrimitiveTypes::Char8
+            | PrimitiveTypes::Char16
+            | PrimitiveTypes::Char32
+            | PrimitiveTypes::Char64 => true,
+
+            _ => false,
+        }
+    }
+
+    pub const fn is_untyped_interger(&self) -> bool {
+        match self {
+            PrimitiveTypes::UntypedInt
+            | PrimitiveTypes::UntypedUint
+            | PrimitiveTypes::UntypedFloat => true,
             _ => false,
         }
     }
@@ -329,4 +338,3 @@ define_symbols!(
         LogOr => "||", SymbolKind::DoubleOr, 0,
     }
 );
-

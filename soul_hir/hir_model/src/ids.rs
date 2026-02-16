@@ -1,7 +1,7 @@
 use soul_utils::vec_map::VecMapIndex;
 
 /// used for internal idGenerator
-pub trait IdAlloc {
+pub trait IdAlloc: Clone {
     /// unique error Id always the same
     fn error() -> Self;
 
@@ -10,6 +10,9 @@ pub trait IdAlloc {
 
     /// Allocates a new unique ID and advances the generator.
     fn alloc(&mut self) -> Self;
+
+    /// get last allocated ID.
+    fn last(&self) -> Self;
 }
 
 /// Generates strongly-typed ID newtypes and implements allocation logic.
@@ -47,6 +50,10 @@ macro_rules! impl_ids {
                     self.0 += 1;
                     new
                 }
+
+                fn last(&self) -> Self {
+                    self.clone()
+                }
             }
         )*
     };
@@ -59,7 +66,7 @@ impl_ids!(
     LocalId,
     ModuleId,
     FunctionId,
-    InferVarId,
+    InferTypeId,
     StatementId,
     ExpressionId
 );
@@ -80,13 +87,23 @@ impl<Id: IdAlloc> IdGenerator<Id> {
         }
     }
 
+    pub fn from_id(current: Id) -> Self {
+        Self { current }
+    }
+
     /// Allocates and returns a fresh ID.
     pub fn alloc(&mut self) -> Id {
         self.current.alloc()
     }
+
+    pub fn last(&self) -> Id {
+        self.current.last()
+    }
 }
 impl<Id: IdAlloc> Default for IdGenerator<Id> {
     fn default() -> Self {
-        Self { current: Id::begin() }
+        Self {
+            current: Id::begin(),
+        }
     }
 }

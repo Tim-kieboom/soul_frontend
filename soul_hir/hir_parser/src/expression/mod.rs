@@ -1,16 +1,19 @@
 use ast::{VarTypeKind, scope::NodeId};
-use hir::{FunctionId, HirType, HirTypeKind, IdAlloc, LocalId, TypeId};
+use hir::{FunctionId, HirType, HirTypeKind, IdAlloc, LocalId, Place, PlaceKind, TypeId};
 use soul_utils::{
-    Ident, error::{SoulError, SoulErrorKind}, soul_error_internal, span::Span
+    Ident,
+    error::{SoulError, SoulErrorKind},
+    soul_error_internal,
+    span::Span,
 };
 
-use crate::{HirContext};
+use crate::HirContext;
 mod array;
 mod r#if;
 
 impl<'a> HirContext<'a> {
     pub fn lower_expression(&mut self, expression: &ast::Expression) -> hir::ExpressionId {
-        let id = self.id_generator.alloc_expression();
+        let id = self.alloc_expression(expression.span);
 
         let span = expression.span;
         let hir_expression = match &expression.node {
@@ -25,10 +28,13 @@ impl<'a> HirContext<'a> {
                 kind: hir::ExpressionKind::Literal(literal.clone()),
             },
             ast::ExpressionKind::Index(index) => {
-                let place = hir::Place::Index {
-                    base: Box::new(self.lower_place(&index.collection)),
-                    index: self.lower_expression(&index.index),
-                };
+                let place = Place::new(
+                    PlaceKind::Index {
+                        base: Box::new(self.lower_place(&index.collection)),
+                        index: self.lower_expression(&index.index),
+                    },
+                    span,
+                );
 
                 hir::Expression {
                     id,
@@ -41,9 +47,7 @@ impl<'a> HirContext<'a> {
                 ident,
                 resolved: _,
                 id: option_id,
-            } => {
-                self.lower_expression_variable(id, ident, *option_id)
-            }
+            } => self.lower_expression_variable(id, ident, *option_id),
             ast::ExpressionKind::If(r#if) => self.lower_if(id, r#if),
             ast::ExpressionKind::As(cast) => {
                 let value = self.lower_expression(&cast.left);
@@ -77,7 +81,7 @@ impl<'a> HirContext<'a> {
                 let body = self.lower_block(&r#while.block);
                 hir::Expression {
                     id,
-                    ty: self.add_type(HirType::none_ty()),
+                    ty: self.add_type(HirType::none_type()),
                     kind: hir::ExpressionKind::While { condition, body },
                 }
             }
@@ -104,9 +108,7 @@ impl<'a> HirContext<'a> {
                 id: _,
                 is_mutable,
                 expression,
-            } => {
-                self.lower_ref(id, expression, is_mutable, span)
-            }
+            } => self.lower_ref(id, expression, is_mutable, span),
             ast::ExpressionKind::Default(_) => {
                 todo!("desugar Default")
             }
@@ -133,12 +135,8 @@ impl<'a> HirContext<'a> {
         let body = self.lower_block(block);
 
         let ty = match &self.hir.blocks[body].terminator {
-            Some(value) => {
-                self.hir.expressions[*value].ty
-            }
-            None => {
-                self.add_type(HirType::none_ty())
-            }
+            Some(value) => self.hir.expressions[*value].ty,
+            None => self.add_type(HirType::none_type()),
         };
 
         let id = self.alloc_expression(block.span);
@@ -151,7 +149,13 @@ impl<'a> HirContext<'a> {
         self.insert_expression(id, return_value)
     }
 
-    fn lower_ref(&mut self, id: hir::ExpressionId, expression: &ast::Expression, is_mutable: &bool, span: Span) -> hir::Expression {
+    fn lower_ref(
+        &mut self,
+        id: hir::ExpressionId,
+        expression: &ast::Expression,
+        is_mutable: &bool,
+        span: Span,
+    ) -> hir::Expression {
         let inner = self.lower_expression(expression);
         let of_type = self.hir.expressions[inner].ty;
 
@@ -169,7 +173,7 @@ impl<'a> HirContext<'a> {
             },
             _ => {
                 let temp_local = self.id_generator.alloc_local();
-                
+
                 let variable = hir::Variable {
                     ty: of_type,
                     local: temp_local,
@@ -180,7 +184,7 @@ impl<'a> HirContext<'a> {
             }
         };
 
-        let place = hir::Place::Local(local);
+        let place = Place::new(PlaceKind::Local(local), span);
         let ty = self.add_type(HirType::new(HirTypeKind::Ref {
             of_type,
             mutable: *is_mutable,
@@ -195,7 +199,12 @@ impl<'a> HirContext<'a> {
         }
     }
 
-    fn lower_expression_variable(&mut self, id: hir::ExpressionId, ident: &Ident, option_id: Option<NodeId>) -> hir::Expression {
+    fn lower_expression_variable(
+        &mut self,
+        id: hir::ExpressionId,
+        ident: &Ident,
+        option_id: Option<NodeId>,
+    ) -> hir::Expression {
         let node_id = option_id.expect("node_id should be Some(_) in hir");
         let var_type_kind = self.ast_store.get_variable_type(node_id);
 
@@ -221,7 +230,7 @@ impl<'a> HirContext<'a> {
             }
         };
 
-        let place = hir::Place::Local(local);
+        let place = Place::new(PlaceKind::Local(local), ident.span);
 
         hir::Expression {
             id,
@@ -235,16 +244,19 @@ impl<'a> HirContext<'a> {
         id: hir::ExpressionId,
         function_call: &ast::FunctionCall,
     ) -> hir::Expression {
-        let resolved = function_call
-            .resolved
-            .expect("node_id should be Some(_) in hir");
+        let resolved = match function_call.resolved {
+            Some(val) => val,
+            None => {
+                return hir::Expression {
+                    id,
+                    ty: TypeId::error(),
+                    kind: hir::ExpressionKind::Null,
+                };
+            }
+        };
 
         let ty = match self.ast_store.get_function(resolved) {
-            Some(signature) => Self::convert_type(
-                &signature.return_type,
-                &mut self.hir.types,
-                &mut self.id_generator.ty,
-            ),
+            Some(signature) => Self::convert_type(&signature.return_type, &mut self.hir.types),
             None => self.new_infer_type(),
         };
 

@@ -27,7 +27,6 @@ impl<'a> HirContext<'a> {
     fn lower_if_arm(&mut self, arm: &ast::ElseKind) -> BlockId {
         match arm {
             ast::ElseKind::Else(block) => self.lower_block(&block.node),
-
             ast::ElseKind::ElseIf(if_expr) => self.lower_else_if(&*if_expr),
         }
     }
@@ -37,18 +36,20 @@ impl<'a> HirContext<'a> {
         let if_expression = self.lower_if(id, &arm.node);
 
         let block_id = self.id_generator.alloc_body();
-        let mut block = hir::Block::new(block_id);
+        let block = hir::Block::new(block_id);
+        self.insert_block(block_id, block, arm.span);
 
         let expression_id = self.insert_expression(id, if_expression);
 
         let _ = self.alloc_statement(&ItemMetaData::default_const(), arm.span);
         let if_statement = hir::Statement::Expression {
+            id: self.alloc_statement(&ItemMetaData::default_const(), arm.span),
             value: expression_id,
             ends_semicolon: false,
         };
 
-        block.statements.push(if_statement);
-        self.hir.blocks.insert(block_id, block);
+        self.insert_in_block(block_id, if_statement);
+        self.insert_block_terminator(block_id, expression_id);
         block_id
     }
 }

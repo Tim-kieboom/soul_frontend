@@ -1,4 +1,3 @@
-
 #[macro_export]
 /// Defines a string-backed enum with convenient helpers.
 ///
@@ -175,13 +174,13 @@ macro_rules! define_str_enum {
 ///
 /// const CONST_REF_STR: &str = Refs::ConstRef.as_str(); // const-time
 /// assert_eq!(CONST_REF_STR, "@");
-/// 
+///
 /// const CONST_REF_SYMBOOL: SymboolKind = Refs::ConstRef.as_symbool(); // const-time
 /// assert_eq!(CONST_REF_SYMBOOL, SymboolKind::ConstRef);
 ///
 /// const CONST_REF: Option<Refs> = Refs::from_symbool(SymboolKind::ConstRef); // const-time
 /// assert_eq!(CONST_REF, Some(Refs::ConstRef));
-/// 
+///
 /// let mut_ref = Refs::from_str("&");
 /// assert_eq!(mut_ref, Some(Refs::MutRef));
 ///

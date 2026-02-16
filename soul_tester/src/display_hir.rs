@@ -1,9 +1,20 @@
 use hir::{ExpressionId, FunctionId, HirTree, LocalId, TypeId};
+use hir_typed_context::HirTypedTable;
 use soul_utils::{soul_names::KeyWord, vec_map::VecMapIndex};
 use std::fmt::Write;
 
 pub fn display_hir(hir: &HirTree) -> String {
-    let mut displayer = HirDisplayer::new(hir);
+    let mut displayer = HirDisplayer::new_hir(hir);
+
+    for global in &hir.root.globals {
+        displayer.display_global(global);
+    }
+
+    displayer.to_string()
+}
+
+pub fn display_typed_hir(hir: &HirTree, type_table: &HirTypedTable) -> String {
+    let mut displayer = HirDisplayer::new_typed_hir(hir, type_table);
 
     for global in &hir.root.globals {
         displayer.display_global(global);
@@ -15,17 +26,29 @@ pub fn display_hir(hir: &HirTree) -> String {
 struct HirDisplayer<'a> {
     sb: String,
     hir: &'a HirTree,
+    type_table: Option<&'a HirTypedTable>,
 
     depth: usize,
     terminate: Option<ExpressionId>,
 }
 impl<'a> HirDisplayer<'a> {
-    fn new(hir: &'a HirTree) -> Self {
+    fn new_hir(hir: &'a HirTree) -> Self {
         Self {
             hir,
             depth: 0,
             sb: String::new(),
             terminate: None,
+            type_table: None,
+        }
+    }
+
+    fn new_typed_hir(hir: &'a HirTree, type_table: &'a HirTypedTable) -> Self {
+        Self {
+            hir,
+            depth: 0,
+            sb: String::new(),
+            terminate: None,
+            type_table: Some(type_table),
         }
     }
 
@@ -38,7 +61,8 @@ impl<'a> HirDisplayer<'a> {
         self.push('\n');
     }
 
-    fn display_function(&mut self, function: &hir::Function) {
+    fn display_function(&mut self, function_id: &hir::FunctionId) {
+        let function = &self.hir.functions[*function_id];
         self.push('\n');
         self.display_call_id(function.id);
         self.push(' ');
@@ -49,13 +73,22 @@ impl<'a> HirDisplayer<'a> {
         for (i, arg) in function.parameters.iter().enumerate() {
             self.display_local(arg.local);
             self.push_str(": ");
-            self.display_type(arg.ty);
+            let ty = match &self.type_table {
+                Some(val) => val.locals[arg.local],
+                None => function.return_type,
+            };
+            self.display_type(ty);
             if i != last_index {
                 self.push_str(", ");
             }
         }
         self.push_str("): ");
-        self.display_type(function.return_type);
+
+        let ty = match &self.type_table {
+            Some(val) => val.functions[function.id],
+            None => function.return_type,
+        };
+        self.display_type(ty);
         self.push(' ');
         self.display_block(&function.body);
     }
@@ -63,7 +96,11 @@ impl<'a> HirDisplayer<'a> {
     fn display_variable(&mut self, variable: &hir::Variable) {
         self.display_local(variable.local);
         self.push_str(": ");
-        self.display_type(variable.ty);
+        let ty = match self.type_table {
+            Some(val) => val.locals[variable.local],
+            None => variable.ty,
+        };
+        self.display_type(ty);
         if let Some(value) = &variable.value {
             self.push_str(" := ");
             self.display_expression(value);
@@ -82,6 +119,7 @@ impl<'a> HirDisplayer<'a> {
         let prev = self.terminate;
         self.terminate = block.terminator;
 
+        self.push_str(&format!("Block_{}", id.index()));
         self.push_str("{\n");
 
         self.depth += 1;
@@ -100,28 +138,29 @@ impl<'a> HirDisplayer<'a> {
 
     fn display_statement(&mut self, node: &hir::Statement) {
         match node {
-            hir::Statement::Assign(assign) => self.display_assign(assign),
-            hir::Statement::Variable(variable) => self.display_variable(variable),
-            hir::Statement::Fall(expression_id) => {
+            hir::Statement::Assign(assign, _) => self.display_assign(assign),
+            hir::Statement::Variable(variable, _) => self.display_variable(variable),
+            hir::Statement::Fall(expression_id, _) => {
                 self.push_str("fall ");
                 if let Some(value) = expression_id {
                     self.display_expression(value);
                 }
             }
-            hir::Statement::Break(expression_id) => {
+            hir::Statement::Break(expression_id, _) => {
                 self.push_str("break ");
                 if let Some(value) = expression_id {
                     self.display_expression(value);
                 }
             }
-            hir::Statement::Return(expression_id) => {
+            hir::Statement::Return(expression_id, _) => {
                 self.push_str("return ");
                 if let Some(value) = expression_id {
                     self.display_expression(value);
                 }
             }
-            hir::Statement::Continue => self.push_str(KeyWord::Continue.as_str()),
+            hir::Statement::Continue(_) => self.push_str(KeyWord::Continue.as_str()),
             hir::Statement::Expression {
+                id:_,
                 value,
                 ends_semicolon,
             } => {
@@ -151,14 +190,12 @@ impl<'a> HirDisplayer<'a> {
             }
             hir::ExpressionKind::Ref { place, mutable } => {
                 self.push(if *mutable { '&' } else { '@' });
-
                 self.display_place(place);
-                self.display_astype(value.ty);
             }
             hir::ExpressionKind::DeRef(expression_id) => {
                 self.push('*');
                 self.display_expression(expression_id);
-                self.display_astype(value.ty);
+                self.display_expression_astype(value.id, value.ty);
             }
             hir::ExpressionKind::Unary {
                 operator,
@@ -166,7 +203,7 @@ impl<'a> HirDisplayer<'a> {
             } => {
                 self.push_str(operator.node.as_str());
                 self.display_expression(expression);
-                self.display_astype(value.ty);
+                self.display_expression_astype(value.id, value.ty);
             }
             hir::ExpressionKind::Binary {
                 left,
@@ -178,7 +215,7 @@ impl<'a> HirDisplayer<'a> {
                 self.push_str(operator.node.as_str());
                 self.display_expression(right);
                 self.push(')');
-                self.display_astype(value.ty);
+                self.display_expression_astype(value.id, value.ty);
             }
             hir::ExpressionKind::If {
                 condition,
@@ -195,7 +232,7 @@ impl<'a> HirDisplayer<'a> {
                     self.push_str("else ");
                     self.display_block(arm);
                 }
-                self.display_astype(value.ty);
+                self.display_expression_astype(value.id, value.ty);
                 self.push('\n');
             }
             hir::ExpressionKind::While { condition, body } => {
@@ -204,7 +241,7 @@ impl<'a> HirDisplayer<'a> {
                     self.display_expression(value);
                 }
                 self.display_block(body);
-                self.display_astype(value.ty);
+                self.display_expression_astype(value.id, value.ty);
                 self.push('\n');
             }
             hir::ExpressionKind::Call {
@@ -227,7 +264,7 @@ impl<'a> HirDisplayer<'a> {
                     }
                 }
                 self.push(')');
-                self.display_astype(value.ty)
+                self.display_expression_astype(value.id, value.ty);
             }
             hir::ExpressionKind::Cast { value, cast_to } => {
                 self.display_expression(value);
@@ -245,19 +282,19 @@ impl<'a> HirDisplayer<'a> {
     }
 
     fn display_place(&mut self, place: &hir::Place) {
-        match place {
-            hir::Place::Local(local_id) => self.display_local(*local_id),
-            hir::Place::Deref(place) => {
+        match &place.node {
+            hir::PlaceKind::Local(local_id) => self.display_local(*local_id),
+            hir::PlaceKind::Deref(place) => {
                 self.push('*');
                 self.display_place(place);
             }
-            hir::Place::Index { base, index } => {
+            hir::PlaceKind::Index { base, index } => {
                 self.display_place(base);
                 self.push('[');
                 self.display_expression(index);
                 self.push(']');
             }
-            hir::Place::Field { base, index } => {
+            hir::PlaceKind::Field { base, index } => {
                 self.display_place(base);
                 self.push('.');
                 write!(self.sb, "{:?}", index).expect("no fromat error");
@@ -266,11 +303,19 @@ impl<'a> HirDisplayer<'a> {
     }
 
     fn display_call_id(&mut self, id: FunctionId) {
-        write!(self.sb, "func_{}", id.index()).expect("no format error")
+        write!(self.sb, "Func_{}", id.index()).expect("no format error")
     }
 
     fn display_local(&mut self, id: LocalId) {
         write!(self.sb, "var_{}", id.index()).expect("no format error")
+    }
+
+    fn display_expression_astype(&mut self, value: ExpressionId, id: TypeId) {
+        let ty = match &self.type_table {
+            Some(val) => val.expressions[value],
+            None => id,
+        };
+        self.display_astype(ty);
     }
 
     fn display_astype(&mut self, id: TypeId) {
@@ -280,8 +325,12 @@ impl<'a> HirDisplayer<'a> {
     }
 
     fn display_type(&mut self, id: TypeId) {
-        let ty = self.hir.types.get_type(id).expect("should have id");
-        ty.write_display(&self.hir.types, &mut self.sb)
+        let types = match &self.type_table {
+            Some(val) => &val.types,
+            None => &self.hir.types,
+        };
+        let ty = types.get_type(id).expect("should have id");
+        ty.write_display(types, &mut self.sb)
             .expect("no format error");
     }
 
