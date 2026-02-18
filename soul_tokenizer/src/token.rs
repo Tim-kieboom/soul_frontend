@@ -31,6 +31,15 @@ pub enum TokenKind {
     /// String literal, e.g. `"hello"`.
     StringLiteral(String),
 }
+impl TokenKind {
+    pub fn is_end_line(&self) -> bool {
+        matches!(self, TokenKind::EndLine)
+    }
+
+    pub fn is_end_file(&self) -> bool {
+        matches!(self, TokenKind::EndFile)
+    }
+}
 
 /// Represents different numeric literal kinds parsed from source code.
 #[derive(Debug, Clone, Copy, PartialEq)]

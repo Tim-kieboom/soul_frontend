@@ -8,7 +8,7 @@ use soul_utils::{
 };
 
 use crate::{
-    BlockId, ExpressionId, HirType, HirTypeKind, IdAlloc, IdGenerator, InferTypeId, ModuleId, StatementId, TypeId
+    BlockId, ExpressionId, FunctionId, HirType, HirTypeKind, IdAlloc, IdGenerator, InferTypeId, LocalId, ModuleId, StatementId, TypeId
 };
 
 /// Maps HIR node IDs to their original source code spans.
@@ -26,6 +26,10 @@ pub struct SpanMap {
 
     /// Source spans for blocks.
     pub blocks: VecMap<BlockId, Span>,
+
+    pub locals: VecMap<LocalId, Span>,
+
+    pub functions: VecMap<FunctionId, Span>,
 }
 
 /// Auxiliary semantic metadata attached to HIR statements.
@@ -82,6 +86,10 @@ impl TypesMap {
 
     pub fn iter_types(&self) -> impl Iterator<Item = &HirType> {
         self.map.key_to_value.values()
+    }    
+    
+    pub fn iter_ids(&self) -> impl Iterator<Item = TypeId> {
+        self.map.key_to_value.keys()
     }
 
     pub fn last_infertype(&self) -> InferTypeId {

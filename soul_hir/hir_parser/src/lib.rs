@@ -2,7 +2,7 @@ mod id_generator;
 use ast::{DeclareStore, ParseResponse};
 use hir::{BlockId, FunctionId, HirTree, LocalId, TypeId};
 use id_generator::IdGenerator;
-use soul_utils::{Ident, error::SoulError, sementic_level::SementicFault, soul_error_internal, span::Span};
+use soul_utils::{Ident, error::SoulError, sementic_level::SementicFault, soul_error_internal, span::Span, vec_map::VecMapIndex};
 use std::collections::HashMap;
 
 mod expression;
@@ -87,10 +87,6 @@ impl<'a> HirContext<'a> {
         None
     }
 
-    fn insert_local_type(&mut self, local: LocalId, ty: TypeId) {
-        self.hir.locals.insert(local, ty);
-    }
-
     fn insert_local(&mut self, name: &Ident, local: LocalId, ty: TypeId) {
         let scope = match self.scopes.last_mut() {
             Some(val) => val,
@@ -103,8 +99,9 @@ impl<'a> HirContext<'a> {
             }
         };
 
+        self.hir.spans.locals.insert(local, name.span);
         scope.locals.insert(name.to_string(), local);
-        self.insert_local_type(local, ty);
+        self.hir.locals.insert(local, ty);
     }
 
     fn insert_block(&mut self, id: BlockId, block: hir::Block, span: Span) {
@@ -132,6 +129,7 @@ impl<'a> HirContext<'a> {
             }
         };
 
+        self.hir.spans.functions.insert(function, name.span);
         scope.functions.insert(name.to_string(), function);
     }
 
@@ -142,4 +140,8 @@ impl<'a> HirContext<'a> {
     fn log_error(&mut self, err: SoulError) {
         self.faults.push(SementicFault::error(err));
     }
+}
+
+fn create_local_name(id: LocalId) -> String {
+    format!("__local_{}", id.index())
 }

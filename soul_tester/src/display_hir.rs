@@ -1,4 +1,4 @@
-use hir::{ExpressionId, FunctionId, HirTree, LocalId, TypeId};
+use hir::{BlockId, ExpressionId, FunctionId, HirTree, LocalId, TypeId};
 use hir_typed_context::HirTypedTable;
 use soul_utils::{soul_names::KeyWord, vec_map::VecMapIndex};
 use std::fmt::Write;
@@ -119,7 +119,7 @@ impl<'a> HirDisplayer<'a> {
         let prev = self.terminate;
         self.terminate = block.terminator;
 
-        self.push_str(&format!("Block_{}", id.index()));
+        self.display_block_id(*id);
         self.push_str("{\n");
 
         self.depth += 1;
@@ -160,7 +160,7 @@ impl<'a> HirDisplayer<'a> {
             }
             hir::Statement::Continue(_) => self.push_str(KeyWord::Continue.as_str()),
             hir::Statement::Expression {
-                id:_,
+                id: _,
                 value,
                 ends_semicolon,
             } => {
@@ -271,11 +271,9 @@ impl<'a> HirDisplayer<'a> {
                 self.push_str(" as ");
                 self.display_type(*cast_to);
             }
-            hir::ExpressionKind::InnerRawStackArray { ty, len } => {
-                self.push_str("/*RawAlloced [");
-                self.display_expression(len);
-                self.push(']');
-                self.display_type(*ty);
+            hir::ExpressionKind::InnerRawStackArray { ty, .. } => {
+                self.push_str("/*RawAlloced ");
+                self.display_expression_astype(value.id, *ty);
                 self.push_str("*/");
             }
         };
@@ -300,6 +298,10 @@ impl<'a> HirDisplayer<'a> {
                 write!(self.sb, "{:?}", index).expect("no fromat error");
             }
         }
+    }
+
+    fn display_block_id(&mut self, id: BlockId) {
+        write!(self.sb, "Block_{}", id.index()).expect("no format error")
     }
 
     fn display_call_id(&mut self, id: FunctionId) {

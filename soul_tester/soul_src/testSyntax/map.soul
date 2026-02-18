@@ -12,7 +12,7 @@ where
     mut entries: List<Bucket, Mem>
 
     This(capacity: uint = 1000) {
-        return This{entries: List(capacity)}
+        This{entries: List(capacity)}
     }
 
     This:[(K, V)](array) {
@@ -21,14 +21,14 @@ where
             self.Insert(key, value)
         }
 
-        return self
+        self
     }
 
     Contains(@this, key: @K): bool {
         hash := getKeyIndex(key)
 
         entry := @entries[hash].catch{return false}
-        return findEntry(entry, key) != null
+        findEntry(entry, key) != null
     }
 
     Insert(&this, key: K, value: V) {
@@ -59,7 +59,7 @@ where
             entry = entry.next.pass
         }
 
-        return entry
+        entry
     }
 
     findEntry(@this, key: @K): ?@Bucket {
@@ -70,7 +70,7 @@ where
             entry = entry.next.pass
         }
 
-        return entry
+        entry
     }
 
     findEntryMut(&this, key: @K): ?&Bucket {
@@ -81,10 +81,10 @@ where
             entry = entry.next.pass
         }
 
-        return entry
+        entry
     }
 
     getKeyIndex(@this, key: @K) -> uint {
-        return key.Hash() % entries.Len()
+        key.Hash() % entries.Len()
     }
 }

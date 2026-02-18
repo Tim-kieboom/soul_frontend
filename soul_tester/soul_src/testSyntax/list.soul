@@ -17,21 +17,21 @@ where
     TryFromArray(array: [_]T): Err<This> {
         mut self = TryNew(0).pass
         self.ExtendArray(array).pass
-        return self
+        self
     }
 
     TryNew(capacity: uint): Err<This> {
         mut self = This{..}
         self.Reserve(capacity).pass
-        return self
+        self
     }
 
     Len(@this): uint {
-        return len
+        len
     }
 
     Cap(@this): uint {
-        return buffer.Len()
+        buffer.Len()
     }
 
     ExtendArray(&this, array: [_]T): Err {
@@ -65,7 +65,7 @@ where
         mut temp = null
         Swap(&buffer[--len].pass, &temp)
 
-        return temp ?? error.@str("Pop element is somehow Uninit")
+        temp ?? error.@str("Pop element is somehow Uninit")
     }
 
     Reserve(&this, toCapacity: uint): Err {
@@ -103,13 +103,13 @@ where
             capReserve = capReserve * INCREASE_FACTOR
         }
 
-        return Reserve(uint(capReserve))
+        Reserve(uint(capReserve))
     }
 
     grow(): Err {
         oldCap := f64(Cap().Min(1))
         cap := uint(oldCap * INCREASE_FACTOR)
-        return Reserve(cap)
+        Reserve(cap)
     }
 
     impl OpuaqeIndex<T> {
@@ -120,7 +120,7 @@ where
                 return error.OutOfBounds(len, index)
             }
 
-            return &buffer[index]
+            &buffer[index]
         }
     }
 }

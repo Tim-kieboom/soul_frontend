@@ -6,3 +6,4 @@
 *.soulAST.json
 soul_tester/path.json
 
+soul_tester/log.txt

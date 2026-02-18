@@ -1,7 +1,7 @@
 use hir::{Assign, ExpressionId, HirType, Place, PlaceKind, TypeId};
-use soul_utils::span::Span;
+use soul_utils::{Ident, span::Span};
 
-use crate::HirContext;
+use crate::{HirContext, create_local_name};
 
 impl<'a> HirContext<'a> {
     pub(super) fn lower_array(
@@ -10,14 +10,17 @@ impl<'a> HirContext<'a> {
         array: &ast::Array,
         span: Span,
     ) -> hir::Expression {
-        let (ty, element_type) = self.type_from_array(array, span);
+        let ty = self.type_from_array(array, span);
 
         let temp_local = self.id_generator.alloc_local();
-        self.insert_local_type(temp_local, ty);
+        let name =  Ident::new(create_local_name(temp_local), span);
+        self.insert_local(&name, temp_local, ty);
         let temp_place = Place::new(PlaceKind::Local(temp_local), span);
 
-        let size = array.values.len();
-        let unalloc = self.create_unallocted_array(ty, element_type, size, span);
+        let size = array.values.len() as u64;
+        let element = self.new_infer_type();
+        let infer_array = self.add_type(create_array(element, size));
+        let unalloc = self.create_unallocted_array(infer_array, element, size, span);
 
         let temp_array = hir::Variable {
             ty,
@@ -29,8 +32,8 @@ impl<'a> HirContext<'a> {
 
         for (i, element) in array.values.iter().enumerate() {
             let value = self.lower_expression(element);
-            let assign = self.create_assign_array_element(i, &temp_place, value, span);
-            self.insert_desugar_assignment(assign, span);
+            let assign = self.create_assign_array_element(i, &temp_place, value, element.span);
+            self.insert_desugar_assignment(assign, element.span);
         }
 
         hir::Expression {
@@ -44,7 +47,7 @@ impl<'a> HirContext<'a> {
         &mut self,
         ty: TypeId,
         element_type: TypeId,
-        size: usize,
+        size: u64,
         span: Span,
     ) -> ExpressionId {
         let uint = self.add_type(HirType::index_type());
@@ -103,4 +106,8 @@ impl<'a> HirContext<'a> {
             ),
         }
     }
+}
+
+fn create_array(element: TypeId, size: u64) -> HirType {
+    HirType { kind: hir::HirTypeKind::Array { element, kind: ast::ArrayKind::StackArray(size) }, modifier: None }
 }

@@ -6,6 +6,18 @@ macro_rules! define_const_strs {
             #[allow(unused)]
             pub const $name: &str = $value;
         )*
+
+        #[allow(non_camel_case_types)]
+        pub enum Colors {
+            $($name),*
+        }
+        impl Colors {
+            pub fn to_raw(&self) -> &'static str {
+                match self {
+                    $(Colors::$name => $value),*
+                }
+            } 
+        }
     };
 }
 

@@ -88,7 +88,7 @@ impl HirType {
         }
     }
 
-    pub const fn is_unknown(&self) -> bool {
+    pub const fn is_infertype(&self) -> bool {
         matches!(self.kind, HirTypeKind::InferType(_))
     }
 
@@ -329,11 +329,14 @@ impl HirTypeKind {
             | (HirTypeKind::Error, _)
             | (_, HirTypeKind::Error) => Ok(()),
 
-            _ => Err(format!(
+            _ => if self == should_be {
+                Ok(())
+            } else {
+                Err(format!(
                 "typekind '{}' not compatible with '{}'",
                 self.display_variant(),
                 should_be.display_variant()
-            )),
+            ))},
         }
     }
 
@@ -481,7 +484,7 @@ pub trait PrimitiveTypesHelper {
 }
 impl PrimitiveTypesHelper for PrimitiveTypes {
     fn resolve_untyped(&mut self, should_be: &Self) {
-        if !self.is_untyped_interger() {
+        if !self.is_untyped_numeric() {
             return;
         }
 
@@ -499,8 +502,8 @@ impl PrimitiveTypesHelper for PrimitiveTypes {
     }
 
     fn compatible(&self, should_be: &Self) -> bool {
-        if self.is_untyped_interger() || should_be.is_untyped_interger() {
-            if should_be.is_untyped_interger() && should_be.is_untyped_interger() {
+        if self.is_untyped_numeric() || should_be.is_untyped_numeric() {
+            if should_be.is_untyped_numeric() && should_be.is_untyped_numeric() {
                 return true;
             }
 

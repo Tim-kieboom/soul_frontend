@@ -7,24 +7,21 @@ use soul_utils::{
 };
 
 #[derive(Debug, Clone)]
-pub(crate) struct InferTable<'a> {
-    types: &'a TypesMap,
+pub(crate) struct InferTable {
     table: VecMap<InferTypeId, InferBinding>,
     id_generator: hir::IdGenerator<InferTypeId>,
 }
-impl<'a> InferTable<'a> {
-    pub(crate) fn new(types: &'a TypesMap) -> Self {
-        let table = types.iter_types()
-            .filter_map(|ty| {
-                match &ty.kind {
-                    HirTypeKind::InferType(id) => Some((*id, InferBinding::Unbound)),
-                    _ => None,
-                }
+impl InferTable {
+    pub(crate) fn new(types: &TypesMap) -> Self {
+        let table = types
+            .iter_types()
+            .filter_map(|ty| match &ty.kind {
+                HirTypeKind::InferType(id) => Some((*id, InferBinding::Unbound)),
+                _ => None,
             })
-            .collect::<VecMap<_,_>>();
+            .collect::<VecMap<_, _>>();
 
         Self {
-            types,
             table,
             id_generator: hir::IdGenerator::from_id(types.last_infertype()),
         }
@@ -64,16 +61,23 @@ impl<'a> InferTable<'a> {
 
     pub(crate) fn unify_type_type(
         &mut self,
+        types: &mut TypesMap,
         expected: TypeId,
         got_type: TypeId,
         span: Span,
     ) -> SoulResult<UnifyResult> {
-        let a_ty = self.get_type(expected)?;
-        let b_ty = self.get_type(got_type)?;
+        let a_id = self.resolve_type_lazy(types, expected, span)?;
+        let b_id = self.resolve_type_lazy(types, got_type, span)?;
+        let a_ty = self.get_type(types, a_id)?;
+        let b_ty = self.get_type(types, b_id)?;
 
         match (&a_ty.kind, &b_ty.kind) {
-            (HirTypeKind::InferType(a_inf), _) => self.unify_var_type(*a_inf, got_type, span),
-            (_, HirTypeKind::InferType(b_inf)) => self.unify_var_type(*b_inf, expected, span),
+            (HirTypeKind::InferType(a_inf), _) => {
+                self.unify_var_type(types, *a_inf, got_type, span)
+            }
+            (_, HirTypeKind::InferType(b_inf)) => {
+                self.unify_var_type(types, *b_inf, expected, span)
+            }
 
             (
                 HirTypeKind::Array {
@@ -92,7 +96,7 @@ impl<'a> InferTable<'a> {
                         Some(span),
                     ));
                 }
-                self.unify_type_type(*a_el, *b_el, span)
+                self.unify_type_type(types, *a_el, *b_el, span)
             }
 
             (
@@ -109,19 +113,19 @@ impl<'a> InferTable<'a> {
                     return Err(SoulError::new(
                         format!(
                             "Type mismatch: expected {} got {}",
-                            a_ty.display(self.types),
-                            b_ty.display(self.types)
+                            a_ty.display(types),
+                            b_ty.display(types)
                         ),
                         SoulErrorKind::UnifyTypeError,
                         Some(span),
                     ));
                 }
-                self.unify_type_type(*a_id, *b_id, span)
+                self.unify_type_type(types, *a_id, *b_id, span)
             }
 
             (HirTypeKind::Pointer(a_id), HirTypeKind::Pointer(b_id))
             | (HirTypeKind::Optional(a_id), HirTypeKind::Optional(b_id)) => {
-                self.unify_type_type(*a_id, *b_id, span)
+                self.unify_type_type(types, *a_id, *b_id, span)
             }
 
             _ => {
@@ -129,8 +133,8 @@ impl<'a> InferTable<'a> {
                     SoulError::new(
                         format!(
                             "Type mismatch: expected {} got {} because {reason}",
-                            a_ty.display(self.types),
-                            b_ty.display(self.types)
+                            a_ty.display(types),
+                            b_ty.display(types)
                         ),
                         SoulErrorKind::UnifyTypeError,
                         Some(span),
@@ -143,12 +147,22 @@ impl<'a> InferTable<'a> {
 
     pub(crate) fn unify_var_type(
         &mut self,
+        types: &mut TypesMap,
         var: InferTypeId,
         ty: TypeId,
         span: Span,
     ) -> SoulResult<UnifyResult> {
+        
         let root = self.find_root(var)?;
-        let ty = self.resolve_type(ty)?;
+        let ty = self.resolve_type_lazy(types, ty, span)?;
+        
+        if self.occurs_in(types, root, ty) {
+            return Err(SoulError::new(
+                "infinite type: inference variable occurs in its own definition",
+                SoulErrorKind::UnifyTypeError,
+                Some(span),
+            )); 
+        }
 
         match self.get_binding(root)? {
             InferBinding::Unbound => {
@@ -157,17 +171,17 @@ impl<'a> InferTable<'a> {
             }
 
             InferBinding::Bound(expect_id) => {
-                let expect_id = self.resolve_type(expect_id)?;
-                
-                let expecting = self.get_type(expect_id)?;
-                let is_type = self.get_type(ty)?;
+                let expect_id = self.resolve_type_lazy(types, expect_id, span)?;
+
+                let expecting = self.get_type(types, expect_id)?;
+                let is_type = self.get_type(types, ty)?;
 
                 expecting.compatible_type_kind(is_type).map_err(|reason| {
                     SoulError::new(
                         format!(
                             "Type mismatch: expected {} got {} because {reason}",
-                            expecting.display(&self.types),
-                            is_type.display(&self.types)
+                            expecting.display(types),
+                            is_type.display(types)
                         ),
                         SoulErrorKind::UnifyTypeError,
                         Some(span),
@@ -179,36 +193,173 @@ impl<'a> InferTable<'a> {
         }
     }
 
-    pub(crate) fn get_priority_type(&mut self, left: TypeId, right: TypeId) -> TypeId {
-        let left_type = self.get_type(left).expect("should have id");
-        let right_type = self.get_type(right).expect("should have id");
+    pub(crate) fn get_priority_type(
+        &mut self,
+        types: &TypesMap,
+        left: TypeId,
+        right: TypeId,
+    ) -> TypeId {
+        let left_type = self.get_type(types, left).expect("should have id");
+        let right_type = self.get_type(types, right).expect("should have id");
         match left_type.get_priority(right_type) {
             hir::Priority::Left => left,
             hir::Priority::Right => right,
         }
     }
 
-    fn resolve_type(&mut self, ty: TypeId) -> SoulResult<TypeId> {
-        let hir_ty = self.get_type(ty)?;
-        match hir_ty.kind {
+    pub(crate) fn resolve_type_strict(
+        &mut self,
+        types: &mut TypesMap,
+        ty: TypeId,
+        span: Span,
+    ) -> SoulResult<TypeId> {
+        let hir_ty = self.get_type(types, ty)?;
+        let modifier = hir_ty.modifier;
+
+        match &hir_ty.kind {
             HirTypeKind::InferType(inf) => {
-                let root = self.find_root(inf)?;
+                let root = self.find_root(*inf)?;
                 match self.table.get(root) {
+                    Some(InferBinding::Bound(t)) => self.resolve_type_strict(types, *t, span),
+                    Some(InferBinding::Unbound) => {
+                        Ok(types.insert(HirType::error_type()))
+                    }
+                    Some(_) => unreachable!(),
+                    None => return Err(soul_error_internal!(format!("{:?} not found", root), Some(span)))
+                }
+            }
+
+            HirTypeKind::Pointer(inner) => {
+                let inner_resolved = self.resolve_type_strict(types, *inner, span)?;
+                Ok(types.insert(HirType {
+                    kind: HirTypeKind::Pointer(inner_resolved),
+                    modifier,
+                }))
+            }
+
+            HirTypeKind::Optional(inner) => {
+                let inner_resolved = self.resolve_type_strict(types, *inner, span)?;
+                Ok(types.insert(HirType {
+                    kind: HirTypeKind::Optional(inner_resolved),
+                    modifier,
+                }))
+            }
+
+            HirTypeKind::Ref { of_type, mutable } => {
+                let mutable = *mutable;
+                let inner_resolved = self.resolve_type_strict(types, *of_type, span)?;
+                Ok(types.insert(HirType {
+                    kind: HirTypeKind::Ref { of_type: inner_resolved, mutable },
+                    modifier,
+                }))
+            }
+
+            HirTypeKind::Array { element, kind } => {
+                let kind = *kind;
+                let elem_resolved = self.resolve_type_strict(types, *element, span)?;
+                Ok(types.insert(HirType {
+                    kind: HirTypeKind::Array { element: elem_resolved, kind },
+                    modifier,
+                }))
+            }
+
+            _ => Ok(ty),
+        }
+    }
+
+    pub(crate) fn resolve_type_lazy(
+        &mut self,
+        types: &mut TypesMap,
+        ty: TypeId,
+        span: Span,
+    ) -> SoulResult<TypeId> {
+        let hir_ty = self.get_type(types, ty)?;
+        let modifier = hir_ty.modifier;
+        let resolved = match &hir_ty.kind {
+            HirTypeKind::InferType(inf) => {
+                let root = self.find_root(*inf)?;
+                return match self.table.get(root) {
                     Some(InferBinding::Bound(t)) => Ok(*t),
                     Some(InferBinding::Unbound) => Ok(ty),
                     Some(InferBinding::Alias(_)) => unreachable!(),
                     None => Err(soul_error_internal!("InferTypeId not found", None)),
+                };
+            }
+            HirTypeKind::None
+            | HirTypeKind::Type
+            | HirTypeKind::Error
+            | HirTypeKind::Primitive(_) => return Ok(ty),
+
+            HirTypeKind::Pointer(id) => HirType {
+                kind: HirTypeKind::Pointer(self.resolve_type_lazy(types, *id, span)?),
+                modifier,
+            },
+            HirTypeKind::Optional(id) => HirType {
+                kind: HirTypeKind::Optional(self.resolve_type_lazy(types, *id, span)?),
+                modifier,
+            },
+            HirTypeKind::Ref { of_type, mutable } => {
+                let of_type = *of_type;
+                let mutable = *mutable;
+                HirType {
+                    kind: HirTypeKind::Ref {
+                        of_type: self.resolve_type_lazy(types, of_type, span)?,
+                        mutable,
+                    },
+                    modifier,
                 }
             }
-            _ => Ok(ty),
+            HirTypeKind::Array { element, kind } => {
+                let element = *element;
+                let kind = *kind;
+                HirType {
+                    kind: HirTypeKind::Array {
+                        element: self.resolve_type_lazy(types, element, span)?,
+                        kind,
+                    },
+                    modifier,
+                }
+            }
+        };
+
+        Ok(types.insert(resolved))
+    }
+
+    fn occurs_in(
+        &mut self,
+        types: &TypesMap,
+        var: InferTypeId,
+        ty: TypeId,
+    ) -> bool {
+        let hir_ty = match types.get_type(ty) {
+            Some(t) => t,
+            None => return false,
+        };
+
+        match &hir_ty.kind {
+            HirTypeKind::InferType(inf) => {
+                self.find_root(*inf).ok() == self.find_root(var).ok()
+            }
+
+            HirTypeKind::Pointer(id)
+            | HirTypeKind::Optional(id) => self.occurs_in(types, var, *id),
+
+            HirTypeKind::Ref { of_type, .. } => self.occurs_in(types, var, *of_type),
+
+            HirTypeKind::Array { element, .. } => self.occurs_in(types, var, *element),
+
+            _ => false,
         }
     }
-        
-    fn get_type(&self, ty: TypeId) -> SoulResult<&HirType> {
-        self.types.get_type(ty).ok_or(soul_error_internal!(
-            format!("TypeId({}) not found", ty.index()),
-            None
-        ))
+
+    fn get_type<'a>(&self, types: &'a TypesMap, ty: TypeId) -> SoulResult<&'a HirType> {
+        match types.get_type(ty) {
+            Some(val) => Ok(val),
+            None => Err(soul_error_internal!(
+                format!("TypeId({}) not found", ty.index()),
+                None
+            )),
+        }
     }
 }
 

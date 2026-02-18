@@ -1,8 +1,14 @@
-use ast::{BinaryOperator, BinaryOperatorKind, UnaryOperator};
+use ast::{ArrayKind, BinaryOperator, BinaryOperatorKind, UnaryOperator};
 use hir::{BlockId, ExpressionId, FunctionId, HirType, IdAlloc, TypeId};
-use soul_utils::{error::{SoulError, SoulErrorKind}, span::Span};
+use soul_utils::{
+    error::{SoulError, SoulErrorKind},
+    span::Span,
+};
 
 use crate::HirTypedContext;
+
+const MUT: bool = true;
+const CONST: bool = false;
 
 impl<'a> HirTypedContext<'a> {
     pub(crate) fn infer_expression(&mut self, expression_id: hir::ExpressionId) -> TypeId {
@@ -28,10 +34,28 @@ impl<'a> HirTypedContext<'a> {
             hir::ExpressionKind::Function(function) => self.hir.functions[*function].return_type,
             hir::ExpressionKind::Ref { place, mutable } => {
                 let inner = self.infer_place(place);
-                let ty = HirType::new(hir::HirTypeKind::Ref {
-                    of_type: inner,
-                    mutable: *mutable,
-                });
+
+                let ty = match self.get_type(inner).kind {
+                    hir::HirTypeKind::Array {
+                        element,
+                        kind: ArrayKind::HeapArray,
+                    }
+                    | hir::HirTypeKind::Array {
+                        element,
+                        kind: ArrayKind::StackArray(_),
+                    } => {
+                        let kind = match *mutable {
+                            MUT => ArrayKind::MutSlice,
+                            CONST => ArrayKind::ConstSlice,
+                        };
+                        HirType::new(hir::HirTypeKind::Array { element, kind })
+                    }
+                    _ => HirType::new(hir::HirTypeKind::Ref {
+                        of_type: inner,
+                        mutable: *mutable,
+                    }),
+                };
+
                 self.add_type(ty)
             }
             hir::ExpressionKind::Cast { value, cast_to } => {
@@ -59,64 +83,64 @@ impl<'a> HirTypedContext<'a> {
             hir::ExpressionKind::Unary {
                 operator,
                 expression,
-            } => {
-                self.infer_unary(operator, *expression, span)
-            }
+            } => self.infer_unary(operator, *expression, span),
             hir::ExpressionKind::Binary {
                 left,
                 operator,
                 right,
-            } => {
-                self.infer_binary(*left, operator, *right, span)
-            }
+            } => self.infer_binary(*left, operator, *right, span),
             hir::ExpressionKind::Call {
                 function,
                 callee,
                 arguments,
-            } => {
-                self.infer_call(*function, *callee, arguments)
-            }
+            } => self.infer_call(*function, *callee, arguments),
             hir::ExpressionKind::If {
                 condition,
                 then_block,
                 else_block,
-            } => {
-                self.infer_if(*condition, *then_block, *else_block)
-            }
-            hir::ExpressionKind::InnerRawStackArray { ty, .. } => *ty,
+            } => self.infer_if(*condition, *then_block, *else_block),
+            hir::ExpressionKind::InnerRawStackArray { .. } => value.ty,
         };
 
         self.type_expression(expression_id, ty);
         ty
     }
 
-    fn infer_if(&mut self, condition: ExpressionId, then_block: BlockId, else_block: Option<BlockId>) -> TypeId {
-        
+    fn infer_if(
+        &mut self,
+        condition: ExpressionId,
+        then_block: BlockId,
+        else_block: Option<BlockId>,
+    ) -> TypeId {
         let bool = self.add_type(HirType::bool_type());
 
         let condition_span = self.expression_span(condition);
         let condition_type = self.infer_expression(condition);
         self.unify(condition, bool, condition_type, condition_span);
-        
+
         let then_type = self.infer_block(then_block);
         let then_span = self.block_span(then_block);
         let else_block = match else_block {
             Some(val) => val,
             None => {
                 self.unify(ExpressionId::error(), self.none_type, then_type, then_span);
-                return self.none_type
+                return self.none_type;
             }
         };
 
         let else_type = self.infer_block(else_block);
         let else_span = self.block_span(else_block);
         self.unify(ExpressionId::error(), then_type, else_type, else_span);
-        
-        self.infer_table.get_priority_type(then_type, else_type)
+
+        self.get_priority_type(then_type, else_type)
     }
 
-    fn infer_call(&mut self, function_id: FunctionId, callee: Option<ExpressionId>, arguments: &Vec<ExpressionId>) -> TypeId {
-        
+    fn infer_call(
+        &mut self,
+        function_id: FunctionId,
+        callee: Option<ExpressionId>,
+        arguments: &Vec<ExpressionId>,
+    ) -> TypeId {
         let function = &self.hir.functions[function_id];
         let return_type = self.type_table.functions[function_id];
         if let Some(callee) = callee {
@@ -125,15 +149,18 @@ impl<'a> HirTypedContext<'a> {
 
         if function.parameters.len() != arguments.len() {
             self.log_error(SoulError::new(
-                format!("functionCall has {} arguments but expects {} arguments", arguments.len(), function.parameters.len()),
+                format!(
+                    "functionCall has {} arguments but expects {} arguments",
+                    arguments.len(),
+                    function.parameters.len()
+                ),
                 SoulErrorKind::InvalidContext,
                 Some(function.name.span),
             ));
-            return return_type
+            return return_type;
         }
 
         for (argument, parameter) in arguments.iter().zip(function.parameters.iter()) {
-            
             let ty = self.infer_expression(*argument);
             let span = self.expression_span(*argument);
             self.unify(*argument, parameter.ty, ty, span);
@@ -142,8 +169,13 @@ impl<'a> HirTypedContext<'a> {
         return_type
     }
 
-    fn infer_binary(&mut self, left: ExpressionId, operator: &BinaryOperator, right: ExpressionId, span: Span) -> TypeId {
-
+    fn infer_binary(
+        &mut self,
+        left: ExpressionId,
+        operator: &BinaryOperator,
+        right: ExpressionId,
+        span: Span,
+    ) -> TypeId {
         let left_id = self.infer_expression(left);
         let right_id = self.infer_expression(right);
         let binary_typecheck = to_binary_typecheck(&operator.node);
@@ -154,42 +186,40 @@ impl<'a> HirTypedContext<'a> {
                 self.unify(right, bool, right_id, span);
                 bool
             }
-            BinaryTypeCheck::Equal 
-            | BinaryTypeCheck::Compare => {
+            BinaryTypeCheck::Equal | BinaryTypeCheck::Compare => {
                 self.unify(right, left_id, right_id, span);
                 self.add_type(HirType::bool_type())
             }
-            BinaryTypeCheck::Bitwise
-            | BinaryTypeCheck::Numeric => {
+            BinaryTypeCheck::Bitwise | BinaryTypeCheck::Numeric => {
                 self.unify(right, left_id, right_id, span);
                 let left_type = self.get_type(left_id);
                 let right_type = self.get_type(right_id);
                 if !left_type.is_numeric() {
                     self.log_error(SoulError::new(
-                        format!(""), 
-                        SoulErrorKind::UnifyTypeError, 
+                        format!(""),
+                        SoulErrorKind::UnifyTypeError,
                         Some(self.expression_span(left)),
                     ));
-                    return TypeId::error()
+                    return TypeId::error();
                 }
-                
+
                 if !right_type.is_numeric() {
                     self.log_error(SoulError::new(
-                        format!(""), 
-                        SoulErrorKind::UnifyTypeError, 
+                        format!(""),
+                        SoulErrorKind::UnifyTypeError,
                         Some(self.expression_span(left)),
                     ));
-                    return TypeId::error()
+                    return TypeId::error();
                 }
-                
-                self.infer_table.get_priority_type(left_id, right_id)
+
+                self.get_priority_type(left_id, right_id)
             }
         }
     }
 
     fn infer_unary(&mut self, operator: &UnaryOperator, value: ExpressionId, span: Span) -> TypeId {
         use ast::UnaryOperatorKind as Unary;
-        
+
         match operator.node {
             Unary::Invalid => todo!("should not have invalid"),
             Unary::Neg => {
@@ -198,12 +228,12 @@ impl<'a> HirTypedContext<'a> {
                 if !ty.is_unsigned_interger() && !ty.is_signed_interger() && !ty.is_float() {
                     self.log_error(SoulError::new(
                         format!("'{}' can only be used for float and signedInterger types (f32, int, i32, ect..)", operator.node.as_str()), 
-                        SoulErrorKind::UnifyTypeError, 
+                        SoulErrorKind::UnifyTypeError,
                         Some(span),
                     ));
-                    return TypeId::error()
+                    return TypeId::error();
                 }
-                
+
                 value_type
             }
             Unary::Not => {
@@ -211,34 +241,44 @@ impl<'a> HirTypedContext<'a> {
                 let ty = self.get_type(value_type);
                 if !ty.is_boolean() {
                     self.log_error(SoulError::new(
-                        format!("'{}' can only be used for bool type", operator.node.as_str()), 
-                        SoulErrorKind::UnifyTypeError, 
+                        format!(
+                            "'{}' can only be used for bool type",
+                            operator.node.as_str()
+                        ),
+                        SoulErrorKind::UnifyTypeError,
                         Some(span),
                     ));
-                    return TypeId::error()
+                    return TypeId::error();
                 }
-                
+
                 value_type
             }
-            Unary::Increment { .. }
-            | Unary::Decrement { .. } => {
+            Unary::Increment { .. } | Unary::Decrement { .. } => {
                 let value_type = self.infer_expression(value);
                 let ty = self.get_type(value_type);
                 if !ty.is_numeric() {
                     self.log_error(SoulError::new(
-                        format!("'{}' can only be used for number types", operator.node.as_str()), 
-                        SoulErrorKind::UnifyTypeError, 
+                        format!(
+                            "'{}' can only be used for number types",
+                            operator.node.as_str()
+                        ),
+                        SoulErrorKind::UnifyTypeError,
                         Some(span),
                     ));
-                    return TypeId::error()
+                    return TypeId::error();
                 }
-                
+
                 value_type
             }
         }
     }
 
-    fn infer_while(&mut self, condition: Option<ExpressionId>, body: BlockId, span: Span) -> TypeId{
+    fn infer_while(
+        &mut self,
+        condition: Option<ExpressionId>,
+        body: BlockId,
+        span: Span,
+    ) -> TypeId {
         let return_type = self.infer_block(body);
 
         let condition = match condition {
@@ -257,7 +297,7 @@ impl<'a> HirTypedContext<'a> {
                 SoulErrorKind::InvalidContext,
                 Some(span),
             ));
-            return TypeId::error()
+            return TypeId::error();
         }
 
         self.none_type
@@ -280,34 +320,26 @@ enum BinaryTypeCheck {
 
 fn to_binary_typecheck(operator: &BinaryOperatorKind) -> BinaryTypeCheck {
     use ast::BinaryOperatorKind as Binary;
-    
+
     match operator {
-        Binary::Add 
-        | Binary::Sub 
-        | Binary::Mul 
-        | Binary::Div 
-        | Binary::Log 
-        | Binary::Pow 
+        Binary::Add
+        | Binary::Sub
+        | Binary::Mul
+        | Binary::Div
+        | Binary::Log
+        | Binary::Pow
         | Binary::Mod
-        | Binary::Root => BinaryTypeCheck::Numeric, 
+        | Binary::Root => BinaryTypeCheck::Numeric,
 
-        Binary::Eq
-        | Binary::NotEq => BinaryTypeCheck::Equal,
+        Binary::Eq | Binary::NotEq => BinaryTypeCheck::Equal,
 
-        Binary::Lt
-        | Binary::Gt
-        | Binary::Le
-        | Binary::Ge => BinaryTypeCheck::Compare,
-        
-        Binary::LogOr
-        | Binary::LogAnd => BinaryTypeCheck::Logical,
-        
-        Binary::BitOr
-        | Binary::BitAnd
-        | Binary::BitXor => BinaryTypeCheck::Bitwise,
+        Binary::Lt | Binary::Gt | Binary::Le | Binary::Ge => BinaryTypeCheck::Compare,
 
-        Binary::Range
-        | Binary::TypeOf => todo!("{} not yet impl", operator.as_str()),
+        Binary::LogOr | Binary::LogAnd => BinaryTypeCheck::Logical,
+
+        Binary::BitOr | Binary::BitAnd | Binary::BitXor => BinaryTypeCheck::Bitwise,
+
+        Binary::Range | Binary::TypeOf => todo!("{} not yet impl", operator.as_str()),
         Binary::Invalid => todo!("should not be invalid"),
     }
 }

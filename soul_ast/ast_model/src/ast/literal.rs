@@ -49,10 +49,18 @@ impl Literal {
 
     /// Returns a string representation of the literal's value.
     pub fn value_to_string(&self) -> String {
+        fn no_demcimal(x: &f64) -> bool {
+            x.fract() == 0.0
+        }
+
         match self {
             Literal::Int(val) => format!("{}", val),
             Literal::Uint(val) => format!("{}", val),
-            Literal::Float(val) => format!("{}", val),
+            Literal::Float(val) => if no_demcimal(val) {
+                format!("{}.0", val)
+            } else {
+                format!("{}", val)
+            },
             Literal::Bool(val) => format!("{}", val),
             Literal::Char(char) => format!("'{}'", char),
             Literal::Str(str) => format!("\"{}\"", str),

@@ -15,3 +15,5 @@ soul_tokenizer = { version = "0.1.0", path = "../soul_tokenizer" }
 hir_parser = { version = "0.1.0", path = "../soul_hir/hir_parser" }
 hir = { version = "0.1.0", path = "../soul_hir/hir_model" }
 hir_typed_context = { version = "0.1.0", path = "../soul_hir/hir_typed_context" }
+fern = "0.6"
+log = "0.4.29"

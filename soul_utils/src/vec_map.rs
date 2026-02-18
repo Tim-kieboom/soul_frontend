@@ -167,9 +167,22 @@ impl<I: VecMapIndex, T> VecMap<I, T> {
         self.vec.iter().flat_map(|el| el)
     }
 
+    /// Returns an iterator over references to all existing values.
+    pub fn values_mut(&mut self) -> impl Iterator<Item = &mut T> {
+        self.vec.iter_mut().flat_map(|el| el)
+    }
+
     /// Consumes the map and returns an iterator over all values.
     pub fn into_values(self) -> impl Iterator<Item = T> {
         self.vec.into_iter().flat_map(|el| el)
+    }
+
+    /// Raw index of inner vec
+    pub fn raw_index(&self, index: usize) -> Option<&T> {
+        match self.vec.get(index) {
+            Some(val) => val.as_ref(),
+            None => None,
+        }
     }
 }
 impl<I: VecMapIndex, T: PartialEq> PartialEq for VecMap<I, T> {

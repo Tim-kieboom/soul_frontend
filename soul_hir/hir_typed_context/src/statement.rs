@@ -1,6 +1,6 @@
 use crate::HirTypedContext;
 use hir::{
-    Assign, BlockId, ExpressionId, FunctionId, Global, HirType, IdAlloc, Place, PlaceKind, Statement, TypeId, UnifyResult, Variable
+    Assign, BlockId, ExpressionId, FunctionId, Global, HirType, IdAlloc, LocalId, Place, PlaceKind, Statement, TypeId, Variable
 };
 use soul_utils::error::{SoulError, SoulErrorKind};
 
@@ -8,11 +8,7 @@ impl<'a> HirTypedContext<'a> {
     pub(crate) fn infer_global(&mut self, global: &Global) {
         let ty = match global {
             Global::InternalAssign(assign, _) => self.infer_assign(assign),
-            Global::Variable(variable, _) => {
-                let ty = self.infer_variable(variable);
-                self.type_local(variable.local, ty);
-                ty
-            }
+            Global::Variable(variable, _) => self.infer_variable(variable),
             Global::Function(function, _) => {
                 let ty = self.infer_function(function);
                 self.type_function(*function, ty);
@@ -79,10 +75,10 @@ impl<'a> HirTypedContext<'a> {
     pub(crate) fn infer_place(&mut self, place: &Place) -> TypeId {
         let span = place.span;
         match &place.node {
-            PlaceKind::Local(id) => {
-                let ty = self.hir.locals[*id];
-                self.type_local(*id, ty);
-                ty
+            PlaceKind::Local(id) => if *id == LocalId::error() {
+                TypeId::error()
+            } else {
+                self.hir.locals[*id]
             }
             PlaceKind::Deref(place) => {
                 let inner = self.infer_place(place);
@@ -97,12 +93,13 @@ impl<'a> HirTypedContext<'a> {
             }
             PlaceKind::Index { base, .. } => {
                 let base = self.infer_place(base);
-                let base_type = self.get_type(base);
+                let resolved = self.resolve_type_lazy(base, span);
+                let base_type = self.get_type(resolved);
                 match &base_type.kind {
                     hir::HirTypeKind::Array { element, .. } => *element,
                     _ => {
                         self.log_error(SoulError::new(
-                            "can only index array type",
+                            format!("can only use index on an array type '{}' is not an array type", self.get_type(resolved).display(&self.type_table.types)),
                             SoulErrorKind::UnifyTypeError,
                             Some(span),
                         ));
@@ -123,13 +120,23 @@ impl<'a> HirTypedContext<'a> {
 
         let (value, span) = match variable.value {
             Some(val) => (val, self.expression_span(val)),
-            None => return declared_type,
+            None => {
+                self.type_local(variable.local, declared_type);
+                return declared_type;
+            }
         };
 
         let value_type = self.infer_expression(value);
         self.unify(value, declared_type, value_type, span);
-        self.type_local(variable.local, declared_type);
-        declared_type
+
+        let var_type = if self.get_type(declared_type).is_infertype() {
+            value_type
+        } else {
+            declared_type
+        };
+
+        self.type_local(variable.local, var_type);
+        var_type
     }
 
     fn infer_function(&mut self, function_id: &FunctionId) -> TypeId {
@@ -152,11 +159,17 @@ impl<'a> HirTypedContext<'a> {
         let span = self.expression_span(assign.value);
         let expected = self.infer_place(&assign.place);
         let value_type = self.infer_expression(assign.value);
-        match self.infer_table.unify_type_type(expected, value_type, span) {
-            Ok(UnifyResult::Ok) => (),
-            Ok(UnifyResult::NeedsAutoCopy) => self.add_autocopy(assign.value),
-            Err(err) => self.log_error(err),
+        self.unify(assign.value, expected, value_type, span);
+
+        if self.get_type(value_type).is_infertype() {
+            self.log_error(SoulError::new(
+                "type should be known at this point",
+                SoulErrorKind::UnifyTypeError,
+                Some(span),
+            ));
+            return expected;
         }
+
         expected
     }
 }

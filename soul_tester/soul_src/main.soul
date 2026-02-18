@@ -1,60 +1,64 @@
-const val = 1
-const array: [3]int = [int: 1,2,3]
+// const val = 1
+// const array: [3]int = [int: 1,2,3]
 
-sum(a: int, b: int): int {
-    return a + b
-}
+// sum(a: int, b: int): int {
+//     return a + b
+// }
 
-returnTerminate(): int {
-    doStuff := 1 + 2
-    1
-}
+// returnTerminate(): int {
+//     doStuff := 1 + 2
+//     1
+// }
 
-returnNone() {
-    doStuff := 1 + 2
-    1;
-}
+// returnNone() {
+//     doStuff := 1 + 2
+//     1;
+// }
 
 variable() {
-    literal chars = "hello world"
+    // literal chars = "hello world"
 
     constTyped: int = 1
-    constInfer := 1 + -2
+    // constInfer := 1 + -2
 
-    const scopeVar = 1
-    {
-        const scopeVar = 2
-        // { scopeVar = 3 }
-        { 
-            scopeVar = 3 
-        }
-    }
-    scopeVar = 4
+    // const scopeVar = 1
+    // {
+    //     const scopeVar = 2
+    //     // { scopeVar = 3 }
+    //     { 
+    //         scopeVar = 3 
+    //     }
+    // }
+    // scopeVar = 4
 
-    mut mutTyped: uint = 1
-    mut mutInfer = 1.0 + -2.0
-    mutTyped = returnTerminate()
+    // mut mutInfer = 1.0 + -2.0
 
-    floatArray := [f64: 1,2,3,4]
-    mut heap: [*]int = []
-    mut array: [5]int = [1,1,3,4,constTyped]
+    // mut mutTyped: int = 1
+    // mutTyped = returnTerminate()
 
-    element := array[1]
+    // floatArray := [f64: 1,2,3,4]
+    mut array = [1,1,3,4,constTyped]
+    array[0] = 6
 
-    ref := @1
+    // element := array[1]
 
-    slice: [@]int = @array
-    mutSlice: [&]int = &heap
-    mut array2D: [2][1]int := [[1], [2]]
+    // ref := @1
 
-    mut cast := 1 as int
-    cast = sum(1, 2)
+    // slice: [@]int = @array
+    // mutSlice: [&]int = &heap
+    // mut array2D: [2][1]int := [[1], [2]]
 
-    const lateInfer
-    lateInfer = 1
+    // mut cast := 1 as int
+    // cast = sum(1, 2)
 
-    mut inferArray = @[]
-    inferArray = @[1]
+    // const lateInfer
+    // lateInfer = 1
+
+    // mut inferArray = @[]
+    // inferArray = @[1]
+
+    // mut option = null
+    // option = 1
 }
 
 conditionals() {

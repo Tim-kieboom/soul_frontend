@@ -66,7 +66,7 @@ literal $primitiveTypes: [23]type = type[
 
 trait PrimitiveType {}
 
-literal $emptyImpl($prims: [_]type, $traitType: type): syntax {
+literal $emptyImpl($prims: [_]type, $traitType: type.trait): syntax {
     
     literal $impls = syntax{}
     for $prim in $prims {
@@ -78,19 +78,19 @@ literal $emptyImpl($prims: [_]type, $traitType: type): syntax {
     $impls
 }
 
-literal $implInts($intergers: [_]type): syntax {   
+literal $implPrims($intergers: [_]type): syntax {   
     
     literal $impls = syntax{}
     for $interger in $intergers {
         
         $impls.Append(
-            $implInt($interger)
+            $implPrim($interger)
         )
     }
     $impls
 }
 
-literal $implInt($ty: type): syntax {
+literal $implPrim($ty: type): syntax {
     literal interger = $ty.toInterger()
         .catch{literalPanic}
 
@@ -104,6 +104,7 @@ literal $implInt($ty: type): syntax {
             literal MAX = max
             literal MIN = min
 
+            #[inline]
             This(num: impl PrimitiveType) {
                 num as This
             }
@@ -119,7 +120,4 @@ $emptyImpl(
     $primitiveTypes,
     PrimitiveType
 )
-$implInts([
-    $signedIntergers,
-    $unsignedIntergers,
-])
+$implPrims($primitiveTypes)

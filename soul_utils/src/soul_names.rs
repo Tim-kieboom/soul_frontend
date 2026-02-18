@@ -194,7 +194,7 @@ impl PrimitiveTypes {
         }
     }
 
-    pub const fn is_untyped_interger(&self) -> bool {
+    pub const fn is_untyped_numeric(&self) -> bool {
         match self {
             PrimitiveTypes::UntypedInt
             | PrimitiveTypes::UntypedUint

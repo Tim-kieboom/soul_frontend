@@ -48,13 +48,13 @@ impl<'a> HirContext<'a> {
         self.add_type(HirType::new(ty))
     }
 
-    pub(crate) fn type_from_array(&mut self, array: &ast::Array, span: Span) -> (TypeId, TypeId) {
+    pub(crate) fn type_from_array(&mut self, array: &ast::Array, span: Span) -> TypeId {
         if array.collection_type.is_some() {
             self.log_error(soul_error_internal!(
                 "collection type in array is unstable",
                 Some(span)
             ));
-            return (TypeId::error(), TypeId::error());
+            return TypeId::error();
         }
 
         let kind = ast::ArrayKind::StackArray(array.values.len() as u64);
@@ -64,7 +64,7 @@ impl<'a> HirContext<'a> {
         };
 
         let array_ty = self.add_type(HirType::new(HirTypeKind::Array { element, kind }));
-        (array_ty, element)
+        array_ty
     }
 
     pub(crate) fn new_infer_type(&mut self) -> TypeId {

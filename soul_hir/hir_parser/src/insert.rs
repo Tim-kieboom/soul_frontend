@@ -1,7 +1,7 @@
 use hir::{ExpressionId, StatementId};
-use soul_utils::span::{ItemMetaData, Span};
+use soul_utils::{Ident, span::{ItemMetaData, Span}};
 
-use crate::HirContext;
+use crate::{HirContext, create_local_name};
 
 impl<'a> HirContext<'a> {
     pub(crate) fn alloc_expression(&mut self, span: Span) -> ExpressionId {
@@ -32,7 +32,8 @@ impl<'a> HirContext<'a> {
     }
 
     pub(crate) fn insert_desugar_variable(&mut self, variable: hir::Variable, span: Span) {
-        self.insert_local_type(variable.local, variable.ty);
+        let name = Ident::new(create_local_name(variable.local), span);
+        self.insert_local(&name, variable.local, variable.ty);
         
         match self.current_body {
             crate::CurrentBody::Global => {

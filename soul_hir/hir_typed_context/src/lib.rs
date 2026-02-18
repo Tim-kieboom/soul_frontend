@@ -1,6 +1,6 @@
 use hir::{
     BlockId, ExpressionId, FunctionId, HirTree, HirType, IdAlloc, LocalId, StatementId, TypeId,
-    TypesMap, UnifyResult,
+    TypesMap,
 };
 use soul_utils::{
     error::SoulError, sementic_level::SementicFault, span::Span, vec_map::VecMap, vec_set::VecSet,
@@ -9,6 +9,7 @@ use soul_utils::{
 use crate::infer_table::InferTable;
 
 mod expression;
+mod handle_type;
 mod infer_table;
 mod statement;
 
@@ -19,6 +20,8 @@ pub fn infer_types(hir: &HirTree, faults: &mut Vec<SementicFault>) -> HirTypedTa
         context.infer_global(global);
     }
 
+    context.resolve_all_types();
+    context.finalize_types();
     context.to_type_table()
 }
 
@@ -33,6 +36,24 @@ pub struct HirTypedTable {
     pub types: TypesMap,
     pub auto_copys: VecSet<ExpressionId>,
 }
+impl HirTypedTable {
+    fn remap_types(&mut self, map: &VecMap<TypeId, TypeId>) {
+        macro_rules! remap {
+            ($field:ident) => {
+                for ty in self.$field.values_mut() {
+                    if let Some(new) = map.get(*ty) {
+                        *ty = *new;
+                    }
+                }
+            };
+        }
+        remap!(locals);
+        remap!(blocks);
+        remap!(functions);
+        remap!(statements);
+        remap!(expressions);
+    }
+}
 
 struct HirTypedContext<'a> {
     hir: &'a HirTree,
@@ -41,12 +62,17 @@ struct HirTypedContext<'a> {
     is_in_unsafe: bool,
     none_type: TypeId,
     type_table: HirTypedTable,
-    infer_table: InferTable<'a>,
+    infer_table: InferTable,
 }
 impl<'a> HirTypedContext<'a> {
     fn new(hir: &'a HirTree, faults: &'a mut Vec<SementicFault>) -> Self {
-        let functions = hir.functions.entries().map(|(i, function)| (i, function.return_type)).collect();
+        let functions = hir
+            .functions
+            .entries()
+            .map(|(i, function)| (i, function.return_type))
+            .collect();
 
+        let types = hir.types.clone();
         let mut this = Self {
             hir,
             faults,
@@ -60,20 +86,12 @@ impl<'a> HirTypedContext<'a> {
                 statements: VecMap::with_capacity(hir.meta_data.statements.len()),
                 expressions: VecMap::with_capacity(hir.expressions.len()),
 
-                types: hir.types.clone(),
+                types,
                 auto_copys: VecSet::new(),
             },
         };
         this.none_type = this.add_type(HirType::none_type());
         this
-    }
-
-    fn unify(&mut self, value: ExpressionId, expect: TypeId, got: TypeId, span: Span) {
-        match self.infer_table.unify_type_type(expect, got, span) {
-            Ok(UnifyResult::Ok) => (),
-            Ok(UnifyResult::NeedsAutoCopy) => self.add_autocopy(value),
-            Err(err) => self.log_error(err),
-        }
     }
 
     fn statement_span(&self, id: StatementId) -> Span {
@@ -88,30 +106,6 @@ impl<'a> HirTypedContext<'a> {
         self.hir.spans.blocks[id]
     }
 
-    fn type_block(&mut self, id: BlockId, ty: TypeId) {
-        self.type_table.blocks.insert(id, ty);
-    }
-
-    fn type_function(&mut self, id: FunctionId, ty: TypeId) {
-        self.type_table.functions.insert(id, ty);
-    }
-
-    fn type_statement(&mut self, id: StatementId, ty: TypeId) {
-        self.type_table.statements.insert(id, ty);
-    }
-
-    fn type_expression(&mut self, id: ExpressionId, ty: TypeId) {
-        self.type_table.expressions.insert(id, ty);
-    }
-
-    fn type_local(&mut self, id: LocalId, ty: TypeId) {
-        self.type_table.locals.insert(id, ty);
-    }
-
-    fn add_type(&mut self, ty: HirType) -> TypeId {
-        self.type_table.types.insert(ty)
-    }
-
     fn add_autocopy(&mut self, id: ExpressionId) {
         self.type_table.auto_copys.insert(id);
     }
@@ -121,6 +115,26 @@ impl<'a> HirTypedContext<'a> {
             .types
             .get_type(ty)
             .expect("TypeId should always have a type")
+    }
+
+    fn resolve_type_strict(&mut self, ty: TypeId, span: Span) -> TypeId {
+        match self.infer_table.resolve_type_strict(&mut self.type_table.types, ty, span) {
+            Ok(val) => val,
+            Err(err) => {
+                self.log_error(err);
+                TypeId::error()
+            }
+        }
+    }
+
+    fn resolve_type_lazy(&mut self, ty: TypeId, span: Span) -> TypeId {
+        match self.infer_table.resolve_type_lazy(&mut self.type_table.types, ty, span) {
+            Ok(val) => val,
+            Err(err) => {
+                self.log_error(err);
+                TypeId::error()
+            }
+        }
     }
 
     fn log_error(&mut self, err: SoulError) {

@@ -1,4 +1,7 @@
-use std::{fs::File, io::Read};
+use std::{
+    fs::{File, OpenOptions},
+    io::{Read, stdout},
+};
 
 use anyhow::Result;
 use ast::{
@@ -7,15 +10,22 @@ use ast::{
 };
 use ast_parser::parse;
 use display_hir::display_hir;
+use fern::Dispatch;
 use hir::HirTree;
 use hir_parser::hir_lower;
 use hir_typed_context::{HirTypedTable, infer_types};
+use log::{error, info};
 use paths::Paths;
 use soul_name_resolver::name_resolve;
 use soul_tokenizer::{TokenStream, tokenize};
+use soul_utils::char_colors::{DEFAULT, GREEN};
 use soul_utils::sementic_level::SementicFault;
 
-use crate::{convert_soul_error::ToMessage, display_hir::display_typed_hir, display_tokenizer::display_tokens};
+use crate::{
+    convert_soul_error::{MessageConfig, ToMessage},
+    display_hir::display_typed_hir,
+    display_tokenizer::display_tokens,
+};
 
 mod convert_soul_error;
 mod display_hir;
@@ -24,7 +34,10 @@ mod paths;
 
 static PATHS: &[u8] = include_bytes!("../paths.json");
 
-pub const ERROR_BACKTRACE: bool = false;
+pub const MESSAGE_CONFIG: MessageConfig = MessageConfig {
+    backtrace: false,
+    colors: true,
+};
 
 struct Ouput<'a> {
     hir: HirTree,
@@ -37,6 +50,7 @@ struct Ouput<'a> {
 
 fn main() -> Result<()> {
     let paths: Paths = serde_json::from_slice(PATHS)?;
+    init_logger(&paths.log_file)?;
 
     let source_file = read_source_file(&paths.source_file)?;
     let token_stream = tokenize(&source_file);
@@ -65,23 +79,29 @@ fn handle_output<'a>(paths: &Paths, output: Ouput<'a>) -> Result<()> {
     let tokens_string = display_tokens(&paths, &output.source_file, output.token_stream)?;
 
     paths.write_multiple_outputs([
-        (tokens_string, "tokenizer/tokens.soulc"),
-        (root.display(&DisplayKind::Parser), "ast/tree.soulc"),
+        (&tokens_string, "tokenizer/tokens.soulc"),
+        (&root.display(&DisplayKind::Parser), "ast/tree.soulc"),
         (
-            root.display(&DisplayKind::NameResolver),
+            &root.display(&DisplayKind::NameResolver),
             "ast/NameResolved.soulc",
         ),
-        (display_hir(&output.hir), "hir/tree.soulc"),
-        (display_typed_hir(&output.hir, &output.hir_types), "hir/typed.soulc"),
+        (&display_hir(&output.hir), "hir/tree.soulc"),
+        (
+            &display_typed_hir(&output.hir, &output.hir_types),
+            "hir/typed.soulc",
+        ),
     ])?;
 
     for fault in &output.faults {
-        eprintln!("{}", fault.to_message("main.soul", output.source_file, ERROR_BACKTRACE));
+        error!(
+            "{}",
+            fault.to_message("main.soul", output.source_file, MESSAGE_CONFIG)
+        );
     }
 
     if output.faults.is_empty() {
-        use soul_utils::char_colors::{DEFAULT, GREEN};
-        println!("{GREEN}success!!{DEFAULT}")
+        let msg = "success!!";
+        info!("{GREEN}{msg}{DEFAULT}");
     }
 
     Ok(())
@@ -93,4 +113,20 @@ fn read_source_file(source_path: &str) -> Result<String> {
     file.read_to_string(&mut source_file)?;
 
     Ok(source_file)
+}
+
+fn init_logger(log_file: &str) -> Result<()> {
+    let log_file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log_file)?;
+
+    Dispatch::new()
+        .format(|out, message, _record| out.finish(format_args!("{}", message)))
+        .level_for("soulc", log::LevelFilter::Info)
+        .chain(stdout())
+        .chain(log_file)
+        .apply()?;
+
+    Ok(())
 }
