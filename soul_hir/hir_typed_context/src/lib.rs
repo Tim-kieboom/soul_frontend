@@ -117,18 +117,24 @@ impl<'a> HirTypedContext<'a> {
             .expect("TypeId should always have a type")
     }
 
-    fn resolve_type_strict(&mut self, ty: TypeId, span: Span) -> TypeId {
-        match self.infer_table.resolve_type_strict(&mut self.type_table.types, ty, span) {
-            Ok(val) => val,
+    fn resolve_type_strict(&mut self, ty: TypeId, span: Span) -> Option<TypeId> {
+        match self
+            .infer_table
+            .resolve_type_strict(&mut self.type_table.types, ty, span)
+        {
+            Ok(val) => Some(val),
             Err(err) => {
                 self.log_error(err);
-                TypeId::error()
+                None
             }
         }
     }
 
     fn resolve_type_lazy(&mut self, ty: TypeId, span: Span) -> TypeId {
-        match self.infer_table.resolve_type_lazy(&mut self.type_table.types, ty, span) {
+        match self
+            .infer_table
+            .resolve_type_lazy(&mut self.type_table.types, ty, span)
+        {
             Ok(val) => val,
             Err(err) => {
                 self.log_error(err);

@@ -13,17 +13,17 @@ impl<'a> HirContext<'a> {
         let ty = self.type_from_array(array, span);
 
         let temp_local = self.id_generator.alloc_local();
-        let name =  Ident::new(create_local_name(temp_local), span);
+        let name = Ident::new(create_local_name(temp_local), span);
         self.insert_local(&name, temp_local, ty);
         let temp_place = Place::new(PlaceKind::Local(temp_local), span);
 
         let size = array.values.len() as u64;
-        let element = self.new_infer_type();
+        let element = self.new_infer_type(span);
         let infer_array = self.add_type(create_array(element, size));
         let unalloc = self.create_unallocted_array(infer_array, element, size, span);
 
         let temp_array = hir::Variable {
-            ty,
+            ty: self.new_infer_type(span),
             local: temp_local,
             value: Some(unalloc),
         };

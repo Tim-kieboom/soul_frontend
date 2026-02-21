@@ -1,10 +1,10 @@
 use hir::BlockId;
-use soul_utils::span::{ItemMetaData, Spanned};
+use soul_utils::span::{ItemMetaData, Span, Spanned};
 
 use crate::HirContext;
 
 impl<'a> HirContext<'a> {
-    pub(super) fn lower_if(&mut self, id: hir::ExpressionId, r#if: &ast::If) -> hir::Expression {
+    pub(super) fn lower_if(&mut self, id: hir::ExpressionId, r#if: &ast::If, span: Span) -> hir::Expression {
         let condition = self.lower_expression(&r#if.condition);
         let then_block = self.lower_block(&r#if.block);
 
@@ -15,7 +15,7 @@ impl<'a> HirContext<'a> {
 
         hir::Expression {
             id,
-            ty: self.new_infer_type(),
+            ty: self.new_infer_type(span),
             kind: hir::ExpressionKind::If {
                 condition,
                 then_block,
@@ -33,7 +33,7 @@ impl<'a> HirContext<'a> {
 
     fn lower_else_if(&mut self, arm: &Spanned<ast::If>) -> BlockId {
         let id = self.alloc_expression(arm.span);
-        let if_expression = self.lower_if(id, &arm.node);
+        let if_expression = self.lower_if(id, &arm.node, arm.span);
 
         let block_id = self.id_generator.alloc_body();
         let block = hir::Block::new(block_id);

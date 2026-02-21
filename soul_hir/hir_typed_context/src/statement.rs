@@ -2,13 +2,18 @@ use crate::HirTypedContext;
 use hir::{
     Assign, BlockId, ExpressionId, FunctionId, Global, HirType, IdAlloc, LocalId, Place, PlaceKind, Statement, TypeId, Variable
 };
-use soul_utils::error::{SoulError, SoulErrorKind};
+use soul_utils::{
+    error::{SoulError, SoulErrorKind},
+    span::Span,
+};
 
 impl<'a> HirTypedContext<'a> {
     pub(crate) fn infer_global(&mut self, global: &Global) {
         let ty = match global {
             Global::InternalAssign(assign, _) => self.infer_assign(assign),
-            Global::Variable(variable, _) => self.infer_variable(variable),
+            Global::Variable(variable, id) => {
+                self.infer_variable(variable, self.statement_span(*id))
+            }
             Global::Function(function, _) => {
                 let ty = self.infer_function(function);
                 self.type_function(*function, ty);
@@ -23,7 +28,9 @@ impl<'a> HirTypedContext<'a> {
         let ty = match statement {
             Statement::Assign(assign, _) => self.infer_assign(assign),
             Statement::Continue(_) => self.add_type(HirType::none_type()),
-            Statement::Variable(variable, _) => self.infer_variable(variable),
+            Statement::Variable(variable, id) => {
+                self.infer_variable(variable, self.statement_span(*id))
+            }
             Statement::Expression { value, .. } => self.infer_expression(*value),
 
             Statement::Fall(value, _)
@@ -33,7 +40,7 @@ impl<'a> HirTypedContext<'a> {
                 None => self.none_type,
             },
         };
-
+        
         self.type_statement(statement.get_id(), ty);
     }
 
@@ -75,10 +82,12 @@ impl<'a> HirTypedContext<'a> {
     pub(crate) fn infer_place(&mut self, place: &Place) -> TypeId {
         let span = place.span;
         match &place.node {
-            PlaceKind::Local(id) => if *id == LocalId::error() {
-                TypeId::error()
-            } else {
-                self.hir.locals[*id]
+            PlaceKind::Local(id) => {
+                if *id == LocalId::error() {
+                    TypeId::error()
+                } else {
+                    self.hir.locals[*id]
+                }
             }
             PlaceKind::Deref(place) => {
                 let inner = self.infer_place(place);
@@ -99,7 +108,10 @@ impl<'a> HirTypedContext<'a> {
                     hir::HirTypeKind::Array { element, .. } => *element,
                     _ => {
                         self.log_error(SoulError::new(
-                            format!("can only use index on an array type '{}' is not an array type", self.get_type(resolved).display(&self.type_table.types)),
+                            format!(
+                                "can only use index on an array type '{}' is not an array type",
+                                self.get_type(resolved).display(&self.type_table.types)
+                            ),
                             SoulErrorKind::UnifyTypeError,
                             Some(span),
                         ));
@@ -111,17 +123,17 @@ impl<'a> HirTypedContext<'a> {
         }
     }
 
-    fn infer_variable(&mut self, variable: &Variable) -> TypeId {
+    fn infer_variable(&mut self, variable: &Variable, span: Span) -> TypeId {
         let declared_type = variable.ty;
         if declared_type == TypeId::error() {
-            self.type_local(variable.local, declared_type);
+            self.type_local(variable.local, declared_type, span);
             return declared_type;
         }
 
         let (value, span) = match variable.value {
             Some(val) => (val, self.expression_span(val)),
             None => {
-                self.type_local(variable.local, declared_type);
+                self.type_local(variable.local, declared_type, span);
                 return declared_type;
             }
         };
@@ -135,8 +147,8 @@ impl<'a> HirTypedContext<'a> {
             declared_type
         };
 
-        self.type_local(variable.local, var_type);
-        var_type
+        let resolved = self.resolve_type_lazy(var_type, span);
+        self.type_local(variable.local, resolved, span)
     }
 
     fn infer_function(&mut self, function_id: &FunctionId) -> TypeId {
@@ -144,7 +156,7 @@ impl<'a> HirTypedContext<'a> {
         let span = self.block_span(function.body);
         let block_type = self.infer_block(function.body);
         for parameter in &function.parameters {
-            self.type_local(parameter.local, parameter.ty);
+            self.type_local(parameter.local, parameter.ty, span);
         }
         self.unify(
             ExpressionId::error(),
@@ -161,15 +173,6 @@ impl<'a> HirTypedContext<'a> {
         let value_type = self.infer_expression(assign.value);
         self.unify(assign.value, expected, value_type, span);
 
-        if self.get_type(value_type).is_infertype() {
-            self.log_error(SoulError::new(
-                "type should be known at this point",
-                SoulErrorKind::UnifyTypeError,
-                Some(span),
-            ));
-            return expected;
-        }
-
-        expected
+        self.resolve_type_strict(value_type, span).unwrap_or(TypeId::error())
     }
 }

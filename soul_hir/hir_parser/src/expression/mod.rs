@@ -19,7 +19,7 @@ impl<'a> HirContext<'a> {
         let hir_expression = match &expression.node {
             ast::ExpressionKind::Null(_node_id) => hir::Expression {
                 id,
-                ty: self.null_ty(),
+                ty: self.null_ty(span),
                 kind: hir::ExpressionKind::Null,
             },
             ast::ExpressionKind::Literal((_id, literal)) => hir::Expression {
@@ -38,7 +38,7 @@ impl<'a> HirContext<'a> {
 
                 hir::Expression {
                     id,
-                    ty: self.new_infer_type(),
+                    ty: self.new_infer_type(span),
                     kind: hir::ExpressionKind::Load(place),
                 }
             }
@@ -48,7 +48,7 @@ impl<'a> HirContext<'a> {
                 resolved: _,
                 id: option_id,
             } => self.lower_expression_variable(id, ident, *option_id),
-            ast::ExpressionKind::If(r#if) => self.lower_if(id, r#if),
+            ast::ExpressionKind::If(r#if) => self.lower_if(id, r#if, span),
             ast::ExpressionKind::As(cast) => {
                 let value = self.lower_expression(&cast.left);
                 let cast_to = self.lower_type(&cast.type_cast);
@@ -63,7 +63,7 @@ impl<'a> HirContext<'a> {
                 let operator = unary.operator.clone();
                 hir::Expression {
                     id,
-                    ty: self.new_infer_type(),
+                    ty: self.new_infer_type(span),
                     kind: hir::ExpressionKind::Unary {
                         operator,
                         expression,
@@ -91,7 +91,7 @@ impl<'a> HirContext<'a> {
                 let right = self.lower_expression(&binary.right);
                 hir::Expression {
                     id,
-                    ty: self.new_infer_type(),
+                    ty: self.new_infer_type(span),
                     kind: hir::ExpressionKind::Binary {
                         left,
                         operator,
@@ -101,7 +101,7 @@ impl<'a> HirContext<'a> {
             }
             ast::ExpressionKind::Deref { id: _, inner } => hir::Expression {
                 id,
-                ty: self.new_infer_type(),
+                ty: self.new_infer_type(span),
                 kind: hir::ExpressionKind::DeRef(self.lower_expression(inner)),
             },
             ast::ExpressionKind::Ref {
@@ -209,11 +209,11 @@ impl<'a> HirContext<'a> {
         let var_type_kind = self.ast_store.get_variable_type(node_id);
 
         let ty = match var_type_kind {
-            None => self.new_infer_type(),
+            None => self.new_infer_type(ident.span),
             Some(VarTypeKind::NonInveredType(ty)) => self.lower_type(ty),
             Some(VarTypeKind::InveredType(modifier)) => {
                 let modifier = *modifier;
-                self.new_infer_with_modifier(modifier)
+                self.new_infer_with_modifier(modifier, ident.span)
             }
         };
 
@@ -257,7 +257,7 @@ impl<'a> HirContext<'a> {
 
         let ty = match self.ast_store.get_function(resolved) {
             Some(signature) => Self::convert_type(&signature.return_type, &mut self.hir.types),
-            None => self.new_infer_type(),
+            None => self.new_infer_type(function_call.name.span),
         };
 
         let callee = function_call
@@ -287,8 +287,8 @@ impl<'a> HirContext<'a> {
         }
     }
 
-    fn null_ty(&mut self) -> TypeId {
-        let infer = self.new_infer_type();
+    fn null_ty(&mut self, span: Span) -> TypeId {
+        let infer = self.new_infer_type(span);
         self.add_type(HirType {
             kind: HirTypeKind::Optional(infer),
             modifier: None,

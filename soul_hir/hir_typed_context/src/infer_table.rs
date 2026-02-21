@@ -16,7 +16,7 @@ impl InferTable {
         let table = types
             .iter_types()
             .filter_map(|ty| match &ty.kind {
-                HirTypeKind::InferType(id) => Some((*id, InferBinding::Unbound)),
+                HirTypeKind::InferType(id, span) => Some((*id, InferBinding::Unbound(*span))),
                 _ => None,
             })
             .collect::<VecMap<_, _>>();
@@ -27,9 +27,9 @@ impl InferTable {
         }
     }
 
-    pub(crate) fn alloc(&mut self) -> InferTypeId {
+    pub(crate) fn alloc(&mut self, span: Span) -> InferTypeId {
         let id = self.id_generator.alloc();
-        self.table.insert(id, InferBinding::Unbound);
+        self.table.insert(id, InferBinding::Unbound(span));
         id
     }
 
@@ -72,10 +72,10 @@ impl InferTable {
         let b_ty = self.get_type(types, b_id)?;
 
         match (&a_ty.kind, &b_ty.kind) {
-            (HirTypeKind::InferType(a_inf), _) => {
+            (HirTypeKind::InferType(a_inf, _), _) => {
                 self.unify_var_type(types, *a_inf, got_type, span)
             }
-            (_, HirTypeKind::InferType(b_inf)) => {
+            (_, HirTypeKind::InferType(b_inf, _)) => {
                 self.unify_var_type(types, *b_inf, expected, span)
             }
 
@@ -128,6 +128,11 @@ impl InferTable {
                 self.unify_type_type(types, *a_id, *b_id, span)
             }
 
+            (HirTypeKind::Error, _)
+            | (_, HirTypeKind::Error) => {
+                Ok(UnifyResult::Ok)
+            }
+
             _ => {
                 a_ty.compatible_type_kind(b_ty).map_err(|reason| {
                     SoulError::new(
@@ -152,20 +157,19 @@ impl InferTable {
         ty: TypeId,
         span: Span,
     ) -> SoulResult<UnifyResult> {
-        
         let root = self.find_root(var)?;
         let ty = self.resolve_type_lazy(types, ty, span)?;
-        
+
         if self.occurs_in(types, root, ty) {
             return Err(SoulError::new(
                 "infinite type: inference variable occurs in its own definition",
                 SoulErrorKind::UnifyTypeError,
                 Some(span),
-            )); 
+            ));
         }
 
         match self.get_binding(root)? {
-            InferBinding::Unbound => {
+            InferBinding::Unbound(_) => {
                 self.table.insert(root, InferBinding::Bound(ty));
                 Ok(UnifyResult::Ok)
             }
@@ -207,6 +211,10 @@ impl InferTable {
         }
     }
 
+    pub(crate) fn add_infer_binding(&mut self, id: InferTypeId, kown: TypeId) {
+        self.table.insert(id, InferBinding::Bound(kown));
+    }
+
     pub(crate) fn resolve_type_strict(
         &mut self,
         types: &mut TypesMap,
@@ -217,15 +225,31 @@ impl InferTable {
         let modifier = hir_ty.modifier;
 
         match &hir_ty.kind {
-            HirTypeKind::InferType(inf) => {
+            HirTypeKind::InferType(inf, _) => {
                 let root = self.find_root(*inf)?;
                 match self.table.get(root) {
                     Some(InferBinding::Bound(t)) => self.resolve_type_strict(types, *t, span),
-                    Some(InferBinding::Unbound) => {
-                        Ok(types.insert(HirType::error_type()))
+                    Some(InferBinding::Unbound(span)) => {
+                        #[cfg(debug_assertions)]
+                        return Err(SoulError::new(
+                            format!("type {:?} could not be inferd", ty),
+                            SoulErrorKind::UnifyTypeError,
+                            Some(*span),
+                        ));
+                        #[cfg(not(debug_assertions))]
+                        return Err(SoulError::new(
+                            "type could not be inferd",
+                            SoulErrorKind::UnifyTypeError,
+                            Some(*span),
+                        ));
                     }
                     Some(_) => unreachable!(),
-                    None => return Err(soul_error_internal!(format!("{:?} not found", root), Some(span)))
+                    None => {
+                        return Err(soul_error_internal!(
+                            format!("{:?} not found", root),
+                            Some(span)
+                        ));
+                    }
                 }
             }
 
@@ -249,7 +273,10 @@ impl InferTable {
                 let mutable = *mutable;
                 let inner_resolved = self.resolve_type_strict(types, *of_type, span)?;
                 Ok(types.insert(HirType {
-                    kind: HirTypeKind::Ref { of_type: inner_resolved, mutable },
+                    kind: HirTypeKind::Ref {
+                        of_type: inner_resolved,
+                        mutable,
+                    },
                     modifier,
                 }))
             }
@@ -258,7 +285,10 @@ impl InferTable {
                 let kind = *kind;
                 let elem_resolved = self.resolve_type_strict(types, *element, span)?;
                 Ok(types.insert(HirType {
-                    kind: HirTypeKind::Array { element: elem_resolved, kind },
+                    kind: HirTypeKind::Array {
+                        element: elem_resolved,
+                        kind,
+                    },
                     modifier,
                 }))
             }
@@ -276,11 +306,11 @@ impl InferTable {
         let hir_ty = self.get_type(types, ty)?;
         let modifier = hir_ty.modifier;
         let resolved = match &hir_ty.kind {
-            HirTypeKind::InferType(inf) => {
+            HirTypeKind::InferType(inf, _) => {
                 let root = self.find_root(*inf)?;
                 return match self.table.get(root) {
                     Some(InferBinding::Bound(t)) => Ok(*t),
-                    Some(InferBinding::Unbound) => Ok(ty),
+                    Some(InferBinding::Unbound(_)) => Ok(ty),
                     Some(InferBinding::Alias(_)) => unreachable!(),
                     None => Err(soul_error_internal!("InferTypeId not found", None)),
                 };
@@ -325,24 +355,16 @@ impl InferTable {
         Ok(types.insert(resolved))
     }
 
-    fn occurs_in(
-        &mut self,
-        types: &TypesMap,
-        var: InferTypeId,
-        ty: TypeId,
-    ) -> bool {
+    fn occurs_in(&mut self, types: &TypesMap, var: InferTypeId, ty: TypeId) -> bool {
         let hir_ty = match types.get_type(ty) {
             Some(t) => t,
             None => return false,
         };
 
         match &hir_ty.kind {
-            HirTypeKind::InferType(inf) => {
-                self.find_root(*inf).ok() == self.find_root(var).ok()
-            }
+            HirTypeKind::InferType(inf, _) => self.find_root(*inf).ok() == self.find_root(var).ok(),
 
-            HirTypeKind::Pointer(id)
-            | HirTypeKind::Optional(id) => self.occurs_in(types, var, *id),
+            HirTypeKind::Pointer(id) | HirTypeKind::Optional(id) => self.occurs_in(types, var, *id),
 
             HirTypeKind::Ref { of_type, .. } => self.occurs_in(types, var, *of_type),
 
@@ -367,7 +389,7 @@ impl InferTable {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum InferBinding {
     /// Still unbound
-    Unbound,
+    Unbound(Span),
 
     /// Bound to a concrete type
     Bound(TypeId),

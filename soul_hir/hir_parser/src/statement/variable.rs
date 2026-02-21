@@ -5,7 +5,7 @@ impl<'a> HirContext<'a> {
         let ty = match &variable.ty {
             ast::VarTypeKind::NonInveredType(soul_type) => self.lower_type(soul_type),
             ast::VarTypeKind::InveredType(type_modifier) => {
-                self.new_infer_with_modifier(*type_modifier)
+                self.new_infer_with_modifier(*type_modifier, variable.name.span)
             }
         };
 

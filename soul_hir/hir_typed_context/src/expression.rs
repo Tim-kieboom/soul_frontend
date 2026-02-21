@@ -1,8 +1,7 @@
 use ast::{ArrayKind, BinaryOperator, BinaryOperatorKind, UnaryOperator};
-use hir::{BlockId, ExpressionId, FunctionId, HirType, IdAlloc, TypeId};
+use hir::{BlockId, ExpressionId, FunctionId, HirType, HirTypeKind, IdAlloc, TypeId};
 use soul_utils::{
-    error::{SoulError, SoulErrorKind},
-    span::Span,
+    error::{SoulError, SoulErrorKind}, span::Span
 };
 
 use crate::HirTypedContext;
@@ -12,10 +11,16 @@ const CONST: bool = false;
 
 impl<'a> HirTypedContext<'a> {
     pub(crate) fn infer_expression(&mut self, expression_id: hir::ExpressionId) -> TypeId {
+        
+        if self.type_table.expressions.get(expression_id) == Some(&TypeId::error()) {
+            return TypeId::error()
+        }
+
+        
         let value = &self.hir.expressions[expression_id];
         let span = self.expression_span(expression_id);
         let ty = match &value.kind {
-            hir::ExpressionKind::Null => self.new_infer_optional(),
+            hir::ExpressionKind::Null => self.new_infer_optional(span),
             hir::ExpressionKind::Load(place) => self.infer_place(place),
             hir::ExpressionKind::Block(body) => self.infer_block(*body),
             hir::ExpressionKind::Local(local) => self.type_table.locals[*local],
@@ -33,25 +38,26 @@ impl<'a> HirTypedContext<'a> {
             }
             hir::ExpressionKind::Function(function) => self.hir.functions[*function].return_type,
             hir::ExpressionKind::Ref { place, mutable } => {
-                let inner = self.infer_place(place);
-
-                let ty = match self.get_type(inner).kind {
+                let place_type = self.infer_place(place);
+                let resolved = self.resolve_type_lazy(place_type, span);
+                let resolved_ty = self.get_type(resolved);
+                let ty = match &resolved_ty.kind {
                     hir::HirTypeKind::Array {
                         element,
-                        kind: ArrayKind::HeapArray,
-                    }
-                    | hir::HirTypeKind::Array {
-                        element,
-                        kind: ArrayKind::StackArray(_),
+                        kind: ArrayKind::HeapArray | ArrayKind::StackArray(_),
                     } => {
                         let kind = match *mutable {
                             MUT => ArrayKind::MutSlice,
                             CONST => ArrayKind::ConstSlice,
                         };
-                        HirType::new(hir::HirTypeKind::Array { element, kind })
+                        HirType::new(hir::HirTypeKind::Array {
+                            element: *element,
+                            kind,
+                        })
                     }
+
                     _ => HirType::new(hir::HirTypeKind::Ref {
-                        of_type: inner,
+                        of_type: place_type,
                         mutable: *mutable,
                     }),
                 };
@@ -101,7 +107,11 @@ impl<'a> HirTypedContext<'a> {
             } => self.infer_if(*condition, *then_block, *else_block),
             hir::ExpressionKind::InnerRawStackArray { .. } => value.ty,
         };
-
+        
+        if let HirTypeKind::InferType(id, _) = &self.get_type(value.ty).kind {
+            self.infer_table.add_infer_binding(*id, ty);
+        }
+        
         self.type_expression(expression_id, ty);
         ty
     }
@@ -196,7 +206,10 @@ impl<'a> HirTypedContext<'a> {
                 let right_type = self.get_type(right_id);
                 if !left_type.is_numeric() {
                     self.log_error(SoulError::new(
-                        format!(""),
+                        format!(
+                            "type is '{}' but can only be used for number types (f32, uint, int, i32, ect..)", 
+                            left_type.display(&self.type_table.types)
+                        ),
                         SoulErrorKind::UnifyTypeError,
                         Some(self.expression_span(left)),
                     ));
@@ -205,7 +218,10 @@ impl<'a> HirTypedContext<'a> {
 
                 if !right_type.is_numeric() {
                     self.log_error(SoulError::new(
-                        format!(""),
+                        format!(
+                            "type is '{}' but can only be used for number types (f32, uint, int, i32, ect..)", 
+                            left_type.display(&self.type_table.types)
+                        ),
                         SoulErrorKind::UnifyTypeError,
                         Some(self.expression_span(left)),
                     ));
@@ -225,9 +241,12 @@ impl<'a> HirTypedContext<'a> {
             Unary::Neg => {
                 let value_type = self.infer_expression(value);
                 let ty = self.get_type(value_type);
-                if !ty.is_unsigned_interger() && !ty.is_signed_interger() && !ty.is_float() {
+                if !ty.is_numeric() {
                     self.log_error(SoulError::new(
-                        format!("'{}' can only be used for float and signedInterger types (f32, int, i32, ect..)", operator.node.as_str()), 
+                        format!(
+                            "type is '{}' but can only be used for number types (f32, uint, int, i32, ect..)", 
+                            operator.node.as_str()
+                        ),
                         SoulErrorKind::UnifyTypeError,
                         Some(span),
                     ));
@@ -242,7 +261,7 @@ impl<'a> HirTypedContext<'a> {
                 if !ty.is_boolean() {
                     self.log_error(SoulError::new(
                         format!(
-                            "'{}' can only be used for bool type",
+                            "type is '{}' but can only be used for bool type",
                             operator.node.as_str()
                         ),
                         SoulErrorKind::UnifyTypeError,
@@ -259,7 +278,7 @@ impl<'a> HirTypedContext<'a> {
                 if !ty.is_numeric() {
                     self.log_error(SoulError::new(
                         format!(
-                            "'{}' can only be used for number types",
+                            "type is '{}' but can only be used for number types (f32, uint, int, i32, ect..)",
                             operator.node.as_str()
                         ),
                         SoulErrorKind::UnifyTypeError,
@@ -303,9 +322,9 @@ impl<'a> HirTypedContext<'a> {
         self.none_type
     }
 
-    fn new_infer_optional(&mut self) -> TypeId {
-        let id = self.infer_table.alloc();
-        let infer = self.add_type(HirType::infer_type(id));
+    fn new_infer_optional(&mut self, span: Span) -> TypeId {
+        let id = self.infer_table.alloc(span);
+        let infer = self.add_type(HirType::infer_type(id, span));
         self.add_type(HirType::new(hir::HirTypeKind::Optional(infer)))
     }
 }

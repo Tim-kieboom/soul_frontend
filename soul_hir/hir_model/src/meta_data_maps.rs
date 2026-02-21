@@ -1,10 +1,7 @@
 use std::{collections::HashMap, hash::Hash};
 
 use soul_utils::{
-    soul_import_path::SoulImportPath,
-    soul_names::TypeModifier,
-    span::{ItemMetaData, Span},
-    vec_map::{VecMap, VecMapIndex},
+    soul_import_path::SoulImportPath, soul_names::TypeModifier, span::{ItemMetaData, Span}, vec_map::{VecMap, VecMapIndex}
 };
 
 use crate::{
@@ -76,12 +73,13 @@ impl TypesMap {
         self.map.insert(&mut self.type_generator, ty)
     }
 
-    pub fn new_infertype(&mut self, modifier: Option<TypeModifier>) -> TypeId {
+    pub fn new_infertype(&mut self, modifier: Option<TypeModifier>, span: Span) -> TypeId {
         let infer = self.infer_generator.alloc();
-        self.insert(HirType {
-            kind: crate::HirTypeKind::InferType(infer),
+        let ty = self.insert(HirType {
+            kind: crate::HirTypeKind::InferType(infer, span),
             modifier,
-        })
+        });
+        ty
     }
 
     pub fn iter_types(&self) -> impl Iterator<Item = &HirType> {

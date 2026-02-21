@@ -60,19 +60,21 @@ impl<'a> HirContext<'a> {
         let kind = ast::ArrayKind::StackArray(array.values.len() as u64);
         let element = match &array.element_type {
             Some(val) => self.lower_type(val),
-            None => self.new_infer_type(),
+            None => self.new_infer_type(span),
         };
 
-        let array_ty = self.add_type(HirType::new(HirTypeKind::Array { element, kind }));
+        let array_ty = self.add_type(
+            HirType::new(HirTypeKind::Array { element, kind })
+        );
         array_ty
     }
 
-    pub(crate) fn new_infer_type(&mut self) -> TypeId {
-        self.hir.types.new_infertype(None)
+    pub(crate) fn new_infer_type(&mut self, span: Span) -> TypeId {
+        self.hir.types.new_infertype(None, span)
     }
 
-    pub(crate) fn new_infer_with_modifier(&mut self, modifier: TypeModifier) -> TypeId {
-        self.hir.types.new_infertype(Some(modifier))
+    pub(crate) fn new_infer_with_modifier(&mut self, modifier: TypeModifier, span: Span) -> TypeId {
+        self.hir.types.new_infertype(Some(modifier), span)
     }
 
     pub(crate) fn add_type(&mut self, ty: HirType) -> TypeId {

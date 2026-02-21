@@ -42,7 +42,7 @@ pub enum HirTypeKind {
 
     Error,
     /// special type for unkown hir type (should not exist in Thir and further)
-    InferType(InferTypeId),
+    InferType(InferTypeId, Span),
 }
 
 impl HirType {
@@ -74,9 +74,9 @@ impl HirType {
         }
     }
 
-    pub const fn infer_type(infer_id: InferTypeId) -> Self {
+    pub const fn infer_type(infer_id: InferTypeId, span: Span) -> Self {
         Self {
-            kind: HirTypeKind::InferType(infer_id),
+            kind: HirTypeKind::InferType(infer_id, span),
             modifier: None,
         }
     }
@@ -89,7 +89,7 @@ impl HirType {
     }
 
     pub const fn is_infertype(&self) -> bool {
-        matches!(self.kind, HirTypeKind::InferType(_))
+        matches!(self.kind, HirTypeKind::InferType(_, _))
     }
 
     pub fn with_modifier(mut self, modifier: TypeModifier) -> Self {
@@ -119,6 +119,10 @@ impl HirType {
 
     pub const fn is_boolean(&self) -> bool {
         matches!(self.kind, HirTypeKind::Primitive(PrimitiveTypes::Boolean))
+    }
+
+    pub const fn is_error(&self) -> bool {
+        matches!(self.kind, HirTypeKind::Error)
     }
 
     pub const fn is_signed_interger(&self) -> bool {
@@ -169,8 +173,8 @@ impl HirType {
         &self,
         should_be: &Self,
     ) -> Result<UnifyResult, MishmatchReason> {
-        debug_assert!(!matches!(self.kind, HirTypeKind::InferType(_)), "this fn should be used after infer typed are resolved");
-        debug_assert!(!matches!(should_be.kind, HirTypeKind::InferType(_)), "this fn should be used after infer typed are resolved");
+        debug_assert!(!matches!(self.kind, HirTypeKind::InferType(_, _)), "this fn should be used after infer typed are resolved");
+        debug_assert!(!matches!(should_be.kind, HirTypeKind::InferType(_, _)), "this fn should be used after infer typed are resolved");
 
         let result = match (self.modifier, should_be.modifier) {
             (Some(self_modifier), Some(should_be_modifier)) => {
@@ -182,6 +186,10 @@ impl HirType {
             }
             _ => None,
         };
+
+        if self.is_error() || should_be.is_error() {
+            return Ok(UnifyResult::Ok)
+        }
 
         self.kind.compatible_type_kind(&should_be.kind)?;
         Ok(result.unwrap_or(UnifyResult::Ok))
@@ -273,7 +281,7 @@ impl HirTypeKind {
                 write_display_from_id(types, *type_id, sb)
             }
             HirTypeKind::Error => write!(sb, "<error>"),
-            HirTypeKind::InferType(_) => write!(sb, "<infer>"),
+            HirTypeKind::InferType(id, _) => write!(sb, "<infer_{}>", id.index()),
         }
     }
 
@@ -285,7 +293,7 @@ impl HirTypeKind {
     }
 
     pub const fn is_unknown(&self) -> bool {
-        matches!(self, HirTypeKind::InferType(_))
+        matches!(self, HirTypeKind::InferType(_, _))
     }
 
     pub fn display(&self, types: &TypesMap) -> String {
@@ -301,7 +309,7 @@ impl HirTypeKind {
             HirTypeKind::Error => "<error>",
             HirTypeKind::Ref { .. } => "<ref>",
             HirTypeKind::Array { .. } => "<array>",
-            HirTypeKind::InferType(_) => "<unknown>",
+            HirTypeKind::InferType(_, _) => "<unknown>",
             HirTypeKind::Pointer(_) => "<pointer>",
             HirTypeKind::Optional(_) => "<optional>",
             HirTypeKind::Primitive(primitive) => primitive.as_str(),
@@ -388,7 +396,7 @@ impl HirTypeKind {
                     return Err("can only type cast pointers in unsafe".to_string());
                 }
 
-                if matches!(a.kind, HirTypeKind::InferType(_)) {
+                if a.is_infertype() {
                     return Ok(());
                 }
 
@@ -399,7 +407,7 @@ impl HirTypeKind {
                 let a = get_type(types, *a_id);
                 let b = get_type(types, *b_id);
 
-                if matches!(a.kind, HirTypeKind::InferType(_)) {
+                if a.is_infertype() {
                     return Ok(());
                 }
 
@@ -413,7 +421,7 @@ impl HirTypeKind {
             (a, HirTypeKind::Optional(b_id)) => {
                 let b = get_type(types, *b_id);
 
-                if matches!(a, HirTypeKind::InferType(_)) {
+                if matches!(a, HirTypeKind::InferType(_, _)) {
                     return Ok(());
                 }
 

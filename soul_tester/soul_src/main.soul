@@ -1,61 +1,63 @@
-// const val = 1
-// const array: [3]int = [int: 1,2,3]
+const val = 1
+mut array: [0]int = []
+slice: [@]int = @array
+mutSlice: [&]int = &array
 
-// sum(a: int, b: int): int {
-//     return a + b
-// }
+sum(a: int, b: int): int {
+    return a + b
+}
 
-// returnTerminate(): int {
-//     doStuff := 1 + 2
-//     1
-// }
+returnTerminate(): int {
+    doStuff := 1 + 2
+    1
+}
 
-// returnNone() {
-//     doStuff := 1 + 2
-//     1;
-// }
+returnNone() {
+    doStuff := 1 + 2
+    1;
+}
 
 variable() {
-    // literal chars = "hello world"
+    literal chars = "hello world"
 
-    constTyped: int = 1
-    // constInfer := 1 + -2
+    constTyped := 1
+    constInfer := 1 + -2
 
-    // const scopeVar = 1
-    // {
-    //     const scopeVar = 2
-    //     // { scopeVar = 3 }
-    //     { 
-    //         scopeVar = 3 
-    //     }
-    // }
-    // scopeVar = 4
+    const scopeVar = 1
+    {
+        const scopeVar = 2
+        // { scopeVar = 3 }
+        { 
+            scopeVar = 3 
+        }
+    }
+    scopeVar = 4
 
-    // mut mutInfer = 1.0 + -2.0
+    mut mutInfer = 1.0 + -2.0
 
-    // mut mutTyped: int = 1
-    // mutTyped = returnTerminate()
+    mut mutTyped: int = 1
+    mutTyped = returnTerminate()
 
-    // floatArray := [f64: 1,2,3,4]
+    floatArray := [f64: 1,2,3,4]
     mut array = [1,1,3,4,constTyped]
     array[0] = 6
 
-    // element := array[1]
+    element := array[1]
 
-    // ref := @1
+    ref := @1
 
-    // slice: [@]int = @array
-    // mutSlice: [&]int = &heap
-    // mut array2D: [2][1]int := [[1], [2]]
+    slice: [@]int = @array
+    mutSlice: [&]int = &array
+    mut array2D: [2][1]int := [[1], [2]]
 
-    // mut cast := 1 as int
-    // cast = sum(1, 2)
+    mut cast := 1 as int
+    cast = sum(1, 2)
 
-    // const lateInfer
-    // lateInfer = 1
+    const lateInfer
+    lateInfer = 1
 
-    // mut inferArray = @[]
-    // inferArray = @[1]
+    mut inferArray: [@]int = @[]
+    inferArray = @[1]
 
     // mut option = null
     // option = 1

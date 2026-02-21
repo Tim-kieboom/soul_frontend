@@ -331,6 +331,7 @@ impl<'a> HirDisplayer<'a> {
             Some(val) => &val.types,
             None => &self.hir.types,
         };
+
         let ty = types.get_type(id).expect("should have id");
         ty.write_display(types, &mut self.sb)
             .expect("no format error");
