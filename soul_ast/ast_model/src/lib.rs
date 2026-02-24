@@ -1,4 +1,4 @@
-use soul_utils::{vec_map::VecMap};
+use soul_utils::vec_map::VecMap;
 
 mod ast;
 pub mod scope;

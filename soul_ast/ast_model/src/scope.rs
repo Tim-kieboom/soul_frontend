@@ -106,8 +106,8 @@ impl ScopeBuilder {
         None
     }
 
-    pub fn lookup_value(&self, ident: &Ident, kind: ScopeValueEntryKind) -> Option<NodeId> {
-        
+    pub fn lookup_value(&self, ident: &Ident, kind: ScopeValue) -> Option<NodeId> {
+
         for scope in self.scopes.iter().rev() {
             
             let ids = match scope.values.get(ident.as_str()) {
@@ -115,10 +115,8 @@ impl ScopeBuilder {
                 None => continue,
             };
 
-            for id in ids {
-                if id.kind == kind {
-                    return Some(id.node_id);
-                }
+            if let Some(id) = ids.get(kind) {
+                return Some(id)
             }
         }
 
@@ -133,7 +131,7 @@ impl Default for ScopeBuilder {
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct Scope {
-    pub values: HashMap<String, Vec<ScopeValueEntry>>,
+    pub values: HashMap<String, ScopeValueEntry>,
     pub types: HashMap<String, ScopeTypeEntry>,
 }
 impl Scope {
@@ -142,25 +140,43 @@ impl Scope {
     }
 }
 
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct ScopeValueEntry {
-    pub node_id: NodeId,
-    pub kind: ScopeValueEntryKind,
+    kinds: [Option<NodeId>; 3]
+}
+impl ScopeValueEntry {
+    pub fn insert(&mut self, kind: ScopeValue, id: NodeId) -> Option<NodeId> {
+        let index = kind as usize;
+        debug_assert!(
+            index < self.kinds.len(), 
+            "should probebly increase stack array len to amount of variants of ScopeValueEntryKind",
+        );
+        self.kinds[index].replace(id)
+    }
+    
+    pub fn get(&self, kind: ScopeValue) -> Option<NodeId> {
+        let index = kind as usize;
+        debug_assert!(
+            index < self.kinds.len(), 
+            "should probebly increase stack array len to amount of variants of ScopeValueEntryKind",
+        );
+        self.kinds[index]
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum ScopeValueEntryKind {
-    Field,
-    Function,
-    Variable,
+pub enum ScopeValue {
+    Field = 0,
+    Function = 1,
+    Variable = 2,
 }
 
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct ScopeTypeEntry {
     pub span: Span,
     pub node_id: NodeId,
-    pub trait_parent: Option<NodeId>,
     pub kind: ScopeTypeEntryKind,
+    pub trait_parent: Option<NodeId>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -188,10 +204,10 @@ impl<'a> ScopeValueKind<'a> {
         }
     }
 
-    pub fn to_entry_kind(&self) -> ScopeValueEntryKind {
+    pub fn to_entry_kind(&self) -> ScopeValue {
         match self {
-            ScopeValueKind::Variable(_) => ScopeValueEntryKind::Variable,
-            ScopeValueKind::Function(_) => ScopeValueEntryKind::Function,
+            ScopeValueKind::Variable(_) => ScopeValue::Variable,
+            ScopeValueKind::Function(_) => ScopeValue::Function,
         }
     }
 }

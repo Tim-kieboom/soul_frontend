@@ -1,4 +1,4 @@
-use ast::{AbstractSyntaxTree, DeclareStore, ParseResponse, meta_data::AstMetadata, scope::{NodeId, NodeIdGenerator, ScopeValueEntryKind}};
+use ast::{DeclareStore, ParseResponse, meta_data::AstMetadata, scope::{NodeId, NodeIdGenerator, ScopeValue}};
 use soul_utils::{Ident, error::SoulError, sementic_level::SementicFault};
 
 mod collect;
@@ -6,7 +6,10 @@ mod resolve;
 
 pub fn name_resolve(request: &mut ParseResponse, faults: &mut Vec<SementicFault>) {
     let mut resolver = NameResolver::new(&mut request.meta_data, faults, &mut request.store);
-    resolver.run(&mut request.tree);
+    let root = &mut request.tree.root;
+    
+    resolver.collect_declarations(root);
+    resolver.resolve_names(root);
 }
 
 struct NameResolver<'a>  {
@@ -27,16 +30,11 @@ impl<'a> NameResolver<'a> {
         }
     }
 
-    fn run(&mut self, ast: &mut AbstractSyntaxTree) {
-        self.collect_declarations(&mut ast.root);
-        self.resolve_names(&mut ast.root);
-    }
-
     fn log_error(&mut self, error: SoulError) {
         self.faults.push(SementicFault::error(error));
     }
 
     fn check_variable(&mut self, name: &Ident) -> Option<NodeId> {
-        self.info.scopes.lookup_value(name, ScopeValueEntryKind::Variable)
+        self.info.scopes.lookup_value(name, ScopeValue::Variable)
     }
 }

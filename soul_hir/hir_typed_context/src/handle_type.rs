@@ -110,10 +110,11 @@ impl<'a> HirTypedContext<'a> {
     }
 
     pub(crate) fn resolve_all_types(&mut self) {
+
         macro_rules! resolve {
             ($field:ident, $id:ty) => {
                 let cap = self.type_table.$field.cap();
-                for i in 0..cap {
+                for i in 1..cap {
                     let type_id = match self.type_table.$field.raw_index(i) {
                         Some(val) => *val,
                         None => continue,

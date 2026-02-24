@@ -1,4 +1,4 @@
-use ast::{Block, NamedTupleType, VarTypeKind, scope::{NodeId, Scope, ScopeId, ScopeValueEntry, ScopeValueEntryKind, ScopeValueKind}};
+use ast::{Block, NamedTupleType, VarTypeKind, scope::{NodeId, Scope, ScopeId, ScopeValue, ScopeValueKind}};
 
 use crate::NameResolver;
 mod collect_statement;
@@ -7,7 +7,8 @@ mod collect_type;
 
 impl<'a> NameResolver<'a> {
     pub(crate) fn collect_declarations(&mut self, block: &mut Block) {
-        self.collect_block(block);
+        block.scope_id = Some(self.info.scopes.current_scope_id());
+        self.collect_scopeless_block(block);
     }
 
     fn push_scope(&mut self, set_scope_id: &mut Option<ScopeId>) {
@@ -33,10 +34,8 @@ impl<'a> NameResolver<'a> {
 
             self.insert_value(
                 name.as_str(),
-                ScopeValueEntry { 
-                    node_id: id, 
-                    kind: ScopeValueEntryKind::Variable, 
-                }
+                id, 
+                ScopeValue::Variable, 
             )
         }
     }
@@ -47,20 +46,18 @@ impl<'a> NameResolver<'a> {
 
         self.insert_value(
             value.get_name().as_str(), 
-            ScopeValueEntry { 
-                node_id: id, 
-                kind: value.to_entry_kind(),
-            },
+            id, 
+            value.to_entry_kind(),
         );
         id
     }
 
-    fn insert_value<S: Into<String>>(&mut self, name: S, entry: ScopeValueEntry) {
+    fn insert_value<S: Into<String>>(&mut self, name: S, id: NodeId, kind: ScopeValue) {
         self.current_scope_mut()
             .values
             .entry(name.into())
             .or_default()
-            .push(entry)
+            .insert(kind, id);
     }
 
     fn current_scope_mut(&mut self) -> &mut Scope {
