@@ -66,7 +66,9 @@ fn to_message(
 
     let mut sb = String::new();
     if config.backtrace {
+        color(Colors::BRIGHT_RED, &mut sb, &config);
         sb.push_str(&err.backtrace.to_string());
+        color_default(&mut sb, &config);
     }
     sb.push_str("-----");
     color(level_color(&level), &mut sb, &config);

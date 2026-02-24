@@ -277,10 +277,18 @@ impl InferTable {
 
             HirTypeKind::Array { element, kind } => {
                 let kind = *kind;
-                let elem_resolved = self.resolve_type_strict(types, *element, span)?;
+                let resolved = self.resolve_type_strict(types, *element, span)?;
+                let element = if self.get_type(types, resolved)?.modifier == None {
+                    resolved
+                } else {
+                    let mut new = self.get_type(types, resolved)?.clone();
+                    new.modifier = None;
+                    types.insert(new)
+                };
+
                 Ok(types.insert(HirType {
                     kind: HirTypeKind::Array {
-                        element: elem_resolved,
+                        element,
                         kind,
                     },
                     modifier,

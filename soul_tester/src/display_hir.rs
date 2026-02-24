@@ -56,7 +56,14 @@ impl<'a> HirDisplayer<'a> {
         match global {
             hir::Global::Function(function, _id) => self.display_function(function),
             hir::Global::Variable(variable, _id) => self.display_variable(variable),
-            hir::Global::InternalAssign(assign, _id) => self.display_assign(assign),
+            hir::Global::InternalAssign(assign, _id) => {
+                self.push_str("/*internal*/");
+                self.display_assign(assign);
+            }
+            hir::Global::InternalVariable(variable, _id) => {
+                self.push_str("/*internal*/");
+                self.display_variable(variable);
+            }
         }
         self.push('\n');
     }

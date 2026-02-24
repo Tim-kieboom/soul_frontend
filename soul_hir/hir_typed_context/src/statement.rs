@@ -11,7 +11,8 @@ impl<'a> HirTypedContext<'a> {
     pub(crate) fn infer_global(&mut self, global: &Global) {
         let ty = match global {
             Global::InternalAssign(assign, _) => self.infer_assign(assign),
-            Global::Variable(variable, id) => {
+            Global::Variable(variable, id)
+            | Global::InternalVariable(variable, id) => {
                 self.infer_variable(variable, self.statement_span(*id))
             }
             Global::Function(function, _) => {

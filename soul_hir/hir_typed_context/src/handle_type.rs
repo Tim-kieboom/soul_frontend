@@ -12,20 +12,7 @@ use soul_utils::{
 use crate::HirTypedContext;
 
 impl<'a> HirTypedContext<'a> {
-    pub(crate) fn unify(&mut self, value: ExpressionId, expect: TypeId, got: TypeId, span: Span) {
-        match self
-            .infer_table
-            .unify_type_type(&mut self.type_table.types, expect, got, span)
-        {
-            Ok(UnifyResult::Ok) => (),
-            Ok(UnifyResult::NeedsAutoCopy) => self.add_autocopy(value),
-            Err(err) => {
-                self.log_error(err);
-                self.posion_expression(value);
-            }
-        }
-    }
-
+    
     pub(crate) fn type_block(&mut self, id: BlockId, ty: TypeId) {
         self.type_table.blocks.insert(id, ty);
     }
@@ -40,6 +27,57 @@ impl<'a> HirTypedContext<'a> {
 
     pub(crate) fn type_expression(&mut self, id: ExpressionId, ty: TypeId) {
         self.type_table.expressions.insert(id, ty);
+    }
+
+    pub(crate) fn add_type(&mut self, ty: HirType) -> TypeId {
+        self.type_table.types.insert(ty)
+    }
+
+    pub(crate) fn get_type(&self, ty: TypeId) -> &HirType {
+        self.type_table
+            .types
+            .get_type(ty)
+            .expect("TypeId should always have a type")
+    }
+
+    pub(crate) fn resolve_type_strict(&mut self, ty: TypeId, span: Span) -> Option<TypeId> {
+        match self
+            .infer_table
+            .resolve_type_strict(&mut self.type_table.types, ty, span)
+        {
+            Ok(val) => Some(val),
+            Err(err) => {
+                self.log_error(err);
+                None
+            }
+        }
+    }
+
+    pub(crate) fn resolve_type_lazy(&mut self, ty: TypeId, span: Span) -> TypeId {
+        match self
+            .infer_table
+            .resolve_type_lazy(&mut self.type_table.types, ty, span)
+        {
+            Ok(val) => val,
+            Err(err) => {
+                self.log_error(err);
+                TypeId::error()
+            }
+        }
+    }
+    
+    pub(crate) fn unify(&mut self, value: ExpressionId, expect: TypeId, got: TypeId, span: Span) {
+        match self
+            .infer_table
+            .unify_type_type(&mut self.type_table.types, expect, got, span)
+        {
+            Ok(UnifyResult::Ok) => (),
+            Ok(UnifyResult::NeedsAutoCopy) => self.add_autocopy(value),
+            Err(err) => {
+                self.log_error(err);
+                self.posion_expression(value);
+            }
+        }
     }
 
     pub(crate) fn type_local(&mut self, id: LocalId, type_id: TypeId, modifier: TypeModifier, span: Span) -> TypeId {
@@ -64,10 +102,6 @@ impl<'a> HirTypedContext<'a> {
         
         self.type_table.locals.insert(id, local_type_id);
         local_type_id
-    }
-
-    pub(crate) fn add_type(&mut self, ty: HirType) -> TypeId {
-        self.type_table.types.insert(ty)
     }
 
     pub(crate) fn get_priority_type(&mut self, left: TypeId, right: TypeId) -> TypeId {

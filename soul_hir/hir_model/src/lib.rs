@@ -83,6 +83,8 @@ pub enum Global {
     Function(FunctionId, StatementId),
     Variable(Variable, StatementId),
 
+    /// (allows mutable) only allowed to be used by hir lowerer not user
+    InternalVariable(Variable, StatementId),
     /// only allowed to be used by hir lowerer not user
     InternalAssign(Assign, StatementId),
 }
@@ -92,6 +94,7 @@ impl Global {
             Global::Function(_, statement_id) => *statement_id,
             Global::Variable(_, statement_id) => *statement_id,
             Global::InternalAssign(_, statement_id) => *statement_id,
+            Global::InternalVariable(_, statement_id) => *statement_id,
         }
     }
 
@@ -100,6 +103,7 @@ impl Global {
             Global::Variable(variable, _) => spans.locals.get(variable.local),
             Global::Function(function_id, _) => spans.functions.get(*function_id),
             Global::InternalAssign(assign, _) => spans.expressions.get(assign.value),
+            Global::InternalVariable(variable, _) => spans.locals.get(variable.local),
         };
 
         match span {
@@ -115,7 +119,9 @@ impl Global {
 
     pub const fn should_be_inmutable(&self) -> bool {
         match self {
-            Global::Function(_, _) => false,
+            Global::Function(_, _)
+            | Global::InternalVariable(_, _) => false,
+            
             Global::Variable(_, _) 
             | Global::InternalAssign(_, _) => true,
         }

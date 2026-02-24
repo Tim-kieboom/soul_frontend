@@ -38,7 +38,7 @@ impl<'a> HirContext<'a> {
         match self.current_body {
             crate::CurrentBody::Global => {
                 let id = self.alloc_statement(&ItemMetaData::default_const(), span);
-                let global = hir::Global::Variable(variable, id);
+                let global = hir::Global::InternalVariable(variable, id);
                 self.hir.root.globals.push(global);
             }
             crate::CurrentBody::Block(block_id) => {

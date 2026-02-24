@@ -1,5 +1,5 @@
 use hir::{Assign, ExpressionId, HirType, Place, PlaceKind, TypeId};
-use soul_utils::{Ident, span::Span};
+use soul_utils::{Ident, soul_names::TypeModifier, span::Span};
 
 use crate::{HirContext, create_local_name};
 
@@ -23,7 +23,7 @@ impl<'a> HirContext<'a> {
         let unalloc = self.create_unallocted_array(infer_array, element, size, span);
 
         let temp_array = hir::Variable {
-            ty: self.new_infer_type(span),
+            ty: self.new_infer_with_modifier(TypeModifier::Mut, span),
             local: temp_local,
             value: Some(unalloc),
         };
