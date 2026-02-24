@@ -1,15 +1,18 @@
 use hir::{
-    BlockId, ExpressionId, FunctionId, HirType, HirTypeKind, IdAlloc, LocalId, StatementId, TypeId, TypesMap, UnifyResult
+    BlockId, ExpressionId, FunctionId, HirType, HirTypeKind, IdAlloc, LocalId, StatementId, TypeId,
+    TypesMap, UnifyResult,
 };
 use soul_utils::{
-    error::SoulResult, soul_names::PrimitiveTypes, span::Span, vec_map::{VecMap, VecMapIndex}
+    error::SoulResult,
+    soul_names::{PrimitiveTypes, TypeModifier},
+    span::Span,
+    vec_map::{VecMap, VecMapIndex},
 };
 
 use crate::HirTypedContext;
 
 impl<'a> HirTypedContext<'a> {
     pub(crate) fn unify(&mut self, value: ExpressionId, expect: TypeId, got: TypeId, span: Span) {
-
         match self
             .infer_table
             .unify_type_type(&mut self.type_table.types, expect, got, span)
@@ -39,22 +42,26 @@ impl<'a> HirTypedContext<'a> {
         self.type_table.expressions.insert(id, ty);
     }
 
-    pub(crate) fn type_local(&mut self, id: LocalId, type_id: TypeId, span: Span) -> TypeId {
-        let ty = self.hir.locals[id];
-        let modifier = self.get_type(ty).modifier;
+    pub(crate) fn type_local(&mut self, id: LocalId, type_id: TypeId, modifier: TypeModifier, span: Span) -> TypeId {
 
         let resolved = self.resolve_untyped_primitive(type_id, span);
         let local_type_id = match resolved {
             Some(mut ty) => {
-                ty.modifier = modifier;
+                ty.modifier = Some(modifier);
                 self.add_type(ty)
             }
             None => {
                 let mut ty = self.get_type(type_id).clone();
-                ty.modifier = modifier;
+                ty.modifier = Some(modifier);
                 self.add_type(ty)
             }
         };
+
+        debug_assert_eq!(
+            self.get_type(local_type_id).modifier, 
+            Some(modifier),
+        );
+        
         self.type_table.locals.insert(id, local_type_id);
         local_type_id
     }
@@ -86,7 +93,9 @@ impl<'a> HirTypedContext<'a> {
                             Span::default()
                         }
                     };
-                    let resolved = self.resolve_type_strict(type_id, span).unwrap_or(TypeId::error());
+                    let resolved = self
+                        .resolve_type_strict(type_id, span)
+                        .unwrap_or(TypeId::error());
                     self.type_table.$field.insert(index, resolved);
                 }
             };
@@ -140,19 +149,26 @@ impl<'a> HirTypedContext<'a> {
             return Ok(id);
         }
 
-        let resolved = self.resolve_type_strict(ty, Span::default()).unwrap_or(TypeId::error());
+        let resolved = self
+            .resolve_type_strict(ty, Span::default())
+            .unwrap_or(TypeId::error());
         let typed = match self.resolve_untyped_primitive(resolved, Span::default_const()) {
             Some(val) => self.add_type(val),
             None => resolved,
         };
-        let hir_ty = self.type_table.types.get_type(typed).expect("should have id");
+        let hir_ty = self
+            .type_table
+            .types
+            .get_type(typed)
+            .expect("should have id");
 
         debug_assert!(
             !hir_ty.is_infertype(),
             "InferType leaked into final type graph"
         );
 
-        let new_ty = match &hir_ty.kind {
+        let modifier = hir_ty.modifier;
+        let mut new_ty = match &hir_ty.kind {
             HirTypeKind::Optional(id) => {
                 let id = self.finalize_type(*id, new_types, map)?;
                 HirType::new(HirTypeKind::Optional(id))
@@ -188,6 +204,7 @@ impl<'a> HirTypedContext<'a> {
             HirTypeKind::InferType(_, _) => unreachable!("resolve_type must eliminate InferType"),
         };
 
+        new_ty.modifier = modifier;
         let new_id = new_types.insert(new_ty);
         map.insert(ty, new_id);
         Ok(new_id)

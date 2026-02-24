@@ -1,4 +1,6 @@
-const val = 1
+literal chars = "hello world"
+num := 1
+val := 1
 mut array: [0]int = []
 slice: [@]int = @array
 mutSlice: [&]int = &array

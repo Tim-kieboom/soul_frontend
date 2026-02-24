@@ -11,7 +11,7 @@ pub use hir_type::*;
 pub use ids::*;
 pub use meta_data_maps::*;
 pub use place::*;
-use soul_utils::vec_map::VecMap;
+use soul_utils::{span::Span, vec_map::VecMap};
 pub use statement::*;
 
 /// High-level Intermediate Representation (HIR) tree.
@@ -94,6 +94,32 @@ impl Global {
             Global::InternalAssign(_, statement_id) => *statement_id,
         }
     }
+
+    pub fn get_span(&self, spans: &SpanMap) -> Span {
+        let span = match self {
+            Global::Variable(variable, _) => spans.locals.get(variable.local),
+            Global::Function(function_id, _) => spans.functions.get(*function_id),
+            Global::InternalAssign(assign, _) => spans.expressions.get(assign.value),
+        };
+
+        match span {
+            Some(val) => *val,
+            None => {
+                #[cfg(debug_assertions)]
+                panic!("span not found of {:?}", self);
+                #[cfg(not(debug_assertions))]
+                Span::default_const()
+            }
+        }
+    }
+
+    pub const fn should_be_inmutable(&self) -> bool {
+        match self {
+            Global::Function(_, _) => false,
+            Global::Variable(_, _) 
+            | Global::InternalAssign(_, _) => true,
+        }
+    } 
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

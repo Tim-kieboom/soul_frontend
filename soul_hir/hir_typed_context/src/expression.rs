@@ -1,7 +1,8 @@
 use ast::{ArrayKind, BinaryOperator, BinaryOperatorKind, UnaryOperator};
 use hir::{BlockId, ExpressionId, FunctionId, HirType, HirTypeKind, IdAlloc, TypeId};
 use soul_utils::{
-    error::{SoulError, SoulErrorKind}, span::Span
+    error::{SoulError, SoulErrorKind},
+    span::Span,
 };
 
 use crate::HirTypedContext;
@@ -11,12 +12,10 @@ const CONST: bool = false;
 
 impl<'a> HirTypedContext<'a> {
     pub(crate) fn infer_expression(&mut self, expression_id: hir::ExpressionId) -> TypeId {
-        
         if self.type_table.expressions.get(expression_id) == Some(&TypeId::error()) {
-            return TypeId::error()
+            return TypeId::error();
         }
 
-        
         let value = &self.hir.expressions[expression_id];
         let span = self.expression_span(expression_id);
         let ty = match &value.kind {
@@ -107,11 +106,11 @@ impl<'a> HirTypedContext<'a> {
             } => self.infer_if(*condition, *then_block, *else_block),
             hir::ExpressionKind::InnerRawStackArray { .. } => value.ty,
         };
-        
+
         if let HirTypeKind::InferType(id, _) = &self.get_type(value.ty).kind {
             self.infer_table.add_infer_binding(*id, ty);
         }
-        
+
         self.type_expression(expression_id, ty);
         ty
     }

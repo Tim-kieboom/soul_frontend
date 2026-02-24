@@ -1,9 +1,6 @@
 use hir::{HirType, HirTypeKind, InferTypeId, TypeId, TypesMap, UnifyResult};
 use soul_utils::{
-    error::{SoulError, SoulErrorKind, SoulResult},
-    soul_error_internal,
-    span::Span,
-    vec_map::{VecMap, VecMapIndex},
+    error::{SoulError, SoulErrorKind, SoulResult}, soul_error_internal, soul_names::TypeModifier, span::Span, vec_map::{VecMap, VecMapIndex}
 };
 
 #[derive(Debug, Clone)]
@@ -128,10 +125,7 @@ impl InferTable {
                 self.unify_type_type(types, *a_id, *b_id, span)
             }
 
-            (HirTypeKind::Error, _)
-            | (_, HirTypeKind::Error) => {
-                Ok(UnifyResult::Ok)
-            }
+            (HirTypeKind::Error, _) | (_, HirTypeKind::Error) => Ok(UnifyResult::Ok),
 
             _ => {
                 a_ty.compatible_type_kind(b_ty).map_err(|reason| {
@@ -309,7 +303,7 @@ impl InferTable {
             HirTypeKind::InferType(inf, _) => {
                 let root = self.find_root(*inf)?;
                 return match self.table.get(root) {
-                    Some(InferBinding::Bound(t)) => Ok(*t),
+                    Some(InferBinding::Bound(t)) => self.insure_modifier(types, *t, modifier),
                     Some(InferBinding::Unbound(_)) => Ok(ty),
                     Some(InferBinding::Alias(_)) => unreachable!(),
                     None => Err(soul_error_internal!("InferTypeId not found", None)),
@@ -353,6 +347,19 @@ impl InferTable {
         };
 
         Ok(types.insert(resolved))
+    }
+
+    pub(crate) fn insure_modifier(&mut self, types: &mut TypesMap, ty: TypeId, modifier: Option<TypeModifier>) -> SoulResult<TypeId> {
+        let hir_type = self.get_type(types, ty)?;
+        if hir_type.modifier == modifier {
+            return Ok(ty)
+        }
+
+        let mut new = hir_type.clone();
+        new.modifier = modifier;
+        Ok(
+            types.insert(new)
+        )
     }
 
     fn occurs_in(&mut self, types: &TypesMap, var: InferTypeId, ty: TypeId) -> bool {

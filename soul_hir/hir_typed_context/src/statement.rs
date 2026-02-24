@@ -1,10 +1,10 @@
 use crate::HirTypedContext;
 use hir::{
-    Assign, BlockId, ExpressionId, FunctionId, Global, HirType, IdAlloc, LocalId, Place, PlaceKind, Statement, TypeId, Variable
+    Assign, BlockId, ExpressionId, FunctionId, Global, HirType, IdAlloc, LocalId, Place, PlaceKind,
+    Statement, TypeId, Variable,
 };
 use soul_utils::{
-    error::{SoulError, SoulErrorKind},
-    span::Span,
+    error::{SoulError, SoulErrorKind}, soul_names::TypeModifier, span::Span
 };
 
 impl<'a> HirTypedContext<'a> {
@@ -21,7 +21,16 @@ impl<'a> HirTypedContext<'a> {
             }
         };
 
-        self.type_statement(global.get_id(), ty);
+        if global.should_be_inmutable() && self.get_type(ty).is_mutable() {
+            let span = global.get_span(&self.hir.spans);
+            self.log_error(SoulError::new(
+                "can not have 'mut' in global scope",
+                SoulErrorKind::InvalidContext,
+                Some(span),
+            ));
+        } else {
+            self.type_statement(global.get_id(), ty);
+        }
     }
 
     pub(crate) fn infer_statement(&mut self, statement: &Statement) {
@@ -40,7 +49,7 @@ impl<'a> HirTypedContext<'a> {
                 None => self.none_type,
             },
         };
-        
+
         self.type_statement(statement.get_id(), ty);
     }
 
@@ -124,31 +133,37 @@ impl<'a> HirTypedContext<'a> {
     }
 
     fn infer_variable(&mut self, variable: &Variable, span: Span) -> TypeId {
-        let declared_type = variable.ty;
-        if declared_type == TypeId::error() {
-            self.type_local(variable.local, declared_type, span);
-            return declared_type;
+        let declared_type_id = variable.ty;
+        if declared_type_id == TypeId::error() {
+            let modifier = self.get_type(declared_type_id).modifier.unwrap_or(TypeModifier::Const);
+            self.type_local(variable.local, declared_type_id, modifier, span);
+            return declared_type_id;
         }
 
         let (value, span) = match variable.value {
             Some(val) => (val, self.expression_span(val)),
             None => {
-                self.type_local(variable.local, declared_type, span);
-                return declared_type;
+                let modifier = self.get_type(declared_type_id).modifier.unwrap_or(TypeModifier::Const);
+                self.type_local(variable.local, declared_type_id, modifier, span);
+                return declared_type_id;
             }
         };
 
-        let value_type = self.infer_expression(value);
-        self.unify(value, declared_type, value_type, span);
+        let value_type_id = self.infer_expression(value);
+        self.unify(value, declared_type_id, value_type_id, span);
 
-        let var_type = if self.get_type(declared_type).is_infertype() {
-            value_type
+        let declare_type = self.get_type(declared_type_id);
+        
+        let mut variable_type_id = if !declare_type.is_infertype() {
+            declared_type_id
         } else {
-            declared_type
+            value_type_id
         };
 
-        let resolved = self.resolve_type_lazy(var_type, span);
-        self.type_local(variable.local, resolved, span)
+        let modifier = declare_type.modifier.unwrap_or(TypeModifier::Const);
+        variable_type_id = self.resolve_type_lazy(variable_type_id, span);
+
+        self.type_local(variable.local, variable_type_id, modifier, span)
     }
 
     fn infer_function(&mut self, function_id: &FunctionId) -> TypeId {
@@ -156,7 +171,8 @@ impl<'a> HirTypedContext<'a> {
         let span = self.block_span(function.body);
         let block_type = self.infer_block(function.body);
         for parameter in &function.parameters {
-            self.type_local(parameter.local, parameter.ty, span);
+            let modifier = self.get_type(parameter.ty).modifier.unwrap_or(TypeModifier::Const);
+            self.type_local(parameter.local, parameter.ty, modifier, span);
         }
         self.unify(
             ExpressionId::error(),
@@ -173,6 +189,7 @@ impl<'a> HirTypedContext<'a> {
         let value_type = self.infer_expression(assign.value);
         self.unify(assign.value, expected, value_type, span);
 
-        self.resolve_type_strict(value_type, span).unwrap_or(TypeId::error())
+        self.resolve_type_strict(value_type, span)
+            .unwrap_or(TypeId::error())
     }
 }

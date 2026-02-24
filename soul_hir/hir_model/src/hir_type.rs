@@ -88,6 +88,10 @@ impl HirType {
         }
     }
 
+    pub fn is_mutable(&self) -> bool {
+        self.modifier == Some(TypeModifier::Mut)
+    }
+
     pub const fn is_infertype(&self) -> bool {
         matches!(self.kind, HirTypeKind::InferType(_, _))
     }
