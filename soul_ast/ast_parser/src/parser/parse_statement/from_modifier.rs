@@ -24,7 +24,11 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         if self.current_is(&CURLY_OPEN) {
             let block = self.parse_block(modifier).try_err()?;
-            return TryOk(Statement::new_block(block, self.span_combine(start_span), self.current_is(&SEMI_COLON)));
+            return TryOk(Statement::new_block(
+                block,
+                self.span_combine(start_span),
+                self.current_is(&SEMI_COLON),
+            ));
         }
 
         let name = match self.try_consume_name().try_err()? {

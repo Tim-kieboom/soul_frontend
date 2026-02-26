@@ -1,5 +1,5 @@
-use soul_utils::{vec_map::VecMap, vec_set::VecSet};
 use crate::scope::NodeId;
+use soul_utils::{vec_map::VecMap, vec_set::VecSet};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum DisplayKind {

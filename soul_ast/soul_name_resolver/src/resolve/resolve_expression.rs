@@ -4,9 +4,7 @@ use soul_utils::error::{SoulError, SoulErrorKind};
 use crate::NameResolver;
 
 impl<'a> NameResolver<'a> {
-
     pub(super) fn resolve_expression(&mut self, expression: &mut Expression) {
-        
         let span = expression.span;
         match &mut expression.node {
             ExpressionKind::As(type_cast) => {
@@ -18,7 +16,7 @@ impl<'a> NameResolver<'a> {
             }
             ExpressionKind::FunctionCall(function_call) => {
                 function_call.resolved = self.lookup_function(&function_call.name);
-    
+
                 if function_call.resolved.is_none() {
                     self.log_error(SoulError::new(
                         format!(
@@ -29,12 +27,16 @@ impl<'a> NameResolver<'a> {
                         Some(span),
                     ));
                 };
-    
+
                 for arg in &mut function_call.arguments {
                     self.resolve_expression(arg);
                 }
             }
-            ExpressionKind::Variable { id:_, ident, resolved } => {
+            ExpressionKind::Variable {
+                id: _,
+                ident,
+                resolved,
+            } => {
                 self.resolve_variable(ident, resolved, span);
             }
             ExpressionKind::Unary(unary) => {
@@ -54,7 +56,7 @@ impl<'a> NameResolver<'a> {
                 }
                 self.resolve_block(&mut r#while.block);
             }
-            ExpressionKind::Deref{ id:_, inner } => {
+            ExpressionKind::Deref { id: _, inner } => {
                 self.resolve_expression(inner);
             }
             ExpressionKind::Ref { expression, .. } => {
@@ -68,17 +70,17 @@ impl<'a> NameResolver<'a> {
                     self.resolve_expression(value);
                 }
             }
-            
+
             ExpressionKind::Array(array) => {
                 for value in &mut array.values {
                     self.resolve_expression(value);
                 }
             }
 
-            ExpressionKind::Null(_) 
-            | ExpressionKind::Default(_) 
-            | ExpressionKind::Literal(_) 
+            ExpressionKind::Null(_)
+            | ExpressionKind::Default(_)
+            | ExpressionKind::Literal(_)
             | ExpressionKind::ExternalExpression(_) => (),
         }
-    }  
+    }
 }

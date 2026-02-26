@@ -1,8 +1,8 @@
 use soul_utils::vec_map::VecMap;
 
 mod ast;
-pub mod scope;
 pub mod meta_data;
+pub mod scope;
 pub mod syntax_display;
 pub use ast::*;
 

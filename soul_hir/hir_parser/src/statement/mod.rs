@@ -61,10 +61,13 @@ impl<'a> HirContext<'a> {
                 let hir_variable = self.lower_variable(variable);
                 hir::Statement::Variable(hir_variable, id)
             }
-            ast::StatementKind::Assignment(assignment) => hir::Statement::Assign(Assign {
-                place: self.lower_place(&assignment.left),
-                value: self.lower_expression(&assignment.right),
-            }, id),
+            ast::StatementKind::Assignment(assignment) => hir::Statement::Assign(
+                Assign {
+                    place: self.lower_place(&assignment.left),
+                    value: self.lower_expression(&assignment.right),
+                },
+                id,
+            ),
             ast::StatementKind::Expression {
                 id: _,
                 expression,
@@ -111,7 +114,7 @@ impl<'a> HirContext<'a> {
             };
 
             if let hir::Statement::Expression {
-                id:_,
+                id: _,
                 value,
                 ends_semicolon,
             } = &hir_statement
@@ -143,7 +146,11 @@ impl<'a> HirContext<'a> {
         id
     }
 
-    fn lower_return_like(&mut self, return_like: &ast::ReturnLike, id: StatementId) -> hir::Statement {
+    fn lower_return_like(
+        &mut self,
+        return_like: &ast::ReturnLike,
+        id: StatementId,
+    ) -> hir::Statement {
         let value = match &return_like.value {
             Some(val) => Some(self.lower_expression(val)),
             None => None,

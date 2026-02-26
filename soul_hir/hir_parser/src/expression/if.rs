@@ -4,7 +4,12 @@ use soul_utils::span::{ItemMetaData, Span, Spanned};
 use crate::HirContext;
 
 impl<'a> HirContext<'a> {
-    pub(super) fn lower_if(&mut self, id: hir::ExpressionId, r#if: &ast::If, span: Span) -> hir::Expression {
+    pub(super) fn lower_if(
+        &mut self,
+        id: hir::ExpressionId,
+        r#if: &ast::If,
+        span: Span,
+    ) -> hir::Expression {
         let condition = self.lower_expression(&r#if.condition);
         let then_block = self.lower_block(&r#if.block);
 

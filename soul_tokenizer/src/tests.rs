@@ -1,4 +1,4 @@
-use soul_utils::{symbool_kind::SymbolKind};
+use soul_utils::symbool_kind::SymbolKind;
 
 use crate::{TokenKind, lexer::Lexer, token::Number};
 
@@ -58,7 +58,7 @@ fn lex_identifier_and_number() {
     let expected = vec![
         TokenKind::Ident("x".to_string()),
         TokenKind::Symbol(SymbolKind::Assign),
-        TokenKind::Number(Number::Uint(42)),    
+        TokenKind::Number(Number::Uint(42)),
     ];
 
     assert_eq!(tokens, expected);

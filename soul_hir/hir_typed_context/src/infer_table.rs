@@ -1,6 +1,10 @@
 use hir::{HirType, HirTypeKind, InferTypeId, TypeId, TypesMap, UnifyResult};
 use soul_utils::{
-    error::{SoulError, SoulErrorKind, SoulResult}, soul_error_internal, soul_names::TypeModifier, span::Span, vec_map::{VecMap, VecMapIndex}
+    error::{SoulError, SoulErrorKind, SoulResult},
+    soul_error_internal,
+    soul_names::TypeModifier,
+    span::Span,
+    vec_map::{VecMap, VecMapIndex},
 };
 
 #[derive(Debug, Clone)]
@@ -287,10 +291,7 @@ impl InferTable {
                 };
 
                 Ok(types.insert(HirType {
-                    kind: HirTypeKind::Array {
-                        element,
-                        kind,
-                    },
+                    kind: HirTypeKind::Array { element, kind },
                     modifier,
                 }))
             }
@@ -357,17 +358,20 @@ impl InferTable {
         Ok(types.insert(resolved))
     }
 
-    pub(crate) fn insure_modifier(&mut self, types: &mut TypesMap, ty: TypeId, modifier: Option<TypeModifier>) -> SoulResult<TypeId> {
+    pub(crate) fn insure_modifier(
+        &mut self,
+        types: &mut TypesMap,
+        ty: TypeId,
+        modifier: Option<TypeModifier>,
+    ) -> SoulResult<TypeId> {
         let hir_type = self.get_type(types, ty)?;
         if hir_type.modifier == modifier {
-            return Ok(ty)
+            return Ok(ty);
         }
 
         let mut new = hir_type.clone();
         new.modifier = modifier;
-        Ok(
-            types.insert(new)
-        )
+        Ok(types.insert(new))
     }
 
     fn occurs_in(&mut self, types: &TypesMap, var: InferTypeId, ty: TypeId) -> bool {

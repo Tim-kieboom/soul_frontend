@@ -44,8 +44,8 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     #[cfg(debug_assertions)]
     fn new(tokens: TokenStream<'a>, faults: &'f mut Vec<SementicFault>) -> Self {
-        use soul_utils::span::Span;
         use soul_tokenizer::TokenKind;
+        use soul_utils::span::Span;
 
         let debug = DebugViewer {
             current: Token::new(TokenKind::EndLine, Span::default_const()),
@@ -59,7 +59,10 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
     }
 
-    pub fn parse(tokens: TokenStream<'a>, faults: &'f mut Vec<SementicFault>) -> AbstractSyntaxTree {
+    pub fn parse(
+        tokens: TokenStream<'a>,
+        faults: &'f mut Vec<SementicFault>,
+    ) -> AbstractSyntaxTree {
         let mut this = Self::new(tokens, faults);
         if let Err(err) = this.tokens.initialize() {
             this.log_error(err);
@@ -71,7 +74,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                     node_id: None,
                     span: this.token().span,
                 },
-            }
+            };
         }
 
         #[cfg(debug_assertions)]

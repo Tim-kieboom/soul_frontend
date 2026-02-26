@@ -16,7 +16,7 @@ macro_rules! define_const_strs {
                 match self {
                     $(Colors::$name => $value),*
                 }
-            } 
+            }
         }
     };
 }

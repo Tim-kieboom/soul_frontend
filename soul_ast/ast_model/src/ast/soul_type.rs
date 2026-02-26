@@ -45,7 +45,7 @@ pub struct ArrayType {
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ArrayKind {
-    /// stackArray `[2]int` set size same as C stackArray 
+    /// stackArray `[2]int` set size same as C stackArray
     StackArray(u64),
     /// heapArray `[*]int` runtime sized array that lifes on the heap
     HeapArray,
@@ -57,7 +57,8 @@ pub enum ArrayKind {
 impl ArrayKind {
     pub fn to_string(&self) -> String {
         let mut sb = String::new();
-        self.write_to_string(&mut sb).expect("expect no format errors");
+        self.write_to_string(&mut sb)
+            .expect("expect no format errors");
         sb
     }
 
@@ -88,8 +89,8 @@ pub struct ReferenceType {
 
 impl ArrayType {
     pub fn new(ty: SoulType, kind: ArrayKind) -> Self {
-        Self { 
-            of_type: Box::new(ty), 
+        Self {
+            of_type: Box::new(ty),
             kind,
         }
     }
@@ -115,7 +116,11 @@ impl ReferenceType {
 
 impl SoulType {
     pub fn new(modifier: Option<TypeModifier>, kind: TypeKind, span: Span) -> Self {
-        Self { kind, modifier, span }
+        Self {
+            kind,
+            modifier,
+            span,
+        }
     }
 
     pub const fn none(span: Span) -> Self {

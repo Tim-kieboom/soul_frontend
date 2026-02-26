@@ -1,7 +1,8 @@
 use std::{iter, sync::LazyLock};
 
 use ast::{
-    Assignment, Binary, BinaryOperator, BinaryOperatorKind, Expression, ExpressionKind, Statement, StatementKind
+    Assignment, Binary, BinaryOperator, BinaryOperatorKind, Expression, ExpressionKind, Statement,
+    StatementKind,
 };
 use soul_tokenizer::TokenKind;
 use soul_utils::{
@@ -29,7 +30,10 @@ impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_assign(&mut self, start_span: Span) -> SoulResult<Statement> {
         let lvalue = self.parse_expression(&ASSIGNMENT_TOKENS)?;
         if self.current_is_any(STAMENT_END_TOKENS) {
-            return Ok(Statement::from_expression(lvalue, self.current_is(&SEMI_COLON)));
+            return Ok(Statement::from_expression(
+                lvalue,
+                self.current_is(&SEMI_COLON),
+            ));
         }
 
         let assign_token = self.bump_consume();

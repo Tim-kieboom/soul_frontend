@@ -1,6 +1,7 @@
 use crate::{
     ast::{
-        ExpressionKind, FunctionSignature, StatementKind, VarTypeKind, Variable, syntax_display::{DisplayKind, try_display_node_id}
+        ExpressionKind, FunctionSignature, StatementKind, VarTypeKind, Variable,
+        syntax_display::{DisplayKind, try_display_node_id},
     },
     syntax_display::{SyntaxDisplay, tree_prefix},
 };
@@ -41,7 +42,11 @@ impl SyntaxDisplay for StatementKind {
                     }
                 }
             }
-            StatementKind::Expression{id, expression, ends_semicolon} => {
+            StatementKind::Expression {
+                id,
+                expression,
+                ends_semicolon,
+            } => {
                 sb.push_str(&prefix);
                 try_display_node_id(sb, kind, *id);
                 let tag = if matches!(expression.node, ExpressionKind::Block(_)) {
@@ -67,7 +72,6 @@ impl SyntaxDisplay for StatementKind {
                         try_display_infered_type(sb, var, kind);
                     }
                     VarTypeKind::InveredType(type_modifier) => {
-                        
                         if !try_display_infered_type(sb, var, kind) {
                             sb.push_str(type_modifier.as_str());
                             sb.push(' ');
@@ -141,7 +145,6 @@ fn try_display_infered_type(sb: &mut String, var: &Variable, kind: &DisplayKind)
         None => return false,
     };
 
-    
     let copy = auto_copy.contains(node_id);
     let type_str = match type_map.get(node_id) {
         Some(val) => val,

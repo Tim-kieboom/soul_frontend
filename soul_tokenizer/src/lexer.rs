@@ -1,8 +1,15 @@
 use std::{iter::Peekable, str::Chars};
 
-use soul_utils::{error::{SoulError, SoulErrorKind, SoulResult}, span::Span, symbool_kind::SymbolKind};
+use soul_utils::{
+    error::{SoulError, SoulErrorKind, SoulResult},
+    span::Span,
+    symbool_kind::SymbolKind,
+};
 
-use crate::{symbolkind_from_lexer::FromLexer, token::{Number, Token, TokenKind}};
+use crate::{
+    symbolkind_from_lexer::FromLexer,
+    token::{Number, Token, TokenKind},
+};
 
 /// Lexer that processes character streams into tokens with position tracking.
 ///
@@ -16,7 +23,6 @@ pub struct Lexer<'a> {
     offset: usize,
     token_index: usize,
 }
-
 
 impl<'a> Lexer<'a> {
     pub(crate) fn new(source: &'a str) -> Self {
@@ -72,7 +78,6 @@ impl<'a> Lexer<'a> {
         }
 
         if let Some(symbol) = SymbolKind::from_lexer(self) {
-            
             let kind = if self.is_negative_number(symbol) {
                 TokenKind::Number(self.get_number(start_line, start_offset)?)
             } else {
@@ -80,10 +85,7 @@ impl<'a> Lexer<'a> {
                 TokenKind::Symbol(symbol)
             };
 
-            return Ok(Token::new(
-                kind,
-                self.new_span(start_line, start_offset),
-            ));
+            return Ok(Token::new(kind, self.new_span(start_line, start_offset)));
         }
 
         let char = match self.current_char {
@@ -98,7 +100,7 @@ impl<'a> Lexer<'a> {
 
         let kind = self.get_token_kind(char, start_line, start_offset)?;
         let span = if kind == TokenKind::EndLine {
-            Span::new_line(start_line, start_offset+1)
+            Span::new_line(start_line, start_offset + 1)
         } else {
             self.new_span(start_line, start_offset)
         };
@@ -152,7 +154,7 @@ impl<'a> Lexer<'a> {
 
     fn is_negative_number(&mut self, symbol: SymbolKind) -> bool {
         if symbol != SymbolKind::Minus {
-            return false
+            return false;
         }
 
         match self.peek_char() {

@@ -1,6 +1,4 @@
-use ast::{
-    Expression, ExpressionKind, ReturnKind, ReturnLike, Statement,
-};
+use ast::{Expression, ExpressionKind, ReturnKind, ReturnLike, Statement};
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
     soul_error_internal,
@@ -9,7 +7,10 @@ use soul_utils::{
     try_result::{ResultTryErr, TryErr, TryOk, TryResult},
 };
 
-use crate::parser::{Parser, parse_utils::{SEMI_COLON, STAMENT_END_TOKENS}};
+use crate::parser::{
+    Parser,
+    parse_utils::{SEMI_COLON, STAMENT_END_TOKENS},
+};
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub(super) fn try_parse_from_keyword(
@@ -18,19 +19,17 @@ impl<'a, 'f> Parser<'a, 'f> {
         keyword: KeyWord,
     ) -> TryResult<Statement, SoulError> {
         let kind = match keyword {
-            KeyWord::If 
+            KeyWord::If
             | KeyWord::True
             | KeyWord::Null
-            | KeyWord::Else 
+            | KeyWord::Else
             | KeyWord::False
             | KeyWord::While => {
                 let value = self.parse_expression(STAMENT_END_TOKENS).try_err()?;
                 Statement::from_expression(value, self.current_is(&SEMI_COLON))
             }
 
-            KeyWord::Break 
-            | KeyWord::Return 
-            | KeyWord::Continue => {
+            KeyWord::Break | KeyWord::Return | KeyWord::Continue => {
                 let kind = ReturnKind::from_keyword(keyword).expect("should be return keyword");
 
                 self.bump();
@@ -51,7 +50,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                     Expression::new(
                         ExpressionKind::ReturnLike(return_like),
                         self.span_combine(start_span),
-                    ), 
+                    ),
                     self.current_is(&SEMI_COLON),
                 )
             }

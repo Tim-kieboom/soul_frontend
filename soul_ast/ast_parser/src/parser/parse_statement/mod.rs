@@ -1,9 +1,13 @@
 use ast::{Block, Statement, StatementKind};
 use soul_tokenizer::TokenKind;
 use soul_utils::{
-    error::{SoulError, SoulErrorKind, SoulResult}, soul_names::{KeyWord, TypeModifier}, span::Span, symbool_kind::SymbolKind, try_result::{
+    error::{SoulError, SoulErrorKind, SoulResult},
+    soul_names::{KeyWord, TypeModifier},
+    span::Span,
+    symbool_kind::SymbolKind,
+    try_result::{
         ResultTryErr, ResultTryNotValue, TryErr, TryError, TryNotValue, TryOk, TryResult,
-    }
+    },
 };
 
 use crate::parser::{
@@ -20,7 +24,7 @@ mod parse_assign;
 mod parse_import;
 mod parse_variable;
 
-impl<'a, 'f> Parser<'a,'f> {
+impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_global_statments(&mut self) -> Vec<Statement> {
         self.skip_end_lines();
         let mut global_statements = vec![];
@@ -96,24 +100,20 @@ impl<'a, 'f> Parser<'a,'f> {
         self.skip_till(STAMENT_END_TOKENS);
 
         let possible_kind = match &self.token().kind {
-            TokenKind::Ident(_) => {
-                self.try_parse_from_ident(start_span)
-            }
+            TokenKind::Ident(_) => self.try_parse_from_ident(start_span),
             &CURLY_OPEN => TryOk(Statement::new_block(
                 self.parse_block(TypeModifier::Mut)?,
                 self.span_combine(start_span),
                 self.ends_semicolon(),
             )),
-            &STAR => {
-                return self.parse_assign(start_span)
-            }
+            &STAR => return self.parse_assign(start_span),
             TokenKind::Unknown(char) => {
                 return Err(SoulError::new(
                     format!("unknown character: '{char}'"),
                     SoulErrorKind::UnexpectedCharacter,
                     Some(start_span),
                 ));
-            }            
+            }
             _ => TryNotValue(SoulError::empty()),
         };
 
@@ -124,9 +124,7 @@ impl<'a, 'f> Parser<'a,'f> {
         };
 
         match self.parse_expression(STAMENT_END_TOKENS) {
-            Ok(val) => {
-               Ok(Statement::from_expression(val, self.ends_semicolon()))
-            }
+            Ok(val) => Ok(Statement::from_expression(val, self.ends_semicolon())),
             Err(err) => {
                 self.go_to(begin_position);
                 Err(err)

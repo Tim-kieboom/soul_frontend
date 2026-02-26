@@ -1,6 +1,12 @@
-use soul_utils::{error::{SoulError, SoulResult}, span::Span};
+use soul_utils::{
+    error::{SoulError, SoulResult},
+    span::Span,
+};
 
-use crate::{lexer::Lexer, token::{Token, TokenKind}};
+use crate::{
+    lexer::Lexer,
+    token::{Token, TokenKind},
+};
 
 /// This struct provides methods for token stream navigation, consumption, and
 /// conversion to a complete token vector. It supports save/restore positions
@@ -14,7 +20,6 @@ pub struct TokenStream<'a> {
 /// Position snapshot of a TokenStream for save/restore functionality.
 #[derive(Debug, Clone)]
 pub struct TokenStreamPosition<'a>(TokenStream<'a>);
-
 
 impl<'a> TokenStream<'a> {
     pub fn new(source: &'a str) -> Self {

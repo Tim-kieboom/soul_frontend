@@ -1,9 +1,9 @@
 use hir::{
-    BlockId, ExpressionId, FunctionId, HirTree, HirType, IdAlloc, LocalId, StatementId, TypeId,
-    TypesMap,
+    BlockId, ExpressionId, FunctionId, HirTree, HirType, IdAlloc, LocalId, PlaceId, StatementId,
+    TypeId, TypesMap,
 };
 use soul_utils::{
-    error::SoulError, sementic_level::SementicFault, span::Span, vec_map::VecMap, vec_set::VecSet
+    error::SoulError, sementic_level::SementicFault, span::Span, vec_map::VecMap, vec_set::VecSet,
 };
 
 use crate::infer_table::InferTable;
@@ -27,6 +27,7 @@ pub fn infer_types(hir: &HirTree, faults: &mut Vec<SementicFault>) -> HirTypedTa
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct HirTypedTable {
+    pub places: VecMap<PlaceId, TypeId>,
     pub locals: VecMap<LocalId, TypeId>,
     pub blocks: VecMap<BlockId, TypeId>,
     pub functions: VecMap<FunctionId, TypeId>,
@@ -81,6 +82,7 @@ impl<'a> HirTypedContext<'a> {
             infer_table: InferTable::new(&hir.types),
             type_table: HirTypedTable {
                 functions,
+                places: VecMap::const_default(),
                 locals: VecMap::const_default(),
                 blocks: VecMap::with_capacity(hir.blocks.len()),
                 statements: VecMap::with_capacity(hir.meta_data.statements.len()),

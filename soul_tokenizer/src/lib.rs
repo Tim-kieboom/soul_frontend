@@ -1,10 +1,10 @@
-pub use token::{Token, TokenKind, Number};
+pub use token::{Number, Token, TokenKind};
 pub use token_stream::{TokenStream, TokenStreamPosition};
 
 mod lexer;
+mod symbolkind_from_lexer;
 mod token;
 mod token_stream;
-mod symbolkind_from_lexer;
 
 #[cfg(test)]
 mod tests;

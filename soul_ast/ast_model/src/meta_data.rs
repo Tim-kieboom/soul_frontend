@@ -1,4 +1,4 @@
-use soul_utils::{vec_map::VecMapIndex};
+use soul_utils::vec_map::VecMapIndex;
 
 use crate::scope::{NodeId, ScopeBuilder};
 

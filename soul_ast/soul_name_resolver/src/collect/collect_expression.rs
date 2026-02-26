@@ -1,10 +1,9 @@
+use crate::NameResolver;
 use ast::{ElseKind, Expression, ExpressionKind, If};
 use soul_utils::error::{SoulError, SoulErrorKind};
-use crate::NameResolver;
 
 impl<'a> NameResolver<'a> {
     pub(super) fn collect_expression(&mut self, expression: &mut Expression) {
-
         match &mut expression.node {
             ExpressionKind::Null(node_id) => {
                 *node_id = Some(self.alloc_id());
@@ -51,7 +50,7 @@ impl<'a> NameResolver<'a> {
                 return_like.id = Some(self.alloc_id());
                 if let Some(value) = &mut return_like.value {
                     self.collect_expression(value);
-                } 
+                }
             }
             ExpressionKind::FunctionCall(function_call) => {
                 function_call.id = Some(self.alloc_id());
@@ -70,7 +69,6 @@ impl<'a> NameResolver<'a> {
             ExpressionKind::Default(id) => *id = Some(self.alloc_id()),
             ExpressionKind::Literal((id, _)) => *id = Some(self.alloc_id()),
             ExpressionKind::Variable { id, ident, .. } => {
-                
                 let variable_id = match self.check_variable(ident) {
                     Some(id) => id,
                     _ => {
@@ -90,7 +88,7 @@ impl<'a> NameResolver<'a> {
                 for value in &mut array.values {
                     self.collect_expression(value);
                 }
-            },
+            }
         }
     }
 
@@ -114,5 +112,5 @@ impl<'a> NameResolver<'a> {
                 }
             }
         }
-    }   
+    }
 }

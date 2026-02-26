@@ -1,6 +1,4 @@
-use ast::{
-    ArrayKind, ArrayType, FunctionKind, NamedTupleType, ReferenceType, SoulType, TypeKind,
-};
+use ast::{ArrayKind, ArrayType, FunctionKind, NamedTupleType, ReferenceType, SoulType, TypeKind};
 use soul_tokenizer::{Number, TokenKind};
 use soul_utils::{
     error::{SoulError, SoulErrorKind},

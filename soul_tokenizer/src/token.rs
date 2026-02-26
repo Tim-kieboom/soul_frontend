@@ -1,6 +1,6 @@
 use anyhow::Result;
 use soul_utils::{soul_names::PrimitiveTypes, span::Span, symbool_kind::SymbolKind};
-use std::{fmt::Write};
+use std::fmt::Write;
 
 /// A single token containing its kind and source span information.
 #[derive(Debug, Clone, PartialEq)]
@@ -88,10 +88,9 @@ impl TokenKind {
             TokenKind::EndLine => Self::END_LINE_STR.len(),
             TokenKind::Ident(ident) => "\"".len() + ident.len() + "\"".len(),
             TokenKind::Unknown(_) => "Unknown('".len() + 1 + "')".len(),
-            TokenKind::Number(number) => {
-                number.inner_display(&mut String::new())
-                    .expect("no write error")
-            }
+            TokenKind::Number(number) => number
+                .inner_display(&mut String::new())
+                .expect("no write error"),
             TokenKind::CharLiteral(_) => "char(".len() + 3 + "')".len(),
             TokenKind::Symbol(symbol_kind) => "\"".len() + symbol_kind.as_str().len() + "\"".len(),
             TokenKind::StringLiteral(str) => "str(\"".len() + str.len() + "\")".len(),
@@ -131,11 +130,10 @@ impl Number {
     }
 
     fn inner_display(&self, sb: &mut String) -> Result<usize> {
-        
         const INT_STR: &str = PrimitiveTypes::UntypedInt.as_str();
         const UINT_STR: &str = PrimitiveTypes::UntypedUint.as_str();
         const FLOAT_STR: &str = PrimitiveTypes::UntypedFloat.as_str();
-        
+
         let len = sb.len();
         match self {
             Number::Int(num) => write!(sb, "{num}: {INT_STR}"),

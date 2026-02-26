@@ -19,7 +19,8 @@ pub trait IdAlloc: Clone {
 ///
 /// Each generated ID type is backed by a `usize` and can be used
 /// as an index into `VecMap`.
-macro_rules! impl_ids {
+#[macro_export]
+macro_rules! impl_soul_ids {
     ($($ty:ident),*) => {
         $(
             #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -59,12 +60,13 @@ macro_rules! impl_ids {
     };
 }
 
-impl_ids!(
+impl_soul_ids!(
     TypeId,
     BlockId,
     FieldId,
     LocalId,
     ModuleId,
+    PlaceId,
     FunctionId,
     InferTypeId,
     StatementId,

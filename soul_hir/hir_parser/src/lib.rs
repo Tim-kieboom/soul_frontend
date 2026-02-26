@@ -2,7 +2,10 @@ mod id_generator;
 use ast::{DeclareStore, ParseResponse};
 use hir::{BlockId, FunctionId, HirTree, LocalId, TypeId};
 use id_generator::IdGenerator;
-use soul_utils::{Ident, error::SoulError, sementic_level::SementicFault, soul_error_internal, span::Span, vec_map::VecMapIndex};
+use soul_utils::{
+    Ident, error::SoulError, sementic_level::SementicFault, soul_error_internal, span::Span,
+    vec_map::VecMapIndex,
+};
 use std::collections::HashMap;
 
 mod expression;

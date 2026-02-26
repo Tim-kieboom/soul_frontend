@@ -31,7 +31,7 @@ impl VecMapIndex for NodeId {
 pub struct NodeIdGenerator(u32);
 impl NodeIdGenerator {
     pub fn from_last(last: NodeId) -> Self {
-        Self(last.0+1)
+        Self(last.0 + 1)
     }
 
     pub fn new() -> Self {
@@ -107,16 +107,14 @@ impl ScopeBuilder {
     }
 
     pub fn lookup_value(&self, ident: &Ident, kind: ScopeValue) -> Option<NodeId> {
-
         for scope in self.scopes.iter().rev() {
-            
             let ids = match scope.values.get(ident.as_str()) {
                 Some(val) => val,
                 None => continue,
             };
 
             if let Some(id) = ids.get(kind) {
-                return Some(id)
+                return Some(id);
             }
         }
 
@@ -142,22 +140,22 @@ impl Scope {
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct ScopeValueEntry {
-    kinds: [Option<NodeId>; 3]
+    kinds: [Option<NodeId>; 3],
 }
 impl ScopeValueEntry {
     pub fn insert(&mut self, kind: ScopeValue, id: NodeId) -> Option<NodeId> {
         let index = kind as usize;
         debug_assert!(
-            index < self.kinds.len(), 
+            index < self.kinds.len(),
             "should probebly increase stack array len to amount of variants of ScopeValueEntryKind",
         );
         self.kinds[index].replace(id)
     }
-    
+
     pub fn get(&self, kind: ScopeValue) -> Option<NodeId> {
         let index = kind as usize;
         debug_assert!(
-            index < self.kinds.len(), 
+            index < self.kinds.len(),
             "should probebly increase stack array len to amount of variants of ScopeValueEntryKind",
         );
         self.kinds[index]

@@ -12,11 +12,13 @@ impl<I: VecMapIndex> VecSet<I> {
     }
 
     pub fn with_capacity(cap: usize) -> Self {
-        Self { map: VecMap::with_capacity(cap) }
+        Self {
+            map: VecMap::with_capacity(cap),
+        }
     }
 
     pub fn from_vecmap(map: VecMap<I, ()>) -> Self {
-        Self {map}
+        Self { map }
     }
 
     pub fn from_vec(keys: Vec<I>) -> Self {

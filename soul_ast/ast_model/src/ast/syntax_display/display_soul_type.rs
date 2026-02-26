@@ -59,9 +59,7 @@ impl TypeKind {
             TypeKind::Array(array) => _ = array.inner_display(sb),
             TypeKind::None => sb.push_str("none"),
             TypeKind::Primitive(internal_primitive_types) => {
-                sb.push_str(
-                    internal_primitive_types.as_str()
-                )
+                sb.push_str(internal_primitive_types.as_str())
             }
         }
     }
@@ -81,6 +79,7 @@ impl ArrayType {
             crate::ast::ArrayKind::ConstSlice => sb.push_str("[@]"),
             crate::ast::ArrayKind::StackArray(number) => sb.push_str(&format!("[{number}]")),
         }
-        self.of_type.inner_display(sb, &DisplayKind::Parser, 0, false);
+        self.of_type
+            .inner_display(sb, &DisplayKind::Parser, 0, false);
     }
 }

@@ -1,4 +1,7 @@
-use crate::{ast::{BoxExpression, Expression}, scope::NodeId};
+use crate::{
+    ast::{BoxExpression, Expression},
+    scope::NodeId,
+};
 use soul_utils::span::Spanned;
 
 /// A unary operator wrapped with source location information.
@@ -33,56 +36,60 @@ pub struct Binary {
 pub enum UnaryOperatorKind {
     Invalid,
     /// `-`
-    Neg,                            
+    Neg,
     /// `!`
-    Not,                                                                       
+    Not,
     /// `++`
-    Increment { before_var: bool }, 
+    Increment {
+        before_var: bool,
+    },
     /// `--`
-    Decrement { before_var: bool }, 
+    Decrement {
+        before_var: bool,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum BinaryOperatorKind {
     Invalid,
     /// `+`
-    Add,  
+    Add,
     /// `-`
-    Sub,  
+    Sub,
     /// `*`
-    Mul,  
+    Mul,
     /// `/`
-    Div,  
+    Div,
     /// `log`
-    Log,  
+    Log,
     /// `**`
-    Pow,  
+    Pow,
     /// `</`
-    Root, 
+    Root,
     /// `%`
-    Mod,  
+    Mod,
 
     /// `&`
-    BitAnd, 
+    BitAnd,
     /// `|`
-    BitOr,  
+    BitOr,
     /// `^`
-    BitXor, 
+    BitXor,
 
     /// `&&`    
-    LogAnd, 
+    LogAnd,
     /// `||`
-    LogOr,  
+    LogOr,
     /// `==`
-    Eq,     
+    Eq,
     /// `!=`
-    NotEq,  
+    NotEq,
     /// `<`
-    Lt,     
+    Lt,
     /// `>`
-    Gt,     
+    Gt,
     /// `<=`
-    Le,     
+    Le,
     /// `>=`
     Ge,
 
@@ -149,7 +156,7 @@ impl BinaryOperatorKind {
             | BinaryOperatorKind::Lt
             | BinaryOperatorKind::Gt
             | BinaryOperatorKind::Le
-            | BinaryOperatorKind::Ge 
+            | BinaryOperatorKind::Ge
             | BinaryOperatorKind::NotEq
             | BinaryOperatorKind::LogOr
             | BinaryOperatorKind::LogAnd => true,

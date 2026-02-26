@@ -132,7 +132,6 @@ impl SoulError {
 
     #[cfg(not(feature = "error_backtrace"))]
     pub fn new<S: Into<String>>(message: S, kind: SoulErrorKind, span: Option<Span>) -> Self {
-
         Self {
             message: message.into(),
             kind,
@@ -149,5 +148,4 @@ impl SoulError {
             backtrace: Backtrace::force_capture().to_string(),
         }
     }
-
 }

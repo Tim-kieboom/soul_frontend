@@ -1,5 +1,5 @@
-use std::fmt::Write;
 use soul_utils::soul_names::{KeyWord, TypeWrapper};
+use std::fmt::Write;
 
 use crate::{
     ast::{
@@ -44,7 +44,7 @@ impl SyntaxDisplay for ExpressionKind {
                     ty.inner_display(sb, kind, tab, is_last);
                     sb.push_str(": ");
                 }
-                
+
                 let last_index = array.values.len().saturating_sub(1);
                 for (i, value) in array.values.iter().enumerate() {
                     value.node.inner_display(sb, kind, tab, is_last);
@@ -78,7 +78,7 @@ impl SyntaxDisplay for ExpressionKind {
                 sb.push(')');
             }
             ExpressionKind::Variable {
-                id:_,
+                id: _,
                 ident: variable,
                 resolved,
             } => {
@@ -153,7 +153,7 @@ impl SyntaxDisplay for ExpressionKind {
                 }
                 r#while.block.inner_display(sb, kind, tab, is_last);
             }
-            ExpressionKind::Deref{inner, id} => {
+            ExpressionKind::Deref { inner, id } => {
                 try_display_infered_type(sb, kind, *id);
                 sb.push_str(TypeWrapper::Pointer.as_str());
                 inner.node.inner_display(sb, kind, tab, is_last);

@@ -8,16 +8,18 @@ use crate::HirContext;
 
 impl<'a> HirContext<'a> {
     pub fn lower_place(&mut self, place: &ast::Expression) -> hir::Place {
+        let id = self.id_generator.alloc_place();
         match &place.node {
             ast::ExpressionKind::Index(index) => Place::new(
                 PlaceKind::Index {
+                    id,
                     base: Box::new(self.lower_place(&index.collection)),
                     index: self.lower_expression(&index.index),
                 },
                 place.span,
             ),
             ast::ExpressionKind::Deref { id: _, inner } => Place::new(
-                PlaceKind::Deref(Box::new(self.lower_place(inner))),
+                PlaceKind::Deref(Box::new(self.lower_place(inner)), id),
                 place.span,
             ),
             ast::ExpressionKind::Variable {
@@ -36,14 +38,14 @@ impl<'a> HirContext<'a> {
                         LocalId::error()
                     }
                 };
-                Place::new(PlaceKind::Local(local), ident.span)
+                Place::new(PlaceKind::Local(local, id), ident.span)
             }
             other => {
                 self.log_error(soul_error_internal!(
                     format!("{} can not be a Place", other.variant_str()),
                     Some(place.span)
                 ));
-                Place::new(PlaceKind::Local(LocalId::error()), place.span)
+                Place::new(PlaceKind::Local(LocalId::error(), id), place.span)
             }
         }
     }

@@ -59,11 +59,7 @@ fn test_vecset_index() {
 
 #[test]
 fn test_vecset_serde() {
-    let map = TestSet::from_vec(vec![
-        (TestIndex(0)),
-        (TestIndex(1)),
-        (TestIndex(10)),
-    ]);
+    let map = TestSet::from_vec(vec![(TestIndex(0)), (TestIndex(1)), (TestIndex(10))]);
     let json = serde_json::to_value(&map).unwrap();
     let new_map: TestSet = serde_json::from_value(json).unwrap();
 

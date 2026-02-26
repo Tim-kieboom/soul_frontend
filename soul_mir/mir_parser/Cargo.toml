@@ -1,0 +1,11 @@
+[package]
+name = "mir_parser"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ast = { version = "0.1.0", path = "../../soul_ast/ast_model" }
+hir = { version = "0.1.0", path = "../../soul_hir/hir_model" }
+hir_typed_context = { version = "0.1.0", path = "../../soul_hir/hir_typed_context" }
+serde = { version = "1.0.228", features = ["derive"] }
+soul_utils = { version = "0.1.0", path = "../../soul_utils" }

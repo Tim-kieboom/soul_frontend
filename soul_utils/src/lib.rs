@@ -12,9 +12,9 @@ pub mod vec_map;
 pub mod vec_set;
 
 #[cfg(test)]
-mod vec_set_tests;
-#[cfg(test)]
 mod vec_map_tests;
+#[cfg(test)]
+mod vec_set_tests;
 
 pub type Ident = crate::span::Spanned<String>;
 impl Ident {

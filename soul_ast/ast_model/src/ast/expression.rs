@@ -1,5 +1,8 @@
 use soul_utils::{
-    Ident, soul_import_path::SoulImportPath, soul_names::KeyWord, span::{Span, Spanned}
+    Ident,
+    soul_import_path::SoulImportPath,
+    soul_names::KeyWord,
+    span::{Span, Spanned},
 };
 
 use crate::{
@@ -17,7 +20,6 @@ impl Expression {
     pub fn new(node: ExpressionKind, span: Span) -> Self {
         Self { node, span }
     }
-
 }
 
 /// A boxed expression (used to avoid deep recursion in the AST).
@@ -56,7 +58,10 @@ pub enum ExpressionKind {
     /// A conditional loop `while true {Println("loop")}`.
     While(While),
     /// A dereference, e.g., `*ptr`.
-    Deref{id: Option<NodeId>, inner: BoxExpression},
+    Deref {
+        id: Option<NodeId>,
+        inner: BoxExpression,
+    },
     /// reference, e.g., `&x`(mut) or `@x`(const).
     Ref {
         id: Option<NodeId>,
@@ -74,7 +79,7 @@ pub enum ExpressionKind {
 pub struct AsTypeCast {
     pub id: Option<NodeId>,
     pub left: Expression,
-    pub type_cast: SoulType, 
+    pub type_cast: SoulType,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -197,29 +202,38 @@ pub trait ExpressionHelpers {
     fn new_ref(mutable: bool, expression: Expression, span: Span) -> Expression;
     fn new_unary(op: UnaryOperator, rvalue: Expression, span: Span) -> Expression;
     fn new_index(collection: Expression, index: Expression, span: Span) -> Expression;
-    fn new_binary(lvalue: Expression, op: BinaryOperator, rvalue: Expression, span: Span) -> Expression;
+    fn new_binary(
+        lvalue: Expression,
+        op: BinaryOperator,
+        rvalue: Expression,
+        span: Span,
+    ) -> Expression;
 }
 impl ExpressionHelpers for Expression {
-    
     fn new_block(block: Block, span: Span) -> Expression {
         Expression::new(ExpressionKind::Block(block), span)
     }
- 
+
     fn from_array(array: Spanned<Array>) -> Expression {
         let Spanned { node, span } = array;
         Expression::new(ExpressionKind::Array(node), span)
     }
-    
+
     fn new_unary(op: UnaryOperator, rvalue: Expression, span: Span) -> Expression {
-        let unary = Unary{
+        let unary = Unary {
             id: None,
             operator: op,
             expression: Box::new(rvalue),
         };
         Expression::new(ExpressionKind::Unary(unary), span)
     }
-    
-    fn new_binary(lvalue: Expression, op: BinaryOperator, rvalue: Expression, span: Span) -> Expression {
+
+    fn new_binary(
+        lvalue: Expression,
+        op: BinaryOperator,
+        rvalue: Expression,
+        span: Span,
+    ) -> Expression {
         let binary = Binary {
             id: None,
             left: Box::new(lvalue),
@@ -228,36 +242,43 @@ impl ExpressionHelpers for Expression {
         };
         Expression::new(ExpressionKind::Binary(binary), span)
     }
-    
+
     fn new_literal(literal: Literal, span: Span) -> Expression {
         Expression::new(ExpressionKind::Literal((None, literal)), span)
     }
-    
+
     fn from_function_call(function_call: Spanned<FunctionCall>) -> Expression {
         let Spanned { node, span } = function_call;
         Expression::new(ExpressionKind::FunctionCall(node), span)
     }
-    
+
     fn new_index(collection: Expression, index: Expression, span: Span) -> Expression {
         Expression::new(
             ExpressionKind::Index(Index {
-                id: None,  
-                collection: Box::new(collection), 
+                id: None,
+                collection: Box::new(collection),
                 index: Box::new(index),
-            }), 
+            }),
             span,
         )
     }
-    
+
     fn new_ref(mutable: bool, expression: Expression, new_span: Span) -> Expression {
         let Expression { node, span } = expression;
-        let new_ref = ExpressionKind::Ref { id: None, is_mutable:mutable, expression: Box::new(Expression::new(node, span)) };
+        let new_ref = ExpressionKind::Ref {
+            id: None,
+            is_mutable: mutable,
+            expression: Box::new(Expression::new(node, span)),
+        };
         Expression::new(new_ref, new_span)
     }
 
     fn new_deref(expression: Expression, new_span: Span) -> Expression {
         let Expression { node, span } = expression;
-        let deref = ExpressionKind::Deref { id: None, inner: Box::new(Expression::new(node, span)) };
+        let deref = ExpressionKind::Deref {
+            id: None,
+            inner: Box::new(Expression::new(node, span)),
+        };
         Expression::new(deref, new_span)
     }
 }

@@ -1,5 +1,7 @@
 use std::{
-    fmt::Debug, marker::PhantomData, ops::{Index, IndexMut}
+    fmt::Debug,
+    marker::PhantomData,
+    ops::{Index, IndexMut},
 };
 
 use serde::{Serialize, Serializer, ser::SerializeMap};

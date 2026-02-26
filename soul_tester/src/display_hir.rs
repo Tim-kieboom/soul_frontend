@@ -288,18 +288,18 @@ impl<'a> HirDisplayer<'a> {
 
     fn display_place(&mut self, place: &hir::Place) {
         match &place.node {
-            hir::PlaceKind::Local(local_id) => self.display_local(*local_id),
-            hir::PlaceKind::Deref(place) => {
+            hir::PlaceKind::Local(local_id, _) => self.display_local(*local_id),
+            hir::PlaceKind::Deref(place, _) => {
                 self.push('*');
                 self.display_place(place);
             }
-            hir::PlaceKind::Index { base, index } => {
+            hir::PlaceKind::Index { base, index, .. } => {
                 self.display_place(base);
                 self.push('[');
                 self.display_expression(index);
                 self.push(']');
             }
-            hir::PlaceKind::Field { base, index } => {
+            hir::PlaceKind::Field { base, index, .. } => {
                 self.display_place(base);
                 self.push('.');
                 write!(self.sb, "{:?}", index).expect("no fromat error");

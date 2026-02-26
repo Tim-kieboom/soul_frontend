@@ -12,7 +12,6 @@ use soul_utils::{
 use crate::HirTypedContext;
 
 impl<'a> HirTypedContext<'a> {
-    
     pub(crate) fn type_block(&mut self, id: BlockId, ty: TypeId) {
         self.type_table.blocks.insert(id, ty);
     }
@@ -65,7 +64,7 @@ impl<'a> HirTypedContext<'a> {
             }
         }
     }
-    
+
     pub(crate) fn unify(&mut self, value: ExpressionId, expect: TypeId, got: TypeId, span: Span) {
         match self
             .infer_table
@@ -80,8 +79,13 @@ impl<'a> HirTypedContext<'a> {
         }
     }
 
-    pub(crate) fn type_local(&mut self, id: LocalId, type_id: TypeId, modifier: TypeModifier, span: Span) -> TypeId {
-
+    pub(crate) fn type_local(
+        &mut self,
+        id: LocalId,
+        type_id: TypeId,
+        modifier: TypeModifier,
+        span: Span,
+    ) -> TypeId {
         let resolved = self.resolve_untyped_primitive(type_id, span);
         let local_type_id = match resolved {
             Some(mut ty) => {
@@ -95,11 +99,8 @@ impl<'a> HirTypedContext<'a> {
             }
         };
 
-        debug_assert_eq!(
-            self.get_type(local_type_id).modifier, 
-            Some(modifier),
-        );
-        
+        debug_assert_eq!(self.get_type(local_type_id).modifier, Some(modifier),);
+
         self.type_table.locals.insert(id, local_type_id);
         local_type_id
     }
@@ -110,7 +111,6 @@ impl<'a> HirTypedContext<'a> {
     }
 
     pub(crate) fn resolve_all_types(&mut self) {
-
         macro_rules! resolve {
             ($field:ident, $id:ty) => {
                 let cap = self.type_table.$field.cap();

@@ -1,6 +1,6 @@
 use soul_utils::span::Spanned;
 
-use crate::{ExpressionId, FieldId, LocalId};
+use crate::{ExpressionId, FieldId, LocalId, PlaceId};
 
 /// A memory location that can be read from or written to.
 ///
@@ -15,17 +15,32 @@ pub type Place = Spanned<PlaceKind>;
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum PlaceKind {
     /// A local variable.
-    Local(LocalId),
+    Local(LocalId, PlaceId),
 
     /// Dereference of another place.
-    Deref(Box<Place>),
+    Deref(Box<Place>, PlaceId),
 
     /// Indexed access into an aggregate.
     Index {
+        id: PlaceId,
         base: Box<Place>,
         index: ExpressionId,
     },
 
     /// Field access within a composite type.
-    Field { base: Box<Place>, index: FieldId },
+    Field {
+        id: PlaceId,
+        base: Box<Place>,
+        index: FieldId,
+    },
+}
+impl PlaceKind {
+    pub fn get_id(&self) -> PlaceId {
+        match self {
+            PlaceKind::Local(_, place_id) => *place_id,
+            PlaceKind::Deref(_, place_id) => *place_id,
+            PlaceKind::Index { id, .. } => *id,
+            PlaceKind::Field { id, .. } => *id,
+        }
+    }
 }

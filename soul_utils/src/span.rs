@@ -1,5 +1,5 @@
 use crate::Ident;
-use std::{hash::Hash};
+use std::hash::Hash;
 
 /// Represents a source code location span.
 ///
@@ -111,23 +111,23 @@ impl Span {
     pub fn combine(self, other: Self) -> Self {
         let start_line = self.start_line.min(other.start_line);
         let start_offset = self.combine_start_offset(&other);
-        
+
         let end_line = self.end_line.max(other.end_line);
         let end_offset = self.combine_end_offset(&other);
 
         Self {
             start_line,
             start_offset,
-            end_line, 
+            end_line,
             end_offset,
         }
     }
 
     fn combine_start_offset(&self, other: &Self) -> usize {
         if self.start_line == other.start_line {
-            return self.start_offset.min(other.start_offset)
+            return self.start_offset.min(other.start_offset);
         }
-        
+
         if self.start_line < other.start_line {
             self.start_offset
         } else {
@@ -137,9 +137,9 @@ impl Span {
 
     fn combine_end_offset(&self, other: &Self) -> usize {
         if self.end_line == other.end_line {
-            return self.end_offset.max(other.end_offset)
+            return self.end_offset.max(other.end_offset);
         }
-        
+
         if self.end_line > other.end_line {
             self.end_offset
         } else {

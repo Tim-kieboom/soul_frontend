@@ -5,8 +5,8 @@ define_str_enum!(
     pub enum SementicLevel {
         Error => "error", 0,
         Warning => "warning", 1,
-        Debug => "debug", 2,
-        Note => "note", 3,
+        Note => "note", 2,
+        Debug => "debug", 3,
     }
 );
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

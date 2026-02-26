@@ -1,11 +1,15 @@
 use std::{collections::HashMap, hash::Hash};
 
 use soul_utils::{
-    soul_import_path::SoulImportPath, soul_names::TypeModifier, span::{ItemMetaData, Span}, vec_map::{VecMap, VecMapIndex}
+    soul_import_path::SoulImportPath,
+    soul_names::TypeModifier,
+    span::{ItemMetaData, Span},
+    vec_map::{VecMap, VecMapIndex},
 };
 
 use crate::{
-    BlockId, ExpressionId, FunctionId, HirType, HirTypeKind, IdAlloc, IdGenerator, InferTypeId, LocalId, ModuleId, StatementId, TypeId
+    BlockId, ExpressionId, FunctionId, HirType, HirTypeKind, IdAlloc, IdGenerator, InferTypeId,
+    LocalId, ModuleId, StatementId, TypeId,
 };
 
 /// Maps HIR node IDs to their original source code spans.
@@ -51,9 +55,7 @@ impl TypesMap {
         Self {
             type_generator: IdGenerator::new(),
             infer_generator: IdGenerator::new(),
-            map: BiMap::from_array([
-                (TypeId::error(), HirType::error_type())
-            ]),
+            map: BiMap::from_array([(TypeId::error(), HirType::error_type())]),
         }
     }
 
@@ -66,7 +68,10 @@ impl TypesMap {
     }
 
     pub fn get_id_from_typekind(&self, ty: HirTypeKind) -> Option<TypeId> {
-        self.map.get_key(&HirType { kind: ty, modifier: None })
+        self.map.get_key(&HirType {
+            kind: ty,
+            modifier: None,
+        })
     }
 
     pub fn insert(&mut self, ty: HirType) -> TypeId {
@@ -84,8 +89,8 @@ impl TypesMap {
 
     pub fn iter_types(&self) -> impl Iterator<Item = &HirType> {
         self.map.key_to_value.values()
-    }    
-    
+    }
+
     pub fn iter_ids(&self) -> impl Iterator<Item = TypeId> {
         self.map.key_to_value.keys()
     }

@@ -30,6 +30,7 @@ impl<'a> HirContext<'a> {
             ast::ExpressionKind::Index(index) => {
                 let place = Place::new(
                     PlaceKind::Index {
+                        id: self.id_generator.alloc_place(),
                         base: Box::new(self.lower_place(&index.collection)),
                         index: self.lower_expression(&index.index),
                     },
@@ -184,7 +185,10 @@ impl<'a> HirContext<'a> {
             }
         };
 
-        let place = Place::new(PlaceKind::Local(local), span);
+        let place = Place::new(
+            PlaceKind::Local(local, self.id_generator.alloc_place()),
+            span,
+        );
         let ty = self.add_type(HirType::new(HirTypeKind::Ref {
             of_type,
             mutable: *is_mutable,
@@ -230,7 +234,10 @@ impl<'a> HirContext<'a> {
             }
         };
 
-        let place = Place::new(PlaceKind::Local(local), ident.span);
+        let place = Place::new(
+            PlaceKind::Local(local, self.id_generator.alloc_place()),
+            ident.span,
+        );
 
         hir::Expression {
             id,

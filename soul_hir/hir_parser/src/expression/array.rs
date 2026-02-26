@@ -15,7 +15,10 @@ impl<'a> HirContext<'a> {
         let temp_local = self.id_generator.alloc_local();
         let name = Ident::new(create_local_name(temp_local), span);
         self.insert_local(&name, temp_local, ty);
-        let temp_place = Place::new(PlaceKind::Local(temp_local), span);
+        let temp_place = Place::new(
+            PlaceKind::Local(temp_local, self.id_generator.alloc_place()),
+            span,
+        );
 
         let size = array.values.len() as u64;
         let element = self.new_infer_type(span);
@@ -99,6 +102,7 @@ impl<'a> HirContext<'a> {
             value,
             place: Place::new(
                 PlaceKind::Index {
+                    id: self.id_generator.alloc_place(),
                     base: Box::new(place.clone()),
                     index,
                 },
@@ -109,5 +113,11 @@ impl<'a> HirContext<'a> {
 }
 
 fn create_array(element: TypeId, size: u64) -> HirType {
-    HirType { kind: hir::HirTypeKind::Array { element, kind: ast::ArrayKind::StackArray(size) }, modifier: None }
+    HirType {
+        kind: hir::HirTypeKind::Array {
+            element,
+            kind: ast::ArrayKind::StackArray(size),
+        },
+        modifier: None,
+    }
 }

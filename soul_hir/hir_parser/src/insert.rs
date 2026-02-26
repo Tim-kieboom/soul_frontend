@@ -1,5 +1,8 @@
 use hir::{ExpressionId, StatementId};
-use soul_utils::{Ident, span::{ItemMetaData, Span}};
+use soul_utils::{
+    Ident,
+    span::{ItemMetaData, Span},
+};
 
 use crate::{HirContext, create_local_name};
 
@@ -34,7 +37,7 @@ impl<'a> HirContext<'a> {
     pub(crate) fn insert_desugar_variable(&mut self, variable: hir::Variable, span: Span) {
         let name = Ident::new(create_local_name(variable.local), span);
         self.insert_local(&name, variable.local, variable.ty);
-        
+
         match self.current_body {
             crate::CurrentBody::Global => {
                 let id = self.alloc_statement(&ItemMetaData::default_const(), span);

@@ -119,13 +119,11 @@ impl Global {
 
     pub const fn should_be_inmutable(&self) -> bool {
         match self {
-            Global::Function(_, _)
-            | Global::InternalVariable(_, _) => false,
-            
-            Global::Variable(_, _) 
-            | Global::InternalAssign(_, _) => true,
+            Global::Function(_, _) | Global::InternalVariable(_, _) => false,
+
+            Global::Variable(_, _) | Global::InternalAssign(_, _) => true,
         }
-    } 
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

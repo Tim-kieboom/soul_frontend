@@ -121,6 +121,10 @@ impl HirType {
         self.kind.is_untyped_interger()
     }
 
+    pub const fn is_none(&self) -> bool {
+        matches!(self.kind, HirTypeKind::None)
+    }
+
     pub const fn is_boolean(&self) -> bool {
         matches!(self.kind, HirTypeKind::Primitive(PrimitiveTypes::Boolean))
     }
@@ -173,12 +177,15 @@ impl HirType {
         }
     }
 
-    pub fn compatible_type_kind(
-        &self,
-        should_be: &Self,
-    ) -> Result<UnifyResult, MishmatchReason> {
-        debug_assert!(!matches!(self.kind, HirTypeKind::InferType(_, _)), "this fn should be used after infer typed are resolved");
-        debug_assert!(!matches!(should_be.kind, HirTypeKind::InferType(_, _)), "this fn should be used after infer typed are resolved");
+    pub fn compatible_type_kind(&self, should_be: &Self) -> Result<UnifyResult, MishmatchReason> {
+        debug_assert!(
+            !matches!(self.kind, HirTypeKind::InferType(_, _)),
+            "this fn should be used after infer typed are resolved"
+        );
+        debug_assert!(
+            !matches!(should_be.kind, HirTypeKind::InferType(_, _)),
+            "this fn should be used after infer typed are resolved"
+        );
 
         let result = match (self.modifier, should_be.modifier) {
             (Some(self_modifier), Some(should_be_modifier)) => {
@@ -192,7 +199,7 @@ impl HirType {
         };
 
         if self.is_error() || should_be.is_error() {
-            return Ok(UnifyResult::Ok)
+            return Ok(UnifyResult::Ok);
         }
 
         self.kind.compatible_type_kind(&should_be.kind)?;
@@ -205,7 +212,6 @@ impl HirType {
         should_be: &Self,
         is_in_unsafe: bool,
     ) -> Result<(), MishmatchReason> {
-        
         match (self.modifier, should_be.modifier) {
             (Some(self_modifier), Some(should_be_modifier)) => {
                 if !HirTypeKind::modifier_compatible(self_modifier, should_be_modifier) {
@@ -213,13 +219,14 @@ impl HirType {
                         "can not cast from modifier {} to modifier {}",
                         self_modifier.as_str(),
                         should_be_modifier.as_str(),
-                    ))
+                    ));
                 }
             }
             _ => (),
         };
 
-        self.kind.unify_primitive_cast(types, &should_be.kind, is_in_unsafe)
+        self.kind
+            .unify_primitive_cast(types, &should_be.kind, is_in_unsafe)
     }
 
     pub fn resolve_untyped(&mut self, should_be: &Self) {
@@ -320,10 +327,7 @@ impl HirTypeKind {
         }
     }
 
-    pub fn compatible_type_kind(
-        &self,
-        should_be: &Self,
-    ) -> Result<(), MishmatchReason> {
+    pub fn compatible_type_kind(&self, should_be: &Self) -> Result<(), MishmatchReason> {
         match (self, should_be) {
             (HirTypeKind::Primitive(a), HirTypeKind::Primitive(b)) => {
                 if !a.compatible(b) {
@@ -341,14 +345,17 @@ impl HirTypeKind {
             | (HirTypeKind::Error, _)
             | (_, HirTypeKind::Error) => Ok(()),
 
-            _ => if self == should_be {
-                Ok(())
-            } else {
-                Err(format!(
-                "typekind '{}' not compatible with '{}'",
-                self.display_variant(),
-                should_be.display_variant()
-            ))},
+            _ => {
+                if self == should_be {
+                    Ok(())
+                } else {
+                    Err(format!(
+                        "typekind '{}' not compatible with '{}'",
+                        self.display_variant(),
+                        should_be.display_variant()
+                    ))
+                }
+            }
         }
     }
 

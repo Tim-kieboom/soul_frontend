@@ -1,9 +1,12 @@
-use ast::{Block, scope::{NodeId, ScopeId, ScopeValue}};
+use ast::{
+    Block,
+    scope::{NodeId, ScopeId, ScopeValue},
+};
 use soul_utils::Ident;
 
 use crate::NameResolver;
-mod resolve_statement;
 mod resolve_expression;
+mod resolve_statement;
 
 impl<'a> NameResolver<'a> {
     pub(super) fn resolve_names(&mut self, block: &mut Block) {

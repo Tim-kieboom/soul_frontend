@@ -1,4 +1,4 @@
-use ast::{Block, Function, Statement, StatementKind, VarTypeKind, scope::{ScopeValueKind}};
+use ast::{Block, Function, Statement, StatementKind, VarTypeKind, scope::ScopeValueKind};
 
 use crate::NameResolver;
 
@@ -12,17 +12,17 @@ impl<'a> NameResolver<'a> {
     pub(crate) fn collect_scopeless_block(&mut self, block: &mut Block) {
         block.node_id = Some(self.alloc_id());
         for statement in &mut block.statements {
-            self.collect_statement(statement);    
+            self.collect_statement(statement);
         }
     }
 
     fn collect_statement(&mut self, statement: &mut Statement) {
-         match &mut statement.node {
+        match &mut statement.node {
             StatementKind::Import(_) => todo!("impl import trait collection"),
             StatementKind::Variable(variable) => {
                 let id = self.declare_value(ScopeValueKind::Variable(variable));
                 self.store.insert_variable_type(id, variable.ty.clone());
-                
+
                 match &mut variable.ty {
                     VarTypeKind::NonInveredType(soul_type) => self.collect_type(soul_type),
                     VarTypeKind::InveredType(_) => (),
@@ -35,7 +35,11 @@ impl<'a> NameResolver<'a> {
             StatementKind::Function(function) => {
                 self.collect_function(function);
             }
-            StatementKind::Expression{id, expression, ends_semicolon:_} => {
+            StatementKind::Expression {
+                id,
+                expression,
+                ends_semicolon: _,
+            } => {
                 *id = Some(self.alloc_id());
                 self.collect_expression(expression);
             }
@@ -44,7 +48,6 @@ impl<'a> NameResolver<'a> {
                 self.collect_expression(&mut assignment.left);
                 self.collect_expression(&mut assignment.right);
             }
-
         }
     }
 
@@ -52,7 +55,7 @@ impl<'a> NameResolver<'a> {
         let id = self.declare_value(ScopeValueKind::Function(function));
         let prev = self.current_function;
         self.current_function = Some(id);
-        
+
         let signature = &mut function.signature.node;
         self.collect_type(&mut signature.methode_type);
         self.collect_type(&mut signature.return_type);
@@ -62,7 +65,8 @@ impl<'a> NameResolver<'a> {
         self.collect_scopeless_block(&mut function.block);
         self.pop_scope();
 
-        self.store.insert_functions(id, function.signature.node.clone());
+        self.store
+            .insert_functions(id, function.signature.node.clone());
         self.current_function = prev;
     }
 }

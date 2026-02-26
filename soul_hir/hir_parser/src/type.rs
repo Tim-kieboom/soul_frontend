@@ -63,9 +63,7 @@ impl<'a> HirContext<'a> {
             None => self.new_infer_type(span),
         };
 
-        let array_ty = self.add_type(
-            HirType::new(HirTypeKind::Array { element, kind })
-        );
+        let array_ty = self.add_type(HirType::new(HirTypeKind::Array { element, kind }));
         array_ty
     }
 

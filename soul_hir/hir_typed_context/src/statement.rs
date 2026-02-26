@@ -4,15 +4,16 @@ use hir::{
     Statement, TypeId, Variable,
 };
 use soul_utils::{
-    error::{SoulError, SoulErrorKind}, soul_names::TypeModifier, span::Span
+    error::{SoulError, SoulErrorKind},
+    soul_names::TypeModifier,
+    span::Span,
 };
 
 impl<'a> HirTypedContext<'a> {
     pub(crate) fn infer_global(&mut self, global: &Global) {
         let ty = match global {
             Global::InternalAssign(assign, _) => self.infer_assign(assign),
-            Global::Variable(variable, id)
-            | Global::InternalVariable(variable, id) => {
+            Global::Variable(variable, id) | Global::InternalVariable(variable, id) => {
                 self.infer_variable(variable, self.statement_span(*id))
             }
             Global::Function(function, _) => {
@@ -91,15 +92,15 @@ impl<'a> HirTypedContext<'a> {
 
     pub(crate) fn infer_place(&mut self, place: &Place) -> TypeId {
         let span = place.span;
-        match &place.node {
-            PlaceKind::Local(id) => {
+        let ty = match &place.node {
+            PlaceKind::Local(id, _) => {
                 if *id == LocalId::error() {
                     TypeId::error()
                 } else {
                     self.hir.locals[*id]
                 }
             }
-            PlaceKind::Deref(place) => {
+            PlaceKind::Deref(place, _) => {
                 let inner = self.infer_place(place);
                 let deref = self.get_type(inner).try_deref(&self.hir.types, span);
                 match deref {
@@ -130,13 +131,18 @@ impl<'a> HirTypedContext<'a> {
                 }
             }
             PlaceKind::Field { .. } => todo!("field not yet impl"),
-        }
+        };
+        self.type_table.places.insert(place.node.get_id(), ty);
+        ty
     }
 
     fn infer_variable(&mut self, variable: &Variable, span: Span) -> TypeId {
         let declared_type_id = variable.ty;
         if declared_type_id == TypeId::error() {
-            let modifier = self.get_type(declared_type_id).modifier.unwrap_or(TypeModifier::Const);
+            let modifier = self
+                .get_type(declared_type_id)
+                .modifier
+                .unwrap_or(TypeModifier::Const);
             self.type_local(variable.local, declared_type_id, modifier, span);
             return declared_type_id;
         }
@@ -144,7 +150,10 @@ impl<'a> HirTypedContext<'a> {
         let (value, span) = match variable.value {
             Some(val) => (val, self.expression_span(val)),
             None => {
-                let modifier = self.get_type(declared_type_id).modifier.unwrap_or(TypeModifier::Const);
+                let modifier = self
+                    .get_type(declared_type_id)
+                    .modifier
+                    .unwrap_or(TypeModifier::Const);
                 self.type_local(variable.local, declared_type_id, modifier, span);
                 return declared_type_id;
             }
@@ -154,7 +163,7 @@ impl<'a> HirTypedContext<'a> {
         self.unify(value, declared_type_id, value_type_id, span);
 
         let declare_type = self.get_type(declared_type_id);
-        
+
         let mut variable_type_id = if !declare_type.is_infertype() {
             declared_type_id
         } else {
@@ -172,7 +181,10 @@ impl<'a> HirTypedContext<'a> {
         let span = self.block_span(function.body);
         let block_type = self.infer_block(function.body);
         for parameter in &function.parameters {
-            let modifier = self.get_type(parameter.ty).modifier.unwrap_or(TypeModifier::Const);
+            let modifier = self
+                .get_type(parameter.ty)
+                .modifier
+                .unwrap_or(TypeModifier::Const);
             self.type_local(parameter.local, parameter.ty, modifier, span);
         }
         self.unify(

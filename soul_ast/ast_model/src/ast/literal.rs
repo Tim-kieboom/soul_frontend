@@ -1,4 +1,4 @@
-use std::fmt::{Debug};
+use std::fmt::Debug;
 
 use soul_utils::soul_names::{PrimitiveTypes, TypeModifier};
 
@@ -56,11 +56,13 @@ impl Literal {
         match self {
             Literal::Int(val) => format!("{}", val),
             Literal::Uint(val) => format!("{}", val),
-            Literal::Float(val) => if no_demcimal(val) {
-                format!("{}.0", val)
-            } else {
-                format!("{}", val)
-            },
+            Literal::Float(val) => {
+                if no_demcimal(val) {
+                    format!("{}.0", val)
+                } else {
+                    format!("{}", val)
+                }
+            }
             Literal::Bool(val) => format!("{}", val),
             Literal::Char(char) => format!("'{}'", char),
             Literal::Str(str) => format!("\"{}\"", str),
@@ -118,7 +120,7 @@ impl LiteralType {
     /// Returns a string representation of the literal type.
     pub fn type_to_string(&self) -> String {
         const LITERAL: &str = TypeModifier::Literal.as_str();
-        
+
         match self {
             LiteralType::Str => format!("{LITERAL} {}", "str"),
             LiteralType::Char => format!("{LITERAL} {}", PrimitiveTypes::Char.as_str()),

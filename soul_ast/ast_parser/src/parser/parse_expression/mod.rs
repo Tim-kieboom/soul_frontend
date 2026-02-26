@@ -177,22 +177,20 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         if self.current_keyword(KeyWord::As) {
-            return self.parse_as_typecast(expression, start_span)
+            return self.parse_as_typecast(expression, start_span);
         }
 
         Ok(expression)
     }
 
     fn parse_primary_ident(&mut self, start_span: Span) -> SoulResult<Expression> {
-        
         let str = self.try_token_as_ident_str()?;
 
         match KeyWord::from_str(str) {
             Some(KeyWord::If) => return self.parse_if(),
             Some(KeyWord::While) => return self.parse_while(),
 
-            Some(KeyWord::True)
-            | Some(KeyWord::False) => {
+            Some(KeyWord::True) | Some(KeyWord::False) => {
                 let value = str == "true";
                 self.bump();
                 return Ok(Expression::new_literal(
@@ -204,7 +202,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             Some(KeyWord::Null) => {
                 self.bump();
                 return Ok(Expression::new(
-                    ExpressionKind::Null(None), 
+                    ExpressionKind::Null(None),
                     self.token().span,
                 ));
             }
@@ -234,7 +232,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                         Some(ident.span)
                     ));
                 }
-                
+
                 return Err(soul_error_internal!(
                     "collectionType array not yet impl",
                     Some(ident.span)
@@ -342,9 +340,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         fn try_binary(symbol: &SymbolKind) -> Option<BinaryOperatorKind> {
-            match Operator::from_symbool(*symbol)
-                .map(|el| el.to_binary())
-            {
+            match Operator::from_symbool(*symbol).map(|el| el.to_binary()) {
                 Some(Some(val)) => Some(val),
                 _ => None,
             }
@@ -394,7 +390,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 } else {
                     binary
                 }
-            },
+            }
             _ => binary,
         }
     }

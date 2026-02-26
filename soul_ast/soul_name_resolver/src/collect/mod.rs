@@ -1,8 +1,11 @@
-use ast::{Block, NamedTupleType, VarTypeKind, scope::{NodeId, Scope, ScopeId, ScopeValue, ScopeValueKind}};
+use ast::{
+    Block, NamedTupleType, VarTypeKind,
+    scope::{NodeId, Scope, ScopeId, ScopeValue, ScopeValueKind},
+};
 
 use crate::NameResolver;
-mod collect_statement;
 mod collect_expression;
+mod collect_statement;
 mod collect_type;
 
 impl<'a> NameResolver<'a> {
@@ -25,18 +28,14 @@ impl<'a> NameResolver<'a> {
     }
 
     fn declare_parameters(&mut self, types: &mut NamedTupleType) {
-
         for (name, ty, node_id) in types {
             let id = self.alloc_id();
             *node_id = Some(id);
 
-            self.store.insert_variable_type(id, VarTypeKind::NonInveredType(ty.clone()));
+            self.store
+                .insert_variable_type(id, VarTypeKind::NonInveredType(ty.clone()));
 
-            self.insert_value(
-                name.as_str(),
-                id, 
-                ScopeValue::Variable, 
-            )
+            self.insert_value(name.as_str(), id, ScopeValue::Variable)
         }
     }
 
@@ -44,11 +43,7 @@ impl<'a> NameResolver<'a> {
         let id = self.alloc_id();
         *value.get_id_mut() = Some(id);
 
-        self.insert_value(
-            value.get_name().as_str(), 
-            id, 
-            value.to_entry_kind(),
-        );
+        self.insert_value(value.get_name().as_str(), id, value.to_entry_kind());
         id
     }
 

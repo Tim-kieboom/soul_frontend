@@ -1,4 +1,7 @@
-use crate::{ast::{Expression, SoulType}, scope::NodeId};
+use crate::{
+    ast::{Expression, SoulType},
+    scope::NodeId,
+};
 
 /// An array literal, e.g., `[1, 2, 3]`.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
