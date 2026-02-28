@@ -18,7 +18,7 @@ impl<'a> MirContext<'a> {
             hir::Statement::Variable(variable, _) => {
                 let local = match self.local_remap.get(variable.local) {
                     Some(val) => *val,
-                    None => self.new_local(variable.local, variable.ty),
+                    None => self.new_local(variable.local, self.types.locals[variable.local]),
                 };
                 
                 if let Some(value) = variable.value {

@@ -7,15 +7,15 @@
 main() {
     mut num := 1
     {
-        const foo = 1
+        const foo = "hello world"
         num = 2
     }
-    // num = 3
+    num = 3
 }
 
-// sum(a: int, b: int): int {
-//     return a + b
-// }
+sum(a: int, b: int): int {
+    return a + b
+}
 
 // returnTerminate(): int {
 //     doStuff := 1 + 2

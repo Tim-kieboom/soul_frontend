@@ -342,6 +342,9 @@ impl<'a> HirDisplayer<'a> {
         let ty = types.get_type(id).expect("should have id");
         ty.write_display(types, &mut self.sb)
             .expect("no format error");
+        self.push_str("/*");
+        self.push_str(&format!("{:?}", id.index()));
+        self.push_str("*/");
     }
 
     fn to_string(self) -> String {

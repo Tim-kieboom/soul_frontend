@@ -202,6 +202,10 @@ impl<'a> MirContext<'a> {
         }
     }
 
+    pub(crate) fn expression_ty(&self, id: hir::ExpressionId) -> hir::TypeId {
+        self.types.expressions[id]
+    }
+
     fn to_mir_tree(self) -> MirTree {
         self.tree
     }

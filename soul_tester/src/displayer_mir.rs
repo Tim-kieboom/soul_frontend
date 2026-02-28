@@ -76,6 +76,9 @@ impl<'a> MirDisplayer<'a> {
             hir_type
                 .write_display(&self.types.types, &mut self.sb)
                 .expect("no fmt error");
+            
+            self.push_str(&format!("/*{}*/", local.ty.index()));
+
             self.push('\n');
         }
 
