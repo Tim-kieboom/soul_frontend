@@ -9,12 +9,13 @@ use ast::{
     syntax_display::{DisplayKind, SyntaxDisplay},
 };
 use ast_parser::parse;
-use display_hir::display_hir;
+use displayer_hir::display_hir;
 use fern::Dispatch;
 use hir::HirTree;
 use hir_parser::hir_lower;
 use hir_typed_context::{HirTypedTable, infer_types};
 use log::{error, info};
+use mir_parser::{mir::MirTree, mir_lower};
 use paths::Paths;
 use soul_name_resolver::name_resolve;
 use soul_tokenizer::{TokenStream, tokenize};
@@ -23,13 +24,15 @@ use soul_utils::sementic_level::SementicFault;
 
 use crate::{
     convert_soul_error::{MessageConfig, ToMessage},
-    display_hir::display_typed_hir,
-    display_tokenizer::display_tokens,
+    displayer_hir::display_typed_hir,
+    displayer_mir::display_mir,
+    displayer_tokenizer::display_tokens,
 };
 
 mod convert_soul_error;
-mod display_hir;
-mod display_tokenizer;
+mod displayer_hir;
+mod displayer_mir;
+mod displayer_tokenizer;
 mod paths;
 
 static PATHS: &[u8] = include_bytes!("../paths.json");
@@ -40,6 +43,7 @@ pub const MESSAGE_CONFIG: MessageConfig = MessageConfig {
 };
 
 struct Ouput<'a> {
+    mir: MirTree,
     hir: HirTree,
     source_file: &'a str,
     ast: AbstractSyntaxTree,
@@ -62,7 +66,10 @@ fn main() -> Result<()> {
     let hir = hir_lower(&parse_response, &mut faults);
     let hir_types = infer_types(&hir, &mut faults);
 
+    let mir = mir_lower(&hir, &hir_types, &mut faults);
+
     let output = Ouput {
+        mir,
         hir,
         faults,
         hir_types,
@@ -89,6 +96,10 @@ fn handle_output<'a>(paths: &Paths, output: Ouput<'a>) -> Result<()> {
         (
             &display_typed_hir(&output.hir, &output.hir_types),
             "hir/typed.soulc",
+        ),
+        (
+            &display_mir(&output.mir, &output.hir_types),
+            "mir/tree.soulc",
         ),
     ])?;
 

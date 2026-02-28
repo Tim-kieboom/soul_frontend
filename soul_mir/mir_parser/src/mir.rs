@@ -74,8 +74,9 @@ pub struct Local {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Block {
     pub id: BlockId,
-    pub statements: Vec<StatementId>,
+    pub returnable: bool,
     pub terminator: Terminator,
+    pub statements: Vec<StatementId>,
 }
 
 /// A MIR statement.
@@ -94,7 +95,13 @@ pub enum StatementKind {
     Eval(Operand),
 
     /// Assign the result of an rvalue computation into a place.
-    Assign { place: PlaceId, value: Rvalue },
+    Assign {
+        place: PlaceId,
+        value: Rvalue,
+    },
+
+    StorageStart(Vec<LocalId>),
+    StorageDead(LocalId),
 }
 
 /// A right-hand-side computation.
@@ -120,6 +127,11 @@ pub enum RvalueKind {
     Unary {
         operator: UnaryOperator,
         value: Operand,
+    },
+
+    StackAlloc {
+        ty: TypeId,
+        len: Operand,
     },
 }
 
@@ -156,6 +168,7 @@ pub enum Terminator {
 /// An operand represents a value used by MIR.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Operand {
+    pub ty: TypeId,
     pub kind: OperandKind,
 }
 
@@ -205,7 +218,7 @@ impl Rvalue {
 }
 
 impl Operand {
-    pub fn new(kind: OperandKind) -> Self {
-        Self { kind }
+    pub fn new(ty: TypeId, kind: OperandKind) -> Self {
+        Self { ty, kind }
     }
 }

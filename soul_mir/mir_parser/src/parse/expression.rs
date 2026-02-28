@@ -1,18 +1,20 @@
 use hir::IdAlloc;
 use soul_utils::soul_error_internal;
 
-use crate::{MirContext, mir};
+use crate::{EndBlock, MirContext, mir};
 
 impl<'a> MirContext<'a> {
-    pub(crate) fn lower_operand(&mut self, value_id: hir::ExpressionId) -> mir::Operand {
+    pub(crate) fn lower_operand(&mut self, value_id: hir::ExpressionId) -> EndBlock<mir::Operand> {
         let value = &self.hir.expressions[value_id];
         let span = self.hir.spans.expressions[value_id];
+        let is_end = &mut false;
 
-        match &value.kind {
+        let operand = match &value.kind {
             hir::ExpressionKind::Literal(literal) => {
-                mir::Operand::new(mir::OperandKind::Comptime(literal.clone()))
+                mir::Operand::new(value.ty, mir::OperandKind::Comptime(literal.clone()))
             }
             hir::ExpressionKind::Local(local_id) => {
+                let ty = self.types.locals[*local_id];
                 let id = match self.local_remap.get(*local_id) {
                     Some(val) => *val,
                     None => {
@@ -23,14 +25,14 @@ impl<'a> MirContext<'a> {
                         mir::LocalId::error()
                     }
                 };
-                mir::Operand::new(mir::OperandKind::Local(id))
+                mir::Operand::new(ty, mir::OperandKind::Local(id))
             }
             hir::ExpressionKind::Unary {
                 operator,
                 expression,
             } => {
                 let ty = self.hir.expressions[*expression].ty;
-                let value = self.lower_operand(*expression);
+                let inner = self.lower_operand(*expression).pass(is_end);
 
                 let temp = self.new_temp(ty);
 
@@ -38,19 +40,19 @@ impl<'a> MirContext<'a> {
                     place: self.new_place(mir::Place::Temp(temp)),
                     value: mir::Rvalue::new(mir::RvalueKind::Unary {
                         operator: operator.clone(),
-                        value,
+                        value: inner,
                     }),
                 });
                 self.push_statement(statement);
-                mir::Operand::new(mir::OperandKind::Temp(temp))
+                mir::Operand::new(value.ty, mir::OperandKind::Temp(temp))
             }
             hir::ExpressionKind::Binary {
                 left,
                 operator,
                 right,
             } => {
-                let left = self.lower_operand(*left);
-                let right = self.lower_operand(*right);
+                let left = self.lower_operand(*left).pass(is_end);
+                let right = self.lower_operand(*right).pass(is_end);
 
                 let temp = self.new_temp(value.ty);
 
@@ -63,12 +65,12 @@ impl<'a> MirContext<'a> {
                     }),
                 });
                 self.push_statement(statement);
-                mir::Operand::new(mir::OperandKind::Temp(temp))
+                mir::Operand::new(value.ty, mir::OperandKind::Temp(temp))
             }
             hir::ExpressionKind::Call {
                 function,
                 callee,
-                arguments,
+                arguments: hir_arguments,
             } => {
                 if callee.is_some() {
                     self.log_error(soul_error_internal!(
@@ -77,10 +79,12 @@ impl<'a> MirContext<'a> {
                     ));
                 }
 
-                let arguments: Vec<_> = arguments
-                    .iter()
-                    .map(|arg| self.lower_operand(*arg))
-                    .collect();
+                let mut arguments = vec![];
+                for arg in hir_arguments {
+                    arguments.push(
+                        self.lower_operand(*arg).pass(is_end)
+                    );
+                }
 
                 let temp = if self.get_type(value.ty).is_none() {
                     None
@@ -102,51 +106,127 @@ impl<'a> MirContext<'a> {
                     },
                 );
 
-                self.current_block = Some(next_block);
+                self.current.block = Some(next_block);
 
                 match temp {
-                    Some(val) => mir::Operand::new(mir::OperandKind::Temp(val)),
-                    None => mir::Operand::new(mir::OperandKind::None),
+                    Some(val) => mir::Operand::new(value.ty, mir::OperandKind::Temp(val)),
+                    None => mir::Operand::new(value.ty, mir::OperandKind::None),
                 }
             }
             hir::ExpressionKind::Block(block_id) => {
-                let parent = self.expect_current_block();
-                let new_block = self.new_block();
+                let main_body = self.expect_current_block();
+                self.lower_block(*block_id, main_body).pass(is_end);
 
-                self.insert_terminator(parent, mir::Terminator::Goto(new_block));
-                self.current_block = Some(new_block);
-
-                self.lower_block(*block_id, new_block);
-
-                match self.hir.blocks[*block_id].terminator {
+                let operand = match self.hir.blocks[*block_id].terminator {
                     Some(terminator) => {
-                        let value = self.lower_operand(terminator);
+                        let inner = self.lower_operand(terminator).pass(is_end);
                         let ty = self.hir.expressions[terminator].ty;
                         let temp = self.new_temp(ty);
 
                         let place = self.new_place(mir::Place::Temp(temp));
                         self.push_statement(mir::Statement::new(mir::StatementKind::Assign {
                             place,
-                            value: mir::Rvalue::new(mir::RvalueKind::Use(value)),
+                            value: mir::Rvalue::new(mir::RvalueKind::Use(inner)),
                         }));
 
-                        mir::Operand::new(mir::OperandKind::Temp(temp))
+                        mir::Operand::new(value.ty, mir::OperandKind::Temp(temp))
                     }
-                    None => mir::Operand::new(mir::OperandKind::None),
-                }
+                    None => mir::Operand::new(value.ty, mir::OperandKind::None),
+                };
+
+                operand
             }
 
-            hir::ExpressionKind::Null
-            | hir::ExpressionKind::Load(_)
-            | hir::ExpressionKind::DeRef(_)
-            | hir::ExpressionKind::If { .. }
-            | hir::ExpressionKind::Ref { .. }
-            | hir::ExpressionKind::Cast { .. }
-            | hir::ExpressionKind::While { .. }
-            | hir::ExpressionKind::Function(_)
-            | hir::ExpressionKind::InnerRawStackArray { .. } => {
-                todo!("expression kind is not yet impl")
+            hir::ExpressionKind::Null => todo!("ExpressionKind::Null  not yet impl in mir"),
+            hir::ExpressionKind::Function(_) => {
+                todo!("ExpressionKind::Function not yet impl in mir")
             }
-        }
+
+            hir::ExpressionKind::Load(place) => {
+
+                let place_id = self.lower_place(place).pass(is_end);
+                let operand = match &self.tree.places[place_id] {
+                    mir::Place::Local(local) => {
+                        mir::Operand::new(value.ty, mir::OperandKind::Local(*local))
+                    }
+                    _ => mir::Operand::new(
+                        value.ty,
+                        mir::OperandKind::Temp(self.place_to_temp(place_id, value.ty)),
+                    ),
+                };
+
+                let temp = self.new_temp(value.ty);
+
+                let statement = mir::Statement::new(mir::StatementKind::Assign {
+                    place: self.new_place(mir::Place::Temp(temp)),
+                    value: mir::Rvalue::new(mir::RvalueKind::Use(operand)),
+                });
+
+                self.push_statement(statement);
+                mir::Operand::new(value.ty, mir::OperandKind::Temp(temp))
+            }
+
+            hir::ExpressionKind::DeRef(inner) => {
+                let ptr = self.lower_operand(*inner).pass(is_end);
+                let temp = self.new_temp(value.ty);
+
+                let stmt = mir::Statement::new(mir::StatementKind::Assign {
+                    place: self.new_place(mir::Place::Temp(temp)),
+                    value: mir::Rvalue::new(mir::RvalueKind::Use(ptr)),
+                });
+
+                self.push_statement(stmt);
+                mir::Operand::new(value.ty, mir::OperandKind::Temp(temp))
+            }
+
+            hir::ExpressionKind::Ref { place, mutable: _ } => {
+                let ty = self.types.places[place.node.get_id()];
+
+                let place_id = self.lower_place(place).pass(is_end);
+                let temp = self.new_temp(value.ty);
+
+                let stmt = mir::Statement::new(mir::StatementKind::Assign {
+                    place: self.new_place(mir::Place::Temp(temp)),
+                    value: mir::Rvalue::new(mir::RvalueKind::Use(mir::Operand::new(
+                        value.ty,
+                        mir::OperandKind::Temp(self.place_to_temp(place_id, ty)),
+                    ))),
+                });
+
+                self.push_statement(stmt);
+                mir::Operand::new(value.ty, mir::OperandKind::Temp(temp))
+            }
+
+            hir::ExpressionKind::Cast { value: inner, .. } => self.lower_operand(*inner).pass(is_end),
+
+            hir::ExpressionKind::InnerRawStackArray { ty, len } => {
+                let len = self.lower_operand(*len).pass(is_end);
+                let temp = self.new_temp(*ty);
+
+                let stmt = mir::Statement::new(mir::StatementKind::Assign {
+                    place: self.new_place(mir::Place::Temp(temp)),
+                    value: mir::Rvalue::new(mir::RvalueKind::StackAlloc { ty: *ty, len }),
+                });
+
+                self.push_statement(stmt);
+                mir::Operand::new(value.ty, mir::OperandKind::Temp(temp))
+            }
+
+            _ => todo!(),
+            // hir::ExpressionKind::If {
+            //     condition,
+            //     then_block,
+            //     else_block,
+            // } => {
+            //     self.lower_if(*condition, *then_block, *else_block, value.ty)
+            // }
+
+            // hir::ExpressionKind::While { condition, body } => {
+            //     self.lower_while(*condition, *body);
+            //     mir::Operand::new(mir::OperandKind::None)
+            // }
+        };
+
+        EndBlock::new(operand, is_end)
     }
 }

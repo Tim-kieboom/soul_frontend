@@ -1,3 +1,4 @@
+
 use hir::{HirTree, IdAlloc};
 use hir_typed_context::HirTypedTable;
 use soul_utils::{
@@ -7,6 +8,8 @@ use soul_utils::{
     vec_map::VecMap,
 };
 
+pub(crate) use utils::*;
+mod utils;
 mod id_generators;
 pub mod mir;
 mod parse;
@@ -25,14 +28,28 @@ pub fn mir_lower(hir: &HirTree, types: &HirTypedTable, faults: &mut Vec<Sementic
 struct MirContext<'a> {
     tree: MirTree,
 
+    current: CurrentContext,
     id_generators: IdGenerators,
-    current_function: hir::FunctionId,
-    current_block: Option<mir::BlockId>,
     local_remap: VecMap<hir::LocalId, mir::LocalId>,
 
     hir: &'a HirTree,
     types: &'a HirTypedTable,
     faults: &'a mut Vec<SementicFault>,
+}
+
+struct CurrentContext {
+    scope: Vec<mir::LocalId>,
+    function: hir::FunctionId,
+    block: Option<mir::BlockId>,
+}
+impl CurrentContext {
+    pub fn new(function: hir::FunctionId) -> Self {
+        Self {
+            scope: vec![],
+            function,
+            block: None,
+        }
+    }
 }
 
 impl<'a> MirContext<'a> {
@@ -51,13 +68,24 @@ impl<'a> MirContext<'a> {
                 hir::FunctionId::error()
             });
 
+        let mut blocks = VecMap::const_default();
+        blocks.insert(
+            mir::BlockId::error(),
+            mir::Block {
+                id: mir::BlockId::error(),
+                returnable: false,
+                statements: vec![],
+                terminator: mir::Terminator::Unreachable,
+            },
+        );
+
         let tree = MirTree {
             main,
 
+            blocks,
             temps: VecMap::const_default(),
             places: VecMap::const_default(),
             locals: VecMap::const_default(),
-            blocks: VecMap::const_default(),
             functions: VecMap::const_default(),
             statements: VecMap::const_default(),
         };
@@ -67,10 +95,9 @@ impl<'a> MirContext<'a> {
             tree,
             types,
             faults,
-            current_block: None,
-            current_function: main,
             id_generators: IdGenerators::new(),
             local_remap: VecMap::const_default(),
+            current: CurrentContext::new(main),
         }
     }
 
@@ -78,17 +105,31 @@ impl<'a> MirContext<'a> {
         self.faults.push(SementicFault::error(err));
     }
 
+    fn new_function_block(&mut self) -> mir::BlockId {
+        let id = self.id_generators.alloc_block();
+        let block = mir::Block {
+            id,
+            returnable: true,
+            statements: vec![],
+            terminator: mir::Terminator::Unreachable,
+        };
+
+        self.tree.blocks.insert(id, block);
+        id
+    }
+
     fn new_block(&mut self) -> mir::BlockId {
         let id = self.id_generators.alloc_block();
         let block = mir::Block {
             id,
+            returnable: false,
             statements: vec![],
             terminator: mir::Terminator::Unreachable,
         };
 
         self.tree
             .functions
-            .get_mut(self.current_function)
+            .get_mut(self.current.function)
             .expect("should have id")
             .blocks
             .push(id);
@@ -99,8 +140,12 @@ impl<'a> MirContext<'a> {
 
     fn new_local(&mut self, local: hir::LocalId, ty: hir::TypeId) -> mir::LocalId {
         let id = self.id_generators.alloc_local();
+
         self.local_remap.insert(local, id);
         self.tree.locals.insert(id, mir::Local { id, ty });
+        self.tree.functions[self.current.function].locals.push(id);
+
+        self.current.scope.push(id);
         id
     }
 
@@ -145,7 +190,7 @@ impl<'a> MirContext<'a> {
     }
 
     fn expect_current_block(&mut self) -> mir::BlockId {
-        match self.current_block {
+        match self.current.block {
             Some(val) => val,
             None => {
                 self.log_error(soul_error_internal!(
