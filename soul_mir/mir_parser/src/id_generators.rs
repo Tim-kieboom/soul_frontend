@@ -6,6 +6,7 @@ pub(crate) struct IdGenerators {
     block: IdGenerator<mir::BlockId>,
     local: IdGenerator<mir::LocalId>,
     place: IdGenerator<mir::PlaceId>,
+    global: IdGenerator<mir::GlobalId>,
     statement: IdGenerator<mir::StatementId>,
 }
 impl IdGenerators {
@@ -15,8 +16,13 @@ impl IdGenerators {
             block: IdGenerator::new(),
             local: IdGenerator::new(),
             place: IdGenerator::new(),
+            global: IdGenerator::new(),
             statement: IdGenerator::new(),
         }
+    }
+
+    pub(crate) fn alloc_global(&mut self) -> mir::GlobalId {
+        self.global.alloc()
     }
 
     pub(crate) fn alloc_temp(&mut self) -> mir::TempId {

@@ -1,13 +1,13 @@
-use hir::{FieldId, FunctionId, HirType};
+use hir::{FieldId, FunctionId, HirTree, HirType, IdAlloc};
 use hir_typed_context::HirTypedTable;
 use mir_parser::mir::{
     self, BlockId, LocalId, MirTree, Operand, Place, PlaceId, Rvalue, StatementId, TempId
 };
-use soul_utils::{soul_names::TypeModifier, vec_map::VecMapIndex};
+use soul_utils::{soul_names::{TypeModifier, TypeWrapper}, vec_map::VecMapIndex};
 use std::fmt::Write;
 
-pub fn display_mir(mir: &MirTree, types: &HirTypedTable) -> String {
-    let mut displayer = MirDisplayer::new(mir, types);
+pub fn display_mir(mir: &MirTree, hir: &HirTree, types: &HirTypedTable) -> String {
+    let mut displayer = MirDisplayer::new(mir, hir, types);
 
     for function in mir.functions.keys() {
         displayer.display_function(function);
@@ -20,14 +20,16 @@ pub fn display_mir(mir: &MirTree, types: &HirTypedTable) -> String {
 struct MirDisplayer<'a> {
     sb: String,
     mir: &'a MirTree,
+    hir: &'a HirTree,
     types: &'a HirTypedTable,
 }
 impl<'a> MirDisplayer<'a> {
-    fn new(mir: &'a MirTree, types: &'a HirTypedTable) -> Self {
+    fn new(mir: &'a MirTree, hir: &'a HirTree, types: &'a HirTypedTable) -> Self {
         Self {
-            sb: String::new(),
+            hir,
             mir,
             types,
+            sb: String::new(),
         }
     }
 
@@ -77,8 +79,6 @@ impl<'a> MirDisplayer<'a> {
                 .write_display(&self.types.types, &mut self.sb)
                 .expect("no fmt error");
             
-            self.push_str(&format!("/*{}*/", local.ty.index()));
-
             self.push('\n');
         }
 
@@ -104,8 +104,7 @@ impl<'a> MirDisplayer<'a> {
         self.push_str("\t\t");
         match &block.terminator {
             mir::Terminator::Goto(block_id) => {
-                self.push_str("goto ");
-                self.display_block_name(*block_id);
+                self.display_goto(*block_id);
             }
             mir::Terminator::Return(operand) => {
                 self.push_str("return ");
@@ -113,11 +112,34 @@ impl<'a> MirDisplayer<'a> {
                     self.display_operand(value);
                 }
             }
-            mir::Terminator::If { .. } => todo!(),
-            mir::Terminator::Call { .. } => todo!(),
+            mir::Terminator::If { condition, then, arm } => {
+                self.push_str("if(");
+                self.display_operand(condition);
+                self.push_str(") ");
+                self.display_goto(*then);
+                self.push_str("\n\t\telse ");
+                self.display_goto(*arm);
+            }
+            mir::Terminator::Call { id, arguments, return_place, next, } => {
+                if let Some(place) = return_place {
+                    self.display_place(place);
+                    self.push_str(" = ");
+                }
+                self.display_function_name(*id);
+                self.push('(');
+                let last_index = arguments.len().saturating_sub(1);
+                for (i, arg) in arguments.iter().enumerate() {
+                    self.display_operand(arg);
+                    if i != last_index {
+                        self.push_str(", ");
+                    }
+                }
+                self.push_str(") ");
+                self.display_goto(*next);
+            }
             mir::Terminator::Unreachable => self.push_str("// unreachable"),
         }
-        self.push_str("\n\t}");
+        self.push_str("\n\t}\n");
     }
 
     fn display_statement(&mut self, statement_id: StatementId) {
@@ -146,14 +168,19 @@ impl<'a> MirDisplayer<'a> {
                 self.display_local_name(*local_id);
                 self.push(')');
             }
+            mir::StatementKind::Exit => self.push_str("exit()"),
         }
     }
 
     fn display_rvalue(&mut self, value: &Rvalue) {
         match &value.kind {
-            mir::RvalueKind::StackAlloc { ty: _, len } => {
+            mir::RvalueKind::StackAlloc { ty, len:_ } => {
                 self.push_str("/*stack alloc ");
-                self.display_operand(len);
+                self.types.types
+                    .get_type(*ty)
+                    .expect("should have TypeId")
+                    .write_display(&self.types.types, &mut self.sb)
+                    .expect("no fmt error");
                 self.push_str("*/");
             }
             mir::RvalueKind::Use(operand) => self.display_operand(operand),
@@ -176,7 +203,17 @@ impl<'a> MirDisplayer<'a> {
     }
 
     fn display_operand(&mut self, operand: &Operand) {
+        const MUT: bool = true;
+        const CONST: bool = false;
+
         match &operand.kind {
+            mir::OperandKind::Ref { place, mutable, } => {
+                match *mutable {
+                    MUT => self.push_str(TypeWrapper::MutRef.as_str()),
+                    CONST => self.push_str(TypeWrapper::ConstRef.as_str()),
+                };
+                self.display_place(place);
+            }
             mir::OperandKind::Temp(temp_id) => self.display_temp_name(*temp_id),
             mir::OperandKind::Local(local_id) => self.display_local_name(*local_id),
             mir::OperandKind::Comptime(literal) => {
@@ -209,12 +246,27 @@ impl<'a> MirDisplayer<'a> {
         }
     }
 
+    fn display_goto(&mut self, block_id: BlockId) {
+        self.push_str("goto -> ");
+        self.display_block_name(block_id);
+    }
+
+    fn display_function_name(&mut self, function: FunctionId) {
+        self.push_str(
+            self.hir.functions[function].name.as_str()
+        );
+    }
+
     fn display_field_name(&mut self, field: FieldId) {
         write!(self.sb, "field{}", field.index()).expect("not fmt error");
     }
 
     fn display_local_name(&mut self, local: LocalId) {
-        write!(self.sb, "_{}", local.index()).expect("not fmt error");
+        if local == LocalId::error() {
+            self.push_str("_error");
+        } else {
+            write!(self.sb, "_{}", local.index()).expect("not fmt error");
+        }
     }
 
     fn display_temp_name(&mut self, temp: TempId) {

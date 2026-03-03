@@ -6,7 +6,7 @@ use soul_utils::{
     Ident, error::SoulError, sementic_level::SementicFault, soul_error_internal, span::Span,
     vec_map::VecMapIndex,
 };
-use std::collections::HashMap;
+use std::{collections::HashMap};
 
 mod expression;
 mod insert;
@@ -54,6 +54,7 @@ enum CurrentBody {
 impl<'a> HirContext<'a> {
     fn new(ast_store: &'a DeclareStore, faults: &'a mut Vec<SementicFault>) -> Self {
         let mut id_generator = IdGenerator::new();
+        let start_function = id_generator.alloc_function();
         let root_id = id_generator.alloc_module();
 
         Self {
@@ -62,7 +63,7 @@ impl<'a> HirContext<'a> {
             id_generator,
             scopes: vec![Scope::default()],
             current_body: CurrentBody::Global,
-            hir: HirTree::new(root_id),
+            hir: HirTree::new(root_id, start_function),
         }
     }
 

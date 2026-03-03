@@ -141,6 +141,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         match &self.token().kind {
             TokenKind::Ident(val) if val == NONE_STR => {
+                self.bump();
                 return TryOk(SoulType::none(self.token().span));
             }
             &ROUND_OPEN => {

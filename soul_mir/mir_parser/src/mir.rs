@@ -5,7 +5,7 @@ use soul_utils::{
     vec_map::{VecMap, VecMapIndex},
 };
 
-impl_soul_ids!(BlockId, LocalId, StatementId, PlaceId, TempId);
+impl_soul_ids!(GlobalId, BlockId, LocalId, StatementId, PlaceId, TempId);
 
 /// Mid-level Intermediate Representation (MIR) tree.
 ///
@@ -16,8 +16,10 @@ impl_soul_ids!(BlockId, LocalId, StatementId, PlaceId, TempId);
 /// - Easy to lower to LLVM IR
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MirTree {
-    /// Entry point function (usually `main`)
-    pub main: hir::FunctionId,
+    /// Entry point function (_start function that inits runtime globals and calls main)
+    pub start_function: hir::FunctionId,
+
+    pub globals: VecMap<GlobalId, Global>,
 
     /// Temporary values created during lowering (SSA-like registers)
     /// Each temp has a type.
@@ -56,6 +58,22 @@ pub struct Function {
 
     /// Return type of the function
     pub return_type: TypeId,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Global {
+    pub id: GlobalId,
+    pub local: LocalId,
+    pub ty: TypeId,
+    pub literal: Option<Literal>,
+}
+impl Global {
+    pub fn is_literal(&self) -> bool {
+        self.literal.is_some()
+    }
+    pub fn is_runtime(&self) -> bool {
+        self.literal.is_none()
+    }
 }
 
 /// A local variable in MIR.
@@ -102,6 +120,7 @@ pub enum StatementKind {
 
     StorageStart(Vec<LocalId>),
     StorageDead(LocalId),
+    Exit,
 }
 
 /// A right-hand-side computation.
@@ -183,6 +202,12 @@ pub enum OperandKind {
 
     /// A compile-time constant value.
     Comptime(Literal),
+
+    /// Ref Place (e.g. `&a` or `@a`)
+    Ref{
+        place: PlaceId,
+        mutable: bool,
+    },
 
     None,
 }

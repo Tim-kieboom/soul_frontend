@@ -48,7 +48,7 @@ impl<'a> HirTypedContext<'a> {
             | Statement::Break(value, _)
             | Statement::Return(value, _) => match value {
                 Some(val) => self.infer_expression(*val),
-                None => self.none_type,
+                None => self.type_table.none_type,
             },
         };
 
@@ -65,7 +65,7 @@ impl<'a> HirTypedContext<'a> {
                 let span = self.statement_span(*id);
                 let got = match value {
                     Some(val) => self.infer_expression(*val),
-                    None => self.none_type,
+                    None => self.type_table.none_type,
                 };
 
                 let value = value.unwrap_or(ExpressionId::error());
@@ -85,7 +85,7 @@ impl<'a> HirTypedContext<'a> {
             }
         }
 
-        let ty = return_type.unwrap_or(self.none_type);
+        let ty = return_type.unwrap_or(self.type_table.none_type);
         self.type_block(body, ty);
         ty
     }

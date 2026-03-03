@@ -20,7 +20,6 @@ use paths::Paths;
 use soul_name_resolver::name_resolve;
 use soul_tokenizer::{TokenStream, tokenize};
 use soul_utils::char_colors::{DEFAULT, GREEN};
-use soul_utils::sementic_level::SementicFault;
 
 use crate::{
     convert_soul_error::{MessageConfig, ToMessage},
@@ -48,7 +47,6 @@ struct Ouput<'a> {
     source_file: &'a str,
     ast: AbstractSyntaxTree,
     hir_types: HirTypedTable,
-    faults: Vec<SementicFault>,
     token_stream: TokenStream<'a>,
 }
 
@@ -71,14 +69,26 @@ fn main() -> Result<()> {
     let output = Ouput {
         mir,
         hir,
-        faults,
         hir_types,
         token_stream,
         ast: parse_response.tree,
         source_file: &source_file,
     };
 
-    handle_output(&paths, output)
+    handle_output(&paths, output)?;
+    for fault in &faults {
+        error!(
+            "{}",
+            fault.to_message("main.soul", &source_file, MESSAGE_CONFIG)
+        );
+    }
+
+    if faults.is_empty() {
+        let msg = "success!!";
+        info!("{GREEN}{msg}{DEFAULT}");
+    }
+
+    Ok(())
 }
 
 fn handle_output<'a>(paths: &Paths, output: Ouput<'a>) -> Result<()> {
@@ -98,24 +108,10 @@ fn handle_output<'a>(paths: &Paths, output: Ouput<'a>) -> Result<()> {
             "hir/typed.soulc",
         ),
         (
-            &display_mir(&output.mir, &output.hir_types),
+            &display_mir(&output.mir, &output.hir, &output.hir_types),
             "mir/tree.soulc",
         ),
-    ])?;
-
-    for fault in &output.faults {
-        error!(
-            "{}",
-            fault.to_message("main.soul", output.source_file, MESSAGE_CONFIG)
-        );
-    }
-
-    if output.faults.is_empty() {
-        let msg = "success!!";
-        info!("{GREEN}{msg}{DEFAULT}");
-    }
-
-    Ok(())
+    ])
 }
 
 fn read_source_file(source_path: &str) -> Result<String> {

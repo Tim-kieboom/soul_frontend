@@ -124,7 +124,6 @@ impl<'a> HirTypedContext<'a> {
                     let span = match self.hir.spans.$field.get(index).copied() {
                         Some(val) => val,
                         None => {
-                            debug_assert!(false, "span of {:?} not found", index);
                             Span::default()
                         }
                     };
@@ -160,6 +159,11 @@ impl<'a> HirTypedContext<'a> {
 
         self.type_table.types = new_types;
         self.type_table.remap_types(&remap);
+
+        self.type_table.none_type = self.type_table
+            .types
+            .get_id(&HirType::none_type())
+            .expect("should have none type in table");
     }
 
     fn collect_root_types(&self) -> Vec<TypeId> {
@@ -170,6 +174,7 @@ impl<'a> HirTypedContext<'a> {
         roots.extend(self.type_table.functions.values().copied());
         roots.extend(self.type_table.statements.values().copied());
         roots.extend(self.type_table.expressions.values().copied());
+        roots.push(self.type_table.none_type);
 
         roots
     }

@@ -132,8 +132,8 @@ impl<'a> HirTypedContext<'a> {
         let else_block = match else_block {
             Some(val) => val,
             None => {
-                self.unify(ExpressionId::error(), self.none_type, then_type, then_span);
-                return self.none_type;
+                self.unify(ExpressionId::error(), self.type_table.none_type, then_type, then_span);
+                return self.type_table.none_type;
             }
         };
 
@@ -309,7 +309,7 @@ impl<'a> HirTypedContext<'a> {
 
         self.unify(condition, bool_type, condition_type, span);
 
-        if return_type != self.none_type {
+        if return_type != self.type_table.none_type {
             self.log_error(SoulError::new(
                 "while loops with a condition can not have return type",
                 SoulErrorKind::InvalidContext,
@@ -318,7 +318,7 @@ impl<'a> HirTypedContext<'a> {
             return TypeId::error();
         }
 
-        self.none_type
+        self.type_table.none_type
     }
 
     fn new_infer_optional(&mut self, span: Span) -> TypeId {

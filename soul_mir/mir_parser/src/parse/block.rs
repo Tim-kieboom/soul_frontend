@@ -3,9 +3,12 @@ use soul_utils::soul_error_internal;
 use crate::{EndBlock, MirContext, mir};
 
 impl<'a> MirContext<'a> {
-    pub(crate) fn lower_block(&mut self, block_id: hir::BlockId, entry_block: mir::BlockId) -> EndBlock<()> {
+    pub(crate) fn lower_block(&mut self, block_id: hir::BlockId, entry_block: mir::BlockId) -> EndBlock<Option<mir::Operand>> {
 
-        let (live_i, parent_scope) = self.start_scope(entry_block);
+        let mut this_block = entry_block;
+
+        self.current.block = Some(this_block);
+        let (live_i, parent_scope) = self.start_scope(this_block);
         let block = &self.hir.blocks[block_id];
 
         let mut terminator = None;
@@ -19,7 +22,7 @@ impl<'a> MirContext<'a> {
                 Some(val) => terminator = Some(val),
                 None => (),
             }          
-            match response.block_operand {
+            match response.expression_operand {
                 Some(val) => block_operand = Some(val),
                 None => (),
             }
@@ -28,20 +31,25 @@ impl<'a> MirContext<'a> {
                 break
             }
         }
-        
-        
-        if !self.tree.blocks[entry_block].returnable {
-            if let Some(terminator) = terminator {
-                self.insert_terminator(entry_block, terminator);
-            }
 
-            self.end_scope(live_i, entry_block, parent_scope);
-            return EndBlock::new((), is_end);
+        this_block = self.expect_current_block();
+        if !self.tree.blocks[this_block].returnable {
+            let terminator = match terminator {
+                Some(mir::Terminator::Return(operand)) => operand,
+                None => None,
+                _ => {
+                    self.log_error(soul_error_internal!("should not have this terminator kind in block", None));
+                    None
+                }
+            };
+
+            self.end_scope(live_i, this_block, parent_scope);
+            return EndBlock::new(terminator, is_end);
         }
 
         match (terminator, block.terminator) {
             (Some(terminator), _) => {
-                self.insert_terminator(entry_block, terminator)
+                self.insert_terminator(this_block, terminator)
             }
             (_, Some(expression)) => {
                 let value = match block_operand {
@@ -52,19 +60,18 @@ impl<'a> MirContext<'a> {
                     }
                 };
 
-                self.insert_terminator(entry_block, mir::Terminator::Return(Some(value)))
+                self.insert_terminator(this_block, mir::Terminator::Return(Some(value)))
             }
             _ => {
-                self.insert_terminator(entry_block, mir::Terminator::Return(None))
+                self.insert_terminator(this_block, mir::Terminator::Return(None))
             }
         }
 
-        self.end_scope(live_i, entry_block, parent_scope);
-        EndBlock::new((), is_end)
+        self.end_scope(live_i, this_block, parent_scope);
+        EndBlock::new(None, is_end)
     }
 
     fn start_scope(&mut self, entry_block: mir::BlockId) -> (usize, Vec<mir::LocalId>) {
-        self.current.block = Some(entry_block);
         let parent_scope = self.push_scope();
         
         let i = self.tree.blocks[entry_block].statements.len();

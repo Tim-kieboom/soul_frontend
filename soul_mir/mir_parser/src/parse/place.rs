@@ -62,7 +62,11 @@ impl<'a> MirContext<'a> {
                 let operand = operand.clone();
                 self.deref_to_operand(operand)
             }
-            mir::Place::Index(_, _) => todo!(),
+            mir::Place::Index(place, operand) => {
+                let operand = operand.clone();
+                let place = *place;
+                self.index_ptr(place, operand)
+            }
             mir::Place::Field(_, _) => todo!(),
 
             mir::Place::Temp(_) => unreachable!(),
@@ -87,5 +91,9 @@ impl<'a> MirContext<'a> {
         self.push_statement(statement);
 
         mir::Operand::new(ty, mir::OperandKind::Temp(deref_temp))
+    }
+
+    fn index_ptr(&mut self, place_id: mir::PlaceId, operand: mir::Operand) -> mir::Operand {
+        todo!()
     }
 }

@@ -5,13 +5,14 @@ mod ids;
 mod meta_data_maps;
 mod place;
 mod statement;
+use ast::FunctionKind;
 pub use expression::*;
 pub use function::*;
 pub use hir_type::*;
 pub use ids::*;
 pub use meta_data_maps::*;
 pub use place::*;
-use soul_utils::{span::Span, vec_map::VecMap};
+use soul_utils::{Ident, span::Span, vec_map::VecMap};
 pub use statement::*;
 
 /// High-level Intermediate Representation (HIR) tree.
@@ -38,6 +39,9 @@ pub struct HirTree {
     /// for HIR nodes.
     pub meta_data: MetaDataMap,
 
+    /// id for _start function created in mir
+    pub start_function: FunctionId,
+
     pub imports: ImportMap,
     pub blocks: VecMap<BlockId, Block>,
     pub locals: VecMap<LocalId, TypeId>,
@@ -46,16 +50,26 @@ pub struct HirTree {
 }
 
 impl HirTree {
-    pub fn new(root_id: ModuleId) -> Self {
+    pub fn new(root_id: ModuleId, start_function_id: FunctionId) -> Self {
+        let start_function = Function{ 
+            id: start_function_id, 
+            name: Ident::new("_start".to_string(), Span::default_const()), 
+            parameters: vec![], 
+            body: BlockId::error(), 
+            kind: FunctionKind::Static, 
+            return_type: TypeId::error(), 
+        };
+
         Self {
+            start_function: start_function_id,
             types: TypesMap::new(),
             spans: SpanMap::default(),
             blocks: VecMap::default(),
             locals: VecMap::default(),
             imports: ImportMap::new(),
-            functions: VecMap::default(),
             expressions: VecMap::default(),
             meta_data: MetaDataMap::default(),
+            functions: VecMap::from_vec(vec![(start_function_id, start_function)]),
             root: Module {
                 id: root_id,
                 imports: vec![],
