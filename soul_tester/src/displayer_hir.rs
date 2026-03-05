@@ -101,7 +101,12 @@ impl<'a> HirDisplayer<'a> {
     }
 
     fn display_variable(&mut self, variable: &hir::Variable) {
-        self.display_local(variable.local);
+        if variable.is_temp {
+            self.display_temp(variable.local);
+        } else {
+            self.display_local(variable.local);
+        }
+
         self.push_str(": ");
         let ty = match self.type_table {
             Some(val) => val.locals[variable.local],
@@ -288,6 +293,7 @@ impl<'a> HirDisplayer<'a> {
 
     fn display_place(&mut self, place: &hir::Place) {
         match &place.node {
+            hir::PlaceKind::Temp(local_id, _) => self.display_temp(*local_id),
             hir::PlaceKind::Local(local_id, _) => self.display_local(*local_id),
             hir::PlaceKind::Deref(place, _) => {
                 self.push('*');
@@ -317,6 +323,10 @@ impl<'a> HirDisplayer<'a> {
 
     fn display_local(&mut self, id: LocalId) {
         write!(self.sb, "var_{}", id.index()).expect("no format error")
+    }
+
+    fn display_temp(&mut self, id: LocalId) {
+        write!(self.sb, "temp_{}", id.index()).expect("no format error")
     }
 
     fn display_expression_astype(&mut self, value: ExpressionId, id: TypeId) {

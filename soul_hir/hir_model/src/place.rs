@@ -16,6 +16,9 @@ pub type Place = Spanned<PlaceKind>;
 pub enum PlaceKind {
     /// A local variable.
     Local(LocalId, PlaceId),
+    
+    /// A temperary local variable.
+    Temp(LocalId, PlaceId),
 
     /// Dereference of another place.
     Deref(Box<Place>, PlaceId),
@@ -38,6 +41,7 @@ impl PlaceKind {
     pub fn get_id(&self) -> PlaceId {
         match self {
             PlaceKind::Local(_, place_id) => *place_id,
+            PlaceKind::Temp(_, place_id) => *place_id,
             PlaceKind::Deref(_, place_id) => *place_id,
             PlaceKind::Index { id, .. } => *id,
             PlaceKind::Field { id, .. } => *id,

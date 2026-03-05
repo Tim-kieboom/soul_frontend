@@ -103,6 +103,7 @@ impl<'a> MirDisplayer<'a> {
 
         self.push_str("\t\t");
         match &block.terminator {
+            mir::Terminator::Exit => self.push_str("// exit"),
             mir::Terminator::Goto(block_id) => {
                 self.display_goto(*block_id);
             }
@@ -168,7 +169,6 @@ impl<'a> MirDisplayer<'a> {
                 self.display_local_name(*local_id);
                 self.push(')');
             }
-            mir::StatementKind::Exit => self.push_str("exit()"),
         }
     }
 

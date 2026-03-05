@@ -42,9 +42,12 @@ pub struct HirTree {
     /// id for _start function created in mir
     pub start_function: FunctionId,
 
+    pub internal_fields: Option<InternalFields>,
+
     pub imports: ImportMap,
+    pub fields: VecMap<FieldId, Field>,
     pub blocks: VecMap<BlockId, Block>,
-    pub locals: VecMap<LocalId, TypeId>,
+    pub locals: VecMap<LocalId, LocalInfo>,
     pub functions: VecMap<FunctionId, Function>,
     pub expressions: VecMap<ExpressionId, Expression>,
 }
@@ -61,11 +64,13 @@ impl HirTree {
         };
 
         Self {
+            internal_fields: None,
             start_function: start_function_id,
             types: TypesMap::new(),
             spans: SpanMap::default(),
             blocks: VecMap::default(),
             locals: VecMap::default(),
+            fields: VecMap::default(),
             imports: ImportMap::new(),
             expressions: VecMap::default(),
             meta_data: MetaDataMap::default(),
@@ -77,6 +82,53 @@ impl HirTree {
             },
         }
     }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct LocalInfo {
+    pub ty: TypeId,
+    pub kind: LocalKind,
+}
+impl LocalInfo {
+    pub fn is_temp(&self) -> bool {
+        self.kind == LocalKind::Temp
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum LocalKind {
+    Variable,
+    Parameter,
+    Temp,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct InternalFields {
+    pub array_ptr: FieldId,
+    pub array_len: FieldId,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Field {
+    pub id: FieldId,
+    /// The name of the field (for readability, debugging, codegen).
+    pub name: String,
+    /// The type of the field in HIR.
+    pub type_id: TypeId,
+    /// stores alignmentInfo
+    pub align: Alignment,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Alignment {
+    /// Byte offset of the start of the field within its parent struct.
+    pub offset: usize,
+    /// Size of the field in bytes (computed from `type_id`).
+    pub size: usize,
+    /// Alignment requirement of this field in bytes.
+    pub align: usize,
+    /// Whether this field is padded or part of a packed struct.
+    pub is_packed: bool,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -143,6 +195,7 @@ impl Global {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Variable {
     pub ty: TypeId,
+    pub is_temp: bool,
     pub local: LocalId,
     pub value: Option<ExpressionId>,
 }

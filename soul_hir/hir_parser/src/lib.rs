@@ -1,6 +1,6 @@
 mod id_generator;
 use ast::{DeclareStore, ParseResponse};
-use hir::{BlockId, FunctionId, HirTree, LocalId, TypeId};
+use hir::{BlockId, Field, FunctionId, HirTree, IdAlloc, InternalFields, LocalId, TypeId};
 use id_generator::IdGenerator;
 use soul_utils::{
     Ident, error::SoulError, sementic_level::SementicFault, soul_error_internal, span::Span,
@@ -17,6 +17,7 @@ mod r#type;
 
 pub fn hir_lower(response: &ParseResponse, faults: &mut Vec<SementicFault>) -> HirTree {
     let mut context = HirContext::new(&response.store, faults);
+    context.build_internal_fields();
 
     for global in &response.tree.root.statements {
         context.lower_global(global);
@@ -67,6 +68,47 @@ impl<'a> HirContext<'a> {
         }
     }
 
+    fn build_internal_fields(&mut self) {
+
+        
+        let array_len = self.id_generator.alloc_field(); 
+        self.hir.fields.insert(
+            array_len, 
+            Field {
+                id: array_len,
+                name: "len".to_string(),
+                type_id: TypeId::error(),
+                align: hir::Alignment {
+                    offset: 0,
+                    size: 4,
+                    align: 8,
+                    is_packed: false,
+                },
+            }
+        );
+
+        let array_ptr = self.id_generator.alloc_field(); 
+        self.hir.fields.insert(
+            array_ptr, 
+            Field {
+                id: array_ptr,
+                name: "ptr".to_string(),
+                type_id: TypeId::error(),
+                align: hir::Alignment {
+                    offset: 4,
+                    size: 4,
+                    align: 8,
+                    is_packed: false,
+                },
+            }
+        );
+
+        self.hir.internal_fields = Some(InternalFields {
+            array_ptr,
+            array_len,
+        })
+    }
+
     fn push_scope(&mut self) {
         self.scopes.push(Scope::default());
     }
@@ -91,7 +133,19 @@ impl<'a> HirContext<'a> {
         None
     }
 
-    fn insert_local(&mut self, name: &Ident, local: LocalId, ty: TypeId) {
+    fn insert_parameter(&mut self, name: &Ident, local: LocalId, ty: TypeId) {
+        self.inner_insert_local(name, local, hir::LocalInfo{ty, kind: hir::LocalKind::Parameter});
+    }
+    
+    fn insert_variable(&mut self, name: &Ident, local: LocalId, ty: TypeId) {
+        self.inner_insert_local(name, local, hir::LocalInfo{ty, kind: hir::LocalKind::Variable});
+    }    
+    
+    fn insert_temp(&mut self, name: &Ident, local: LocalId, ty: TypeId) {
+        self.inner_insert_local(name, local, hir::LocalInfo{ty, kind: hir::LocalKind::Temp});
+    }
+
+    fn inner_insert_local(&mut self, name: &Ident, local: LocalId, info: hir::LocalInfo) {
         let scope = match self.scopes.last_mut() {
             Some(val) => val,
             None => {
@@ -105,7 +159,7 @@ impl<'a> HirContext<'a> {
 
         self.hir.spans.locals.insert(local, name.span);
         scope.locals.insert(name.to_string(), local);
-        self.hir.locals.insert(local, ty);
+        self.hir.locals.insert(local, info);
     }
 
     fn insert_block(&mut self, id: BlockId, block: hir::Block, span: Span) {

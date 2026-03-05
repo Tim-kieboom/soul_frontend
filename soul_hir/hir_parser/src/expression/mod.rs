@@ -177,6 +177,7 @@ impl<'a> HirContext<'a> {
 
                 let variable = hir::Variable {
                     ty: of_type,
+                    is_temp: false,
                     local: temp_local,
                     value: Some(inner),
                 };
@@ -234,8 +235,15 @@ impl<'a> HirContext<'a> {
             }
         };
 
+        let place_id = self.id_generator.alloc_place();
+        let place_kind = if self.hir.locals[local].is_temp() {
+            PlaceKind::Local(local, place_id)
+        } else {
+            PlaceKind::Temp(local, place_id)
+        };
+
         let place = Place::new(
-            PlaceKind::Local(local, self.id_generator.alloc_place()),
+            place_kind,
             ident.span,
         );
 

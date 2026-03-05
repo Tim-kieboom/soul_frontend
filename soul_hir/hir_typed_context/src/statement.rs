@@ -93,11 +93,12 @@ impl<'a> HirTypedContext<'a> {
     pub(crate) fn infer_place(&mut self, place: &Place) -> TypeId {
         let span = place.span;
         let ty = match &place.node {
-            PlaceKind::Local(id, _) => {
+            PlaceKind::Temp(id, _)
+            | PlaceKind::Local(id, _) => {
                 if *id == LocalId::error() {
                     TypeId::error()
                 } else {
-                    self.hir.locals[*id]
+                    self.hir.locals[*id].ty
                 }
             }
             PlaceKind::Deref(place, _) => {

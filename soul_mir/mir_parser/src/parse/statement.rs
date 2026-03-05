@@ -68,15 +68,23 @@ impl<'a> MirContext<'a> {
     }
 
     pub(crate) fn lower_variable(&mut self, variable: &hir::Variable, is_end: &mut bool) {
-        let local = match self.local_remap.get(variable.local) {
-            Some(val) => *val,
-            None => self.new_local(variable.local, self.types.locals[variable.local]),
+        
+        let local = if variable.is_temp {
+            mir::Place::Temp(match self.temp_remap.get(variable.local) {
+                Some(val) => *val,
+                None => self.new_temp(self.types.locals[variable.local]),
+            })
+        } else {
+            mir::Place::Local(match self.local_remap.get(variable.local) {
+                Some(val) => *val,
+                None => self.new_local(variable.local, self.types.locals[variable.local]),
+            })
         };
         
         if let Some(value) = variable.value {
             let operand = self.lower_operand(value).pass(is_end);
 
-            let place = self.new_place(mir::Place::Local(local));
+            let place = self.new_place(local);
             let statement = mir::Statement::new(mir::StatementKind::Assign {
                 place,
                 value: mir::Rvalue::new(mir::RvalueKind::Use(operand)),
@@ -89,6 +97,9 @@ impl<'a> MirContext<'a> {
     pub(crate) fn lower_assign(&mut self, assign: &hir::Assign, is_end: &mut bool) {
         let place = self.lower_place(&assign.place).pass(is_end);
         let value = self.lower_operand(assign.value).pass(is_end);
+        if matches!(value.kind, mir::OperandKind::None) {
+            return
+        }
 
         let statement = mir::Statement::new(mir::StatementKind::Assign {
             place,

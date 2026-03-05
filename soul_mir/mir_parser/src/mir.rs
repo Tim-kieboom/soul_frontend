@@ -120,7 +120,6 @@ pub enum StatementKind {
 
     StorageStart(Vec<LocalId>),
     StorageDead(LocalId),
-    Exit,
 }
 
 /// A right-hand-side computation.
@@ -179,6 +178,8 @@ pub enum Terminator {
         return_place: Option<PlaceId>,
         next: BlockId,
     },
+
+    Exit,
 
     /// Indicates unreachable code (after errors or diverging control flow).
     Unreachable,

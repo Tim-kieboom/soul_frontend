@@ -33,7 +33,9 @@ struct MirContext<'a> {
 
     current: CurrentContext,
     id_generators: IdGenerators,
+    place_typed: VecMap<mir::PlaceId, TypeId>,
     local_remap: VecMap<hir::LocalId, mir::LocalId>,
+    temp_remap: VecMap<hir::LocalId, mir::TempId>,
 
     hir: &'a HirTree,
     types: &'a HirTypedTable,
@@ -102,6 +104,8 @@ impl<'a> MirContext<'a> {
             types,
             faults,
             id_generators: IdGenerators::new(),
+            temp_remap: VecMap::const_default(),
+            place_typed: VecMap::const_default(),
             local_remap: VecMap::const_default(),
             current: CurrentContext::new(hir.start_function),
         };
@@ -127,7 +131,7 @@ impl<'a> MirContext<'a> {
                 mir::BlockId::error()
             }
         };
-        self.push_statement_from(mir::Statement::new(mir::StatementKind::Exit), end_block);
+        self.insert_terminator(end_block, mir::Terminator::Exit);
     }
 
     fn build_start_function(&mut self) {
@@ -156,7 +160,11 @@ impl<'a> MirContext<'a> {
             
             hir::Global::Variable(variable,_) 
             | hir::Global::InternalVariable(variable,_) => {
-                let local = self.lower_global_variable(variable);
+                let local = if variable.is_temp {
+                    mir::Place::Temp(self.new_temp(self.types.locals[variable.local]))
+                } else {
+                    mir::Place::Local(self.lower_global_variable(variable))
+                };
                 let value = match variable.value {
                     Some(val) => val,
                     None => return,
@@ -165,7 +173,7 @@ impl<'a> MirContext<'a> {
                 self.current.function = self.tree.start_function;
                 self.current.block = Some(self.expect_start_block());
 
-                let place = self.new_place(mir::Place::Local(local));
+                let place = self.new_place(local);
                 let value = self.lower_operand(value).pass(is_end);
                 self.push_statement(mir::Statement::new(mir::StatementKind::Assign { 
                     place, 

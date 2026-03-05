@@ -14,7 +14,7 @@ impl<'a> HirContext<'a> {
             .map(|(name, ty, _node_id)| {
                 let ty = self.lower_type(ty);
                 let local = self.id_generator.alloc_local();
-                self.insert_local(name, local, ty);
+                self.insert_parameter(name, local, ty);
                 hir::Parameter { local, ty }
             })
             .collect();

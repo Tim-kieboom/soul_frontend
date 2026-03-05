@@ -2,6 +2,11 @@ use soul_utils::soul_error_internal;
 
 use crate::{EndBlock, MirContext, mir};
 
+struct LiveIndex {
+    block: mir::BlockId,
+    index: usize,
+}
+
 impl<'a> MirContext<'a> {
     pub(crate) fn lower_block(&mut self, block_id: hir::BlockId, entry_block: mir::BlockId) -> EndBlock<Option<mir::Operand>> {
 
@@ -36,14 +41,14 @@ impl<'a> MirContext<'a> {
         if !self.tree.blocks[this_block].returnable {
             let terminator = match terminator {
                 Some(mir::Terminator::Return(operand)) => operand,
-                None => None,
+                None => block_operand,
                 _ => {
                     self.log_error(soul_error_internal!("should not have this terminator kind in block", None));
                     None
                 }
             };
 
-            self.end_scope(live_i, this_block, parent_scope);
+            self.end_scope(live_i, parent_scope);
             return EndBlock::new(terminator, is_end);
         }
 
@@ -67,25 +72,25 @@ impl<'a> MirContext<'a> {
             }
         }
 
-        self.end_scope(live_i, this_block, parent_scope);
+        self.end_scope(live_i, parent_scope);
         EndBlock::new(None, is_end)
     }
 
-    fn start_scope(&mut self, entry_block: mir::BlockId) -> (usize, Vec<mir::LocalId>) {
+    fn start_scope(&mut self, entry_block: mir::BlockId) -> (LiveIndex, Vec<mir::LocalId>) {
         let parent_scope = self.push_scope();
         
         let i = self.tree.blocks[entry_block].statements.len();
         self.push_statement(mir::Statement::new(mir::StatementKind::StorageStart(vec![])));
-        (i, parent_scope)
+        (LiveIndex{ block: entry_block, index: i }, parent_scope)
     }
 
-    fn end_scope(&mut self, i_live: usize, entry_block: mir::BlockId, parent_scope: Vec<mir::LocalId>) {
+    fn end_scope(&mut self, i_live: LiveIndex, parent_scope: Vec<mir::LocalId>) {
         let this_scope = self.pop_scope(parent_scope);
         for local in &this_scope {
             self.push_statement(mir::Statement::new(mir::StatementKind::StorageDead(*local)));
         }
 
-        let statement_id = self.tree.blocks[entry_block].statements[i_live];
+        let statement_id = self.tree.blocks[i_live.block].statements[i_live.index];
         let statement = &mut self.tree.statements[statement_id];
         if let mir::StatementKind::StorageStart(scope) = &mut statement.kind {
             *scope = this_scope;

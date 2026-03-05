@@ -150,17 +150,8 @@ impl<'a> MirContext<'a> {
 
             hir::ExpressionKind::Cast { value: inner, .. } => self.lower_operand(*inner).pass(is_end),
 
-            hir::ExpressionKind::InnerRawStackArray { ty:_, len } => {
-                let len = self.lower_operand(*len).pass(is_end);
-                let temp = self.new_temp(ty);
-
-                let stmt = mir::Statement::new(mir::StatementKind::Assign {
-                    place: self.new_place(mir::Place::Temp(temp)),
-                    value: mir::Rvalue::new(mir::RvalueKind::StackAlloc { ty, len }),
-                });
-
-                self.push_statement(stmt);
-                mir::Operand::new(ty, mir::OperandKind::Temp(temp))
+            hir::ExpressionKind::InnerRawStackArray { .. } => {
+                mir::Operand::new(self.types.none_type, mir::OperandKind::None)
             }
 
             hir::ExpressionKind::If {
@@ -303,7 +294,7 @@ impl<'a> MirContext<'a> {
                         place, 
                         value: mir::Rvalue::new(mir::RvalueKind::Use(value)),
                     }), 
-                    parent,
+                    arm,
                 );
             }
             None => (),

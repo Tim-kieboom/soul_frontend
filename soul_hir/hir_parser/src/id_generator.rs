@@ -1,7 +1,8 @@
-use hir::{BlockId, ExpressionId, FunctionId, LocalId, ModuleId, PlaceId, StatementId};
+use hir::{BlockId, ExpressionId, FieldId, FunctionId, LocalId, ModuleId, PlaceId, StatementId};
 
 #[derive(Debug, Clone)]
 pub(crate) struct IdGenerator {
+    pub(crate) field: hir::IdGenerator<FieldId>,
     pub(crate) place: hir::IdGenerator<PlaceId>,
     pub(crate) block: hir::IdGenerator<BlockId>,
     pub(crate) local: hir::IdGenerator<LocalId>,
@@ -13,6 +14,7 @@ pub(crate) struct IdGenerator {
 impl IdGenerator {
     pub fn new() -> Self {
         Self {
+            field: hir::IdGenerator::new(),
             place: hir::IdGenerator::new(),
             block: hir::IdGenerator::new(),
             local: hir::IdGenerator::new(),
@@ -49,5 +51,9 @@ impl IdGenerator {
 
     pub fn alloc_body(&mut self) -> BlockId {
         self.block.alloc()
+    }
+
+    pub fn alloc_field(&mut self) -> FieldId {
+        self.field.alloc()
     }
 }
