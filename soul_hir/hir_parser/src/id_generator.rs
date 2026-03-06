@@ -1,27 +1,29 @@
-use hir::{BlockId, ExpressionId, FieldId, FunctionId, LocalId, ModuleId, PlaceId, StatementId};
+use hir::{BlockId, ExpressionId, FieldId, LocalId, ModuleId, PlaceId, StatementId};
+
+use soul_utils::ids::{FunctionId, IdGenerator as Generator};
 
 #[derive(Debug, Clone)]
 pub(crate) struct IdGenerator {
-    pub(crate) field: hir::IdGenerator<FieldId>,
-    pub(crate) place: hir::IdGenerator<PlaceId>,
-    pub(crate) block: hir::IdGenerator<BlockId>,
-    pub(crate) local: hir::IdGenerator<LocalId>,
-    pub(crate) module: hir::IdGenerator<ModuleId>,
-    pub(crate) function: hir::IdGenerator<FunctionId>,
-    pub(crate) statement: hir::IdGenerator<StatementId>,
-    pub(crate) expression: hir::IdGenerator<ExpressionId>,
+    pub(crate) field: Generator<FieldId>,
+    pub(crate) place: Generator<PlaceId>,
+    pub(crate) block: Generator<BlockId>,
+    pub(crate) local: Generator<LocalId>,
+    pub(crate) module: Generator<ModuleId>,
+    pub(crate) function: Generator<FunctionId>,
+    pub(crate) statement: Generator<StatementId>,
+    pub(crate) expression: Generator<ExpressionId>,
 }
 impl IdGenerator {
     pub fn new() -> Self {
         Self {
-            field: hir::IdGenerator::new(),
-            place: hir::IdGenerator::new(),
-            block: hir::IdGenerator::new(),
-            local: hir::IdGenerator::new(),
-            module: hir::IdGenerator::new(),
-            function: hir::IdGenerator::new(),
-            statement: hir::IdGenerator::new(),
-            expression: hir::IdGenerator::new(),
+            field: Generator::new(),
+            place: Generator::new(),
+            block: Generator::new(),
+            local: Generator::new(),
+            module: Generator::new(),
+            function: Generator::new(),
+            statement: Generator::new(),
+            expression: Generator::new(),
         }
     }
 

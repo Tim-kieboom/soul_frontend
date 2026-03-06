@@ -1,6 +1,6 @@
-use hir::{BlockId, ExpressionId, FunctionId, HirTree, LocalId, TypeId};
+use hir::{BlockId, ExpressionId, HirTree, LocalId, TypeId};
 use hir_typed_context::HirTypedTable;
-use soul_utils::{soul_names::KeyWord, vec_map::VecMapIndex};
+use soul_utils::{ids::{FunctionId, IdAlloc}, soul_names::KeyWord, vec_map::VecMapIndex};
 use std::fmt::Write;
 
 pub fn display_hir(hir: &HirTree) -> String {
@@ -68,7 +68,7 @@ impl<'a> HirDisplayer<'a> {
         self.push('\n');
     }
 
-    fn display_function(&mut self, function_id: &hir::FunctionId) {
+    fn display_function(&mut self, function_id: &FunctionId) {
         let function = &self.hir.functions[*function_id];
         self.push('\n');
         self.display_call_id(function.id);
@@ -233,6 +233,7 @@ impl<'a> HirDisplayer<'a> {
                 condition,
                 then_block,
                 else_block,
+                ends_with_else: _,
             } => {
                 self.push_str("if ");
                 self.display_expression(condition);
@@ -318,20 +319,26 @@ impl<'a> HirDisplayer<'a> {
     }
 
     fn display_call_id(&mut self, id: FunctionId) {
-        write!(self.sb, "Func_{}", id.index()).expect("no format error")
+        let name = if id == FunctionId::error() {
+            "<error>"
+        } else {
+            self.hir.functions[id].name.as_str()
+        };
+
+        self.push_str(name);
     }
 
     fn display_local(&mut self, id: LocalId) {
-        write!(self.sb, "var_{}", id.index()).expect("no format error")
+        write!(self.sb, "_{}", id.index()).expect("no format error")
     }
 
     fn display_temp(&mut self, id: LocalId) {
-        write!(self.sb, "temp_{}", id.index()).expect("no format error")
+        write!(self.sb, "temp{}", id.index()).expect("no format error")
     }
 
     fn display_expression_astype(&mut self, value: ExpressionId, id: TypeId) {
         let ty = match &self.type_table {
-            Some(val) => val.expressions[value],
+            Some(val) => val.expressions.get(value).copied().unwrap_or(TypeId::error()),
             None => id,
         };
         self.display_astype(ty);

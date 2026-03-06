@@ -1,7 +1,7 @@
 use crate::{
     ast::{
         ExpressionKind, FunctionSignature, StatementKind, VarTypeKind, Variable,
-        syntax_display::{DisplayKind, try_display_node_id},
+        syntax_display::{DisplayKind, try_display_function_id, try_display_node_id},
     },
     syntax_display::{SyntaxDisplay, tree_prefix},
 };
@@ -93,7 +93,7 @@ impl SyntaxDisplay for StatementKind {
             }
             StatementKind::Function(function) => {
                 sb.push_str(&prefix);
-                try_display_node_id(sb, kind, function.node_id);
+                try_display_function_id(sb, kind, function.id);
                 sb.push_str("Function >> ");
                 inner_display_function_declaration(
                     sb,

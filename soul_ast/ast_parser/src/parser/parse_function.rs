@@ -60,7 +60,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             Function {
                 block,
                 signature,
-                node_id: None,
+                id: None,
             },
             self.span_combine(span),
         ))

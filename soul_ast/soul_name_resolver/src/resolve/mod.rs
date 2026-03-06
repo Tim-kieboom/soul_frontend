@@ -1,8 +1,8 @@
 use ast::{
     Block,
-    scope::{NodeId, ScopeId, ScopeValue},
+    scope::ScopeId,
 };
-use soul_utils::Ident;
+use soul_utils::{Ident, ids::FunctionId};
 
 use crate::NameResolver;
 mod resolve_expression;
@@ -20,7 +20,7 @@ impl<'a> NameResolver<'a> {
         }
     }
 
-    fn lookup_function(&mut self, name: &Ident) -> Option<NodeId> {
-        self.info.scopes.lookup_value(name, ScopeValue::Function)
+    fn lookup_function(&mut self, name: &Ident) -> Option<FunctionId> {
+        self.info.scopes.lookup_function(name)
     }
 }

@@ -41,7 +41,7 @@ impl<'a> NameResolver<'a> {
 
     fn resolves_function(&mut self, function: &mut Function) {
         let prev = self.current_function;
-        self.current_function = function.node_id;
+        self.current_function = function.id;
 
         self.try_go_to(function.block.scope_id);
         self.resolve_block(&mut function.block);

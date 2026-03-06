@@ -1,8 +1,7 @@
 use ast::{BinaryOperator, Literal, UnaryOperator};
-use hir::{IdAlloc, TypeId, impl_soul_ids};
+use hir::{TypeId};
 use soul_utils::{
-    Ident,
-    vec_map::{VecMap, VecMapIndex},
+    Ident, ids::FunctionId, impl_soul_ids, vec_map::VecMap
 };
 
 impl_soul_ids!(GlobalId, BlockId, LocalId, StatementId, PlaceId, TempId);
@@ -17,7 +16,7 @@ impl_soul_ids!(GlobalId, BlockId, LocalId, StatementId, PlaceId, TempId);
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MirTree {
     /// Entry point function (_start function that inits runtime globals and calls main)
-    pub start_function: hir::FunctionId,
+    pub start_function: FunctionId,
 
     pub globals: VecMap<GlobalId, Global>,
 
@@ -38,13 +37,13 @@ pub struct MirTree {
     pub statements: VecMap<StatementId, Statement>,
 
     /// Function metadata
-    pub functions: VecMap<hir::FunctionId, Function>,
+    pub functions: VecMap<FunctionId, Function>,
 }
 
 /// Lowered function definition in MIR.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Function {
-    pub id: hir::FunctionId,
+    pub id: FunctionId,
     pub name: Ident,
 
     /// Parameters are locals
@@ -173,7 +172,7 @@ pub enum Terminator {
     ///
     /// Control flows to `next` after the call completes.
     Call {
-        id: hir::FunctionId,
+        id: FunctionId,
         arguments: Vec<Operand>,
         return_place: Option<PlaceId>,
         next: BlockId,
@@ -223,12 +222,6 @@ pub enum Place {
 
     /// Local variable place.
     Local(LocalId),
-
-    /// Indexed access: `base[index]`
-    Index(PlaceId, Operand),
-
-    /// Field access: `base.field`
-    Field(PlaceId, hir::FieldId),
 }
 
 impl Statement {

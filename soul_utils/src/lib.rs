@@ -10,6 +10,7 @@ pub mod symbool_kind;
 pub mod try_result;
 pub mod vec_map;
 pub mod vec_set;
+pub mod ids;
 
 #[cfg(test)]
 mod vec_map_tests;

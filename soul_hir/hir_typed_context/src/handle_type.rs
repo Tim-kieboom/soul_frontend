@@ -1,5 +1,5 @@
 use hir::{
-    BlockId, ExpressionId, FunctionId, HirType, HirTypeKind, IdAlloc, LocalId, StatementId, TypeId,
+    BlockId, ExpressionId, HirType, HirTypeKind, LocalId, StatementId, TypeId,
     TypesMap, UnifyResult,
 };
 use soul_utils::{
@@ -7,6 +7,7 @@ use soul_utils::{
     soul_names::{PrimitiveTypes, TypeModifier},
     span::Span,
     vec_map::{VecMap, VecMapIndex},
+    ids::{FunctionId, IdAlloc},
 };
 
 use crate::HirTypedContext;
@@ -65,16 +66,20 @@ impl<'a> HirTypedContext<'a> {
         }
     }
 
-    pub(crate) fn unify(&mut self, value: ExpressionId, expect: TypeId, got: TypeId, span: Span) {
+    pub(crate) fn unify(&mut self, value: ExpressionId, expect: TypeId, got: TypeId, span: Span) -> bool {
         match self
             .infer_table
             .unify_type_type(&mut self.type_table.types, expect, got, span)
         {
-            Ok(UnifyResult::Ok) => (),
-            Ok(UnifyResult::NeedsAutoCopy) => self.add_autocopy(value),
+            Ok(UnifyResult::Ok) => true,
+            Ok(UnifyResult::NeedsAutoCopy) => {
+                self.add_autocopy(value);
+                true
+            }
             Err(err) => {
                 self.log_error(err);
                 self.posion_expression(value);
+                false
             }
         }
     }

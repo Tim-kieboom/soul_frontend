@@ -1,7 +1,9 @@
+use soul_utils::ids::FunctionId;
+
 use crate::{MirContext, mir};
 
 impl<'a> MirContext<'a> {
-    pub fn lower_function(&mut self, function_id: hir::FunctionId) {
+    pub fn lower_function(&mut self, function_id: FunctionId) {
         self.current.function = function_id;
         let function = &self.hir.functions[function_id];
 

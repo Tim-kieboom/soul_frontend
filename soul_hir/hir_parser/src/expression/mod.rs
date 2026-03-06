@@ -1,10 +1,7 @@
 use ast::{VarTypeKind, scope::NodeId};
-use hir::{FunctionId, HirType, HirTypeKind, IdAlloc, LocalId, Place, PlaceKind, TypeId};
+use hir::{HirType, HirTypeKind, LocalId, Place, PlaceKind, TypeId};
 use soul_utils::{
-    Ident,
-    error::{SoulError, SoulErrorKind},
-    soul_error_internal,
-    span::Span,
+    Ident, error::{SoulError, SoulErrorKind}, ids::{IdAlloc}, soul_error_internal, span::Span
 };
 
 use crate::HirContext;
@@ -236,7 +233,7 @@ impl<'a> HirContext<'a> {
         };
 
         let place_id = self.id_generator.alloc_place();
-        let place_kind = if self.hir.locals[local].is_temp() {
+        let place_kind = if self.hir.locals.get(local).is_some_and(|info| info.is_temp()) {
             PlaceKind::Local(local, place_id)
         } else {
             PlaceKind::Temp(local, place_id)
@@ -286,18 +283,13 @@ impl<'a> HirContext<'a> {
             .map(|el| self.lower_expression(el))
             .collect();
 
-        let function = match self.find_function(&function_call.name) {
-            Some(val) => val,
-            None => FunctionId::error(),
-        };
-
         hir::Expression {
             id,
             ty,
             kind: hir::ExpressionKind::Call {
                 callee,
                 arguments,
-                function,
+                function: resolved,
             },
         }
     }

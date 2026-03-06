@@ -1,5 +1,6 @@
+use soul_utils::ids::IdGenerator;
+
 use crate::mir;
-use hir::IdGenerator;
 
 pub(crate) struct IdGenerators {
     temp: IdGenerator<mir::TempId>,

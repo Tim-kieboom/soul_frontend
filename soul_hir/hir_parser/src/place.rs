@@ -1,7 +1,6 @@
-use hir::{IdAlloc, LocalId, Place, PlaceKind};
+use hir::{LocalId, Place, PlaceKind};
 use soul_utils::{
-    error::{SoulError, SoulErrorKind},
-    soul_error_internal,
+    error::{SoulError, SoulErrorKind}, ids::IdAlloc, soul_error_internal
 };
 
 use crate::HirContext;

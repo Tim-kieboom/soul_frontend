@@ -6,54 +6,54 @@ impl<'a> NameResolver<'a> {
     pub(super) fn collect_expression(&mut self, expression: &mut Expression) {
         match &mut expression.node {
             ExpressionKind::Null(node_id) => {
-                *node_id = Some(self.alloc_id());
+                *node_id = Some(self.alloc_node());
             }
             ExpressionKind::As(type_cast) => {
-                type_cast.id = Some(self.alloc_id());
+                type_cast.id = Some(self.alloc_node());
                 self.collect_expression(&mut type_cast.left);
                 self.collect_type(&mut type_cast.type_cast);
             }
             ExpressionKind::If(r#if) => {
-                r#if.id = Some(self.alloc_id());
+                r#if.id = Some(self.alloc_node());
                 self.collect_if(r#if);
             }
             ExpressionKind::While(r#while) => {
-                r#while.id = Some(self.alloc_id());
+                r#while.id = Some(self.alloc_node());
                 if let Some(condition) = &mut r#while.condition {
                     self.collect_expression(condition);
                 }
                 self.collect_block(&mut r#while.block);
             }
             ExpressionKind::Index(index) => {
-                index.id = Some(self.alloc_id());
+                index.id = Some(self.alloc_node());
                 self.collect_expression(&mut index.collection);
                 self.collect_expression(&mut index.index);
             }
             ExpressionKind::Unary(unary) => {
-                unary.id = Some(self.alloc_id());
+                unary.id = Some(self.alloc_node());
                 self.collect_expression(&mut unary.expression);
             }
             ExpressionKind::Block(block) => {
-                block.node_id = Some(self.alloc_id());
+                block.node_id = Some(self.alloc_node());
                 self.collect_block(block);
             }
             ExpressionKind::Binary(binary) => {
-                binary.id = Some(self.alloc_id());
+                binary.id = Some(self.alloc_node());
                 self.collect_expression(&mut binary.left);
                 self.collect_expression(&mut binary.right);
             }
             ExpressionKind::Deref { inner, id } => {
-                *id = Some(self.alloc_id());
+                *id = Some(self.alloc_node());
                 self.collect_expression(inner);
             }
             ExpressionKind::ReturnLike(return_like) => {
-                return_like.id = Some(self.alloc_id());
+                return_like.id = Some(self.alloc_node());
                 if let Some(value) = &mut return_like.value {
                     self.collect_expression(value);
                 }
             }
             ExpressionKind::FunctionCall(function_call) => {
-                function_call.id = Some(self.alloc_id());
+                function_call.id = Some(self.alloc_node());
                 for arg in &mut function_call.arguments {
                     self.collect_expression(arg);
                 }
@@ -62,12 +62,12 @@ impl<'a> NameResolver<'a> {
                 }
             }
             ExpressionKind::Ref { expression, id, .. } => {
-                *id = Some(self.alloc_id());
+                *id = Some(self.alloc_node());
                 self.collect_expression(expression);
             }
             ExpressionKind::ExternalExpression(_) => todo!("impl external expressions"),
-            ExpressionKind::Default(id) => *id = Some(self.alloc_id()),
-            ExpressionKind::Literal((id, _)) => *id = Some(self.alloc_id()),
+            ExpressionKind::Default(id) => *id = Some(self.alloc_node()),
+            ExpressionKind::Literal((id, _)) => *id = Some(self.alloc_node()),
             ExpressionKind::Variable { id, ident, .. } => {
                 let variable_id = match self.check_variable(ident) {
                     Some(id) => id,
@@ -77,14 +77,14 @@ impl<'a> NameResolver<'a> {
                             SoulErrorKind::NotFoundInScope,
                             Some(ident.span),
                         ));
-                        self.alloc_id()
+                        self.alloc_node()
                     }
                 };
 
                 *id = Some(variable_id);
             }
             ExpressionKind::Array(array) => {
-                array.id = Some(self.alloc_id());
+                array.id = Some(self.alloc_node());
                 for value in &mut array.values {
                     self.collect_expression(value);
                 }
@@ -107,7 +107,6 @@ impl<'a> NameResolver<'a> {
                 ElseKind::ElseIf(el) => {
                     self.collect_expression(&mut el.node.condition);
                     self.collect_block(&mut el.node.block);
-                    debug_assert!(el.node.else_branchs.is_some());
                     current = el.node.else_branchs.as_mut();
                 }
             }

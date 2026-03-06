@@ -1,16 +1,12 @@
 use hir::{HirType, HirTypeKind, InferTypeId, TypeId, TypesMap, UnifyResult};
 use soul_utils::{
-    error::{SoulError, SoulErrorKind, SoulResult},
-    soul_error_internal,
-    soul_names::TypeModifier,
-    span::Span,
-    vec_map::{VecMap, VecMapIndex},
+    error::{SoulError, SoulErrorKind, SoulResult}, ids::IdGenerator, soul_error_internal, soul_names::TypeModifier, span::Span, vec_map::{VecMap, VecMapIndex}
 };
 
 #[derive(Debug, Clone)]
 pub(crate) struct InferTable {
     table: VecMap<InferTypeId, InferBinding>,
-    id_generator: hir::IdGenerator<InferTypeId>,
+    id_generator: IdGenerator<InferTypeId>,
 }
 impl InferTable {
     pub(crate) fn new(types: &TypesMap) -> Self {
@@ -24,7 +20,7 @@ impl InferTable {
 
         Self {
             table,
-            id_generator: hir::IdGenerator::from_id(types.last_infertype()),
+            id_generator: IdGenerator::from_id(types.last_infertype()),
         }
     }
 

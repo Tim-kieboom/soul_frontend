@@ -10,7 +10,7 @@ impl<'a> NameResolver<'a> {
     }
 
     pub(crate) fn collect_scopeless_block(&mut self, block: &mut Block) {
-        block.node_id = Some(self.alloc_id());
+        block.node_id = Some(self.alloc_node());
         for statement in &mut block.statements {
             self.collect_statement(statement);
         }
@@ -40,11 +40,11 @@ impl<'a> NameResolver<'a> {
                 expression,
                 ends_semicolon: _,
             } => {
-                *id = Some(self.alloc_id());
+                *id = Some(self.alloc_node());
                 self.collect_expression(expression);
             }
             StatementKind::Assignment(assignment) => {
-                assignment.node_id = Some(self.alloc_id());
+                assignment.node_id = Some(self.alloc_node());
                 self.collect_expression(&mut assignment.left);
                 self.collect_expression(&mut assignment.right);
             }
@@ -52,7 +52,7 @@ impl<'a> NameResolver<'a> {
     }
 
     fn collect_function(&mut self, function: &mut Function) {
-        let id = self.declare_value(ScopeValueKind::Function(function));
+        let id = self.declare_function(function);
         let prev = self.current_function;
         self.current_function = Some(id);
 

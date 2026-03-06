@@ -1,9 +1,9 @@
 use ast::{
     DeclareStore, ParseResponse,
     meta_data::AstMetadata,
-    scope::{NodeId, NodeIdGenerator, ScopeValue},
+    scope::{NodeId, ScopeValue},
 };
-use soul_utils::{Ident, error::SoulError, sementic_level::SementicFault};
+use soul_utils::{Ident, error::SoulError, ids::{FunctionId, IdGenerator}, sementic_level::SementicFault};
 
 mod collect;
 mod resolve;
@@ -17,11 +17,12 @@ pub fn name_resolve(request: &mut ParseResponse, faults: &mut Vec<SementicFault>
 }
 
 struct NameResolver<'a> {
-    id_generator: NodeIdGenerator,
+    node_generator: IdGenerator<NodeId>,
+    function_generator: IdGenerator<FunctionId>,
     info: &'a mut AstMetadata,
     store: &'a mut DeclareStore,
     faults: &'a mut Vec<SementicFault>,
-    current_function: Option<NodeId>,
+    current_function: Option<FunctionId>,
 }
 impl<'a> NameResolver<'a> {
     fn new(
@@ -34,7 +35,8 @@ impl<'a> NameResolver<'a> {
             store,
             faults,
             current_function: None,
-            id_generator: NodeIdGenerator::new(),
+            node_generator: IdGenerator::new(),
+            function_generator: IdGenerator::new(),
         }
     }
 

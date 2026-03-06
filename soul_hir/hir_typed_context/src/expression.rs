@@ -1,8 +1,7 @@
 use ast::{ArrayKind, BinaryOperator, BinaryOperatorKind, UnaryOperator};
-use hir::{BlockId, ExpressionId, FunctionId, HirType, HirTypeKind, IdAlloc, TypeId};
+use hir::{BlockId, ExpressionId, HirType, HirTypeKind, TypeId};
 use soul_utils::{
-    error::{SoulError, SoulErrorKind},
-    span::Span,
+    error::{SoulError, SoulErrorKind}, ids::{FunctionId, IdAlloc}, span::Span
 };
 
 use crate::HirTypedContext;
@@ -103,7 +102,8 @@ impl<'a> HirTypedContext<'a> {
                 condition,
                 then_block,
                 else_block,
-            } => self.infer_if(*condition, *then_block, *else_block),
+                ends_with_else,
+            } => self.infer_if(*condition, *then_block, *else_block, *ends_with_else, span),
             hir::ExpressionKind::InnerRawStackArray { .. } => value.ty,
         };
 
@@ -120,27 +120,39 @@ impl<'a> HirTypedContext<'a> {
         condition: ExpressionId,
         then_block: BlockId,
         else_block: Option<BlockId>,
+        ends_with_else: bool,
+        if_span: Span,
     ) -> TypeId {
         let bool = self.add_type(HirType::bool_type());
 
         let condition_span = self.expression_span(condition);
         let condition_type = self.infer_expression(condition);
-        self.unify(condition, bool, condition_type, condition_span);
+        _ = self.unify(condition, bool, condition_type, condition_span);
 
         let then_type = self.infer_block(then_block);
         let then_span = self.block_span(then_block);
         let else_block = match else_block {
             Some(val) => val,
             None => {
-                self.unify(ExpressionId::error(), self.type_table.none_type, then_type, then_span);
+                _ = self.unify(ExpressionId::error(), self.type_table.none_type, then_type, then_span);
                 return self.type_table.none_type;
             }
         };
 
+        if !ends_with_else && then_type != self.type_table.none_type {
+            self.log_error(SoulError::new(
+                "'if' should end with an 'else' if you want to return a value",
+                SoulErrorKind::InvalidContext,
+                Some(if_span),
+            ));
+
+            return TypeId::error()
+        }
+
         let else_type = self.infer_block(else_block);
         let else_span = self.block_span(else_block);
-        self.unify(ExpressionId::error(), then_type, else_type, else_span);
-
+        
+        _ = self.unify(ExpressionId::error(), then_type, else_type, else_span);
         self.get_priority_type(then_type, else_type)
     }
 
@@ -150,7 +162,10 @@ impl<'a> HirTypedContext<'a> {
         callee: Option<ExpressionId>,
         arguments: &Vec<ExpressionId>,
     ) -> TypeId {
-        let function = &self.hir.functions[function_id];
+        let function = match self.hir.functions.get(function_id) {
+            Some(val) => val,
+            None => return TypeId::error(),
+        };
         let return_type = self.type_table.functions[function_id];
         if let Some(callee) = callee {
             self.infer_expression(callee);

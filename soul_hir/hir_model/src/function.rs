@@ -1,7 +1,7 @@
 use ast::FunctionKind;
-use soul_utils::Ident;
+use soul_utils::{Ident, ids::FunctionId};
 
-use crate::{BlockId, FunctionId, LocalId, TypeId};
+use crate::{BlockId, LocalId, TypeId};
 
 /// A function definition in HIR.
 ///

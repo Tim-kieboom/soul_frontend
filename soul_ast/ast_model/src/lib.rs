@@ -1,4 +1,4 @@
-use soul_utils::vec_map::VecMap;
+use soul_utils::{ids::FunctionId, vec_map::VecMap};
 
 mod ast;
 pub mod meta_data;
@@ -23,7 +23,7 @@ pub struct ParseResponse {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DeclareStore {
-    functions: VecMap<NodeId, FunctionSignature>,
+    functions: VecMap<FunctionId, FunctionSignature>,
     variable_type: VecMap<NodeId, VarTypeKind>,
 }
 impl DeclareStore {
@@ -34,11 +34,11 @@ impl DeclareStore {
         }
     }
 
-    pub fn get_function(&self, index: NodeId) -> Option<&FunctionSignature> {
+    pub fn get_function(&self, index: FunctionId) -> Option<&FunctionSignature> {
         self.functions.get(index)
     }
 
-    pub fn insert_functions(&mut self, index: NodeId, function: FunctionSignature) {
+    pub fn insert_functions(&mut self, index: FunctionId, function: FunctionSignature) {
         self.functions.insert(index, function);
     }
 

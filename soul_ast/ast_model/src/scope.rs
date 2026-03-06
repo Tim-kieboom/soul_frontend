@@ -1,49 +1,10 @@
 use std::collections::HashMap;
 
-use soul_utils::{Ident, span::Span, vec_map::VecMapIndex};
+use soul_utils::{Ident, ids::FunctionId, impl_soul_ids, span::Span};
 
-use crate::ast::{Function, Variable};
+use crate::{ast::Variable};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct NodeId(u32);
-impl NodeId {
-    pub fn internal_new(value: u32) -> Self {
-        Self(value)
-    }
-    pub fn display(&self) -> String {
-        format!("{}", self.0)
-    }
-    pub fn write(&self, sb: &mut String) {
-        use std::fmt::Write;
-        write!(sb, "{}", self.0).expect("should not give write error")
-    }
-}
-impl VecMapIndex for NodeId {
-    fn new_index(value: usize) -> Self {
-        Self(value as u32)
-    }
-
-    fn index(&self) -> usize {
-        self.0 as usize
-    }
-}
-
-pub struct NodeIdGenerator(u32);
-impl NodeIdGenerator {
-    pub fn from_last(last: NodeId) -> Self {
-        Self(last.0 + 1)
-    }
-
-    pub fn new() -> Self {
-        Self(0)
-    }
-
-    pub fn alloc(&mut self) -> NodeId {
-        let node = NodeId::internal_new(self.0);
-        self.0 += 1;
-        node
-    }
-}
+impl_soul_ids!(NodeId);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ScopeId {
@@ -120,6 +81,17 @@ impl ScopeBuilder {
 
         None
     }
+
+    pub fn lookup_function(&self, ident: &Ident) -> Option<FunctionId> {
+        for scope in self.scopes.iter().rev() {
+            match scope.functions.get(ident.as_str()) {
+                Some(val) => return Some(*val),
+                None => (),
+            };
+        }
+
+        None
+    }
 }
 impl Default for ScopeBuilder {
     fn default() -> Self {
@@ -131,6 +103,7 @@ impl Default for ScopeBuilder {
 pub struct Scope {
     pub values: HashMap<String, ScopeValueEntry>,
     pub types: HashMap<String, ScopeTypeEntry>,
+    pub functions: HashMap<String, FunctionId>,
 }
 impl Scope {
     pub fn new() -> Self {
@@ -138,9 +111,15 @@ impl Scope {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum ScopeValue {
+    Field = 0,
+    Variable = 1,
+}
+
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct ScopeValueEntry {
-    kinds: [Option<NodeId>; 3],
+    kinds: [Option<NodeId>; 2],
 }
 impl ScopeValueEntry {
     pub fn insert(&mut self, kind: ScopeValue, id: NodeId) -> Option<NodeId> {
@@ -162,13 +141,6 @@ impl ScopeValueEntry {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum ScopeValue {
-    Field = 0,
-    Function = 1,
-    Variable = 2,
-}
-
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct ScopeTypeEntry {
     pub span: Span,
@@ -185,27 +157,23 @@ pub enum ScopeTypeEntryKind {
 
 pub enum ScopeValueKind<'a> {
     Variable(&'a mut Variable),
-    Function(&'a mut Function),
 }
 impl<'a> ScopeValueKind<'a> {
     pub fn get_id_mut(&mut self) -> &mut Option<NodeId> {
         match self {
             ScopeValueKind::Variable(variable) => &mut variable.node_id,
-            ScopeValueKind::Function(function) => &mut function.node_id,
         }
     }
 
     pub fn get_name(&self) -> &Ident {
         match self {
             ScopeValueKind::Variable(variable) => &variable.name,
-            ScopeValueKind::Function(function) => &function.signature.node.name,
         }
     }
 
     pub fn to_entry_kind(&self) -> ScopeValue {
         match self {
             ScopeValueKind::Variable(_) => ScopeValue::Variable,
-            ScopeValueKind::Function(_) => ScopeValue::Function,
         }
     }
 }

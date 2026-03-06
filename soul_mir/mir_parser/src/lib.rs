@@ -1,8 +1,8 @@
 
-use hir::{HirTree, IdAlloc, TypeId};
+use hir::{HirTree, TypeId};
 use hir_typed_context::HirTypedTable;
 use soul_utils::{
-    Ident, error::{SoulError, SoulErrorKind}, sementic_level::SementicFault, soul_error_internal, span::Span, vec_map::VecMap
+    Ident, error::{SoulError, SoulErrorKind}, ids::{FunctionId, IdAlloc}, sementic_level::SementicFault, soul_error_internal, span::Span, vec_map::VecMap
 };
 
 pub(crate) use utils::*;
@@ -29,7 +29,7 @@ pub fn mir_lower(hir: &HirTree, types: &HirTypedTable, faults: &mut Vec<Sementic
 
 struct MirContext<'a> {
     tree: MirTree,
-    main: hir::FunctionId,
+    main: FunctionId,
 
     current: CurrentContext,
     id_generators: IdGenerators,
@@ -44,11 +44,11 @@ struct MirContext<'a> {
 
 struct CurrentContext {
     scope: Vec<mir::LocalId>,
-    function: hir::FunctionId,
+    function: FunctionId,
     block: Option<mir::BlockId>,
 }
 impl CurrentContext {
-    pub fn new(function: hir::FunctionId) -> Self {
+    pub fn new(function: FunctionId) -> Self {
         Self {
             scope: vec![],
             function,
@@ -65,9 +65,9 @@ impl<'a> MirContext<'a> {
             .values()
             .find(|func| func.name.as_str() == "main") 
             .map(|f| f.id)
-            .unwrap_or(hir::FunctionId::error());
+            .unwrap_or(FunctionId::error());
 
-        if main == hir::FunctionId::error() {
+        if main == FunctionId::error() {
             faults.push(SementicFault::error(SoulError::new(
                 "'main' function not found",
                 SoulErrorKind::InvalidContext,
@@ -115,7 +115,7 @@ impl<'a> MirContext<'a> {
     }
 
     fn insert_main_call(&mut self) {
-        if self.main == hir::FunctionId::error() {
+        if self.main == FunctionId::error() {
             return
         }
 

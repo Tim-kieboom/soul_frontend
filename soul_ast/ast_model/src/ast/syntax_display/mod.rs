@@ -1,3 +1,5 @@
+use soul_utils::ids::FunctionId;
+
 use crate::{scope::NodeId, syntax_display::DisplayKind};
 
 pub mod display_expression;
@@ -11,12 +13,26 @@ fn node_id_display(node_id: Option<NodeId>, kind: &DisplayKind) -> String {
     }
 
     node_id
-        .map(|el| format!("/*{}*/", el.display()))
+        .map(|el| format!("/*{:?}*/", el))
         .unwrap_or_default()
 }
 
-fn try_display_node_id(sb: &mut String, kind: &DisplayKind, node_id: Option<NodeId>) {
-    sb.push_str(&node_id_display(node_id, kind));
+fn try_display_node_id(sb: &mut String, kind: &DisplayKind, id: Option<NodeId>) {
+    sb.push_str(&node_id_display(id, kind));
+}
+
+fn function_id_display(node_id: Option<FunctionId>, kind: &DisplayKind) -> String {
+    if kind != &DisplayKind::NameResolver {
+        return String::default();
+    }
+
+    node_id
+        .map(|el| format!("/*{:?}*/", el))
+        .unwrap_or_default()
+}
+
+fn try_display_function_id(sb: &mut String, kind: &DisplayKind, id: Option<FunctionId>) {
+    sb.push_str(&function_id_display(id, kind));
 }
 
 fn try_display_infered_type(sb: &mut String, kind: &DisplayKind, node_id: Option<NodeId>) {
@@ -35,8 +51,8 @@ fn try_display_infered_type(sb: &mut String, kind: &DisplayKind, node_id: Option
         Some(val) => val,
         None => {
             sb.push_str(&format!(
-                "/*!!type of nodeId({}) not found!!*/",
-                id.display()
+                "/*!!type of {:?} not found!!*/",
+                id
             ));
             return;
         }

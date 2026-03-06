@@ -1,7 +1,7 @@
 use ast::{
-    Block, NamedTupleType, VarTypeKind,
-    scope::{NodeId, Scope, ScopeId, ScopeValue, ScopeValueKind},
+    Block, Function, NamedTupleType, VarTypeKind, scope::{NodeId, Scope, ScopeId, ScopeValue, ScopeValueKind}
 };
+use soul_utils::ids::FunctionId;
 
 use crate::NameResolver;
 mod collect_expression;
@@ -23,13 +23,17 @@ impl<'a> NameResolver<'a> {
         self.info.scopes.pop_scope();
     }
 
-    fn alloc_id(&mut self) -> NodeId {
-        self.id_generator.alloc()
+    fn alloc_node(&mut self) -> NodeId {
+        self.node_generator.alloc()
+    }    
+    
+    fn alloc_function(&mut self) -> FunctionId {
+        self.function_generator.alloc()
     }
 
     fn declare_parameters(&mut self, types: &mut NamedTupleType) {
         for (name, ty, node_id) in types {
-            let id = self.alloc_id();
+            let id = self.alloc_node();
             *node_id = Some(id);
 
             self.store
@@ -40,11 +44,25 @@ impl<'a> NameResolver<'a> {
     }
 
     fn declare_value(&mut self, mut value: ScopeValueKind) -> NodeId {
-        let id = self.alloc_id();
+        let id = self.alloc_node();
         *value.get_id_mut() = Some(id);
 
         self.insert_value(value.get_name().as_str(), id, value.to_entry_kind());
         id
+    }
+
+    fn declare_function(&mut self, function: &mut Function) -> FunctionId {
+        let id = self.alloc_function();
+        function.id = Some(id);
+        let name = function.signature.node.name.as_str();
+        self.insert_function(name, id);
+        id
+    }
+
+    fn insert_function<S: Into<String>>(&mut self, name: S, id: FunctionId) {
+        self.current_scope_mut()
+            .functions
+            .insert(name.into(), id);
     }
 
     fn insert_value<S: Into<String>>(&mut self, name: S, id: NodeId, kind: ScopeValue) {

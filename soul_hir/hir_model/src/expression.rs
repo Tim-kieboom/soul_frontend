@@ -1,5 +1,6 @@
-use crate::{BlockId, ExpressionId, FunctionId, LocalId, Place, TypeId};
+use crate::{BlockId, ExpressionId, LocalId, Place, TypeId};
 use ast::{BinaryOperator, Literal, UnaryOperator};
+use soul_utils::ids::FunctionId;
 
 /// A typed HIR expression.
 ///
@@ -78,6 +79,7 @@ pub enum ExpressionKind {
         condition: ExpressionId,
         then_block: BlockId,
         else_block: Option<BlockId>,
+        ends_with_else: bool,
     },
 
     /// A `while` loop expression.
@@ -106,4 +108,9 @@ pub enum ExpressionKind {
         value: ExpressionId,
         cast_to: TypeId,
     },
+}
+impl ExpressionKind {
+    pub fn is_if() {
+
+    }
 }

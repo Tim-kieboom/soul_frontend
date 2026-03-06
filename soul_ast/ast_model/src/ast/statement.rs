@@ -1,4 +1,5 @@
 use enum_variant_name_const::EnumVariantNameConst;
+use soul_utils::ids::FunctionId;
 use soul_utils::soul_names::TypeModifier;
 use soul_utils::span::{ItemMetaData, Span};
 use soul_utils::{Ident, soul_import_path::SoulImportPath, span::Spanned};
@@ -73,7 +74,7 @@ pub struct Function {
     pub signature: Spanned<FunctionSignature>,
     /// The function's body block.
     pub block: Block,
-    pub node_id: Option<NodeId>,
+    pub id: Option<FunctionId>,
 }
 
 /// A function signature describing a function's interface.

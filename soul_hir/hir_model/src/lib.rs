@@ -12,7 +12,7 @@ pub use hir_type::*;
 pub use ids::*;
 pub use meta_data_maps::*;
 pub use place::*;
-use soul_utils::{Ident, span::Span, vec_map::VecMap};
+use soul_utils::{Ident, ids::{FunctionId, IdAlloc}, span::Span, vec_map::VecMap};
 pub use statement::*;
 
 /// High-level Intermediate Representation (HIR) tree.

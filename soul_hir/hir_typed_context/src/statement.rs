@@ -1,12 +1,10 @@
 use crate::HirTypedContext;
 use hir::{
-    Assign, BlockId, ExpressionId, FunctionId, Global, HirType, IdAlloc, LocalId, Place, PlaceKind,
+    Assign, BlockId, ExpressionId, Global, HirType, LocalId, Place, PlaceKind,
     Statement, TypeId, Variable,
 };
 use soul_utils::{
-    error::{SoulError, SoulErrorKind},
-    soul_names::TypeModifier,
-    span::Span,
+    error::{SoulError, SoulErrorKind}, ids::{FunctionId, IdAlloc}, soul_names::TypeModifier, span::Span
 };
 
 impl<'a> HirTypedContext<'a> {
@@ -70,7 +68,7 @@ impl<'a> HirTypedContext<'a> {
 
                 let value = value.unwrap_or(ExpressionId::error());
                 match return_type {
-                    Some(ty) => self.unify(value, ty, got, span),
+                    Some(ty) => _ = self.unify(value, ty, got, span),
                     None => return_type = Some(got),
                 }
             }
@@ -80,7 +78,7 @@ impl<'a> HirTypedContext<'a> {
             let span = self.expression_span(terminator);
             let got = self.infer_expression(terminator);
             match return_type {
-                Some(ty) => self.unify(terminator, ty, got, span),
+                Some(ty) => _ = self.unify(terminator, ty, got, span),
                 None => return_type = Some(got),
             }
         }

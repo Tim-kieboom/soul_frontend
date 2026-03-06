@@ -1,10 +1,9 @@
 mod id_generator;
 use ast::{DeclareStore, ParseResponse};
-use hir::{BlockId, Field, FunctionId, HirTree, IdAlloc, InternalFields, LocalId, TypeId};
+use hir::{BlockId, Field, HirTree, InternalFields, LocalId, TypeId};
 use id_generator::IdGenerator;
 use soul_utils::{
-    Ident, error::SoulError, sementic_level::SementicFault, soul_error_internal, span::Span,
-    vec_map::VecMapIndex,
+    Ident, error::SoulError, ids::{FunctionId, IdAlloc}, sementic_level::SementicFault, soul_error_internal, span::Span, vec_map::VecMapIndex
 };
 use std::{collections::HashMap};
 
@@ -116,16 +115,6 @@ impl<'a> HirContext<'a> {
     fn find_local(&mut self, name: &Ident) -> Option<LocalId> {
         for store in self.scopes.iter().rev() {
             if let Some(id) = store.locals.get(name.as_str()).copied() {
-                return Some(id);
-            }
-        }
-
-        None
-    }
-
-    fn find_function(&mut self, name: &Ident) -> Option<FunctionId> {
-        for store in self.scopes.iter().rev() {
-            if let Some(id) = store.functions.get(name.as_str()).copied() {
                 return Some(id);
             }
         }

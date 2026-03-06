@@ -1,5 +1,4 @@
-use hir::IdAlloc;
-use soul_utils::{soul_error_internal, span::Span};
+use soul_utils::{ids::{FunctionId, IdAlloc}, soul_error_internal, span::Span};
 
 use crate::{EndBlock, MirContext, mir};
 
@@ -158,6 +157,7 @@ impl<'a> MirContext<'a> {
                 condition,
                 then_block,
                 else_block,
+                ends_with_else: _,
             } => {
                 self.lower_if(*condition, *then_block, *else_block, value.ty, is_end)
             }
@@ -174,7 +174,7 @@ impl<'a> MirContext<'a> {
 
     pub(crate) fn lower_call(
         &mut self, 
-        function: hir::FunctionId, 
+        function: FunctionId, 
         callee: &Option<hir::ExpressionId>, 
         hir_arguments: &Vec<hir::ExpressionId>, 
         ty: hir::TypeId, 
@@ -245,12 +245,12 @@ impl<'a> MirContext<'a> {
 
         let then = self.new_block();
         let condition = self.lower_operand(hir_condition).pass(is_end);
-        self.lower_arm(parent, then_block, then, after_if, ty, temp, is_end);
+        self.lower_arm(then_block, then, after_if, ty, temp, is_end);
 
         let arm = match else_block {
             Some(arm_block) => {
                 let arm = self.new_block();
-                self.lower_arm(parent, arm_block, arm, after_if, ty, temp, is_end);
+                self.lower_arm(arm_block, arm, after_if, ty, temp, is_end);
                 arm
             }
             None => after_if,
@@ -269,7 +269,6 @@ impl<'a> MirContext<'a> {
 
     fn lower_arm(
         &mut self, 
-        parent: mir::BlockId, 
         hir_block: hir::BlockId, 
         arm: mir::BlockId, 
         join: mir::BlockId, 

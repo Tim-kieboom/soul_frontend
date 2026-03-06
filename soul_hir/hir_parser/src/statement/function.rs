@@ -1,8 +1,16 @@
+use soul_utils::{ids::{FunctionId, IdAlloc}, soul_error_internal};
+
 use crate::HirContext;
 
 impl<'a> HirContext<'a> {
-    pub(crate) fn lower_function(&mut self, function: &ast::Function) -> hir::FunctionId {
-        let id = self.id_generator.alloc_function();
+    pub(crate) fn lower_function(&mut self, function: &ast::Function) -> FunctionId {
+        let id = match function.id {
+            Some(val) => val,
+            None => {
+                self.log_error(soul_error_internal!("function.id should be Some(_)", Some(function.signature.span)));
+                FunctionId::error()
+            }
+        };
         let signature = &function.signature.node;
         self.insert_function(&signature.name, id);
 

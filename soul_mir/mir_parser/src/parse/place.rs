@@ -1,5 +1,5 @@
-use hir::{IdAlloc, TypeId};
-use soul_utils::soul_error_internal;
+use hir::{TypeId};
+use soul_utils::{ids::IdAlloc, soul_error_internal};
 
 use crate::{
     EndBlock, MirContext, mir::{self, Rvalue}
@@ -44,15 +44,8 @@ impl<'a> MirContext<'a> {
                 let operand = self.place_to_operand(base_place, ty);
                 self.new_place(mir::Place::Deref(operand))
             }
-            hir::PlaceKind::Index { base, index, .. } => {
-                let place = self.lower_place(base).pass(is_end);
-                let operand = self.lower_operand(*index).pass(is_end);
-                self.new_place(mir::Place::Index(place, operand))
-            }
-            hir::PlaceKind::Field { base, index, .. } => {
-                let place = self.lower_place(base).pass(is_end);
-                self.new_place(mir::Place::Field(place, *index))
-            }
+            hir::PlaceKind::Index { .. } => todo!("mir desugar index"),
+            hir::PlaceKind::Field { .. } => todo!("mir desugar field"),
         };
 
         self.place_typed.insert(mir_place, self.types.places[place.node.get_id()]);
@@ -86,13 +79,6 @@ impl<'a> MirContext<'a> {
                 let operand = operand.clone();
                 self.deref_to_operand(operand)
             }
-            mir::Place::Index(place, operand) => {
-                let operand = operand.clone();
-                self.index_to_operand(*place, operand)
-            }
-            mir::Place::Field(place_id, field_id) => {
-                self.field_to_operand(*place_id, *field_id)
-            }
         }
     }
 
@@ -107,13 +93,5 @@ impl<'a> MirContext<'a> {
         self.push_statement(statement);
 
         mir::Operand::new(ty, mir::OperandKind::Temp(deref_temp))
-    }
-
-    fn index_to_operand(&mut self, _: mir::PlaceId, _: mir::Operand) -> mir::Operand {
-        todo!()
-    }
-
-    fn field_to_operand(&mut self, _: mir::PlaceId, _: hir::FieldId) -> mir::Operand {
-        todo!()
     }
 }

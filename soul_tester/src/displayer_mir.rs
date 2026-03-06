@@ -1,9 +1,9 @@
-use hir::{FieldId, FunctionId, HirTree, HirType, IdAlloc};
+use hir::{HirTree, HirType};
 use hir_typed_context::HirTypedTable;
 use mir_parser::mir::{
     self, BlockId, LocalId, MirTree, Operand, Place, PlaceId, Rvalue, StatementId, TempId
 };
-use soul_utils::{soul_names::{TypeModifier, TypeWrapper}, vec_map::VecMapIndex};
+use soul_utils::{ids::{FunctionId, IdAlloc}, soul_names::{TypeModifier, TypeWrapper}, vec_map::VecMapIndex};
 use std::fmt::Write;
 
 pub fn display_mir(mir: &MirTree, hir: &HirTree, types: &HirTypedTable) -> String {
@@ -232,17 +232,6 @@ impl<'a> MirDisplayer<'a> {
                 self.display_operand(operand);
             }
             Place::Local(local_id) => self.display_local_name(*local_id),
-            Place::Index(place_id, operand) => {
-                self.display_place(place_id);
-                self.push('[');
-                self.display_operand(operand);
-                self.push(']');
-            }
-            Place::Field(place_id, field_id) => {
-                self.display_place(place_id);
-                self.push('.');
-                self.display_field_name(*field_id);
-            }
         }
     }
 
@@ -252,13 +241,13 @@ impl<'a> MirDisplayer<'a> {
     }
 
     fn display_function_name(&mut self, function: FunctionId) {
-        self.push_str(
+        let name = if function == FunctionId::error() {
+            "<error>"
+        } else {
             self.hir.functions[function].name.as_str()
-        );
-    }
+        };
 
-    fn display_field_name(&mut self, field: FieldId) {
-        write!(self.sb, "field{}", field.index()).expect("not fmt error");
+        self.push_str(name);
     }
 
     fn display_local_name(&mut self, local: LocalId) {
