@@ -20,7 +20,7 @@ impl InferTable {
 
         Self {
             table,
-            id_generator: IdGenerator::from_id(types.last_infertype()),
+            id_generator: types.infer_generator().clone(),
         }
     }
 

@@ -1,0 +1,54 @@
+struct ErrIndex {
+    index: uint,
+}
+use ErrIndex { 
+    impl AnyErr {}
+    impl Fmt {
+        Fmt(@this, fmt: &impl Formatter): ErrFmt {
+            fmt.push_fstr(f"index: {this.index} out of bounds")
+        }
+    }
+}
+
+use ErrIndex<T> = Err<T, ErrIndex>
+use<T, N as uint> [N]T {
+/*
+internal methodes:
+    const Ptr(@this): ?*T
+    const Len(@this): uint
+*/
+
+    impl const ConsumeIndex<T> {
+        ConsumeIndex(this, index: uint): ErrIndex<T> {
+            
+            if index > N {
+                return error.ErrIndex{index}
+            }
+
+            ptr := this.Ptr() ?? panic("should not be null")
+            *(ptr + index)
+        }
+    }
+
+    impl const RefIndex<T> {
+        RefIndex(@this, index: uint): ErrIndex<@T> {
+            if index > N {
+                return error.ErrIndex{index}
+            }
+
+            ptr := this.Ptr() ?? panic("should not be null")
+            @*(ptr + index)
+        }
+    }
+
+    impl const MutIndex<T> {
+        MutIndex(&this, index: uint): ErrIndex<&T> {
+            if index > N {
+                return error.ErrIndex{index}
+            }
+
+            ptr := this.Ptr() ?? panic("should not be null")
+            &*(ptr + index)
+        }
+    }
+}

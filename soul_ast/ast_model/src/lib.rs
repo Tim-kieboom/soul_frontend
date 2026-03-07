@@ -1,4 +1,4 @@
-use soul_utils::{ids::FunctionId, vec_map::VecMap};
+use soul_utils::{ids::{FunctionId, IdGenerator}, vec_map::VecMap};
 
 mod ast;
 pub mod meta_data;
@@ -19,6 +19,7 @@ pub struct ParseResponse {
     pub store: DeclareStore,
     pub meta_data: AstMetadata,
     pub tree: AbstractSyntaxTree,
+    pub function_generators: IdGenerator<FunctionId>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

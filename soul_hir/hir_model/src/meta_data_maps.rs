@@ -92,8 +92,8 @@ impl TypesMap {
         self.map.key_to_value.keys()
     }
 
-    pub fn last_infertype(&self) -> InferTypeId {
-        self.infer_generator.last()
+    pub fn infer_generator(&self) -> &IdGenerator<InferTypeId> {
+        &self.infer_generator
     }
 }
 

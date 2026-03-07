@@ -45,6 +45,8 @@ pub struct MirTree {
 pub struct Function {
     pub id: FunctionId,
     pub name: Ident,
+    
+    pub entry_block: BlockId,
 
     /// Parameters are locals
     pub parameters: Vec<LocalId>,

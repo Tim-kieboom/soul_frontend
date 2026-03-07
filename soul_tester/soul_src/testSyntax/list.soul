@@ -1,17 +1,14 @@
-class List<T, Mem = Malloc> 
-where
-    Mem: Allocator
-{
-    literal INCREASE_FACTOR: f64 = 2.0
+class List<T> {
+    literal INCREASE_FACTOR = 2.0
     mut buffer: [*]?T = []
-    mut len: uint = 0
+    mut len = 0
 
     This(capacity: uint = 0) {
-        TryNew(capacity).catch{Panic}
+        TryNew(capacity).catch{panic}
     }
 
     This:[T](array) {
-        TryFromArray(array).catch{Panic}        
+        TryFromArray(array).catch{panic}        
     }
 
     TryFromArray(array: [_]T): Err<This> {
@@ -42,7 +39,7 @@ where
     }
 
     Push(&this, value: T) {
-        TryPush(value).catch{Panic}
+        TryPush(value).catch{panic}
     }
 
     TryPush(&this, value: T): Err {
@@ -54,7 +51,7 @@ where
     }
 
     Pop(&this): ?T {
-        TryPop().catch{Panic}
+        TryPop().catch{panic}
     }
 
     TryPop(&this): Err<?T> {
@@ -72,7 +69,7 @@ where
         import std::mem::Swap
 
         old := buffer
-        buffer = new<Mem>:[for toCapacity => null].pass
+        buffer = new:[for toCapacity => null].pass
 
         minLen := len.min(toCapacity)
         for i in 0..minLen {
@@ -86,7 +83,7 @@ where
         import std::mem::Swap
 
         old := buffer
-        buffer = new<Mem>:[for toCapacity => default.copy].pass
+        buffer = new:[for toCapacity => default.copy].pass
 
         minLen := len.min(toCapacity)
         for i in 0..minLen {

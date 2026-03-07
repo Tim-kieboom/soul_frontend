@@ -1,9 +1,9 @@
 mod id_generator;
 use ast::{DeclareStore, ParseResponse};
-use hir::{BlockId, Field, HirTree, InternalFields, LocalId, TypeId};
-use id_generator::IdGenerator;
+use hir::{BlockId, HirTree, LocalId, TypeId};
+use id_generator::IdAllocalors;
 use soul_utils::{
-    Ident, error::SoulError, ids::{FunctionId, IdAlloc}, sementic_level::SementicFault, soul_error_internal, span::Span, vec_map::VecMapIndex
+    Ident, error::SoulError, ids::{FunctionId, IdGenerator}, sementic_level::SementicFault, soul_error_internal, span::Span, vec_map::VecMapIndex
 };
 use std::{collections::HashMap};
 
@@ -15,8 +15,11 @@ mod statement;
 mod r#type;
 
 pub fn hir_lower(response: &ParseResponse, faults: &mut Vec<SementicFault>) -> HirTree {
-    let mut context = HirContext::new(&response.store, faults);
-    context.build_internal_fields();
+    let mut context = HirContext::new(
+        response.function_generators.clone(), 
+        &response.store, 
+        faults,
+    );
 
     for global in &response.tree.root.statements {
         context.lower_global(global);
@@ -40,7 +43,7 @@ struct HirContext<'a> {
     pub scopes: Vec<Scope>,
     pub current_body: CurrentBody,
 
-    pub id_generator: IdGenerator,
+    pub id_generator: IdAllocalors,
     pub faults: &'a mut Vec<SementicFault>,
 }
 
@@ -52,8 +55,8 @@ enum CurrentBody {
 }
 
 impl<'a> HirContext<'a> {
-    fn new(ast_store: &'a DeclareStore, faults: &'a mut Vec<SementicFault>) -> Self {
-        let mut id_generator = IdGenerator::new();
+    fn new(function_generator: IdGenerator<FunctionId>, ast_store: &'a DeclareStore, faults: &'a mut Vec<SementicFault>) -> Self {
+        let mut id_generator = IdAllocalors::new(function_generator);
         let start_function = id_generator.alloc_function();
         let root_id = id_generator.alloc_module();
 
@@ -65,47 +68,6 @@ impl<'a> HirContext<'a> {
             current_body: CurrentBody::Global,
             hir: HirTree::new(root_id, start_function),
         }
-    }
-
-    fn build_internal_fields(&mut self) {
-
-        
-        let array_len = self.id_generator.alloc_field(); 
-        self.hir.fields.insert(
-            array_len, 
-            Field {
-                id: array_len,
-                name: "len".to_string(),
-                type_id: TypeId::error(),
-                align: hir::Alignment {
-                    offset: 0,
-                    size: 4,
-                    align: 8,
-                    is_packed: false,
-                },
-            }
-        );
-
-        let array_ptr = self.id_generator.alloc_field(); 
-        self.hir.fields.insert(
-            array_ptr, 
-            Field {
-                id: array_ptr,
-                name: "ptr".to_string(),
-                type_id: TypeId::error(),
-                align: hir::Alignment {
-                    offset: 4,
-                    size: 4,
-                    align: 8,
-                    is_packed: false,
-                },
-            }
-        );
-
-        self.hir.internal_fields = Some(InternalFields {
-            array_ptr,
-            array_len,
-        })
     }
 
     fn push_scope(&mut self) {

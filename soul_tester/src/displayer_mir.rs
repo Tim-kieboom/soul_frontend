@@ -8,8 +8,18 @@ use std::fmt::Write;
 
 pub fn display_mir(mir: &MirTree, hir: &HirTree, types: &HirTypedTable) -> String {
     let mut displayer = MirDisplayer::new(mir, hir, types);
+    
+    displayer.push_str("Globals [\n");
+    for global in mir.globals.values() {
+        displayer.display_global(global);
+    }
+    displayer.push_str("]\n");
 
-    for function in mir.functions.keys() {
+    let start = mir.functions[hir.start_function].id;
+    displayer.display_function(start);
+    displayer.push('\n');
+
+    for function in mir.functions.keys().filter(|id| *id != hir.start_function) {
         displayer.display_function(function);
         displayer.push('\n');
     }
@@ -45,6 +55,16 @@ impl<'a> MirDisplayer<'a> {
         self.sb
     }
 
+    fn display_global(&mut self, global: &mir::Global) {
+        self.push('\t');
+        self.display_local_declare(global.local);
+        if let Some(literal) = &global.literal {
+            self.push_str(" = ");
+            self.push_str(&literal.value_to_string());
+        }
+        self.push('\n');
+    }
+
     fn display_function(&mut self, function_id: FunctionId) {
         let function = &self.mir.functions[function_id];
         self.push_str(function.name.as_str());
@@ -57,28 +77,13 @@ impl<'a> MirDisplayer<'a> {
                 self.push_str(", ");
             }
         }
-        self.push_str(") [\n");
+        self.push_str(") [\n\t");
+        self.display_goto(function.entry_block);
+        self.push('\n');
+
         for local_id in &function.locals {
-            let local = &self.mir.locals[*local_id];
-
-            let mut hir_type = self
-                .types
-                .types
-                .get_type(local.ty)
-                .unwrap_or(&HirType::error_type())
-                .clone();
-            let modifier = hir_type.modifier.unwrap_or(TypeModifier::Const);
-            hir_type.modifier = None;
-
             self.push('\t');
-            self.push_str(modifier.as_str());
-            self.push(' ');
-            self.display_local_name(local.id);
-            self.push_str(": ");
-            hir_type
-                .write_display(&self.types.types, &mut self.sb)
-                .expect("no fmt error");
-            
+            self.display_local_declare(*local_id);
             self.push('\n');
         }
 
@@ -87,6 +92,27 @@ impl<'a> MirDisplayer<'a> {
             self.display_block(*block);
         }
         self.push_str("\n]\n");
+    }
+
+    fn display_local_declare(&mut self, local_id: LocalId) {
+        let local = &self.mir.locals[local_id];
+
+        let mut hir_type = self
+            .types
+            .types
+            .get_type(local.ty)
+            .unwrap_or(&HirType::error_type())
+            .clone();
+        let modifier = hir_type.modifier.unwrap_or(TypeModifier::Const);
+        hir_type.modifier = None;
+
+        self.push_str(modifier.as_str());
+        self.push(' ');
+        self.display_local_name(local.id);
+        self.push_str(": ");
+        hir_type
+            .write_display(&self.types.types, &mut self.sb)
+            .expect("no fmt error");
     }
 
     fn display_block(&mut self, block_id: BlockId) {

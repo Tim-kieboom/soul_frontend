@@ -1,4 +1,4 @@
-literal $chars: [5]type = type[
+literal $chars: [5]type = type:[
     char,
     char8,
     char16,
@@ -6,14 +6,14 @@ literal $chars: [5]type = type[
     char64,
 ]
 
-literal $floatingPoint: [4]type = type[
+literal $floatingPoint: [4]type = type:[
     untypedFloat,
     f16,
     f32, 
     f64,
 ]
 
-literal $signedIntergers: [7]type = type[
+literal $signedIntergers: [7]type = type:[
     untypedInt, 
     int, 
     i8, 
@@ -23,7 +23,7 @@ literal $signedIntergers: [7]type = type[
     i128,
 ]
 
-literal $unsignedIntergers: [7]type = type[
+literal $unsignedIntergers: [7]type = type:[
     untypedUint,
     uint, 
     u8, 
@@ -33,7 +33,7 @@ literal $unsignedIntergers: [7]type = type[
     u128,
 ]
 
-literal $primitiveTypes: [23]type = type[
+literal $primitiveTypes: [23]type = type:[
     bool,
     
     char,

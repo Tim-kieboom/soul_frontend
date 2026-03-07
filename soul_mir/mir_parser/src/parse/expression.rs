@@ -161,12 +161,9 @@ impl<'a> MirContext<'a> {
             } => {
                 self.lower_if(*condition, *then_block, *else_block, value.ty, is_end)
             }
-
-            // hir::ExpressionKind::While { condition, body } => {
-            //     self.lower_while(*condition, *body);
-            //     mir::Operand::new(mir::OperandKind::None)
-            // }
-            _ => todo!(),
+            hir::ExpressionKind::While { condition, body } => {
+                self.lower_while(*condition, *body, is_end)
+            }
         };
 
         EndBlock::new(operand, is_end)
@@ -225,6 +222,55 @@ impl<'a> MirContext<'a> {
         };
 
         EndBlock::new(operand, is_end)
+    }
+
+    fn lower_while(
+        &mut self, 
+        hir_condition: Option<hir::ExpressionId>,
+        body_id: hir::BlockId,
+        is_end: &mut bool,
+    ) -> mir::Operand {
+
+        let prev_finish = self.current.loop_finish;
+        let prev_continue = self.current.loop_continue;
+        
+        let parent = self.expect_current_block();
+
+        let returnable = self.tree.blocks[parent].returnable;
+
+        let after_while = self.new_block();
+        self.current.loop_finish = Some(after_while);
+        self.tree.blocks[after_while].returnable = returnable;
+
+        let loop_block = self.new_block();
+
+        let condition_block = self.new_block();
+        self.current.block = Some(condition_block);
+        self.current.loop_continue = Some(condition_block);
+        self.insert_terminator(parent, mir::Terminator::Goto(condition_block));
+
+        match hir_condition {
+            Some(hir_condition) => {
+                let condition = self.lower_operand(hir_condition).pass(is_end);
+                self.insert_terminator(
+                    condition_block, 
+                    mir::Terminator::If { 
+                        condition, 
+                        then: loop_block, 
+                        arm: after_while,
+                    }
+                );
+            }
+            None => self.insert_terminator(condition_block, mir::Terminator::Goto(loop_block)),
+        }
+
+        self.insert_terminator(loop_block, mir::Terminator::Goto(condition_block));
+        self.lower_block(body_id, loop_block);
+
+        self.current.block = Some(after_while);
+        self.current.loop_finish = prev_finish;
+        self.current.loop_continue = prev_continue;
+        mir::Operand::new(self.types.none_type, mir::OperandKind::None)
     }
 
     fn lower_if(
@@ -299,6 +345,8 @@ impl<'a> MirContext<'a> {
             None => (),
         }
 
-        self.insert_terminator(arm, mir::Terminator::Goto(join));
+        if matches!(self.tree.blocks[arm].terminator, mir::Terminator::Unreachable) {
+            self.insert_terminator(arm, mir::Terminator::Goto(join));
+        }
     }
 }

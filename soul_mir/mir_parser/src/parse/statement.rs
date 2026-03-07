@@ -17,6 +17,7 @@ impl<'a> MirContext<'a> {
 
         let mut last_operand = None;
 
+        let span = self.hir.spans.statements[statement_id];
         let terminator = match statement {
             hir::Statement::Variable(variable, _) => {
                 self.lower_variable(variable, is_end);
@@ -51,9 +52,39 @@ impl<'a> MirContext<'a> {
                 *is_end = true;
                 Some(mir::Terminator::Return(operand))
             }
-            hir::Statement::Continue(_)
-            | hir::Statement::Fall(_, _)
-            | hir::Statement::Break(_, _) => {
+            hir::Statement::Continue(_) => {
+                let current = self.expect_current_block();
+                match self.current.loop_continue {
+                    Some(block_id) => {
+                        *is_end = true;
+                        self.insert_terminator(current, mir::Terminator::Goto(block_id));
+                    }
+                    _ => {
+                        self.log_error(soul_error_internal!("`self.current.loop_continue` is None", Some(span)));
+                    }
+                }
+
+                None
+            }
+            hir::Statement::Break(value, _) => {
+                if value.is_some() {
+                    self.log_error(soul_error_internal!("'break' with value is not yet impl", Some(span)));
+                }
+
+                let current = self.expect_current_block();
+                match self.current.loop_finish {
+                    Some(bock_id) => {
+                        *is_end = true;
+                        self.insert_terminator(current, mir::Terminator::Goto(bock_id));
+                    }
+                    _ => {
+                        self.log_error(soul_error_internal!("`self.current.loop_finish` is None", Some(span)));
+                    }
+                }
+
+                None
+            }
+            hir::Statement::Fall(_, _) => {
                 let span = self.hir.spans.statements[statement_id];
                 self.log_error(soul_error_internal!("statement not yet impl", Some(span)));
                 None
@@ -69,7 +100,7 @@ impl<'a> MirContext<'a> {
 
     pub(crate) fn lower_variable(&mut self, variable: &hir::Variable, is_end: &mut bool) {
         
-        let local = if variable.is_temp {
+        let place_kind = if variable.is_temp {
             mir::Place::Temp(match self.temp_remap.get(variable.local) {
                 Some(val) => *val,
                 None => self.new_temp(self.types.locals[variable.local]),
@@ -83,8 +114,8 @@ impl<'a> MirContext<'a> {
         
         if let Some(value) = variable.value {
             let operand = self.lower_operand(value).pass(is_end);
+            let place = self.new_place(place_kind);
 
-            let place = self.new_place(local);
             let statement = mir::Statement::new(mir::StatementKind::Assign {
                 place,
                 value: mir::Rvalue::new(mir::RvalueKind::Use(operand)),

@@ -1,18 +1,19 @@
-class Map<K, V, Mem = Malloc>
+class Map<K, V>
 where
     K: Hash + Eq,
-    Mem: Allocator 
 {
+    literal INITIAL_CAP = 1000
     struct Bucket {
         key: K
         mut value: V
         mut next: ?*Bucket = null 
     }
 
-    mut entries: List<Bucket, Mem>
+    mut buckets: [*]?Bucket
 
-    This(capacity: uint = 1000) {
-        This{entries: List(capacity)}
+    This(capacity: uint = INITIAL_CAP) {
+        TryNew(capacity)
+            .catch{panic}
     }
 
     This:[(K, V)](array) {
@@ -24,23 +25,29 @@ where
         self
     }
 
+    TryNew(capacity: uint = INITIAL_CAP): Err<This> {
+        This{
+            buckets: new:[for capacity => null].pass
+        }
+    }
+
     Contains(@this, key: @K): bool {
         hash := getKeyIndex(key)
 
-        entry := @entries[hash].catch{return false}
-        findEntry(entry, key) != null
+        entry := @buckets[hash] ?? return false
+        entry := findEntry(entry, key)
     }
 
     Insert(&this, key: K, value: V) {
         hash := getKeyIndex(@key)
 
-        if entries[hash] == null {
-            entries[hash] = Bucket{key, value, ..}
+        if buckets[hash] == null {
+            buckets[hash] = Bucket{key, value, ..}
             return   
         }
 
         mut entry = findEntryMut(entry, @key) ?? return
-        entry.next = new<Mem>(Bucket{key, value, ..})
+        entry.next = new(Bucket{key, value, ..})
     }
 
     Get(@this, key: @K): ?@V {
@@ -53,7 +60,7 @@ where
 
     Remove(&this, key: @K): ?V {
         hash := getKeyIndex(key)
-        mut entry = &entries[hash].catch{return null}
+        mut entry = &entries[hash].pass
 
         while entry.key != key {
             entry = entry.next.pass
@@ -64,10 +71,10 @@ where
 
     findEntry(@this, key: @K): ?@Bucket {
         hash := getKeyIndex(key)
-        mut entry = @entries[hash].catch{return null}
+        mut entry = @entries[hash].pass
 
         while entry.key != key {
-            entry = entry.next.pass
+            entry = @entry.next.pass
         }
 
         entry
@@ -75,10 +82,10 @@ where
 
     findEntryMut(&this, key: @K): ?&Bucket {
         hash := getKeyIndex(key)
-        mut entry = &entries[hash].catch{return null}
+        mut entry = &entries[hash].pass
 
         while entry.key != key {
-            entry = entry.next.pass
+            entry = &entry.next.pass
         }
 
         entry

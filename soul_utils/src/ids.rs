@@ -76,10 +76,6 @@ impl<Id: IdAlloc> IdGenerator<Id> {
         }
     }
 
-    pub fn from_id(current: Id) -> Self {
-        Self { current }
-    }
-
     /// Allocates and returns a fresh ID.
     pub fn alloc(&mut self) -> Id {
         self.current.alloc()

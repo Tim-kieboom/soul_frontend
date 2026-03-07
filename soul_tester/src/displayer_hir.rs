@@ -71,8 +71,6 @@ impl<'a> HirDisplayer<'a> {
     fn display_function(&mut self, function_id: &FunctionId) {
         let function = &self.hir.functions[*function_id];
         self.push('\n');
-        self.display_call_id(function.id);
-        self.push(' ');
         self.push_str(function.name.as_str());
         self.push('(');
 
@@ -252,6 +250,7 @@ impl<'a> HirDisplayer<'a> {
                 self.push_str("while ");
                 if let Some(value) = condition {
                     self.display_expression(value);
+                    self.push(' ');
                 }
                 self.display_block(body);
                 self.display_expression_astype(value.id, value.ty);

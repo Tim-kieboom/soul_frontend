@@ -233,10 +233,11 @@ impl<'a> HirContext<'a> {
         };
 
         let place_id = self.id_generator.alloc_place();
-        let place_kind = if self.hir.locals.get(local).is_some_and(|info| info.is_temp()) {
-            PlaceKind::Local(local, place_id)
-        } else {
+
+        let place_kind = if self.hir.locals[local].is_temp() {
             PlaceKind::Temp(local, place_id)
+        } else {
+            PlaceKind::Local(local, place_id)
         };
 
         let place = Place::new(

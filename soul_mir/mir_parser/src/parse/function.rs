@@ -13,6 +13,7 @@ impl<'a> MirContext<'a> {
         let mir_function = mir::Function {
             locals: vec![],
             id: function_id,
+            entry_block,
             parameters: vec![],
             blocks: vec![entry_block],
             name: function.name.clone(),

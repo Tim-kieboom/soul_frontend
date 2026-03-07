@@ -8,13 +8,13 @@ struct LiveIndex {
 }
 
 impl<'a> MirContext<'a> {
-    pub(crate) fn lower_block(&mut self, block_id: hir::BlockId, entry_block: mir::BlockId) -> EndBlock<Option<mir::Operand>> {
+    pub(crate) fn lower_block(&mut self, hir_block: hir::BlockId, mir_block: mir::BlockId) -> EndBlock<Option<mir::Operand>> {
 
-        let mut this_block = entry_block;
+        let mut this_block = mir_block;
 
         self.current.block = Some(this_block);
         let (live_i, parent_scope) = self.start_scope(this_block);
-        let block = &self.hir.blocks[block_id];
+        let block = &self.hir.blocks[hir_block];
 
         let mut terminator = None;
         let mut block_operand = None;
@@ -41,7 +41,8 @@ impl<'a> MirContext<'a> {
         if !self.tree.blocks[this_block].returnable {
             let terminator = match terminator {
                 Some(mir::Terminator::Return(operand)) => operand,
-                None => block_operand,
+                Some(mir::Terminator::Goto(_))
+                | None => block_operand,
                 _ => {
                     self.log_error(soul_error_internal!("should not have this terminator kind in block", None));
                     None
