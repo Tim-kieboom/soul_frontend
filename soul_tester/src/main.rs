@@ -19,7 +19,7 @@ use mir_parser::{mir::MirTree, mir_lower};
 use paths::Paths;
 use soul_name_resolver::name_resolve;
 use soul_tokenizer::{TokenStream, tokenize};
-use soul_utils::char_colors::{DEFAULT, GREEN};
+use soul_utils::{char_colors::{DEFAULT, GREEN}, sementic_level::SementicFault};
 
 use crate::{
     convert_soul_error::{MessageConfig, ToMessage},
@@ -48,6 +48,7 @@ struct Ouput<'a> {
     ast: AbstractSyntaxTree,
     hir_types: HirTypedTable,
     token_stream: TokenStream<'a>,
+    faults: Vec<SementicFault>,
 }
 
 fn main() -> Result<()> {
@@ -55,6 +56,25 @@ fn main() -> Result<()> {
     init_logger(&paths.log_file)?;
 
     let source_file = read_source_file(&paths.source_file)?;
+    let output = run_compiler(&source_file); 
+
+    display_output(&paths, &output)?;
+    for fault in &output.faults {
+        error!(
+            "{}",
+            fault.to_message("main.soul", &source_file, MESSAGE_CONFIG)
+        );
+    }
+
+    if output.faults.is_empty() {
+        let msg = "success!!";
+        info!("{GREEN}{msg}{DEFAULT}");
+    }
+
+    Ok(())
+}
+
+fn run_compiler<'a>(source_file: &'a str) -> Ouput<'a> {
     let token_stream = tokenize(&source_file);
 
     let mut faults = vec![];
@@ -66,34 +86,20 @@ fn main() -> Result<()> {
 
     let mir = mir_lower(&hir, &hir_types, &mut faults);
 
-    let output = Ouput {
+    Ouput {
         mir,
         hir,
+        faults,
         hir_types,
         token_stream,
         ast: parse_response.tree,
         source_file: &source_file,
-    };
-
-    handle_output(&paths, output)?;
-    for fault in &faults {
-        error!(
-            "{}",
-            fault.to_message("main.soul", &source_file, MESSAGE_CONFIG)
-        );
     }
-
-    if faults.is_empty() {
-        let msg = "success!!";
-        info!("{GREEN}{msg}{DEFAULT}");
-    }
-
-    Ok(())
 }
 
-fn handle_output<'a>(paths: &Paths, output: Ouput<'a>) -> Result<()> {
+fn display_output<'a>(paths: &Paths, output: &Ouput<'a>) -> Result<()> {
     let root = &output.ast.root;
-    let tokens_string = display_tokens(&paths, &output.source_file, output.token_stream)?;
+    let tokens_string = display_tokens(&paths, &output.source_file, output.token_stream.clone())?;
 
     paths.write_multiple_outputs([
         (&tokens_string, "tokenizer/tokens.soulc"),

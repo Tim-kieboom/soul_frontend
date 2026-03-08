@@ -1,7 +1,5 @@
-
-
 global1: int = 1
-global2 := global1 + 1 * 2 ** 4 </ 2
+global2 := global1 + 1 * 2 ** 4
 
 elif() {
     mut num = 0
