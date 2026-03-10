@@ -11,6 +11,7 @@ pub mod try_result;
 pub mod vec_map;
 pub mod vec_set;
 pub mod ids;
+pub mod precedence;
 
 #[cfg(test)]
 mod vec_map_tests;

@@ -22,16 +22,29 @@ pub(crate) fn interpret_binary(
 
         B::Add | B::Sub | B::Mul | B::Div | B::Mod
         | B::Pow | B::Root | B::Log => {
-            if let (Some(a), Some(b)) = (try_as_i128(left), try_as_i128(right)) {
+            if let (Some(a), Some(b)) = (try_as_u128(left), try_as_u128(right)) {
+                match operator.node {
+                    B::Add => Literal::Uint(a + b as u128),
+                    B::Sub => Literal::Uint(a - b as u128),
+                    B::Mul => Literal::Uint(a * b as u128),
+                    B::Div => Literal::Uint(a / b),
+                    B::Mod => Literal::Uint(a % b),
+                    B::Pow => Literal::Uint((a as f64).powf(b as f64) as u128),
+                    B::Root => Literal::Uint((a as f64).powf(1.0 / b as f64) as u128),
+                    B::Log => Literal::Uint((a as f64).log(b as f64) as u128),
+                    _ => unreachable!(),
+                }
+            }
+            else if let (Some(a), Some(b)) = (try_as_i128(left), try_as_i128(right)) {
                 match operator.node {
                     B::Add => Literal::Int(a + b as i128),
                     B::Sub => Literal::Int(a - b as i128),
                     B::Mul => Literal::Int(a * b as i128),
-                    B::Div => Literal::Float(a as f64 / b as f64),
+                    B::Div => Literal::Int(a / b),
                     B::Mod => Literal::Int(a % b),
-                    B::Pow => Literal::Float((a as f64).powf(b as f64)),
-                    B::Root => Literal::Float((a as f64).powf(1.0 / b as f64)),
-                    B::Log => Literal::Float((a as f64).log(b as f64)),
+                    B::Pow => Literal::Int((a as f64).powf(b as f64) as i128),
+                    B::Root => Literal::Int((a as f64).powf(1.0 / b as f64) as i128),
+                    B::Log => Literal::Int((a as f64).log(b as f64) as i128),
                     _ => unreachable!(),
                 }
             } else if let (Some(a), Some(b)) = (try_as_f64(left), try_as_f64(right)) {

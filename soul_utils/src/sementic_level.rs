@@ -42,6 +42,6 @@ impl SementicFault {
     }
 
     pub const fn is_fatal(&self, fatal_level: SementicLevel) -> bool {
-        fatal_level.precedence() <= self.get_level().precedence()
+        fatal_level.precedence().as_usize() <= self.get_level().precedence().as_usize()
     }
 }

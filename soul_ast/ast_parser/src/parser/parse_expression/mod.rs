@@ -4,12 +4,7 @@ use ast::{
 };
 use soul_tokenizer::{Number, Token, TokenKind};
 use soul_utils::{
-    error::{SoulError, SoulErrorKind, SoulResult},
-    soul_error_internal,
-    soul_names::{AccessType, KeyWord, Operator, TypeModifier},
-    span::{Span, Spanned},
-    symbool_kind::SymbolKind,
-    try_result::ToResult,
+    error::{SoulError, SoulErrorKind, SoulResult}, precedence::Precedence, soul_error_internal, soul_names::{AccessType, KeyWord, Operator, TypeModifier}, span::{Span, Spanned}, symbool_kind::SymbolKind, try_result::ToResult
 };
 
 use crate::parser::{
@@ -25,12 +20,12 @@ mod parse_expression_group;
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_expression(&mut self, end_tokens: &[TokenKind]) -> SoulResult<Expression> {
-        self.pratt_parse_expression(0, end_tokens)
+        self.pratt_parse_expression(Precedence::MIN, end_tokens)
     }
 
     fn pratt_parse_expression(
         &mut self,
-        min_precedence: usize,
+        min_precedence: Precedence,
         end_tokens: &[TokenKind],
     ) -> SoulResult<Expression> {
         let start_span = self.token().span;
@@ -63,7 +58,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             match self.consume_expression_operator(start_span)? {
                 ExpressionOperator::Binary(operator) => {
-                    let next_min_precedence = precedence + 1;
+                    let next_min_precedence = precedence.next();
                     let right = self.pratt_parse_expression(next_min_precedence, end_tokens)?;
                     left =
                         Expression::new_binary(left, operator, right, self.span_combine(start_span))
@@ -308,25 +303,28 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
     }
 
-    fn current_precedence(&self) -> usize {
+    fn current_precedence(&mut self) -> Precedence {
         match &self.token().kind {
             TokenKind::Ident(ident) => {
                 if let Some(keyword) = KeyWord::from_str(ident) {
                     keyword.precedence()
                 } else {
-                    0
+                    Precedence::MIN
                 }
             }
             TokenKind::Symbol(symbool_kind) => {
-                if let Some(access) = AccessType::from_symbool(*symbool_kind) {
+                if let Some(bin) = try_to_binary_operator(symbool_kind) {
+                    let peek = self.peek();
+                    self.try_multi_binary(&peek, bin).precedence()
+                } else if let Some(access) = AccessType::from_symbool(*symbool_kind) {
                     access.precedence()
-                } else if let Some(op) = Operator::from_symbool(*symbool_kind) {
-                    op.precedence()
+                } else if let Some(unary) = try_to_unary_operator(symbool_kind) {
+                    unary.precedence()
                 } else {
-                    0
+                    Precedence::MIN
                 }
             }
-            _ => 0,
+            _ => Precedence::MIN,
         }
     }
 
@@ -339,21 +337,14 @@ impl<'a, 'f> Parser<'a, 'f> {
             ))
         }
 
-        fn try_binary(symbol: &SymbolKind) -> Option<BinaryOperatorKind> {
-            match Operator::from_symbool(*symbol).map(|el| el.to_binary()) {
-                Some(Some(val)) => Some(val),
-                _ => None,
-            }
-        }
-
         match &self.token().kind {
             TokenKind::Symbol(sym) => {
                 if let Some(access) = AccessType::from_symbool(*sym) {
                     self.bump();
                     return Ok(ExpressionOperator::Access(access));
-                } else if let Some(mut binary) = try_binary(sym) {
+                } else if let Some(mut binary) = try_to_binary_operator(sym) {
                     self.bump();
-                    binary = self.try_multi_binary(binary);
+                    binary = self.try_consume_multi_binary(binary);
 
                     return Ok(ExpressionOperator::Binary(BinaryOperator::new(
                         binary,
@@ -368,8 +359,18 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
     }
 
-    fn try_multi_binary(&mut self, binary: BinaryOperatorKind) -> BinaryOperatorKind {
-        let symbol = match &self.token().kind {
+    fn try_consume_multi_binary(&mut self, binary: BinaryOperatorKind) -> BinaryOperatorKind {
+        let bin = self.try_multi_binary(self.token(), binary);
+        match bin {
+            BinaryOperatorKind::Pow 
+            | BinaryOperatorKind::LogAnd => self.bump(),
+            _ => () 
+        };
+        bin
+    }
+
+    fn try_multi_binary(&self, current: &Token, binary: BinaryOperatorKind) -> BinaryOperatorKind {
+        let symbol = match &current.kind {
             TokenKind::Symbol(val) => *val,
             _ => return binary,
         };
@@ -377,7 +378,6 @@ impl<'a, 'f> Parser<'a, 'f> {
         match binary {
             BinaryOperatorKind::Mul => {
                 if let Some(Operator::Mul) = Operator::from_symbool(symbol) {
-                    self.bump();
                     BinaryOperatorKind::Pow
                 } else {
                     binary
@@ -385,7 +385,6 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
             BinaryOperatorKind::BitAnd => {
                 if let Some(Operator::BitAnd) = Operator::from_symbool(symbol) {
-                    self.bump();
                     BinaryOperatorKind::LogAnd
                 } else {
                     binary
@@ -393,6 +392,20 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
             _ => binary,
         }
+    }
+}
+
+fn try_to_binary_operator(symbol: &SymbolKind) -> Option<BinaryOperatorKind> {
+    match Operator::from_symbool(*symbol).map(|el| el.to_binary()) {
+        Some(Some(val)) => Some(val),
+        _ => None,
+    }
+}
+
+fn try_to_unary_operator(symbol: &SymbolKind) -> Option<UnaryOperatorKind> {
+    match Operator::from_symbool(*symbol).map(|el| el.to_unary()) {
+        Some(Some(val)) => Some(val),
+        _ => None,
     }
 }
 

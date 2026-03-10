@@ -132,9 +132,9 @@ macro_rules! define_str_enum {
             }
 
             /// Returns the precedence value of this variant.
-            pub const fn precedence(&self) -> usize {
+            pub const fn precedence(&self) -> $crate::precedence::Precedence {
                 match self {
-                    $( $enum_name::$name => $precedence, )*
+                    $( $enum_name::$name => $crate::precedence::Precedence::new($precedence), )*
                 }
             }
         }
@@ -311,9 +311,9 @@ macro_rules! define_symbols {
                 }
             }
 
-            pub const fn precedence(&self) -> usize {
+            pub const fn precedence(&self) -> $crate::precedence::Precedence {
                 match self {
-                    $( $enum_name::$name => $precedence, )*
+                    $( $enum_name::$name => $crate::precedence::Precedence::new($precedence), )*
                 }
             }
         }

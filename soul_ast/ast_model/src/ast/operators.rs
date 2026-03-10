@@ -2,7 +2,7 @@ use crate::{
     ast::{BoxExpression, Expression},
     scope::NodeId,
 };
-use soul_utils::span::Spanned;
+use soul_utils::{precedence::Precedence, soul_names::Operator, span::Spanned};
 
 /// A unary operator wrapped with source location information.
 pub type UnaryOperator = Spanned<UnaryOperatorKind>;
@@ -111,6 +111,16 @@ impl Binary {
 }
 
 impl UnaryOperatorKind {
+    pub const fn precedence(&self) -> Precedence {
+        match self {
+            UnaryOperatorKind::Invalid => Precedence::MIN,
+            UnaryOperatorKind::Neg // Operator::Neq doesn't exist so use Not
+            | UnaryOperatorKind::Not => Operator::Not.precedence(),
+            UnaryOperatorKind::Increment { .. } => Operator::Incr.precedence(),
+            UnaryOperatorKind::Decrement { .. } => Operator::Decr.precedence(),
+        }
+    }
+
     pub const fn as_str(&self) -> &str {
         match self {
             UnaryOperatorKind::Invalid => "<invalid>",
@@ -123,6 +133,37 @@ impl UnaryOperatorKind {
 }
 
 impl BinaryOperatorKind {
+    pub const fn precedence(&self) -> Precedence {
+        match self {
+            BinaryOperatorKind::Invalid => Precedence::MIN,
+            BinaryOperatorKind::Add => Operator::Add.precedence(),
+            BinaryOperatorKind::Sub => Operator::Sub.precedence(),
+            BinaryOperatorKind::Mul => Operator::Mul.precedence(),
+            BinaryOperatorKind::Div => Operator::Div.precedence(),
+
+            BinaryOperatorKind::Pow //Operator::Pow doesn't exist so use Root
+            | BinaryOperatorKind::Log //Operator::Log doesn't exist so use Root
+            | BinaryOperatorKind::Root => Operator::Root.precedence(),
+
+            BinaryOperatorKind::Mod => Operator::Mod.precedence(),
+            BinaryOperatorKind::BitAnd => Operator::BitAnd.precedence(),
+            BinaryOperatorKind::BitOr => Operator::BitOr.precedence(),
+            BinaryOperatorKind::BitXor => Operator::BitXor.precedence(),
+
+            BinaryOperatorKind::LogAnd // Operator::LogAnd doesn't exist so use LogOr
+            | BinaryOperatorKind::LogOr => Operator::LogOr.precedence(),
+
+            BinaryOperatorKind::Eq => Operator::Eq.precedence(),
+            BinaryOperatorKind::NotEq => Operator::NotEq.precedence(),
+            BinaryOperatorKind::Lt => Operator::LessThen.precedence(),
+            BinaryOperatorKind::Gt => Operator::GreatThen.precedence(),
+            BinaryOperatorKind::Le => Operator::LessEq.precedence(),
+            BinaryOperatorKind::Ge => Operator::GreatEq.precedence(),
+            BinaryOperatorKind::Range => Operator::Range.precedence(),
+            BinaryOperatorKind::TypeOf => Operator::Range.precedence(), //Operator::TypeOf doesn't exist so use Range
+        }
+    }
+
     pub const fn as_str(&self) -> &str {
         match self {
             BinaryOperatorKind::Invalid => "<invalid>",
