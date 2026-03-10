@@ -31,23 +31,24 @@ pub(crate) fn interpret_unary(
         U::Increment { before_var: _ } | U::Decrement { before_var: _ } => {
             // For literals, we treat increment/decrement as simple arithmetic
             // (ignoring the before_var flag since literals aren't variables)
-            let value = match operand {
-                Literal::Int(i) => *i as i128,
-                Literal::Uint(u) => *u as i128,
-                Literal::Float(value) => {
-                    return Some(match operator.node {
+            match operand {
+                Literal::Int(value) => match operator.node {
+                    U::Increment { .. } => Literal::Int(value + 1),
+                    U::Decrement { .. } => Literal::Int(value - 1),
+                    _ => unreachable!(),
+                }
+                Literal::Uint(value) => match operator.node {
+                    U::Increment { .. } => Literal::Uint(value + 1),
+                    U::Decrement { .. } => Literal::Uint(value - 1),
+                    _ => unreachable!(),
+                }
+                Literal::Float(value) => 
+                    match operator.node {
                         U::Increment { .. } => Literal::Float(value + 1.0),
                         U::Decrement { .. } => Literal::Float(value - 1.0),
                         _ => unreachable!(),
-                    })
-                }
+                    }
                 _ => return None,
-            };
-
-            match operator.node {
-                U::Increment { .. } => Literal::Int((value + 1) as i128),
-                U::Decrement { .. } => Literal::Int((value - 1) as i128),
-                _ => unreachable!(),
             }
         }
 

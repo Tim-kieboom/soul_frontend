@@ -38,19 +38,34 @@ pub fn try_literal_resolve_expression(hir: &HirTree, types: &HirTypedTable, valu
         }
         hir::ExpressionKind::Unary(unary) => {
             let value = get_literal(hir, types, unary.expression)?;
-            interpret_unary(&unary.operator, &value)
+            interpret_unary(&unary.operator, value.get_ref())
         }
         hir::ExpressionKind::Binary(binary) => {
             let left = get_literal(hir, types, binary.left)?;
             let right = get_literal(hir, types, binary.right)?;
-            interpret_binary(&left, &binary.operator, &right)
+            interpret_binary(left.get_ref(), &binary.operator, right.get_ref())
         }
     }
 }
 
-fn get_literal(hir: &HirTree, types: &HirTypedTable, value_id: hir::ExpressionId) -> Option<Literal> {
+fn get_literal<'a>(hir: &'a HirTree, types: &HirTypedTable, value_id: hir::ExpressionId) -> Option<LiteralRef<'a>> {
     if let hir::ExpressionKind::Literal(literal) = &hir.expressions[value_id].kind {
-        return Some(literal.clone());
+        return Some(LiteralRef::Ref(literal));
     }
     try_literal_resolve_expression(hir, types, value_id)
+        .map(|literal| LiteralRef::Owner(literal))
+}
+
+/// enum to avoid allow owner and ref to avoid .clone()
+enum LiteralRef<'a> {
+    Owner(Literal),
+    Ref(&'a Literal),
+}
+impl<'a> LiteralRef<'a> {
+    fn get_ref(&self) -> &Literal {
+        match self {
+            LiteralRef::Owner(literal) => literal,
+            LiteralRef::Ref(literal) => literal,
+        }
+    }
 }

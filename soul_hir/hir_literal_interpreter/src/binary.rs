@@ -1,18 +1,13 @@
 use std::cmp::Ordering;
 use ast::{BinaryOperator, Literal};
 
-use crate::{literal_types_compatible, try_as_f64, try_as_i128, try_as_u128};
+use crate::{try_as_f64, try_as_i128, try_as_u128};
 
 pub(crate) fn interpret_binary(
     left: &Literal,
     operator: &BinaryOperator,
     right: &Literal,
 ) -> Option<Literal> {
-    
-    if !literal_types_compatible(left, right) {
-        return None
-    }
-
     use ast::BinaryOperatorKind as B;
 
     Some(match operator.node {
