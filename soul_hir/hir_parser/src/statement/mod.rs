@@ -16,6 +16,7 @@ impl<'a> HirContext<'a> {
         let hir_global = match &global.node {
             ast::StatementKind::Variable(variable) => {
                 let hir_variable = self.lower_variable(variable);
+
                 self.insert_variable(&variable.name, hir_variable.local, hir_variable.ty);
                 hir::Global::Variable(hir_variable, id)
             }

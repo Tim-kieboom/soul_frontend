@@ -1,16 +1,6 @@
 global1: int = 1
-global2 := global1 + 1 * 2 ** 4
-
-elif() {
-    mut num = 0
-    if 1==1 {
-        num = 3
-    } else if 1==2 {
-        num = 4
-    } else {
-        num = 5
-    }
-}
+global2 := 2 + 1 * 2 ** 4
+global3 := 2 ** 4
 
 main() {
     sum := sum(global1, global2)
@@ -26,6 +16,17 @@ main() {
 
 sum(a: int, b: int): int {
     a + b
+}
+
+elif() {
+    mut num = 0
+    if 1==1 {
+        num = 3
+    } else if 1==2 {
+        num = 4
+    } else {
+        num = 5
+    }
 }
 
 ifs() {

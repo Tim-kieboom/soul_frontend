@@ -1,5 +1,5 @@
 use ast::{VarTypeKind, scope::NodeId};
-use hir::{HirType, HirTypeKind, LocalId, Place, PlaceKind, TypeId};
+use hir::{Binary, HirType, HirTypeKind, LocalId, Place, PlaceKind, TypeId, Unary};
 use soul_utils::{
     Ident, error::{SoulError, SoulErrorKind}, ids::{IdAlloc}, soul_error_internal, span::Span
 };
@@ -62,10 +62,10 @@ impl<'a> HirContext<'a> {
                 hir::Expression {
                     id,
                     ty: self.new_infer_type(span),
-                    kind: hir::ExpressionKind::Unary {
+                    kind: hir::ExpressionKind::Unary(Unary {
                         operator,
                         expression,
-                    },
+                    }),
                 }
             }
             ast::ExpressionKind::Array(array) => self.lower_array(id, array, span),
@@ -90,11 +90,11 @@ impl<'a> HirContext<'a> {
                 hir::Expression {
                     id,
                     ty: self.new_infer_type(span),
-                    kind: hir::ExpressionKind::Binary {
+                    kind: hir::ExpressionKind::Binary(Binary {
                         left,
                         operator,
                         right,
-                    },
+                    }),
                 }
             }
             ast::ExpressionKind::Deref { id: _, inner } => hir::Expression {

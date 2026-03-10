@@ -13,7 +13,7 @@ mod handle_type;
 mod infer_table;
 mod statement;
 
-pub fn infer_types(hir: &HirTree, faults: &mut Vec<SementicFault>) -> HirTypedTable {
+pub fn infer_hir_types(hir: &HirTree, faults: &mut Vec<SementicFault>) -> HirTypedTable {
     let mut context = HirTypedContext::new(hir, faults);
 
     for global in &hir.root.globals {

@@ -1,4 +1,4 @@
-use hir::{BlockId, ExpressionId, HirTree, LocalId, TypeId};
+use hir::{Binary, BlockId, ExpressionId, HirTree, LocalId, TypeId, Unary};
 use hir_typed_context::HirTypedTable;
 use soul_utils::{ids::{FunctionId, IdAlloc}, soul_names::KeyWord, vec_map::VecMapIndex};
 use std::fmt::Write;
@@ -207,19 +207,19 @@ impl<'a> HirDisplayer<'a> {
                 self.display_expression(expression_id);
                 self.display_expression_astype(value.id, value.ty);
             }
-            hir::ExpressionKind::Unary {
+            hir::ExpressionKind::Unary(Unary {
                 operator,
                 expression,
-            } => {
+            }) => {
                 self.push_str(operator.node.as_str());
                 self.display_expression(expression);
                 self.display_expression_astype(value.id, value.ty);
             }
-            hir::ExpressionKind::Binary {
+            hir::ExpressionKind::Binary(Binary {
                 left,
                 operator,
                 right,
-            } => {
+            }) => {
                 self.push('(');
                 self.display_expression(left);
                 self.push_str(operator.node.as_str());

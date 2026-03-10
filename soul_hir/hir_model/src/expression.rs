@@ -58,17 +58,10 @@ pub enum ExpressionKind {
 
     // --- Operators ---
     /// A unary operation.
-    Unary {
-        operator: UnaryOperator,
-        expression: ExpressionId,
-    },
+    Unary(Unary),
 
     /// A binary operation.
-    Binary {
-        left: ExpressionId,
-        operator: BinaryOperator,
-        right: ExpressionId,
-    },
+    Binary(Binary),
 
     // --- Control flow ---
     /// An `if` expression.
@@ -109,8 +102,16 @@ pub enum ExpressionKind {
         cast_to: TypeId,
     },
 }
-impl ExpressionKind {
-    pub fn is_if() {
 
-    }
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Unary {
+    pub operator: UnaryOperator,
+    pub expression: ExpressionId,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Binary {
+    pub left: ExpressionId,
+    pub operator: BinaryOperator,
+    pub right: ExpressionId,
 }

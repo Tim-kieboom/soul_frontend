@@ -1,5 +1,5 @@
 use ast::{ArrayKind, BinaryOperator, BinaryOperatorKind, UnaryOperator};
-use hir::{BlockId, ExpressionId, HirType, HirTypeKind, TypeId};
+use hir::{Binary, BlockId, ExpressionId, HirType, HirTypeKind, TypeId, Unary};
 use soul_utils::{
     error::{SoulError, SoulErrorKind}, ids::{FunctionId, IdAlloc}, span::Span
 };
@@ -84,15 +84,15 @@ impl<'a> HirTypedContext<'a> {
             hir::ExpressionKind::While { condition, body } => {
                 self.infer_while(*condition, *body, span)
             }
-            hir::ExpressionKind::Unary {
+            hir::ExpressionKind::Unary(Unary {
                 operator,
                 expression,
-            } => self.infer_unary(operator, *expression, span),
-            hir::ExpressionKind::Binary {
+            }) => self.infer_unary(operator, *expression, span),
+            hir::ExpressionKind::Binary(Binary {
                 left,
                 operator,
                 right,
-            } => self.infer_binary(*left, operator, *right, span),
+            }) => self.infer_binary(*left, operator, *right, span),
             hir::ExpressionKind::Call {
                 function,
                 callee,

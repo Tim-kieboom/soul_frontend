@@ -62,7 +62,7 @@ impl<'a> HirContext<'a> {
             hir::Expression {
                 id: len,
                 ty: uint,
-                kind: hir::ExpressionKind::Literal(ast::Literal::Uint(size as u64)),
+                kind: hir::ExpressionKind::Literal(ast::Literal::Uint(size as u128)),
             },
         );
 
@@ -95,7 +95,7 @@ impl<'a> HirContext<'a> {
             hir::Expression {
                 id,
                 ty,
-                kind: hir::ExpressionKind::Literal(ast::Literal::Uint(i as u64)),
+                kind: hir::ExpressionKind::Literal(ast::Literal::Uint(i as u128)),
             },
         );
 

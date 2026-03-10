@@ -1,6 +1,5 @@
 use std::{
-    fs::{File, OpenOptions},
-    io::{Read, stdout},
+    fs::{File, OpenOptions}, io::{Read, stdout}
 };
 
 use anyhow::Result;
@@ -12,18 +11,19 @@ use ast_parser::parse;
 use displayer_hir::display_hir;
 use fern::Dispatch;
 use hir::HirTree;
+use hir_literal_interpreter::try_literal_resolve_expression;
 use hir_parser::hir_lower;
-use hir_typed_context::{HirTypedTable, infer_types};
+use hir_typed_context::{HirTypedTable, infer_hir_types};
 use log::{error, info};
 use mir_parser::{mir::MirTree, mir_lower};
 use paths::Paths;
 use soul_name_resolver::name_resolve;
-use soul_tokenizer::{TokenStream, tokenize};
-use soul_utils::{char_colors::{DEFAULT, GREEN}, sementic_level::SementicFault};
+use soul_tokenizer::tokenize;
+use soul_utils::{char_colors::{DEFAULT, GREEN}, error::SoulError, sementic_level::SementicFault};
 
 use crate::{
     convert_soul_error::{MessageConfig, ToMessage},
-    displayer_hir::display_typed_hir,
+    displayer_hir::{display_typed_hir},
     displayer_mir::display_mir,
     displayer_tokenizer::display_tokens,
 };
@@ -41,13 +41,12 @@ pub const MESSAGE_CONFIG: MessageConfig = MessageConfig {
     colors: true,
 };
 
-struct Ouput<'a> {
+struct Ouput {
     mir: MirTree,
     hir: HirTree,
-    source_file: &'a str,
+    source_file: String,
+    types: HirTypedTable,
     ast: AbstractSyntaxTree,
-    hir_types: HirTypedTable,
-    token_stream: TokenStream<'a>,
     faults: Vec<SementicFault>,
 }
 
@@ -55,14 +54,12 @@ fn main() -> Result<()> {
     let paths: Paths = serde_json::from_slice(PATHS)?;
     init_logger(&paths.log_file)?;
 
-    let source_file = read_source_file(&paths.source_file)?;
-    let output = run_compiler(&source_file); 
-
+    let output = run_compiler(&paths)?; 
     display_output(&paths, &output)?;
     for fault in &output.faults {
         error!(
             "{}",
-            fault.to_message("main.soul", &source_file, MESSAGE_CONFIG)
+            fault.to_message("main.soul", &output.source_file, MESSAGE_CONFIG)
         );
     }
 
@@ -74,32 +71,44 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn run_compiler<'a>(source_file: &'a str) -> Ouput<'a> {
-    let token_stream = tokenize(&source_file);
+fn run_compiler<'a>(paths: &'a Paths) -> Result<Ouput> {
+    let source_file = read_source_file(&paths.source_file)?;
 
     let mut faults = vec![];
-    let mut parse_response = parse(token_stream.clone(), &mut faults);
+    let mut parse_response = parse(tokenize(&source_file), &mut faults);
     name_resolve(&mut parse_response, &mut faults);
 
     let hir = hir_lower(&parse_response, &mut faults);
-    let hir_types = infer_types(&hir, &mut faults);
+    let types = infer_hir_types(&hir, &mut faults);
 
-    let mir = mir_lower(&hir, &hir_types, &mut faults);
+    for value_id in hir.expressions.keys() {
+        let span = hir.spans.expressions[value_id];
+        let literal = try_literal_resolve_expression(&hir, &types, value_id);
+        if let Some(literal) = literal {
+            let msg = SoulError::new(format!("literal resolved to >> {}", literal.value_to_string()), soul_utils::error::SoulErrorKind::InvalidContext, Some(span));
+            error!(
+                "{}",
+                SementicFault::debug(msg).to_message("main.soul", &source_file, MESSAGE_CONFIG)
+            );
+        }
+    }
 
-    Ouput {
+    let mir = mir_lower(&hir, &types, &mut faults);
+
+    Ok(Ouput {
         mir,
         hir,
+        types,
         faults,
-        hir_types,
-        token_stream,
+        source_file,
         ast: parse_response.tree,
-        source_file: &source_file,
-    }
+    })
 }
 
-fn display_output<'a>(paths: &Paths, output: &Ouput<'a>) -> Result<()> {
+fn display_output<'a>(paths: &Paths, output: &Ouput) -> Result<()> {
     let root = &output.ast.root;
-    let tokens_string = display_tokens(&paths, &output.source_file, output.token_stream.clone())?;
+    let token_stream = tokenize(&output.source_file);
+    let tokens_string = display_tokens(&paths, &output.source_file, token_stream)?;
 
     paths.write_multiple_outputs([
         (&tokens_string, "tokenizer/tokens.soulc"),
@@ -110,11 +119,11 @@ fn display_output<'a>(paths: &Paths, output: &Ouput<'a>) -> Result<()> {
         ),
         (&display_hir(&output.hir), "hir/tree.soulc"),
         (
-            &display_typed_hir(&output.hir, &output.hir_types),
+            &display_typed_hir(&output.hir, &output.types),
             "hir/typed.soulc",
         ),
         (
-            &display_mir(&output.mir, &output.hir, &output.hir_types),
+            &display_mir(&output.mir, &output.hir, &output.types),
             "mir/tree.soulc",
         ),
     ])

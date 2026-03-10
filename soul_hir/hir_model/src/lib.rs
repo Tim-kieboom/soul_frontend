@@ -5,7 +5,7 @@ mod ids;
 mod meta_data_maps;
 mod place;
 mod statement;
-use ast::FunctionKind;
+use ast::{FunctionKind};
 pub use expression::*;
 pub use function::*;
 pub use hir_type::*;

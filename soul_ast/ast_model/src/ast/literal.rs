@@ -5,8 +5,8 @@ use soul_utils::soul_names::{PrimitiveTypes, TypeModifier};
 /// A literal value in the Soul language.
 #[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Literal {
-    Int(i64),
-    Uint(u64),
+    Int(i128),
+    Uint(u128),
     Float(f64),
     Bool(bool),
     Char(char),

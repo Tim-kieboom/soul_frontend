@@ -139,8 +139,8 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
             TokenKind::Number(num) => {
                 let number = match num {
-                    Number::Int(val) => Literal::Int(*val),
-                    Number::Uint(val) => Literal::Uint(*val),
+                    Number::Int(val) => Literal::Int(*val as i128),
+                    Number::Uint(val) => Literal::Uint(*val as u128),
                     Number::Float(val) => Literal::Float(*val),
                 };
                 self.bump();
