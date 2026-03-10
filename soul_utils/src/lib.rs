@@ -12,6 +12,7 @@ pub mod vec_map;
 pub mod vec_set;
 pub mod ids;
 pub mod precedence;
+pub mod compile_options;
 
 #[cfg(test)]
 mod vec_map_tests;

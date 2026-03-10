@@ -9,6 +9,6 @@ mod token_stream;
 #[cfg(test)]
 mod tests;
 
-pub fn tokenize<'a>(source: &'a str) -> TokenStream<'a> {
+pub fn to_token_stream<'a>(source: &'a str) -> TokenStream<'a> {
     TokenStream::new(source)
 }

@@ -1,5 +1,5 @@
 use ast::{
-    DeclareStore, ParseResponse,
+    DeclareStore, AstResponse,
     meta_data::AstMetadata,
     scope::{NodeId, ScopeValue},
 };
@@ -8,7 +8,7 @@ use soul_utils::{Ident, error::SoulError, ids::{FunctionId, IdGenerator}, sement
 mod collect;
 mod resolve;
 
-pub fn name_resolve(request: &mut ParseResponse, faults: &mut Vec<SementicFault>) {
+pub fn name_resolve(request: &mut AstResponse, faults: &mut Vec<SementicFault>) {
     let mut resolver = NameResolver::new(
         &mut request.meta_data, 
         faults, 

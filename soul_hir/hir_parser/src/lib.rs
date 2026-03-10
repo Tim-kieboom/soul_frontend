@@ -1,5 +1,5 @@
 mod id_generator;
-use ast::{DeclareStore, ParseResponse};
+use ast::{DeclareStore, AstResponse};
 use hir::{BlockId, HirTree, LocalId, TypeId};
 use id_generator::IdAllocalors;
 use soul_utils::{
@@ -14,7 +14,7 @@ mod resolve_import;
 mod statement;
 mod r#type;
 
-pub fn hir_lower(response: &ParseResponse, faults: &mut Vec<SementicFault>) -> HirTree {
+pub fn hir_lower(response: &AstResponse, faults: &mut Vec<SementicFault>) -> HirTree {
     let mut context = HirContext::new(
         response.function_generators.clone(), 
         &response.store, 

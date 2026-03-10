@@ -1,0 +1,11 @@
+[package]
+name = "run_ast"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ast = { version = "0.1.0", path = "../ast_model" }
+ast_parser = { version = "0.1.0", path = "../ast_parser" }
+soul_name_resolver = { version = "0.1.0", path = "../soul_name_resolver" }
+soul_tokenizer = { version = "0.1.0", path = "../../soul_tokenizer" }
+soul_utils = { version = "0.1.0", path = "../../soul_utils" }

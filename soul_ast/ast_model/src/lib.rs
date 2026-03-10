@@ -15,7 +15,7 @@ pub struct AbstractSyntaxTree {
     pub root: ast::Block,
 }
 
-pub struct ParseResponse {
+pub struct AstResponse {
     pub store: DeclareStore,
     pub meta_data: AstMetadata,
     pub tree: AbstractSyntaxTree,

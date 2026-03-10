@@ -4,22 +4,18 @@ use std::{
 
 use anyhow::Result;
 use ast::{
-    AbstractSyntaxTree,
-    syntax_display::{DisplayKind, SyntaxDisplay},
+    AstResponse, syntax_display::{DisplayKind, SyntaxDisplay}
 };
-use ast_parser::parse;
 use displayer_hir::display_hir;
 use fern::Dispatch;
-use hir::HirTree;
-use hir_literal_interpreter::try_literal_resolve_expression;
-use hir_parser::hir_lower;
-use hir_typed_context::{HirTypedTable, infer_hir_types};
 use log::{error, info};
-use mir_parser::{mir::MirTree, mir_lower};
+use mir_parser::{mir::MirTree};
 use paths::Paths;
-use soul_name_resolver::name_resolve;
-use soul_tokenizer::tokenize;
-use soul_utils::{char_colors::{DEFAULT, GREEN}, error::SoulError, sementic_level::SementicFault};
+use run_ast::to_ast;
+use run_hir::{HirResponse, to_hir};
+use run_mir::to_mir;
+use soul_tokenizer::to_token_stream;
+use soul_utils::{char_colors::{DEFAULT, GREEN}, compile_options::CompilerOptions, sementic_level::SementicFault};
 
 use crate::{
     convert_soul_error::{MessageConfig, ToMessage},
@@ -41,12 +37,15 @@ pub const MESSAGE_CONFIG: MessageConfig = MessageConfig {
     colors: true,
 };
 
+pub const COMPILER_OPTIONS: CompilerOptions = CompilerOptions {
+    debug_view_literal_resolve: true,
+};
+
 struct Ouput {
     mir: MirTree,
-    hir: HirTree,
+    hir: HirResponse,
+    ast: AstResponse,
     source_file: String,
-    types: HirTypedTable,
-    ast: AbstractSyntaxTree,
     faults: Vec<SementicFault>,
 }
 
@@ -72,42 +71,27 @@ fn main() -> Result<()> {
 }
 
 fn run_compiler<'a>(paths: &'a Paths) -> Result<Ouput> {
-    let source_file = read_source_file(&paths.source_file)?;
-
+    
     let mut faults = vec![];
-    let mut parse_response = parse(tokenize(&source_file), &mut faults);
-    name_resolve(&mut parse_response, &mut faults);
 
-    let hir = hir_lower(&parse_response, &mut faults);
-    let types = infer_hir_types(&hir, &mut faults);
-
-    for value_id in hir.expressions.keys() {
-        let span = hir.spans.expressions[value_id];
-        let literal = try_literal_resolve_expression(&hir, &types, value_id);
-        if let Some(literal) = literal {
-            let msg = SoulError::new(format!("literal resolved to >> {}", literal.value_to_string()), soul_utils::error::SoulErrorKind::InvalidContext, Some(span));
-            error!(
-                "{}",
-                SementicFault::debug(msg).to_message("main.soul", &source_file, MESSAGE_CONFIG)
-            );
-        }
-    }
-
-    let mir = mir_lower(&hir, &types, &mut faults);
+    let source_file = to_source_file(&paths.source_file)?;
+    let tokens = to_token_stream(&source_file);
+    let ast = to_ast(tokens, &COMPILER_OPTIONS, &mut faults);
+    let hir = to_hir(&ast, &COMPILER_OPTIONS, &mut faults);
+    let mir = to_mir(&hir, &COMPILER_OPTIONS, &mut faults);
 
     Ok(Ouput {
         mir,
+        ast,
         hir,
-        types,
         faults,
         source_file,
-        ast: parse_response.tree,
     })
 }
 
 fn display_output<'a>(paths: &Paths, output: &Ouput) -> Result<()> {
-    let root = &output.ast.root;
-    let token_stream = tokenize(&output.source_file);
+    let root = &output.ast.tree.root;
+    let token_stream = to_token_stream(&output.source_file);
     let tokens_string = display_tokens(&paths, &output.source_file, token_stream)?;
 
     paths.write_multiple_outputs([
@@ -117,19 +101,19 @@ fn display_output<'a>(paths: &Paths, output: &Ouput) -> Result<()> {
             &root.display(&DisplayKind::NameResolver),
             "ast/NameResolved.soulc",
         ),
-        (&display_hir(&output.hir), "hir/tree.soulc"),
+        (&display_hir(&output.hir.tree), "hir/tree.soulc"),
         (
-            &display_typed_hir(&output.hir, &output.types),
+            &display_typed_hir(&output.hir.tree, &output.hir.types),
             "hir/typed.soulc",
         ),
         (
-            &display_mir(&output.mir, &output.hir, &output.types),
+            &display_mir(&output.mir, &output.hir.tree, &output.hir.types),
             "mir/tree.soulc",
         ),
     ])
 }
 
-fn read_source_file(source_path: &str) -> Result<String> {
+fn to_source_file(source_path: &str) -> Result<String> {
     let mut file = File::open(source_path)?;
     let mut source_file = String::new();
     file.read_to_string(&mut source_file)?;
