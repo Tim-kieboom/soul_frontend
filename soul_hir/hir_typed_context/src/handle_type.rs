@@ -1,13 +1,13 @@
 use hir::{
-    BlockId, ExpressionId, HirType, HirTypeKind, LocalId, StatementId, TypeId,
-    TypesMap, UnifyResult,
+    BlockId, ExpressionId, HirType, HirTypeKind, LocalId, StatementId, TypeId, TypesMap,
+    UnifyResult,
 };
 use soul_utils::{
     error::SoulResult,
+    ids::{FunctionId, IdAlloc},
     soul_names::{PrimitiveTypes, TypeModifier},
     span::Span,
     vec_map::{VecMap, VecMapIndex},
-    ids::{FunctionId, IdAlloc},
 };
 
 use crate::HirTypedContext;
@@ -66,7 +66,13 @@ impl<'a> HirTypedContext<'a> {
         }
     }
 
-    pub(crate) fn unify(&mut self, value: ExpressionId, expect: TypeId, got: TypeId, span: Span) -> bool {
+    pub(crate) fn unify(
+        &mut self,
+        value: ExpressionId,
+        expect: TypeId,
+        got: TypeId,
+        span: Span,
+    ) -> bool {
         match self
             .infer_table
             .unify_type_type(&mut self.type_table.types, expect, got, span)
@@ -128,9 +134,7 @@ impl<'a> HirTypedContext<'a> {
 
                     let span = match self.hir.spans.$field.get(index).copied() {
                         Some(val) => val,
-                        None => {
-                            Span::default()
-                        }
+                        None => Span::default(),
                     };
                     let resolved = self
                         .resolve_type_strict(type_id, span)
@@ -165,7 +169,8 @@ impl<'a> HirTypedContext<'a> {
         self.type_table.types = new_types;
         self.type_table.remap_types(&remap);
 
-        self.type_table.none_type = self.type_table
+        self.type_table.none_type = self
+            .type_table
             .types
             .get_id(&HirType::none_type())
             .expect("should have none type in table");

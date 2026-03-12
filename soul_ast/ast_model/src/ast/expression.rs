@@ -1,5 +1,9 @@
 use soul_utils::{
-    Ident, ids::FunctionId, soul_import_path::SoulImportPath, soul_names::KeyWord, span::{Span, Spanned}
+    Ident,
+    ids::FunctionId,
+    soul_import_path::SoulImportPath,
+    soul_names::KeyWord,
+    span::{Span, Spanned},
 };
 
 use crate::{

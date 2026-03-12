@@ -1,7 +1,4 @@
-use ast::{
-    Block,
-    scope::ScopeId,
-};
+use ast::{Block, scope::ScopeId};
 use soul_utils::{Ident, ids::FunctionId};
 
 use crate::NameResolver;

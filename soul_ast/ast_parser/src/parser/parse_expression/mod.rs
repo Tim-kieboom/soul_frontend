@@ -4,7 +4,13 @@ use ast::{
 };
 use soul_tokenizer::{Number, Token, TokenKind};
 use soul_utils::{
-    error::{SoulError, SoulErrorKind, SoulResult}, precedence::Precedence, soul_error_internal, soul_names::{AccessType, KeyWord, Operator, TypeModifier}, span::{Span, Spanned}, symbool_kind::SymbolKind, try_result::ToResult
+    error::{SoulError, SoulErrorKind, SoulResult},
+    precedence::Precedence,
+    soul_error_internal,
+    soul_names::{AccessType, KeyWord, Operator, TypeModifier},
+    span::{Span, Spanned},
+    symbool_kind::SymbolKind,
+    try_result::ToResult,
 };
 
 use crate::parser::{
@@ -362,9 +368,8 @@ impl<'a, 'f> Parser<'a, 'f> {
     fn try_consume_multi_binary(&mut self, binary: BinaryOperatorKind) -> BinaryOperatorKind {
         let bin = self.try_multi_binary(self.token(), binary);
         match bin {
-            BinaryOperatorKind::Pow 
-            | BinaryOperatorKind::LogAnd => self.bump(),
-            _ => () 
+            BinaryOperatorKind::Pow | BinaryOperatorKind::LogAnd => self.bump(),
+            _ => (),
         };
         bin
     }

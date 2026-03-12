@@ -4,7 +4,9 @@ use std::fmt::Write;
 use crate::{
     ast::{
         ElseKind, ExpressionKind, ReturnKind,
-        syntax_display::{DisplayKind, try_display_function_id, try_display_infered_type, try_display_node_id},
+        syntax_display::{
+            DisplayKind, try_display_function_id, try_display_infered_type, try_display_node_id,
+        },
     },
     syntax_display::{SyntaxDisplay, tree_prefix},
 };

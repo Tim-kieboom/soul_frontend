@@ -1,11 +1,17 @@
 mod id_generator;
-use ast::{DeclareStore, AstResponse};
+use ast::{AstResponse, DeclareStore};
 use hir::{BlockId, HirTree, LocalId, TypeId};
 use id_generator::IdAllocalors;
 use soul_utils::{
-    Ident, error::SoulError, ids::{FunctionId, IdGenerator}, sementic_level::SementicFault, soul_error_internal, span::Span, vec_map::VecMapIndex
+    Ident,
+    error::SoulError,
+    ids::{FunctionId, IdGenerator},
+    sementic_level::SementicFault,
+    soul_error_internal,
+    span::Span,
+    vec_map::VecMapIndex,
 };
-use std::{collections::HashMap};
+use std::collections::HashMap;
 
 mod expression;
 mod insert;
@@ -16,8 +22,8 @@ mod r#type;
 
 pub fn hir_lower(response: &AstResponse, faults: &mut Vec<SementicFault>) -> HirTree {
     let mut context = HirContext::new(
-        response.function_generators.clone(), 
-        &response.store, 
+        response.function_generators.clone(),
+        &response.store,
         faults,
     );
 
@@ -55,7 +61,11 @@ enum CurrentBody {
 }
 
 impl<'a> HirContext<'a> {
-    fn new(function_generator: IdGenerator<FunctionId>, ast_store: &'a DeclareStore, faults: &'a mut Vec<SementicFault>) -> Self {
+    fn new(
+        function_generator: IdGenerator<FunctionId>,
+        ast_store: &'a DeclareStore,
+        faults: &'a mut Vec<SementicFault>,
+    ) -> Self {
         let mut id_generator = IdAllocalors::new(function_generator);
         let start_function = id_generator.alloc_function();
         let root_id = id_generator.alloc_module();
@@ -85,15 +95,36 @@ impl<'a> HirContext<'a> {
     }
 
     fn insert_parameter(&mut self, name: &Ident, local: LocalId, ty: TypeId) {
-        self.inner_insert_local(name, local, hir::LocalInfo{ty, kind: hir::LocalKind::Parameter});
+        self.inner_insert_local(
+            name,
+            local,
+            hir::LocalInfo {
+                ty,
+                kind: hir::LocalKind::Parameter,
+            },
+        );
     }
-    
+
     fn insert_variable(&mut self, name: &Ident, local: LocalId, ty: TypeId) {
-        self.inner_insert_local(name, local, hir::LocalInfo{ty, kind: hir::LocalKind::Variable});
-    }    
-    
+        self.inner_insert_local(
+            name,
+            local,
+            hir::LocalInfo {
+                ty,
+                kind: hir::LocalKind::Variable,
+            },
+        );
+    }
+
     fn insert_temp(&mut self, name: &Ident, local: LocalId, ty: TypeId) {
-        self.inner_insert_local(name, local, hir::LocalInfo{ty, kind: hir::LocalKind::Temp});
+        self.inner_insert_local(
+            name,
+            local,
+            hir::LocalInfo {
+                ty,
+                kind: hir::LocalKind::Temp,
+            },
+        );
     }
 
     fn inner_insert_local(&mut self, name: &Ident, local: LocalId, info: hir::LocalInfo) {

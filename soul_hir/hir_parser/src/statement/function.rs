@@ -1,4 +1,7 @@
-use soul_utils::{ids::{FunctionId, IdAlloc}, soul_error_internal};
+use soul_utils::{
+    ids::{FunctionId, IdAlloc},
+    soul_error_internal,
+};
 
 use crate::HirContext;
 
@@ -7,7 +10,10 @@ impl<'a> HirContext<'a> {
         let id = match function.id {
             Some(val) => val,
             None => {
-                self.log_error(soul_error_internal!("function.id should be Some(_)", Some(function.signature.span)));
+                self.log_error(soul_error_internal!(
+                    "function.id should be Some(_)",
+                    Some(function.signature.span)
+                ));
                 FunctionId::error()
             }
         };

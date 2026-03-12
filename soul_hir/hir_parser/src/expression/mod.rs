@@ -1,7 +1,11 @@
 use ast::{VarTypeKind, scope::NodeId};
 use hir::{Binary, HirType, HirTypeKind, LocalId, Place, PlaceKind, TypeId, Unary};
 use soul_utils::{
-    Ident, error::{SoulError, SoulErrorKind}, ids::{IdAlloc}, soul_error_internal, span::Span
+    Ident,
+    error::{SoulError, SoulErrorKind},
+    ids::IdAlloc,
+    soul_error_internal,
+    span::Span,
 };
 
 use crate::HirContext;
@@ -238,10 +242,7 @@ impl<'a> HirContext<'a> {
             _ => PlaceKind::Local(local, place_id),
         };
 
-        let place = Place::new(
-            place_kind,
-            ident.span,
-        );
+        let place = Place::new(place_kind, ident.span);
 
         hir::Expression {
             id,

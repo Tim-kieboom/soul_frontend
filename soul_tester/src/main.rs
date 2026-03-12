@@ -1,25 +1,30 @@
 use std::{
-    fs::{File, OpenOptions}, io::{Read, stdout}
+    fs::{File, OpenOptions},
+    io::{Read, stdout},
 };
 
 use anyhow::Result;
 use ast::{
-    AstResponse, syntax_display::{DisplayKind, SyntaxDisplay}
+    AstResponse,
+    syntax_display::{DisplayKind, SyntaxDisplay},
 };
 use displayer_hir::display_hir;
 use fern::Dispatch;
 use log::{error, info};
-use mir_parser::{mir::MirTree};
 use paths::Paths;
 use run_ast::to_ast;
 use run_hir::{HirResponse, to_hir};
-use run_mir::to_mir;
+use run_mir::{MirResponse, to_mir};
 use soul_tokenizer::to_token_stream;
-use soul_utils::{char_colors::{DEFAULT, GREEN}, compile_options::CompilerOptions, sementic_level::SementicFault};
+use soul_utils::{
+    char_colors::{DEFAULT, GREEN},
+    compile_options::CompilerOptions,
+    sementic_level::SementicFault,
+};
 
 use crate::{
     convert_soul_error::{MessageConfig, ToMessage},
-    displayer_hir::{display_typed_hir},
+    displayer_hir::display_typed_hir,
     displayer_mir::display_mir,
     displayer_tokenizer::display_tokens,
 };
@@ -38,11 +43,11 @@ pub const MESSAGE_CONFIG: MessageConfig = MessageConfig {
 };
 
 pub const COMPILER_OPTIONS: CompilerOptions = CompilerOptions {
-    debug_view_literal_resolve: true,
+    debug_view_literal_resolve: false,
 };
 
 struct Ouput {
-    mir: MirTree,
+    mir: MirResponse,
     hir: HirResponse,
     ast: AstResponse,
     source_file: String,
@@ -53,7 +58,7 @@ fn main() -> Result<()> {
     let paths: Paths = serde_json::from_slice(PATHS)?;
     init_logger(&paths.log_file)?;
 
-    let output = run_compiler(&paths)?; 
+    let output = run_compiler(&paths)?;
     display_output(&paths, &output)?;
     for fault in &output.faults {
         error!(
@@ -71,7 +76,6 @@ fn main() -> Result<()> {
 }
 
 fn run_compiler<'a>(paths: &'a Paths) -> Result<Ouput> {
-    
     let mut faults = vec![];
 
     let source_file = to_source_file(&paths.source_file)?;
@@ -107,7 +111,7 @@ fn display_output<'a>(paths: &Paths, output: &Ouput) -> Result<()> {
             "hir/typed.soulc",
         ),
         (
-            &display_mir(&output.mir, &output.hir.tree, &output.hir.types),
+            &display_mir(&output.mir.tree, &output.hir.tree, &output.hir.types),
             "mir/tree.soulc",
         ),
     ])

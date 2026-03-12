@@ -1,7 +1,9 @@
 use ast::{ArrayKind, BinaryOperator, BinaryOperatorKind, UnaryOperator};
 use hir::{Binary, BlockId, ExpressionId, HirType, HirTypeKind, TypeId, Unary};
 use soul_utils::{
-    error::{SoulError, SoulErrorKind}, ids::{FunctionId, IdAlloc}, span::Span
+    error::{SoulError, SoulErrorKind},
+    ids::{FunctionId, IdAlloc},
+    span::Span,
 };
 
 use crate::HirTypedContext;
@@ -134,7 +136,12 @@ impl<'a> HirTypedContext<'a> {
         let else_block = match else_block {
             Some(val) => val,
             None => {
-                _ = self.unify(ExpressionId::error(), self.type_table.none_type, then_type, then_span);
+                _ = self.unify(
+                    ExpressionId::error(),
+                    self.type_table.none_type,
+                    then_type,
+                    then_span,
+                );
                 return self.type_table.none_type;
             }
         };
@@ -146,12 +153,12 @@ impl<'a> HirTypedContext<'a> {
                 Some(if_span),
             ));
 
-            return TypeId::error()
+            return TypeId::error();
         }
 
         let else_type = self.infer_block(else_block);
         let else_span = self.block_span(else_block);
-        
+
         _ = self.unify(ExpressionId::error(), then_type, else_type, else_span);
         self.get_priority_type(then_type, else_type)
     }

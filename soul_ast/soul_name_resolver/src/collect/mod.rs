@@ -1,7 +1,7 @@
 use ast::{
     Block, Function, NamedTupleType, VarTypeKind, scope::{NodeId, Scope, ScopeId, ScopeValue, ScopeValueKind}
 };
-use soul_utils::ids::FunctionId;
+use soul_utils::{ids::FunctionId};
 
 use crate::NameResolver;
 mod collect_expression;
@@ -25,8 +25,8 @@ impl<'a> NameResolver<'a> {
 
     fn alloc_node(&mut self) -> NodeId {
         self.node_generator.alloc()
-    }    
-    
+    }
+
     fn alloc_function(&mut self) -> FunctionId {
         self.function_generator.alloc()
     }
@@ -60,9 +60,7 @@ impl<'a> NameResolver<'a> {
     }
 
     fn insert_function<S: Into<String>>(&mut self, name: S, id: FunctionId) {
-        self.current_scope_mut()
-            .functions
-            .insert(name.into(), id);
+        self.current_scope_mut().functions.insert(name.into(), id);
     }
 
     fn insert_value<S: Into<String>>(&mut self, name: S, id: NodeId, kind: ScopeValue) {

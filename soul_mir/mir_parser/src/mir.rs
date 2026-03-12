@@ -1,8 +1,6 @@
 use ast::{BinaryOperator, Literal, UnaryOperator};
-use hir::{TypeId};
-use soul_utils::{
-    Ident, ids::FunctionId, impl_soul_ids, vec_map::VecMap
-};
+use hir::TypeId;
+use soul_utils::{Ident, ids::FunctionId, impl_soul_ids, vec_map::VecMap};
 
 impl_soul_ids!(GlobalId, BlockId, LocalId, StatementId, PlaceId, TempId);
 
@@ -38,6 +36,8 @@ pub struct MirTree {
 
     /// Function metadata
     pub functions: VecMap<FunctionId, Function>,
+
+    pub exit_block: BlockId,
 }
 
 /// Lowered function definition in MIR.
@@ -45,7 +45,7 @@ pub struct MirTree {
 pub struct Function {
     pub id: FunctionId,
     pub name: Ident,
-    
+
     pub entry_block: BlockId,
 
     /// Parameters are locals
@@ -206,7 +206,7 @@ pub enum OperandKind {
     Comptime(Literal),
 
     /// Ref Place (e.g. `&a` or `@a`)
-    Ref{
+    Ref {
         place: PlaceId,
         mutable: bool,
     },

@@ -3,7 +3,7 @@ global1: int = 1
 global2 := 2 + 1 * 2 ** 4
 
 main() {
-    sum := sum(global1, global2)
+    sum := sum(global, global2)
     ifs()
     elif()
     // array()

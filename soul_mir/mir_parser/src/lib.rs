@@ -1,16 +1,21 @@
-
 use hir::{HirTree, TypeId};
 use hir_typed_context::HirTypedTable;
 use soul_utils::{
-    Ident, error::{SoulError, SoulErrorKind}, ids::{FunctionId, IdAlloc}, sementic_level::SementicFault, soul_error_internal, span::Span, vec_map::VecMap
+    Ident,
+    error::{SoulError, SoulErrorKind},
+    ids::{FunctionId, IdAlloc},
+    sementic_level::SementicFault,
+    soul_error_internal,
+    span::Span,
+    vec_map::VecMap,
 };
 
 pub(crate) use utils::*;
-mod utils;
 mod id_generators;
 pub mod mir;
 mod parse;
-use crate::{id_generators::IdGenerators, mir::MirTree};
+mod utils;
+use crate::{id_generators::IdGenerators, mir::{BlockId, MirTree}};
 
 pub fn mir_lower(hir: &HirTree, types: &HirTypedTable, faults: &mut Vec<SementicFault>) -> MirTree {
     let mut context = MirContext::new(hir, types, faults);
@@ -19,7 +24,7 @@ pub fn mir_lower(hir: &HirTree, types: &HirTypedTable, faults: &mut Vec<Sementic
     for global in &hir.root.globals {
         context.lower_global(global, is_end);
         if *is_end {
-            break
+            break;
         }
     }
 
@@ -30,7 +35,6 @@ pub fn mir_lower(hir: &HirTree, types: &HirTypedTable, faults: &mut Vec<Sementic
 struct MirContext<'a> {
     tree: MirTree,
     main: FunctionId,
-    exit_block: mir::BlockId,
 
     current: CurrentContext,
     id_generators: IdGenerators,
@@ -65,11 +69,10 @@ impl CurrentContext {
 
 impl<'a> MirContext<'a> {
     fn new(hir: &'a HirTree, types: &'a HirTypedTable, faults: &'a mut Vec<SementicFault>) -> Self {
-        
         let main = hir
             .functions
             .values()
-            .find(|func| func.name.as_str() == "main") 
+            .find(|func| func.name.as_str() == "main")
             .map(|f| f.id)
             .unwrap_or(FunctionId::error());
 
@@ -94,6 +97,7 @@ impl<'a> MirContext<'a> {
 
         let tree = MirTree {
             blocks,
+            exit_block: BlockId::error(),
             start_function: hir.start_function,
             temps: VecMap::const_default(),
             places: VecMap::const_default(),
@@ -106,7 +110,6 @@ impl<'a> MirContext<'a> {
         let mut this = Self {
             hir,
             main,
-            exit_block: mir::BlockId::error(),
 
             tree,
             types,
@@ -124,7 +127,7 @@ impl<'a> MirContext<'a> {
 
     fn insert_main_call(&mut self) {
         if self.main == FunctionId::error() {
-            return
+            return;
         }
 
         self.current.function = self.tree.start_function;
@@ -135,15 +138,17 @@ impl<'a> MirContext<'a> {
         let end_block = match self.current.block {
             Some(val) => val,
             None => {
-                self.log_error(soul_error_internal!("self.current.block should be Some(_)", None));
+                self.log_error(soul_error_internal!(
+                    "self.current.block should be Some(_)",
+                    None
+                ));
                 mir::BlockId::error()
             }
         };
-        self.insert_terminator(end_block, mir::Terminator::Goto(self.exit_block));
+        self.insert_terminator(end_block, mir::Terminator::Goto(self.tree.exit_block));
     }
 
     fn build_start_function(&mut self) {
-
         let entry_block = self.new_function_block();
         let start = mir::Function {
             id: self.tree.start_function,
@@ -155,24 +160,26 @@ impl<'a> MirContext<'a> {
             return_type: TypeId::error(),
         };
 
-        self.tree.blocks.insert(entry_block, mir::Block{
-            id: entry_block,
-            returnable: false,
-            terminator: mir::Terminator::Unreachable,
-            statements: vec![],
-        });
+        self.tree.blocks.insert(
+            entry_block,
+            mir::Block {
+                id: entry_block,
+                returnable: false,
+                terminator: mir::Terminator::Unreachable,
+                statements: vec![],
+            },
+        );
         self.tree.functions.insert(self.tree.start_function, start);
 
-        self.exit_block = self.new_block();
-        self.insert_terminator(self.exit_block, mir::Terminator::Exit);
+        self.tree.exit_block = self.new_block();
+        self.insert_terminator(self.tree.exit_block, mir::Terminator::Exit);
     }
 
     fn lower_global(&mut self, global: &hir::Global, is_end: &mut bool) {
         match global {
-            hir::Global::Function(function,_) => self.lower_function(*function),
-            
-            hir::Global::Variable(variable,_) 
-            | hir::Global::InternalVariable(variable,_) => {
+            hir::Global::Function(function, _) => self.lower_function(*function),
+
+            hir::Global::Variable(variable, _) | hir::Global::InternalVariable(variable, _) => {
                 let local = match self.lower_global_variable(variable) {
                     Some(val) => val,
                     None => return,
@@ -182,26 +189,26 @@ impl<'a> MirContext<'a> {
                     Some(val) => val,
                     None => return,
                 };
-                
+
                 self.current.function = self.tree.start_function;
                 self.current.block = Some(self.expect_start_block());
 
                 let place = self.new_place(local);
                 let value = self.lower_operand(value).pass(is_end);
-                self.push_statement(mir::Statement::new(mir::StatementKind::Assign { 
-                    place, 
+                self.push_statement(mir::Statement::new(mir::StatementKind::Assign {
+                    place,
                     value: mir::Rvalue::new(mir::RvalueKind::Use(value)),
                 }));
             }
-            
-            hir::Global::InternalAssign(assign,_) => {
+
+            hir::Global::InternalAssign(assign, _) => {
                 self.current.function = self.tree.start_function;
                 self.current.block = Some(self.expect_start_block());
 
                 let place = self.lower_place(&assign.place).pass(is_end);
                 let value = self.lower_operand(assign.value).pass(is_end);
-                self.push_statement(mir::Statement::new(mir::StatementKind::Assign { 
-                    place, 
+                self.push_statement(mir::Statement::new(mir::StatementKind::Assign {
+                    place,
                     value: mir::Rvalue::new(mir::RvalueKind::Use(value)),
                 }));
             }
@@ -210,11 +217,11 @@ impl<'a> MirContext<'a> {
 
     fn lower_global_variable(&mut self, variable: &hir::Variable) -> Option<mir::Place> {
         if variable.is_temp {
-            return Some(
-                mir::Place::Temp(self.new_temp(self.types.locals[variable.local]))
-            )
+            return Some(mir::Place::Temp(
+                self.new_temp(self.types.locals[variable.local]),
+            ));
         }
-        
+
         let ty = self.types.locals[variable.local];
         let local = self.new_local_global(variable.local, ty);
         let id = self.id_generators.alloc_global();
@@ -223,16 +230,20 @@ impl<'a> MirContext<'a> {
             Some(val) => val,
             None => {
                 #[cfg(debug_assertions)]
-                self.log_error(soul_error_internal!("global variables should have Some(_) value", None));
-                return None
+                self.log_error(soul_error_internal!(
+                    "global variables should have Some(_) value",
+                    None
+                ));
+                return None;
             }
         };
 
-        let literal = if let hir::ExpressionKind::Literal(literal) = &self.hir.expressions[value_id].kind {
-            Some(literal.clone())
-        } else {
-            None
-        };
+        let literal =
+            if let hir::ExpressionKind::Literal(literal) = &self.hir.expressions[value_id].kind {
+                Some(literal.clone())
+            } else {
+                None
+            };
 
         let is_literal = literal.is_some();
         let global = mir::Global {
@@ -243,7 +254,7 @@ impl<'a> MirContext<'a> {
         };
         self.tree.globals.insert(id, global);
         if is_literal {
-            return None
+            return None;
         }
 
         Some(mir::Place::Local(local))
@@ -324,7 +335,11 @@ impl<'a> MirContext<'a> {
         self.push_statement_from(statement, block_id)
     }
 
-    fn push_statement_from(&mut self, statement: mir::Statement, block_id: mir::BlockId) -> mir::StatementId {
+    fn push_statement_from(
+        &mut self,
+        statement: mir::Statement,
+        block_id: mir::BlockId,
+    ) -> mir::StatementId {
         let id = self.id_generators.alloc_statement();
         self.tree.statements.insert(id, statement);
         self.tree.blocks[block_id].statements.push(id);
@@ -364,9 +379,12 @@ impl<'a> MirContext<'a> {
     }
 
     fn expect_start_block(&mut self) -> mir::BlockId {
-        
         let start = self.tree.start_function;
-        let block = self.tree.functions.get(start).map(|block| block.blocks.get(0));
+        let block = self
+            .tree
+            .functions
+            .get(start)
+            .map(|block| block.blocks.get(0));
 
         match block {
             Some(Some(val)) => *val,
@@ -381,7 +399,11 @@ impl<'a> MirContext<'a> {
     }
 
     pub(crate) fn expression_ty(&self, id: hir::ExpressionId) -> hir::TypeId {
-        self.types.expressions.get(id).copied().unwrap_or(hir::TypeId::error())
+        self.types
+            .expressions
+            .get(id)
+            .copied()
+            .unwrap_or(hir::TypeId::error())
     }
 
     fn to_mir_tree(self) -> MirTree {

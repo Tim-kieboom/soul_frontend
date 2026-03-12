@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use soul_utils::{Ident, ids::FunctionId, impl_soul_ids, span::Span};
 
-use crate::{ast::Variable};
+use crate::ast::Variable;
 
 impl_soul_ids!(NodeId);
 

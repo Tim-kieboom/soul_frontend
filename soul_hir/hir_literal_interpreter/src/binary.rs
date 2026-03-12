@@ -1,5 +1,5 @@
-use std::cmp::Ordering;
 use ast::{BinaryOperator, Literal};
+use std::cmp::Ordering;
 
 use crate::{try_as_f64, try_as_i128, try_as_u128};
 
@@ -11,12 +11,9 @@ pub(crate) fn interpret_binary(
     use ast::BinaryOperatorKind as B;
 
     Some(match operator.node {
-        B::Invalid
-        | B::TypeOf
-        | B::Range => return None,
+        B::Invalid | B::TypeOf | B::Range => return None,
 
-        B::Add | B::Sub | B::Mul | B::Div | B::Mod
-        | B::Pow | B::Root | B::Log => {
+        B::Add | B::Sub | B::Mul | B::Div | B::Mod | B::Pow | B::Root | B::Log => {
             if let (Some(a), Some(b)) = (try_as_u128(left), try_as_u128(right)) {
                 match operator.node {
                     B::Add => Literal::Uint(a + b as u128),
@@ -29,8 +26,7 @@ pub(crate) fn interpret_binary(
                     B::Log => Literal::Uint((a as f64).log(b as f64) as u128),
                     _ => unreachable!(),
                 }
-            }
-            else if let (Some(a), Some(b)) = (try_as_i128(left), try_as_i128(right)) {
+            } else if let (Some(a), Some(b)) = (try_as_i128(left), try_as_i128(right)) {
                 match operator.node {
                     B::Add => Literal::Int(a + b as i128),
                     B::Sub => Literal::Int(a - b as i128),
@@ -55,7 +51,7 @@ pub(crate) fn interpret_binary(
                     _ => unreachable!(),
                 }
             } else {
-                return None
+                return None;
             }
         }
 
@@ -63,14 +59,14 @@ pub(crate) fn interpret_binary(
             if let (Some(a), Some(b)) = (try_as_i128(left), try_as_i128(right)) {
                 match operator.node {
                     B::BitAnd => Literal::Int((a & b) as i128),
-                    B::BitOr  => Literal::Int((a | b) as i128),
+                    B::BitOr => Literal::Int((a | b) as i128),
                     B::BitXor => Literal::Int((a ^ b) as i128),
                     _ => unreachable!(),
                 }
             } else if let (Some(a), Some(b)) = (try_as_u128(left), try_as_u128(right)) {
                 match operator.node {
                     B::BitAnd => Literal::Uint((a & b) as u128),
-                    B::BitOr  => Literal::Uint((a | b) as u128),
+                    B::BitOr => Literal::Uint((a | b) as u128),
                     B::BitXor => Literal::Uint((a ^ b) as u128),
                     _ => unreachable!(),
                 }
@@ -79,16 +75,14 @@ pub(crate) fn interpret_binary(
             }
         }
 
-        B::LogAnd | B::LogOr => {
-            match (left, right) {
-                (Literal::Bool(a), Literal::Bool(b)) => match operator.node {
-                    B::LogAnd => Literal::Bool(*a && *b),
-                    B::LogOr  => Literal::Bool(*a || *b),
-                    _ => unreachable!(),
-                },
-                _ => return None,
-            }
-        }
+        B::LogAnd | B::LogOr => match (left, right) {
+            (Literal::Bool(a), Literal::Bool(b)) => match operator.node {
+                B::LogAnd => Literal::Bool(*a && *b),
+                B::LogOr => Literal::Bool(*a || *b),
+                _ => unreachable!(),
+            },
+            _ => return None,
+        },
 
         B::Eq | B::NotEq => {
             let eq = match (left, right) {
@@ -102,7 +96,7 @@ pub(crate) fn interpret_binary(
                     if let (Some(a), Some(b)) = (try_as_f64(left), try_as_f64(right)) {
                         a == b
                     } else {
-                        return None
+                        return None;
                     }
                 }
             };

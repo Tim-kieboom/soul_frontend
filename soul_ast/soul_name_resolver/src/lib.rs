@@ -1,19 +1,24 @@
 use ast::{
-    DeclareStore, AstResponse,
+    AstResponse, DeclareStore,
     meta_data::AstMetadata,
     scope::{NodeId, ScopeValue},
 };
-use soul_utils::{Ident, error::SoulError, ids::{FunctionId, IdGenerator}, sementic_level::SementicFault};
+use soul_utils::{
+    Ident,
+    error::SoulError,
+    ids::{FunctionId, IdGenerator},
+    sementic_level::SementicFault,
+};
 
 mod collect;
 mod resolve;
 
 pub fn name_resolve(request: &mut AstResponse, faults: &mut Vec<SementicFault>) {
     let mut resolver = NameResolver::new(
-        &mut request.meta_data, 
-        faults, 
+        &mut request.meta_data,
+        faults,
         &mut request.store,
-        &mut request.function_generators, 
+        &mut request.function_generators,
     );
     let root = &mut request.tree.root;
 

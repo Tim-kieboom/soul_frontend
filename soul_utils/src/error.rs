@@ -82,6 +82,8 @@ pub enum SoulErrorKind {
     Empty,
     InternalError(String, u32),
 
+    LlvmError,
+
     NotFoundInScope,
 
     UnifyTypeError,

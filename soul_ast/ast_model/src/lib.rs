@@ -1,4 +1,7 @@
-use soul_utils::{ids::{FunctionId, IdGenerator}, vec_map::VecMap};
+use soul_utils::{
+    ids::{FunctionId, IdGenerator},
+    vec_map::VecMap,
+};
 
 mod ast;
 pub mod meta_data;

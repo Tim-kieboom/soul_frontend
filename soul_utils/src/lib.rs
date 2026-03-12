@@ -1,6 +1,9 @@
 pub mod char_colors;
+pub mod compile_options;
 pub mod define_enums;
 pub mod error;
+pub mod ids;
+pub mod precedence;
 pub mod print_breakpoint;
 pub mod sementic_level;
 pub mod soul_import_path;
@@ -10,9 +13,6 @@ pub mod symbool_kind;
 pub mod try_result;
 pub mod vec_map;
 pub mod vec_set;
-pub mod ids;
-pub mod precedence;
-pub mod compile_options;
 
 #[cfg(test)]
 mod vec_map_tests;

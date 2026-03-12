@@ -52,5 +52,4 @@ impl IdAllocalors {
     pub fn alloc_body(&mut self) -> BlockId {
         self.block.alloc()
     }
-
 }

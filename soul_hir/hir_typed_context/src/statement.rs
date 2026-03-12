@@ -1,10 +1,13 @@
 use crate::HirTypedContext;
 use hir::{
-    Assign, BlockId, ExpressionId, Global, HirType, LocalId, Place, PlaceKind,
-    Statement, TypeId, Variable,
+    Assign, BlockId, ExpressionId, Global, HirType, LocalId, Place, PlaceKind, Statement, TypeId,
+    Variable,
 };
 use soul_utils::{
-    error::{SoulError, SoulErrorKind}, ids::{FunctionId, IdAlloc}, soul_names::TypeModifier, span::Span
+    error::{SoulError, SoulErrorKind},
+    ids::{FunctionId, IdAlloc},
+    soul_names::TypeModifier,
+    span::Span,
 };
 
 impl<'a> HirTypedContext<'a> {
@@ -91,8 +94,7 @@ impl<'a> HirTypedContext<'a> {
     pub(crate) fn infer_place(&mut self, place: &Place) -> TypeId {
         let span = place.span;
         let ty = match &place.node {
-            PlaceKind::Temp(id, _)
-            | PlaceKind::Local(id, _) => {
+            PlaceKind::Temp(id, _) | PlaceKind::Local(id, _) => {
                 if *id == LocalId::error() {
                     TypeId::error()
                 } else {

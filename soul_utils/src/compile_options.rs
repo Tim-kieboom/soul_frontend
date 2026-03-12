@@ -3,6 +3,8 @@ pub struct CompilerOptions {
 }
 impl Default for CompilerOptions {
     fn default() -> Self {
-        Self { debug_view_literal_resolve: false }
+        Self {
+            debug_view_literal_resolve: false,
+        }
     }
 }

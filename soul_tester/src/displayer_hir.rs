@@ -1,6 +1,10 @@
 use hir::{Binary, BlockId, ExpressionId, HirTree, LocalId, TypeId, Unary};
 use hir_typed_context::HirTypedTable;
-use soul_utils::{ids::{FunctionId, IdAlloc}, soul_names::KeyWord, vec_map::VecMapIndex};
+use soul_utils::{
+    ids::{FunctionId, IdAlloc},
+    soul_names::KeyWord,
+    vec_map::VecMapIndex,
+};
 use std::fmt::Write;
 
 pub fn display_hir(hir: &HirTree) -> String {
@@ -337,7 +341,11 @@ impl<'a> HirDisplayer<'a> {
 
     fn display_expression_astype(&mut self, value: ExpressionId, id: TypeId) {
         let ty = match &self.type_table {
-            Some(val) => val.expressions.get(value).copied().unwrap_or(TypeId::error()),
+            Some(val) => val
+                .expressions
+                .get(value)
+                .copied()
+                .unwrap_or(TypeId::error()),
             None => id,
         };
         self.display_astype(ty);

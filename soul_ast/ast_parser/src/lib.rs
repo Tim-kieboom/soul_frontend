@@ -1,6 +1,6 @@
-use ast::{DeclareStore, AstResponse, meta_data::AstMetadata};
+use ast::{AstResponse, DeclareStore, meta_data::AstMetadata};
 use soul_tokenizer::TokenStream;
-use soul_utils::{ids::{IdGenerator}, sementic_level::SementicFault};
+use soul_utils::{ids::IdGenerator, sementic_level::SementicFault};
 
 use crate::parser::Parser;
 mod parser;

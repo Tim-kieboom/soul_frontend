@@ -1,9 +1,13 @@
 use hir::{
-    BlockId, ExpressionId, HirTree, HirType, LocalId, PlaceId, StatementId,
-    TypeId, TypesMap,
+    BlockId, ExpressionId, HirTree, HirType, LocalId, PlaceId, StatementId, TypeId, TypesMap,
 };
 use soul_utils::{
-    error::SoulError, ids::{FunctionId, IdAlloc}, sementic_level::SementicFault, span::Span, vec_map::VecMap, vec_set::VecSet
+    error::SoulError,
+    ids::{FunctionId, IdAlloc},
+    sementic_level::SementicFault,
+    span::Span,
+    vec_map::VecMap,
+    vec_set::VecSet,
 };
 
 use crate::infer_table::InferTable;

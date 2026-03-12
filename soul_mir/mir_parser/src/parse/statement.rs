@@ -5,15 +5,18 @@ use crate::{EndBlock, MirContext, mir};
 pub(crate) struct StatementResponse {
     /// insert terminator in block
     pub(crate) terminator: Option<mir::Terminator>,
-    
+
     /// operand is Some() when statement is expressionStatement
     pub(crate) expression_operand: Option<mir::Operand>,
 }
 
 impl<'a> MirContext<'a> {
-    pub(crate) fn lower_statement(&mut self, statement: &hir::Statement) -> EndBlock<StatementResponse> {
+    pub(crate) fn lower_statement(
+        &mut self,
+        statement: &hir::Statement,
+    ) -> EndBlock<StatementResponse> {
         let statement_id = statement.get_id();
-        let is_end = &mut false; 
+        let is_end = &mut false;
 
         let mut last_operand = None;
 
@@ -28,11 +31,12 @@ impl<'a> MirContext<'a> {
                 None
             }
             hir::Statement::Expression { value, .. } => {
-
                 let kind = &self.hir.expressions[*value].kind;
                 let operand = self.lower_operand(*value).pass(is_end);
-                
-                if is_valid_statement_expression(kind) && !matches!(operand.kind, mir::OperandKind::None) {
+
+                if is_valid_statement_expression(kind)
+                    && !matches!(operand.kind, mir::OperandKind::None)
+                {
                     let statement = mir::Statement::new(mir::StatementKind::Eval(operand.clone()));
                     self.push_statement(statement);
                 }
@@ -60,7 +64,10 @@ impl<'a> MirContext<'a> {
                         self.insert_terminator(current, mir::Terminator::Goto(block_id));
                     }
                     _ => {
-                        self.log_error(soul_error_internal!("`self.current.loop_continue` is None", Some(span)));
+                        self.log_error(soul_error_internal!(
+                            "`self.current.loop_continue` is None",
+                            Some(span)
+                        ));
                     }
                 }
 
@@ -68,7 +75,10 @@ impl<'a> MirContext<'a> {
             }
             hir::Statement::Break(value, _) => {
                 if value.is_some() {
-                    self.log_error(soul_error_internal!("'break' with value is not yet impl", Some(span)));
+                    self.log_error(soul_error_internal!(
+                        "'break' with value is not yet impl",
+                        Some(span)
+                    ));
                 }
 
                 let current = self.expect_current_block();
@@ -78,7 +88,10 @@ impl<'a> MirContext<'a> {
                         self.insert_terminator(current, mir::Terminator::Goto(bock_id));
                     }
                     _ => {
-                        self.log_error(soul_error_internal!("`self.current.loop_finish` is None", Some(span)));
+                        self.log_error(soul_error_internal!(
+                            "`self.current.loop_finish` is None",
+                            Some(span)
+                        ));
                     }
                 }
 
@@ -99,7 +112,6 @@ impl<'a> MirContext<'a> {
     }
 
     pub(crate) fn lower_variable(&mut self, variable: &hir::Variable, is_end: &mut bool) {
-        
         let place_kind = if variable.is_temp {
             mir::Place::Temp(match self.temp_remap.get(variable.local) {
                 Some(val) => *val,
@@ -111,7 +123,7 @@ impl<'a> MirContext<'a> {
                 None => self.new_local(variable.local, self.types.locals[variable.local]),
             })
         };
-        
+
         if let Some(value) = variable.value {
             let operand = self.lower_operand(value).pass(is_end);
             let place = self.new_place(place_kind);
@@ -129,7 +141,7 @@ impl<'a> MirContext<'a> {
         let place = self.lower_place(&assign.place).pass(is_end);
         let value = self.lower_operand(assign.value).pass(is_end);
         if matches!(value.kind, mir::OperandKind::None) {
-            return
+            return;
         }
 
         let statement = mir::Statement::new(mir::StatementKind::Assign {
@@ -143,7 +155,7 @@ impl<'a> MirContext<'a> {
 
 fn is_valid_statement_expression(kind: &hir::ExpressionKind) -> bool {
     match kind {
-        hir::ExpressionKind::Null 
+        hir::ExpressionKind::Null
         | hir::ExpressionKind::Load(_)
         | hir::ExpressionKind::Local(_)
         | hir::ExpressionKind::DeRef(_)
@@ -153,7 +165,7 @@ fn is_valid_statement_expression(kind: &hir::ExpressionKind) -> bool {
         | hir::ExpressionKind::Unary { .. }
         | hir::ExpressionKind::Binary { .. }
         | hir::ExpressionKind::InnerRawStackArray { .. } => false,
-        
+
         hir::ExpressionKind::Block(_)
         | hir::ExpressionKind::Function(_)
         | hir::ExpressionKind::If { .. }

@@ -50,10 +50,7 @@ fn try_display_infered_type(sb: &mut String, kind: &DisplayKind, node_id: Option
     let type_str = match types_store.get(id) {
         Some(val) => val,
         None => {
-            sb.push_str(&format!(
-                "/*!!type of {:?} not found!!*/",
-                id
-            ));
+            sb.push_str(&format!("/*!!type of {:?} not found!!*/", id));
             return;
         }
     };

@@ -16,7 +16,7 @@ pub type Place = Spanned<PlaceKind>;
 pub enum PlaceKind {
     /// A local variable.
     Local(LocalId, PlaceId),
-    
+
     /// A temperary local variable.
     Temp(LocalId, PlaceId),
 

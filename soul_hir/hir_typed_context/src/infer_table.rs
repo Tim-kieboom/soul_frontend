@@ -1,6 +1,11 @@
 use hir::{HirType, HirTypeKind, InferTypeId, TypeId, TypesMap, UnifyResult};
 use soul_utils::{
-    error::{SoulError, SoulErrorKind, SoulResult}, ids::IdGenerator, soul_error_internal, soul_names::TypeModifier, span::Span, vec_map::{VecMap, VecMapIndex}
+    error::{SoulError, SoulErrorKind, SoulResult},
+    ids::IdGenerator,
+    soul_error_internal,
+    soul_names::TypeModifier,
+    span::Span,
+    vec_map::{VecMap, VecMapIndex},
 };
 
 #[derive(Debug, Clone)]

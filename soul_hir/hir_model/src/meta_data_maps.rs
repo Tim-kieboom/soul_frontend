@@ -1,12 +1,16 @@
 use std::{collections::HashMap, hash::Hash};
 
 use soul_utils::{
-    ids::{FunctionId, IdAlloc, IdGenerator}, soul_import_path::SoulImportPath, soul_names::TypeModifier, span::{ItemMetaData, Span}, vec_map::{VecMap, VecMapIndex}
+    ids::{FunctionId, IdAlloc, IdGenerator},
+    soul_import_path::SoulImportPath,
+    soul_names::TypeModifier,
+    span::{ItemMetaData, Span},
+    vec_map::{VecMap, VecMapIndex},
 };
 
 use crate::{
-    BlockId, ExpressionId, HirType, HirTypeKind, InferTypeId,
-    LocalId, ModuleId, StatementId, TypeId,
+    BlockId, ExpressionId, HirType, HirTypeKind, InferTypeId, LocalId, ModuleId, StatementId,
+    TypeId,
 };
 
 /// Maps HIR node IDs to their original source code spans.

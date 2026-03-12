@@ -24,7 +24,7 @@ impl<'a> MirContext<'a> {
         for parameter in &function.parameters {
             let ty = self.types.locals[parameter.local];
             let local_id = self.new_local(parameter.local, ty);
-            
+
             let parameters = &mut self.tree.functions[function_id].parameters;
             parameters.push(local_id);
         }

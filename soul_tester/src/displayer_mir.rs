@@ -1,14 +1,18 @@
 use hir::{HirTree, HirType};
 use hir_typed_context::HirTypedTable;
 use mir_parser::mir::{
-    self, BlockId, LocalId, MirTree, Operand, Place, PlaceId, Rvalue, StatementId, TempId
+    self, BlockId, LocalId, MirTree, Operand, Place, PlaceId, Rvalue, StatementId, TempId,
 };
-use soul_utils::{ids::{FunctionId, IdAlloc}, soul_names::{TypeModifier, TypeWrapper}, vec_map::VecMapIndex};
+use soul_utils::{
+    ids::{FunctionId, IdAlloc},
+    soul_names::{TypeModifier, TypeWrapper},
+    vec_map::VecMapIndex,
+};
 use std::fmt::Write;
 
 pub fn display_mir(mir: &MirTree, hir: &HirTree, types: &HirTypedTable) -> String {
     let mut displayer = MirDisplayer::new(mir, hir, types);
-    
+
     displayer.push_str("Globals [\n");
     for global in mir.globals.values() {
         displayer.display_global(global);
@@ -139,7 +143,11 @@ impl<'a> MirDisplayer<'a> {
                     self.display_operand(value);
                 }
             }
-            mir::Terminator::If { condition, then, arm } => {
+            mir::Terminator::If {
+                condition,
+                then,
+                arm,
+            } => {
                 self.push_str("if(");
                 self.display_operand(condition);
                 self.push_str(") ");
@@ -147,7 +155,12 @@ impl<'a> MirDisplayer<'a> {
                 self.push_str("\n\t\telse ");
                 self.display_goto(*arm);
             }
-            mir::Terminator::Call { id, arguments, return_place, next, } => {
+            mir::Terminator::Call {
+                id,
+                arguments,
+                return_place,
+                next,
+            } => {
                 if let Some(place) = return_place {
                     self.display_place(place);
                     self.push_str(" = ");
@@ -200,9 +213,10 @@ impl<'a> MirDisplayer<'a> {
 
     fn display_rvalue(&mut self, value: &Rvalue) {
         match &value.kind {
-            mir::RvalueKind::StackAlloc { ty, len:_ } => {
+            mir::RvalueKind::StackAlloc { ty, len: _ } => {
                 self.push_str("/*stack alloc ");
-                self.types.types
+                self.types
+                    .types
                     .get_type(*ty)
                     .expect("should have TypeId")
                     .write_display(&self.types.types, &mut self.sb)
@@ -233,7 +247,7 @@ impl<'a> MirDisplayer<'a> {
         const CONST: bool = false;
 
         match &operand.kind {
-            mir::OperandKind::Ref { place, mutable, } => {
+            mir::OperandKind::Ref { place, mutable } => {
                 match *mutable {
                     MUT => self.push_str(TypeWrapper::MutRef.as_str()),
                     CONST => self.push_str(TypeWrapper::ConstRef.as_str()),

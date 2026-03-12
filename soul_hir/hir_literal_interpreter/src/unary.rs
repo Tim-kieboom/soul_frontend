@@ -1,11 +1,8 @@
-use ast::{UnaryOperator, Literal};
+use ast::{Literal, UnaryOperator};
 
 use crate::{try_as_f64, try_as_i128};
 
-pub(crate) fn interpret_unary(
-    operator: &UnaryOperator,
-    operand: &Literal,
-) -> Option<Literal> {
+pub(crate) fn interpret_unary(operator: &UnaryOperator, operand: &Literal) -> Option<Literal> {
     use ast::UnaryOperatorKind as U;
 
     Some(match operator.node {
@@ -36,21 +33,19 @@ pub(crate) fn interpret_unary(
                     U::Increment { .. } => Literal::Int(value + 1),
                     U::Decrement { .. } => Literal::Int(value - 1),
                     _ => unreachable!(),
-                }
+                },
                 Literal::Uint(value) => match operator.node {
                     U::Increment { .. } => Literal::Uint(value + 1),
                     U::Decrement { .. } => Literal::Uint(value - 1),
                     _ => unreachable!(),
-                }
-                Literal::Float(value) => 
-                    match operator.node {
-                        U::Increment { .. } => Literal::Float(value + 1.0),
-                        U::Decrement { .. } => Literal::Float(value - 1.0),
-                        _ => unreachable!(),
-                    }
+                },
+                Literal::Float(value) => match operator.node {
+                    U::Increment { .. } => Literal::Float(value + 1.0),
+                    U::Decrement { .. } => Literal::Float(value - 1.0),
+                    _ => unreachable!(),
+                },
                 _ => return None,
             }
         }
-
     })
 }

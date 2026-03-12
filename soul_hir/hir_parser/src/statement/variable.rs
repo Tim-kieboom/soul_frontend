@@ -13,10 +13,15 @@ impl<'a> HirContext<'a> {
             Some(val) => Some(self.lower_expression(val)),
             None => None,
         };
-        
+
         let local = self.id_generator.alloc_local();
         self.insert_variable(&variable.name, local, ty);
 
-        hir::Variable { ty, is_temp: false, value, local }
+        hir::Variable {
+            ty,
+            is_temp: false,
+            value,
+            local,
+        }
     }
 }

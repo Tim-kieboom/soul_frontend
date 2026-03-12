@@ -11,5 +11,3 @@ impl_soul_ids!(
     StatementId,
     ExpressionId
 );
-
-

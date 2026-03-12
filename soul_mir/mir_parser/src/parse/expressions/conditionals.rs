@@ -2,15 +2,14 @@ use crate::{MirContext, mir};
 
 impl<'a> MirContext<'a> {
     pub(super) fn lower_while(
-        &mut self, 
+        &mut self,
         hir_condition: Option<hir::ExpressionId>,
         body_id: hir::BlockId,
         is_end: &mut bool,
     ) -> mir::Operand {
-
         let prev_finish = self.current.loop_finish;
         let prev_continue = self.current.loop_continue;
-        
+
         let parent_bb = self.expect_current_block();
 
         let returnable = self.tree.blocks[parent_bb].returnable;
@@ -30,12 +29,12 @@ impl<'a> MirContext<'a> {
             Some(hir_condition) => {
                 let condition = self.lower_operand(hir_condition).pass(is_end);
                 self.insert_terminator(
-                    condition_bb, 
-                    mir::Terminator::If { 
-                        condition, 
-                        then: loop_bb, 
+                    condition_bb,
+                    mir::Terminator::If {
+                        condition,
+                        then: loop_bb,
                         arm: join_bb,
-                    }
+                    },
                 );
             }
             None => self.insert_terminator(condition_bb, mir::Terminator::Goto(loop_bb)),
@@ -51,11 +50,11 @@ impl<'a> MirContext<'a> {
     }
 
     pub(super) fn lower_if(
-        &mut self, 
-        hir_condition: hir::ExpressionId, 
-        then_block: hir::BlockId, 
-        else_block: Option<hir::BlockId>, 
-        ty: hir::TypeId, 
+        &mut self,
+        hir_condition: hir::ExpressionId,
+        then_block: hir::BlockId,
+        else_block: Option<hir::BlockId>,
+        ty: hir::TypeId,
         is_end: &mut bool,
     ) -> mir::Operand {
         let parent = self.expect_current_block();
@@ -79,23 +78,30 @@ impl<'a> MirContext<'a> {
             None => after_if,
         };
 
-        self.insert_terminator(parent, mir::Terminator::If { condition, then, arm });
+        self.insert_terminator(
+            parent,
+            mir::Terminator::If {
+                condition,
+                then,
+                arm,
+            },
+        );
         self.current.block = Some(after_if);
         mir::Operand::new(
-            ty, 
+            ty,
             match temp {
                 Some(temp_id) => mir::OperandKind::Temp(*temp_id),
                 None => mir::OperandKind::None,
-            }
+            },
         )
-    } 
+    }
 
     fn lower_arm(
-        &mut self, 
-        hir_block: hir::BlockId, 
-        arm: mir::BlockId, 
-        join: mir::BlockId, 
-        ty: hir::TypeId, 
+        &mut self,
+        hir_block: hir::BlockId,
+        arm: mir::BlockId,
+        join: mir::BlockId,
+        ty: hir::TypeId,
         temp: &mut Option<mir::TempId>,
         is_end: &mut bool,
     ) {

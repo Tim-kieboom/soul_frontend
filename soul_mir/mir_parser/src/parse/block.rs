@@ -8,8 +8,11 @@ struct LiveIndex {
 }
 
 impl<'a> MirContext<'a> {
-    pub(crate) fn lower_block(&mut self, hir_block: hir::BlockId, mir_block: mir::BlockId) -> EndBlock<Option<mir::Operand>> {
-
+    pub(crate) fn lower_block(
+        &mut self,
+        hir_block: hir::BlockId,
+        mir_block: mir::BlockId,
+    ) -> EndBlock<Option<mir::Operand>> {
         let mut this_block = mir_block;
 
         self.current.block = Some(this_block);
@@ -21,19 +24,18 @@ impl<'a> MirContext<'a> {
         let is_end = &mut false;
 
         for statement in &block.statements {
-            
             let response = self.lower_statement(statement).pass(is_end);
             match response.terminator {
                 Some(val) => terminator = Some(val),
                 None => (),
-            }          
+            }
             match response.expression_operand {
                 Some(val) => block_operand = Some(val),
                 None => (),
             }
 
             if *is_end {
-                break
+                break;
             }
         }
 
@@ -41,10 +43,12 @@ impl<'a> MirContext<'a> {
         if !self.tree.blocks[this_block].returnable {
             let terminator = match terminator {
                 Some(mir::Terminator::Return(operand)) => operand,
-                Some(mir::Terminator::Goto(_))
-                | None => block_operand,
+                Some(mir::Terminator::Goto(_)) | None => block_operand,
                 _ => {
-                    self.log_error(soul_error_internal!("should not have this terminator kind in block", None));
+                    self.log_error(soul_error_internal!(
+                        "should not have this terminator kind in block",
+                        None
+                    ));
                     None
                 }
             };
@@ -54,23 +58,22 @@ impl<'a> MirContext<'a> {
         }
 
         match (terminator, block.terminator) {
-            (Some(terminator), _) => {
-                self.insert_terminator(this_block, terminator)
-            }
+            (Some(terminator), _) => self.insert_terminator(this_block, terminator),
             (_, Some(expression)) => {
                 let value = match block_operand {
                     Some(val) => val,
                     None => {
-                        self.log_error(soul_error_internal!("block_operand should be Some(_)", None));
+                        self.log_error(soul_error_internal!(
+                            "block_operand should be Some(_)",
+                            None
+                        ));
                         self.lower_operand(expression).pass(is_end)
                     }
                 };
 
                 self.insert_terminator(this_block, mir::Terminator::Return(Some(value)))
             }
-            _ => {
-                self.insert_terminator(this_block, mir::Terminator::Return(None))
-            }
+            _ => self.insert_terminator(this_block, mir::Terminator::Return(None)),
         }
 
         self.end_scope(live_i, parent_scope);
@@ -79,10 +82,18 @@ impl<'a> MirContext<'a> {
 
     fn start_scope(&mut self, entry_block: mir::BlockId) -> (LiveIndex, Vec<mir::LocalId>) {
         let parent_scope = self.push_scope();
-        
+
         let i = self.tree.blocks[entry_block].statements.len();
-        self.push_statement(mir::Statement::new(mir::StatementKind::StorageStart(vec![])));
-        (LiveIndex{ block: entry_block, index: i }, parent_scope)
+        self.push_statement(mir::Statement::new(mir::StatementKind::StorageStart(
+            vec![],
+        )));
+        (
+            LiveIndex {
+                block: entry_block,
+                index: i,
+            },
+            parent_scope,
+        )
     }
 
     fn end_scope(&mut self, i_live: LiveIndex, parent_scope: Vec<mir::LocalId>) {
@@ -95,7 +106,7 @@ impl<'a> MirContext<'a> {
         let statement = &mut self.tree.statements[statement_id];
         if let mir::StatementKind::StorageStart(scope) = &mut statement.kind {
             *scope = this_scope;
-        } 
+        }
     }
 
     /// makes new scope in `current.scope` and return parent scope

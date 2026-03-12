@@ -1,8 +1,9 @@
-use hir::{TypeId};
+use hir::TypeId;
 use soul_utils::{ids::IdAlloc, soul_error_internal};
 
 use crate::{
-    EndBlock, MirContext, mir::{self, Rvalue}
+    EndBlock, MirContext,
+    mir::{self, Rvalue},
 };
 
 impl<'a> MirContext<'a> {
@@ -31,7 +32,7 @@ impl<'a> MirContext<'a> {
                         let temp = self.new_temp(ty);
                         self.temp_remap.insert(*local_id, temp);
                         temp
-                    },
+                    }
                 };
 
                 self.new_place(mir::Place::Temp(temp))
@@ -48,7 +49,8 @@ impl<'a> MirContext<'a> {
             hir::PlaceKind::Field { .. } => todo!("mir desugar field"),
         };
 
-        self.place_typed.insert(mir_place, self.types.places[place.node.get_id()]);
+        let ty = self.types.places[place.node.get_id()];
+        self.place_typed.insert(mir_place, ty);
         EndBlock::new(mir_place, is_end)
     }
 
@@ -72,9 +74,7 @@ impl<'a> MirContext<'a> {
             mir::Place::Local(local_id) => {
                 mir::Operand::new(ty, mir::OperandKind::Local(*local_id))
             }
-            mir::Place::Temp(temp) => {
-                mir::Operand::new(ty, mir::OperandKind::Temp(*temp))
-            }
+            mir::Place::Temp(temp) => mir::Operand::new(ty, mir::OperandKind::Temp(*temp)),
             mir::Place::Deref(operand) => {
                 let operand = operand.clone();
                 self.deref_to_operand(operand)

@@ -1,6 +1,9 @@
 use hir::{HirType, HirTypeKind, TypeId, TypesMap};
 use soul_utils::{
-    ids::IdAlloc, soul_error_internal, soul_names::{PrimitiveTypes, TypeModifier}, span::Span
+    ids::IdAlloc,
+    soul_error_internal,
+    soul_names::{PrimitiveTypes, TypeModifier},
+    span::Span,
 };
 
 use crate::HirContext;

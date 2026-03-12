@@ -5,14 +5,19 @@ mod ids;
 mod meta_data_maps;
 mod place;
 mod statement;
-use ast::{FunctionKind};
+use ast::FunctionKind;
 pub use expression::*;
 pub use function::*;
 pub use hir_type::*;
 pub use ids::*;
 pub use meta_data_maps::*;
 pub use place::*;
-use soul_utils::{Ident, ids::{FunctionId, IdAlloc}, span::Span, vec_map::VecMap};
+use soul_utils::{
+    Ident,
+    ids::{FunctionId, IdAlloc},
+    span::Span,
+    vec_map::VecMap,
+};
 pub use statement::*;
 
 /// High-level Intermediate Representation (HIR) tree.
@@ -54,13 +59,13 @@ pub struct HirTree {
 
 impl HirTree {
     pub fn new(root_id: ModuleId, start_function_id: FunctionId) -> Self {
-        let start_function = Function{ 
-            id: start_function_id, 
-            name: Ident::new("_start".to_string(), Span::default_const()), 
-            parameters: vec![], 
-            body: BlockId::error(), 
-            kind: FunctionKind::Static, 
-            return_type: TypeId::error(), 
+        let start_function = Function {
+            id: start_function_id,
+            name: Ident::new("_start".to_string(), Span::default_const()),
+            parameters: vec![],
+            body: BlockId::error(),
+            kind: FunctionKind::Static,
+            return_type: TypeId::error(),
         };
 
         Self {

@@ -1,5 +1,7 @@
 use hir::{Binary, Unary};
-use soul_utils::{ids::{FunctionId, IdAlloc}, soul_error_internal, span::Span};
+use soul_utils::{
+    ids::{FunctionId, IdAlloc}, soul_error_internal, span::Span
+};
 
 use crate::{EndBlock, MirContext, mir};
 
@@ -73,9 +75,9 @@ impl<'a> MirContext<'a> {
                 function,
                 callee,
                 arguments: hir_arguments,
-            } => {
-                self.lower_call(*function, callee, hir_arguments, ty, span).pass(is_end)
-            }
+            } => self
+                .lower_call(*function, callee, hir_arguments, ty, span)
+                .pass(is_end),
             hir::ExpressionKind::Block(block_id) => {
                 let main_body = self.expect_current_block();
                 self.lower_block(*block_id, main_body).pass(is_end);
@@ -100,13 +102,16 @@ impl<'a> MirContext<'a> {
                 operand
             }
 
-            hir::ExpressionKind::Null => todo!("ExpressionKind::Null  not yet impl in mir"),
+            hir::ExpressionKind::Null => {
+                self.log_error(soul_error_internal!("ExpressionKind::Null  not yet impl in mir", Some(span)));
+                mir::Operand::new(ty, mir::OperandKind::None)
+            }
             hir::ExpressionKind::Function(_) => {
-                todo!("ExpressionKind::Function not yet impl in mir")
+                self.log_error(soul_error_internal!("ExpressionKind::Function not yet impl in mir", Some(span)));
+                mir::Operand::new(ty, mir::OperandKind::None)
             }
 
             hir::ExpressionKind::Load(place) => {
-
                 let place_id = self.lower_place(place).pass(is_end);
                 let operand = match &self.tree.places[place_id] {
                     mir::Place::Local(local) => {
@@ -147,10 +152,18 @@ impl<'a> MirContext<'a> {
 
                 let place_id = self.lower_place(place).pass(is_end);
 
-                mir::Operand::new(ty, mir::OperandKind::Ref{place: place_id, mutable: *mutable})
+                mir::Operand::new(
+                    ty,
+                    mir::OperandKind::Ref {
+                        place: place_id,
+                        mutable: *mutable,
+                    },
+                )
             }
 
-            hir::ExpressionKind::Cast { value: inner, .. } => self.lower_operand(*inner).pass(is_end),
+            hir::ExpressionKind::Cast { value: inner, .. } => {
+                self.lower_operand(*inner).pass(is_end)
+            }
 
             hir::ExpressionKind::InnerRawStackArray { .. } => {
                 mir::Operand::new(self.types.none_type, mir::OperandKind::None)
@@ -161,9 +174,7 @@ impl<'a> MirContext<'a> {
                 then_block,
                 else_block,
                 ends_with_else: _,
-            } => {
-                self.lower_if(*condition, *then_block, *else_block, value.ty, is_end)
-            }
+            } => self.lower_if(*condition, *then_block, *else_block, value.ty, is_end),
             hir::ExpressionKind::While { condition, body } => {
                 self.lower_while(*condition, *body, is_end)
             }
@@ -173,15 +184,15 @@ impl<'a> MirContext<'a> {
     }
 
     pub(crate) fn lower_call(
-        &mut self, 
-        function: FunctionId, 
-        callee: &Option<hir::ExpressionId>, 
-        hir_arguments: &Vec<hir::ExpressionId>, 
-        ty: hir::TypeId, 
+        &mut self,
+        function: FunctionId,
+        callee: &Option<hir::ExpressionId>,
+        hir_arguments: &Vec<hir::ExpressionId>,
+        ty: hir::TypeId,
         span: Span,
     ) -> EndBlock<mir::Operand> {
         let is_end = &mut false;
-        
+
         if callee.is_some() {
             self.log_error(soul_error_internal!(
                 "function call callee not yet impl",
@@ -191,9 +202,7 @@ impl<'a> MirContext<'a> {
 
         let mut arguments = vec![];
         for arg in hir_arguments {
-            arguments.push(
-                self.lower_operand(*arg).pass(is_end)
-            );
+            arguments.push(self.lower_operand(*arg).pass(is_end));
         }
 
         let temp = if self.get_type(ty).is_none() {
