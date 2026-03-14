@@ -63,9 +63,9 @@ impl HirTree {
             id: start_function_id,
             name: Ident::new("_start".to_string(), Span::default_const()),
             parameters: vec![],
-            body: BlockId::error(),
             kind: FunctionKind::Static,
             return_type: TypeId::error(),
+            body: FunctionBody::Internal(BlockId::error()),
         };
 
         Self {

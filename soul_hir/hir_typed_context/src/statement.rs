@@ -179,15 +179,24 @@ impl<'a> HirTypedContext<'a> {
 
     fn infer_function(&mut self, function_id: &FunctionId) -> TypeId {
         let function = &self.hir.functions[*function_id];
-        let span = self.block_span(function.body);
-        let block_type = self.infer_block(function.body);
+
         for parameter in &function.parameters {
             let modifier = self
                 .get_type(parameter.ty)
                 .modifier
                 .unwrap_or(TypeModifier::Const);
+
+            let span = self.hir.spans.locals[parameter.local];
             self.type_local(parameter.local, parameter.ty, modifier, span);
         }
+
+        let body = match function.body {
+            hir::FunctionBody::Internal(block_id) => block_id,
+            hir::FunctionBody::External(_) => return function.return_type,
+        };
+
+        let span = self.block_span(body);
+        let block_type = self.infer_block(body);
         self.unify(
             ExpressionId::error(),
             function.return_type,

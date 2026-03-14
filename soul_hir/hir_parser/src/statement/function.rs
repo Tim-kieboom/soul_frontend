@@ -7,7 +7,7 @@ use crate::HirContext;
 
 impl<'a> HirContext<'a> {
     pub(crate) fn lower_function(&mut self, function: &ast::Function) -> FunctionId {
-        let id = match function.id {
+        let id = match function.signature.node.id {
             Some(val) => val,
             None => {
                 self.log_error(soul_error_internal!(
@@ -33,8 +33,12 @@ impl<'a> HirContext<'a> {
             })
             .collect();
 
-        let body = self.lower_block(&function.block);
 
+        let body = match function.signature.node.external {
+            Some(language) => hir::FunctionBody::External(language),
+            None => hir::FunctionBody::Internal(self.lower_block(&function.block)),
+        };
+        
         self.pop_scope();
 
         let hir_function = hir::Function {

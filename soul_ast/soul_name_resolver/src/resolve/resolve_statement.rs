@@ -36,12 +36,13 @@ impl<'a> NameResolver<'a> {
                 ends_semicolon: _,
             } => self.resolve_expression(expression),
             StatementKind::Import(_) => (), // maybe later track imports
+            StatementKind::ExternalFunction(_) => (), // maybe later track imports
         }
     }
 
     fn resolves_function(&mut self, function: &mut Function) {
         let prev = self.current_function;
-        self.current_function = function.id;
+        self.current_function = function.signature.node.id;
 
         self.try_go_to(function.block.scope_id);
         self.resolve_block(&mut function.block);

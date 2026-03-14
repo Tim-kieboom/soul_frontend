@@ -19,13 +19,9 @@ impl<'a> LlvmBackend<'a> {
                 }
             }
 
-            hir::HirTypeKind::Ref { of_type, .. } | hir::HirTypeKind::Pointer(of_type) => {
-                let element_type = match self.lower_type(of_type)? {
-                    Some(ty) => ty,
-                    None => self.context.i8_type().into(),
-                };
-
-                element_type.into_pointer_type().into()
+            hir::HirTypeKind::Ref { .. } | hir::HirTypeKind::Pointer(_) => {
+                let ptr_type = self.context.ptr_type(AddressSpace::default());
+                ptr_type.into()
             }
             hir::HirTypeKind::Optional(type_id) => {
                 let element_type = match self.lower_type(type_id)? {

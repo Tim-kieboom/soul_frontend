@@ -32,7 +32,8 @@ impl<'a> NameResolver<'a> {
                     self.collect_expression(value);
                 }
             }
-            StatementKind::Function(function) => {
+            StatementKind::ExternalFunction(function)
+            | StatementKind::Function(function) => {
                 self.collect_function(function);
             }
             StatementKind::Expression {
@@ -52,7 +53,7 @@ impl<'a> NameResolver<'a> {
     }
 
     fn collect_function(&mut self, function: &mut Function) {
-        let id = self.declare_function(function);
+        let id = self.declare_function(&mut function.signature);
         let prev = self.current_function;
         self.current_function = Some(id);
 

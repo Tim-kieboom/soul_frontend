@@ -1,8 +1,11 @@
-use ast::{Expression, Function, FunctionCall, FunctionSignature, SoulType, Statement};
+use ast::{
+    Expression, ExternLanguage, Function, FunctionCall, FunctionSignature, SoulType, Statement
+};
+use soul_tokenizer::TokenKind;
 use soul_utils::{
     Ident,
-    error::{SoulError, SoulResult},
-    soul_names::TypeModifier,
+    error::{SoulError, SoulErrorKind, SoulResult},
+    soul_names::{KeyWord, TypeModifier},
     span::{Span, Spanned},
     try_result::{ResultTryErr, ToResult, TryErr, TryError, TryNotValue, TryOk, TryResult},
 };
@@ -14,6 +17,42 @@ use crate::parser::{
 
 type FuncResult<T> = TryResult<T, (Ident, Box<SoulError>)>;
 impl<'a, 'f> Parser<'a, 'f> {
+    pub(crate) fn parse_extern_function(&mut self) -> SoulResult<Statement> {
+        self.expect_ident(KeyWord::Extern.as_str())?;
+
+        let string_literal = match &self.token().kind {
+            TokenKind::StringLiteral(val) => val,
+            other => {
+                return Err(SoulError::new(
+                    format!("expected string_literal of language name but got {}", other.display()),
+                    SoulErrorKind::InvalidIdent,
+                    Some(self.token().span),
+                ));
+            }
+        };
+
+        let external = match string_literal.as_str() {
+            "C" => ExternLanguage::C,
+            _ => {
+                return Err(SoulError::new(
+                    format!("language {} is not supported", string_literal),
+                    SoulErrorKind::InvalidIdent,
+                    Some(self.token().span),
+                ));
+            }
+        };
+
+        self.bump();
+        let name = self.try_bump_consume_ident()?;
+
+        let span = self.token().span;
+        match self.try_parse_function_signature(span, SoulType::none(span), name, Some(external)) {
+            Ok(signature) => Ok(Statement::from_external_function(signature)),
+            Err(TryError::IsErr(err)) => Err(err),
+            Err(TryError::IsNotValue((_, err))) => Err(*err),
+        }
+    }
+
     pub(crate) fn parse_any_function(&mut self) -> SoulResult<Statement> {
         fn default_methode_type(span: Span) -> SoulType {
             SoulType::none(span).with_modifier(Some(TypeModifier::Mut))
@@ -38,10 +77,21 @@ impl<'a, 'f> Parser<'a, 'f> {
         methode_type: SoulType,
         name: Ident,
     ) -> FuncResult<Spanned<Function>> {
+        self.inner_function_declaration(start_span, methode_type, name, None)
+    }
+
+    fn inner_function_declaration(
+        &mut self,
+        start_span: Span,
+        methode_type: SoulType,
+        name: Ident,
+        external: Option<ExternLanguage>,
+    ) -> FuncResult<Spanned<Function>> {
         let begin = self.current_position();
         let modifier = methode_type.modifier.unwrap_or(TypeModifier::Mut);
 
-        let signature = self.try_parse_function_signature(start_span, methode_type, name)?;
+        let signature =
+            self.try_parse_function_signature(start_span, methode_type, name, external)?;
 
         let block = match self.parse_block(modifier) {
             Ok(val) => val,
@@ -60,7 +110,6 @@ impl<'a, 'f> Parser<'a, 'f> {
             Function {
                 block,
                 signature,
-                id: None,
             },
             self.span_combine(span),
         ))
@@ -94,9 +143,10 @@ impl<'a, 'f> Parser<'a, 'f> {
         start_span: Span,
         methode_type: SoulType,
         name: Ident,
+        external: Option<ExternLanguage>,
     ) -> FuncResult<Spanned<FunctionSignature>> {
         let begin_position = self.current_position();
-        let result = self.inner_parse_function_signature(start_span, methode_type, name);
+        let result = self.inner_parse_function_signature(start_span, methode_type, name, external);
 
         if result.is_err() {
             self.go_to(begin_position);
@@ -132,6 +182,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         start_span: Span,
         methode_type: SoulType,
         name: Ident,
+        external: Option<ExternLanguage>,
     ) -> FuncResult<Spanned<FunctionSignature>> {
         if !self.current_is_any(&[ROUND_OPEN, ARROW_LEFT]) {
             return TryNotValue((
@@ -164,6 +215,8 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let signature = FunctionSignature {
             name,
+            external,
+            id: None,
             parameters,
             return_type,
             methode_type,

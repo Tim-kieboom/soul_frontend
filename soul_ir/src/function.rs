@@ -1,9 +1,8 @@
-use mir_parser::mir::{Function, LocalId, Operand, OperandKind};
+use mir_parser::mir::{FunctionBody, Operand, OperandKind};
 use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},
     ids::FunctionId,
     soul_error_internal,
-    vec_map::VecMapIndex,
 };
 
 use crate::{IrOperand, LlvmBackend, build_error};
@@ -24,10 +23,15 @@ impl<'a> LlvmBackend<'a> {
         self.current.function_id = function_id;
         let function = &self.mir.tree.functions[function_id];
 
+        let blocks = match &function.body {
+            FunctionBody::External(_) => return,
+            FunctionBody::Internal { blocks, .. } => blocks,
+        };
+
         self.create_blocks();
         self.allocate_function_locals(function);
 
-        for block_id in &function.blocks {
+        for block_id in blocks {
             let llvm_block = self.blocks[*block_id];
             self.builder.position_at_end(llvm_block);
             self.lower_statement(*block_id);
@@ -41,9 +45,13 @@ impl<'a> LlvmBackend<'a> {
     pub(crate) fn lower_operand(&self, condition: &Operand) -> SoulResult<IrOperand<'a>> {
         Ok(match &condition.kind {
             OperandKind::Temp(temp_id) => {
-                self.temps.get(*temp_id)
+                self.temps
+                    .get(*temp_id)
                     .copied()
-                    .ok_or(soul_error_internal!(format!("{:?} not found", *temp_id), None))?
+                    .ok_or(soul_error_internal!(
+                        format!("{:?} not found", *temp_id),
+                        None
+                    ))?
             }
             OperandKind::Local(local_id) => {
                 let local = &self.mir.tree.locals[*local_id];
@@ -71,68 +79,9 @@ impl<'a> LlvmBackend<'a> {
                     })
                     .map_err(|err| build_error(err));
             }
-            OperandKind::Comptime(literal) => match literal {
-                ast::Literal::Int(value) => {
-                    let negative = *value < 0;
-                    let value = self
-                        .context
-                        .i64_type()
-                        .const_int(value.abs() as u64, negative)
-                        .into();
-
-                    IrOperand {
-                        value,
-                        is_signed_interger: true,
-                    }
-                }
-                ast::Literal::Uint(value) => {
-                    let value = self
-                        .context
-                        .i64_type()
-                        .const_int(*value as u64, false)
-                        .into();
-
-                    IrOperand {
-                        value,
-                        is_signed_interger: false,
-                    }
-                }
-                ast::Literal::Float(value) => {
-                    let value = self.context.f64_type().const_float(*value).into();
-
-                    IrOperand {
-                        value,
-                        is_signed_interger: false,
-                    }
-                }
-                ast::Literal::Bool(value) => {
-                    let value = self
-                        .context
-                        .bool_type()
-                        .const_int(*value as u64, false)
-                        .into();
-
-                    IrOperand {
-                        value,
-                        is_signed_interger: false,
-                    }
-                }
-                ast::Literal::Char(value) => {
-                    let value = self
-                        .context
-                        .i8_type()
-                        .const_int(*value as u64, false)
-                        .into();
-
-                    IrOperand {
-                        value,
-                        is_signed_interger: false,
-                    }
-                }
-                ast::Literal::Str(_) => {
-                    todo!("string literal not yet impl")
-                }
-            },
+            OperandKind::Comptime(literal) => {
+                self.lower_literal(literal)
+            }
             OperandKind::Ref { .. } => {
                 todo!("ref not yet impl")
             }
@@ -146,32 +95,68 @@ impl<'a> LlvmBackend<'a> {
         })
     }
 
-    pub(crate) fn allocate_function_locals(&mut self, function: &Function) {
-        let entry = self.blocks[function.entry_block];
-        self.builder.position_at_end(entry);
+    pub(crate) fn lower_literal(&self, literal: &ast::Literal) -> IrOperand<'a> {
+        match literal {
+            ast::Literal::Int(value) => {
+                let negative = *value < 0;
+                let value = self
+                    .context
+                    .i64_type()
+                    .const_int(value.abs() as u64, negative)
+                    .into();
 
-        for local_id in &function.locals {
-            let local = &self.mir.tree.locals[*local_id];
-            let name = self.local_name(*local_id);
-
-            match self.lower_type(local.ty) {
-                Ok(Some(ty)) => {
-                    let ptr = match self.builder.build_alloca(ty, &name) {
-                        Ok(val) => val,
-                        Err(err) => {
-                            self.log_error(build_error(err));
-                            return;
-                        }
-                    };
-                    self.locals.insert(*local_id, ptr);
+                IrOperand {
+                    value,
+                    is_signed_interger: true,
                 }
-                Err(err) => self.log_error(err),
-                Ok(None) => (),
-            };
-        }
-    }
+            }
+            ast::Literal::Uint(value) => {
+                let value = self
+                    .context
+                    .i64_type()
+                    .const_int(*value as u64, false)
+                    .into();
 
-    fn local_name(&mut self, id: LocalId) -> String {
-        format!("_{}", id.index())
+                IrOperand {
+                    value,
+                    is_signed_interger: false,
+                }
+            }
+            ast::Literal::Float(value) => {
+                let value = self.context.f64_type().const_float(*value).into();
+
+                IrOperand {
+                    value,
+                    is_signed_interger: false,
+                }
+            }
+            ast::Literal::Bool(value) => {
+                let value = self
+                    .context
+                    .bool_type()
+                    .const_int(*value as u64, false)
+                    .into();
+
+                IrOperand {
+                    value,
+                    is_signed_interger: false,
+                }
+            }
+            ast::Literal::Char(value) => {
+                let value = self
+                    .context
+                    .i8_type()
+                    .const_int(*value as u64, false)
+                    .into();
+
+                IrOperand {
+                    value,
+                    is_signed_interger: false,
+                }
+            }
+            ast::Literal::Str(_) => {
+                todo!("string literal not yet impl")
+            }
+        }
     }
 }

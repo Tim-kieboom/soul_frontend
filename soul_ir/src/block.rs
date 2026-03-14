@@ -1,13 +1,18 @@
-use crate::{LlvmBackend, build_error};
-use mir_parser::mir::{BlockId, Terminator};
-use soul_utils::{error::SoulResult, vec_map::VecMapIndex};
+use crate::{IrOperand, LlvmBackend, build_error};
+use mir_parser::mir::{BlockId, FunctionBody, Operand, Place, PlaceId, Terminator};
+use soul_utils::{error::SoulResult, ids::FunctionId, vec_map::VecMapIndex};
 
 impl<'a> LlvmBackend<'a> {
     pub(crate) fn create_blocks(&mut self) {
         let function = &self.mir.tree.functions[self.current.function_id];
         let llvm_function = self.functions[function.id];
 
-        for block_id in &function.blocks {
+        let blocks = match &function.body {
+            FunctionBody::External(_) => return,
+            FunctionBody::Internal { blocks, .. } => blocks,
+        };
+
+        for block_id in blocks {
             let bb = self
                 .context
                 .append_basic_block(llvm_function, &name_block(*block_id));
@@ -55,25 +60,48 @@ impl<'a> LlvmBackend<'a> {
             Terminator::Call {
                 id,
                 arguments,
-                return_place: _,
+                return_place,
                 next,
             } => {
-                let mut ir_arguments = Vec::with_capacity(arguments.len());
-                for arg in arguments {
-                    let meta_data_value = self.lower_operand(arg)?.value.into();
-                    ir_arguments.push(meta_data_value);
-                }
-
-                self.builder
-                    .build_call(self.functions[*id], ir_arguments.as_slice(), "call_result")
-                    .map_err(build_error)?;
-
-                self.builder
-                    .build_unconditional_branch(self.blocks[*next])
-                    .map_err(build_error)?;
+                self.lower_call(*id, arguments, return_place, *next)?;
             }
             Terminator::Unreachable => panic!("should not have unreachable"),
         };
+
+        Ok(())
+    }
+
+    fn lower_call(&mut self, id: FunctionId, arguments: &Vec<Operand>, return_place: &Option<PlaceId>, next: BlockId) -> SoulResult<()> {
+        let mut ir_arguments = Vec::with_capacity(arguments.len());
+        for arg in arguments {
+            let meta_data_value = self.lower_operand(arg)?.value.into();
+            ir_arguments.push(meta_data_value);
+        }
+
+        let call = self.builder
+            .build_call(self.functions[id], ir_arguments.as_slice(), "call_result")
+            .map_err(build_error)?;
+
+        self.builder
+            .build_unconditional_branch(self.blocks[next])
+            .map_err(build_error)?;
+
+        let place = match return_place {
+            Some(id) => &self.mir.tree.places[*id],
+            None => return Ok(()),
+        };
+
+        let return_value = call.try_as_basic_value().unwrap_basic();
+        match place {
+            Place::Temp(temp_id) => {
+                self.temps.insert(*temp_id, IrOperand { 
+                    value: return_value, 
+                    is_signed_interger: false,
+                });
+            }
+            Place::Deref(_) => panic!("call return value should be Place::Temp not Place::Deref"), 
+            Place::Local(_) => panic!("call return value should be Place::Temp not Place::Local"),
+        }
 
         Ok(())
     }

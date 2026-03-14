@@ -22,3 +22,5 @@ hir_literal_interpreter = { version = "0.1.0", path = "../soul_hir/hir_literal_i
 run_ast = { version = "0.1.0", path = "../soul_ast/run_ast" }
 run_hir = { version = "0.1.0", path = "../soul_hir/run_hir" }
 run_mir = { version = "0.1.0", path = "../soul_mir/run_mir" }
+inkwell = { version = "0.8", features = ["llvm16-0"] }
+soul_ir = { version = "0.1.0", path = "../soul_ir" }

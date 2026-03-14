@@ -1,7 +1,7 @@
 use ast::{
-    Block, Function, NamedTupleType, VarTypeKind, scope::{NodeId, Scope, ScopeId, ScopeValue, ScopeValueKind}
+    Block, FunctionSignature, NamedTupleType, VarTypeKind, scope::{NodeId, Scope, ScopeId, ScopeValue, ScopeValueKind}
 };
-use soul_utils::{ids::FunctionId};
+use soul_utils::{ids::FunctionId, span::Spanned};
 
 use crate::NameResolver;
 mod collect_expression;
@@ -51,10 +51,10 @@ impl<'a> NameResolver<'a> {
         id
     }
 
-    fn declare_function(&mut self, function: &mut Function) -> FunctionId {
+    fn declare_function(&mut self, function_signature: &mut Spanned<FunctionSignature>) -> FunctionId {
         let id = self.alloc_function();
-        function.id = Some(id);
-        let name = function.signature.node.name.as_str();
+        function_signature.node.id = Some(id);
+        let name = function_signature.node.name.as_str();
         self.insert_function(name, id);
         id
     }

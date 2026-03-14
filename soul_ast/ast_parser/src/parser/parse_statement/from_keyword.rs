@@ -54,7 +54,9 @@ impl<'a, 'f> Parser<'a, 'f> {
                     self.current_is(&SEMI_COLON),
                 )
             }
+
             KeyWord::Import => self.parse_import().try_err()?,
+            KeyWord::Extern => self.parse_extern_function().try_err()?,
 
             KeyWord::New
             | KeyWord::For

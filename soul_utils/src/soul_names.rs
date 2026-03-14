@@ -281,6 +281,7 @@ define_str_enum!(
         Impl => "impl", 0,
         Typeof => "typeof", 0,
         Import => "import", 0,
+        Extern => "extern", 0,
     }
 );
 

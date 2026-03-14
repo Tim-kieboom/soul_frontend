@@ -15,7 +15,10 @@ mod id_generators;
 pub mod mir;
 mod parse;
 mod utils;
-use crate::{id_generators::IdGenerators, mir::{BlockId, MirTree}};
+use crate::{
+    id_generators::IdGenerators,
+    mir::{BlockId, MirTree},
+};
 
 pub fn mir_lower(hir: &HirTree, types: &HirTypedTable, faults: &mut Vec<SementicFault>) -> MirTree {
     let mut context = MirContext::new(hir, types, faults);
@@ -153,10 +156,12 @@ impl<'a> MirContext<'a> {
         let start = mir::Function {
             id: self.tree.start_function,
             name: Ident::new("_start".to_string(), Span::default_const()),
-            entry_block,
-            locals: vec![],
+            body: mir::FunctionBody::Internal { 
+                entry_block,
+                locals: vec![],
+                blocks: vec![entry_block],
+            },
             parameters: vec![],
-            blocks: vec![entry_block],
             return_type: TypeId::error(),
         };
 
@@ -286,12 +291,18 @@ impl<'a> MirContext<'a> {
             terminator: mir::Terminator::Unreachable,
         };
 
-        self.tree
+        let function = self.tree
             .functions
             .get_mut(self.current.function)
-            .expect("should have id")
-            .blocks
-            .push(id);
+            .expect("should have id");
+
+        match &mut function.body {
+            mir::FunctionBody::External(_) => panic!("should be internal function"),
+            mir::FunctionBody::Internal { blocks, .. } => {
+                blocks
+                .push(id);
+            }
+        };
 
         self.tree.blocks.insert(id, block);
         id
@@ -302,9 +313,14 @@ impl<'a> MirContext<'a> {
 
         self.local_remap.insert(local, id);
         self.tree.locals.insert(id, mir::Local { id, ty });
-        self.tree.functions[self.current.function].locals.push(id);
-
+        
         self.current.scope.push(id);
+
+        match &mut self.tree.functions[self.current.function].body {
+            mir::FunctionBody::External(_) => return id,
+            mir::FunctionBody::Internal { locals, .. } => locals.push(id),
+        };
+
         id
     }
 
@@ -384,7 +400,12 @@ impl<'a> MirContext<'a> {
             .tree
             .functions
             .get(start)
-            .map(|block| block.blocks.get(0));
+            .map(|func| {
+                match &func.body {
+                    mir::FunctionBody::External(_) => panic!("should be internal function"),
+                    mir::FunctionBody::Internal { blocks, .. } => blocks.get(0),
+                }
+            });
 
         match block {
             Some(Some(val)) => *val,

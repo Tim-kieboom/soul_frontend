@@ -10,14 +10,25 @@ impl<'a> MirContext<'a> {
         let entry_block = self.new_function_block();
         self.current.block = Some(entry_block);
 
+        let body = match function.body {
+            hir::FunctionBody::Internal(_) => {
+                mir::FunctionBody::Internal { 
+                    entry_block, 
+                    locals: vec![],
+                    blocks: vec![entry_block], 
+                }
+            }
+            hir::FunctionBody::External(extern_language) => {
+                mir::FunctionBody::External(extern_language)
+            }
+        };
+
         let mir_function = mir::Function {
-            locals: vec![],
+            body,
             id: function_id,
-            entry_block,
             parameters: vec![],
-            blocks: vec![entry_block],
             name: function.name.clone(),
-            return_type: function.return_type,
+            return_type: self.types.functions[function_id],
         };
         self.tree.functions.insert(function_id, mir_function);
 
@@ -29,6 +40,11 @@ impl<'a> MirContext<'a> {
             parameters.push(local_id);
         }
 
-        let _endblock = self.lower_block(function.body, entry_block);
+        let body = match function.body {
+            hir::FunctionBody::Internal(block_id) => block_id,
+            hir::FunctionBody::External(_) => return,
+        };
+
+        let _endblock = self.lower_block(body, entry_block);
     }
 }

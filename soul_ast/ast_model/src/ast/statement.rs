@@ -37,6 +37,7 @@ pub enum StatementKind {
 
     /// A function declaration (with body block).
     Function(Function),
+    ExternalFunction(Function),
 }
 
 /// Imported paths
@@ -74,7 +75,19 @@ pub struct Function {
     pub signature: Spanned<FunctionSignature>,
     /// The function's body block.
     pub block: Block,
-    pub id: Option<FunctionId>,
+}
+
+
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum ExternLanguage {
+    C,
+}
+impl ExternLanguage {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ExternLanguage::C => "C",
+        }
+    }
 }
 
 /// A function signature describing a function's interface.
@@ -82,12 +95,14 @@ pub struct Function {
 pub struct FunctionSignature {
     /// The name of the function.
     pub name: Ident,
+    pub id: Option<FunctionId>,
     pub methode_type: SoulType,
     pub function_kind: FunctionKind,
     /// Function parameters.
     pub parameters: NamedTupleType,
     /// Return type, if specified.
     pub return_type: SoulType,
+    pub external: Option<ExternLanguage>,
 }
 
 /// Optional `this` parameter type.
@@ -211,7 +226,17 @@ impl Statement {
         Self::new(StatementKind::Function(node), span)
     }
 
+    pub fn from_external_function(signature: Spanned<FunctionSignature>) -> Self {
+        let span = signature.span;
+        let function = Function{ signature, block: empty_block(span) };
+        Self::new(StatementKind::ExternalFunction(function), span)
+    }
+
     pub fn new_variable(variable: Variable, span: Span) -> Self {
         Self::new(StatementKind::Variable(variable), span)
     }
+}
+
+fn empty_block(span: Span) -> Block {
+    Block { modifier: TypeModifier::Mut, statements: vec![], scope_id: None, node_id: None, span }
 }

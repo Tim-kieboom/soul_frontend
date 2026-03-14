@@ -6,7 +6,7 @@ use inkwell::{
     builder::{Builder, BuilderError},
     context::Context,
     module::Module,
-    targets::{CodeModel, RelocMode, Target, TargetData, TargetTriple},
+    targets::{CodeModel, InitializationConfig, RelocMode, Target, TargetData, TargetMachine},
     values::{BasicValueEnum, FunctionValue, PointerValue},
 };
 use mir_parser::mir::{BlockId, LocalId, TempId};
@@ -20,6 +20,7 @@ use soul_utils::{
     vec_map::VecMap,
 };
 
+mod local;
 mod block;
 mod function;
 mod ir_type;
@@ -27,9 +28,9 @@ mod rvalue;
 mod statement;
 
 pub struct IrRequest<'ctx> {
-    context: &'ctx Context,
-    mir: &'ctx MirResponse,
-    types: &'ctx HirTypedTable,
+    pub context: &'ctx Context,
+    pub mir: &'ctx MirResponse,
+    pub types: &'ctx HirTypedTable,
 }
 impl<'ctx> IrRequest<'ctx> {
     pub fn new(mir: &'ctx MirResponse, types: &'ctx HirTypedTable, context: &'ctx Context) -> Self {
@@ -41,11 +42,16 @@ impl<'ctx> IrRequest<'ctx> {
     }
 }
 
+pub struct IrResponse<'a> {
+    pub module: Module<'a>,
+    pub no_errors: bool,
+}
+
 pub fn to_llvm_ir<'a>(
     request: &'a IrRequest<'a>,
     _options: &CompilerOptions,
     faults: &'a mut Vec<SementicFault>,
-) -> Module<'a> {
+) -> IrResponse<'a> {
     let mut backend = LlvmBackend::new(request, faults);
 
     let mir = &request.mir.tree;
@@ -53,11 +59,13 @@ pub fn to_llvm_ir<'a>(
         backend.declare_function(function_id);
     }
 
+    backend.allocate_globals();
+
     for function_id in mir.functions.keys() {
         backend.lower_function(function_id);
     }
 
-    backend.to_module()
+    backend.to_ir_reponse()
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -114,19 +122,25 @@ impl<'a> LlvmBackend<'a> {
         self.faults.push(SementicFault::error(err));
     }
 
-    fn to_module(self) -> Module<'a> {
-        self.module
+    fn to_ir_reponse(self) -> IrResponse<'a> {
+        IrResponse {
+            module: self.module,
+            no_errors: self.faults.is_empty(),
+        }
     }
 }
 
 fn get_target_data() -> TargetData {
-    let target = Target::from_name("x86_64").unwrap();
-    let triple = TargetTriple::create("x86_64-pc-windows-msvc");
+    Target::initialize_native(&InitializationConfig::default()).unwrap();
+
+    let triple = TargetMachine::get_default_triple();
+    let target = Target::from_triple(&triple).unwrap();
+
     let target_machine = target
         .create_target_machine(
             &triple,
-            "x86-64", // CPU
-            "+avx2",  // Features
+            "generic",
+            "",
             OptimizationLevel::Default,
             RelocMode::Default,
             CodeModel::Default,

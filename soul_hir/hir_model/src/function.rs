@@ -1,4 +1,4 @@
-use ast::FunctionKind;
+use ast::{ExternLanguage, FunctionKind};
 use soul_utils::{Ident, ids::FunctionId};
 
 use crate::{BlockId, LocalId, TypeId};
@@ -26,7 +26,13 @@ pub struct Function {
     pub return_type: TypeId,
 
     /// Body of the function.
-    pub body: BlockId,
+    pub body: FunctionBody,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum FunctionBody {
+    Internal(BlockId),
+    External(ExternLanguage),
 }
 
 /// A function parameter.

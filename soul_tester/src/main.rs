@@ -10,11 +10,13 @@ use ast::{
 };
 use displayer_hir::display_hir;
 use fern::Dispatch;
+use inkwell::context::Context;
 use log::{error, info};
 use paths::Paths;
 use run_ast::to_ast;
 use run_hir::{HirResponse, to_hir};
 use run_mir::{MirResponse, to_mir};
+use soul_ir::{IrRequest, to_llvm_ir};
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
     char_colors::{DEFAULT, GREEN},
@@ -58,20 +60,34 @@ fn main() -> Result<()> {
     let paths: Paths = serde_json::from_slice(PATHS)?;
     init_logger(&paths.log_file)?;
 
-    let output = run_compiler(&paths)?;
+    let mut output = run_compiler(&paths)?;
     display_output(&paths, &output)?;
-    for fault in &output.faults {
-        error!(
-            "{}",
-            fault.to_message("main.soul", &output.source_file, MESSAGE_CONFIG)
-        );
-    }
 
     if output.faults.is_empty() {
-        let msg = "success!!";
-        info!("{GREEN}{msg}{DEFAULT}");
+        info!("{GREEN}frontend success!!{DEFAULT}");
+    } else {
+        log_faults(&output.faults, &output.source_file);
+        return Ok(());
     }
 
+    let request = IrRequest {
+        mir: &output.mir,
+        types: &output.hir.types,
+        context: &Context::create(),
+    };
+
+    let ir = to_llvm_ir(&request, &COMPILER_OPTIONS, &mut output.faults);
+
+    if ir.no_errors {
+        info!("{GREEN}llvm success!!{DEFAULT}");
+
+        if let Err(err) = ir.module.print_to_file("output/out.ll") {
+            error!("{err}");
+        };
+    } else {
+        drop(ir); // drop to be able to use faults
+        log_faults(&output.faults, &output.source_file);
+    }
     Ok(())
 }
 
@@ -123,6 +139,15 @@ fn to_source_file(source_path: &str) -> Result<String> {
     file.read_to_string(&mut source_file)?;
 
     Ok(source_file)
+}
+
+fn log_faults(faults: &Vec<SementicFault>, source_file: &str) {
+    for fault in faults {
+        error!(
+            "{}",
+            fault.to_message("main.soul", source_file, MESSAGE_CONFIG)
+        );
+    }
 }
 
 fn init_logger(log_file: &str) -> Result<()> {

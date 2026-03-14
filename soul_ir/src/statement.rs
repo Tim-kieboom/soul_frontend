@@ -1,4 +1,4 @@
-use mir_parser::mir::{BlockId, Place, PlaceId, Rvalue, StatementKind};
+use mir_parser::mir::{BlockId, OperandKind, Place, PlaceId, Rvalue, RvalueKind, StatementKind};
 use soul_utils::error::SoulResult;
 
 use crate::{LlvmBackend, build_error};
@@ -26,6 +26,10 @@ impl<'a> LlvmBackend<'a> {
     }
 
     fn lower_assign(&mut self, place_id: PlaceId, value: &Rvalue) -> SoulResult<()> {
+        if rvalue_is_none(value) {
+            return Ok(())
+        }
+        
         let ir_value = self.lower_rvalue(value)?;
         match &self.mir.tree.places[place_id] {
             Place::Temp(temp_id) => {
@@ -41,5 +45,12 @@ impl<'a> LlvmBackend<'a> {
         }
 
         Ok(())
+    }
+}
+
+fn rvalue_is_none(rvalue: &Rvalue) -> bool {
+    match &rvalue.kind {
+        RvalueKind::Use(operand) => matches!(operand.kind, OperandKind::None),
+        _ => false,
     }
 }

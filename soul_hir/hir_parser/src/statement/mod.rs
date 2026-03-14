@@ -20,7 +20,8 @@ impl<'a> HirContext<'a> {
                 self.insert_variable(&variable.name, hir_variable.local, hir_variable.ty);
                 hir::Global::Variable(hir_variable, id)
             }
-            ast::StatementKind::Function(function) => {
+            ast::StatementKind::ExternalFunction(function)
+            | ast::StatementKind::Function(function) => {
                 let hir_function = self.lower_function(function);
                 hir::Global::Function(hir_function, id)
             }
@@ -58,6 +59,7 @@ impl<'a> HirContext<'a> {
                 self.insert_global(hir::Global::Function(hir_function, id));
                 return None;
             }
+            ast::StatementKind::ExternalFunction(_) => todo!(),
             ast::StatementKind::Variable(variable) => {
                 let hir_variable = self.lower_variable(variable);
                 hir::Statement::Variable(hir_variable, id)

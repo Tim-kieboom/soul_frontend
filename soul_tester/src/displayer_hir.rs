@@ -1,4 +1,4 @@
-use hir::{Binary, BlockId, ExpressionId, HirTree, LocalId, TypeId, Unary};
+use hir::{Binary, BlockId, ExpressionId, FunctionBody, HirTree, LocalId, TypeId, Unary};
 use hir_typed_context::HirTypedTable;
 use soul_utils::{
     ids::{FunctionId, IdAlloc},
@@ -98,8 +98,10 @@ impl<'a> HirDisplayer<'a> {
             None => function.return_type,
         };
         self.display_type(ty);
-        self.push(' ');
-        self.display_block(&function.body);
+        if let FunctionBody::Internal(body) = &function.body {
+            self.push(' ');
+            self.display_block(body);
+        }
     }
 
     fn display_variable(&mut self, variable: &hir::Variable) {

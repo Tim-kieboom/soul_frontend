@@ -1,4 +1,4 @@
-use ast::{BinaryOperator, Literal, UnaryOperator};
+use ast::{BinaryOperator, ExternLanguage, Literal, UnaryOperator};
 use hir::TypeId;
 use soul_utils::{Ident, ids::FunctionId, impl_soul_ids, vec_map::VecMap};
 
@@ -46,19 +46,25 @@ pub struct Function {
     pub id: FunctionId,
     pub name: Ident,
 
-    pub entry_block: BlockId,
+    pub body: FunctionBody,
 
     /// Parameters are locals
     pub parameters: Vec<LocalId>,
 
-    /// All locals declared in the function body
-    pub locals: Vec<LocalId>,
-
-    /// All blocks belonging to this function
-    pub blocks: Vec<BlockId>,
-
     /// Return type of the function
     pub return_type: TypeId,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum FunctionBody {
+    External(ExternLanguage),
+    Internal{
+        entry_block: BlockId,
+        /// All locals declared in the function body
+        locals: Vec<LocalId>,
+        /// All blocks belonging to this function
+        blocks: Vec<BlockId>,
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

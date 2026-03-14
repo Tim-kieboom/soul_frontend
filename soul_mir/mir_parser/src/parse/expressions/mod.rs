@@ -1,6 +1,8 @@
 use hir::{Binary, Unary};
 use soul_utils::{
-    ids::{FunctionId, IdAlloc}, soul_error_internal, span::Span
+    ids::{FunctionId, IdAlloc},
+    soul_error_internal,
+    span::Span,
 };
 
 use crate::{EndBlock, MirContext, mir};
@@ -103,11 +105,17 @@ impl<'a> MirContext<'a> {
             }
 
             hir::ExpressionKind::Null => {
-                self.log_error(soul_error_internal!("ExpressionKind::Null  not yet impl in mir", Some(span)));
+                self.log_error(soul_error_internal!(
+                    "ExpressionKind::Null  not yet impl in mir",
+                    Some(span)
+                ));
                 mir::Operand::new(ty, mir::OperandKind::None)
             }
             hir::ExpressionKind::Function(_) => {
-                self.log_error(soul_error_internal!("ExpressionKind::Function not yet impl in mir", Some(span)));
+                self.log_error(soul_error_internal!(
+                    "ExpressionKind::Function not yet impl in mir",
+                    Some(span)
+                ));
                 mir::Operand::new(ty, mir::OperandKind::None)
             }
 

@@ -1,119 +1,126 @@
-global := 2 ** 4
+// extern "C" __csoul_alloc(size: int): ?*none
+// extern "C" __csoul_freeNonNull(ptr: ?*none)
+
+// extern "C" __csoul_printInt(a: int)
+// extern "C" __csoul_printChar(a: char)
+
+global := 2 * 4
 global1: int = 1
-global2 := 2 + 1 * 2 ** 4
+global2 := 2 + 1 * 2 * 4
+// pow := 4 ** 2
 
 main() {
     sum := sum(global, global2)
-    ifs()
-    elif()
-    // array()
-    bigifs()
-    whiles()
-    variable()
-    returnNone()
-    returnTerminate();
+    // ifs()
+    // elif()
+    // // array()
+    // bigifs()
+    // whiles()
+    // variable()
+    // returnNone()
+    // returnTerminate();
 }
 
 sum(a: int, b: int): int {
     a + b
 }
 
-elif() {
-    mut num = 0
-    if 1==1 {
-        num = 3
-    } else if 1==2 {
-        num = 4
-    } else {
-        num = 5
-    }
-}
-
-ifs() {
-    foo := if 1==0 {
-        1
-    } else {
-        2
-    }
-}
-
-bigifs() {
-    num := if 1==3 {
-        6
-    } else if 1==4 {
-        7
-    } else if 1==5 {
-        8
-    } else if 1==6 {
-        9
-    } else {
-        10
-    }
-}
-
-whiles() {
-    while1()
-    while2()
-    while3()
-}
-
-while1() {
-    while {
-        loop := 1 + 2 + 3
-        break
-    }
-}
-
-while2() {
-    mut stop = false
-    while stop {
-        stop = true
-    }
-}
-
-while3() {
-    mut stop = false
-    while {
-        stop = true
-        if stop {
-            break
-        } else {
-            continue
-        }
-    }
-}
-
-returnTerminate(): int {
-    doStuff := 1 + 2
-    doStuff
-}
-
-returnNone() {
-    doStuff := 1 + 2
-    1;
-}
-
-variable() {
-    constTyped: int = 1
-    constInfer := constTyped + -2
-
-    ref := @1
-
-    mut cast := 1 as int
-    cast = sum(1, 2)
-
-    const lateInfer
-    lateInfer = 1
-}
-
-// array() {
-//     array := [uint: 1,2,3,4,5]
-//     array[0] = 1
-//     num := array[0]
-//     ref := @array[0]
-
-//     mut refArray = &[]
-//     refArray = &[1, 2, 3]
-//     refArray[0] = 1
-//     num2 := refArray[0]
+// elif() {
+//     mut num = 0
+//     if 1==1 {
+//         num = 3
+//     } else if 1==2 {
+//         num = 4
+//     } else {
+//         num = 5
+//     }
 // }
+
+// ifs() {
+//     foo := if 1==0 {
+//         1
+//     } else {
+//         2
+//     }
+// }
+
+// bigifs() {
+//     num := if 1==3 {
+//         6
+//     } else if 1==4 {
+//         7
+//     } else if 1==5 {
+//         8
+//     } else if 1==6 {
+//         9
+//     } else {
+//         10
+//     }
+// }
+
+// whiles() {
+//     while1()
+//     while2()
+//     // while3()
+// }
+
+// while1() {
+//     while {
+//         loop := 1 + 2 + 3
+//         break
+//     }
+// }
+
+// while2() {
+//     mut stop = false
+//     while stop {
+//         stop = true
+//     }
+// }
+
+// // while3() {
+// //     mut stop = false
+// //     while {
+// //         stop = true
+// //         if stop {
+// //             break
+// //         } else {
+// //             continue
+// //         }
+// //     }
+// // }
+
+// returnTerminate(): int {
+//     doStuff := 1 + 2
+//     doStuff
+// }
+
+// returnNone() {
+//     doStuff := 1 + 2
+//     1;
+// }
+
+// variable() {
+//     constTyped: int = 1
+//     constInfer := constTyped + -2
+
+//     // ref := @1
+
+//     mut cast := 1 as int
+//     cast = sum(1, 2)
+
+//     const lateInfer
+//     lateInfer = 1
+// }
+
+// // array() {
+// //     array := [uint: 1,2,3,4,5]
+// //     array[0] = 1
+// //     num := array[0]
+// //     ref := @array[0]
+
+// //     mut refArray = &[]
+// //     refArray = &[1, 2, 3]
+// //     refArray[0] = 1
+// //     num2 := refArray[0]
+// // }

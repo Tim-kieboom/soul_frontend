@@ -1,7 +1,7 @@
-use hir::{HirTree, HirType};
+use hir::{HirTree, HirType, TypeId};
 use hir_typed_context::HirTypedTable;
 use mir_parser::mir::{
-    self, BlockId, LocalId, MirTree, Operand, Place, PlaceId, Rvalue, StatementId, TempId,
+    self, BlockId, FunctionBody, LocalId, MirTree, Operand, Place, PlaceId, Rvalue, StatementId, TempId
 };
 use soul_utils::{
     ids::{FunctionId, IdAlloc},
@@ -71,28 +71,45 @@ impl<'a> MirDisplayer<'a> {
 
     fn display_function(&mut self, function_id: FunctionId) {
         let function = &self.mir.functions[function_id];
+        
+        if let FunctionBody::External(language) = function.body {
+            self.push_str("extern \"");
+            self.push_str(language.as_str());
+            self.push_str("\" ");
+        }
+
         self.push_str(function.name.as_str());
         self.push('(');
 
         let last_index = function.parameters.len().saturating_sub(1);
         for (i, local) in function.parameters.iter().enumerate() {
-            self.display_local_name(*local);
+            
+            self.display_local_declare(*local);
             if i != last_index {
                 self.push_str(", ");
             }
         }
-        self.push_str(") [\n\t");
-        self.display_goto(function.entry_block);
+        self.push_str("): ");
+        self.get_type(function.return_type).write_display(&self.types.types, &mut self.sb).expect("no fmt error");
+        self.push(' ');
+
+        let (entry_block, locals, blocks) = match &function.body {
+            FunctionBody::External(_) => return,
+            FunctionBody::Internal { entry_block, locals, blocks } => (*entry_block, locals, blocks),
+        };
+
+        self.push_str(" [\n\t");
+        self.display_goto(entry_block);
         self.push('\n');
 
-        for local_id in &function.locals {
+        for local_id in locals {
             self.push('\t');
             self.display_local_declare(*local_id);
             self.push('\n');
         }
 
         self.push('\n');
-        for block in &function.blocks {
+        for block in blocks {
             self.display_block(*block);
         }
         self.push_str("\n]\n");
@@ -101,12 +118,7 @@ impl<'a> MirDisplayer<'a> {
     fn display_local_declare(&mut self, local_id: LocalId) {
         let local = &self.mir.locals[local_id];
 
-        let mut hir_type = self
-            .types
-            .types
-            .get_type(local.ty)
-            .unwrap_or(&HirType::error_type())
-            .clone();
+        let mut hir_type = self.get_type(local.ty);
         let modifier = hir_type.modifier.unwrap_or(TypeModifier::Const);
         hir_type.modifier = None;
 
@@ -304,5 +316,14 @@ impl<'a> MirDisplayer<'a> {
 
     fn display_block_name(&mut self, block_id: BlockId) {
         write!(self.sb, "bb_{}", block_id.index()).expect("not fmt error");
+    }
+
+    fn get_type(&self, ty: TypeId) -> HirType {
+        self
+            .types
+            .types
+            .get_type(ty)
+            .cloned()
+            .unwrap_or(HirType::error_type())
     }
 }

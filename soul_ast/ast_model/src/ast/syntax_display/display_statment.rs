@@ -16,6 +16,18 @@ impl SyntaxDisplay for StatementKind {
     fn inner_display(&self, sb: &mut String, kind: &DisplayKind, tab: usize, is_last: bool) {
         let prefix = tree_prefix(tab, is_last);
         match self {
+            StatementKind::ExternalFunction(function) => {
+                sb.push_str(&prefix);
+                try_display_function_id(sb, kind, function.signature.node.id);
+                sb.push_str("ExternalFunction >> ");
+                inner_display_function_signature(
+                    sb,
+                    kind,
+                    &function.signature.node,
+                    tab,
+                    is_last
+                )
+            }
             StatementKind::Import(paths) => {
                 sb.push_str(&prefix);
                 sb.push_str("Import >> ");
@@ -93,9 +105,9 @@ impl SyntaxDisplay for StatementKind {
             }
             StatementKind::Function(function) => {
                 sb.push_str(&prefix);
-                try_display_function_id(sb, kind, function.id);
+                try_display_function_id(sb, kind, function.signature.node.id);
                 sb.push_str("Function >> ");
-                inner_display_function_declaration(
+                inner_display_function_signature(
                     sb,
                     kind,
                     &function.signature.node,
@@ -108,7 +120,7 @@ impl SyntaxDisplay for StatementKind {
     }
 }
 
-fn inner_display_function_declaration(
+fn inner_display_function_signature(
     sb: &mut String,
     kind: &DisplayKind,
     signature: &FunctionSignature,
