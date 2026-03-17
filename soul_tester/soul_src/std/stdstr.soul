@@ -1,0 +1,19 @@
+trait Formatter {
+
+}
+
+struct FmtStr<'a> {
+    pieces: [@'a]@'a str
+    args: [@'a]Arg<'a>
+}
+
+union Arg<'a> {
+    Empty(),
+    Int(i128),
+    Uint(u128),
+    Char(char),
+    Float(f64),
+    Str(@'a str),
+    Boolean(bool),
+    Format(*dyn FnOnce(&dyn Formatter) -> Err),
+}

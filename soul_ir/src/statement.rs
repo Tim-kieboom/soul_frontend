@@ -1,5 +1,6 @@
+use inkwell::values::BasicValueEnum;
 use mir_parser::mir::{BlockId, OperandKind, Place, PlaceId, Rvalue, RvalueKind, StatementKind};
-use soul_utils::error::SoulResult;
+use soul_utils::error::{SoulError, SoulErrorKind, SoulResult};
 
 use crate::{LlvmBackend, build_error};
 
@@ -19,6 +20,17 @@ impl<'a> LlvmBackend<'a> {
                         self.log_error(err);
                     }
                 }
+                StatementKind::Call {
+                    id,
+                    arguments,
+                    return_place,
+                } => {
+                    if let Err(err) =
+                        self.lower_call(*id, arguments, *return_place)
+                    {
+                        self.log_error(err);
+                    }
+                }
                 StatementKind::StorageDead(_) => (),
                 StatementKind::StorageStart(_) => (),
             }
@@ -27,9 +39,9 @@ impl<'a> LlvmBackend<'a> {
 
     fn lower_assign(&mut self, place_id: PlaceId, value: &Rvalue) -> SoulResult<()> {
         if rvalue_is_none(value) {
-            return Ok(())
+            return Ok(());
         }
-        
+
         let ir_value = self.lower_rvalue(value)?;
         match &self.mir.tree.places[place_id] {
             Place::Temp(temp_id) => {
@@ -41,7 +53,24 @@ impl<'a> LlvmBackend<'a> {
                     .build_store(ptr, ir_value.value)
                     .map_err(build_error)?;
             }
-            Place::Deref(_) => todo!("impl deref"),
+            Place::Deref(operand) => {
+                let ptr_value = self.lower_operand(operand)?.value;
+
+                let ptr = match ptr_value {
+                    BasicValueEnum::PointerValue(p) => p,
+                    _ => {
+                        return Err(SoulError::new(
+                            "deref operand must be a pointer",
+                            SoulErrorKind::LlvmError,
+                            None,
+                        ));
+                    }
+                };
+
+                self.builder
+                    .build_store(ptr, ir_value.value)
+                    .map_err(build_error)?;
+            }
         }
 
         Ok(())

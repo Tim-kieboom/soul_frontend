@@ -1,4 +1,4 @@
-use ast::{Block, Function, Statement, StatementKind, VarTypeKind, scope::ScopeValueKind};
+use ast::{Block, Function, FunctionSignature, Statement, StatementKind, TypeKind, VarTypeKind, scope::ScopeValueKind};
 
 use crate::NameResolver;
 
@@ -32,8 +32,7 @@ impl<'a> NameResolver<'a> {
                     self.collect_expression(value);
                 }
             }
-            StatementKind::ExternalFunction(function)
-            | StatementKind::Function(function) => {
+            StatementKind::ExternalFunction(function) | StatementKind::Function(function) => {
                 self.collect_function(function);
             }
             StatementKind::Expression {
@@ -57,6 +56,10 @@ impl<'a> NameResolver<'a> {
         let prev = self.current_function;
         self.current_function = Some(id);
 
+        if is_main(&function.signature.node) {
+            self.store.main_function = Some(id);
+        }
+
         let signature = &mut function.signature.node;
         self.collect_type(&mut signature.methode_type);
         self.collect_type(&mut signature.return_type);
@@ -70,4 +73,9 @@ impl<'a> NameResolver<'a> {
             .insert_functions(id, function.signature.node.clone());
         self.current_function = prev;
     }
+}
+
+fn is_main(signature: &FunctionSignature) -> bool {
+    signature.name.as_str() == "main" &&
+    matches!(signature.methode_type.kind, TypeKind::None)
 }

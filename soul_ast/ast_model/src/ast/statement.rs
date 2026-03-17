@@ -77,7 +77,6 @@ pub struct Function {
     pub block: Block,
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ExternLanguage {
     C,
@@ -228,7 +227,10 @@ impl Statement {
 
     pub fn from_external_function(signature: Spanned<FunctionSignature>) -> Self {
         let span = signature.span;
-        let function = Function{ signature, block: empty_block(span) };
+        let function = Function {
+            signature,
+            block: empty_block(span),
+        };
         Self::new(StatementKind::ExternalFunction(function), span)
     }
 
@@ -238,5 +240,11 @@ impl Statement {
 }
 
 fn empty_block(span: Span) -> Block {
-    Block { modifier: TypeModifier::Mut, statements: vec![], scope_id: None, node_id: None, span }
+    Block {
+        modifier: TypeModifier::Mut,
+        statements: vec![],
+        scope_id: None,
+        node_id: None,
+        span,
+    }
 }

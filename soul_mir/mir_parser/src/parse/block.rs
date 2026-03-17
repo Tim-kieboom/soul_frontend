@@ -1,6 +1,6 @@
 use soul_utils::soul_error_internal;
 
-use crate::{EndBlock, MirContext, mir};
+use crate::{EndBlock, MirContext, mir::{self, OperandKind}};
 
 struct LiveIndex {
     block: mir::BlockId,
@@ -71,7 +71,13 @@ impl<'a> MirContext<'a> {
                     }
                 };
 
-                self.insert_terminator(this_block, mir::Terminator::Return(Some(value)))
+                let return_value = if matches!(value.kind, OperandKind::None) {
+                    None
+                } else {
+                    Some(value)
+                };
+
+                self.insert_terminator(this_block, mir::Terminator::Return(return_value))
             }
             _ => self.insert_terminator(this_block, mir::Terminator::Return(None)),
         }

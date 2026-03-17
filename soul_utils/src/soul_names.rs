@@ -34,6 +34,16 @@ define_str_enum!(
     }
 );
 
+pub enum PrimitiveSize {
+    CharSize,
+    IntSize,
+    Bit8,
+    Bit16,
+    Bit32,
+    Bit64,
+    Bit128,
+}
+
 define_str_enum!(
     /// Internal primitive types available in the Soul language.
     ///
@@ -200,6 +210,21 @@ impl PrimitiveTypes {
             | PrimitiveTypes::UntypedUint
             | PrimitiveTypes::UntypedFloat => true,
             _ => false,
+        }
+    }
+
+    pub const fn to_primitive_size(&self) -> PrimitiveSize {
+        if matches!(self, PrimitiveTypes::Char) {
+            return PrimitiveSize::CharSize
+        }
+        
+        match self.precedence().as_usize() {
+            8 => PrimitiveSize::Bit8,
+            16 => PrimitiveSize::Bit16,
+            32 => PrimitiveSize::Bit32,
+            64 => PrimitiveSize::Bit64,
+            128 => PrimitiveSize::Bit128,
+            _ => PrimitiveSize::IntSize,
         }
     }
 }

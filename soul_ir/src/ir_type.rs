@@ -35,10 +35,7 @@ impl<'a> LlvmBackend<'a> {
             }
             hir::HirTypeKind::Array { element, kind } => {
                 let ptr_type = self.context.ptr_type(AddressSpace::default()).into();
-                let len_type = self
-                    .context
-                    .ptr_sized_int_type(&self.target_data, None)
-                    .into();
+                let len_type = self.default_int_type.into();
 
                 match kind {
                     ast::ArrayKind::StackArray(num) => {
@@ -69,10 +66,11 @@ impl<'a> LlvmBackend<'a> {
         Some(match primitive {
             PrimitiveTypes::None => return None,
 
-            PrimitiveTypes::Char
-            | PrimitiveTypes::Int8
-            | PrimitiveTypes::Uint8
-            | PrimitiveTypes::Char8 => self.context.i8_type().into(),
+            PrimitiveTypes::Char => self.default_char_type.into(),
+
+            PrimitiveTypes::Int8 | PrimitiveTypes::Uint8 | PrimitiveTypes::Char8 => {
+                self.context.i8_type().into()
+            }
             PrimitiveTypes::Boolean => self.context.bool_type().into(),
 
             PrimitiveTypes::Int16 | PrimitiveTypes::Char16 | PrimitiveTypes::Uint16 => {
@@ -86,11 +84,7 @@ impl<'a> LlvmBackend<'a> {
             PrimitiveTypes::Int
             | PrimitiveTypes::Uint
             | PrimitiveTypes::UntypedInt
-            | PrimitiveTypes::UntypedUint => self
-                .context
-                .ptr_sized_int_type(&self.target_data, None)
-                .into(),
-
+            | PrimitiveTypes::UntypedUint => self.default_int_type.into(),
             PrimitiveTypes::Int64 | PrimitiveTypes::Char64 | PrimitiveTypes::Uint64 => {
                 self.context.i64_type().into()
             }

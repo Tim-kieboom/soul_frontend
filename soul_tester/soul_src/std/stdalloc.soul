@@ -1,0 +1,38 @@
+extern "C" malloc(len: int): ?*none
+extern "C" free(ptr: ?*none)
+
+unsafe alloc(len: uint): *none {
+    malloc(len as int) ?? panic("alloc failed")
+}
+
+#[public]
+type new
+
+use<T> new<T> {
+    This<T>(value: T): *T {
+        unsafe{
+            alloc(T.sizeof) as *T 
+        }
+    }
+
+    This:[T](array): [*]T {
+        unsafe{
+            len := array.Len()
+            mut ptr = alloc(T.sizeof * len) as *T
+        
+            mut i = 0
+            while i < len {
+                *(ptr + i) = array[i]
+                i++
+            }
+
+            [*]T{ptr, len}
+        }
+    }
+}
+
+use<T> *T impl Drop {
+    Drop(ptr: *T) {
+        free(ptr as *none)
+    }
+}

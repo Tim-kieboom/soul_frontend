@@ -27,7 +27,12 @@ impl<'a> HirTypedContext<'a> {
             hir::ExpressionKind::Literal(_) => value.ty, /*already handled by hir*/
             hir::ExpressionKind::DeRef(inner) => {
                 let inner = self.infer_expression(*inner);
-                let deref = self.get_type(inner).try_deref(&self.hir.types, span);
+                let ty = match self.resolve_type_strict(inner, span) {
+                    Some(val) => val,
+                    None => return TypeId::error(),
+                };
+
+                let deref = self.get_type(ty).try_deref(&self.hir.types, span);
                 match deref {
                     Ok(val) => val,
                     Err(err) => {
@@ -72,7 +77,6 @@ impl<'a> HirTypedContext<'a> {
                 match from_type.unify_primitive_cast(
                     &self.type_table.types,
                     to_type,
-                    self.is_in_unsafe,
                 ) {
                     Ok(()) => (),
                     Err(err) => self.log_error(SoulError::new(
@@ -225,7 +229,7 @@ impl<'a> HirTypedContext<'a> {
                 self.unify(right, left_id, right_id, span);
                 let left_type = self.get_type(left_id);
                 let right_type = self.get_type(right_id);
-                if !left_type.is_numeric() {
+                if !left_type.is_numeric_type() {
                     self.log_error(SoulError::new(
                         format!(
                             "type is '{}' but can only be used for number types (f32, uint, int, i32, ect..)", 
@@ -237,7 +241,7 @@ impl<'a> HirTypedContext<'a> {
                     return TypeId::error();
                 }
 
-                if !right_type.is_numeric() {
+                if !right_type.is_numeric_type() {
                     self.log_error(SoulError::new(
                         format!(
                             "type is '{}' but can only be used for number types (f32, uint, int, i32, ect..)", 
@@ -262,7 +266,7 @@ impl<'a> HirTypedContext<'a> {
             Unary::Neg => {
                 let value_type = self.infer_expression(value);
                 let ty = self.get_type(value_type);
-                if !ty.is_numeric() {
+                if !ty.is_numeric_type() {
                     self.log_error(SoulError::new(
                         format!(
                             "type is '{}' but can only be used for number types (f32, uint, int, i32, ect..)", 
@@ -279,7 +283,7 @@ impl<'a> HirTypedContext<'a> {
             Unary::Not => {
                 let value_type = self.infer_expression(value);
                 let ty = self.get_type(value_type);
-                if !ty.is_boolean() {
+                if !ty.is_boolean_type() {
                     self.log_error(SoulError::new(
                         format!(
                             "type is '{}' but can only be used for bool type",
@@ -296,7 +300,7 @@ impl<'a> HirTypedContext<'a> {
             Unary::Increment { .. } | Unary::Decrement { .. } => {
                 let value_type = self.infer_expression(value);
                 let ty = self.get_type(value_type);
-                if !ty.is_numeric() {
+                if !ty.is_numeric_type() {
                     self.log_error(SoulError::new(
                         format!(
                             "type is '{}' but can only be used for number types (f32, uint, int, i32, ect..)",

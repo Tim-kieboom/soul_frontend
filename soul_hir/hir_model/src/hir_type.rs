@@ -92,7 +92,7 @@ impl HirType {
         self.modifier == Some(TypeModifier::Mut)
     }
 
-    pub const fn is_infertype(&self) -> bool {
+    pub const fn is_infer_type(&self) -> bool {
         matches!(self.kind, HirTypeKind::InferType(_, _))
     }
 
@@ -117,23 +117,23 @@ impl HirType {
         self.kind.write_display(types, sb)
     }
 
-    pub const fn is_untyped_interger(&self) -> bool {
+    pub const fn is_untyped_interger_type(&self) -> bool {
         self.kind.is_untyped_interger()
     }
 
-    pub const fn is_none(&self) -> bool {
+    pub const fn is_none_type(&self) -> bool {
         matches!(self.kind, HirTypeKind::None)
     }
 
-    pub const fn is_boolean(&self) -> bool {
+    pub const fn is_boolean_type(&self) -> bool {
         matches!(self.kind, HirTypeKind::Primitive(PrimitiveTypes::Boolean))
     }
 
-    pub const fn is_error(&self) -> bool {
+    pub const fn is_error_type(&self) -> bool {
         matches!(self.kind, HirTypeKind::Error)
     }
 
-    pub const fn is_signed_interger(&self) -> bool {
+    pub const fn is_any_int_type(&self) -> bool {
         if let HirTypeKind::Primitive(prim) = self.kind {
             prim.is_signed_interger()
         } else {
@@ -141,7 +141,7 @@ impl HirType {
         }
     }
 
-    pub const fn is_unsigned_interger(&self) -> bool {
+    pub const fn is_any_uint_type(&self) -> bool {
         if let HirTypeKind::Primitive(prim) = self.kind {
             prim.is_unsigned_interger()
         } else {
@@ -149,7 +149,7 @@ impl HirType {
         }
     }
 
-    pub const fn is_float(&self) -> bool {
+    pub const fn is_float_type(&self) -> bool {
         if let HirTypeKind::Primitive(prim) = self.kind {
             prim.is_float()
         } else {
@@ -157,11 +157,11 @@ impl HirType {
         }
     }
 
-    pub const fn is_numeric(&self) -> bool {
-        self.is_float() || self.is_unsigned_interger() || self.is_signed_interger()
+    pub const fn is_numeric_type(&self) -> bool {
+        self.is_float_type() || self.is_any_uint_type() || self.is_any_int_type()
     }
 
-    pub const fn is_primitive(&self) -> bool {
+    pub const fn is_primitive_type(&self) -> bool {
         matches!(self.kind, HirTypeKind::Primitive(_))
     }
 
@@ -198,7 +198,7 @@ impl HirType {
             _ => None,
         };
 
-        if self.is_error() || should_be.is_error() {
+        if self.is_error_type() || should_be.is_error_type() {
             return Ok(UnifyResult::Ok);
         }
 
@@ -210,7 +210,6 @@ impl HirType {
         &self,
         types: &TypesMap,
         should_be: &Self,
-        is_in_unsafe: bool,
     ) -> Result<(), MishmatchReason> {
         match (self.modifier, should_be.modifier) {
             (Some(self_modifier), Some(should_be_modifier)) => {
@@ -226,7 +225,7 @@ impl HirType {
         };
 
         self.kind
-            .unify_primitive_cast(types, &should_be.kind, is_in_unsafe)
+            .unify_primitive_cast(types, &should_be.kind)
     }
 
     pub fn resolve_untyped(&mut self, should_be: &Self) {
@@ -246,13 +245,13 @@ impl HirType {
             }
         }
 
-        if self.is_untyped_interger() && other.is_untyped_interger() {
+        if self.is_untyped_interger_type() && other.is_untyped_interger_type() {
             if number_precendence(self) < number_precendence(other) {
                 Priority::Left
             } else {
                 Priority::Right
             }
-        } else if self.is_untyped_interger() || self.kind.is_unknown() {
+        } else if self.is_untyped_interger_type() || self.kind.is_unknown() {
             Priority::Right
         } else {
             Priority::Left
@@ -363,7 +362,6 @@ impl HirTypeKind {
         &self,
         types: &TypesMap,
         should_be: &Self,
-        is_in_unsafe: bool,
     ) -> Result<(), MishmatchReason> {
         Ok(match (self, should_be) {
             (
@@ -379,7 +377,7 @@ impl HirTypeKind {
                 let a = get_type(types, *a_id);
                 let b = get_type(types, *b_id);
 
-                a.unify_primitive_cast(types, b, is_in_unsafe)?;
+                a.unify_primitive_cast(types, b)?;
                 if mut_a != mut_b {
                     let display = |bool: &bool| {
                         if *bool {
@@ -399,30 +397,19 @@ impl HirTypeKind {
                 return Err("can only type cast primitive types".to_string());
             }
 
-            (HirTypeKind::Pointer(a_id), HirTypeKind::Pointer(b_id)) => {
-                let a = get_type(types, *a_id);
-                let b = get_type(types, *b_id);
-
-                if !is_in_unsafe {
-                    return Err("can only type cast pointers in unsafe".to_string());
-                }
-
-                if a.is_infertype() {
-                    return Ok(());
-                }
-
-                a.unify_primitive_cast(types, b, is_in_unsafe)?
+            (_, HirTypeKind::Pointer(_)) => {
+                return Ok(())
             }
 
             (HirTypeKind::Optional(a_id), HirTypeKind::Optional(b_id)) => {
                 let a = get_type(types, *a_id);
                 let b = get_type(types, *b_id);
 
-                if a.is_infertype() {
+                if a.is_infer_type() {
                     return Ok(());
                 }
 
-                a.unify_primitive_cast(types, b, is_in_unsafe)?
+                a.unify_primitive_cast(types, b)?
             }
 
             (HirTypeKind::None, HirTypeKind::None)
@@ -436,7 +423,7 @@ impl HirTypeKind {
                     return Ok(());
                 }
 
-                a.unify_primitive_cast(types, &b.kind, is_in_unsafe)?
+                a.unify_primitive_cast(types, &b.kind)?
             }
             _ => {
                 return Err(format!(
@@ -448,7 +435,7 @@ impl HirTypeKind {
         })
     }
 
-    pub fn modifier_compatible(this: TypeModifier, should_be: TypeModifier) -> bool {
+    pub const fn modifier_compatible(this: TypeModifier, should_be: TypeModifier) -> bool {
         match (this, should_be) {
             (TypeModifier::Mut, TypeModifier::Const)
             | (TypeModifier::Mut, TypeModifier::Literal)

@@ -4,8 +4,8 @@ use hir::{BlockId, HirTree, LocalId, TypeId};
 use id_generator::IdAllocalors;
 use soul_utils::{
     Ident,
-    error::SoulError,
-    ids::{FunctionId, IdGenerator},
+    error::{SoulError, SoulErrorKind},
+    ids::{FunctionId, IdAlloc, IdGenerator},
     sementic_level::SementicFault,
     soul_error_internal,
     span::Span,
@@ -67,8 +67,16 @@ impl<'a> HirContext<'a> {
         faults: &'a mut Vec<SementicFault>,
     ) -> Self {
         let mut id_generator = IdAllocalors::new(function_generator);
-        let start_function = id_generator.alloc_function();
+        let init_global_function = id_generator.alloc_function();
         let root_id = id_generator.alloc_module();
+
+        let main = match ast_store.main_function {
+            Some(val) => val,
+            None => {
+                faults.push(SementicFault::error(SoulError::new("main function not found", SoulErrorKind::InvalidContext, None)));
+                FunctionId::error()
+            }
+        };
 
         Self {
             faults,
@@ -76,7 +84,7 @@ impl<'a> HirContext<'a> {
             id_generator,
             scopes: vec![Scope::default()],
             current_body: CurrentBody::Global,
-            hir: HirTree::new(root_id, start_function),
+            hir: HirTree::new(root_id, main, init_global_function),
         }
     }
 

@@ -1,5 +1,5 @@
 use ast::{
-    Expression, ExternLanguage, Function, FunctionCall, FunctionSignature, SoulType, Statement
+    Expression, ExternLanguage, Function, FunctionCall, FunctionSignature, SoulType, Statement,
 };
 use soul_tokenizer::TokenKind;
 use soul_utils::{
@@ -24,7 +24,10 @@ impl<'a, 'f> Parser<'a, 'f> {
             TokenKind::StringLiteral(val) => val,
             other => {
                 return Err(SoulError::new(
-                    format!("expected string_literal of language name but got {}", other.display()),
+                    format!(
+                        "expected string_literal of language name but got {}",
+                        other.display()
+                    ),
                     SoulErrorKind::InvalidIdent,
                     Some(self.token().span),
                 ));
@@ -107,10 +110,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let span = signature.span;
         Ok(Spanned::new(
-            Function {
-                block,
-                signature,
-            },
+            Function { block, signature },
             self.span_combine(span),
         ))
     }

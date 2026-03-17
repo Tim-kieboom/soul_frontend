@@ -44,8 +44,9 @@ pub struct HirTree {
     /// for HIR nodes.
     pub meta_data: MetaDataMap,
 
-    /// id for _start function created in mir
-    pub start_function: FunctionId,
+    /// id for initialize runtime globals function created in mir
+    pub init_global_function: FunctionId,
+    pub main_function: FunctionId,
 
     pub internal_fields: Option<InternalFields>,
 
@@ -58,9 +59,9 @@ pub struct HirTree {
 }
 
 impl HirTree {
-    pub fn new(root_id: ModuleId, start_function_id: FunctionId) -> Self {
-        let start_function = Function {
-            id: start_function_id,
+    pub fn new(root_id: ModuleId, main_function: FunctionId, init_global_function_id: FunctionId) -> Self {
+        let init_global_function = Function {
+            id: init_global_function_id,
             name: Ident::new("_start".to_string(), Span::default_const()),
             parameters: vec![],
             kind: FunctionKind::Static,
@@ -70,7 +71,8 @@ impl HirTree {
 
         Self {
             internal_fields: None,
-            start_function: start_function_id,
+            main_function,
+            init_global_function: init_global_function_id,
             types: TypesMap::new(),
             spans: SpanMap::default(),
             blocks: VecMap::default(),
@@ -79,7 +81,7 @@ impl HirTree {
             imports: ImportMap::new(),
             expressions: VecMap::default(),
             meta_data: MetaDataMap::default(),
-            functions: VecMap::from_vec(vec![(start_function_id, start_function)]),
+            functions: VecMap::from_vec(vec![(init_global_function_id, init_global_function)]),
             root: Module {
                 id: root_id,
                 imports: vec![],

@@ -27,12 +27,14 @@ pub struct AstResponse {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DeclareStore {
+    pub main_function: Option<FunctionId>,
     functions: VecMap<FunctionId, FunctionSignature>,
     variable_type: VecMap<NodeId, VarTypeKind>,
 }
 impl DeclareStore {
     pub const fn new() -> Self {
         Self {
+            main_function: None,
             functions: VecMap::const_default(),
             variable_type: VecMap::const_default(),
         }

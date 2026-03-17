@@ -1,21 +1,44 @@
-use mir_parser::mir::{FunctionBody, Operand, OperandKind};
+use inkwell::types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FunctionType, VoidType};
+use mir_parser::mir::{FunctionBody};
 use soul_utils::{
-    error::{SoulError, SoulErrorKind, SoulResult},
     ids::FunctionId,
-    soul_error_internal,
 };
 
-use crate::{IrOperand, LlvmBackend, build_error};
+use crate::{LlvmBackend};
 
 impl<'a> LlvmBackend<'a> {
     pub(crate) fn declare_function(&mut self, function_id: FunctionId) {
         let function = &self.mir.tree.functions[function_id];
 
-        let function_type = self.context.i32_type().fn_type(&[], false);
+        let ty: FunctionReturnType<'a> = match self.lower_type(function.return_type) {
+            Ok(Some(val)) => val.into(),
+            Ok(None) => self.context.void_type().into(),
+            Err(err) => {
+                self.log_error(err);
+                self.context.void_type().into()
+            }
+        };
+
+        let mut args = Vec::with_capacity(function.parameters.len());
+        for arg in &function.parameters {
+            let local_type = self.mir.tree.locals[*arg].ty;
+            let ty = match self.lower_type(local_type) {
+                Ok(Some(val)) => val.into(),
+                Ok(None) => self.context.i8_type().into(),
+                Err(err) => {
+                    self.log_error(err);
+                    self.context.i8_type().into()
+                }
+            };
+            args.push(ty);
+        }
+
+        let function_type = ty.fn_type(&args, false);
         let llvm_function = self
             .module
             .add_function(function.name.as_str(), function_type, None);
 
+        self.create_block(function_id, llvm_function);
         self.functions.insert(function_id, llvm_function);
     }
 
@@ -28,7 +51,6 @@ impl<'a> LlvmBackend<'a> {
             FunctionBody::Internal { blocks, .. } => blocks,
         };
 
-        self.create_blocks();
         self.allocate_function_locals(function);
 
         for block_id in blocks {
@@ -42,121 +64,27 @@ impl<'a> LlvmBackend<'a> {
         }
     }
 
-    pub(crate) fn lower_operand(&self, condition: &Operand) -> SoulResult<IrOperand<'a>> {
-        Ok(match &condition.kind {
-            OperandKind::Temp(temp_id) => {
-                self.temps
-                    .get(*temp_id)
-                    .copied()
-                    .ok_or(soul_error_internal!(
-                        format!("{:?} not found", *temp_id),
-                        None
-                    ))?
-            }
-            OperandKind::Local(local_id) => {
-                let local = &self.mir.tree.locals[*local_id];
-                let ty = match self.lower_type(local.ty)? {
-                    Some(val) => val,
-                    None => self.context.i8_type().into(),
-                };
-                let ptr = self.locals[*local_id];
-                let is_signed_interger = self
-                    .types
-                    .types
-                    .get_type(local.ty)
-                    .ok_or(soul_error_internal!(
-                        format!("{:?} not found", local.ty),
-                        None
-                    ))?
-                    .is_signed_interger();
+}
 
-                return self
-                    .builder
-                    .build_load(ty, ptr, "load")
-                    .map(|value| IrOperand {
-                        value,
-                        is_signed_interger,
-                    })
-                    .map_err(|err| build_error(err));
-            }
-            OperandKind::Comptime(literal) => {
-                self.lower_literal(literal)
-            }
-            OperandKind::Ref { .. } => {
-                todo!("ref not yet impl")
-            }
-            OperandKind::None => {
-                return Err(SoulError::new(
-                    "operand should be Some(_)",
-                    SoulErrorKind::LlvmError,
-                    None,
-                ));
-            }
-        })
-    }
-
-    pub(crate) fn lower_literal(&self, literal: &ast::Literal) -> IrOperand<'a> {
-        match literal {
-            ast::Literal::Int(value) => {
-                let negative = *value < 0;
-                let value = self
-                    .context
-                    .i64_type()
-                    .const_int(value.abs() as u64, negative)
-                    .into();
-
-                IrOperand {
-                    value,
-                    is_signed_interger: true,
-                }
-            }
-            ast::Literal::Uint(value) => {
-                let value = self
-                    .context
-                    .i64_type()
-                    .const_int(*value as u64, false)
-                    .into();
-
-                IrOperand {
-                    value,
-                    is_signed_interger: false,
-                }
-            }
-            ast::Literal::Float(value) => {
-                let value = self.context.f64_type().const_float(*value).into();
-
-                IrOperand {
-                    value,
-                    is_signed_interger: false,
-                }
-            }
-            ast::Literal::Bool(value) => {
-                let value = self
-                    .context
-                    .bool_type()
-                    .const_int(*value as u64, false)
-                    .into();
-
-                IrOperand {
-                    value,
-                    is_signed_interger: false,
-                }
-            }
-            ast::Literal::Char(value) => {
-                let value = self
-                    .context
-                    .i8_type()
-                    .const_int(*value as u64, false)
-                    .into();
-
-                IrOperand {
-                    value,
-                    is_signed_interger: false,
-                }
-            }
-            ast::Literal::Str(_) => {
-                todo!("string literal not yet impl")
-            }
+enum FunctionReturnType<'a> {
+    Basic(BasicTypeEnum<'a>),
+    Void(VoidType<'a>),
+}
+impl<'a> FunctionReturnType<'a> {
+    fn fn_type(&self, args: &[BasicMetadataTypeEnum<'a>], varargs: bool) -> FunctionType<'a> {
+        match self {
+            FunctionReturnType::Void(ty) => ty.fn_type(args, varargs),
+            FunctionReturnType::Basic(ty) => ty.fn_type(args, varargs),
         }
+    }
+}
+impl<'a> From<VoidType<'a>> for FunctionReturnType<'a> {
+    fn from(value: VoidType<'a>) -> Self {
+        Self::Void(value)
+    }
+}
+impl<'a> From<BasicTypeEnum<'a>> for FunctionReturnType<'a> {
+    fn from(value: BasicTypeEnum<'a>) -> Self {
+        Self::Basic(value)
     }
 }

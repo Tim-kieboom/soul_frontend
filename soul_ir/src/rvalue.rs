@@ -312,7 +312,7 @@ impl<'a> LlvmBackend<'a> {
             }
             (BasicValueEnum::FloatValue(l), BasicValueEnum::FloatValue(r)) => self
                 .builder
-                .build_float_compare(cmp.to_float_cmp(), l, r, "rvalue")
+                .build_float_compare(cmp.to_float_cmp_no_nan(), l, r, "rvalue")
                 .map_err(build_error)
                 .map(BasicValueEnum::from),
             _ => Err(SoulError::new(
@@ -419,14 +419,14 @@ impl IrCompare {
         }
     }
 
-    fn to_float_cmp(&self) -> FloatPredicate {
+    fn to_float_cmp_no_nan(&self) -> FloatPredicate {
         match self {
-            IrCompare::Lt => FloatPredicate::ULT,
-            IrCompare::Gt => FloatPredicate::UGT,
-            IrCompare::Le => FloatPredicate::ULE,
-            IrCompare::Ge => FloatPredicate::UGE,
-            IrCompare::Eq => FloatPredicate::UEQ,
-            IrCompare::NotEq => FloatPredicate::UNE,
+            IrCompare::Lt => FloatPredicate::OLT,
+            IrCompare::Gt => FloatPredicate::OGT,
+            IrCompare::Le => FloatPredicate::OLE,
+            IrCompare::Ge => FloatPredicate::OGE,
+            IrCompare::Eq => FloatPredicate::OEQ,
+            IrCompare::NotEq => FloatPredicate::ONE,
         }
     }
 }

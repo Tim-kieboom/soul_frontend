@@ -1,6 +1,6 @@
 use soul_utils::soul_error_internal;
 
-use crate::{EndBlock, MirContext, mir};
+use crate::{EndBlock, MirContext, mir::{self, OperandKind}};
 
 pub(crate) struct StatementResponse {
     /// insert terminator in block
@@ -48,7 +48,11 @@ impl<'a> MirContext<'a> {
                 let operand = match value {
                     Some(val) => {
                         let operand = self.lower_operand(*val).pass(is_end);
-                        Some(operand)
+                        if matches!(operand.kind, OperandKind::None) {
+                            None
+                        } else {
+                            Some(operand)
+                        }
                     }
                     None => None,
                 };

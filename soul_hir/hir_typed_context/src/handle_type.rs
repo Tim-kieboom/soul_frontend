@@ -213,7 +213,7 @@ impl<'a> HirTypedContext<'a> {
             .expect("should have id");
 
         debug_assert!(
-            !hir_ty.is_infertype(),
+            !hir_ty.is_infer_type(),
             "InferType leaked into final type graph"
         );
 

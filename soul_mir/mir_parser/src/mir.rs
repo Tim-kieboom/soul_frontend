@@ -13,8 +13,7 @@ impl_soul_ids!(GlobalId, BlockId, LocalId, StatementId, PlaceId, TempId);
 /// - Easy to lower to LLVM IR
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MirTree {
-    /// Entry point function (_start function that inits runtime globals and calls main)
-    pub start_function: FunctionId,
+    pub init_global_function: FunctionId,
 
     pub globals: VecMap<GlobalId, Global>,
 
@@ -36,8 +35,6 @@ pub struct MirTree {
 
     /// Function metadata
     pub functions: VecMap<FunctionId, Function>,
-
-    pub exit_block: BlockId,
 }
 
 /// Lowered function definition in MIR.
@@ -58,13 +55,13 @@ pub struct Function {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum FunctionBody {
     External(ExternLanguage),
-    Internal{
+    Internal {
         entry_block: BlockId,
         /// All locals declared in the function body
         locals: Vec<LocalId>,
         /// All blocks belonging to this function
         blocks: Vec<BlockId>,
-    }
+    },
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -125,6 +122,16 @@ pub enum StatementKind {
         value: Rvalue,
     },
 
+    /// Function call.
+    ///
+    /// Control flows to `next` after the call completes.
+    /// has to return Value
+    Call {
+        id: FunctionId,
+        arguments: Vec<Operand>,
+        return_place: Option<PlaceId>
+    },
+
     StorageStart(Vec<LocalId>),
     StorageDead(LocalId),
 }
@@ -174,16 +181,6 @@ pub enum Terminator {
         condition: Operand,
         then: BlockId,
         arm: BlockId,
-    },
-
-    /// Function call.
-    ///
-    /// Control flows to `next` after the call completes.
-    Call {
-        id: FunctionId,
-        arguments: Vec<Operand>,
-        return_place: Option<PlaceId>,
-        next: BlockId,
     },
 
     Exit,

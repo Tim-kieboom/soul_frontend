@@ -4,10 +4,7 @@ use hir::{
     Variable,
 };
 use soul_utils::{
-    error::{SoulError, SoulErrorKind},
-    ids::{FunctionId, IdAlloc},
-    soul_names::TypeModifier,
-    span::Span,
+    error::{SoulError, SoulErrorKind}, ids::{FunctionId, IdAlloc}, soul_error_internal, soul_names::TypeModifier, span::Span
 };
 
 impl<'a> HirTypedContext<'a> {
@@ -17,8 +14,8 @@ impl<'a> HirTypedContext<'a> {
             Global::Variable(variable, id) | Global::InternalVariable(variable, id) => {
                 self.infer_variable(variable, self.statement_span(*id))
             }
-            Global::Function(function, _) => {
-                let ty = self.infer_function(function);
+            Global::Function(function, _) => {                
+                let ty = self.infer_function(*function);
                 self.type_function(*function, ty);
                 ty
             }
@@ -46,9 +43,16 @@ impl<'a> HirTypedContext<'a> {
             Statement::Expression { value, .. } => self.infer_expression(*value),
 
             Statement::Fall(value, _)
-            | Statement::Break(value, _)
-            | Statement::Return(value, _) => match value {
-                Some(val) => self.infer_expression(*val),
+            | Statement::Break(value, _) => {
+                if let Some(value) = value {
+                    let span = self.hir.spans.expressions[*value];
+                    self.log_error(soul_error_internal!("break/fall with value is not yet impl", Some(span)));
+                }
+                return
+            }
+
+            Statement::Return(value, _) => match *value {
+                Some(val) => self.infer_expression(val),
                 None => self.type_table.none_type,
             },
         };
@@ -103,7 +107,12 @@ impl<'a> HirTypedContext<'a> {
             }
             PlaceKind::Deref(place, _) => {
                 let inner = self.infer_place(place);
-                let deref = self.get_type(inner).try_deref(&self.hir.types, span);
+                let ty = match self.resolve_type_strict(inner, span) {
+                    Some(val) => val,
+                    None => return TypeId::error(),
+                };
+
+                let deref = self.get_type(ty).try_deref(&self.hir.types, span);
                 match deref {
                     Ok(val) => val,
                     Err(err) => {
@@ -165,7 +174,7 @@ impl<'a> HirTypedContext<'a> {
 
         let declare_type = self.get_type(declared_type_id);
 
-        let mut variable_type_id = if !declare_type.is_infertype() {
+        let mut variable_type_id = if !declare_type.is_infer_type() {
             declared_type_id
         } else {
             value_type_id
@@ -177,8 +186,9 @@ impl<'a> HirTypedContext<'a> {
         self.type_local(variable.local, variable_type_id, modifier, span)
     }
 
-    fn infer_function(&mut self, function_id: &FunctionId) -> TypeId {
-        let function = &self.hir.functions[*function_id];
+    fn infer_function(&mut self, function_id: FunctionId) -> TypeId {
+        self.current_function = Some(function_id);
+        let function = &self.hir.functions[function_id];
 
         for parameter in &function.parameters {
             let modifier = self
@@ -203,6 +213,8 @@ impl<'a> HirTypedContext<'a> {
             block_type,
             span,
         );
+
+        self.current_function = None;
         function.return_type
     }
 

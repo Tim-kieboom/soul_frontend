@@ -33,12 +33,11 @@ impl<'a> HirContext<'a> {
             })
             .collect();
 
-
         let body = match function.signature.node.external {
             Some(language) => hir::FunctionBody::External(language),
             None => hir::FunctionBody::Internal(self.lower_block(&function.block)),
         };
-        
+
         self.pop_scope();
 
         let hir_function = hir::Function {

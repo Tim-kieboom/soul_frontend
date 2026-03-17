@@ -1,0 +1,28 @@
+extern "C" exit(code: int)
+extern "C" __csoul_printChar(ch: char)
+
+trait Display {
+    Display(@this, fmt: &Formatter): Err
+}
+
+#[public]
+print(value: impl Display) {
+    mut fmt = StdFormatter()
+    value.Display(&fmt)
+    for ch in fmt.Chars() {
+        __csoul_printChar(ch)
+    }
+}
+
+#[public]
+println(value: impl Display) {
+    print(value)
+    __csoul_printChar('\n')
+}
+
+#[public]
+panic(text: impl Display) {
+    print(text)
+    exit(1)
+}
+

@@ -1,6 +1,5 @@
 use std::{
-    fs::{File, OpenOptions},
-    io::{Read, stdout},
+    fs::{File, OpenOptions}, io::{Read, stdout}
 };
 
 use anyhow::Result;
@@ -40,7 +39,7 @@ mod paths;
 static PATHS: &[u8] = include_bytes!("../paths.json");
 
 pub const MESSAGE_CONFIG: MessageConfig = MessageConfig {
-    backtrace: false,
+    backtrace: true,
     colors: true,
 };
 
@@ -60,7 +59,7 @@ fn main() -> Result<()> {
     let paths: Paths = serde_json::from_slice(PATHS)?;
     init_logger(&paths.log_file)?;
 
-    let mut output = run_compiler(&paths)?;
+    let output = run_fontend(&paths)?;
     display_output(&paths, &output)?;
 
     if output.faults.is_empty() {
@@ -70,28 +69,14 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    let request = IrRequest {
-        mir: &output.mir,
-        types: &output.hir.types,
-        context: &Context::create(),
-    };
-
-    let ir = to_llvm_ir(&request, &COMPILER_OPTIONS, &mut output.faults);
-
-    if ir.no_errors {
-        info!("{GREEN}llvm success!!{DEFAULT}");
-
-        if let Err(err) = ir.module.print_to_file("output/out.ll") {
-            error!("{err}");
-        };
-    } else {
-        drop(ir); // drop to be able to use faults
-        log_faults(&output.faults, &output.source_file);
+    let is_success = run_llvm(&output);
+    if is_success {
+        info!("{GREEN}llvm success!!{DEFAULT}")
     }
     Ok(())
 }
 
-fn run_compiler<'a>(paths: &'a Paths) -> Result<Ouput> {
+fn run_fontend<'a>(paths: &'a Paths) -> Result<Ouput> {
     let mut faults = vec![];
 
     let source_file = to_source_file(&paths.source_file)?;
@@ -107,6 +92,29 @@ fn run_compiler<'a>(paths: &'a Paths) -> Result<Ouput> {
         faults,
         source_file,
     })
+}
+
+fn run_llvm(output: &Ouput) -> bool {
+    let request = IrRequest {
+        mir: &output.mir,
+        types: &output.hir.types,
+        context: &Context::create(),
+    };
+
+    let mut faults = vec![];
+    let ir = to_llvm_ir(&request, &COMPILER_OPTIONS, &mut faults);
+    let is_success = ir.no_errors;
+
+    if is_success {
+        if let Err(err) = ir.module.print_to_file("output/out.ll") {
+            error!("{err}");
+        };
+    } else {
+        drop(ir); // drop to be able to use faults
+        log_faults(&faults, &output.source_file);
+    }
+
+    is_success
 }
 
 fn display_output<'a>(paths: &Paths, output: &Ouput) -> Result<()> {

@@ -1,4 +1,4 @@
-use hir::{Binary, Unary};
+use hir::{Binary, TypeId, Unary};
 use soul_utils::{
     ids::{FunctionId, IdAlloc},
     soul_error_internal,
@@ -120,26 +120,7 @@ impl<'a> MirContext<'a> {
             }
 
             hir::ExpressionKind::Load(place) => {
-                let place_id = self.lower_place(place).pass(is_end);
-                let operand = match &self.tree.places[place_id] {
-                    mir::Place::Local(local) => {
-                        mir::Operand::new(ty, mir::OperandKind::Local(*local))
-                    }
-                    _ => mir::Operand::new(
-                        ty,
-                        mir::OperandKind::Temp(self.place_to_temp(place_id, ty)),
-                    ),
-                };
-
-                let temp = self.new_temp(ty);
-
-                let statement = mir::Statement::new(mir::StatementKind::Assign {
-                    place: self.new_place(mir::Place::Temp(temp)),
-                    value: mir::Rvalue::new(mir::RvalueKind::Use(operand)),
-                });
-
-                self.push_statement(statement);
-                mir::Operand::new(ty, mir::OperandKind::Temp(temp))
+                self.lower_load(ty, place, is_end)
             }
 
             hir::ExpressionKind::DeRef(inner) => {
@@ -213,28 +194,15 @@ impl<'a> MirContext<'a> {
             arguments.push(self.lower_operand(*arg).pass(is_end));
         }
 
-        let temp = if self.get_type(ty).is_none() {
+        let temp = if self.get_type(ty).is_none_type() {
             None
         } else {
             Some(self.new_temp(ty))
         };
 
-        let current = self.expect_current_block();
-        let next_block = self.new_block();
-        self.tree.blocks[next_block].returnable = self.tree.blocks[current].returnable;
-
         let return_place = temp.map(|val| self.new_place(mir::Place::Temp(val)));
-        self.insert_terminator(
-            current,
-            mir::Terminator::Call {
-                id: function,
-                arguments,
-                return_place,
-                next: next_block,
-            },
-        );
-
-        self.current.block = Some(next_block);
+        let statement = mir::Statement::new(mir::StatementKind::Call { id: function, arguments, return_place });
+        self.push_statement(statement);
 
         let operand = match temp {
             Some(val) => mir::Operand::new(ty, mir::OperandKind::Temp(val)),
@@ -242,5 +210,28 @@ impl<'a> MirContext<'a> {
         };
 
         EndBlock::new(operand, is_end)
+    }
+
+    fn lower_load(&mut self, ty: TypeId, place: &hir::Place, is_end: &mut bool) -> mir::Operand {
+        let place_id = self.lower_place(place).pass(is_end);
+        let operand = match &self.tree.places[place_id] {
+            mir::Place::Local(local) => {
+                return mir::Operand::new(ty, mir::OperandKind::Local(*local))
+            }
+            _ => mir::Operand::new(
+                ty,
+                mir::OperandKind::Temp(self.place_to_temp(place_id, ty)),
+            ),
+        };
+
+        let temp = self.new_temp(ty);
+
+        let statement = mir::Statement::new(mir::StatementKind::Assign {
+            place: self.new_place(mir::Place::Temp(temp)),
+            value: mir::Rvalue::new(mir::RvalueKind::Use(operand)),
+        });
+
+        self.push_statement(statement);
+        mir::Operand::new(ty, mir::OperandKind::Temp(temp))
     }
 }

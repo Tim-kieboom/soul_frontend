@@ -19,11 +19,18 @@ pub fn display_mir(mir: &MirTree, hir: &HirTree, types: &HirTypedTable) -> Strin
     }
     displayer.push_str("]\n");
 
-    let start = mir.functions[hir.start_function].id;
-    displayer.display_function(start);
-    displayer.push('\n');
+    if let Some(main) = mir.functions.get(hir.main_function).map(|f| f.id) {
+        displayer.display_function(main);
+        displayer.push('\n');
+    }
 
-    for function in mir.functions.keys().filter(|id| *id != hir.start_function) {
+    if let Some(init_globals) = mir.functions.get(hir.init_global_function).map(|f| f.id) {
+        displayer.display_function(init_globals);
+        displayer.push('\n');
+    }
+
+    let keys = mir.functions.keys().filter(|id| *id != hir.init_global_function && *id != hir.main_function );
+    for function in keys {
         displayer.display_function(function);
         displayer.push('\n');
     }
@@ -71,7 +78,7 @@ impl<'a> MirDisplayer<'a> {
 
     fn display_function(&mut self, function_id: FunctionId) {
         let function = &self.mir.functions[function_id];
-        
+
         if let FunctionBody::External(language) = function.body {
             self.push_str("extern \"");
             self.push_str(language.as_str());
@@ -83,19 +90,24 @@ impl<'a> MirDisplayer<'a> {
 
         let last_index = function.parameters.len().saturating_sub(1);
         for (i, local) in function.parameters.iter().enumerate() {
-            
             self.display_local_declare(*local);
             if i != last_index {
                 self.push_str(", ");
             }
         }
         self.push_str("): ");
-        self.get_type(function.return_type).write_display(&self.types.types, &mut self.sb).expect("no fmt error");
+        self.get_type(function.return_type)
+            .write_display(&self.types.types, &mut self.sb)
+            .expect("no fmt error");
         self.push(' ');
 
         let (entry_block, locals, blocks) = match &function.body {
             FunctionBody::External(_) => return,
-            FunctionBody::Internal { entry_block, locals, blocks } => (*entry_block, locals, blocks),
+            FunctionBody::Internal {
+                entry_block,
+                locals,
+                blocks,
+            } => (*entry_block, locals, blocks),
         };
 
         self.push_str(" [\n\t");
@@ -167,16 +179,25 @@ impl<'a> MirDisplayer<'a> {
                 self.push_str("\n\t\telse ");
                 self.display_goto(*arm);
             }
-            mir::Terminator::Call {
-                id,
-                arguments,
+            mir::Terminator::Unreachable => self.push_str("// unreachable"),
+        }
+        self.push_str("\n\t}\n");
+    }
+
+    fn display_statement(&mut self, statement_id: StatementId) {
+        let statement = &self.mir.statements[statement_id];
+
+        match &statement.kind {
+            mir::StatementKind::Call { 
+                id, 
+                arguments, 
                 return_place,
-                next,
             } => {
                 if let Some(place) = return_place {
                     self.display_place(place);
                     self.push_str(" = ");
                 }
+
                 self.display_function_name(*id);
                 self.push('(');
                 let last_index = arguments.len().saturating_sub(1);
@@ -187,17 +208,7 @@ impl<'a> MirDisplayer<'a> {
                     }
                 }
                 self.push_str(") ");
-                self.display_goto(*next);
             }
-            mir::Terminator::Unreachable => self.push_str("// unreachable"),
-        }
-        self.push_str("\n\t}\n");
-    }
-
-    fn display_statement(&mut self, statement_id: StatementId) {
-        let statement = &self.mir.statements[statement_id];
-
-        match &statement.kind {
             mir::StatementKind::StorageStart(locals) => {
                 self.push_str("StorageLives([");
                 let last_index = locals.len().saturating_sub(1);
@@ -227,12 +238,7 @@ impl<'a> MirDisplayer<'a> {
         match &value.kind {
             mir::RvalueKind::StackAlloc { ty, len: _ } => {
                 self.push_str("/*stack alloc ");
-                self.types
-                    .types
-                    .get_type(*ty)
-                    .expect("should have TypeId")
-                    .write_display(&self.types.types, &mut self.sb)
-                    .expect("no fmt error");
+                self.display_type(*ty);
                 self.push_str("*/");
             }
             mir::RvalueKind::Use(operand) => self.display_operand(operand),
@@ -273,12 +279,15 @@ impl<'a> MirDisplayer<'a> {
             }
             mir::OperandKind::None => self.push_str("<none>"),
         }
+
     }
 
     fn display_place(&mut self, place_id: &PlaceId) {
         let place = &self.mir.places[*place_id];
         match place {
-            Place::Temp(temp_id) => self.display_temp_name(*temp_id),
+            Place::Temp(temp_id) => {
+                self.display_temp_name(*temp_id);
+            }
             Place::Deref(operand) => {
                 self.push('*');
                 self.display_operand(operand);
@@ -311,16 +320,19 @@ impl<'a> MirDisplayer<'a> {
     }
 
     fn display_temp_name(&mut self, temp: TempId) {
-        write!(self.sb, "temp{}", temp.index()).expect("not fmt error");
+        write!(self.sb, "temp{}", temp.index()).expect("no fmt error");
     }
 
     fn display_block_name(&mut self, block_id: BlockId) {
-        write!(self.sb, "bb_{}", block_id.index()).expect("not fmt error");
+        write!(self.sb, "bb_{}", block_id.index()).expect("no fmt error");
+    }
+
+    fn display_type(&mut self, ty: TypeId) {
+        self.get_type(ty).write_display(&self.types.types, &mut self.sb).expect("no fmt error");
     }
 
     fn get_type(&self, ty: TypeId) -> HirType {
-        self
-            .types
+        self.types
             .types
             .get_type(ty)
             .cloned()

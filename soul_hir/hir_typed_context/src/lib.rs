@@ -32,6 +32,7 @@ pub fn infer_hir_types(hir: &HirTree, faults: &mut Vec<SementicFault>) -> HirTyp
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct HirTypedTable {
     pub none_type: TypeId,
+    pub bool_type: TypeId,
 
     pub places: VecMap<PlaceId, TypeId>,
     pub locals: VecMap<LocalId, TypeId>,
@@ -66,9 +67,9 @@ struct HirTypedContext<'a> {
     hir: &'a HirTree,
     faults: &'a mut Vec<SementicFault>,
 
-    is_in_unsafe: bool,
-    type_table: HirTypedTable,
     infer_table: InferTable,
+    type_table: HirTypedTable,
+    current_function: Option<FunctionId>,
 }
 impl<'a> HirTypedContext<'a> {
     fn new(hir: &'a HirTree, faults: &'a mut Vec<SementicFault>) -> Self {
@@ -82,10 +83,11 @@ impl<'a> HirTypedContext<'a> {
         let mut this = Self {
             hir,
             faults,
-            is_in_unsafe: false,
+            current_function: None,
             infer_table: InferTable::new(&hir.types),
             type_table: HirTypedTable {
                 none_type: TypeId::error(),
+                bool_type: TypeId::error(),
                 functions,
                 places: VecMap::const_default(),
                 locals: VecMap::const_default(),
@@ -98,6 +100,7 @@ impl<'a> HirTypedContext<'a> {
             },
         };
         this.type_table.none_type = this.add_type(HirType::none_type());
+        this.type_table.bool_type = this.add_type(HirType::bool_type());
         this
     }
 

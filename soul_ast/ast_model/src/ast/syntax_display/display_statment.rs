@@ -20,13 +20,7 @@ impl SyntaxDisplay for StatementKind {
                 sb.push_str(&prefix);
                 try_display_function_id(sb, kind, function.signature.node.id);
                 sb.push_str("ExternalFunction >> ");
-                inner_display_function_signature(
-                    sb,
-                    kind,
-                    &function.signature.node,
-                    tab,
-                    is_last
-                )
+                inner_display_function_signature(sb, kind, &function.signature.node, tab, is_last)
             }
             StatementKind::Import(paths) => {
                 sb.push_str(&prefix);
@@ -107,13 +101,7 @@ impl SyntaxDisplay for StatementKind {
                 sb.push_str(&prefix);
                 try_display_function_id(sb, kind, function.signature.node.id);
                 sb.push_str("Function >> ");
-                inner_display_function_signature(
-                    sb,
-                    kind,
-                    &function.signature.node,
-                    tab,
-                    is_last,
-                );
+                inner_display_function_signature(sb, kind, &function.signature.node, tab, is_last);
                 function.block.inner_display(sb, kind, tab, is_last);
             }
         }

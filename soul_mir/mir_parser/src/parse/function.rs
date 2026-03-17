@@ -1,24 +1,62 @@
-use soul_utils::ids::FunctionId;
+use soul_utils::{Ident, ids::FunctionId, soul_error_internal, span::Span};
 
 use crate::{MirContext, mir};
 
 impl<'a> MirContext<'a> {
-    pub fn lower_function(&mut self, function_id: FunctionId) {
+    pub(crate) fn build_init_global_function(&mut self) {
+        let entry_block = self.new_function_block();
+        let init_globals = mir::Function {
+            id: self.tree.init_global_function,
+            name: Ident::new("_init_globals".to_string(), Span::default_const()),
+            body: mir::FunctionBody::Internal {
+                entry_block,
+                locals: vec![],
+                blocks: vec![entry_block],
+            },
+            parameters: vec![],
+            return_type: self.types.none_type,
+        };
+
+        self.tree.blocks.insert(
+            entry_block,
+            mir::Block {
+                id: entry_block,
+                returnable: false,
+                terminator: mir::Terminator::Return(None),
+                statements: vec![],
+            },
+        );
+        self.tree.functions.insert(self.tree.init_global_function, init_globals);
+    }
+
+    pub(crate) fn lower_function(&mut self, function_id: FunctionId) {
+        self.inner_function(function_id, false);
+    }
+
+    pub(crate) fn lower_main_function(&mut self) {
+        self.inner_function(self.main, true);
+    }
+
+    fn inner_function(&mut self, function_id: FunctionId, is_main: bool) {
         self.current.function = function_id;
         let function = &self.hir.functions[function_id];
+        let span = self.hir.spans.functions[function_id];
 
         let entry_block = self.new_function_block();
         self.current.block = Some(entry_block);
 
         let body = match function.body {
-            hir::FunctionBody::Internal(_) => {
-                mir::FunctionBody::Internal { 
-                    entry_block, 
-                    locals: vec![],
-                    blocks: vec![entry_block], 
-                }
-            }
+            hir::FunctionBody::Internal(_) => mir::FunctionBody::Internal {
+                entry_block,
+                locals: vec![],
+                blocks: vec![entry_block],
+            },
             hir::FunctionBody::External(extern_language) => {
+                if is_main {
+                    self.log_error(soul_error_internal!("main can not be external function", Some(span)));
+                    return;
+                } 
+
                 mir::FunctionBody::External(extern_language)
             }
         };
@@ -34,7 +72,7 @@ impl<'a> MirContext<'a> {
 
         for parameter in &function.parameters {
             let ty = self.types.locals[parameter.local];
-            let local_id = self.new_local(parameter.local, ty);
+            let local_id = self.new_parameter(parameter.local, ty);
 
             let parameters = &mut self.tree.functions[function_id].parameters;
             parameters.push(local_id);
@@ -45,6 +83,14 @@ impl<'a> MirContext<'a> {
             hir::FunctionBody::External(_) => return,
         };
 
+        if is_main {
+            let statement = mir::Statement::new(mir::StatementKind::Call { 
+                id: self.hir.init_global_function, 
+                arguments: vec![], 
+                return_place: None,
+            });
+            self.push_statement_from(statement, entry_block);
+        }
         let _endblock = self.lower_block(body, entry_block);
     }
 }
