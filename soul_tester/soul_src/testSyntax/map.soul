@@ -13,7 +13,7 @@ where
 
     This(capacity: uint = INITIAL_CAP) {
         TryNew(capacity)
-            .catch{panic}
+            .Err{panic}
     }
 
     This:[(K, V)](array) {
@@ -25,10 +25,10 @@ where
         self
     }
 
-    TryNew(capacity: uint = INITIAL_CAP): Err<This> {
-        This{
+    TryNew(capacity: uint = INITIAL_CAP): Res<This> {
+        Ok(This{
             buckets: new:[for capacity => null].pass
-        }
+        })
     }
 
     Contains(@this, key: @K): bool {

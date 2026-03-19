@@ -25,9 +25,7 @@ impl<'a> LlvmBackend<'a> {
                     arguments,
                     return_place,
                 } => {
-                    if let Err(err) =
-                        self.lower_call(*id, arguments, *return_place)
-                    {
+                    if let Err(err) = self.lower_call(*id, arguments, *return_place) {
                         self.log_error(err);
                     }
                 }

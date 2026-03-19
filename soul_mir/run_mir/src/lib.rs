@@ -7,11 +7,11 @@ pub struct MirResponse {
 }
 
 pub fn to_mir(
-    hir: &HirResponse,
+    hir_response: &HirResponse,
     _options: &CompilerOptions,
     faults: &mut Vec<SementicFault>,
 ) -> MirResponse {
     MirResponse {
-        tree: mir_lower(&hir.tree, &hir.types, faults),
+        tree: mir_lower(&hir_response.hir, &hir_response.types, faults),
     }
 }

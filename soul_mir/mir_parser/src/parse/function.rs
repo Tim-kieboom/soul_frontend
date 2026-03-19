@@ -26,7 +26,9 @@ impl<'a> MirContext<'a> {
                 statements: vec![],
             },
         );
-        self.tree.functions.insert(self.tree.init_global_function, init_globals);
+        self.tree
+            .functions
+            .insert(self.tree.init_global_function, init_globals);
     }
 
     pub(crate) fn lower_function(&mut self, function_id: FunctionId) {
@@ -53,9 +55,12 @@ impl<'a> MirContext<'a> {
             },
             hir::FunctionBody::External(extern_language) => {
                 if is_main {
-                    self.log_error(soul_error_internal!("main can not be external function", Some(span)));
+                    self.log_error(soul_error_internal!(
+                        "main can not be external function",
+                        Some(span)
+                    ));
                     return;
-                } 
+                }
 
                 mir::FunctionBody::External(extern_language)
             }
@@ -84,9 +89,9 @@ impl<'a> MirContext<'a> {
         };
 
         if is_main {
-            let statement = mir::Statement::new(mir::StatementKind::Call { 
-                id: self.hir.init_global_function, 
-                arguments: vec![], 
+            let statement = mir::Statement::new(mir::StatementKind::Call {
+                id: self.hir.init_global_function,
+                arguments: vec![],
                 return_place: None,
             });
             self.push_statement_from(statement, entry_block);

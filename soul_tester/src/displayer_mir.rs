@@ -236,7 +236,7 @@ impl<'a> MirDisplayer<'a> {
 
     fn display_rvalue(&mut self, value: &Rvalue) {
         match &value.kind {
-            mir::RvalueKind::StackAlloc { ty, len: _ } => {
+            mir::RvalueKind::StackAlloc(ty) => {
                 self.push_str("/*stack alloc ");
                 self.display_type(*ty);
                 self.push_str("*/");
@@ -256,6 +256,11 @@ impl<'a> MirDisplayer<'a> {
             mir::RvalueKind::Unary { operator, value } => {
                 self.push_str(operator.node.as_str());
                 self.display_operand(value);
+            }
+            mir::RvalueKind::CastUse { value, cast_to } => {
+                self.display_operand(value);
+                self.push_str(" as ");
+                self.display_type(*cast_to);
             }
         }
     }

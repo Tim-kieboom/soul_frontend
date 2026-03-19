@@ -19,9 +19,13 @@ pub trait IdAlloc: Clone {
 /// as an index into `VecMap`.
 #[macro_export]
 macro_rules! impl_soul_ids {
-    ($($ty:ident),*) => {
+    ( $( $( #[$meta:meta] )* $ty:ident ),* $(,)? ) => {
         $(
-            #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+            $( #[$meta] )*
+            #[derive(
+                Debug, Clone, Copy, Hash, PartialEq, Eq,
+                serde::Serialize, serde::Deserialize
+            )]
             pub struct $ty(usize);
 
             impl $crate::vec_map::VecMapIndex for $ty {

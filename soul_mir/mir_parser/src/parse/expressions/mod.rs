@@ -119,20 +119,18 @@ impl<'a> MirContext<'a> {
                 mir::Operand::new(ty, mir::OperandKind::None)
             }
 
-            hir::ExpressionKind::Load(place) => {
-                self.lower_load(ty, place, is_end)
-            }
+            hir::ExpressionKind::Load(place) => self.lower_load(ty, place, is_end),
 
             hir::ExpressionKind::DeRef(inner) => {
                 let ptr = self.lower_operand(*inner).pass(is_end);
                 let temp = self.new_temp(ty);
 
-                let stmt = mir::Statement::new(mir::StatementKind::Assign {
+                let statement = mir::Statement::new(mir::StatementKind::Assign {
                     place: self.new_place(mir::Place::Temp(temp)),
                     value: mir::Rvalue::new(mir::RvalueKind::Use(ptr)),
                 });
 
-                self.push_statement(stmt);
+                self.push_statement(statement);
                 mir::Operand::new(ty, mir::OperandKind::Temp(temp))
             }
 
@@ -150,8 +148,27 @@ impl<'a> MirContext<'a> {
                 )
             }
 
-            hir::ExpressionKind::Cast { value: inner, .. } => {
-                self.lower_operand(*inner).pass(is_end)
+            hir::ExpressionKind::Cast { value, cast_to } => {
+                let cast_id = *cast_to;
+                let inner_type = self.types.expressions[*value];
+                if inner_type == cast_id {
+                    self.lower_operand(*value).pass(is_end)
+                } else {
+                    let value = self.lower_operand(*value).pass(is_end);
+                    let temp = self.new_temp(cast_id);
+
+                    let statement = mir::Statement::new(mir::StatementKind::Assign {
+                        place: self.new_place(mir::Place::Temp(temp)),
+                        value: mir::Rvalue::new(mir::RvalueKind::CastUse {
+                            value,
+                            cast_to: cast_id,
+                        }),
+                    });
+
+                    self.push_statement(statement);
+
+                    mir::Operand::new(ty, mir::OperandKind::Temp(temp))
+                }
             }
 
             hir::ExpressionKind::InnerRawStackArray { .. } => {
@@ -166,6 +183,9 @@ impl<'a> MirContext<'a> {
             } => self.lower_if(*condition, *then_block, *else_block, value.ty, is_end),
             hir::ExpressionKind::While { condition, body } => {
                 self.lower_while(*condition, *body, is_end)
+            }
+            hir::ExpressionKind::Error => {
+                mir::Operand::new(self.types.none_type, mir::OperandKind::None)
             }
         };
 
@@ -201,7 +221,11 @@ impl<'a> MirContext<'a> {
         };
 
         let return_place = temp.map(|val| self.new_place(mir::Place::Temp(val)));
-        let statement = mir::Statement::new(mir::StatementKind::Call { id: function, arguments, return_place });
+        let statement = mir::Statement::new(mir::StatementKind::Call {
+            id: function,
+            arguments,
+            return_place,
+        });
         self.push_statement(statement);
 
         let operand = match temp {
@@ -216,12 +240,9 @@ impl<'a> MirContext<'a> {
         let place_id = self.lower_place(place).pass(is_end);
         let operand = match &self.tree.places[place_id] {
             mir::Place::Local(local) => {
-                return mir::Operand::new(ty, mir::OperandKind::Local(*local))
+                return mir::Operand::new(ty, mir::OperandKind::Local(*local));
             }
-            _ => mir::Operand::new(
-                ty,
-                mir::OperandKind::Temp(self.place_to_temp(place_id, ty)),
-            ),
+            _ => mir::Operand::new(ty, mir::OperandKind::Temp(self.place_to_temp(place_id, ty))),
         };
 
         let temp = self.new_temp(ty);

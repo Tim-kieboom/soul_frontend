@@ -1,6 +1,9 @@
 use soul_utils::soul_error_internal;
 
-use crate::{EndBlock, MirContext, mir::{self, OperandKind}};
+use crate::{
+    EndBlock, MirContext,
+    mir::{self, OperandKind},
+};
 
 struct LiveIndex {
     block: mir::BlockId,

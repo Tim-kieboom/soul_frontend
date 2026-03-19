@@ -88,7 +88,7 @@ impl<'a> LlvmBackend<'a> {
                     PrimitiveSize::Bit128 => self.context.i128_type(),
                 };
 
-                let value = int_type.const_int(value.abs() as u64, negative).into();
+                let value = int_type.const_int(*value as u64, negative).into();
 
                 IrOperand {
                     value,

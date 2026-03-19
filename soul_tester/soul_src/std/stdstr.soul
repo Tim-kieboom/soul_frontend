@@ -1,5 +1,33 @@
-trait Formatter {
+trait Fmt {
+    Fmt(@this, fmt: &StringBuilder): Err
+}
 
+class StringBuilder {
+    buffer: List<char>
+
+    This(buffer: List<char> = []) {
+        This{buffer}
+    }
+
+    Push(ch: char) {
+        buffer.Push(ch)
+    }
+
+    PushStr(text: @str) {
+        for ch in text {
+            buffer.Push(ch)
+        }
+    }
+
+    ToStr(this): str {
+        buffer.ToArray() as str
+    }
+
+    impl Iter<char> {
+        Iter(@this): Iterator<char> {
+            this.buffer.Iter()
+        }
+    }
 }
 
 struct FmtStr<'a> {
@@ -13,7 +41,41 @@ union Arg<'a> {
     Uint(u128),
     Char(char),
     Float(f64),
-    Str(@'a str),
     Boolean(bool),
-    Format(*dyn FnOnce(&dyn Formatter) -> Err),
+    String(@'a str),
+    Other(@'a dyn Fmt),
+}
+
+use int impl Fmt {
+    Fmt(@this, fmt: &StringBuilder): Err {
+        literal NUMBERS = "0123456789";
+
+        mut num = *this
+        is_negative := num < 0
+        if num == 0 {
+            fmt.Push('0')
+            return
+        }
+
+        if is_negative {
+            num = -num
+        }
+
+        digits := [for 16 => '\0']
+
+        mut i = 0
+        while num > 0 {
+            digits[i] = NUMBERS[num % 10]
+            num /= 10
+            i++
+        }
+
+        if is_negative {
+            fmt.Push('-')
+        }
+
+        for ch in digits.Select().Rev() {
+            fmt.Push(ch)
+        }
+    }
 }

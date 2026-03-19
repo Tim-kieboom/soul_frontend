@@ -23,9 +23,8 @@ mod block;
 mod function;
 mod ir_type;
 mod local;
-mod rvalue;
+mod value;
 mod statement;
-mod operand;
 
 pub struct IrRequest<'ctx> {
     pub context: &'ctx Context,
@@ -75,6 +74,8 @@ pub struct IrOperand<'a> {
 }
 
 pub struct LlvmBackend<'a> {
+    default_int_size: u8,
+    default_char_size: u8,
     default_int_type: IntType<'a>,
     default_char_type: IntType<'a>,
 
@@ -112,6 +113,8 @@ impl<'a> LlvmBackend<'a> {
             locals: VecMap::const_default(),
             functions: VecMap::const_default(),
 
+            default_int_size: 32,
+            default_char_size: 8,
             default_char_type: request.context.i8_type(),
             default_int_type: request.context.i32_type(),
         }

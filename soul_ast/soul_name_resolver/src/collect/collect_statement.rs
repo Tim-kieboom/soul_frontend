@@ -1,4 +1,7 @@
-use ast::{Block, Function, FunctionSignature, Statement, StatementKind, TypeKind, VarTypeKind, scope::ScopeValueKind};
+use ast::{
+    Block, Function, FunctionSignature, Statement, StatementKind, TypeKind, VarTypeKind,
+    scope::ScopeValueKind,
+};
 
 use crate::NameResolver;
 
@@ -76,6 +79,5 @@ impl<'a> NameResolver<'a> {
 }
 
 fn is_main(signature: &FunctionSignature) -> bool {
-    signature.name.as_str() == "main" &&
-    matches!(signature.methode_type.kind, TypeKind::None)
+    signature.name.as_str() == "main" && matches!(signature.methode_type.kind, TypeKind::None)
 }

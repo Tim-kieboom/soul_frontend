@@ -129,7 +129,7 @@ pub enum StatementKind {
     Call {
         id: FunctionId,
         arguments: Vec<Operand>,
-        return_place: Option<PlaceId>
+        return_place: Option<PlaceId>,
     },
 
     StorageStart(Vec<LocalId>),
@@ -147,6 +147,10 @@ pub struct Rvalue {
 pub enum RvalueKind {
     /// Move or copy an operand.
     Use(Operand),
+    CastUse {
+        value: Operand,
+        cast_to: TypeId,
+    },
 
     /// Binary operator (e.g. `a + b`)
     Binary {
@@ -161,10 +165,7 @@ pub enum RvalueKind {
         value: Operand,
     },
 
-    StackAlloc {
-        ty: TypeId,
-        len: Operand,
-    },
+    StackAlloc(TypeId),
 }
 
 /// Block terminators describe control flow edges.

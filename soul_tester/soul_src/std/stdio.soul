@@ -1,27 +1,22 @@
-extern "C" exit(code: int)
 extern "C" __csoul_printChar(ch: char)
 
-trait Display {
-    Display(@this, fmt: &Formatter): Err
-}
-
 #[public]
-print(value: impl Display) {
-    mut fmt = StdFormatter()
-    value.Display(&fmt)
-    for ch in fmt.Chars() {
+print(value: impl Fmt) {
+    mut fmt = StringBuilder()
+    value.Fmt(&fmt)
+    for ch in fmt {
         __csoul_printChar(ch)
     }
 }
 
 #[public]
-println(value: impl Display) {
+println(value: impl Fmt) {
     print(value)
     __csoul_printChar('\n')
 }
 
 #[public]
-panic(text: impl Display) {
+panic(text: impl Fmt) {
     print(text)
     exit(1)
 }

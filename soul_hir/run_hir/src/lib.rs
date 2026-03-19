@@ -8,7 +8,7 @@ use soul_utils::{
 };
 
 pub struct HirResponse {
-    pub tree: HirTree,
+    pub hir: HirTree,
     pub types: HirTypedTable,
 }
 
@@ -35,5 +35,5 @@ pub fn to_hir(
         }
     }
 
-    HirResponse { types, tree: hir }
+    HirResponse { types, hir }
 }

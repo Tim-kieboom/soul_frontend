@@ -6,10 +6,8 @@ unsafe alloc(len: uint): *none {
 }
 
 #[public]
-type new
-
-use<T> new<T> {
-    This<T>(value: T): *T {
+class new<T> {
+    This(value: T): *T {
         unsafe{
             alloc(T.sizeof) as *T 
         }

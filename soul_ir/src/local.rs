@@ -77,7 +77,6 @@ impl<'a> LlvmBackend<'a> {
     }
 
     pub(crate) fn allocate_globals(&mut self) {
-        
         for global in self.mir.tree.globals.values() {
             let local = global.local;
             let ty = match self.lower_type(global.ty) {
@@ -101,7 +100,6 @@ impl<'a> LlvmBackend<'a> {
             let ir_global = self.module.add_global(ty, None, &self.local_name(local));
             self.locals.insert(local, ir_global.as_pointer_value());
             if let Some(comptime) = &global.literal {
-
                 let ir_operand = match self.lower_literal(comptime, global.ty) {
                     Ok(val) => val,
                     Err(err) => {

@@ -1,10 +1,8 @@
 use inkwell::types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FunctionType, VoidType};
-use mir_parser::mir::{FunctionBody};
-use soul_utils::{
-    ids::FunctionId,
-};
+use mir_parser::mir::FunctionBody;
+use soul_utils::ids::FunctionId;
 
-use crate::{LlvmBackend};
+use crate::LlvmBackend;
 
 impl<'a> LlvmBackend<'a> {
     pub(crate) fn declare_function(&mut self, function_id: FunctionId) {
@@ -63,7 +61,6 @@ impl<'a> LlvmBackend<'a> {
             }
         }
     }
-
 }
 
 enum FunctionReturnType<'a> {

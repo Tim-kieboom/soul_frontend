@@ -20,6 +20,7 @@ impl<'a> HirTypedContext<'a> {
         let value = &self.hir.expressions[expression_id];
         let span = self.expression_span(expression_id);
         let ty = match &value.kind {
+            hir::ExpressionKind::Error => TypeId::error(),
             hir::ExpressionKind::Null => self.new_infer_optional(span),
             hir::ExpressionKind::Load(place) => self.infer_place(place),
             hir::ExpressionKind::Block(body) => self.infer_block(*body),

@@ -1,4 +1,4 @@
-use hir::{Binary, BlockId, ExpressionId, FunctionBody, HirTree, LocalId, TypeId, Unary};
+use hir::{Binary, BlockId, ExpressionId, FunctionBody, HirTree, HirType, LocalId, TypeId, Unary};
 use hir_typed_context::HirTypedTable;
 use soul_utils::{
     ids::{FunctionId, IdAlloc},
@@ -195,6 +195,7 @@ impl<'a> HirDisplayer<'a> {
         let value = &self.hir.expressions[*id];
 
         match &value.kind {
+            hir::ExpressionKind::Error => self.push_str("<error>"),
             hir::ExpressionKind::Block(block_id) => self.display_block(block_id),
             hir::ExpressionKind::Null => self.push_str("null"),
             hir::ExpressionKind::Literal(literal) => self.push_str(&literal.value_to_string()),
@@ -360,12 +361,13 @@ impl<'a> HirDisplayer<'a> {
     }
 
     fn display_type(&mut self, id: TypeId) {
+        const ERROR: HirType = hir::HirType::error_type();
         let types = match &self.type_table {
             Some(val) => &val.types,
             None => &self.hir.types,
         };
 
-        let ty = types.get_type(id).expect("should have id");
+        let ty = types.get_type(id).unwrap_or(&ERROR);
         ty.write_display(types, &mut self.sb)
             .expect("no format error");
     }

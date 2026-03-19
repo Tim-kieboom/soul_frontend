@@ -1,0 +1,51 @@
+use Ok = Res.Ok
+use Err = Res.Err
+
+union Res<V, E> 
+where
+    V = none
+    E: Error = *dyn Error
+{
+    Ok(V),
+    Err(E),
+}
+
+
+main() {
+    /*
+    expends to:
+    ```
+        match resFunc() {
+            Ok(it) => str(it),
+            Err(it) => str(it),
+        }
+    ```
+    */
+    text := resFunc()
+        .Ok{str}
+        .Err{str}
+
+    /*
+    expends to:
+    ```
+        match resFunc() {
+            Err(it) => return,
+            other => other,
+        }
+    ```
+    */
+    num := resFunc()
+        .Err{return}
+
+    op: ?int = 1
+    text: ?str = op?.To<str>()
+}
+
+passErr(): Res {
+    num := resFunc().pass
+    Ok()
+}
+
+resFunc(): Res<int> {
+    Ok(1)
+}

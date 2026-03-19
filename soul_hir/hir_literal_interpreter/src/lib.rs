@@ -17,6 +17,7 @@ pub fn try_literal_resolve_expression(
     let value = &hir.expressions[value_id];
     match &value.kind {
         hir::ExpressionKind::Null
+        | hir::ExpressionKind::Error
         | hir::ExpressionKind::Block(_)
         | hir::ExpressionKind::DeRef(_)
         | hir::ExpressionKind::Literal(_)

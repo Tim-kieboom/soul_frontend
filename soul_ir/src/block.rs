@@ -4,7 +4,11 @@ use mir_parser::mir::{BlockId, FunctionBody, Operand, Place, PlaceId, Terminator
 use soul_utils::{error::SoulResult, ids::FunctionId, vec_map::VecMapIndex};
 
 impl<'a> LlvmBackend<'a> {
-    pub(crate) fn create_block(&mut self, function_id: FunctionId, llvm_function: FunctionValue<'a>) {
+    pub(crate) fn create_block(
+        &mut self,
+        function_id: FunctionId,
+        llvm_function: FunctionValue<'a>,
+    ) {
         let function = &self.mir.tree.functions[function_id];
 
         let blocks = match &function.body {

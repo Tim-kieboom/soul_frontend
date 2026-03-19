@@ -1,5 +1,6 @@
 use std::{
-    fs::{File, OpenOptions}, io::{Read, stdout}
+    fs::{File, OpenOptions},
+    io::{Read, stdout},
 };
 
 use anyhow::Result;
@@ -39,7 +40,7 @@ mod paths;
 static PATHS: &[u8] = include_bytes!("../paths.json");
 
 pub const MESSAGE_CONFIG: MessageConfig = MessageConfig {
-    backtrace: true,
+    backtrace: false,
     colors: true,
 };
 
@@ -129,13 +130,13 @@ fn display_output<'a>(paths: &Paths, output: &Ouput) -> Result<()> {
             &root.display(&DisplayKind::NameResolver),
             "ast/NameResolved.soulc",
         ),
-        (&display_hir(&output.hir.tree), "hir/tree.soulc"),
+        (&display_hir(&output.hir.hir), "hir/tree.soulc"),
         (
-            &display_typed_hir(&output.hir.tree, &output.hir.types),
+            &display_typed_hir(&output.hir.hir, &output.hir.types),
             "hir/typed.soulc",
         ),
         (
-            &display_mir(&output.mir.tree, &output.hir.tree, &output.hir.types),
+            &display_mir(&output.mir.tree, &output.hir.hir, &output.hir.types),
             "mir/tree.soulc",
         ),
     ])

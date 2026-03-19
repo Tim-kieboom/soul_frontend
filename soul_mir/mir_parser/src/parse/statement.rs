@@ -1,6 +1,9 @@
 use soul_utils::soul_error_internal;
 
-use crate::{EndBlock, MirContext, mir::{self, OperandKind}};
+use crate::{
+    EndBlock, MirContext,
+    mir::{self, OperandKind},
+};
 
 pub(crate) struct StatementResponse {
     /// insert terminator in block
@@ -160,6 +163,7 @@ impl<'a> MirContext<'a> {
 fn is_valid_statement_expression(kind: &hir::ExpressionKind) -> bool {
     match kind {
         hir::ExpressionKind::Null
+        | hir::ExpressionKind::Error
         | hir::ExpressionKind::Load(_)
         | hir::ExpressionKind::Local(_)
         | hir::ExpressionKind::DeRef(_)

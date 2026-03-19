@@ -79,8 +79,8 @@ impl Debug for Literal {
             Literal::Uint(val) => write!(f, "{val}: {}", get_type_name()),
             Literal::Float(val) => write!(f, "{val}: {}", get_type_name()),
             Literal::Bool(val) => write!(f, "{val}"),
-            Literal::Char(val) => write!(f, "'{val}'"),
-            Literal::Str(val) => write!(f, "\"{val}\""),
+            Literal::Char(val) => write!(f, "{:?}", val),
+            Literal::Str(val) => write!(f, "{:?}", val),
         }
     }
 }

@@ -51,7 +51,7 @@ define_str_enum!(
     #[derive(Hash)]
     pub enum PrimitiveTypes {
         /// default-size character type
-        Char => "char", 0,
+        Char => "char", 2,
         /// 8-bit character type
         Char8 => "char8", 8,
         /// 16-bit character type
@@ -62,14 +62,14 @@ define_str_enum!(
         Char64 => "char64", 64,
 
         /// empty type (also known as `void` in c like languages)
-        None => "none", 0,
+        None => "none", 8,
         /// boolean (`true` or `false`) type
         Boolean => "bool", 8,
 
         /// undecided integer type
-        UntypedInt => "untypedInt", 0,
+        UntypedInt => "untypedInt", 1,
         /// default-size integer type
-        Int => "int", 0,
+        Int => "int", 1,
         /// 8-bit integer type
         Int8 => "i8", 8,
         /// 16-bit integer type
@@ -82,9 +82,9 @@ define_str_enum!(
         Int128 => "i128", 128,
 
         /// undecided unsigned integer type
-        UntypedUint => "untypedUint", 0,
+        UntypedUint => "untypedUint", 1,
         /// default-size unsigned integer type
-        Uint => "uint", 0,
+        Uint => "uint", 1,
         /// 8-bit unsigned integer type
         Uint8 => "u8", 8,
         /// 16-bit unsigned integer type
@@ -97,7 +97,7 @@ define_str_enum!(
         Uint128 => "u128", 128,
 
         /// undecided floating-point type
-        UntypedFloat => "untypedFloat", 0,
+        UntypedFloat => "untypedFloat", 32,
         /// 16-bit floating-point type
         Float16 => "f16", 16,
         /// 32-bit floating-point type
@@ -213,18 +213,32 @@ impl PrimitiveTypes {
         }
     }
 
+    pub const  fn can_be_negative(&self) -> bool {
+        self.is_signed_interger() || self.is_float()
+    }
+
     pub const fn to_primitive_size(&self) -> PrimitiveSize {
-        if matches!(self, PrimitiveTypes::Char) {
-            return PrimitiveSize::CharSize
-        }
-        
         match self.precedence().as_usize() {
+            1 => PrimitiveSize::IntSize,
+            2 => PrimitiveSize::CharSize,
             8 => PrimitiveSize::Bit8,
             16 => PrimitiveSize::Bit16,
             32 => PrimitiveSize::Bit32,
             64 => PrimitiveSize::Bit64,
             128 => PrimitiveSize::Bit128,
-            _ => PrimitiveSize::IntSize,
+            _ => unreachable!(),
+        }
+    }
+
+    pub const fn to_size_bit_u8(&self, int_size: u8, char_size: u8) -> u8 {
+        match self.to_primitive_size() {
+            PrimitiveSize::CharSize => char_size,
+            PrimitiveSize::IntSize => int_size,
+            PrimitiveSize::Bit8 => 8,
+            PrimitiveSize::Bit16 => 16,
+            PrimitiveSize::Bit32 => 32,
+            PrimitiveSize::Bit64 => 64,
+            PrimitiveSize::Bit128 => 128,
         }
     }
 }

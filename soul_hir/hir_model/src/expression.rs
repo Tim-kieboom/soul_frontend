@@ -23,6 +23,7 @@ pub enum ExpressionKind {
     // --- Values ---
     /// `null` value
     Null,
+    Error,
 
     /// A literal value (integer, float, string, etc.).
     Literal(Literal),

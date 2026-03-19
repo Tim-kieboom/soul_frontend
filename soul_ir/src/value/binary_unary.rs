@@ -1,89 +1,66 @@
-use crate::{IrOperand, LlvmBackend, build_error};
+use ast::{BinaryOperator, UnaryOperator};
 use inkwell::{FloatPredicate, IntPredicate, values::BasicValueEnum};
-use mir_parser::mir::{Rvalue, RvalueKind};
-use soul_utils::{
-    error::{SoulError, SoulErrorKind, SoulResult},
-    soul_error_internal,
-};
+use mir_parser::mir;
+use soul_utils::error::{SoulError, SoulErrorKind, SoulResult};
+
+use crate::{IrOperand, LlvmBackend, build_error};
 
 impl<'a> LlvmBackend<'a> {
-    pub(crate) fn lower_rvalue(&self, value: &Rvalue) -> SoulResult<IrOperand<'a>> {
-        match &value.kind {
-            RvalueKind::Use(operand) => self.lower_operand(operand),
-            RvalueKind::Binary {
-                left,
-                operator,
-                right,
-            } => {
-                let ir_left = self.lower_operand(left)?;
-                let ir_right = self.lower_operand(right)?;
 
-                match operator.node {
-                    ast::BinaryOperatorKind::Invalid => {
-                        return Err(SoulError::new(
-                            "ast::BinaryOperatorKind::Invalid should not exist in llvm lowerer",
-                            SoulErrorKind::LlvmError,
-                            None,
-                        ));
-                    }
-                    ast::BinaryOperatorKind::Add => self.add(ir_left, ir_right),
-                    ast::BinaryOperatorKind::Sub => self.sub(ir_left, ir_right),
-                    ast::BinaryOperatorKind::Mul => self.mul(ir_left, ir_right),
-                    ast::BinaryOperatorKind::Div => self.div(ir_left, ir_right),
-                    ast::BinaryOperatorKind::BitAnd => self.bit_and(ir_left, ir_right),
-                    ast::BinaryOperatorKind::BitOr => self.bit_or(ir_left, ir_right),
-                    ast::BinaryOperatorKind::BitXor => self.bit_xor(ir_left, ir_right),
-                    ast::BinaryOperatorKind::LogAnd => self.bit_and(ir_left, ir_right),
-                    ast::BinaryOperatorKind::LogOr => self.bit_or(ir_left, ir_right),
-                    ast::BinaryOperatorKind::NotEq => {
-                        self.compare(IrCompare::NotEq, ir_left, ir_right)
-                    }
-                    ast::BinaryOperatorKind::Eq => self.compare(IrCompare::Eq, ir_left, ir_right),
-                    ast::BinaryOperatorKind::Lt => self.compare(IrCompare::Lt, ir_left, ir_right),
-                    ast::BinaryOperatorKind::Gt => self.compare(IrCompare::Gt, ir_left, ir_right),
-                    ast::BinaryOperatorKind::Le => self.compare(IrCompare::Le, ir_left, ir_right),
-                    ast::BinaryOperatorKind::Ge => self.compare(IrCompare::Ge, ir_left, ir_right),
+    pub(super) fn lower_binary(&self, left: &mir::Operand, operator: &BinaryOperator, right: &mir::Operand) -> SoulResult<IrOperand<'a>> {
+        let ir_left = self.lower_operand(left)?;
+        let ir_right = self.lower_operand(right)?;
 
-                    ast::BinaryOperatorKind::Mod => todo!("impl mod llvm"),
-                    ast::BinaryOperatorKind::Log => todo!("impl log llvm"),
-                    ast::BinaryOperatorKind::Pow => todo!("impl pow llvm"),
-                    ast::BinaryOperatorKind::Root => todo!("impl root llvm"),
-                    ast::BinaryOperatorKind::Range => todo!("impl range llvm"),
-                    ast::BinaryOperatorKind::TypeOf => todo!("impl typeof llvm"),
-                }
+        match operator.node {
+            ast::BinaryOperatorKind::Invalid => {
+                return Err(SoulError::new(
+                    "ast::BinaryOperatorKind::Invalid should not exist in llvm lowerer",
+                    SoulErrorKind::LlvmError,
+                    None,
+                ));
             }
-            RvalueKind::Unary { operator, value } => {
-                let ir_value = self.lower_operand(value)?;
-
-                match &operator.node {
-                    ast::UnaryOperatorKind::Invalid => {
-                        return Err(SoulError::new(
-                            "ast::UnaryOperatorKind::Invalid should not exist in llvm lowerer",
-                            SoulErrorKind::LlvmError,
-                            None,
-                        ));
-                    }
-                    ast::UnaryOperatorKind::Neg => self.neg(ir_value),
-                    ast::UnaryOperatorKind::Not => self.not(ir_value),
-                    ast::UnaryOperatorKind::Increment { .. } => todo!("impl Increment llvm"),
-                    ast::UnaryOperatorKind::Decrement { .. } => todo!("impl Decrement llvm"),
-                }
+            ast::BinaryOperatorKind::Add => self.add(ir_left, ir_right),
+            ast::BinaryOperatorKind::Sub => self.sub(ir_left, ir_right),
+            ast::BinaryOperatorKind::Mul => self.mul(ir_left, ir_right),
+            ast::BinaryOperatorKind::Div => self.div(ir_left, ir_right),
+            ast::BinaryOperatorKind::BitAnd => self.bit_and(ir_left, ir_right),
+            ast::BinaryOperatorKind::BitOr => self.bit_or(ir_left, ir_right),
+            ast::BinaryOperatorKind::BitXor => self.bit_xor(ir_left, ir_right),
+            ast::BinaryOperatorKind::LogAnd => self.bit_and(ir_left, ir_right),
+            ast::BinaryOperatorKind::LogOr => self.bit_or(ir_left, ir_right),
+            ast::BinaryOperatorKind::NotEq => {
+                self.compare(IrCompare::NotEq, ir_left, ir_right)
             }
-            RvalueKind::StackAlloc { ty, .. } => {
-                let ir_type = self
-                    .lower_type(*ty)?
-                    .ok_or(soul_error_internal!("stackalloc type should be Some", None))?;
+            ast::BinaryOperatorKind::Eq => self.compare(IrCompare::Eq, ir_left, ir_right),
+            ast::BinaryOperatorKind::Lt => self.compare(IrCompare::Lt, ir_left, ir_right),
+            ast::BinaryOperatorKind::Gt => self.compare(IrCompare::Gt, ir_left, ir_right),
+            ast::BinaryOperatorKind::Le => self.compare(IrCompare::Le, ir_left, ir_right),
+            ast::BinaryOperatorKind::Ge => self.compare(IrCompare::Ge, ir_left, ir_right),
 
-                let ptr = self
-                    .builder
-                    .build_alloca(ir_type, "rvalue")
-                    .map_err(build_error)?
-                    .into();
-                Ok(IrOperand {
-                    value: ptr,
-                    is_signed_interger: false,
-                })
+            ast::BinaryOperatorKind::Mod => todo!("impl mod llvm"),
+            ast::BinaryOperatorKind::Log => todo!("impl log llvm"),
+            ast::BinaryOperatorKind::Pow => todo!("impl pow llvm"),
+            ast::BinaryOperatorKind::Root => todo!("impl root llvm"),
+            ast::BinaryOperatorKind::Range => todo!("impl range llvm"),
+            ast::BinaryOperatorKind::TypeOf => todo!("impl typeof llvm"),
+        }
+    }
+
+    pub(super) fn lower_unary(&self, value: &mir::Operand, operator: &UnaryOperator) -> SoulResult<IrOperand<'a>> {
+        let ir_value = self.lower_operand(value)?;
+
+        match &operator.node {
+            ast::UnaryOperatorKind::Invalid => {
+                return Err(SoulError::new(
+                    "ast::UnaryOperatorKind::Invalid should not exist in llvm lowerer",
+                    SoulErrorKind::LlvmError,
+                    None,
+                ));
             }
+            ast::UnaryOperatorKind::Neg => self.neg(ir_value),
+            ast::UnaryOperatorKind::Not => self.not(ir_value),
+            ast::UnaryOperatorKind::Increment { .. } => todo!("impl Increment llvm"),
+            ast::UnaryOperatorKind::Decrement { .. } => todo!("impl Decrement llvm"),
         }
     }
 
