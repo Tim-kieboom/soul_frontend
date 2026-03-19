@@ -1,4 +1,4 @@
-use hir::{Binary, BlockId, ExpressionId, FunctionBody, HirTree, HirType, LocalId, TypeId, Unary};
+use hir::{Binary, BlockId, ExpressionId, FunctionBody, HirTree, HirType, LocalId, RefTypeId, TypeId, Unary};
 use hir_typed_context::HirTypedTable;
 use soul_utils::{
     ids::{FunctionId, IdAlloc},
@@ -288,11 +288,11 @@ impl<'a> HirDisplayer<'a> {
             hir::ExpressionKind::Cast { value, cast_to } => {
                 self.display_expression(value);
                 self.push_str(" as ");
-                self.display_type(*cast_to);
+                self.display_type(self.ref_to_id(*cast_to));
             }
-            hir::ExpressionKind::InnerRawStackArray { ty, .. } => {
+            hir::ExpressionKind::InnerRawStackArray(ty) => {
                 self.push_str("/*stack alloc ");
-                self.display_expression_astype(value.id, *ty);
+                self.display_expression_astype(value.id, self.ref_to_id(*ty));
                 self.push_str("*/");
             }
         };
@@ -318,6 +318,13 @@ impl<'a> HirDisplayer<'a> {
                 write!(self.sb, "{:?}", index).expect("no fromat error");
             }
         }
+    }
+
+    fn ref_to_id(&self, ref_id: RefTypeId) -> TypeId {
+        match self.type_table {
+            Some(types) => types.types.ref_to_id(ref_id),
+            None => self.hir.types.ref_to_id(ref_id),
+        }.unwrap_or(TypeId::error())
     }
 
     fn display_block_id(&mut self, id: BlockId) {
@@ -367,7 +374,7 @@ impl<'a> HirDisplayer<'a> {
             None => &self.hir.types,
         };
 
-        let ty = types.get_type(id).unwrap_or(&ERROR);
+        let ty = types.id_to_type(id).unwrap_or(&ERROR);
         ty.write_display(types, &mut self.sb)
             .expect("no format error");
     }

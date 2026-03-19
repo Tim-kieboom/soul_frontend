@@ -66,16 +66,14 @@ impl<'a> HirContext<'a> {
             },
         );
 
+        let ref_type_id = self.hir.types.insert_ref(element_type);
         let unalloc = self.alloc_expression(span);
         self.insert_expression(
             unalloc,
             hir::Expression {
                 ty,
                 id: unalloc,
-                kind: hir::ExpressionKind::InnerRawStackArray {
-                    ty: element_type,
-                    len,
-                },
+                kind: hir::ExpressionKind::InnerRawStackArray(ref_type_id),
             },
         );
         unalloc

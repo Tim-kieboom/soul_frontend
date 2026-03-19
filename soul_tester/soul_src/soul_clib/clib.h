@@ -6,6 +6,14 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+/* 
+to generate/run exe run commands:
+
+    clang -c .\soul_src\soul_clib\clib.c -o .\output\clib.o
+    clang .\output\out.ll .\output\clib.o -o .\output\out.exe
+    .\output\out.exe
+*/
+
 typedef int8_t i8;
 typedef int16_t i16;
 typedef int32_t i32;
@@ -19,11 +27,5 @@ typedef unsigned int uint;
 
 typedef char* str;
 typedef const char* cstr;
-
-/*
-clang -c .\soul_src\soul_clib\clib.c -o .\output\clib.o
-clang .\output\out.ll .\output\clib.o -o .\output\out.exe
-.\output\out.exe
-*/
 
 #endif

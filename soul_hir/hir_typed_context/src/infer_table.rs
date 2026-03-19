@@ -376,7 +376,7 @@ impl InferTable {
     }
 
     fn occurs_in(&mut self, types: &TypesMap, var: InferTypeId, ty: TypeId) -> bool {
-        let hir_ty = match types.get_type(ty) {
+        let hir_ty = match types.id_to_type(ty) {
             Some(t) => t,
             None => return false,
         };
@@ -395,7 +395,7 @@ impl InferTable {
     }
 
     fn get_type<'a>(&self, types: &'a TypesMap, ty: TypeId) -> SoulResult<&'a HirType> {
-        match types.get_type(ty) {
+        match types.id_to_type(ty) {
             Some(val) => Ok(val),
             None => Err(soul_error_internal!(
                 format!("TypeId({}) not found", ty.index()),

@@ -49,7 +49,7 @@ impl<'a> MirContext<'a> {
             hir::PlaceKind::Field { .. } => todo!("mir desugar field"),
         };
 
-        let ty = self.types.places[place.node.get_id()];
+        let ty = self.types.places.get(place.node.get_id()).copied().unwrap_or(TypeId::error());
         self.place_typed.insert(mir_place, ty);
         EndBlock::new(mir_place, is_end)
     }

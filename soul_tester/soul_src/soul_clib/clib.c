@@ -1,16 +1,16 @@
 #include "clib.h"
 
+// ---------------- #Printers ----------------
+
 void __csoul_printStr(cstr text) {
     printf("%s", text);
-}
-
-void __csoul_printInt(int value) {
-    printf("%d", value);
 }
 
 void __csoul_printChar(char ch) {
     putchar(ch);
 }
+
+// ---------------- #Formatters ----------------
 
 str __csoul_fmtUint(uint num, u8 base, char buf[50]) {
     static cstr NUMBERS = "0123456789ABCDEF";
@@ -65,8 +65,9 @@ static str __inner_fmt_uint(uint64_t n, u8 base, str buf, int max_digits) {
     return buf;
 }
 
-str __csoul_fmtFloat(double num, u8 base, char buf[50], u8 percision) {
+str __csoul_fmtFloat(double num, u8 base, char buf[50], u8 percision, bool capital) {
     static cstr NUMBERS = "0123456789abcdef";
+    static cstr NUMBERS_LOWER = "0123456789abcdef";
     str start = buf;
     if (num < 0.0) {
         *buf++ = '-';
@@ -80,12 +81,13 @@ str __csoul_fmtFloat(double num, u8 base, char buf[50], u8 percision) {
         return buf;
     }
 
+    cstr numbers = capital ? NUMBERS : NUMBERS_LOWER;
     *buf++ = '.';
     double frac = num - (double)whole;
     for(int i = 0; i < percision; i++) {
         frac *= base;
         u64 digit = (u64)frac;
-        *buf++ = NUMBERS[digit];
+        *buf++ = numbers[digit];
         frac -= (double)digit;
     }
 

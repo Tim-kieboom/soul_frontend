@@ -1,6 +1,5 @@
 use hir::{
-    BlockId, ExpressionId, HirType, HirTypeKind, LocalId, StatementId, TypeId, TypesMap,
-    UnifyResult,
+    BlockId, ExpressionId, HirType, HirTypeKind, LocalId, RefTypeId, StatementId, TypeId, TypesMap, UnifyResult
 };
 use soul_utils::{
     error::SoulResult,
@@ -33,11 +32,25 @@ impl<'a> HirTypedContext<'a> {
         self.type_table.types.insert(ty)
     }
 
-    pub(crate) fn get_type(&self, ty: TypeId) -> &HirType {
+    pub(crate) fn id_to_type(&self, ty: TypeId) -> &HirType {
         self.type_table
             .types
-            .get_type(ty)
+            .id_to_type(ty)
             .expect("TypeId should always have a type")
+    }
+
+    pub(crate) fn ref_to_type(&self, ty: RefTypeId) -> &HirType {
+        self.type_table
+            .types
+            .ref_to_type(ty)
+            .expect("RefTypeId should always have a type")
+    }
+
+    pub(crate) fn ref_to_id(&self, ty: RefTypeId) -> TypeId {
+        self.type_table
+            .types
+            .ref_to_id(ty)
+            .expect("RefTypeId should always have a TypeId")
     }
 
     pub(crate) fn resolve_type_strict(&mut self, ty: TypeId, span: Span) -> Option<TypeId> {
@@ -104,13 +117,13 @@ impl<'a> HirTypedContext<'a> {
                 self.add_type(ty)
             }
             None => {
-                let mut ty = self.get_type(type_id).clone();
+                let mut ty = self.id_to_type(type_id).clone();
                 ty.modifier = Some(modifier);
                 self.add_type(ty)
             }
         };
 
-        debug_assert_eq!(self.get_type(local_type_id).modifier, Some(modifier),);
+        debug_assert_eq!(self.id_to_type(local_type_id).modifier, Some(modifier),);
 
         self.type_table.locals.insert(id, local_type_id);
         local_type_id
@@ -163,6 +176,7 @@ impl<'a> HirTypedContext<'a> {
                     return;
                 }
             };
+
             remap.insert(old_id, new_id);
         }
 
@@ -172,7 +186,7 @@ impl<'a> HirTypedContext<'a> {
         self.type_table.none_type = self
             .type_table
             .types
-            .get_id(&HirType::none_type())
+            .type_to_id(&HirType::none_type())
             .expect("should have none type in table");
     }
 
@@ -209,7 +223,7 @@ impl<'a> HirTypedContext<'a> {
         let hir_ty = self
             .type_table
             .types
-            .get_type(typed)
+            .id_to_type(typed)
             .expect("should have id");
 
         debug_assert!(
@@ -257,6 +271,11 @@ impl<'a> HirTypedContext<'a> {
         new_ty.modifier = modifier;
         let new_id = new_types.insert(new_ty);
         map.insert(ty, new_id);
+        
+        if let Some(ref_id) = self.type_table.types.id_to_ref(ty) {
+            new_types.add_ref_id_entry(ref_id, new_id);
+        }
+
         Ok(new_id)
     }
 
@@ -265,7 +284,7 @@ impl<'a> HirTypedContext<'a> {
         base_type: TypeId,
         span: Span,
     ) -> Option<HirType> {
-        let ty = self.get_type(base_type);
+        let ty = self.id_to_type(base_type);
         let modifier = ty.modifier;
         let prim = match &ty.kind {
             HirTypeKind::Primitive(val) => val,

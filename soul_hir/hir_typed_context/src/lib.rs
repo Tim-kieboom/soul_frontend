@@ -1,5 +1,5 @@
 use hir::{
-    BlockId, ExpressionId, HirTree, HirType, LocalId, PlaceId, StatementId, TypeId, TypesMap,
+    BlockId, ExpressionId, HirTree, HirType, LocalId, PlaceId, StatementId, TypeId, TypesMap
 };
 use soul_utils::{
     error::SoulError,
@@ -92,8 +92,8 @@ impl<'a> HirTypedContext<'a> {
                 places: VecMap::const_default(),
                 locals: VecMap::const_default(),
                 blocks: VecMap::with_capacity(hir.blocks.len()),
-                statements: VecMap::with_capacity(hir.meta_data.statements.len()),
                 expressions: VecMap::with_capacity(hir.expressions.len()),
+                statements: VecMap::with_capacity(hir.meta_data.statements.len()),
 
                 types,
                 auto_copys: VecSet::new(),

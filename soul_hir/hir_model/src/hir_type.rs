@@ -475,7 +475,7 @@ impl HirTypeKind {
 }
 
 fn write_display_from_id(types: &TypesMap, ty: TypeId, sb: &mut String) -> std::fmt::Result {
-    let ty = match types.get_type(ty) {
+    let ty = match types.id_to_type(ty) {
         Some(val) => val,
         None => return write!(sb, "/*TypeId({}) not found*/", ty.index()),
     };
@@ -542,5 +542,5 @@ pub enum Priority {
 }
 
 fn get_type(types: &TypesMap, ty: TypeId) -> &HirType {
-    types.get_type(ty).expect("should have TypeId")
+    types.id_to_type(ty).expect("should have TypeId")
 }

@@ -26,7 +26,7 @@ impl<'a> LlvmBackend<'a> {
                 let is_signed_interger = self
                     .types
                     .types
-                    .get_type(local.ty)
+                    .id_to_type(local.ty)
                     .ok_or(soul_error_internal!(
                         format!("{:?} not found", local.ty),
                         None
@@ -62,7 +62,7 @@ impl<'a> LlvmBackend<'a> {
                 let size = match self
                     .types
                     .types
-                    .get_type(should_be)
+                    .id_to_type(should_be)
                     .expect("should have type")
                     .kind
                 {
@@ -99,7 +99,7 @@ impl<'a> LlvmBackend<'a> {
                 let size = match self
                     .types
                     .types
-                    .get_type(should_be)
+                    .id_to_type(should_be)
                     .expect("should have type")
                     .kind
                 {
@@ -135,7 +135,7 @@ impl<'a> LlvmBackend<'a> {
                 let size = match self
                     .types
                     .types
-                    .get_type(should_be)
+                    .id_to_type(should_be)
                     .expect("should have type")
                     .kind
                 {

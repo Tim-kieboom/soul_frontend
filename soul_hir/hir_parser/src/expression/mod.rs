@@ -54,10 +54,11 @@ impl<'a> HirContext<'a> {
             ast::ExpressionKind::As(cast) => {
                 let value = self.lower_expression(&cast.left);
                 let cast_to = self.lower_type(&cast.type_cast);
+                let ref_type = self.hir.types.insert_ref(cast_to);
                 hir::Expression {
                     id,
                     ty: cast_to,
-                    kind: hir::ExpressionKind::Cast { value, cast_to },
+                    kind: hir::ExpressionKind::Cast { value, cast_to: ref_type },
                 }
             }
             ast::ExpressionKind::Unary(unary) => {

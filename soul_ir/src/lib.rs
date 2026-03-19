@@ -138,7 +138,7 @@ impl<'a> LlvmBackend<'a> {
     fn get_type(&self, ty: TypeId) -> SoulResult<&HirType> {
         self.types
             .types
-            .get_type(ty)
+            .id_to_type(ty)
             .ok_or(soul_error_internal!(format!("{:?} not found", ty), None))
     }
 

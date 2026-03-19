@@ -1,4 +1,4 @@
-use hir::{HirTree, TypeId};
+use hir::{HirTree, RefTypeId, TypeId};
 use hir_typed_context::HirTypedTable;
 use soul_utils::{
     error::{SoulError, SoulErrorKind}, ids::{FunctionId, IdAlloc}, sementic_level::SementicFault, soul_error_internal, vec_map::VecMap
@@ -253,10 +253,10 @@ impl<'a> MirContext<'a> {
         self.tree.blocks[block].terminator = terminator;
     }
 
-    fn get_type(&mut self, ty: hir::TypeId) -> &hir::HirType {
+    fn id_to_type(&mut self, ty: hir::TypeId) -> &hir::HirType {
         const ERROR: hir::HirType = hir::HirType::error_type();
 
-        match self.types.types.get_type(ty) {
+        match self.types.types.id_to_type(ty) {
             Some(val) => val,
             None => {
                 self.log_error(soul_error_internal!(
@@ -264,6 +264,19 @@ impl<'a> MirContext<'a> {
                     None
                 ));
                 &ERROR
+            }
+        }
+    }
+
+    fn ref_to_id(&mut self, ref_id: RefTypeId) -> TypeId {
+        match self.types.types.ref_to_id(ref_id) {
+            Some(val) => val,
+            None => {
+                self.log_error(soul_error_internal!(
+                    format!("type {:?} not found in typeTable", ref_id),
+                    None
+                ));
+                TypeId::error()
             }
         }
     }

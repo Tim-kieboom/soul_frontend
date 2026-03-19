@@ -1,6 +1,6 @@
-use crate::{BlockId, ExpressionId, LocalId, Place, TypeId};
+use crate::{BlockId, ExpressionId, LocalId, Place, RefTypeId, TypeId};
 use ast::{BinaryOperator, Literal, UnaryOperator};
-use soul_utils::ids::FunctionId;
+use soul_utils::{ids::FunctionId};
 
 /// A typed HIR expression.
 ///
@@ -12,6 +12,7 @@ pub struct Expression {
     pub ty: TypeId,
     pub kind: ExpressionKind,
 }
+
 
 /// The different kinds of HIR expressions.
 ///
@@ -52,10 +53,7 @@ pub enum ExpressionKind {
     /// Dereferences a pointer or reference expression.
     DeRef(ExpressionId),
 
-    InnerRawStackArray {
-        ty: TypeId,
-        len: ExpressionId,
-    },
+    InnerRawStackArray(RefTypeId),
 
     // --- Operators ---
     /// A unary operation.
@@ -100,7 +98,7 @@ pub enum ExpressionKind {
     /// An explicit type cast.
     Cast {
         value: ExpressionId,
-        cast_to: TypeId,
+        cast_to: RefTypeId,
     },
 }
 

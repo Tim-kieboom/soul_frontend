@@ -21,7 +21,7 @@ impl<'a> HirTypedContext<'a> {
             }
         };
 
-        if global.should_be_inmutable() && self.get_type(ty).is_mutable() {
+        if global.should_be_inmutable() && self.id_to_type(ty).is_mutable() {
             let span = global.get_span(&self.hir.spans);
             self.log_error(SoulError::new(
                 "can not have 'mut' in global scope",
@@ -112,7 +112,7 @@ impl<'a> HirTypedContext<'a> {
                     None => return TypeId::error(),
                 };
 
-                let deref = self.get_type(ty).try_deref(&self.hir.types, span);
+                let deref = self.id_to_type(ty).try_deref(&self.hir.types, span);
                 match deref {
                     Ok(val) => val,
                     Err(err) => {
@@ -124,14 +124,14 @@ impl<'a> HirTypedContext<'a> {
             PlaceKind::Index { base, .. } => {
                 let base = self.infer_place(base);
                 let resolved = self.resolve_type_lazy(base, span);
-                let base_type = self.get_type(resolved);
+                let base_type = self.id_to_type(resolved);
                 match &base_type.kind {
                     hir::HirTypeKind::Array { element, .. } => *element,
                     _ => {
                         self.log_error(SoulError::new(
                             format!(
                                 "can only use index on an array type '{}' is not an array type",
-                                self.get_type(resolved).display(&self.type_table.types)
+                                self.id_to_type(resolved).display(&self.type_table.types)
                             ),
                             SoulErrorKind::UnifyTypeError,
                             Some(span),
@@ -150,7 +150,7 @@ impl<'a> HirTypedContext<'a> {
         let declared_type_id = variable.ty;
         if declared_type_id == TypeId::error() {
             let modifier = self
-                .get_type(declared_type_id)
+                .id_to_type(declared_type_id)
                 .modifier
                 .unwrap_or(TypeModifier::Const);
             self.type_local(variable.local, declared_type_id, modifier, span);
@@ -161,7 +161,7 @@ impl<'a> HirTypedContext<'a> {
             Some(val) => (val, self.expression_span(val)),
             None => {
                 let modifier = self
-                    .get_type(declared_type_id)
+                    .id_to_type(declared_type_id)
                     .modifier
                     .unwrap_or(TypeModifier::Const);
                 self.type_local(variable.local, declared_type_id, modifier, span);
@@ -172,7 +172,7 @@ impl<'a> HirTypedContext<'a> {
         let value_type_id = self.infer_expression(value);
         self.unify(value, declared_type_id, value_type_id, span);
 
-        let declare_type = self.get_type(declared_type_id);
+        let declare_type = self.id_to_type(declared_type_id);
 
         let mut variable_type_id = if !declare_type.is_infer_type() {
             declared_type_id
@@ -192,7 +192,7 @@ impl<'a> HirTypedContext<'a> {
 
         for parameter in &function.parameters {
             let modifier = self
-                .get_type(parameter.ty)
+                .id_to_type(parameter.ty)
                 .modifier
                 .unwrap_or(TypeModifier::Const);
 

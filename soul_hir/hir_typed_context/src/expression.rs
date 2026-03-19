@@ -33,7 +33,7 @@ impl<'a> HirTypedContext<'a> {
                     None => return TypeId::error(),
                 };
 
-                let deref = self.get_type(ty).try_deref(&self.hir.types, span);
+                let deref = self.id_to_type(ty).try_deref(&self.hir.types, span);
                 match deref {
                     Ok(val) => val,
                     Err(err) => {
@@ -46,7 +46,7 @@ impl<'a> HirTypedContext<'a> {
             hir::ExpressionKind::Ref { place, mutable } => {
                 let place_type = self.infer_place(place);
                 let resolved = self.resolve_type_lazy(place_type, span);
-                let resolved_ty = self.get_type(resolved);
+                let resolved_ty = self.id_to_type(resolved);
                 let ty = match &resolved_ty.kind {
                     hir::HirTypeKind::Array {
                         element,
@@ -73,8 +73,8 @@ impl<'a> HirTypedContext<'a> {
             hir::ExpressionKind::Cast { value, cast_to } => {
                 let span = self.expression_span(*value);
                 let from = self.infer_expression(*value);
-                let from_type = self.get_type(from);
-                let to_type = self.get_type(*cast_to);
+                let from_type = self.id_to_type(from);
+                let to_type = self.ref_to_type(*cast_to);
                 match from_type.unify_primitive_cast(
                     &self.type_table.types,
                     to_type,
@@ -86,7 +86,8 @@ impl<'a> HirTypedContext<'a> {
                         Some(span),
                     )),
                 }
-                *cast_to
+                
+                self.ref_to_id(*cast_to)
             }
             hir::ExpressionKind::While { condition, body } => {
                 self.infer_while(*condition, *body, span)
@@ -104,17 +105,19 @@ impl<'a> HirTypedContext<'a> {
                 function,
                 callee,
                 arguments,
-            } => self.infer_call(*function, *callee, arguments),
+            } => self.infer_call(*function, *callee, arguments, span),
             hir::ExpressionKind::If {
                 condition,
                 then_block,
                 else_block,
                 ends_with_else,
             } => self.infer_if(*condition, *then_block, *else_block, *ends_with_else, span),
-            hir::ExpressionKind::InnerRawStackArray { .. } => value.ty,
+            hir::ExpressionKind::InnerRawStackArray(_) => {
+                value.ty
+            },
         };
 
-        if let HirTypeKind::InferType(id, _) = &self.get_type(value.ty).kind {
+        if let HirTypeKind::InferType(id, _) = &self.id_to_type(value.ty).kind {
             self.infer_table.add_infer_binding(*id, ty);
         }
 
@@ -173,6 +176,7 @@ impl<'a> HirTypedContext<'a> {
         function_id: FunctionId,
         callee: Option<ExpressionId>,
         arguments: &Vec<ExpressionId>,
+        span: Span,
     ) -> TypeId {
         let function = match self.hir.functions.get(function_id) {
             Some(val) => val,
@@ -191,7 +195,7 @@ impl<'a> HirTypedContext<'a> {
                     function.parameters.len()
                 ),
                 SoulErrorKind::InvalidContext,
-                Some(function.name.span),
+                Some(span),
             ));
             return return_type;
         }
@@ -228,8 +232,8 @@ impl<'a> HirTypedContext<'a> {
             }
             BinaryTypeCheck::Bitwise | BinaryTypeCheck::Numeric => {
                 self.unify(right, left_id, right_id, span);
-                let left_type = self.get_type(left_id);
-                let right_type = self.get_type(right_id);
+                let left_type = self.id_to_type(left_id);
+                let right_type = self.id_to_type(right_id);
                 if !left_type.is_numeric_type() {
                     self.log_error(SoulError::new(
                         format!(
@@ -266,7 +270,7 @@ impl<'a> HirTypedContext<'a> {
             Unary::Invalid => todo!("should not have invalid"),
             Unary::Neg => {
                 let value_type = self.infer_expression(value);
-                let ty = self.get_type(value_type);
+                let ty = self.id_to_type(value_type);
                 if !ty.is_numeric_type() {
                     self.log_error(SoulError::new(
                         format!(
@@ -283,7 +287,7 @@ impl<'a> HirTypedContext<'a> {
             }
             Unary::Not => {
                 let value_type = self.infer_expression(value);
-                let ty = self.get_type(value_type);
+                let ty = self.id_to_type(value_type);
                 if !ty.is_boolean_type() {
                     self.log_error(SoulError::new(
                         format!(
@@ -300,7 +304,7 @@ impl<'a> HirTypedContext<'a> {
             }
             Unary::Increment { .. } | Unary::Decrement { .. } => {
                 let value_type = self.infer_expression(value);
-                let ty = self.get_type(value_type);
+                let ty = self.id_to_type(value_type);
                 if !ty.is_numeric_type() {
                     self.log_error(SoulError::new(
                         format!(

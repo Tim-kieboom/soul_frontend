@@ -1,16 +1,11 @@
 use std::{collections::HashMap, hash::Hash};
 
 use soul_utils::{
-    ids::{FunctionId, IdAlloc, IdGenerator},
-    soul_import_path::SoulImportPath,
-    soul_names::TypeModifier,
-    span::{ItemMetaData, Span},
-    vec_map::{VecMap, VecMapIndex},
+    ids::{FunctionId, IdAlloc, IdGenerator}, impl_soul_ids, soul_import_path::SoulImportPath, soul_names::TypeModifier, span::{ItemMetaData, Span}, vec_map::{VecMap, VecMapIndex}
 };
 
 use crate::{
-    BlockId, ExpressionId, HirType, HirTypeKind, InferTypeId, LocalId, ModuleId, StatementId,
-    TypeId,
+    BlockId, ExpressionId, HirType, HirTypeKind, InferTypeId, LocalId, ModuleId, StatementId, TypeId
 };
 
 /// Maps HIR node IDs to their original source code spans.
@@ -45,30 +40,49 @@ pub struct MetaDataMap {
     pub statements: VecMap<StatementId, ItemMetaData>,
 }
 
+impl_soul_ids!(RefTypeId);
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TypesMap {
     map: BiMap<TypeId, HirType>,
+    /// for expressions like Cast (so you can have a diffrent TypeId in the typedcontext stage)
+    ref_map: BiMap<RefTypeId, TypeId>,
+    ref_generator: IdGenerator<RefTypeId>,
     type_generator: IdGenerator<TypeId>,
     infer_generator: IdGenerator<InferTypeId>,
 }
 impl TypesMap {
     pub fn new() -> Self {
         Self {
+            ref_generator: IdGenerator::new(),
             type_generator: IdGenerator::new(),
             infer_generator: IdGenerator::new(),
             map: BiMap::from_array([(TypeId::error(), HirType::error_type())]),
+            ref_map: BiMap::from_array([(RefTypeId::error(), TypeId::error())]),
         }
     }
 
-    pub fn get_type(&self, id: TypeId) -> Option<&HirType> {
+    pub fn ref_to_id(&self, id: RefTypeId) -> Option<TypeId> {
+        self.ref_map.get_value(id).copied()
+    }
+
+    pub fn id_to_ref(&self, id: TypeId) -> Option<RefTypeId> {
+        self.ref_map.get_key(&id)
+    }
+
+    pub fn ref_to_type(&self, id: RefTypeId) -> Option<&HirType> {
+        let id = self.ref_to_id(id)?;
         self.map.get_value(id)
     }
 
-    pub fn get_id(&self, ty: &HirType) -> Option<TypeId> {
+    pub fn id_to_type(&self, id: TypeId) -> Option<&HirType> {
+        self.map.get_value(id)
+    }
+
+    pub fn type_to_id(&self, ty: &HirType) -> Option<TypeId> {
         self.map.get_key(ty)
     }
 
-    pub fn get_id_from_typekind(&self, ty: HirTypeKind) -> Option<TypeId> {
+    pub fn typekind_to_id(&self, ty: HirTypeKind) -> Option<TypeId> {
         self.map.get_key(&HirType {
             kind: ty,
             modifier: None,
@@ -77,6 +91,14 @@ impl TypesMap {
 
     pub fn insert(&mut self, ty: HirType) -> TypeId {
         self.map.insert(&mut self.type_generator, ty)
+    }
+
+    pub fn insert_ref(&mut self, ty: TypeId) -> RefTypeId {
+        self.ref_map.insert(&mut self.ref_generator, ty)
+    }
+
+    pub fn add_ref_id_entry(&mut self, ref_id: RefTypeId, ty: TypeId) {
+        self.ref_map.force_insert(ref_id, ty);
     }
 
     pub fn new_infertype(&mut self, modifier: Option<TypeModifier>, span: Span) -> TypeId {

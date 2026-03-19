@@ -339,7 +339,7 @@ impl<'a> MirDisplayer<'a> {
     fn get_type(&self, ty: TypeId) -> HirType {
         self.types
             .types
-            .get_type(ty)
+            .id_to_type(ty)
             .cloned()
             .unwrap_or(HirType::error_type())
     }

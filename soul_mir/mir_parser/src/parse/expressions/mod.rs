@@ -149,8 +149,8 @@ impl<'a> MirContext<'a> {
             }
 
             hir::ExpressionKind::Cast { value, cast_to } => {
-                let cast_id = *cast_to;
-                let inner_type = self.types.expressions[*value];
+                let cast_id = self.ref_to_id(*cast_to);
+                let inner_type = self.types.expressions.get(*value).copied().unwrap_or(TypeId::error());
                 if inner_type == cast_id {
                     self.lower_operand(*value).pass(is_end)
                 } else {
@@ -214,7 +214,7 @@ impl<'a> MirContext<'a> {
             arguments.push(self.lower_operand(*arg).pass(is_end));
         }
 
-        let temp = if self.get_type(ty).is_none_type() {
+        let temp = if self.id_to_type(ty).is_none_type() {
             None
         } else {
             Some(self.new_temp(ty))

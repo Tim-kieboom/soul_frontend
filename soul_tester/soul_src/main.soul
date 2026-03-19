@@ -2,12 +2,14 @@ extern "C" free(ptr: *none)
 extern "C" malloc(len: int): *none
 extern "C" __csoul_printStr(text: *char)
 extern "C" __csoul_printChar(ch: char)
-extern "C" __csoul_fmtFloat(value: f64, base: u8, buf: *char/*[50]char*/, percision: u8): *char
+extern "C" __csoul_fmtFloat(value: f64, base: u8, buf: *char/*[50]char*/, percision: u8, capital: bool): *char
 extern "C" __csoul_fmtUint(value: uint, base: u8, buf: *char/*[50]char*/): *char
 extern "C" __csoul_fmtInt(value: int, base: u8, buf: *char/*[50]char*/): *char
+
 global1: int = 1 + 2
 global2: int = 3
 fmtBuffer := malloc(50) as *char //[for 50 => '\0']
+
 main() {
     print_int(-123)
     endln()
@@ -34,7 +36,7 @@ print_uint(value: uint) {
 }
 
 print_float(value: f32) {
-    cstr := __csoul_fmtFloat(value as f64, 10, fmtBuffer, 4)
+    cstr := __csoul_fmtFloat(value as f64, 10, fmtBuffer, 4, true)
     __csoul_printStr(cstr)
 }
 
