@@ -64,8 +64,8 @@ impl Literal {
                 }
             }
             Literal::Bool(val) => format!("{}", val),
-            Literal::Char(char) => format!("'{}'", char),
-            Literal::Str(str) => format!("\"{}\"", str),
+            Literal::Char(char) => format!("{:?}", char),
+            Literal::Str(str) => format!("{:?}", str),
         }
     }
 }

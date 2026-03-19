@@ -75,6 +75,11 @@ impl<'a> HirDisplayer<'a> {
     fn display_function(&mut self, function_id: &FunctionId) {
         let function = &self.hir.functions[*function_id];
         self.push('\n');
+        if let hir::FunctionBody::External(id) = function.body {
+            self.push_str("extern \"");
+            self.push_str(id.as_str());
+            self.push_str("\" ");
+        }
         self.push_str(function.name.as_str());
         self.push('(');
 

@@ -48,6 +48,7 @@ define_str_enum!(
     /// Internal primitive types available in the Soul language.
     ///
     /// These are the built-in numeric, character, and boolean types.
+    /// (precedence is used for bit size with special 1=defaultIntSize and 2=defaultCharSize)
     #[derive(Hash)]
     pub enum PrimitiveTypes {
         /// default-size character type

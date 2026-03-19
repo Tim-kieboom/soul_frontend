@@ -1,11 +1,11 @@
 #ifndef __BETTERINTS_H__
 #define __BETTERINTS_H__
+#include <time.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
-
 /* 
 to generate/run exe run commands:
 

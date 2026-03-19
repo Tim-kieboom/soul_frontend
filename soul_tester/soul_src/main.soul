@@ -1,48 +1,56 @@
 extern "C" free(ptr: *none)
 extern "C" malloc(len: int): *none
-extern "C" __csoul_printStr(text: *char)
-extern "C" __csoul_printChar(ch: char)
-extern "C" __csoul_fmtFloat(value: f64, base: u8, buf: *char/*[50]char*/, percision: u8, capital: bool): *char
-extern "C" __csoul_fmtUint(value: uint, base: u8, buf: *char/*[50]char*/): *char
-extern "C" __csoul_fmtInt(value: int, base: u8, buf: *char/*[50]char*/): *char
+extern "C" __clib_printChar(ch: char)
+extern "C" __clib_printStr(text: *char)
+extern "C" __clib_fmtInt(value: int, base: u8, buffer: *char/*[50]char*/, capital: bool): *char
+extern "C" __clib_fmtUint(value: uint, base: u8, buffer: *char/*[50]char*/, capital: bool): *char
+extern "C" __clib_fmtFloat(value: f64, base: u8, buffer: *char/*[50]char*/, precision: u8, capital: bool): *char
 
 global1: int = 1 + 2
 global2: int = 3
 fmtBuffer := malloc(50) as *char //[for 50 => '\0']
 
 main() {
+    // mod := 12 % 10
+    // pow := 3 ** 2
+    // root := 2 </ 4
     print_int(-123)
     endln()
     print_uint(123)
     endln()
     print_float(123.4567)
     endln()
-    u8Fn(1)
-//     // ptr()
+    pu8(120)
+}
+
+pu8(num: u8) {
+    print_int(num as int)
 }
 
 endln() {
-    __csoul_printChar('\n')
+    __clib_printChar('\n')
 }
 
-print_int(value: int) {
-    cstr := __csoul_fmtInt(value, 10, fmtBuffer)
-    __csoul_printStr(cstr)
+print_int(value: int/*, base: u8 = 10*/) {
+    literal base = 10
+    literal capital = true
+    cstr := __clib_fmtInt(value, base, fmtBuffer, capital)
+    __clib_printStr(cstr)
 }
 
 print_uint(value: uint) {
-    cstr := __csoul_fmtUint(value, 10, fmtBuffer)
-    __csoul_printStr(cstr)
+    literal base = 10
+    literal capital = true
+    cstr := __clib_fmtUint(value, base, fmtBuffer, capital)
+    __clib_printStr(cstr)
 }
 
-print_float(value: f32) {
-    cstr := __csoul_fmtFloat(value as f64, 10, fmtBuffer, 4, true)
-    __csoul_printStr(cstr)
-}
-
-u8Fn(num: u8) {
-
-    print_int(num as int)
+print_float(value: f64) {
+    literal base = 10
+    literal capital = true
+    literal precision = 4
+    cstr := __clib_fmtFloat(value, base, fmtBuffer, precision, capital)
+    __clib_printStr(cstr)
 }
 
 sum(a: int, b: int): int {
@@ -50,7 +58,6 @@ sum(a: int, b: int): int {
 }
 
 ptr() {
-    const t: *int
     ptr := malloc(32) as *int
     // *ptr = sum(1, 2)
     // number: int = *ptr

@@ -1,8 +1,12 @@
-extern "C" malloc(len: int): ?*none
-extern "C" free(ptr: ?*none)
+extern "C" malloc(len: int): !*none
+extern "C" free(ptr: !*none)
 
 unsafe alloc(len: uint): *none {
     malloc(len as int) ?? panic("alloc failed")
+}
+
+unsafe [*]T This(ptr: *T, len: uint) {
+    This{ptr, len}
 }
 
 #[public]
@@ -24,13 +28,15 @@ class new<T> {
                 i++
             }
 
-            [*]T{ptr, len}
+            [*]T(ptr, len)
         }
     }
 }
 
 use<T> *T impl Drop {
     Drop(ptr: *T) {
-        free(ptr as *none)
+        unsafe{ 
+            free(ptr as !*none)
+        }
     }
 }

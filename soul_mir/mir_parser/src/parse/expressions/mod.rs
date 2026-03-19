@@ -209,9 +209,25 @@ impl<'a> MirContext<'a> {
             ));
         }
 
+        let parameters = &self.hir.functions[function].parameters;
         let mut arguments = vec![];
-        for arg in hir_arguments {
-            arguments.push(self.lower_operand(*arg).pass(is_end));
+        for (i, arg) in hir_arguments.iter().enumerate() {
+
+            let expression = &self.hir.expressions[*arg];
+            let mut value = self.lower_operand(*arg).pass(is_end);
+
+            if expression.is_literal() {
+                let ty = self.types.locals[parameters[i].local];
+                
+                let temp = self.new_temp(ty);
+                let place = self.new_place(mir::Place::Temp(temp));
+                let rvalue = mir::Rvalue::new(mir::RvalueKind::CastUse{value, cast_to: ty});
+                let cast = mir::Statement::new(mir::StatementKind::Assign { place, value: rvalue });
+                self.push_statement(cast);
+
+                value = mir::Operand::new(ty, mir::OperandKind::Temp(temp));
+            }
+            arguments.push(value);
         }
 
         let temp = if self.id_to_type(ty).is_none_type() {

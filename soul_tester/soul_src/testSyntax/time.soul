@@ -1,0 +1,27 @@
+clockPerMilliseconds := __clib_CLOCKS_PER_SEC() * 1000
+clock(): u64 {
+    __clib_clock()
+}
+
+class Time {
+    clockTicks: u64
+
+    Now(): Time {
+        Time{clockTicks: clock()}
+    }
+
+    Elapsed(this): Duration {
+        deltaClock := clock() - this.clockTicks
+        Duration.FromRaw(deltaClock / clockPerMilliseconds)
+    }
+
+    impl AutoCopy{}
+}
+
+class Duration {
+    milliseconds: u64
+
+    FromRaw(milliseconds: u64): This {
+        Duration{milliseconds}
+    }
+}

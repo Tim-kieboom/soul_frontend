@@ -263,7 +263,7 @@ impl<'a> HirContext<'a> {
                 return hir::Expression {
                     id,
                     ty: TypeId::error(),
-                    kind: hir::ExpressionKind::Null,
+                    kind: hir::ExpressionKind::Error,
                 };
             }
         };
