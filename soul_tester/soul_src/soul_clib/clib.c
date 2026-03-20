@@ -1,5 +1,25 @@
 #include "clib.h"
 
+
+// ---------------- #Math ----------------      
+
+#define __POW(ty) ty __clib_pow_##ty(ty a, ty b) { \
+    return (ty)pow((f64)a, (f64)b);                \
+}
+
+#define __ROOT(ty) ty __clib_root_##ty(ty exp, ty base) { \
+    return (ty)pow((f64)base, (f64)1.0 / (f64)exp);       \
+}
+
+/// impl define marcro for all number types
+#define __IMPL_NUMBERS(impl)                \
+    impl(i8);impl(i16);impl(i32);impl(i64); \
+    impl(u8);impl(u16);impl(u32);impl(u64); \
+    impl(f32);impl(f64);
+
+__IMPL_NUMBERS(__POW);
+__IMPL_NUMBERS(__ROOT);
+
 // ---------------- #Printers ----------------
 
 void __clib_printStr(cstr text) {
@@ -32,6 +52,10 @@ str __clib_fmtInt(int num, u8 base, char buf[50], bool capital) {
     str ptr = &buf[49];
     *ptr = '\0';
 
+    if (base == 1) {
+        return NULL;
+    }
+    
     int sign = 0;
     if (num < 0) {
         sign = 1;
@@ -55,7 +79,10 @@ static str __inner_fmt_uint(uint64_t n, u8 base, str buf, int max_digits, bool c
         *buf++ = '0';
         return buf;
     }
-    
+    if (base == 1) {
+        return NULL;
+    }
+
     cstr numbers = capital ? NUMBERS : NUMBERS_LOWER;
     char temp[20];
     int i = 0;
@@ -78,6 +105,9 @@ str __clib_fmtFloat(double num, u8 base, char buf[50], u8 percision, bool capita
     if (num < 0.0) {
         *buf++ = '-';
         num = -num;
+    }
+    if (base == 1) {
+        return NULL;
     }
 
     uint whole = (uint)num;

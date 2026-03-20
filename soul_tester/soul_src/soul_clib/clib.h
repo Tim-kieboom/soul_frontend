@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 #include <stdbool.h>
 /* 
 to generate/run exe run commands:
@@ -24,6 +25,9 @@ typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
 typedef unsigned int uint;
+
+typedef float f32;
+typedef double f64;
 
 typedef char* str;
 typedef const char* cstr;

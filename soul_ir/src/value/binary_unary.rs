@@ -37,7 +37,7 @@ impl<'a> LlvmBackend<'a> {
             ast::BinaryOperatorKind::Le => self.compare(IrCompare::Le, ir_left, ir_right),
             ast::BinaryOperatorKind::Ge => self.compare(IrCompare::Ge, ir_left, ir_right),
 
-            ast::BinaryOperatorKind::Mod => todo!("impl mod llvm"),
+            ast::BinaryOperatorKind::Mod => self.modulo(ir_left, ir_right),
             ast::BinaryOperatorKind::Log => todo!("impl log llvm"),
             ast::BinaryOperatorKind::Pow => todo!("impl pow llvm"),
             ast::BinaryOperatorKind::Root => todo!("impl root llvm"),
@@ -171,6 +171,37 @@ impl<'a> LlvmBackend<'a> {
             _ => Err(SoulError::new(
                 format!(
                     "div requires int or float values (left: {:?}, right: {:?})",
+                    left.value, right.value
+                ),
+                SoulErrorKind::LlvmError,
+                None,
+            )),
+        }?;
+
+        Ok(IrOperand {
+            value,
+            is_signed_interger: left.is_signed_interger,
+        })
+    }
+
+    fn modulo(&self, left: IrOperand<'a>, right: IrOperand<'a>) -> SoulResult<IrOperand<'a>> {
+        let value = match (left.value, right.value) {
+            (BasicValueEnum::IntValue(l), BasicValueEnum::IntValue(r)) => {
+                if left.is_signed_interger {
+                    self.builder
+                        .build_int_signed_rem(l, r, "rvalue")
+                        .map_err(build_error)
+                        .map(BasicValueEnum::from)
+                } else {
+                    self.builder
+                        .build_int_unsigned_rem(l, r, "rvalue")
+                        .map_err(build_error)
+                        .map(BasicValueEnum::from)
+                }
+            }
+            _ => Err(SoulError::new(
+                format!(
+                    "mod requires int values (left: {:?}, right: {:?})",
                     left.value, right.value
                 ),
                 SoulErrorKind::LlvmError,

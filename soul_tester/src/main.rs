@@ -40,7 +40,7 @@ mod paths;
 static PATHS: &[u8] = include_bytes!("../paths.json");
 
 pub const MESSAGE_CONFIG: MessageConfig = MessageConfig {
-    backtrace: true,
+    backtrace: false,
     colors: true,
 };
 
