@@ -1,3 +1,4 @@
+use ast::NamedTupleElement;
 use soul_utils::{
     ids::{FunctionId, IdAlloc},
     soul_error_internal,
@@ -25,11 +26,13 @@ impl<'a> HirContext<'a> {
         let parameters = signature
             .parameters
             .iter()
-            .map(|(name, ty, _node_id)| {
+            .map(|NamedTupleElement{ name, ty, default, node_id:_ }| {
                 let ty = self.lower_type(ty);
                 let local = self.id_generator.alloc_local();
                 self.insert_parameter(name, local, ty);
-                hir::Parameter { local, ty }
+                
+                let default = default.as_ref().map(|value| self.lower_expression(value));
+                hir::Parameter { local, ty, default }
             })
             .collect();
 

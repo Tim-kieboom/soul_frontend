@@ -1,6 +1,6 @@
 use crate::{BlockId, ExpressionId, LocalId, Place, RefTypeId, TypeId};
 use ast::{BinaryOperator, Literal, UnaryOperator};
-use soul_utils::{ids::FunctionId};
+use soul_utils::ids::{FunctionId, IdAlloc};
 
 /// A typed HIR expression.
 ///
@@ -15,6 +15,10 @@ pub struct Expression {
 impl Expression {
     pub fn is_literal(&self) -> bool {
         matches!(self.kind, ExpressionKind::Literal(_))
+    }
+
+    pub fn error(id: ExpressionId) -> Self {
+        Self { id, ty: TypeId::error(), kind: ExpressionKind::Error }
     }
 }
 

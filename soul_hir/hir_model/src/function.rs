@@ -1,7 +1,7 @@
 use ast::{ExternLanguage, FunctionKind};
 use soul_utils::{Ident, ids::FunctionId};
 
-use crate::{BlockId, LocalId, TypeId};
+use crate::{BlockId, ExpressionId, LocalId, TypeId};
 
 /// A function definition in HIR.
 ///
@@ -45,4 +45,6 @@ pub struct Parameter {
 
     /// Type of the parameter.
     pub ty: TypeId,
+
+    pub default: Option<ExpressionId>,
 }

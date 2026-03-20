@@ -79,7 +79,7 @@ impl HirTree {
             locals: VecMap::default(),
             fields: VecMap::default(),
             imports: ImportMap::new(),
-            expressions: VecMap::default(),
+            expressions: VecMap::from_slice(&[(ExpressionId::error(), Expression::error(ExpressionId::error()))]),
             meta_data: MetaDataMap::default(),
             functions: VecMap::from_vec(vec![(init_global_function_id, init_global_function)]),
             root: Module {

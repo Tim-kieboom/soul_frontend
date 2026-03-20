@@ -29,7 +29,7 @@ impl<'a> NameResolver<'a> {
                 };
 
                 for arg in &mut function_call.arguments {
-                    self.resolve_expression(arg);
+                    self.resolve_expression(&mut arg.value);
                 }
             }
             ExpressionKind::Variable {

@@ -211,10 +211,18 @@ impl<'a> MirContext<'a> {
 
         let parameters = &self.hir.functions[function].parameters;
         let mut arguments = vec![];
-        for (i, arg) in hir_arguments.iter().enumerate() {
+        for (i, parameter) in parameters.iter().enumerate() {
 
-            let expression = &self.hir.expressions[*arg];
-            let mut value = self.lower_operand(*arg).pass(is_end);
+            let arg = match hir_arguments.get(i) {
+                Some(val) => *val,
+                None => match parameter.default {
+                    Some(val) => val,
+                    None => continue,
+                },
+            };
+
+            let expression = &self.hir.expressions[arg];
+            let mut value = self.lower_operand(arg).pass(is_end);
 
             if expression.is_literal() {
                 let ty = self.types.locals[parameters[i].local];

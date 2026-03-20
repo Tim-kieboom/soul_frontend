@@ -4,7 +4,7 @@ use soul_utils::{
     span::Span,
 };
 
-use crate::scope::NodeId;
+use crate::{Expression, scope::NodeId};
 
 /// Represents a type in the Soul language.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -75,7 +75,15 @@ impl ArrayKind {
 }
 
 pub type TupleType = Vec<SoulType>;
-pub type NamedTupleType = Vec<(Ident, SoulType, Option<NodeId>)>;
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct NamedTupleElement {
+    pub name: Ident, 
+    pub ty: SoulType, 
+    pub node_id: Option<NodeId>,
+    pub default: Option<Expression>, 
+}
+pub type NamedTupleType = Vec<NamedTupleElement>;
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ReferenceType {

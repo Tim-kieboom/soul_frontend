@@ -72,7 +72,11 @@ impl SyntaxDisplay for ExpressionKind {
 
                 let last_index = function_call.arguments.len().saturating_sub(1);
                 for (i, argument) in function_call.arguments.iter().enumerate() {
-                    argument.node.inner_display(sb, kind, tab, is_last);
+                    if let Some(name) = &argument.name {
+                        sb.push_str(name.as_str());
+                        sb.push_str(": ");
+                    }
+                    argument.value.node.inner_display(sb, kind, tab, is_last);
                     if i != last_index {
                         sb.push_str(", ");
                     }

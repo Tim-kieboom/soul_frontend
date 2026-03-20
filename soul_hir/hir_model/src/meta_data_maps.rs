@@ -13,7 +13,7 @@ use crate::{
 /// Spans originate from the AST and are forwarded through lowering passes.
 /// They are used exclusively for diagnostics and are not part of the IR
 /// structure itself.
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SpanMap {
     /// Source spans for expressions.
     pub expressions: VecMap<ExpressionId, Span>,
@@ -27,6 +27,17 @@ pub struct SpanMap {
     pub locals: VecMap<LocalId, Span>,
 
     pub functions: VecMap<FunctionId, Span>,
+}
+impl Default for SpanMap {
+    fn default() -> Self {
+        Self { 
+            blocks: Default::default(), 
+            locals: Default::default(), 
+            functions: Default::default(),
+            statements: Default::default(), 
+            expressions: VecMap::from_slice(&[(ExpressionId::error(), Span::default_const())]), 
+        }
+    }
 }
 
 /// Auxiliary semantic metadata attached to HIR statements.

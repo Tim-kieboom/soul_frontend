@@ -1,5 +1,5 @@
 use ast::{
-    Expression, ExternLanguage, Function, FunctionCall, FunctionSignature, SoulType, Statement,
+    Argument, Expression, ExternLanguage, Function, FunctionCall, FunctionSignature, SoulType, Statement
 };
 use soul_tokenizer::TokenKind;
 use soul_utils::{
@@ -155,7 +155,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         result
     }
 
-    fn parse_arguments(&mut self) -> SoulResult<Vec<Expression>> {
+    fn parse_arguments(&mut self) -> SoulResult<Vec<Argument>> {
         self.expect(&ROUND_OPEN)?;
         if self.current_is(&ROUND_CLOSE) {
             self.bump();
@@ -164,8 +164,17 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let mut values = vec![];
         loop {
+            
+            let name = if self.peek().kind == COLON {
+                let name = self.try_bump_consume_ident()?;
+                self.expect(&COLON)?;
+                Some(name)
+            } else {
+                None
+            };
+
             let value = self.parse_expression(&[COMMA, ROUND_CLOSE])?;
-            values.push(value);
+            values.push(Argument { name, value });
             if !self.current_is(&COMMA) {
                 break;
             }

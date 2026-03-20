@@ -1,4 +1,4 @@
-use ast::{ArrayKind, ArrayType, FunctionKind, NamedTupleType, ReferenceType, SoulType, TypeKind};
+use ast::{ArrayKind, ArrayType, FunctionKind, NamedTupleElement, NamedTupleType, ReferenceType, SoulType, TypeKind};
 use soul_tokenizer::{Number, TokenKind};
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
@@ -12,8 +12,7 @@ use soul_utils::{
 use crate::parser::{
     Parser,
     parse_utils::{
-        ARRAY, COLON, COMMA, CONST_REF, CURLY_OPEN, MUT_REF, OPTIONAL, POINTER, ROUND_CLOSE,
-        ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN,
+        ARRAY, ASSIGN, COLON, COMMA, CONST_REF, CURLY_OPEN, MUT_REF, OPTIONAL, POINTER, ROUND_CLOSE, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN
     },
 };
 
@@ -189,6 +188,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             return TryOk((types, function_kind));
         }
 
+        let mut has_default = false;
         loop {
             match self.inner_parse_named_this(&mut function_kind, can_have_this)? {
                 Loop::None => (),
@@ -217,7 +217,24 @@ impl<'a, 'f> Parser<'a, 'f> {
             let mut ty = self.try_parse_type()?; // if not value is probebly named_tuple expression 
             ty.modifier = modifier;
 
-            types.push((name, ty, None));
+            
+            let default = if self.current_is(&ASSIGN) {
+                self.bump();
+                has_default = true;
+                Some(self.parse_expression(&[COMMA, close.clone()]).try_err()?)
+            } else {
+                None
+            };
+
+            if default.is_none() && has_default {
+                self.log_error(SoulError::new(
+                    "you can not have a non default parameter after default parameter", 
+                    SoulErrorKind::InvalidContext, 
+                    Some(name.span),
+                ));
+            }
+
+            types.push(NamedTupleElement{ name, ty, node_id: None, default });
             if self.current_is(close) {
                 break;
             }

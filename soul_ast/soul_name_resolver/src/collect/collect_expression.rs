@@ -55,7 +55,7 @@ impl<'a> NameResolver<'a> {
             ExpressionKind::FunctionCall(function_call) => {
                 function_call.id = Some(self.alloc_node());
                 for arg in &mut function_call.arguments {
-                    self.collect_expression(arg);
+                    self.collect_expression(&mut arg.value);
                 }
                 if let Some(callee) = &mut function_call.callee {
                     self.collect_expression(callee);

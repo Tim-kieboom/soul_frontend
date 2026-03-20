@@ -1,9 +1,8 @@
 use crate::{
-    ast::{
+    NamedTupleElement, ast::{
         ExpressionKind, FunctionSignature, StatementKind, VarTypeKind, Variable,
         syntax_display::{DisplayKind, try_display_function_id, try_display_node_id},
-    },
-    syntax_display::{SyntaxDisplay, tree_prefix},
+    }, syntax_display::{SyntaxDisplay, tree_prefix}
 };
 
 impl SyntaxDisplay for StatementKind {
@@ -124,9 +123,13 @@ fn inner_display_function_signature(
     }
     sb.push_str(signature.name.as_str());
     sb.push('(');
-    for (name, el, node_id) in &signature.parameters {
+    for NamedTupleElement{ node_id, name, ty, default } in &signature.parameters {
         try_display_node_id(sb, kind, *node_id);
-        sb.push_str(&format!("{}: {}", name.as_str(), el.display(kind),));
+        sb.push_str(&format!("{}: {}", name.as_str(), ty.display(kind),));
+        if let Some(value) = default {
+            sb.push_str(" = ");
+            value.node.inner_display(sb, kind, tab, is_last);
+        }
         sb.push(',');
     }
     sb.push_str("): ");

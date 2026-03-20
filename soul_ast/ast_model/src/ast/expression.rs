@@ -100,9 +100,15 @@ pub struct FunctionCall {
     /// Optional callee expression (for method calls).
     pub callee: Option<BoxExpression>,
     /// Function arguments.
-    pub arguments: Vec<Expression>,
+    pub arguments: Vec<Argument>,
     pub id: Option<NodeId>,
     pub resolved: Option<FunctionId>,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Argument {
+    pub name: Option<Ident>, 
+    pub value: Expression,
 }
 
 /// An expression from an external page/module.
