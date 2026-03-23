@@ -1,4 +1,5 @@
-use crate::{IrOperand, LlvmBackend, build_error};
+use crate::{GenericSubstitute, IrOperand, LlvmBackend, build_error};
+use hir::TypeId;
 use inkwell::values::FunctionValue;
 use mir_parser::mir::{BlockId, FunctionBody, Operand, Place, PlaceId, Terminator};
 use soul_utils::{error::SoulResult, ids::FunctionId, vec_map::VecMapIndex};
@@ -21,18 +22,22 @@ impl<'a> LlvmBackend<'a> {
                 .context
                 .append_basic_block(llvm_function, &name_block(*block_id));
 
-            self.blocks.insert(*block_id, bb);
+            self.push_block(*block_id, bb);
         }
     }
 
-    pub(crate) fn lower_terminator(&mut self, block_id: BlockId) -> SoulResult<()> {
+    pub(crate) fn lower_terminator(
+        &mut self,
+        block_id: BlockId,
+        generics: &GenericSubstitute,
+    ) -> SoulResult<()> {
         let terminator = &self.mir.tree.blocks[block_id].terminator;
 
         match terminator {
             Terminator::Goto(target) => {
                 _ = self
                     .builder
-                    .build_unconditional_branch(self.blocks[*target])
+                    .build_unconditional_branch(self.get_block(*target))
                     .map_err(build_error)?
             }
             Terminator::Exit => {
@@ -48,7 +53,7 @@ impl<'a> LlvmBackend<'a> {
             }
             Terminator::Return(value) => {
                 let result = if let Some(operand) = value {
-                    let return_value = self.lower_operand(operand)?;
+                    let return_value = self.lower_operand(operand, generics)?;
                     self.builder.build_return(Some(&return_value.value))
                 } else {
                     self.builder.build_return(None)
@@ -61,9 +66,16 @@ impl<'a> LlvmBackend<'a> {
                 then,
                 arm,
             } => {
-                let condition = self.lower_operand(condition)?.value.into_int_value();
+                let condition = self
+                    .lower_operand(condition, generics)?
+                    .value
+                    .into_int_value();
                 self.builder
-                    .build_conditional_branch(condition, self.blocks[*then], self.blocks[*arm])
+                    .build_conditional_branch(
+                        condition,
+                        self.get_block(*then),
+                        self.get_block(*arm),
+                    )
                     .map_err(build_error)?;
             }
             Terminator::Unreachable => panic!("should not have unreachable"),
@@ -77,16 +89,19 @@ impl<'a> LlvmBackend<'a> {
         id: FunctionId,
         arguments: &Vec<Operand>,
         return_place: Option<PlaceId>,
+        type_args: &Vec<TypeId>,
+        generics: &GenericSubstitute,
     ) -> SoulResult<()> {
         let mut ir_arguments = Vec::with_capacity(arguments.len());
         for arg in arguments {
-            let meta_data_value = self.lower_operand(arg)?.value.into();
+            let meta_data_value = self.lower_operand(arg, generics)?.value.into();
             ir_arguments.push(meta_data_value);
         }
 
+        let function = self.get_or_create_function(id, type_args);
         let call = self
             .builder
-            .build_call(self.functions[id], ir_arguments.as_slice(), "call_result")
+            .build_call(function, ir_arguments.as_slice(), "call_result")
             .map_err(build_error)?;
 
         let place = match return_place {
@@ -97,13 +112,11 @@ impl<'a> LlvmBackend<'a> {
         let return_value = call.try_as_basic_value().unwrap_basic();
         match place {
             Place::Temp(temp_id) => {
-                self.temps.insert(
-                    *temp_id,
-                    IrOperand {
-                        value: return_value,
-                        is_signed_interger: false,
-                    },
-                );
+                let value = IrOperand {
+                    value: return_value,
+                    is_signed_interger: false,
+                };
+                self.push_temp(*temp_id, value);
             }
             Place::Deref(_) => panic!("call return value should be Place::Temp not Place::Deref"),
             Place::Local(_) => panic!("call return value should be Place::Temp not Place::Local"),

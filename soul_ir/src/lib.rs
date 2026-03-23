@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use hir::{HirType, TypeId};
 use hir_typed_context::HirTypedTable;
 use inkwell::{
@@ -13,7 +15,8 @@ use run_mir::MirResponse;
 use soul_utils::{
     compile_options::CompilerOptions,
     error::{SoulError, SoulResult},
-    ids::{FunctionId, IdAlloc},
+    ids::{FunctionId, IdGenerator},
+    impl_soul_ids,
     sementic_level::SementicFault,
     soul_error_internal,
     vec_map::VecMap,
@@ -23,8 +26,10 @@ mod block;
 mod function;
 mod ir_type;
 mod local;
-mod value;
 mod statement;
+mod value;
+mod utils;
+use utils::*;
 
 pub struct IrRequest<'ctx> {
     pub context: &'ctx Context,
@@ -54,15 +59,10 @@ pub fn to_llvm_ir<'a>(
     let mut backend = LlvmBackend::new(request, faults);
 
     backend.declare_exit();
-    let mir = &request.mir.tree;
-    for function_id in mir.functions.keys() {
-        backend.declare_function(function_id);
-    }
-
     backend.allocate_globals();
-    for function_id in mir.functions.keys() {
-        backend.lower_function(function_id);
-    }
+
+    let entry = request.mir.tree.entry_function;
+    backend.get_or_create_function(entry, &vec![]);
 
     backend.to_ir_reponse()
 }
@@ -72,6 +72,8 @@ pub struct IrOperand<'a> {
     pub value: BasicValueEnum<'a>,
     pub is_signed_interger: bool,
 }
+
+impl_soul_ids!(FunctionKeyId);
 
 pub struct LlvmBackend<'a> {
     default_int_size: u8,
@@ -84,13 +86,14 @@ pub struct LlvmBackend<'a> {
     context: &'a Context,
     mir: &'a MirResponse,
     builder: Builder<'a>,
-    types: &'a HirTypedTable,
+    types: HirTypedTable,
     exit_function: Option<FunctionValue<'a>>,
 
-    temps: VecMap<TempId, IrOperand<'a>>,
-    blocks: VecMap<BlockId, BasicBlock<'a>>,
-    locals: VecMap<LocalId, PointerValue<'a>>,
-    functions: VecMap<FunctionId, FunctionValue<'a>>,
+    temps: HashMap<(FunctionKeyId, TempId), IrOperand<'a>>,
+    blocks: HashMap<(FunctionKeyId, BlockId), BasicBlock<'a>>,
+    locals: HashMap<(FunctionKeyId, LocalId), PointerValue<'a>>,
+    functions: VecMap<FunctionKeyId, FunctionValue<'a>>,
+    function_keys: FunctionKeyStore,
 
     faults: &'a mut Vec<SementicFault>,
 }
@@ -98,6 +101,7 @@ impl<'a> LlvmBackend<'a> {
     pub fn new(request: &'a IrRequest<'a>, faults: &'a mut Vec<SementicFault>) -> Self {
         let module = request.context.create_module("main");
         let builder = request.context.create_builder();
+        let function_keys = FunctionKeyStore::new();
 
         Self {
             faults,
@@ -105,13 +109,14 @@ impl<'a> LlvmBackend<'a> {
             builder,
             mir: request.mir,
             exit_function: None,
-            types: request.types,
+            types: request.types.clone(),
             context: request.context,
-            current: Current::start(),
-            temps: VecMap::const_default(),
-            blocks: VecMap::const_default(),
-            locals: VecMap::const_default(),
-            functions: VecMap::const_default(),
+            current: Current::start(function_keys.global_key()),
+            temps: HashMap::new(),
+            blocks: HashMap::new(),
+            locals: HashMap::new(),
+            functions: VecMap::new(),
+            function_keys,
 
             default_int_size: 32,
             default_char_size: 8,
@@ -133,6 +138,72 @@ impl<'a> LlvmBackend<'a> {
         exit_fn.add_attribute(inkwell::attributes::AttributeLoc::Function, noreturn_attr);
 
         self.exit_function = Some(exit_fn);
+    }
+
+    fn get_or_create_function(
+        &mut self,
+        function_id: FunctionId,
+        type_args: &Vec<TypeId>,
+    ) -> FunctionValue<'a> {
+        let key = FunctionKey::new(function_id, type_args.clone());
+        let key_id = self.function_keys.insert(key);
+        let prev = self.current;
+        self.current.set_function_key(key_id);
+
+        if let Some(function) = self.functions.get(key_id) {
+            return *function;
+        }
+
+        let function = &self.mir.tree.functions[function_id];
+        let generics = GenericSubstitute::new(&function.generics, type_args);
+        let llvm_fn = self.declare_function_instance(function_id, type_args, &generics);
+
+        self.functions.insert(key_id, llvm_fn);
+        self.lower_function_instance(function_id, key_id, type_args, &generics);
+
+        self.current = prev;
+        if self.current.function_key() != self.function_keys.global_key() {
+            let block = self.get_block(self.current.block());
+            self.builder.position_at_end(block);
+        }
+        llvm_fn
+    }
+
+    fn get_local(&self, id: LocalId) -> PointerValue<'a> {
+        match self
+            .locals
+            .get(&(self.current.function_key(), id))
+        {
+            Some(local) => *local,
+            _ => {
+                let global = self.function_keys.global_key();
+                self.locals[&(global, id)]
+            }
+        }
+    }
+
+    fn get_block(&self, id: BlockId) -> BasicBlock<'a> {
+        self.blocks[&(self.current.function_key(), id)]
+    }
+
+    fn get_temp(&self, id: TempId) -> IrOperand<'a> {
+        self.temps[&(self.current.function_key(), id)]
+    }
+
+    fn push_global(&mut self, id: LocalId, value: PointerValue<'a>) {
+        self.locals.insert((self.function_keys.global_key(), id), value);
+    }
+
+    fn push_local(&mut self, id: LocalId, value: PointerValue<'a>) {
+        self.locals.insert((self.current.function_key(), id), value);
+    }
+
+    fn push_block(&mut self, id: BlockId, value: BasicBlock<'a>) {
+        self.blocks.insert((self.current.function_key(), id), value);
+    }
+
+    fn push_temp(&mut self, id: TempId, value: IrOperand<'a>) {
+        self.temps.insert((self.current.function_key(), id), value);
     }
 
     fn get_type(&self, ty: TypeId) -> SoulResult<&HirType> {
@@ -163,13 +234,43 @@ fn build_error(value: BuilderError) -> SoulError {
     )
 }
 
-pub struct Current {
-    function_id: FunctionId,
+pub struct FunctionKeyStore {
+    to_id: HashMap<FunctionKey, FunctionKeyId>,
+    to_key: VecMap<FunctionKeyId, FunctionKey>,
+    alloc: IdGenerator<FunctionKeyId>,
+    global_key: FunctionKeyId,
 }
-impl Current {
-    pub fn start() -> Self {
+impl FunctionKeyStore {
+    pub fn new() -> Self {
+        let mut alloc = IdGenerator::new();
         Self {
-            function_id: FunctionId::error(),
+            to_id: HashMap::new(),
+            to_key: VecMap::new(),
+            global_key: alloc.alloc(),
+            alloc,
         }
+    }
+
+    pub fn global_key(&self) -> FunctionKeyId {
+        self.global_key
+    }
+
+    pub fn insert(&mut self, key: FunctionKey) -> FunctionKeyId {
+        if let Some(id) = self.to_id.get(&key).copied() {
+            return id;
+        }
+
+        let id = self.alloc.alloc();
+        self.to_key.insert(id, key.clone());
+        self.to_id.insert(key, id);
+        id
+    }
+
+    pub fn id_to_key(&self, id: FunctionKeyId) -> Option<&FunctionKey> {
+        self.to_key.get(id)
+    }
+
+    pub fn key_to_id(&self, key: &FunctionKey) -> Option<FunctionKeyId> {
+        self.to_id.get(key).copied()
     }
 }

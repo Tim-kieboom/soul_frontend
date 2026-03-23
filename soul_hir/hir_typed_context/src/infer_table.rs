@@ -319,9 +319,11 @@ impl InferTable {
                     None => Err(soul_error_internal!("InferTypeId not found", None)),
                 };
             }
+
             HirTypeKind::None
             | HirTypeKind::Type
             | HirTypeKind::Error
+            | HirTypeKind::Generic(_)
             | HirTypeKind::Primitive(_) => return Ok(ty),
 
             HirTypeKind::Pointer(id) => HirType {

@@ -1,7 +1,11 @@
 use hir::{HirTree, RefTypeId, TypeId};
 use hir_typed_context::HirTypedTable;
 use soul_utils::{
-    error::{SoulError, SoulErrorKind}, ids::{FunctionId, IdAlloc}, sementic_level::SementicFault, soul_error_internal, vec_map::VecMap
+    error::{SoulError, SoulErrorKind},
+    ids::{FunctionId, IdAlloc},
+    sementic_level::SementicFault,
+    soul_error_internal,
+    vec_map::VecMap,
 };
 
 pub(crate) use utils::*;
@@ -93,6 +97,7 @@ impl<'a> MirContext<'a> {
 
         let tree = MirTree {
             blocks,
+            entry_function: main,
             init_global_function,
             temps: VecMap::const_default(),
             places: VecMap::const_default(),

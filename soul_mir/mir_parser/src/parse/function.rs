@@ -13,6 +13,8 @@ impl<'a> MirContext<'a> {
                 locals: vec![],
                 blocks: vec![entry_block],
             },
+            callee: None,
+            generics: vec![],
             parameters: vec![],
             return_type: self.types.none_type,
         };
@@ -70,6 +72,8 @@ impl<'a> MirContext<'a> {
             body,
             id: function_id,
             parameters: vec![],
+            callee: None,
+            generics: function.generics.clone(),
             name: function.name.clone(),
             return_type: self.types.functions[function_id],
         };
@@ -91,6 +95,7 @@ impl<'a> MirContext<'a> {
         if is_main {
             let statement = mir::Statement::new(mir::StatementKind::Call {
                 id: self.hir.init_global_function,
+                type_args: vec![],
                 arguments: vec![],
                 return_place: None,
             });

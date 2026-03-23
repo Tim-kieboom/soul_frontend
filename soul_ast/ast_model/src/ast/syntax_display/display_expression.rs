@@ -4,21 +4,19 @@ use std::fmt::Write;
 use crate::{
     ast::{
         ElseKind, ExpressionKind, ReturnKind,
-        syntax_display::{
-            DisplayKind, try_display_function_id, try_display_infered_type, try_display_node_id,
-        },
+        syntax_display::{DisplayKind, try_display_function_id, try_display_node_id},
     },
     syntax_display::{SyntaxDisplay, tree_prefix},
 };
 
 impl SyntaxDisplay for ExpressionKind {
-    fn display(&self, kind: &DisplayKind) -> String {
+    fn display(&self, kind: DisplayKind) -> String {
         let mut sb = String::new();
         self.inner_display(&mut sb, kind, 0, true);
         sb
     }
 
-    fn inner_display(&self, sb: &mut String, kind: &DisplayKind, tab: usize, is_last: bool) {
+    fn inner_display(&self, sb: &mut String, kind: DisplayKind, tab: usize, is_last: bool) {
         match self {
             ExpressionKind::Null(_) => {
                 sb.push_str(KeyWord::Null.as_str());
@@ -28,8 +26,7 @@ impl SyntaxDisplay for ExpressionKind {
                 sb.push_str(" as ");
                 type_cast.type_cast.inner_display(sb, kind, tab, is_last);
             }
-            ExpressionKind::Default(id) => {
-                try_display_infered_type(sb, kind, *id);
+            ExpressionKind::Default(_) => {
                 sb.push_str("<default>");
             }
             ExpressionKind::Literal((id, literal)) => {
@@ -37,7 +34,6 @@ impl SyntaxDisplay for ExpressionKind {
                 write!(sb, "{:?}", literal).expect("no write err");
             }
             ExpressionKind::Array(array) => {
-                try_display_infered_type(sb, kind, array.id);
                 if let Some(ty) = &array.collection_type {
                     ty.inner_display(sb, kind, tab, is_last)
                 }
@@ -58,16 +54,27 @@ impl SyntaxDisplay for ExpressionKind {
                 sb.push(']');
             }
             ExpressionKind::Index(index) => {
-                try_display_infered_type(sb, kind, index.id);
                 index.collection.node.inner_display(sb, kind, tab, is_last);
                 sb.push('[');
                 index.index.node.inner_display(sb, kind, tab, is_last);
                 sb.push(']');
             }
             ExpressionKind::FunctionCall(function_call) => {
-                try_display_infered_type(sb, kind, function_call.id);
                 try_display_function_id(sb, kind, function_call.resolved);
                 sb.push_str(function_call.name.as_str());
+
+                if !function_call.generics.is_empty() {
+                    sb.push('<');
+                    let last_index = function_call.generics.len().saturating_sub(1);
+                    for (i, generic) in function_call.generics.iter().enumerate() {
+                        generic.inner_display(sb, kind, tab, is_last);
+                        if i != last_index {
+                            sb.push_str(", ");
+                        }
+                    }
+                    sb.push('>');
+                }
+
                 sb.push('(');
 
                 let last_index = function_call.arguments.len().saturating_sub(1);
@@ -100,13 +107,11 @@ impl SyntaxDisplay for ExpressionKind {
                     .inner_display(sb, kind, tab, is_last);
             }
             ExpressionKind::Unary(unary) => {
-                try_display_infered_type(sb, kind, unary.id);
                 sb.push_str(unary.operator.node.as_str());
                 unary.expression.node.inner_display(sb, kind, tab, is_last);
             }
             ExpressionKind::Binary(binary) => {
                 sb.push('(');
-                try_display_infered_type(sb, kind, binary.id);
                 binary.left.node.inner_display(sb, kind, tab, is_last);
                 sb.push(' ');
                 sb.push_str(binary.operator.node.as_str());
@@ -115,7 +120,6 @@ impl SyntaxDisplay for ExpressionKind {
                 sb.push(')');
             }
             ExpressionKind::If(r#if) => {
-                try_display_infered_type(sb, kind, r#if.id);
                 sb.push_str(KeyWord::If.as_str());
                 sb.push(' ');
                 r#if.condition.node.inner_display(sb, kind, tab, is_last);
@@ -159,17 +163,15 @@ impl SyntaxDisplay for ExpressionKind {
                 }
                 r#while.block.inner_display(sb, kind, tab, is_last);
             }
-            ExpressionKind::Deref { inner, id } => {
-                try_display_infered_type(sb, kind, *id);
+            ExpressionKind::Deref { inner, .. } => {
                 sb.push_str(TypeWrapper::Pointer.as_str());
                 inner.node.inner_display(sb, kind, tab, is_last);
             }
             ExpressionKind::Ref {
-                id,
+                id: _,
                 is_mutable,
                 expression,
             } => {
-                try_display_infered_type(sb, kind, *id);
                 if *is_mutable {
                     sb.push_str(TypeWrapper::MutRef.as_str());
                 } else {

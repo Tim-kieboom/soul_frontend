@@ -1,4 +1,4 @@
-use hir::{BlockId, ExpressionId, LocalId, ModuleId, PlaceId, StatementId};
+use hir::{BlockId, ExpressionId, GenericId, LocalId, ModuleId, PlaceId, StatementId};
 
 use soul_utils::ids::{FunctionId, IdGenerator as Generator};
 
@@ -8,6 +8,7 @@ pub(crate) struct IdAllocalors {
     pub(crate) block: Generator<BlockId>,
     pub(crate) local: Generator<LocalId>,
     pub(crate) module: Generator<ModuleId>,
+    pub(crate) generic: Generator<GenericId>,
     pub(crate) function: Generator<FunctionId>,
     pub(crate) statement: Generator<StatementId>,
     pub(crate) expression: Generator<ExpressionId>,
@@ -20,9 +21,14 @@ impl IdAllocalors {
             block: Generator::new(),
             local: Generator::new(),
             module: Generator::new(),
+            generic: Generator::new(),
             statement: Generator::new(),
             expression: Generator::new(),
         }
+    }
+
+    pub fn alloc_generic(&mut self) -> GenericId {
+        self.generic.alloc()
     }
 
     pub fn alloc_place(&mut self) -> PlaceId {

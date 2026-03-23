@@ -2,27 +2,24 @@ use hir::TypeId;
 use mir_parser::mir::{Operand, OperandKind};
 use soul_utils::{error::SoulResult, soul_error_internal, soul_names::PrimitiveSize};
 
-use crate::{IrOperand, LlvmBackend, build_error};
+use crate::{GenericSubstitute, IrOperand, LlvmBackend, build_error};
 
 impl<'a> LlvmBackend<'a> {
-    pub(crate) fn lower_operand(&self, condition: &Operand) -> SoulResult<IrOperand<'a>> {
+    pub(crate) fn lower_operand(
+        &self,
+        condition: &Operand,
+        generics: &GenericSubstitute,
+    ) -> SoulResult<IrOperand<'a>> {
         Ok(match &condition.kind {
-            OperandKind::Temp(temp_id) => {
-                self.temps
-                    .get(*temp_id)
-                    .copied()
-                    .ok_or(soul_error_internal!(
-                        format!("{:?} not found", *temp_id),
-                        None
-                    ))?
-            }
+            OperandKind::Temp(temp_id) => self.get_temp(*temp_id),
             OperandKind::Local(local_id) => {
                 let local = &self.mir.tree.locals[*local_id];
-                let ty = match self.lower_type(local.ty)? {
+                let ty = match self.lower_type(local.ty, generics)? {
                     Some(val) => val,
                     None => self.context.i8_type().into(),
                 };
-                let ptr = self.locals[*local_id];
+
+                let ptr = self.get_local(*local_id);
                 let is_signed_interger = self
                     .types
                     .types

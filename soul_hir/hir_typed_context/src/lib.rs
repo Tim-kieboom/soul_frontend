@@ -1,5 +1,6 @@
 use hir::{
-    BlockId, ExpressionId, HirTree, HirType, LocalId, PlaceId, StatementId, TypeId, TypesMap
+    BlockId, ExpressionId, GenericId, HirTree, HirType, LocalId, PlaceId, RefTypeId, StatementId,
+    TypeId, TypesMap,
 };
 use soul_utils::{
     error::SoulError,
@@ -33,6 +34,8 @@ pub fn infer_hir_types(hir: &HirTree, faults: &mut Vec<SementicFault>) -> HirTyp
 pub struct HirTypedTable {
     pub none_type: TypeId,
     pub bool_type: TypeId,
+
+    pub generic_defines: VecMap<GenericId, VecSet<RefTypeId>>,
 
     pub places: VecMap<PlaceId, TypeId>,
     pub locals: VecMap<LocalId, TypeId>,
@@ -91,6 +94,7 @@ impl<'a> HirTypedContext<'a> {
                 functions,
                 places: VecMap::const_default(),
                 locals: VecMap::const_default(),
+                generic_defines: VecMap::const_default(),
                 blocks: VecMap::with_capacity(hir.blocks.len()),
                 expressions: VecMap::with_capacity(hir.expressions.len()),
                 statements: VecMap::with_capacity(hir.meta_data.statements.len()),
@@ -102,6 +106,17 @@ impl<'a> HirTypedContext<'a> {
         this.type_table.none_type = this.add_type(HirType::none_type());
         this.type_table.bool_type = this.add_type(HirType::bool_type());
         this
+    }
+
+    fn insert_generic_define(&mut self, id: GenericId, ty: RefTypeId) {
+        let generic_defines = &mut self.type_table.generic_defines;
+        if let Some(types) = generic_defines.get_mut(id) {
+            types.insert(ty);
+            return;
+        }
+
+        let types = VecSet::from_slice(&[ty]);
+        generic_defines.insert(id, types);
     }
 
     fn statement_span(&self, id: StatementId) -> Span {

@@ -1,6 +1,6 @@
 mod id_generator;
 use ast::{AstResponse, DeclareStore};
-use hir::{BlockId, HirTree, LocalId, TypeId};
+use hir::{BlockId, GenericId, HirTree, LocalId, TypeId};
 use id_generator::IdAllocalors;
 use soul_utils::{
     Ident,
@@ -37,6 +37,7 @@ pub fn hir_lower(response: &AstResponse, faults: &mut Vec<SementicFault>) -> Hir
 #[derive(Debug, Default)]
 struct Scope {
     locals: HashMap<String, LocalId>,
+    generics: HashMap<String, GenericId>,
     functions: HashMap<String, FunctionId>,
 }
 
@@ -73,7 +74,11 @@ impl<'a> HirContext<'a> {
         let main = match ast_store.main_function {
             Some(val) => val,
             None => {
-                faults.push(SementicFault::error(SoulError::new("main function not found", SoulErrorKind::InvalidContext, None)));
+                faults.push(SementicFault::error(SoulError::new(
+                    "main function not found",
+                    SoulErrorKind::InvalidContext,
+                    None,
+                )));
                 FunctionId::error()
             }
         };
@@ -100,6 +105,22 @@ impl<'a> HirContext<'a> {
         }
 
         None
+    }
+
+    fn insert_generic(&mut self, name: &Ident, id: GenericId) {
+        let scope = match self.scopes.last_mut() {
+            Some(val) => val,
+            None => {
+                self.log_error(soul_error_internal!(
+                    "tryed to insert_generic in global scope",
+                    Some(name.span)
+                ));
+                return;
+            }
+        };
+
+        scope.generics.insert(name.node.clone(), id);
+        self.hir.types.insert_generic(name.node.clone(), id);
     }
 
     fn insert_parameter(&mut self, name: &Ident, local: LocalId, ty: TypeId) {

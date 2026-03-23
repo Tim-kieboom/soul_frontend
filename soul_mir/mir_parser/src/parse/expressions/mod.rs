@@ -1,4 +1,4 @@
-use hir::{Binary, TypeId, Unary};
+use hir::{Binary, RefTypeId, TypeId, Unary};
 use soul_utils::{
     ids::{FunctionId, IdAlloc},
     soul_error_internal,
@@ -76,9 +76,10 @@ impl<'a> MirContext<'a> {
             hir::ExpressionKind::Call {
                 function,
                 callee,
+                generics,
                 arguments: hir_arguments,
             } => self
-                .lower_call(*function, callee, hir_arguments, ty, span)
+                .lower_call(*function, callee, generics, hir_arguments, ty, span)
                 .pass(is_end),
             hir::ExpressionKind::Block(block_id) => {
                 let main_body = self.expect_current_block();
@@ -150,7 +151,12 @@ impl<'a> MirContext<'a> {
 
             hir::ExpressionKind::Cast { value, cast_to } => {
                 let cast_id = self.ref_to_id(*cast_to);
-                let inner_type = self.types.expressions.get(*value).copied().unwrap_or(TypeId::error());
+                let inner_type = self
+                    .types
+                    .expressions
+                    .get(*value)
+                    .copied()
+                    .unwrap_or(TypeId::error());
                 if inner_type == cast_id {
                     self.lower_operand(*value).pass(is_end)
                 } else {
@@ -194,8 +200,9 @@ impl<'a> MirContext<'a> {
 
     pub(crate) fn lower_call(
         &mut self,
-        function: FunctionId,
+        function_id: FunctionId,
         callee: &Option<hir::ExpressionId>,
+        hir_generics: &Vec<RefTypeId>,
         hir_arguments: &Vec<hir::ExpressionId>,
         ty: hir::TypeId,
         span: Span,
@@ -209,10 +216,10 @@ impl<'a> MirContext<'a> {
             ));
         }
 
-        let parameters = &self.hir.functions[function].parameters;
+        let function = &self.hir.functions[function_id];
+        let parameters = &function.parameters;
         let mut arguments = vec![];
         for (i, parameter) in parameters.iter().enumerate() {
-
             let arg = match hir_arguments.get(i) {
                 Some(val) => *val,
                 None => match parameter.default {
@@ -224,13 +231,21 @@ impl<'a> MirContext<'a> {
             let expression = &self.hir.expressions[arg];
             let mut value = self.lower_operand(arg).pass(is_end);
 
-            if expression.is_literal() {
-                let ty = self.types.locals[parameters[i].local];
-                
+            let ty = self.types.locals[parameters[i].local];
+
+            let param_type = self.id_to_type(ty).clone();
+            let arg_type = self.id_to_type(self.expression_ty(arg)).clone();
+            let is_castable = arg_type
+                .unify_primitive_cast(&self.types.types, &param_type)
+                .is_ok();
+            if expression.is_literal() && is_castable {
                 let temp = self.new_temp(ty);
                 let place = self.new_place(mir::Place::Temp(temp));
-                let rvalue = mir::Rvalue::new(mir::RvalueKind::CastUse{value, cast_to: ty});
-                let cast = mir::Statement::new(mir::StatementKind::Assign { place, value: rvalue });
+                let rvalue = mir::Rvalue::new(mir::RvalueKind::CastUse { value, cast_to: ty });
+                let cast = mir::Statement::new(mir::StatementKind::Assign {
+                    place,
+                    value: rvalue,
+                });
                 self.push_statement(cast);
 
                 value = mir::Operand::new(ty, mir::OperandKind::Temp(temp));
@@ -244,9 +259,16 @@ impl<'a> MirContext<'a> {
             Some(self.new_temp(ty))
         };
 
+        let type_args = hir_generics
+            .iter()
+            .map(|ref_type| self.ref_to_id(*ref_type))
+            .collect();
+
         let return_place = temp.map(|val| self.new_place(mir::Place::Temp(val)));
+
         let statement = mir::Statement::new(mir::StatementKind::Call {
-            id: function,
+            id: function_id,
+            type_args,
             arguments,
             return_place,
         });

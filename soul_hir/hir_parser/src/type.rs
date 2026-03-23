@@ -1,40 +1,70 @@
-use hir::{HirType, HirTypeKind, TypeId, TypesMap};
+use hir::{GenericId, HirType, HirTypeKind, RefTypeId, TypeId, TypesMap};
 use soul_utils::{
+    error::{SoulError, SoulResult},
     ids::IdAlloc,
     soul_error_internal,
     soul_names::{PrimitiveTypes, TypeModifier},
     span::Span,
 };
 
-use crate::HirContext;
+use crate::{HirContext, Scope};
 
 const CHAR: HirType = HirType::new(hir::HirTypeKind::Primitive(PrimitiveTypes::Char));
 
 impl<'a> HirContext<'a> {
     /// this function is needed is the borrow checker does not validate self.lower_type
-    pub(crate) fn convert_type(ty: &ast::SoulType, types: &mut TypesMap) -> hir::TypeId {
+    pub(crate) fn convert_type(
+        ty: &ast::SoulType,
+        scopes: &Vec<Scope>,
+        call_generics: &Vec<(String, RefTypeId)>,
+        types: &mut TypesMap,
+    ) -> SoulResult<hir::TypeId> {
         let ty = match &ty.kind {
             ast::TypeKind::None => HirTypeKind::None,
             ast::TypeKind::Type => HirTypeKind::Type,
-            ast::TypeKind::Pointer(inner) => HirTypeKind::Pointer(Self::convert_type(inner, types)),
+            ast::TypeKind::Stub(name) => {
+                let id = find_generic(scopes, call_generics, name).ok_or(SoulError::new(
+                    format!("type '{}' not found", name),
+                    soul_utils::error::SoulErrorKind::TypeNotFound,
+                    Some(ty.span),
+                ))?;
+                match id {
+                    GenericKind::Generic(generic) => HirTypeKind::Generic(generic),
+                    GenericKind::Resolved(ref_type) => {
+                        return types.ref_to_id(ref_type).ok_or(soul_error_internal!(
+                            format!("{:?} not found", ref_type),
+                            None
+                        ));
+                    }
+                }
+            }
+            ast::TypeKind::Pointer(inner) => {
+                HirTypeKind::Pointer(Self::convert_type(inner, scopes, call_generics, types)?)
+            }
             ast::TypeKind::Optional(inner) => {
-                HirTypeKind::Optional(Self::convert_type(inner, types))
+                HirTypeKind::Optional(Self::convert_type(inner, scopes, call_generics, types)?)
             }
             ast::TypeKind::Array(array) => HirTypeKind::Array {
-                element: Self::convert_type(&array.of_type, types),
+                element: Self::convert_type(&array.of_type, scopes, call_generics, types)?,
                 kind: array.kind,
             },
             ast::TypeKind::Reference(reference) => HirTypeKind::Ref {
-                of_type: Self::convert_type(&reference.inner, types),
+                of_type: Self::convert_type(&reference.inner, scopes, call_generics, types)?,
                 mutable: reference.mutable,
             },
             ast::TypeKind::Primitive(prim) => HirTypeKind::Primitive(*prim),
         };
-        types.insert(HirType::new(ty))
+        Ok(types.insert(HirType::new(ty)))
     }
 
     pub(crate) fn lower_type(&mut self, ty: &ast::SoulType) -> hir::TypeId {
-        Self::convert_type(ty, &mut self.hir.types)
+        match Self::convert_type(ty, &self.scopes, &vec![], &mut self.hir.types) {
+            Ok(val) => val,
+            Err(err) => {
+                self.log_error(err);
+                TypeId::error()
+            }
+        }
     }
 
     pub(crate) fn type_from_literal(&mut self, literal: &ast::Literal) -> TypeId {
@@ -79,4 +109,29 @@ impl<'a> HirContext<'a> {
     pub(crate) fn add_type(&mut self, ty: HirType) -> TypeId {
         self.hir.types.insert(ty)
     }
+}
+
+enum GenericKind {
+    Generic(GenericId),
+    Resolved(RefTypeId),
+}
+
+fn find_generic(
+    scopes: &Vec<Scope>,
+    call_generics: &Vec<(String, RefTypeId)>,
+    name: &str,
+) -> Option<GenericKind> {
+    for (generic_name, ref_type) in call_generics {
+        if generic_name == name {
+            return Some(GenericKind::Resolved(*ref_type));
+        }
+    }
+
+    for store in scopes.iter().rev() {
+        if let Some(id) = store.generics.get(name).copied() {
+            return Some(GenericKind::Generic(id));
+        }
+    }
+
+    None
 }

@@ -3,15 +3,27 @@ use inkwell::{
     AddressSpace,
     types::{BasicType, BasicTypeEnum},
 };
-use soul_utils::{error::SoulResult, soul_names::PrimitiveTypes};
+use soul_utils::{error::SoulResult, soul_error_internal, soul_names::PrimitiveTypes};
 
-use crate::LlvmBackend;
+use crate::{GenericSubstitute, LlvmBackend};
 
 impl<'a> LlvmBackend<'a> {
-    pub fn lower_type(&self, ty: TypeId) -> SoulResult<Option<BasicTypeEnum<'a>>> {
+    pub fn lower_type(
+        &self,
+        ty: TypeId,
+        generics: &GenericSubstitute,
+    ) -> SoulResult<Option<BasicTypeEnum<'a>>> {
         let hir_type = self.get_type(ty)?;
 
         Ok(Some(match hir_type.kind {
+            hir::HirTypeKind::Generic(id) => {
+                let ty = generics.resolve(id).ok_or(soul_error_internal!(
+                    format!("generic {:?} substitute type not found", ty),
+                    None
+                ))?;
+
+                return self.lower_type(ty, generics);
+            }
             hir::HirTypeKind::Primitive(primitive_types) => {
                 match self.lower_primitive_type(primitive_types) {
                     Some(val) => val,
@@ -24,7 +36,7 @@ impl<'a> LlvmBackend<'a> {
                 ptr_type.into()
             }
             hir::HirTypeKind::Optional(type_id) => {
-                let element_type = match self.lower_type(type_id)? {
+                let element_type = match self.lower_type(type_id, generics)? {
                     Some(ty) => ty,
                     None => self.context.i8_type().into(),
                 };
@@ -39,7 +51,7 @@ impl<'a> LlvmBackend<'a> {
 
                 match kind {
                     ast::ArrayKind::StackArray(num) => {
-                        let element_type = match self.lower_type(element)? {
+                        let element_type = match self.lower_type(element, generics)? {
                             Some(ty) => ty,
                             None => self.context.i8_type().into(),
                         };

@@ -88,7 +88,9 @@ pub enum SoulErrorKind {
 
     UnifyTypeError,
     PlaceTypeError,
+    TypeNotFound,
     TypeInferenceError,
+    GenericDefineError,
 
     InvalidIdent,
     InvalidNumber,

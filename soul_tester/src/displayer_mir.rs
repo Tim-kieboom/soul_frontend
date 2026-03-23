@@ -1,7 +1,8 @@
-use hir::{HirTree, HirType, TypeId};
+use hir::{HirType, TypeId};
 use hir_typed_context::HirTypedTable;
 use mir_parser::mir::{
-    self, BlockId, FunctionBody, LocalId, MirTree, Operand, Place, PlaceId, Rvalue, StatementId, TempId
+    self, BlockId, FunctionBody, LocalId, MirTree, Operand, Place, PlaceId, Rvalue, StatementId,
+    TempId,
 };
 use soul_utils::{
     ids::{FunctionId, IdAlloc},
@@ -10,8 +11,8 @@ use soul_utils::{
 };
 use std::fmt::Write;
 
-pub fn display_mir(mir: &MirTree, hir: &HirTree, types: &HirTypedTable) -> String {
-    let mut displayer = MirDisplayer::new(mir, hir, types);
+pub fn display_mir(mir: &MirTree, types: &HirTypedTable) -> String {
+    let mut displayer = MirDisplayer::new(mir, types);
 
     displayer.push_str("Globals [\n");
     for global in mir.globals.values() {
@@ -19,17 +20,20 @@ pub fn display_mir(mir: &MirTree, hir: &HirTree, types: &HirTypedTable) -> Strin
     }
     displayer.push_str("]\n");
 
-    if let Some(main) = mir.functions.get(hir.main_function).map(|f| f.id) {
+    if let Some(main) = mir.functions.get(mir.entry_function).map(|f| f.id) {
         displayer.display_function(main);
         displayer.push('\n');
     }
 
-    if let Some(init_globals) = mir.functions.get(hir.init_global_function).map(|f| f.id) {
+    if let Some(init_globals) = mir.functions.get(mir.init_global_function).map(|f| f.id) {
         displayer.display_function(init_globals);
         displayer.push('\n');
     }
 
-    let keys = mir.functions.keys().filter(|id| *id != hir.init_global_function && *id != hir.main_function );
+    let keys = mir
+        .functions
+        .keys()
+        .filter(|id| *id != mir.init_global_function && *id != mir.entry_function);
     for function in keys {
         displayer.display_function(function);
         displayer.push('\n');
@@ -41,13 +45,11 @@ pub fn display_mir(mir: &MirTree, hir: &HirTree, types: &HirTypedTable) -> Strin
 struct MirDisplayer<'a> {
     sb: String,
     mir: &'a MirTree,
-    hir: &'a HirTree,
     types: &'a HirTypedTable,
 }
 impl<'a> MirDisplayer<'a> {
-    fn new(mir: &'a MirTree, hir: &'a HirTree, types: &'a HirTypedTable) -> Self {
+    fn new(mir: &'a MirTree, types: &'a HirTypedTable) -> Self {
         Self {
-            hir,
             mir,
             types,
             sb: String::new(),
@@ -188,9 +190,10 @@ impl<'a> MirDisplayer<'a> {
         let statement = &self.mir.statements[statement_id];
 
         match &statement.kind {
-            mir::StatementKind::Call { 
-                id, 
-                arguments, 
+            mir::StatementKind::Call {
+                id,
+                type_args,
+                arguments,
                 return_place,
             } => {
                 if let Some(place) = return_place {
@@ -199,6 +202,17 @@ impl<'a> MirDisplayer<'a> {
                 }
 
                 self.display_function_name(*id);
+                if !type_args.is_empty() {
+                    self.push('<');
+                    let last_index = type_args.len().saturating_sub(1);
+                    for (i, generic) in type_args.iter().enumerate() {
+                        self.display_type(*generic);
+                        if i != last_index {
+                            self.push_str(", ");
+                        }
+                    }
+                    self.push('>');
+                }
                 self.push('(');
                 let last_index = arguments.len().saturating_sub(1);
                 for (i, arg) in arguments.iter().enumerate() {
@@ -284,7 +298,6 @@ impl<'a> MirDisplayer<'a> {
             }
             mir::OperandKind::None => self.push_str("<none>"),
         }
-
     }
 
     fn display_place(&mut self, place_id: &PlaceId) {
@@ -310,7 +323,7 @@ impl<'a> MirDisplayer<'a> {
         let name = if function == FunctionId::error() {
             "<error>"
         } else {
-            self.hir.functions[function].name.as_str()
+            self.mir.functions[function].name.as_str()
         };
 
         self.push_str(name);
@@ -333,7 +346,9 @@ impl<'a> MirDisplayer<'a> {
     }
 
     fn display_type(&mut self, ty: TypeId) {
-        self.get_type(ty).write_display(&self.types.types, &mut self.sb).expect("no fmt error");
+        self.get_type(ty)
+            .write_display(&self.types.types, &mut self.sb)
+            .expect("no fmt error");
     }
 
     fn get_type(&self, ty: TypeId) -> HirType {

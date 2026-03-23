@@ -1,5 +1,6 @@
 use ast::{
-    Block, FunctionSignature, NamedTupleElement, NamedTupleType, VarTypeKind, scope::{NodeId, Scope, ScopeId, ScopeValue, ScopeValueKind}
+    Block, FunctionSignature, NamedTupleElement, NamedTupleType, VarTypeKind,
+    scope::{NodeId, Scope, ScopeId, ScopeValue, ScopeValueKind},
 };
 use soul_utils::{ids::FunctionId, span::Spanned};
 
@@ -32,7 +33,13 @@ impl<'a> NameResolver<'a> {
     }
 
     fn declare_parameters(&mut self, types: &mut NamedTupleType) {
-        for NamedTupleElement{ name, ty, node_id, default:_ } in types {
+        for NamedTupleElement {
+            name,
+            ty,
+            node_id,
+            default: _,
+        } in types
+        {
             let id = self.alloc_node();
             *node_id = Some(id);
 

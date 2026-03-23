@@ -1,13 +1,19 @@
+use hir::TypeId;
 use mir_parser::mir::{Function, FunctionBody, LocalId};
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
     vec_map::VecMapIndex,
 };
 
-use crate::{LlvmBackend, build_error};
+use crate::{GenericSubstitute, LlvmBackend, build_error};
 
 impl<'a> LlvmBackend<'a> {
-    pub(crate) fn allocate_function_locals(&mut self, function: &Function) {
+    pub(crate) fn allocate_function_locals(
+        &mut self,
+        function: &Function,
+        type_args: &Vec<TypeId>,
+        generics: &GenericSubstitute,
+    ) {
         let (entry_block, locals) = match &function.body {
             FunctionBody::External(_) => {
                 panic!("can not call allocate_function_locals in external function")
@@ -19,14 +25,14 @@ impl<'a> LlvmBackend<'a> {
             } => (entry_block, locals),
         };
 
-        let entry = self.blocks[*entry_block];
+        let entry = self.get_block(*entry_block);
         self.builder.position_at_end(entry);
 
         for (i, local_id) in function.parameters.iter().enumerate() {
             let local = &self.mir.tree.locals[*local_id];
             let name = self.local_name(*local_id);
 
-            let ty = match self.lower_type(local.ty) {
+            let ty = match self.lower_type(local.ty, generics) {
                 Ok(Some(ty)) => ty,
                 Err(err) => {
                     self.log_error(err);
@@ -42,11 +48,13 @@ impl<'a> LlvmBackend<'a> {
                     return;
                 }
             };
-            self.locals.insert(*local_id, ptr);
+            self.push_local(*local_id, ptr);
 
-            let param = self.functions[function.id]
+            let function = self.get_or_create_function(function.id, type_args);
+            let param = function
                 .get_nth_param(i as u32)
                 .expect("should have parameter");
+
             if let Err(err) = self.builder.build_store(ptr, param) {
                 self.log_error(build_error(err));
             }
@@ -56,7 +64,7 @@ impl<'a> LlvmBackend<'a> {
             let local = &self.mir.tree.locals[*local_id];
             let name = self.local_name(*local_id);
 
-            let ty = match self.lower_type(local.ty) {
+            let ty = match self.lower_type(local.ty, generics) {
                 Ok(Some(ty)) => ty,
                 Err(err) => {
                     self.log_error(err);
@@ -72,14 +80,15 @@ impl<'a> LlvmBackend<'a> {
                     return;
                 }
             };
-            self.locals.insert(*local_id, ptr);
+            self.push_local(*local_id, ptr);
         }
     }
 
     pub(crate) fn allocate_globals(&mut self) {
+        let empty_generics = GenericSubstitute::new(&[], &[]);
         for global in self.mir.tree.globals.values() {
             let local = global.local;
-            let ty = match self.lower_type(global.ty) {
+            let ty = match self.lower_type(global.ty, &empty_generics) {
                 Ok(Some(val)) => val,
                 Ok(None) => {
                     self.insert_dummy_global(local);
@@ -98,7 +107,7 @@ impl<'a> LlvmBackend<'a> {
             };
 
             let ir_global = self.module.add_global(ty, None, &self.local_name(local));
-            self.locals.insert(local, ir_global.as_pointer_value());
+            self.push_global(local, ir_global.as_pointer_value());
             if let Some(comptime) = &global.literal {
                 let ir_operand = match self.lower_literal(comptime, global.ty) {
                     Ok(val) => val,
@@ -123,7 +132,8 @@ impl<'a> LlvmBackend<'a> {
             .module
             .add_global(dummy_type, None, "global_error")
             .as_pointer_value();
-        self.locals.insert(local, value);
+
+        self.push_local(local, value);
     }
 
     fn local_name(&self, id: LocalId) -> String {

@@ -2,21 +2,21 @@ use inkwell::values::BasicValueEnum;
 use mir_parser::mir::{BlockId, OperandKind, Place, PlaceId, Rvalue, RvalueKind, StatementKind};
 use soul_utils::error::{SoulError, SoulErrorKind, SoulResult};
 
-use crate::{LlvmBackend, build_error};
+use crate::{GenericSubstitute, LlvmBackend, build_error};
 
 impl<'a> LlvmBackend<'a> {
-    pub(crate) fn lower_statement(&mut self, block_id: BlockId) {
+    pub(crate) fn lower_statement(&mut self, block_id: BlockId, generics: &GenericSubstitute) {
         let block = &self.mir.tree.blocks[block_id];
         for statement_id in &block.statements {
             let statement = &self.mir.tree.statements[*statement_id];
             match &statement.kind {
                 StatementKind::Assign { place, value } => {
-                    if let Err(err) = self.lower_assign(*place, value) {
+                    if let Err(err) = self.lower_assign(*place, value, generics) {
                         self.log_error(err);
                     }
                 }
                 StatementKind::Eval(operand) => {
-                    if let Err(err) = self.lower_operand(operand) {
+                    if let Err(err) = self.lower_operand(operand, generics) {
                         self.log_error(err);
                     }
                 }
@@ -24,8 +24,11 @@ impl<'a> LlvmBackend<'a> {
                     id,
                     arguments,
                     return_place,
+                    type_args: call_type_args,
                 } => {
-                    if let Err(err) = self.lower_call(*id, arguments, *return_place) {
+                    if let Err(err) =
+                        self.lower_call(*id, arguments, *return_place, call_type_args, generics)
+                    {
                         self.log_error(err);
                     }
                 }
@@ -35,24 +38,29 @@ impl<'a> LlvmBackend<'a> {
         }
     }
 
-    fn lower_assign(&mut self, place_id: PlaceId, value: &Rvalue) -> SoulResult<()> {
+    fn lower_assign(
+        &mut self,
+        place_id: PlaceId,
+        value: &Rvalue,
+        generics: &GenericSubstitute,
+    ) -> SoulResult<()> {
         if rvalue_is_none(value) {
             return Ok(());
         }
 
-        let ir_value = self.lower_rvalue(value)?;
+        let ir_value = self.lower_rvalue(value, generics)?;
         match &self.mir.tree.places[place_id] {
             Place::Temp(temp_id) => {
-                self.temps.insert(*temp_id, ir_value);
+                self.push_temp(*temp_id, ir_value);
             }
             Place::Local(local_id) => {
-                let ptr = self.locals[*local_id];
+                let ptr = self.get_local(*local_id);
                 self.builder
                     .build_store(ptr, ir_value.value)
                     .map_err(build_error)?;
             }
             Place::Deref(operand) => {
-                let ptr_value = self.lower_operand(operand)?.value;
+                let ptr_value = self.lower_operand(operand, generics)?.value;
 
                 let ptr = match ptr_value {
                     BasicValueEnum::PointerValue(p) => p,

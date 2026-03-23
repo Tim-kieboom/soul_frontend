@@ -7,6 +7,10 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
+#ifdef _WIN32
+#include <WTypesbase.h>
+#endif
+
 /* 
 to generate/run exe run commands:
 
@@ -31,5 +35,10 @@ typedef double f64;
 
 typedef char* str;
 typedef const char* cstr;
+
+typedef struct {
+    u64 sec;
+    u32 nano;
+} Duration;
 
 #endif

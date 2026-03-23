@@ -22,18 +22,31 @@ impl<'a> HirContext<'a> {
         self.insert_function(&signature.name, id);
 
         self.push_scope();
+        let mut generics = vec![];
+        for generic in &function.signature.node.generics {
+            let id = self.id_generator.alloc_generic();
+            self.insert_generic(&generic.name, id);
+            generics.push(id);
+        }
 
         let parameters = signature
             .parameters
             .iter()
-            .map(|NamedTupleElement{ name, ty, default, node_id:_ }| {
-                let ty = self.lower_type(ty);
-                let local = self.id_generator.alloc_local();
-                self.insert_parameter(name, local, ty);
-                
-                let default = default.as_ref().map(|value| self.lower_expression(value));
-                hir::Parameter { local, ty, default }
-            })
+            .map(
+                |NamedTupleElement {
+                     name,
+                     ty,
+                     default,
+                     node_id: _,
+                 }| {
+                    let ty = self.lower_type(ty);
+                    let local = self.id_generator.alloc_local();
+                    self.insert_parameter(name, local, ty);
+
+                    let default = default.as_ref().map(|value| self.lower_expression(value));
+                    hir::Parameter { local, ty, default }
+                },
+            )
             .collect();
 
         let body = match function.signature.node.external {
@@ -41,15 +54,17 @@ impl<'a> HirContext<'a> {
             None => hir::FunctionBody::Internal(self.lower_block(&function.block)),
         };
 
+        let return_type = self.lower_type(&signature.return_type);
         self.pop_scope();
 
         let hir_function = hir::Function {
             id,
             body,
+            generics,
             parameters,
+            return_type,
             name: signature.name.clone(),
             kind: signature.function_kind,
-            return_type: self.lower_type(&signature.return_type),
         };
         self.hir.functions.insert(id, hir_function);
         id

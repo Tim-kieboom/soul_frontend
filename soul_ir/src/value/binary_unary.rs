@@ -3,13 +3,18 @@ use inkwell::{FloatPredicate, IntPredicate, values::BasicValueEnum};
 use mir_parser::mir;
 use soul_utils::error::{SoulError, SoulErrorKind, SoulResult};
 
-use crate::{IrOperand, LlvmBackend, build_error};
+use crate::{GenericSubstitute, IrOperand, LlvmBackend, build_error};
 
 impl<'a> LlvmBackend<'a> {
-
-    pub(super) fn lower_binary(&self, left: &mir::Operand, operator: &BinaryOperator, right: &mir::Operand) -> SoulResult<IrOperand<'a>> {
-        let ir_left = self.lower_operand(left)?;
-        let ir_right = self.lower_operand(right)?;
+    pub(super) fn lower_binary(
+        &self,
+        left: &mir::Operand,
+        operator: &BinaryOperator,
+        right: &mir::Operand,
+        generics: &GenericSubstitute,
+    ) -> SoulResult<IrOperand<'a>> {
+        let ir_left = self.lower_operand(left, generics)?;
+        let ir_right = self.lower_operand(right, generics)?;
 
         match operator.node {
             ast::BinaryOperatorKind::Invalid => {
@@ -28,9 +33,7 @@ impl<'a> LlvmBackend<'a> {
             ast::BinaryOperatorKind::BitXor => self.bit_xor(ir_left, ir_right),
             ast::BinaryOperatorKind::LogAnd => self.bit_and(ir_left, ir_right),
             ast::BinaryOperatorKind::LogOr => self.bit_or(ir_left, ir_right),
-            ast::BinaryOperatorKind::NotEq => {
-                self.compare(IrCompare::NotEq, ir_left, ir_right)
-            }
+            ast::BinaryOperatorKind::NotEq => self.compare(IrCompare::NotEq, ir_left, ir_right),
             ast::BinaryOperatorKind::Eq => self.compare(IrCompare::Eq, ir_left, ir_right),
             ast::BinaryOperatorKind::Lt => self.compare(IrCompare::Lt, ir_left, ir_right),
             ast::BinaryOperatorKind::Gt => self.compare(IrCompare::Gt, ir_left, ir_right),
@@ -46,8 +49,13 @@ impl<'a> LlvmBackend<'a> {
         }
     }
 
-    pub(super) fn lower_unary(&self, value: &mir::Operand, operator: &UnaryOperator) -> SoulResult<IrOperand<'a>> {
-        let ir_value = self.lower_operand(value)?;
+    pub(super) fn lower_unary(
+        &self,
+        value: &mir::Operand,
+        operator: &UnaryOperator,
+        generics: &GenericSubstitute,
+    ) -> SoulResult<IrOperand<'a>> {
+        let ir_value = self.lower_operand(value, generics)?;
 
         match &operator.node {
             ast::UnaryOperatorKind::Invalid => {

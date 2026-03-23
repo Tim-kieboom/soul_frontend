@@ -73,6 +73,10 @@ impl<I: VecMapIndex, T> VecMap<I, T> {
     /// automatically grows to accommodate it.
     pub fn insert(&mut self, index: I, value: T) -> Option<T> {
         let index = index.index();
+        self.inner_insert(index, value)
+    }
+
+    fn inner_insert(&mut self, index: usize, value: T) -> Option<T> {
         if index >= self.vec.len() {
             self.vec.resize_with(index + 1, || None);
         }
@@ -118,11 +122,37 @@ impl<I: VecMapIndex, T> VecMap<I, T> {
     }
 
     /// Returns a mutable reference to the value at the given index, if present.
+    pub fn get_or_default(&mut self, index: I) -> &T
+    where
+        T: Default,
+    {
+        match self.vec.get(index.index()) {
+            Some(None) | None => _ = self.inner_insert(index.index(), Default::default()),
+            _ => (),
+        }
+        
+        self.vec[index.index()].as_ref().expect("on None")
+    }
+
+    /// Returns a mutable reference to the value at the given index, if present.
     pub fn get_mut(&mut self, index: I) -> Option<&mut T> {
         match self.vec.get_mut(index.index()) {
             Some(Some(val)) => Some(val),
             _ => None,
         }
+    }
+
+    /// Returns a mutable reference to the value at the given index, if present.
+    pub fn get_mut_or_default(&mut self, index: I) -> &mut T
+    where
+        T: Default,
+    {
+        match self.vec.get(index.index()) {
+            Some(None) | None => _ = self.inner_insert(index.index(), Default::default()),
+            _ => (),
+        }
+
+        self.vec[index.index()].as_mut().expect("entry in VecMap::get_mut_or_default should be Some(_)")
     }
 
     /// Extends this map by inserting multiple `(index, value)` pairs from an iterator.

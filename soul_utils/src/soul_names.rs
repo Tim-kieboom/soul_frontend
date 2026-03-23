@@ -214,7 +214,7 @@ impl PrimitiveTypes {
         }
     }
 
-    pub const  fn can_be_negative(&self) -> bool {
+    pub const fn can_be_negative(&self) -> bool {
         self.is_signed_interger() || self.is_float()
     }
 

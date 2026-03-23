@@ -7,6 +7,7 @@ impl<'a> NameResolver<'a> {
         match &mut ty.kind {
             ast::TypeKind::None => (),
             ast::TypeKind::Type => (),
+            ast::TypeKind::Stub(_) => (),
             ast::TypeKind::Primitive(_) => (),
             ast::TypeKind::Array(array_type) => self.collect_type(&mut array_type.of_type),
             ast::TypeKind::Reference(reference_type) => {

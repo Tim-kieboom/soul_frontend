@@ -11,6 +11,10 @@
     return (ty)pow((f64)base, (f64)1.0 / (f64)exp);       \
 }
 
+double __clib_log(double exp, double base) {
+    return log10(exp) / log10(base);
+}
+
 /// impl define marcro for all number types
 #define __IMPL_NUMBERS(impl)                \
     impl(i8);impl(i16);impl(i32);impl(i64); \
@@ -37,6 +41,10 @@ str __clib_fmtUint(uint num, u8 base, char buf[50], bool capital) {
     static cstr NUMBERS_LOWER = "0123456789abcdef";
     str ptr = &buf[49];
     *ptr = '\0';
+    
+    if (base < 2 || base > 16) {
+        return NULL;
+    }
 
     cstr numbers = capital ? NUMBERS : NUMBERS_LOWER;
     do {
@@ -52,7 +60,7 @@ str __clib_fmtInt(int num, u8 base, char buf[50], bool capital) {
     str ptr = &buf[49];
     *ptr = '\0';
 
-    if (base == 1) {
+    if (base < 2 || base > 16) {
         return NULL;
     }
     
@@ -79,7 +87,7 @@ static str __inner_fmt_uint(uint64_t n, u8 base, str buf, int max_digits, bool c
         *buf++ = '0';
         return buf;
     }
-    if (base == 1) {
+    if (base < 2 || base > 16) {
         return NULL;
     }
 
@@ -106,7 +114,7 @@ str __clib_fmtFloat(double num, u8 base, char buf[50], u8 percision, bool capita
         *buf++ = '-';
         num = -num;
     }
-    if (base == 1) {
+    if (base < 2 || base > 16) {
         return NULL;
     }
 
@@ -133,19 +141,28 @@ str __clib_fmtFloat(double num, u8 base, char buf[50], u8 percision, bool capita
 
 // ---------------- #Time ----------------
 
-void __clib_delay_ms(i64 ms) {
-    clock_t start = clock();
-    clock_t wait = ms * (CLOCKS_PER_SEC / 1000);
-    while ((clock() - start) < wait) {
-        /*no-op*/;
-    }
-}
+Duration __clib_Duration_now() {
+    struct timespec ts = {0};
 
-u64 __clib_clock() {
-    return (u64)clock();
-}
+#ifdef _WIN32
+    const u64 NANO_PER_TICK = 100ULL;      
+    const u64 WINDOWS_TICK = 10000000ULL;
+    const u64 EPOCH_DIFF = 11644473600ULL;
+    ULARGE_INTEGER ft;
+    GetSystemTimePreciseAsFileTime((LPFILETIME)&ft);
+    ts.tv_sec = (long)(ft.QuadPart / WINDOWS_TICK - EPOCH_DIFF);
+    ts.tv_nsec = (long)((ft.QuadPart % WINDOWS_TICK) * NANO_PER_TICK);
+#elif defined(__unix__) || defined(__APPLE__)
+    clock_gettime(CLOCK_REALTIME, &ts);
+#else
+    // Fallback: second precision only
+    time_t t = time(NULL);
+    ts.tv_sec = (long)t;
+    ts.tv_nsec = 0;
+#endif
 
-u64 __clib_CLOCKS_PER_SEC() {
-    return CLOCKS_PER_SEC;
+    return (Duration){
+        .sec = (u64)ts.tv_sec,
+        .nano = (u32)ts.tv_nsec, 
+    };
 }
-

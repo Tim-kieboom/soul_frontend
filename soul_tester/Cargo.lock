@@ -355,6 +355,7 @@ dependencies = [
  "inkwell",
  "mir_parser",
  "run_mir",
+ "serde",
  "soul_utils",
 ]
 

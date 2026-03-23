@@ -1,5 +1,8 @@
 use ast::{Argument, NamedTupleElement, NamedTupleType, VarTypeKind, scope::NodeId};
-use hir::{Binary, Expression, ExpressionId, HirType, HirTypeKind, LocalId, Place, PlaceKind, TypeId, Unary};
+use hir::{
+    Binary, Expression, ExpressionId, HirType, HirTypeKind, LocalId, Place, PlaceKind, TypeId,
+    Unary,
+};
 use soul_utils::{
     Ident,
     error::{SoulError, SoulErrorKind},
@@ -58,7 +61,10 @@ impl<'a> HirContext<'a> {
                 hir::Expression {
                     id,
                     ty: cast_to,
-                    kind: hir::ExpressionKind::Cast { value, cast_to: ref_type },
+                    kind: hir::ExpressionKind::Cast {
+                        value,
+                        cast_to: ref_type,
+                    },
                 }
             }
             ast::ExpressionKind::Unary(unary) => {
@@ -264,12 +270,15 @@ impl<'a> HirContext<'a> {
             }
         };
 
-        let (signature, ty) = match self.ast_store.get_function(resolved) {
-            Some(signature) => (signature, Self::convert_type(&signature.return_type, &mut self.hir.types)),
+        let signature = match self.ast_store.get_function(resolved) {
+            Some(signature) => signature,
             None => {
                 #[cfg(debug_assertions)]
-                self.log_error(soul_error_internal!("could not find function", Some(function_call.name.span)));
-                return hir::Expression::error(id)
+                self.log_error(soul_error_internal!(
+                    "could not find function",
+                    Some(function_call.name.span)
+                ));
+                return hir::Expression::error(id);
             }
         };
 
@@ -278,17 +287,21 @@ impl<'a> HirContext<'a> {
             .as_ref()
             .map(|el| self.lower_expression(el));
 
-
         let mut arguments = vec![];
         arguments.resize(signature.parameters.len(), ExpressionId::error());
 
         for (i, argument) in function_call.arguments.iter().enumerate() {
-            let parameter_i = match self.get_parameter_index(i, argument, &signature.parameters, function_call.name.span) {
+            let parameter_i = match self.get_parameter_index(
+                i,
+                argument,
+                &signature.parameters,
+                function_call.name.span,
+            ) {
                 Ok(val) => val,
                 Err(span) => {
-                    self.log_error(
-                        SoulError::new(format!("parameters of {} argument not found", i), 
-                        SoulErrorKind::InvalidContext, 
+                    self.log_error(SoulError::new(
+                        format!("parameters of {} argument not found", i),
+                        SoulErrorKind::InvalidContext,
                         Some(span),
                     ));
                     continue;
@@ -306,9 +319,9 @@ impl<'a> HirContext<'a> {
                 Some(val) => self.lower_expression(val),
                 None => {
                     let span = function_call.name.span;
-                    self.log_error(
-                        SoulError::new(format!("argument {} not found in function declation", i+1), 
-                        SoulErrorKind::InvalidContext, 
+                    self.log_error(SoulError::new(
+                        format!("argument {} not found in function declation", i + 1),
+                        SoulErrorKind::InvalidContext,
                         Some(span),
                     ));
                     let id = self.alloc_expression(span);
@@ -316,27 +329,61 @@ impl<'a> HirContext<'a> {
                     self.insert_expression(id, err)
                 }
             };
-        }   
+        }
+
+        let mut generics = vec![];
+        for soul_type in &function_call.generics {
+            let ty = self.lower_type(soul_type);
+            let ref_ty = self.hir.types.insert_ref(ty);
+            generics.push(ref_ty);
+        }
+
+        let call_generics = signature
+            .generics
+            .iter()
+            .map(|generic| generic.name.to_string())
+            .zip(generics.iter().copied())
+            .collect();
+
+        let ty = match Self::convert_type(
+            &signature.return_type,
+            &self.scopes,
+            &call_generics,
+            &mut self.hir.types,
+        ) {
+            Ok(val) => val,
+            Err(err) => {
+                self.log_error(err);
+                TypeId::error()
+            }
+        };
 
         hir::Expression {
             id,
             ty,
             kind: hir::ExpressionKind::Call {
                 callee,
+                generics,
                 arguments,
                 function: resolved,
             },
         }
     }
 
-    fn get_parameter_index(&mut self, i: usize, argument: &Argument, parameters: &Vec<NamedTupleElement>, span: Span) -> Result<usize, Span> {
-        
+    fn get_parameter_index(
+        &mut self,
+        i: usize,
+        argument: &Argument,
+        parameters: &Vec<NamedTupleElement>,
+        span: Span,
+    ) -> Result<usize, Span> {
         if let Some(name) = &argument.name {
-            let (parameter_i, parameter) = find_default_parameter(name.as_str(), parameters).ok_or(name.span)?;
+            let (parameter_i, parameter) =
+                find_default_parameter(name.as_str(), parameters).ok_or(name.span)?;
             if parameter.default.is_none() {
-                self.log_error(
-                    SoulError::new(format!("{} is not a default parameter", name.as_str()), 
-                    SoulErrorKind::InvalidContext, 
+                self.log_error(SoulError::new(
+                    format!("{} is not a default parameter", name.as_str()),
+                    SoulErrorKind::InvalidContext,
                     Some(argument.value.span),
                 ));
             }
@@ -345,9 +392,13 @@ impl<'a> HirContext<'a> {
             let parameter = parameters.get(i).ok_or(span)?;
             if parameter.default.is_some() {
                 let name = &parameter.name;
-                self.log_error(
-                    SoulError::new(format!("argument {} is a default parameter should add name (so '{}: <value>')", i+1, name.as_str()), 
-                    SoulErrorKind::InvalidContext, 
+                self.log_error(SoulError::new(
+                    format!(
+                        "argument {} is a default parameter should add name (so '{}: <value>')",
+                        i + 1,
+                        name.as_str()
+                    ),
+                    SoulErrorKind::InvalidContext,
                     Some(argument.value.span),
                 ));
             }
@@ -364,6 +415,13 @@ impl<'a> HirContext<'a> {
     }
 }
 
-fn find_default_parameter<'a>(name: &str, parameters: &'a NamedTupleType) -> Option<(usize, &'a NamedTupleElement)> {
-    parameters.iter().enumerate().filter(|(_, parameter)| parameter.name.as_str() == name).next()
+fn find_default_parameter<'a>(
+    name: &str,
+    parameters: &'a NamedTupleType,
+) -> Option<(usize, &'a NamedTupleElement)> {
+    parameters
+        .iter()
+        .enumerate()
+        .filter(|(_, parameter)| parameter.name.as_str() == name)
+        .next()
 }

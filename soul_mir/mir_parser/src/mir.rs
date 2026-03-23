@@ -1,5 +1,5 @@
 use ast::{BinaryOperator, ExternLanguage, Literal, UnaryOperator};
-use hir::TypeId;
+use hir::{GenericId, TypeId};
 use soul_utils::{Ident, ids::FunctionId, impl_soul_ids, vec_map::VecMap};
 
 impl_soul_ids!(GlobalId, BlockId, LocalId, StatementId, PlaceId, TempId);
@@ -13,6 +13,7 @@ impl_soul_ids!(GlobalId, BlockId, LocalId, StatementId, PlaceId, TempId);
 /// - Easy to lower to LLVM IR
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MirTree {
+    pub entry_function: FunctionId,
     pub init_global_function: FunctionId,
 
     pub globals: VecMap<GlobalId, Global>,
@@ -47,6 +48,8 @@ pub struct Function {
 
     /// Parameters are locals
     pub parameters: Vec<LocalId>,
+    pub generics: Vec<GenericId>,
+    pub callee: Option<TypeId>,
 
     /// Return type of the function
     pub return_type: TypeId,
@@ -129,6 +132,7 @@ pub enum StatementKind {
     Call {
         id: FunctionId,
         arguments: Vec<Operand>,
+        type_args: Vec<TypeId>,
         return_place: Option<PlaceId>,
     },
 

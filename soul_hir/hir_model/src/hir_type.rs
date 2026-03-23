@@ -8,7 +8,7 @@ use soul_utils::{
 };
 use std::fmt::Write;
 
-use crate::{InferTypeId, TypeId, TypesMap};
+use crate::{GenericId, InferTypeId, TypeId, TypesMap};
 
 pub enum UnifyResult {
     /// fully unifyable
@@ -39,6 +39,7 @@ pub enum HirTypeKind {
     },
     Pointer(TypeId),
     Optional(TypeId),
+    Generic(GenericId),
 
     Error,
     /// special type for unkown hir type (should not exist in Thir and further)
@@ -112,6 +113,15 @@ impl HirType {
         if let Some(modifier) = self.modifier {
             sb.push_str(modifier.as_str());
             sb.push(' ');
+        }
+
+        self.kind.write_display(types, sb)
+    }
+
+    pub fn write_display_no_spaces(&self, types: &TypesMap, sb: &mut String) -> std::fmt::Result {
+        if let Some(modifier) = self.modifier {
+            sb.push_str(modifier.as_str());
+            sb.push('_');
         }
 
         self.kind.write_display(types, sb)
@@ -224,8 +234,7 @@ impl HirType {
             _ => (),
         };
 
-        self.kind
-            .unify_primitive_cast(types, &should_be.kind)
+        self.kind.unify_primitive_cast(types, &should_be.kind)
     }
 
     pub fn resolve_untyped(&mut self, should_be: &Self) {
@@ -268,6 +277,13 @@ impl HirTypeKind {
         match self {
             HirTypeKind::None => write!(sb, "{}", PrimitiveTypes::None.as_str()),
             HirTypeKind::Type => write!(sb, "type"),
+            HirTypeKind::Generic(id) => match types.generic_name(*id) {
+                None => write!(sb, "{:?}", id),
+                Some(name) => {
+                    sb.push_str(name);
+                    Ok(())
+                }
+            },
             HirTypeKind::Primitive(prim) => write!(sb, "{}", prim.as_str()),
             HirTypeKind::Array { element, kind } => {
                 kind.write_to_string(sb)?;
@@ -321,6 +337,7 @@ impl HirTypeKind {
             HirTypeKind::Array { .. } => "<array>",
             HirTypeKind::InferType(_, _) => "<unknown>",
             HirTypeKind::Pointer(_) => "<pointer>",
+            HirTypeKind::Generic(_) => "<generic>",
             HirTypeKind::Optional(_) => "<optional>",
             HirTypeKind::Primitive(primitive) => primitive.as_str(),
         }
@@ -387,7 +404,7 @@ impl HirTypeKind {
                         }
                     };
                     return Err(format!(
-                        "'{}' can not be bast to '{}'",
+                        "'{}' can not be cast to '{}'",
                         display(mut_a),
                         display(mut_b)
                     ));
@@ -397,9 +414,7 @@ impl HirTypeKind {
                 return Err("can only type cast primitive types".to_string());
             }
 
-            (_, HirTypeKind::Pointer(_)) => {
-                return Ok(())
-            }
+            (_, HirTypeKind::Pointer(_)) => return Ok(()),
 
             (HirTypeKind::Optional(a_id), HirTypeKind::Optional(b_id)) => {
                 let a = get_type(types, *a_id);

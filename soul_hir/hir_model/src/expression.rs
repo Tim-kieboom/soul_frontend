@@ -18,10 +18,13 @@ impl Expression {
     }
 
     pub fn error(id: ExpressionId) -> Self {
-        Self { id, ty: TypeId::error(), kind: ExpressionKind::Error }
+        Self {
+            id,
+            ty: TypeId::error(),
+            kind: ExpressionKind::Error,
+        }
     }
 }
-
 
 /// The different kinds of HIR expressions.
 ///
@@ -99,6 +102,7 @@ pub enum ExpressionKind {
     /// If `callee` is present, this represents a method-style call.
     Call {
         function: FunctionId,
+        generics: Vec<RefTypeId>,
         callee: Option<ExpressionId>,
         arguments: Vec<ExpressionId>,
     },

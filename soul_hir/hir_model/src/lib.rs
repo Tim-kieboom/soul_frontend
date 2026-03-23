@@ -59,12 +59,17 @@ pub struct HirTree {
 }
 
 impl HirTree {
-    pub fn new(root_id: ModuleId, main_function: FunctionId, init_global_function_id: FunctionId) -> Self {
+    pub fn new(
+        root_id: ModuleId,
+        main_function: FunctionId,
+        init_global_function_id: FunctionId,
+    ) -> Self {
         let init_global_function = Function {
             id: init_global_function_id,
             name: Ident::new("_start".to_string(), Span::default_const()),
             parameters: vec![],
             kind: FunctionKind::Static,
+            generics: vec![],
             return_type: TypeId::error(),
             body: FunctionBody::Internal(BlockId::error()),
         };
@@ -79,7 +84,10 @@ impl HirTree {
             locals: VecMap::default(),
             fields: VecMap::default(),
             imports: ImportMap::new(),
-            expressions: VecMap::from_slice(&[(ExpressionId::error(), Expression::error(ExpressionId::error()))]),
+            expressions: VecMap::from_slice(&[(
+                ExpressionId::error(),
+                Expression::error(ExpressionId::error()),
+            )]),
             meta_data: MetaDataMap::default(),
             functions: VecMap::from_vec(vec![(init_global_function_id, init_global_function)]),
             root: Module {

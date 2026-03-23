@@ -1,4 +1,7 @@
-use hir::{Binary, BlockId, ExpressionId, FunctionBody, HirTree, HirType, LocalId, RefTypeId, TypeId, Unary};
+use hir::{
+    Binary, BlockId, ExpressionId, FunctionBody, HirTree, HirType, LocalId, RefTypeId, TypeId,
+    Unary,
+};
 use hir_typed_context::HirTypedTable;
 use soul_utils::{
     ids::{FunctionId, IdAlloc},
@@ -271,6 +274,7 @@ impl<'a> HirDisplayer<'a> {
             hir::ExpressionKind::Call {
                 function,
                 callee,
+                generics,
                 arguments,
             } => {
                 if let Some(value) = callee {
@@ -279,6 +283,13 @@ impl<'a> HirDisplayer<'a> {
                 }
 
                 self.display_call_id(*function);
+                if !generics.is_empty() {
+                    self.push('<');
+                    for generic in generics {
+                        self.display_type(self.ref_to_id(*generic));
+                    }
+                    self.push('>');
+                }
                 self.push('(');
                 let last_index = arguments.len().saturating_sub(1);
                 for (i, arg) in arguments.iter().enumerate() {
@@ -329,7 +340,8 @@ impl<'a> HirDisplayer<'a> {
         match self.type_table {
             Some(types) => types.types.ref_to_id(ref_id),
             None => self.hir.types.ref_to_id(ref_id),
-        }.unwrap_or(TypeId::error())
+        }
+        .unwrap_or(TypeId::error())
     }
 
     fn display_block_id(&mut self, id: BlockId) {

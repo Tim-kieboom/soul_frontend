@@ -8,13 +8,13 @@ use crate::{
 };
 
 impl SyntaxDisplay for SoulType {
-    fn display(&self, kind: &DisplayKind) -> String {
+    fn display(&self, kind: DisplayKind) -> String {
         let mut sb = String::new();
         self.inner_display(&mut sb, kind, 0, false);
         sb
     }
 
-    fn inner_display(&self, sb: &mut String, _kind: &DisplayKind, _tab: usize, _is_last: bool) {
+    fn inner_display(&self, sb: &mut String, _kind: DisplayKind, _tab: usize, _is_last: bool) {
         if let Some(modifier) = &self.modifier {
             sb.push_str(modifier.as_str());
             sb.push(' ');
@@ -24,7 +24,7 @@ impl SyntaxDisplay for SoulType {
 }
 
 impl TypeKind {
-    pub const fn display_variant(&self) -> &'static str {
+    pub fn display_variant<'a>(&'a self) -> &'a str {
         match self {
             TypeKind::None => "None",
             TypeKind::Type => "Type",
@@ -32,7 +32,8 @@ impl TypeKind {
             TypeKind::Pointer(_) => "pointer",
             TypeKind::Optional(_) => "optional",
             TypeKind::Reference(_) => "reference",
-            TypeKind::Primitive(internal_primitive_types) => internal_primitive_types.as_str(),
+            TypeKind::Stub(stub) => stub.as_str(),
+            TypeKind::Primitive(primitive_types) => primitive_types.as_str(),
         }
     }
 
@@ -43,9 +44,10 @@ impl TypeKind {
     }
 
     pub fn inner_display(&self, sb: &mut String) {
-        let kind = &DisplayKind::Parser;
+        let kind = DisplayKind::Parser;
         match self {
             TypeKind::Type => sb.push_str("Type"),
+            TypeKind::Stub(stub) => sb.push_str(stub.as_str()),
             TypeKind::Reference(r) => {
                 let ref_str = if r.mutable {
                     TypeWrapper::MutRef.as_str()
@@ -80,6 +82,6 @@ impl ArrayType {
             crate::ast::ArrayKind::StackArray(number) => sb.push_str(&format!("[{number}]")),
         }
         self.of_type
-            .inner_display(sb, &DisplayKind::Parser, 0, false);
+            .inner_display(sb, DisplayKind::Parser, 0, false);
     }
 }

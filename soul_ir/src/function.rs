@@ -1,26 +1,35 @@
-use inkwell::types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FunctionType, VoidType};
+use hir::TypeId;
+use inkwell::{
+    types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FunctionType, VoidType},
+    values::FunctionValue,
+};
 use mir_parser::mir::FunctionBody;
-use soul_utils::ids::FunctionId;
+use soul_utils::{Ident, ids::FunctionId};
 
-use crate::LlvmBackend;
+use crate::{FunctionKeyId, GenericSubstitute, LlvmBackend};
 
 impl<'a> LlvmBackend<'a> {
-    pub(crate) fn declare_function(&mut self, function_id: FunctionId) {
+    pub(crate) fn declare_function_instance(
+        &mut self,
+        function_id: FunctionId,
+        type_args: &Vec<TypeId>,
+        generics: &GenericSubstitute,
+    ) -> FunctionValue<'a> {
         let function = &self.mir.tree.functions[function_id];
 
-        let ty: FunctionReturnType<'a> = match self.lower_type(function.return_type) {
-            Ok(Some(val)) => val.into(),
-            Ok(None) => self.context.void_type().into(),
-            Err(err) => {
-                self.log_error(err);
-                self.context.void_type().into()
-            }
-        };
+        let return_type: FunctionReturnType<'a> =
+            match self.lower_type(function.return_type, generics) {
+                Ok(Some(val)) => val.into(),
+                Ok(None) => self.context.void_type().into(),
+                Err(err) => {
+                    self.log_error(err);
+                    self.context.void_type().into()
+                }
+            };
 
-        let mut args = Vec::with_capacity(function.parameters.len());
-        for arg in &function.parameters {
-            let local_type = self.mir.tree.locals[*arg].ty;
-            let ty = match self.lower_type(local_type) {
+        let mut args = vec![];
+        for _ in &function.parameters {
+            let arg_type = match self.lower_type(function.return_type, generics) {
                 Ok(Some(val)) => val.into(),
                 Ok(None) => self.context.i8_type().into(),
                 Err(err) => {
@@ -28,38 +37,79 @@ impl<'a> LlvmBackend<'a> {
                     self.context.i8_type().into()
                 }
             };
-            args.push(ty);
+
+            args.push(arg_type);
         }
 
-        let function_type = ty.fn_type(&args, false);
-        let llvm_function = self
-            .module
-            .add_function(function.name.as_str(), function_type, None);
-
+        let function_type = return_type.fn_type(&args, false);
+        let name = self.mangle(&function.name, function.callee, type_args);
+        let llvm_function = self.module.add_function(&name, function_type, None);
         self.create_block(function_id, llvm_function);
-        self.functions.insert(function_id, llvm_function);
+        llvm_function
     }
 
-    pub(crate) fn lower_function(&mut self, function_id: FunctionId) {
-        self.current.function_id = function_id;
+    pub(crate) fn lower_function_instance(
+        &mut self,
+        function_id: FunctionId,
+        function_key: FunctionKeyId,
+        type_args: &Vec<TypeId>,
+        generics: &GenericSubstitute,
+    ) {
+        self.current.set_function_key(function_key);
         let function = &self.mir.tree.functions[function_id];
-
         let blocks = match &function.body {
             FunctionBody::External(_) => return,
             FunctionBody::Internal { blocks, .. } => blocks,
         };
 
-        self.allocate_function_locals(function);
+        self.allocate_function_locals(function, type_args, generics);
 
         for block_id in blocks {
-            let llvm_block = self.blocks[*block_id];
+            let llvm_block = self.get_block(*block_id);
+            self.current.set_block(*block_id);  
             self.builder.position_at_end(llvm_block);
-            self.lower_statement(*block_id);
 
-            if let Err(err) = self.lower_terminator(*block_id) {
+            self.lower_statement(*block_id, generics);
+            if let Err(err) = self.lower_terminator(*block_id, generics) {
                 self.log_error(err);
             }
         }
+    }
+
+    pub(crate) fn mangle(&mut self, name: &Ident, callee: Option<TypeId>, type_args: &Vec<TypeId>) -> String {
+        const SEPARATOR: &str = "__";
+
+        let mut sb = name.to_string();
+        if let Some(this) = callee {
+            sb.push_str("_this");
+            sb.push_str(SEPARATOR);
+            match self.get_type(this) {
+                Ok(ty) => ty
+                    .write_display_no_spaces(&self.types.types, &mut sb)
+                    .expect("expect not fmt error"),
+                Err(err) => {
+                    self.log_error(err);
+                    sb.push_str("error");
+                }
+            };
+        }
+        if !type_args.is_empty() {
+            sb.push_str("_Gnrc");
+        }
+        for ty in type_args {
+            sb.push_str(SEPARATOR);
+            match self.get_type(*ty) {
+                Ok(ty) => ty
+                    .write_display_no_spaces(&self.types.types, &mut sb)
+                    .expect("expect not fmt error"),
+                Err(err) => {
+                    self.log_error(err);
+                    sb.push_str("error");
+                }
+            };
+        }
+
+        sb
     }
 }
 

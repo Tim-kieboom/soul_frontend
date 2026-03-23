@@ -1,27 +1,53 @@
-clockPerMilliseconds := __clib_CLOCKS_PER_SEC() * 1000
-clock(): u64 {
-    __clib_clock()
-}
+literal MILLI_PER_SEC: u64 = 10 * 3
+literal NANO_PER_MILLI: u64 = 10 * 6
 
-class Time {
-    clockTicks: u64
+extern "C" __clib_Duration_now(): Duration
 
-    Now(): Time {
-        Time{clockTicks: clock()}
+class Stopwatch {
+    time: Duration
+
+    This() {
+        This{time: unsafe{__clib_timenow()}}
     }
 
-    Elapsed(this): Duration {
-        deltaClock := clock() - this.clockTicks
-        Duration.FromRaw(deltaClock / clockPerMilliseconds)
+    Elapsed(@this): Duration {
+        end := This().time
+        start := this.time
+        end - start
     }
 
     impl AutoCopy{}
 }
 
-class Duration {
-    milliseconds: u64
-
-    FromRaw(milliseconds: u64): This {
-        Duration{milliseconds}
+struct Duration {
+    seconds: u64
+    nanoSeconds: u32 // limit 0..999_999_999
+}
+use Duration {
+    const FromSeconds(seconds: u64): This {
+        This{seconds, nanoSeconds: 0}
     }
+
+    const FromMilliSeconds(milliSeconds: u64): This {
+        seconds := milliSeconds / MILLI_PER_SEC
+        nanoSeconds := (milliSeconds % MILLI_PER_SEC) * NANO_PER_MILLI
+        This{seconds, nanoSeconds: u32(nanoSeconds)}
+    }
+
+    impl const Sub {
+        const Sub(this, other: This): This {
+            
+            if this.nanoSeconds >= other.nanoSeconds {
+                seconds := this.seconds - other.seconds
+                nanoSeconds := this.nanoSeconds - other.nanoSeconds
+                return This{seconds, nanoSeconds}
+            }
+
+            seconds := this.seconds - other.seconds - 1
+            nanoSeconds := this.nanoSeconds + NANOS_PER_SEC - other.nanoSeconds
+            This{seconds, nanoSeconds}
+        }
+    } 
+
+    impl AutoCopy{}
 }

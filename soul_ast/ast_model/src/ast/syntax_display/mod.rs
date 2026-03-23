@@ -7,8 +7,8 @@ pub mod display_group_expression;
 pub mod display_soul_type;
 pub mod display_statment;
 
-fn node_id_display(node_id: Option<NodeId>, kind: &DisplayKind) -> String {
-    if kind != &DisplayKind::NameResolver {
+fn node_id_display(node_id: Option<NodeId>, kind: DisplayKind) -> String {
+    if kind != DisplayKind::NameResolver {
         return String::default();
     }
 
@@ -17,12 +17,12 @@ fn node_id_display(node_id: Option<NodeId>, kind: &DisplayKind) -> String {
         .unwrap_or_default()
 }
 
-fn try_display_node_id(sb: &mut String, kind: &DisplayKind, id: Option<NodeId>) {
+fn try_display_node_id(sb: &mut String, kind: DisplayKind, id: Option<NodeId>) {
     sb.push_str(&node_id_display(id, kind));
 }
 
-fn function_id_display(node_id: Option<FunctionId>, kind: &DisplayKind) -> String {
-    if kind != &DisplayKind::NameResolver {
+fn function_id_display(node_id: Option<FunctionId>, kind: DisplayKind) -> String {
+    if kind != DisplayKind::NameResolver {
         return String::default();
     }
 
@@ -31,34 +31,6 @@ fn function_id_display(node_id: Option<FunctionId>, kind: &DisplayKind) -> Strin
         .unwrap_or_default()
 }
 
-fn try_display_function_id(sb: &mut String, kind: &DisplayKind, id: Option<FunctionId>) {
+fn try_display_function_id(sb: &mut String, kind: DisplayKind, id: Option<FunctionId>) {
     sb.push_str(&function_id_display(id, kind));
-}
-
-fn try_display_infered_type(sb: &mut String, kind: &DisplayKind, node_id: Option<NodeId>) {
-    let (types_store, auto_copys) = match kind {
-        DisplayKind::TypeContext(a, b) => (a, b),
-        _ => return,
-    };
-
-    let id = match node_id {
-        Some(val) => val,
-        None => return,
-    };
-
-    let copy = auto_copys.contains(id);
-    let type_str = match types_store.get(id) {
-        Some(val) => val,
-        None => {
-            sb.push_str(&format!("/*!!type of {:?} not found!!*/", id));
-            return;
-        }
-    };
-
-    sb.push_str("/*");
-    sb.push_str(type_str);
-    if copy {
-        sb.push_str(".copy");
-    }
-    sb.push_str("*/");
 }

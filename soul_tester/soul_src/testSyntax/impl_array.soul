@@ -1,54 +1,57 @@
-struct ErrIndex {
-    index: uint,
-}
+struct ErrIndex {index: uint}
 use ErrIndex { 
-    impl AnyErr {}
+    impl Error {}
     impl Fmt {
-        Fmt(@this, fmt: &impl Formatter): ErrFmt {
+        Fmt(@this, fmt: &impl Formatter): ResFmt {
             fmt.push_fstr(f"index: {this.index} out of bounds")
         }
     }
 }
 
-use ErrIndex<T> = Err<T, ErrIndex>
+use ResIndex<T> = Res<T, ErrIndex>
 use<T, N as uint> [N]T {
-/*
-internal methodes:
-    const Ptr(@this): ?*T
-    const Len(@this): uint
-*/
+
+    const Len(@this): uint {
+        N
+    }
 
     impl const ConsumeIndex<T> {
-        ConsumeIndex(this, index: uint): ErrIndex<T> {
+        ConsumeIndex(this, index: uint): ResIndex<T> {
             
             if index > N {
-                return error.ErrIndex{index}
+                return Err(ErrIndex{index})
             }
 
-            ptr := this.Ptr() ?? panic("should not be null")
-            *(ptr + index)
+            ptr := this.ptr ?? panic("should not be null")
+            Ok(
+                *(ptr + index)
+            )
         }
     }
 
     impl const RefIndex<T> {
-        RefIndex(@this, index: uint): ErrIndex<@T> {
+        RefIndex(@this, index: uint): ResIndex<@T> {
             if index > N {
-                return error.ErrIndex{index}
+                return Err(ErrIndex{index})
             }
 
-            ptr := this.Ptr() ?? panic("should not be null")
-            @*(ptr + index)
+            ptr := this.ptr ?? panic("should not be null")
+            Ok(
+                @*(ptr + index)
+            )
         }
     }
 
     impl const MutIndex<T> {
-        MutIndex(&this, index: uint): ErrIndex<&T> {
+        MutIndex(&this, index: uint): ResIndex<&T> {
             if index > N {
-                return error.ErrIndex{index}
+                return Err(ErrIndex{index})
             }
 
-            ptr := this.Ptr() ?? panic("should not be null")
-            &*(ptr + index)
+            ptr := this.ptr ?? panic("should not be null")
+            Ok(
+                &*(ptr + index)
+            )
         }
     }
 }

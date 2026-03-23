@@ -97,6 +97,7 @@ pub struct Index {
 pub struct FunctionCall {
     /// The name of the function being called.
     pub name: Ident,
+    pub generics: Vec<SoulType>,
     /// Optional callee expression (for method calls).
     pub callee: Option<BoxExpression>,
     /// Function arguments.
@@ -107,7 +108,7 @@ pub struct FunctionCall {
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Argument {
-    pub name: Option<Ident>, 
+    pub name: Option<Ident>,
     pub value: Expression,
 }
 

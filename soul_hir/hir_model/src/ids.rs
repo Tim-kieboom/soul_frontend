@@ -5,8 +5,9 @@ impl_soul_ids!(
     BlockId,
     FieldId,
     LocalId,
-    ModuleId,
     PlaceId,
+    ModuleId,
+    GenericId,
     InferTypeId,
     StatementId,
     ExpressionId

@@ -8,7 +8,6 @@ use ast::{
     AstResponse,
     syntax_display::{DisplayKind, SyntaxDisplay},
 };
-use displayer_hir::display_hir;
 use fern::Dispatch;
 use inkwell::context::Context;
 use log::{error, info};
@@ -27,7 +26,6 @@ use soul_utils::{
 use crate::{
     convert_soul_error::{MessageConfig, ToMessage},
     displayer_hir::display_typed_hir,
-    displayer_mir::display_mir,
     displayer_tokenizer::display_tokens,
 };
 
@@ -51,7 +49,6 @@ pub const COMPILER_OPTIONS: CompilerOptions = CompilerOptions {
 struct Ouput {
     mir: MirResponse,
     hir: HirResponse,
-    ast: AstResponse,
     source_file: String,
     faults: Vec<SementicFault>,
 }
@@ -61,7 +58,6 @@ fn main() -> Result<()> {
     init_logger(&paths.log_file)?;
 
     let output = run_fontend(&paths)?;
-    display_output(&paths, &output)?;
 
     if output.faults.is_empty() {
         info!("{GREEN}frontend success!!{DEFAULT}");
@@ -82,13 +78,19 @@ fn run_fontend<'a>(paths: &'a Paths) -> Result<Ouput> {
 
     let source_file = to_source_file(&paths.source_file)?;
     let tokens = to_token_stream(&source_file);
+    display_tokenizer(paths, &source_file)?;
+
     let ast = to_ast(tokens, &COMPILER_OPTIONS, &mut faults);
+    display_ast(paths, &ast)?;
+
     let hir = to_hir(&ast, &COMPILER_OPTIONS, &mut faults);
+    display_hir(paths, &hir)?;
+
     let mir = to_mir(&hir, &COMPILER_OPTIONS, &mut faults);
+    display_mir(paths, &mir, &hir)?;
 
     Ok(Ouput {
         mir,
-        ast,
         hir,
         faults,
         source_file,
@@ -118,28 +120,33 @@ fn run_llvm(output: &Ouput) -> bool {
     is_success
 }
 
-fn display_output<'a>(paths: &Paths, output: &Ouput) -> Result<()> {
-    let root = &output.ast.tree.root;
-    let token_stream = to_token_stream(&output.source_file);
-    let tokens_string = display_tokens(&paths, &output.source_file, token_stream)?;
+fn display_tokenizer(paths: &Paths, source_file: &str) -> Result<()> {
+    let token_stream = to_token_stream(source_file);
+    let tokens = display_tokens(paths, source_file, token_stream)?;
+    paths.write_to_output(&tokens, "tokenizer/tokens.soulc")
+}
 
-    paths.write_multiple_outputs([
-        (&tokens_string, "tokenizer/tokens.soulc"),
-        (&root.display(&DisplayKind::Parser), "ast/tree.soulc"),
-        (
-            &root.display(&DisplayKind::NameResolver),
-            "ast/NameResolved.soulc",
-        ),
-        (&display_hir(&output.hir.hir), "hir/tree.soulc"),
-        (
-            &display_typed_hir(&output.hir.hir, &output.hir.types),
-            "hir/typed.soulc",
-        ),
-        (
-            &display_mir(&output.mir.tree, &output.hir.hir, &output.hir.types),
-            "mir/tree.soulc",
-        ),
-    ])
+fn display_ast(paths: &Paths, ast: &AstResponse) -> Result<()> {
+    paths.write_to_output(
+        &ast.tree.root.display(DisplayKind::Parser),
+        "ast/tree.soulc",
+    )?;
+    paths.write_to_output(
+        &ast.tree.root.display(DisplayKind::NameResolver),
+        "ast/NameResolved.soulc",
+    )
+}
+
+fn display_hir(paths: &Paths, hir: &HirResponse) -> Result<()> {
+    paths.write_to_output(&displayer_hir::display_hir(&hir.hir), "hir/tree.soulc")?;
+    paths.write_to_output(&display_typed_hir(&hir.hir, &hir.types), "hir/typed.soulc")
+}
+
+fn display_mir(paths: &Paths, mir: &MirResponse, hir: &HirResponse) -> Result<()> {
+    paths.write_to_output(
+        &displayer_mir::display_mir(&mir.tree, &hir.types),
+        "mir/tree.soulc",
+    )
 }
 
 fn to_source_file(source_path: &str) -> Result<String> {

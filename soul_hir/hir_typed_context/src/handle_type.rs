@@ -1,5 +1,6 @@
 use hir::{
-    BlockId, ExpressionId, HirType, HirTypeKind, LocalId, RefTypeId, StatementId, TypeId, TypesMap, UnifyResult
+    BlockId, ExpressionId, GenericId, HirType, HirTypeKind, LocalId, RefTypeId, StatementId,
+    TypeId, TypesMap, UnifyResult,
 };
 use soul_utils::{
     error::SoulResult,
@@ -177,6 +178,9 @@ impl<'a> HirTypedContext<'a> {
                 }
             };
 
+            if let Some(ref_id) = self.type_table.types.id_to_ref(old_id) {
+                new_types.force_insert_ref(ref_id, new_id);
+            }
             remap.insert(old_id, new_id);
         }
 
@@ -193,11 +197,18 @@ impl<'a> HirTypedContext<'a> {
     fn collect_root_types(&self) -> Vec<TypeId> {
         let mut roots = Vec::new();
 
+        let gen_ref_types = self
+            .type_table
+            .generic_defines
+            .entries()
+            .flat_map(|(_, types)| types.entries());
+
         roots.extend(self.type_table.locals.values().copied());
         roots.extend(self.type_table.blocks.values().copied());
         roots.extend(self.type_table.functions.values().copied());
         roots.extend(self.type_table.statements.values().copied());
         roots.extend(self.type_table.expressions.values().copied());
+        roots.extend(gen_ref_types.map(|ref_type| self.ref_to_id(ref_type)));
         roots.push(self.type_table.none_type);
 
         roots
@@ -259,10 +270,10 @@ impl<'a> HirTypedContext<'a> {
                 let el = self.finalize_type(element, new_types, map)?;
                 HirType::new(HirTypeKind::Array { element: el, kind })
             }
-
             HirTypeKind::None
             | HirTypeKind::Type
             | HirTypeKind::Error
+            | HirTypeKind::Generic(_)
             | HirTypeKind::Primitive(_) => hir_ty.clone(),
 
             HirTypeKind::InferType(_, _) => unreachable!("resolve_type must eliminate InferType"),
@@ -271,9 +282,9 @@ impl<'a> HirTypedContext<'a> {
         new_ty.modifier = modifier;
         let new_id = new_types.insert(new_ty);
         map.insert(ty, new_id);
-        
+
         if let Some(ref_id) = self.type_table.types.id_to_ref(ty) {
-            new_types.add_ref_id_entry(ref_id, new_id);
+            new_types.force_insert_ref(ref_id, new_id);
         }
 
         Ok(new_id)
@@ -348,6 +359,21 @@ impl<'a> HirTypedContext<'a> {
             kind: HirTypeKind::Primitive(typed),
             modifier,
         })
+    }
+
+    pub(crate) fn resolve_generic(
+        &mut self,
+        generic_defines: &VecMap<GenericId, TypeId>,
+        ty: TypeId,
+    ) -> TypeId {
+        let hir_type = self.id_to_type(ty);
+        match hir_type.kind {
+            HirTypeKind::Generic(generic_id) => match generic_defines.get(generic_id) {
+                Some(ty) => *ty,
+                None => TypeId::error(),
+            },
+            _ => return ty,
+        }
     }
 
     fn posion_expression(&mut self, value: ExpressionId) {

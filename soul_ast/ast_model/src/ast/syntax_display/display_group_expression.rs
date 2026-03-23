@@ -4,13 +4,13 @@ use crate::{
 };
 
 impl SyntaxDisplay for Array {
-    fn display(&self, kind: &DisplayKind) -> String {
+    fn display(&self, kind: DisplayKind) -> String {
         let mut sb = String::new();
         self.inner_display(&mut sb, kind, 0, true);
         sb
     }
 
-    fn inner_display(&self, sb: &mut String, kind: &DisplayKind, tab: usize, is_last: bool) {
+    fn inner_display(&self, sb: &mut String, kind: DisplayKind, tab: usize, is_last: bool) {
         if let Some(ty) = &self.collection_type {
             ty.inner_display(sb, kind, tab, is_last);
             sb.push(':');

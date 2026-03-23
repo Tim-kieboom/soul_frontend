@@ -4,6 +4,7 @@ use soul_utils::soul_names::TypeModifier;
 use soul_utils::span::{ItemMetaData, Span};
 use soul_utils::{Ident, soul_import_path::SoulImportPath, span::Spanned};
 
+use crate::Generic;
 use crate::ast::{Block, Expression, ExpressionKind, FunctionCall, NamedTupleType, SoulType};
 use crate::scope::NodeId;
 /// A statement in the Soul language, wrapped with source location information.
@@ -96,6 +97,7 @@ pub struct FunctionSignature {
     pub name: Ident,
     pub id: Option<FunctionId>,
     pub methode_type: SoulType,
+    pub generics: Vec<Generic>,
     pub function_kind: FunctionKind,
     /// Function parameters.
     pub parameters: NamedTupleType,

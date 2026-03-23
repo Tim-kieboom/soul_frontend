@@ -4,7 +4,11 @@ use hir::{
     Variable,
 };
 use soul_utils::{
-    error::{SoulError, SoulErrorKind}, ids::{FunctionId, IdAlloc}, soul_error_internal, soul_names::TypeModifier, span::Span
+    error::{SoulError, SoulErrorKind},
+    ids::{FunctionId, IdAlloc},
+    soul_error_internal,
+    soul_names::TypeModifier,
+    span::Span,
 };
 
 impl<'a> HirTypedContext<'a> {
@@ -14,7 +18,7 @@ impl<'a> HirTypedContext<'a> {
             Global::Variable(variable, id) | Global::InternalVariable(variable, id) => {
                 self.infer_variable(variable, self.statement_span(*id))
             }
-            Global::Function(function, _) => {                
+            Global::Function(function, _) => {
                 let ty = self.infer_function(*function);
                 self.type_function(*function, ty);
                 ty
@@ -42,13 +46,15 @@ impl<'a> HirTypedContext<'a> {
             }
             Statement::Expression { value, .. } => self.infer_expression(*value),
 
-            Statement::Fall(value, _)
-            | Statement::Break(value, _) => {
+            Statement::Fall(value, _) | Statement::Break(value, _) => {
                 if let Some(value) = value {
                     let span = self.hir.spans.expressions[*value];
-                    self.log_error(soul_error_internal!("break/fall with value is not yet impl", Some(span)));
+                    self.log_error(soul_error_internal!(
+                        "break/fall with value is not yet impl",
+                        Some(span)
+                    ));
                 }
-                return
+                return;
             }
 
             Statement::Return(value, _) => match *value {

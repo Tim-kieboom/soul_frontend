@@ -10,7 +10,6 @@ where
     Err(E),
 }
 
-
 main() {
     /*
     expends to:

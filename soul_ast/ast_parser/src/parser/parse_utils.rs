@@ -22,6 +22,7 @@ pub const CONST_REF: TokenKind = TokenKind::Symbol(SymbolKind::ConstRef);
 pub const CURLY_OPEN: TokenKind = TokenKind::Symbol(SymbolKind::CurlyOpen);
 pub const ROUND_OPEN: TokenKind = TokenKind::Symbol(SymbolKind::RoundOpen);
 pub const ARROW_LEFT: TokenKind = TokenKind::Symbol(SymbolKind::LeftArray);
+pub const ARROW_RIGHT: TokenKind = TokenKind::Symbol(SymbolKind::RightArray);
 pub const SEMI_COLON: TokenKind = TokenKind::Symbol(SymbolKind::SemiColon);
 pub const INCREMENT: TokenKind = TokenKind::Symbol(SymbolKind::DoublePlus);
 pub const DECREMENT: TokenKind = TokenKind::Symbol(SymbolKind::DoubleMinus);

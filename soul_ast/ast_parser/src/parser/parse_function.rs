@@ -1,5 +1,6 @@
 use ast::{
-    Argument, Expression, ExternLanguage, Function, FunctionCall, FunctionSignature, SoulType, Statement
+    Argument, Expression, ExternLanguage, Function, FunctionCall, FunctionSignature, Generic,
+    SoulType, Statement,
 };
 use soul_tokenizer::TokenKind;
 use soul_utils::{
@@ -12,11 +13,29 @@ use soul_utils::{
 
 use crate::parser::{
     Parser,
-    parse_utils::{ARROW_LEFT, COLON, COMMA, ROUND_CLOSE, ROUND_OPEN, SEMI_COLON},
+    parse_utils::{ARROW_LEFT, ARROW_RIGHT, COLON, COMMA, ROUND_CLOSE, ROUND_OPEN, SEMI_COLON},
 };
 
 type FuncResult<T> = TryResult<T, (Ident, Box<SoulError>)>;
 impl<'a, 'f> Parser<'a, 'f> {
+    pub(crate) fn parse_any_function(&mut self) -> SoulResult<Statement> {
+        fn default_methode_type(span: Span) -> SoulType {
+            SoulType::none(span).with_modifier(Some(TypeModifier::Mut))
+        }
+
+        let ident = self.try_bump_consume_ident()?;
+
+        let span = self.token().span;
+        match self.try_parse_function_declaration(span, default_methode_type(span), ident) {
+            Ok(val) => Ok(Statement::from_function(val)),
+            Err(TryError::IsErr(err)) => Err(err),
+            Err(TryError::IsNotValue((ident, _err))) => self
+                .try_parse_function_call(span, None, &ident)
+                .merge_to_result()
+                .map(|el| Statement::from_function_call(el, self.current_is(&SEMI_COLON))),
+        }
+    }
+
     pub(crate) fn parse_extern_function(&mut self) -> SoulResult<Statement> {
         self.expect_ident(KeyWord::Extern.as_str())?;
 
@@ -53,24 +72,6 @@ impl<'a, 'f> Parser<'a, 'f> {
             Ok(signature) => Ok(Statement::from_external_function(signature)),
             Err(TryError::IsErr(err)) => Err(err),
             Err(TryError::IsNotValue((_, err))) => Err(*err),
-        }
-    }
-
-    pub(crate) fn parse_any_function(&mut self) -> SoulResult<Statement> {
-        fn default_methode_type(span: Span) -> SoulType {
-            SoulType::none(span).with_modifier(Some(TypeModifier::Mut))
-        }
-
-        let ident = self.try_bump_consume_ident()?;
-
-        let span = self.token().span;
-        match self.try_parse_function_declaration(span, default_methode_type(span), ident) {
-            Ok(val) => Ok(Statement::from_function(val)),
-            Err(TryError::IsErr(err)) => Err(err),
-            Err(TryError::IsNotValue((ident, _err))) => self
-                .try_parse_function_call(span, None, &ident)
-                .merge_to_result()
-                .map(|el| Statement::from_function_call(el, self.current_is(&SEMI_COLON))),
         }
     }
 
@@ -125,14 +126,21 @@ impl<'a, 'f> Parser<'a, 'f> {
             return TryNotValue(self.get_expect_any_error(&[ROUND_OPEN, ARROW_LEFT]));
         }
 
+        let generics = if self.current_is(&ARROW_LEFT) {
+            self.parse_generic_define()?
+        } else {
+            vec![]
+        };
+
         let arguments = self.parse_arguments().try_err()?;
         TryOk(Spanned::new(
             FunctionCall {
+                generics,
+                id: None,
+                arguments,
+                resolved: None,
                 name: name.clone(),
                 callee: callee.map(|expr| Box::new(expr.clone())),
-                arguments,
-                id: None,
-                resolved: None,
             },
             self.span_combine(start_span),
         ))
@@ -155,6 +163,23 @@ impl<'a, 'f> Parser<'a, 'f> {
         result
     }
 
+    pub(crate) fn parse_generic_define(&mut self) -> TryResult<Vec<SoulType>, SoulError> {
+        self.expect(&ARROW_LEFT).try_err()?;
+        let mut types = vec![];
+        loop {
+            let ty = self.try_parse_type()?;
+            types.push(ty);
+
+            if self.current_is(&ARROW_RIGHT) {
+                self.bump();
+                break;
+            }
+
+            self.expect(&COMMA).try_err()?;
+        }
+        TryOk(types)
+    }
+
     fn parse_arguments(&mut self) -> SoulResult<Vec<Argument>> {
         self.expect(&ROUND_OPEN)?;
         if self.current_is(&ROUND_CLOSE) {
@@ -164,7 +189,6 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let mut values = vec![];
         loop {
-            
             let name = if self.peek().kind == COLON {
                 let name = self.try_bump_consume_ident()?;
                 self.expect(&COLON)?;
@@ -200,6 +224,8 @@ impl<'a, 'f> Parser<'a, 'f> {
             ));
         }
 
+        let generics = self.parse_generic_declare().try_err()?.unwrap_or(vec![]);
+
         if !self.current_is(&ROUND_OPEN) {
             return TryErr(self.get_expect_error(&ROUND_OPEN));
         }
@@ -224,6 +250,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let signature = FunctionSignature {
             name,
+            generics,
             external,
             id: None,
             parameters,
@@ -233,5 +260,24 @@ impl<'a, 'f> Parser<'a, 'f> {
         };
 
         TryOk(Spanned::new(signature, self.span_combine(start_span)))
+    }
+
+    fn parse_generic_declare(&mut self) -> SoulResult<Option<Vec<Generic>>> {
+        if !self.current_is(&ARROW_LEFT) {
+            return Ok(None);
+        }
+
+        self.bump();
+        let mut generics = vec![];
+        loop {
+            let name = self.try_bump_consume_ident()?;
+            generics.push(Generic { name });
+
+            if self.current_is(&ARROW_RIGHT) {
+                self.bump();
+                return Ok(Some(generics));
+            }
+            self.expect(&COMMA)?;
+        }
     }
 }

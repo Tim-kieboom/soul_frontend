@@ -10,13 +10,6 @@ pub struct Paths {
 }
 
 impl Paths {
-    pub fn write_multiple_outputs<const N: usize>(&self, ouputs: [(&str, &str); N]) -> Result<()> {
-        for (text, file) in ouputs {
-            self.write_to_output(text, file)?;
-        }
-        Ok(())
-    }
-
     pub fn write_to_output(&self, output: &str, relative_file: &str) -> Result<()> {
         let path = PathBuf::from(format!("{}/{relative_file}", self.output));
         if let Some(parent) = path.parent() {

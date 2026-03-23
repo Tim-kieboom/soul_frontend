@@ -26,12 +26,19 @@ pub enum TypeKind {
     /// Primitive types like int, bool, float
     Primitive(PrimitiveTypes),
     Array(ArrayType),
-    /// Reference type: &T or &mut T
+    /// Reference type: &int or &mut int
     Reference(ReferenceType),
-    /// Pointer type: *T
+    /// Pointer type: *int
     Pointer(Box<SoulType>),
-    /// Optional type: ?T
+    /// Optional type: ?int
     Optional(Box<SoulType>),
+    /// unknown type
+    Stub(String),
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Generic {
+    pub name: Ident,
 }
 
 /// Array type
@@ -78,10 +85,10 @@ pub type TupleType = Vec<SoulType>;
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct NamedTupleElement {
-    pub name: Ident, 
-    pub ty: SoulType, 
+    pub name: Ident,
+    pub ty: SoulType,
     pub node_id: Option<NodeId>,
-    pub default: Option<Expression>, 
+    pub default: Option<Expression>,
 }
 pub type NamedTupleType = Vec<NamedTupleElement>;
 

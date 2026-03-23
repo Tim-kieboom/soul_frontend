@@ -1,9 +1,10 @@
 use ast::{ArrayKind, BinaryOperator, BinaryOperatorKind, UnaryOperator};
-use hir::{Binary, BlockId, ExpressionId, HirType, HirTypeKind, TypeId, Unary};
+use hir::{Binary, BlockId, ExpressionId, HirType, HirTypeKind, RefTypeId, TypeId, Unary};
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
     ids::{FunctionId, IdAlloc},
     span::Span,
+    vec_map::VecMap,
 };
 
 use crate::HirTypedContext;
@@ -75,10 +76,7 @@ impl<'a> HirTypedContext<'a> {
                 let from = self.infer_expression(*value);
                 let from_type = self.id_to_type(from);
                 let to_type = self.ref_to_type(*cast_to);
-                match from_type.unify_primitive_cast(
-                    &self.type_table.types,
-                    to_type,
-                ) {
+                match from_type.unify_primitive_cast(&self.type_table.types, to_type) {
                     Ok(()) => (),
                     Err(err) => self.log_error(SoulError::new(
                         err,
@@ -86,7 +84,7 @@ impl<'a> HirTypedContext<'a> {
                         Some(span),
                     )),
                 }
-                
+
                 self.ref_to_id(*cast_to)
             }
             hir::ExpressionKind::While { condition, body } => {
@@ -102,19 +100,18 @@ impl<'a> HirTypedContext<'a> {
                 right,
             }) => self.infer_binary(*left, operator, *right, span),
             hir::ExpressionKind::Call {
-                function,
                 callee,
+                function,
+                generics,
                 arguments,
-            } => self.infer_call(*function, *callee, arguments, span),
+            } => self.infer_call(*function, *callee, generics, arguments, span),
             hir::ExpressionKind::If {
                 condition,
                 then_block,
                 else_block,
                 ends_with_else,
             } => self.infer_if(*condition, *then_block, *else_block, *ends_with_else, span),
-            hir::ExpressionKind::InnerRawStackArray(_) => {
-                value.ty
-            },
+            hir::ExpressionKind::InnerRawStackArray(_) => value.ty,
         };
 
         if let HirTypeKind::InferType(id, _) = &self.id_to_type(value.ty).kind {
@@ -175,6 +172,7 @@ impl<'a> HirTypedContext<'a> {
         &mut self,
         function_id: FunctionId,
         callee: Option<ExpressionId>,
+        generics: &Vec<RefTypeId>,
         arguments: &Vec<ExpressionId>,
         span: Span,
     ) -> TypeId {
@@ -182,7 +180,31 @@ impl<'a> HirTypedContext<'a> {
             Some(val) => val,
             None => return TypeId::error(),
         };
-        let return_type = self.type_table.functions[function_id];
+
+        let mut generic_defines = VecMap::new();
+        for (i, generic_id) in function.generics.iter().copied().enumerate() {
+            let generic_ty = match generics.get(i) {
+                Some(val) => *val,
+                None => {
+                    let msg = match self.hir.types.generic_name(generic_id) {
+                        Some(name) => format!("generic {name} is not defined"),
+                        None => format!("generic {:?} is not defined", generic_id),
+                    };
+                    self.log_error(SoulError::new(
+                        msg,
+                        SoulErrorKind::GenericDefineError,
+                        Some(span),
+                    ));
+                    RefTypeId::error()
+                }
+            };
+            generic_defines.insert(generic_id, self.ref_to_id(generic_ty));
+            self.insert_generic_define(generic_id, generic_ty);
+        }
+
+        let unresolved_return_type = self.type_table.functions[function_id];
+        let return_type = self.resolve_generic(&generic_defines, unresolved_return_type);
+
         if let Some(callee) = callee {
             self.infer_expression(callee);
         }
@@ -203,7 +225,9 @@ impl<'a> HirTypedContext<'a> {
         for (argument, parameter) in arguments.iter().zip(function.parameters.iter()) {
             let ty = self.infer_expression(*argument);
             let span = self.expression_span(*argument);
-            self.unify(*argument, parameter.ty, ty, span);
+
+            let should_be = self.resolve_generic(&generic_defines, parameter.ty);
+            self.unify(*argument, should_be, ty, span);
         }
 
         return_type

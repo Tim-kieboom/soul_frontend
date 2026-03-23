@@ -1,7 +1,7 @@
 use ast::{ExternLanguage, FunctionKind};
 use soul_utils::{Ident, ids::FunctionId};
 
-use crate::{BlockId, ExpressionId, LocalId, TypeId};
+use crate::{BlockId, ExpressionId, GenericId, LocalId, TypeId};
 
 /// A function definition in HIR.
 ///
@@ -21,6 +21,8 @@ pub struct Function {
 
     /// Function parameters.
     pub parameters: Vec<Parameter>,
+
+    pub generics: Vec<GenericId>,
 
     /// Return type of the function.
     pub return_type: TypeId,

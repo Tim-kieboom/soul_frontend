@@ -1,11 +1,17 @@
 use std::{collections::HashMap, hash::Hash};
 
 use soul_utils::{
-    ids::{FunctionId, IdAlloc, IdGenerator}, impl_soul_ids, soul_import_path::SoulImportPath, soul_names::TypeModifier, span::{ItemMetaData, Span}, vec_map::{VecMap, VecMapIndex}
+    ids::{FunctionId, IdAlloc, IdGenerator},
+    impl_soul_ids,
+    soul_import_path::SoulImportPath,
+    soul_names::TypeModifier,
+    span::{ItemMetaData, Span},
+    vec_map::{VecMap, VecMapIndex},
 };
 
 use crate::{
-    BlockId, ExpressionId, HirType, HirTypeKind, InferTypeId, LocalId, ModuleId, StatementId, TypeId
+    BlockId, ExpressionId, GenericId, HirType, HirTypeKind, InferTypeId, LocalId, ModuleId,
+    StatementId, TypeId,
 };
 
 /// Maps HIR node IDs to their original source code spans.
@@ -30,12 +36,12 @@ pub struct SpanMap {
 }
 impl Default for SpanMap {
     fn default() -> Self {
-        Self { 
-            blocks: Default::default(), 
-            locals: Default::default(), 
+        Self {
+            blocks: Default::default(),
+            locals: Default::default(),
             functions: Default::default(),
-            statements: Default::default(), 
-            expressions: VecMap::from_slice(&[(ExpressionId::error(), Span::default_const())]), 
+            statements: Default::default(),
+            expressions: VecMap::from_slice(&[(ExpressionId::error(), Span::default_const())]),
         }
     }
 }
@@ -57,13 +63,15 @@ pub struct TypesMap {
     map: BiMap<TypeId, HirType>,
     /// for expressions like Cast (so you can have a diffrent TypeId in the typedcontext stage)
     ref_map: BiMap<RefTypeId, TypeId>,
-    ref_generator: IdGenerator<RefTypeId>,
+    generics: VecMap<GenericId, String>,
     type_generator: IdGenerator<TypeId>,
+    ref_generator: IdGenerator<RefTypeId>,
     infer_generator: IdGenerator<InferTypeId>,
 }
 impl TypesMap {
     pub fn new() -> Self {
         Self {
+            generics: VecMap::new(),
             ref_generator: IdGenerator::new(),
             type_generator: IdGenerator::new(),
             infer_generator: IdGenerator::new(),
@@ -100,6 +108,14 @@ impl TypesMap {
         })
     }
 
+    pub fn insert_generic(&mut self, name: String, id: GenericId) {
+        self.generics.insert(id, name);
+    }
+
+    pub fn generic_name(&self, id: GenericId) -> Option<&String> {
+        self.generics.get(id)
+    }
+
     pub fn insert(&mut self, ty: HirType) -> TypeId {
         self.map.insert(&mut self.type_generator, ty)
     }
@@ -108,7 +124,7 @@ impl TypesMap {
         self.ref_map.insert(&mut self.ref_generator, ty)
     }
 
-    pub fn add_ref_id_entry(&mut self, ref_id: RefTypeId, ty: TypeId) {
+    pub fn force_insert_ref(&mut self, ref_id: RefTypeId, ty: TypeId) {
         self.ref_map.force_insert(ref_id, ty);
     }
 

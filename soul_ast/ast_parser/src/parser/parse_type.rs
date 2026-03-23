@@ -1,4 +1,7 @@
-use ast::{ArrayKind, ArrayType, FunctionKind, NamedTupleElement, NamedTupleType, ReferenceType, SoulType, TypeKind};
+use ast::{
+    ArrayKind, ArrayType, FunctionKind, NamedTupleElement, NamedTupleType, ReferenceType, SoulType,
+    TypeKind,
+};
 use soul_tokenizer::{Number, TokenKind};
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
@@ -12,7 +15,8 @@ use soul_utils::{
 use crate::parser::{
     Parser,
     parse_utils::{
-        ARRAY, ASSIGN, COLON, COMMA, CONST_REF, CURLY_OPEN, MUT_REF, OPTIONAL, POINTER, ROUND_CLOSE, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN
+        ARRAY, ASSIGN, COLON, COMMA, CONST_REF, CURLY_OPEN, MUT_REF, OPTIONAL, POINTER,
+        ROUND_CLOSE, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN,
     },
 };
 
@@ -165,10 +169,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             return TryOk(SoulType::new(None, TypeKind::Primitive(prim), span));
         }
 
-        TryNotValue(soul_error_internal!(
-            "Stub type not impl",
-            Some(self.token().span)
-        ))
+        TryOk(SoulType::new(None, TypeKind::Stub(ident.node), ident.span))
     }
 
     fn inner_parse_named_tuple_kinds(
@@ -217,7 +218,6 @@ impl<'a, 'f> Parser<'a, 'f> {
             let mut ty = self.try_parse_type()?; // if not value is probebly named_tuple expression 
             ty.modifier = modifier;
 
-            
             let default = if self.current_is(&ASSIGN) {
                 self.bump();
                 has_default = true;
@@ -228,13 +228,18 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             if default.is_none() && has_default {
                 self.log_error(SoulError::new(
-                    "you can not have a non default parameter after default parameter", 
-                    SoulErrorKind::InvalidContext, 
+                    "you can not have a non default parameter after default parameter",
+                    SoulErrorKind::InvalidContext,
                     Some(name.span),
                 ));
             }
 
-            types.push(NamedTupleElement{ name, ty, node_id: None, default });
+            types.push(NamedTupleElement {
+                name,
+                ty,
+                node_id: None,
+                default,
+            });
             if self.current_is(close) {
                 break;
             }
