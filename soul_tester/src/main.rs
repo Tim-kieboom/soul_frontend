@@ -20,7 +20,7 @@ use soul_tokenizer::to_token_stream;
 use soul_utils::{
     char_colors::{DEFAULT, GREEN},
     compile_options::CompilerOptions,
-    sementic_level::SementicFault,
+    sementic_level::{SementicFault, SementicLevel},
 };
 
 use crate::{
@@ -44,6 +44,7 @@ pub const MESSAGE_CONFIG: MessageConfig = MessageConfig {
 
 pub const COMPILER_OPTIONS: CompilerOptions = CompilerOptions {
     debug_view_literal_resolve: false,
+    fault_level: SementicLevel::Error,
 };
 
 struct Ouput {
@@ -56,15 +57,14 @@ struct Ouput {
 fn main() -> Result<()> {
     let paths: Paths = serde_json::from_slice(PATHS)?;
     init_logger(&paths.log_file)?;
-
     let output = run_fontend(&paths)?;
 
-    if output.faults.is_empty() {
-        info!("{GREEN}frontend success!!{DEFAULT}");
-    } else {
-        log_faults(&output.faults, &output.source_file);
+    log_faults(&output.faults, &output.source_file);
+    if is_fatal(&output.faults, SementicLevel::Error) {
         return Ok(());
     }
+    
+    info!("{GREEN}frontend success!!{DEFAULT}");
 
     let is_success = run_llvm(&output);
     if is_success {
@@ -106,18 +106,18 @@ fn run_llvm(output: &Ouput) -> bool {
 
     let mut faults = vec![];
     let ir = to_llvm_ir(&request, &COMPILER_OPTIONS, &mut faults);
-    let is_success = ir.no_errors;
+    log_faults(&faults, &output.source_file);
 
-    if is_success {
-        if let Err(err) = ir.module.print_to_file("output/out.ll") {
-            error!("{err}");
-        };
-    } else {
-        drop(ir); // drop to be able to use faults
-        log_faults(&faults, &output.source_file);
+    if ir.is_fatal {
+        return false
     }
 
-    is_success
+    if let Err(err) = ir.module.print_to_file("output/out.ll") {
+        error!("{err}");
+        return false
+    };
+
+    true
 }
 
 fn display_tokenizer(paths: &Paths, source_file: &str) -> Result<()> {
@@ -180,4 +180,14 @@ fn init_logger(log_file: &str) -> Result<()> {
         .apply()?;
 
     Ok(())
+}
+
+fn is_fatal(faults: &Vec<SementicFault>, fatal_level: SementicLevel) -> bool {
+    for fault in faults {
+        if fault.is_fatal(fatal_level) {
+            return true
+        }
+    } 
+
+    false
 }

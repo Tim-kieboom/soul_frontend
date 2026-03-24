@@ -6,22 +6,36 @@ extern "C" __clib_fmtInt(value: int, base: u8, buffer: *char/*[50]char*/, capita
 extern "C" __clib_fmtUint(value: uint, base: u8, buffer: *char/*[50]char*/, capital: bool): *char
 extern "C" __clib_fmtFloat(value: f64, base: u8, buffer: *char/*[50]char*/, precision: u8, capital: bool): *char
 
+global := 1
+global1 := 10 + 33 * 2
 fmtBuffer := malloc(50) as *char //[for 50 => '\0']
+
+// struct Array {
+//     len: uint
+//     ptr: *u8
+// }
 
 main() {
     // pow := 3 ** 2
     // root := 2 </ 4
     generics()
     prints()
+    comptime()
+}
+
+comptime() {
+    var := 1 * 12 / 2
+    print_int(var)
 }
 
 prints() {
     print_int(-123)
     endln()
-    // print_uint(123)
-    // endln()
-    // print_float(123.4567)
-    // endln()
+
+    print_uint(123)
+    endln()
+    print_float(123.4567)
+    endln()
 }
 
 generics() {
@@ -36,7 +50,7 @@ generics() {
     val := gen<int>(1)
     print_int(val)
     endln()
-    letter := gen2<char, uint>('g', 1)
+    letter := gen2<char, u64>('g', 1)
     print_char(letter)
     endln()
 }

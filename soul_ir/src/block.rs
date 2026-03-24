@@ -4,7 +4,7 @@ use inkwell::values::FunctionValue;
 use mir_parser::mir::{BlockId, FunctionBody, Operand, Place, PlaceId, Terminator};
 use soul_utils::{error::SoulResult, ids::FunctionId, vec_map::VecMapIndex};
 
-impl<'a> LlvmBackend<'a> {
+impl<'f, 'a> LlvmBackend<'f, 'a> {
     pub(crate) fn create_block(
         &mut self,
         function_id: FunctionId,
@@ -97,7 +97,7 @@ impl<'a> LlvmBackend<'a> {
             let meta_data_value = self.lower_operand(arg, generics)?.value.into();
             ir_arguments.push(meta_data_value);
         }
-
+        
         let function = self.get_or_create_function(id, type_args);
         let call = self
             .builder

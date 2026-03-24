@@ -4,7 +4,7 @@ use soul_utils::{error::SoulResult, soul_error_internal, soul_names::PrimitiveSi
 
 use crate::{GenericSubstitute, IrOperand, LlvmBackend, build_error};
 
-impl<'a> LlvmBackend<'a> {
+impl<'f, 'a> LlvmBackend<'f, 'a> {
     pub(crate) fn lower_operand(
         &self,
         condition: &Operand,
@@ -13,22 +13,28 @@ impl<'a> LlvmBackend<'a> {
         Ok(match &condition.kind {
             OperandKind::Temp(temp_id) => self.get_temp(*temp_id),
             OperandKind::Local(local_id) => {
-                let local = &self.mir.tree.locals[*local_id];
-                let ty = match self.lower_type(local.ty, generics)? {
+                let mir_local = &self.mir.tree.locals[*local_id];
+
+                let ty = match self.lower_type(mir_local.ty(), generics)? {
                     Some(val) => val,
                     None => self.context.i8_type().into(),
                 };
 
-                let ptr = self.get_local(*local_id);
+                let local = self.get_local(*local_id);
                 let is_signed_interger = self
                     .types
                     .types
-                    .id_to_type(local.ty)
+                    .id_to_type(mir_local.ty())
                     .ok_or(soul_error_internal!(
-                        format!("{:?} not found", local.ty),
+                        format!("{:?} not found", mir_local.ty()),
                         None
                     ))?
                     .is_any_int_type();
+
+                let ptr = match local {
+                    crate::Local::Runtime(val) => val,
+                    crate::Local::Comptime(literal_operand) => return Ok(literal_operand),
+                };
 
                 return self
                     .builder
@@ -37,7 +43,7 @@ impl<'a> LlvmBackend<'a> {
                         value,
                         is_signed_interger,
                     })
-                    .map_err(|err| build_error(err));
+                    .map_err(|err| build_error(err))
             }
             OperandKind::Comptime(literal) => self.lower_literal(literal, condition.ty)?,
             OperandKind::Ref { .. } => {

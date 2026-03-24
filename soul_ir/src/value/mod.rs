@@ -7,7 +7,7 @@ mod binary_unary;
 mod cast;
 pub(crate) mod operand;
 
-impl<'a> LlvmBackend<'a> {
+impl<'f, 'a> LlvmBackend<'f, 'a> {
     pub(crate) fn lower_rvalue(
         &self,
         value: &Rvalue,

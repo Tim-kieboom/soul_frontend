@@ -7,7 +7,7 @@ use soul_utils::{error::SoulResult, soul_error_internal, soul_names::PrimitiveTy
 
 use crate::{GenericSubstitute, LlvmBackend};
 
-impl<'a> LlvmBackend<'a> {
+impl<'f, 'a> LlvmBackend<'f, 'a> {
     pub fn lower_type(
         &self,
         ty: TypeId,

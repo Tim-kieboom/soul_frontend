@@ -1,11 +1,8 @@
-use hir::{HirTree, RefTypeId, TypeId};
-use hir_typed_context::HirTypedTable;
+use ast::Literal;
+use hir::{RefTypeId, TypeId};
+use run_hir::HirResponse;
 use soul_utils::{
-    error::{SoulError, SoulErrorKind},
-    ids::{FunctionId, IdAlloc},
-    sementic_level::SementicFault,
-    soul_error_internal,
-    vec_map::VecMap,
+    error::{SoulError, SoulErrorKind}, ids::{FunctionId, IdAlloc}, sementic_level::SementicFault, soul_error_internal, span::Span, vec_map::VecMap
 };
 
 pub(crate) use utils::*;
@@ -16,11 +13,11 @@ mod parse;
 mod utils;
 use crate::{id_generators::IdGenerators, mir::MirTree};
 
-pub fn mir_lower(hir: &HirTree, types: &HirTypedTable, faults: &mut Vec<SementicFault>) -> MirTree {
-    let mut context = MirContext::new(hir, types, faults);
+pub fn mir_lower(hir_reponse: &HirResponse, faults: &mut Vec<SementicFault>) -> MirTree {
+    let mut context = MirContext::new(hir_reponse, faults);
     let is_end = &mut false;
 
-    for global in &hir.root.globals {
+    for global in &hir_reponse.hir.root.globals {
         context.lower_global(global, is_end);
         if *is_end {
             break;
@@ -41,8 +38,7 @@ struct MirContext<'a> {
     local_remap: VecMap<hir::LocalId, mir::LocalId>,
     temp_remap: VecMap<hir::LocalId, mir::TempId>,
 
-    hir: &'a HirTree,
-    types: &'a HirTypedTable,
+    hir_response: &'a HirResponse,
     faults: &'a mut Vec<SementicFault>,
 }
 
@@ -67,9 +63,9 @@ impl CurrentContext {
 }
 
 impl<'a> MirContext<'a> {
-    fn new(hir: &'a HirTree, types: &'a HirTypedTable, faults: &'a mut Vec<SementicFault>) -> Self {
-        let init_global_function = hir.init_global_function;
-        let main = hir
+    fn new(hir_reponse: &'a HirResponse, faults: &'a mut Vec<SementicFault>) -> Self {
+        let init_global_function = hir_reponse.hir.init_global_function;
+        let main = hir_reponse.hir
             .functions
             .values()
             .find(|func| func.name.as_str() == "main")
@@ -108,11 +104,10 @@ impl<'a> MirContext<'a> {
         };
 
         let mut this = Self {
-            hir,
             main,
             tree,
-            types,
             faults,
+            hir_response: hir_reponse,
             id_generators: IdGenerators::new(),
             temp_remap: VecMap::const_default(),
             place_typed: VecMap::const_default(),
@@ -194,17 +189,22 @@ impl<'a> MirContext<'a> {
         let id = self.id_generators.alloc_local();
 
         self.local_remap.insert(local, id);
-        self.tree.locals.insert(id, mir::Local { id, ty });
+        self.tree.locals.insert(id, mir::Local::Runtime{ id, ty });
 
         self.current.scope.push(id);
         id
     }
 
-    fn new_local(&mut self, local: hir::LocalId, ty: hir::TypeId) -> mir::LocalId {
+    fn new_local(&mut self, local: hir::LocalId, ty: hir::TypeId, comptime: Option<Literal>) -> mir::LocalId {
         let id = self.id_generators.alloc_local();
 
         self.local_remap.insert(local, id);
-        self.tree.locals.insert(id, mir::Local { id, ty });
+
+        let local_kind = match comptime {
+            Some(value) => mir::Local::Comptime{id, ty, value},
+            None => mir::Local::Runtime{ id, ty },
+        };
+        self.tree.locals.insert(id, local_kind);
 
         self.current.scope.push(id);
 
@@ -220,7 +220,7 @@ impl<'a> MirContext<'a> {
         let id = self.id_generators.alloc_local();
 
         self.local_remap.insert(local, id);
-        self.tree.locals.insert(id, mir::Local { id, ty });
+        self.tree.locals.insert(id, mir::Local::Runtime{ id, ty });
 
         self.current.scope.push(id);
         id
@@ -261,7 +261,7 @@ impl<'a> MirContext<'a> {
     fn id_to_type(&mut self, ty: hir::TypeId) -> &hir::HirType {
         const ERROR: hir::HirType = hir::HirType::error_type();
 
-        match self.types.types.id_to_type(ty) {
+        match self.hir_response.types.types.id_to_type(ty) {
             Some(val) => val,
             None => {
                 self.log_error(soul_error_internal!(
@@ -274,7 +274,7 @@ impl<'a> MirContext<'a> {
     }
 
     fn ref_to_id(&mut self, ref_id: RefTypeId) -> TypeId {
-        match self.types.types.ref_to_id(ref_id) {
+        match self.hir_response.types.types.ref_to_id(ref_id) {
             Some(val) => val,
             None => {
                 self.log_error(soul_error_internal!(
@@ -318,12 +318,61 @@ impl<'a> MirContext<'a> {
         }
     }
 
-    fn expression_ty(&self, id: hir::ExpressionId) -> hir::TypeId {
-        self.types
+    fn place_type(&self, id: hir::PlaceId) -> hir::TypeId {
+        self.hir_response
+            .types
+            .places
+            .get(id)
+            .copied()
+            .unwrap_or(hir::TypeId::error())
+    }
+
+    fn local_type(&self, id: hir::LocalId) -> hir::TypeId {
+        self.hir_response
+            .types
+            .locals
+            .get(id)
+            .copied()
+            .unwrap_or(hir::TypeId::error())
+    } 
+
+    fn function_span(&self, id: FunctionId) -> Span {
+        self.hir_response.hir.spans.functions[id]
+    } 
+
+    fn function_type(&self, id: FunctionId) -> hir::TypeId {
+        self.hir_response
+            .types
+            .functions
+            .get(id)
+            .copied()
+            .unwrap_or(hir::TypeId::error())
+    }
+
+    fn expression_span(&mut self, id: hir::ExpressionId) -> Span {
+        self.hir_response.hir.spans.expressions[id]
+    }
+
+    fn expression_type(&self, id: hir::ExpressionId) -> hir::TypeId {
+        self.hir_response.types
             .expressions
             .get(id)
             .copied()
             .unwrap_or(hir::TypeId::error())
+    }
+
+    fn get_expression_literal(&self, id: hir::ExpressionId) -> Option<&Literal> {
+        match &self.hir_response.hir.expressions[id].kind {
+            hir::ExpressionKind::Literal(literal) => Some(literal),
+            _ => self.hir_response.literal_resolves.get(id),
+        }
+    }
+
+    fn statement_span(&self, id: hir::StatementId) -> Span {
+        self.hir_response
+            .hir
+            .spans
+            .statements[id]
     }
 
     fn to_mir_tree(self) -> MirTree {

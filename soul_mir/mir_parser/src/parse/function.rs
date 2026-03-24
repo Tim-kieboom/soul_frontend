@@ -16,7 +16,7 @@ impl<'a> MirContext<'a> {
             callee: None,
             generics: vec![],
             parameters: vec![],
-            return_type: self.types.none_type,
+            return_type: self.hir_response.types.none_type,
         };
 
         self.tree.blocks.insert(
@@ -43,8 +43,8 @@ impl<'a> MirContext<'a> {
 
     fn inner_function(&mut self, function_id: FunctionId, is_main: bool) {
         self.current.function = function_id;
-        let function = &self.hir.functions[function_id];
-        let span = self.hir.spans.functions[function_id];
+        let function = &self.hir_response.hir.functions[function_id];
+        let span = self.function_span(function_id);
 
         let entry_block = self.new_function_block();
         self.current.block = Some(entry_block);
@@ -75,12 +75,12 @@ impl<'a> MirContext<'a> {
             callee: None,
             generics: function.generics.clone(),
             name: function.name.clone(),
-            return_type: self.types.functions[function_id],
+            return_type: self.function_type(function_id),
         };
         self.tree.functions.insert(function_id, mir_function);
 
         for parameter in &function.parameters {
-            let ty = self.types.locals[parameter.local];
+            let ty = self.local_type(parameter.local);
             let local_id = self.new_parameter(parameter.local, ty);
 
             let parameters = &mut self.tree.functions[function_id].parameters;
@@ -94,7 +94,7 @@ impl<'a> MirContext<'a> {
 
         if is_main {
             let statement = mir::Statement::new(mir::StatementKind::Call {
-                id: self.hir.init_global_function,
+                id: self.hir_response.hir.init_global_function,
                 type_args: vec![],
                 arguments: vec![],
                 return_place: None,

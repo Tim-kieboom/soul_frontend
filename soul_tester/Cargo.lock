@@ -201,6 +201,7 @@ dependencies = [
  "ast",
  "hir",
  "hir_typed_context",
+ "run_hir",
  "serde",
  "soul_utils",
 ]

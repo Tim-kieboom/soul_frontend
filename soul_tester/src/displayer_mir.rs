@@ -1,8 +1,7 @@
 use hir::{HirType, TypeId};
 use hir_typed_context::HirTypedTable;
 use mir_parser::mir::{
-    self, BlockId, FunctionBody, LocalId, MirTree, Operand, Place, PlaceId, Rvalue, StatementId,
-    TempId,
+    self, BlockId, FunctionBody, Local, LocalId, MirTree, Operand, Place, PlaceId, Rvalue, StatementId, TempId
 };
 use soul_utils::{
     ids::{FunctionId, IdAlloc},
@@ -70,6 +69,11 @@ impl<'a> MirDisplayer<'a> {
 
     fn display_global(&mut self, global: &mir::Global) {
         self.push('\t');
+
+        if global.is_comptime() {
+            self.push_str("Comptime ");
+        }
+
         self.display_local_declare(global.local);
         if let Some(literal) = &global.literal {
             self.push_str(" = ");
@@ -112,7 +116,7 @@ impl<'a> MirDisplayer<'a> {
             } => (*entry_block, locals, blocks),
         };
 
-        self.push_str(" [\n\t");
+        self.push_str(" {\n\t");
         self.display_goto(entry_block);
         self.push('\n');
 
@@ -126,38 +130,49 @@ impl<'a> MirDisplayer<'a> {
         for block in blocks {
             self.display_block(*block);
         }
-        self.push_str("\n]\n");
+        self.push_str("\n}\n");
     }
 
     fn display_local_declare(&mut self, local_id: LocalId) {
         let local = &self.mir.locals[local_id];
 
-        let mut hir_type = self.get_type(local.ty);
+        if local.is_comptime() {
+            self.push_str("Comptime ");
+        }
+
+        let mut hir_type = self.get_type(local.ty());
         let modifier = hir_type.modifier.unwrap_or(TypeModifier::Const);
         hir_type.modifier = None;
 
         self.push_str(modifier.as_str());
         self.push(' ');
-        self.display_local_name(local.id);
+        self.display_local_name(local.id());
         self.push_str(": ");
         hir_type
             .write_display(&self.types.types, &mut self.sb)
             .expect("no fmt error");
+
+        match local {
+            Local::Comptime { value, .. } => {
+                self.push_str(" = ");
+                self.push_str(&value.value_to_string());
+            }
+            _ => (),
+        }
     }
 
     fn display_block(&mut self, block_id: BlockId) {
         let block = &self.mir.blocks[block_id];
 
-        self.push('\t');
         self.display_block_name(block_id);
-        self.push_str(": {\n");
+        self.push_str(": \n");
         for statement in &block.statements {
-            self.push_str("\t\t");
+            self.push_str("\t");
             self.display_statement(*statement);
             self.push('\n');
         }
 
-        self.push_str("\t\t");
+        self.push_str("\t");
         match &block.terminator {
             mir::Terminator::Exit => self.push_str("// exit"),
             mir::Terminator::Goto(block_id) => {
@@ -178,12 +193,11 @@ impl<'a> MirDisplayer<'a> {
                 self.display_operand(condition);
                 self.push_str(") ");
                 self.display_goto(*then);
-                self.push_str("\n\t\telse ");
+                self.push_str("\n\telse ");
                 self.display_goto(*arm);
             }
             mir::Terminator::Unreachable => self.push_str("// unreachable"),
         }
-        self.push_str("\n\t}\n");
     }
 
     fn display_statement(&mut self, statement_id: StatementId) {

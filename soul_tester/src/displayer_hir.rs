@@ -285,8 +285,12 @@ impl<'a> HirDisplayer<'a> {
                 self.display_call_id(*function);
                 if !generics.is_empty() {
                     self.push('<');
-                    for generic in generics {
+                    let last_index = generics.len().saturating_sub(1);
+                    for (i, generic) in generics.iter().enumerate() {
                         self.display_type(self.ref_to_id(*generic));
+                        if i != last_index {
+                            self.push_str(", ");
+                        }
                     }
                     self.push('>');
                 }

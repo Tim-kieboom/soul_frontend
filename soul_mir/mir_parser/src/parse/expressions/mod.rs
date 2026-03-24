@@ -11,17 +11,22 @@ mod conditionals;
 
 impl<'a> MirContext<'a> {
     pub(crate) fn lower_operand(&mut self, value_id: hir::ExpressionId) -> EndBlock<mir::Operand> {
-        let value = &self.hir.expressions[value_id];
-        let span = self.hir.spans.expressions[value_id];
-        let ty = self.expression_ty(value_id);
+        let value = &self.hir_response.hir.expressions[value_id];
+        let span = self.expression_span(value_id);
+        let ty = self.expression_type(value_id);
         let is_end = &mut false;
+
+        if let Some(literal) = self.get_expression_literal(value_id) {
+            let operand = mir::Operand::new(ty, mir::OperandKind::Comptime(literal.clone()));
+            return EndBlock::new(operand, is_end);
+        }
 
         let operand = match &value.kind {
             hir::ExpressionKind::Literal(literal) => {
                 mir::Operand::new(ty, mir::OperandKind::Comptime(literal.clone()))
             }
             hir::ExpressionKind::Local(local_id) => {
-                let local_type = self.types.locals[*local_id];
+                let local_type = self.local_type(*local_id);
                 let id = match self.local_remap.get(*local_id) {
                     Some(val) => *val,
                     None => {
@@ -85,10 +90,10 @@ impl<'a> MirContext<'a> {
                 let main_body = self.expect_current_block();
                 self.lower_block(*block_id, main_body).pass(is_end);
 
-                let operand = match self.hir.blocks[*block_id].terminator {
+                let operand = match self.hir_response.hir.blocks[*block_id].terminator {
                     Some(terminator) => {
                         let inner = self.lower_operand(terminator).pass(is_end);
-                        let terminator_type = self.expression_ty(terminator);
+                        let terminator_type = self.expression_type(terminator);
                         let temp = self.new_temp(terminator_type);
 
                         let place = self.new_place(mir::Place::Temp(temp));
@@ -136,7 +141,7 @@ impl<'a> MirContext<'a> {
             }
 
             hir::ExpressionKind::Ref { place, mutable } => {
-                let ty = self.types.places[place.node.get_id()];
+                let ty = self.hir_response.types.places[place.node.get_id()];
 
                 let place_id = self.lower_place(place).pass(is_end);
 
@@ -151,12 +156,7 @@ impl<'a> MirContext<'a> {
 
             hir::ExpressionKind::Cast { value, cast_to } => {
                 let cast_id = self.ref_to_id(*cast_to);
-                let inner_type = self
-                    .types
-                    .expressions
-                    .get(*value)
-                    .copied()
-                    .unwrap_or(TypeId::error());
+                let inner_type = self.expression_type(*value);
                 if inner_type == cast_id {
                     self.lower_operand(*value).pass(is_end)
                 } else {
@@ -178,7 +178,7 @@ impl<'a> MirContext<'a> {
             }
 
             hir::ExpressionKind::InnerRawStackArray { .. } => {
-                mir::Operand::new(self.types.none_type, mir::OperandKind::None)
+                mir::Operand::new(self.hir_response.types.none_type, mir::OperandKind::None)
             }
 
             hir::ExpressionKind::If {
@@ -191,7 +191,7 @@ impl<'a> MirContext<'a> {
                 self.lower_while(*condition, *body, is_end)
             }
             hir::ExpressionKind::Error => {
-                mir::Operand::new(self.types.none_type, mir::OperandKind::None)
+                mir::Operand::new(self.hir_response.types.none_type, mir::OperandKind::None)
             }
         };
 
@@ -216,7 +216,7 @@ impl<'a> MirContext<'a> {
             ));
         }
 
-        let function = &self.hir.functions[function_id];
+        let function = &self.hir_response.hir.functions[function_id];
         let parameters = &function.parameters;
         let mut arguments = vec![];
         for (i, parameter) in parameters.iter().enumerate() {
@@ -228,15 +228,15 @@ impl<'a> MirContext<'a> {
                 },
             };
 
-            let expression = &self.hir.expressions[arg];
+            let expression = &self.hir_response.hir.expressions[arg];
             let mut value = self.lower_operand(arg).pass(is_end);
 
-            let ty = self.types.locals[parameters[i].local];
+            let ty = self.local_type(parameters[i].local);
 
             let param_type = self.id_to_type(ty).clone();
-            let arg_type = self.id_to_type(self.expression_ty(arg)).clone();
+            let arg_type = self.id_to_type(self.expression_type(arg)).clone();
             let is_castable = arg_type
-                .unify_primitive_cast(&self.types.types, &param_type)
+                .unify_primitive_cast(&self.hir_response.types.types, &param_type)
                 .is_ok();
             if expression.is_literal() && is_castable {
                 let temp = self.new_temp(ty);

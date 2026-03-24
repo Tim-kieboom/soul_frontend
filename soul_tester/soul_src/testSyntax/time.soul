@@ -7,7 +7,7 @@ class Stopwatch {
     time: Duration
 
     This() {
-        This{time: unsafe{__clib_timenow()}}
+        This{time: unsafe{__clib_Duration_now()}}
     }
 
     Elapsed(@this): Duration {

@@ -7,5 +7,6 @@ edition = "2024"
 ast = { version = "0.1.0", path = "../../soul_ast/ast_model" }
 hir = { version = "0.1.0", path = "../../soul_hir/hir_model" }
 hir_typed_context = { version = "0.1.0", path = "../../soul_hir/hir_typed_context" }
+run_hir = { version = "0.1.0", path = "../../soul_hir/run_hir" }
 serde = { version = "1.0.228", features = ["derive"] }
 soul_utils = { version = "0.1.0", path = "../../soul_utils" }

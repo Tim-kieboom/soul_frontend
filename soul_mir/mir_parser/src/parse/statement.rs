@@ -23,7 +23,7 @@ impl<'a> MirContext<'a> {
 
         let mut last_operand = None;
 
-        let span = self.hir.spans.statements[statement_id];
+        let span = self.statement_span(statement_id);
         let terminator = match statement {
             hir::Statement::Variable(variable, _) => {
                 self.lower_variable(variable, is_end);
@@ -34,8 +34,8 @@ impl<'a> MirContext<'a> {
                 None
             }
             hir::Statement::Expression { value, .. } => {
-                let kind = &self.hir.expressions[*value].kind;
                 let operand = self.lower_operand(*value).pass(is_end);
+                let kind = &self.hir_response.hir.expressions[*value].kind;
 
                 if is_valid_statement_expression(kind)
                     && !matches!(operand.kind, mir::OperandKind::None)
@@ -105,7 +105,7 @@ impl<'a> MirContext<'a> {
                 None
             }
             hir::Statement::Fall(_, _) => {
-                let span = self.hir.spans.statements[statement_id];
+                let span = self.statement_span(statement_id);
                 self.log_error(soul_error_internal!("statement not yet impl", Some(span)));
                 None
             }
@@ -119,17 +119,33 @@ impl<'a> MirContext<'a> {
     }
 
     pub(crate) fn lower_variable(&mut self, variable: &hir::Variable, is_end: &mut bool) {
+        
+        let should_assign;
         let place_kind = if variable.is_temp {
+            should_assign = true;
             mir::Place::Temp(match self.temp_remap.get(variable.local) {
                 Some(val) => *val,
-                None => self.new_temp(self.types.locals[variable.local]),
+                None => self.new_temp(self.local_type(variable.local)),
             })
         } else {
-            mir::Place::Local(match self.local_remap.get(variable.local) {
+
+            let literal = match variable.value {
+                Some(value) => self.get_expression_literal(value).cloned(),
+                None => None,
+            };
+
+            let local = match self.local_remap.get(variable.local) {
                 Some(val) => *val,
-                None => self.new_local(variable.local, self.types.locals[variable.local]),
-            })
+                None => self.new_local(variable.local, self.local_type(variable.local), literal),
+            };
+
+            should_assign = self.tree.locals[local].is_runtime();
+            mir::Place::Local(local)
         };
+
+        if !should_assign {
+            return
+        }
 
         if let Some(value) = variable.value {
             let operand = self.lower_operand(value).pass(is_end);

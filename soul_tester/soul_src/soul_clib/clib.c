@@ -1,6 +1,5 @@
 #include "clib.h"
 
-
 // ---------------- #Math ----------------      
 
 #define __POW(ty) ty __clib_pow_##ty(ty a, ty b) { \
@@ -11,10 +10,6 @@
     return (ty)pow((f64)base, (f64)1.0 / (f64)exp);       \
 }
 
-double __clib_log(double exp, double base) {
-    return log10(exp) / log10(base);
-}
-
 /// impl define marcro for all number types
 #define __IMPL_NUMBERS(impl)                \
     impl(i8);impl(i16);impl(i32);impl(i64); \
@@ -23,6 +18,18 @@ double __clib_log(double exp, double base) {
 
 __IMPL_NUMBERS(__POW);
 __IMPL_NUMBERS(__ROOT);
+
+double __clib_log10(double base) {
+    return log10(base);
+}
+
+double __clib_log2(double base) {
+    return log2(base);
+}
+
+double __clib_log(double exp, double base) {
+    return log10(exp) / log10(base);
+}
 
 // ---------------- #Printers ----------------
 

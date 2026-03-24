@@ -7,8 +7,8 @@ impl<'a> MirContext<'a> {
     pub(crate) fn lower_global(&mut self, global: &hir::Global, is_end: &mut bool) {
         match global {
             hir::Global::Function(function, _) => {
-                if *function == self.hir.main_function {
-                    return; // lower main later
+                if *function == self.hir_response.hir.main_function {
+                    return // lower main later
                 }
                 self.lower_function(*function)
             }
@@ -51,11 +51,11 @@ impl<'a> MirContext<'a> {
     fn lower_global_variable(&mut self, variable: &hir::Variable) -> Option<mir::Place> {
         if variable.is_temp {
             return Some(mir::Place::Temp(
-                self.new_temp(self.types.locals[variable.local]),
+                self.new_temp(self.local_type(variable.local)),
             ));
         }
 
-        let ty = self.types.locals[variable.local];
+        let ty = self.local_type(variable.local);
         let local = self.new_local_global(variable.local, ty);
         let id = self.id_generators.alloc_global();
 
@@ -71,13 +71,7 @@ impl<'a> MirContext<'a> {
             }
         };
 
-        let literal =
-            if let hir::ExpressionKind::Literal(literal) = &self.hir.expressions[value_id].kind {
-                Some(literal.clone())
-            } else {
-                None
-            };
-
+        let literal = self.get_expression_literal(value_id).cloned();
         let is_literal = literal.is_some();
         let global = mir::Global {
             id,

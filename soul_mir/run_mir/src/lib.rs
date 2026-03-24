@@ -12,6 +12,6 @@ pub fn to_mir(
     faults: &mut Vec<SementicFault>,
 ) -> MirResponse {
     MirResponse {
-        tree: mir_lower(&hir_response.hir, &hir_response.types, faults),
+        tree: mir_lower(&hir_response, faults),
     }
 }

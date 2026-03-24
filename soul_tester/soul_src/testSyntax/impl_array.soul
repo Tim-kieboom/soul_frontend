@@ -16,7 +16,7 @@ use<T, N as uint> [N]T {
     }
 
     impl const ConsumeIndex<T> {
-        ConsumeIndex(this, index: uint): ResIndex<T> {
+        const ConsumeIndex(this, index: uint): ResIndex<T> {
             
             if index > N {
                 return Err(ErrIndex{index})
@@ -30,7 +30,7 @@ use<T, N as uint> [N]T {
     }
 
     impl const RefIndex<T> {
-        RefIndex(@this, index: uint): ResIndex<@T> {
+        const RefIndex(@this, index: uint): ResIndex<@T> {
             if index > N {
                 return Err(ErrIndex{index})
             }

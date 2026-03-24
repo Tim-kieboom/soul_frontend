@@ -1,13 +1,15 @@
+use ast::Literal;
 use hir::TypeId;
-use mir_parser::mir::{Function, FunctionBody, LocalId};
+use inkwell::{types::BasicTypeEnum, values::PointerValue};
+use mir_parser::mir::{self, Function, FunctionBody, LocalId};
 use soul_utils::{
-    error::{SoulError, SoulErrorKind},
+    error::{SoulError, SoulErrorKind, SoulResult},
     vec_map::VecMapIndex,
 };
 
-use crate::{GenericSubstitute, LlvmBackend, build_error};
+use crate::{GenericSubstitute, IrOperand, LlvmBackend, build_error};
 
-impl<'a> LlvmBackend<'a> {
+impl<'f, 'a> LlvmBackend<'f, 'a> {
     pub(crate) fn allocate_function_locals(
         &mut self,
         function: &Function,
@@ -28,60 +30,8 @@ impl<'a> LlvmBackend<'a> {
         let entry = self.get_block(*entry_block);
         self.builder.position_at_end(entry);
 
-        for (i, local_id) in function.parameters.iter().enumerate() {
-            let local = &self.mir.tree.locals[*local_id];
-            let name = self.local_name(*local_id);
-
-            let ty = match self.lower_type(local.ty, generics) {
-                Ok(Some(ty)) => ty,
-                Err(err) => {
-                    self.log_error(err);
-                    self.context.i8_type().into()
-                }
-                Ok(None) => self.context.i8_type().into(),
-            };
-
-            let ptr = match self.builder.build_alloca(ty, &name) {
-                Ok(val) => val,
-                Err(err) => {
-                    self.log_error(build_error(err));
-                    return;
-                }
-            };
-            self.push_local(*local_id, ptr);
-
-            let function = self.get_or_create_function(function.id, type_args);
-            let param = function
-                .get_nth_param(i as u32)
-                .expect("should have parameter");
-
-            if let Err(err) = self.builder.build_store(ptr, param) {
-                self.log_error(build_error(err));
-            }
-        }
-
-        for local_id in locals {
-            let local = &self.mir.tree.locals[*local_id];
-            let name = self.local_name(*local_id);
-
-            let ty = match self.lower_type(local.ty, generics) {
-                Ok(Some(ty)) => ty,
-                Err(err) => {
-                    self.log_error(err);
-                    self.context.i8_type().into()
-                }
-                Ok(None) => self.context.i8_type().into(),
-            };
-
-            let ptr = match self.builder.build_alloca(ty, &name) {
-                Ok(val) => val,
-                Err(err) => {
-                    self.log_error(build_error(err));
-                    return;
-                }
-            };
-            self.push_local(*local_id, ptr);
-        }
+        self.alloc_parameter(function, type_args, generics);
+        self.alloc_locals(locals, generics);
     }
 
     pub(crate) fn allocate_globals(&mut self) {
@@ -126,14 +76,98 @@ impl<'a> LlvmBackend<'a> {
         }
     }
 
+    fn alloc_parameter(&mut self, function: &Function, type_args: &Vec<TypeId>, generics: &GenericSubstitute) {
+        for (i, local_id) in function.parameters.iter().enumerate() {
+            let local = &self.mir.tree.locals[*local_id];
+            let name = self.local_name(*local_id);
+
+            let ty = match self.lower_type(local.ty(), generics) {
+                Ok(Some(ty)) => ty,
+                Err(err) => {
+                    self.log_error(err);
+                    self.context.i8_type().into()
+                }
+                Ok(None) => self.context.i8_type().into(),
+            };
+
+            if let mir::Local::Comptime { value, .. } = local {
+                self.build_comptime_local(ty, local.ty(), *local_id, value);
+                continue;
+            }
+
+            let ptr = match self.build_runtime_local(ty, *local_id, &name) {
+                Ok(val) => val,
+                Err(err) => {
+                    self.log_error(err);
+                    continue
+                }
+            };
+            let function = self.get_or_create_function(function.id, type_args);
+            let param = function
+                .get_nth_param(i as u32)
+                .expect("should have parameter");
+
+            if let Err(err) = self.builder.build_store(ptr, param) {
+                self.log_error(build_error(err));
+            }
+        }
+    }
+
+    fn alloc_locals(&mut self, locals: &Vec<LocalId>, generics: &GenericSubstitute) {
+        for local_id in locals {
+            let local = &self.mir.tree.locals[*local_id];
+            let name = self.local_name(*local_id);
+
+            let ty = match self.lower_type(local.ty(), generics) {
+                Ok(Some(ty)) => ty,
+                Err(err) => {
+                    self.log_error(err);
+                    self.context.i8_type().into()
+                }
+                Ok(None) => self.context.i8_type().into(),
+            };
+
+            if let mir::Local::Comptime { value, .. } = local {
+                self.build_comptime_local(ty, local.ty(), *local_id, value);
+                continue;
+            }
+
+            match self.build_runtime_local(ty, *local_id, &name) {
+                Ok(val) => val,
+                Err(err) => {
+                    self.log_error(err);
+                    continue
+                }
+            };
+    }
+    }
+
+    fn build_runtime_local(&mut self, ty: BasicTypeEnum<'a>, local_id: LocalId, name: &str) -> SoulResult<PointerValue<'a>> {
+        let ptr = self.builder.build_alloca(ty, name).map_err(build_error)?;
+        self.push_local(local_id, crate::Local::Runtime(ptr));
+        Ok(ptr)
+    }
+
+    fn build_comptime_local(&mut self, ty: BasicTypeEnum<'a>, hir_type: TypeId, id: LocalId, literal: &Literal) {
+        let const_operand = match self.lower_literal(literal, hir_type) {
+            Ok(val) => val,
+            Err(err) => {
+                self.log_error(err);
+                IrOperand { value: ty.const_zero(), is_signed_interger: false }
+            }
+        };
+        let local = crate::Local::Comptime(const_operand);
+        self.push_local(id, local);
+    }
+
     fn insert_dummy_global(&mut self, local: LocalId) {
         let dummy_type = self.context.i8_type();
-        let value = self
+        let ptr = self
             .module
             .add_global(dummy_type, None, "global_error")
             .as_pointer_value();
 
-        self.push_local(local, value);
+        self.push_local(local, crate::Local::Runtime(ptr));
     }
 
     fn local_name(&self, id: LocalId) -> String {

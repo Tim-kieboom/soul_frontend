@@ -130,7 +130,7 @@ impl<I: VecMapIndex, T> VecMap<I, T> {
             Some(None) | None => _ = self.inner_insert(index.index(), Default::default()),
             _ => (),
         }
-        
+
         self.vec[index.index()].as_ref().expect("on None")
     }
 
@@ -152,7 +152,9 @@ impl<I: VecMapIndex, T> VecMap<I, T> {
             _ => (),
         }
 
-        self.vec[index.index()].as_mut().expect("entry in VecMap::get_mut_or_default should be Some(_)")
+        self.vec[index.index()]
+            .as_mut()
+            .expect("entry in VecMap::get_mut_or_default should be Some(_)")
     }
 
     /// Extends this map by inserting multiple `(index, value)` pairs from an iterator.

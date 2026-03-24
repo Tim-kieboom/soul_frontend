@@ -5,7 +5,7 @@ use soul_utils::{error::SoulResult, soul_error_internal, soul_names::PrimitiveTy
 
 use crate::{GenericSubstitute, IrOperand, LlvmBackend, build_error};
 
-impl<'a> LlvmBackend<'a> {
+impl<'f, 'a> LlvmBackend<'f, 'a> {
     pub(super) fn lower_cast(
         &self,
         value: &mir::Operand,

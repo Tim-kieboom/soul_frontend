@@ -38,6 +38,42 @@ pub struct MirTree {
     pub functions: VecMap<FunctionId, Function>,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum Local {
+    Runtime{
+        id: LocalId,
+        ty: TypeId,
+    },
+    Comptime{
+        id: LocalId, 
+        ty: TypeId, 
+        value: Literal,
+    },
+}
+impl Local {
+    pub fn id(&self) -> LocalId {
+        match self {
+            Local::Runtime { id, .. } => *id,
+            Local::Comptime { id, .. } => *id,
+        }
+    }
+
+    pub fn ty(&self) -> TypeId {
+        match self {
+            Local::Runtime { ty, .. } => *ty,
+            Local::Comptime { ty, .. } => *ty,
+        }
+    }
+
+    pub fn is_runtime(&self) -> bool {
+        matches!(self, Local::Runtime { .. })
+    }
+
+    pub fn is_comptime(&self) -> bool {
+        matches!(self, Local::Comptime { .. })
+    }
+}
+
 /// Lowered function definition in MIR.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Function {
@@ -66,6 +102,11 @@ pub enum FunctionBody {
         blocks: Vec<BlockId>,
     },
 }
+impl FunctionBody {
+    pub fn is_internal(&self) -> bool {
+        matches!(self, FunctionBody::Internal{..})
+    }
+}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Global {
@@ -75,21 +116,12 @@ pub struct Global {
     pub literal: Option<Literal>,
 }
 impl Global {
-    pub fn is_literal(&self) -> bool {
+    pub fn is_comptime(&self) -> bool {
         self.literal.is_some()
     }
     pub fn is_runtime(&self) -> bool {
         self.literal.is_none()
     }
-}
-
-/// A local variable in MIR.
-///
-/// Locals represent stack-allocated storage.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct Local {
-    pub id: LocalId,
-    pub ty: TypeId,
 }
 
 /// A basic block in MIR.

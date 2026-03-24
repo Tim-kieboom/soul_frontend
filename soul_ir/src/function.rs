@@ -8,7 +8,7 @@ use soul_utils::{Ident, ids::FunctionId};
 
 use crate::{FunctionKeyId, GenericSubstitute, LlvmBackend};
 
-impl<'a> LlvmBackend<'a> {
+impl<'f, 'a> LlvmBackend<'f, 'a> {
     pub(crate) fn declare_function_instance(
         &mut self,
         function_id: FunctionId,
@@ -66,23 +66,27 @@ impl<'a> LlvmBackend<'a> {
 
         for block_id in blocks {
             let llvm_block = self.get_block(*block_id);
-            self.current.set_block(*block_id);  
+            self.current.set_block(*block_id);
             self.builder.position_at_end(llvm_block);
 
-            self.lower_statement(*block_id, generics);
+            self.lower_block(*block_id, generics);
             if let Err(err) = self.lower_terminator(*block_id, generics) {
                 self.log_error(err);
             }
         }
     }
 
-    pub(crate) fn mangle(&mut self, name: &Ident, callee: Option<TypeId>, type_args: &Vec<TypeId>) -> String {
+    pub(crate) fn mangle(
+        &mut self,
+        name: &Ident,
+        callee: Option<TypeId>,
+        type_args: &Vec<TypeId>,
+    ) -> String {
         const SEPARATOR: &str = "__";
 
         let mut sb = name.to_string();
         if let Some(this) = callee {
-            sb.push_str("_this");
-            sb.push_str(SEPARATOR);
+            sb.push_str("_this_");
             match self.get_type(this) {
                 Ok(ty) => ty
                     .write_display_no_spaces(&self.types.types, &mut sb)
@@ -94,7 +98,7 @@ impl<'a> LlvmBackend<'a> {
             };
         }
         if !type_args.is_empty() {
-            sb.push_str("_Gnrc");
+            sb.push_str("_Genrc");
         }
         for ty in type_args {
             sb.push_str(SEPARATOR);

@@ -25,7 +25,7 @@ impl<'a> MirContext<'a> {
                 self.new_place(mir::Place::Local(local))
             }
             hir::PlaceKind::Temp(local_id, id) => {
-                let ty = self.types.places[*id];
+                let ty = self.place_type(*id);
                 let temp = match self.temp_remap.get(*local_id) {
                     Some(val) => *val,
                     None => {
@@ -39,7 +39,7 @@ impl<'a> MirContext<'a> {
             }
             hir::PlaceKind::Deref(inner, _) => {
                 let id = inner.node.get_id();
-                let ty = self.types.places[id];
+                let ty = self.place_type(id);
 
                 let base_place = self.lower_place(inner).pass(is_end);
                 let operand = self.place_to_operand(base_place, ty);
@@ -49,12 +49,7 @@ impl<'a> MirContext<'a> {
             hir::PlaceKind::Field { .. } => todo!("mir desugar field"),
         };
 
-        let ty = self
-            .types
-            .places
-            .get(place.node.get_id())
-            .copied()
-            .unwrap_or(TypeId::error());
+        let ty = self.place_type(place.node.get_id());
         self.place_typed.insert(mir_place, ty);
         EndBlock::new(mir_place, is_end)
     }

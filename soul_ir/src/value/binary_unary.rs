@@ -5,7 +5,7 @@ use soul_utils::error::{SoulError, SoulErrorKind, SoulResult};
 
 use crate::{GenericSubstitute, IrOperand, LlvmBackend, build_error};
 
-impl<'a> LlvmBackend<'a> {
+impl<'f, 'a> LlvmBackend<'f, 'a> {
     pub(super) fn lower_binary(
         &self,
         left: &mir::Operand,

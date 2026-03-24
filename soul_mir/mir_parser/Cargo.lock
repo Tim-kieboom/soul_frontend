@@ -39,6 +39,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "hir_literal_interpreter"
+version = "0.1.0"
+dependencies = [
+ "ast",
+ "hir",
+ "hir_typed_context",
+ "soul_utils",
+]
+
+[[package]]
+name = "hir_parser"
+version = "0.1.0"
+dependencies = [
+ "ast",
+ "enum_variant_name_const",
+ "hir",
+ "soul_utils",
+]
+
+[[package]]
 name = "hir_typed_context"
 version = "0.1.0"
 dependencies = [
@@ -76,6 +96,7 @@ dependencies = [
  "ast",
  "hir",
  "hir_typed_context",
+ "run_hir",
  "serde",
  "soul_utils",
 ]
@@ -96,6 +117,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "21b2ebcf727b7760c461f091f9f0f539b77b8e87f2fd88131e7f1b433b3cece4"
 dependencies = [
  "proc-macro2",
+]
+
+[[package]]
+name = "run_hir"
+version = "0.1.0"
+dependencies = [
+ "ast",
+ "hir",
+ "hir_literal_interpreter",
+ "hir_parser",
+ "hir_typed_context",
+ "soul_utils",
 ]
 
 [[package]]

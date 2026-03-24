@@ -27,8 +27,8 @@ mod function;
 mod ir_type;
 mod local;
 mod statement;
-mod value;
 mod utils;
+mod value;
 use utils::*;
 
 pub struct IrRequest<'ctx> {
@@ -48,15 +48,15 @@ impl<'ctx> IrRequest<'ctx> {
 
 pub struct IrResponse<'a> {
     pub module: Module<'a>,
-    pub no_errors: bool,
+    pub is_fatal: bool,
 }
 
-pub fn to_llvm_ir<'a>(
+pub fn to_llvm_ir<'f, 'a>(
     request: &'a IrRequest<'a>,
-    _options: &CompilerOptions,
-    faults: &'a mut Vec<SementicFault>,
+    options: &'a CompilerOptions,
+    faults: &'f mut Vec<SementicFault>,
 ) -> IrResponse<'a> {
-    let mut backend = LlvmBackend::new(request, faults);
+    let mut backend = LlvmBackend::new(request, options, faults);
 
     backend.declare_exit();
     backend.allocate_globals();
@@ -75,7 +75,7 @@ pub struct IrOperand<'a> {
 
 impl_soul_ids!(FunctionKeyId);
 
-pub struct LlvmBackend<'a> {
+pub struct LlvmBackend<'f, 'a> {
     default_int_size: u8,
     default_char_size: u8,
     default_int_type: IntType<'a>,
@@ -88,17 +88,25 @@ pub struct LlvmBackend<'a> {
     builder: Builder<'a>,
     types: HirTypedTable,
     exit_function: Option<FunctionValue<'a>>,
+    options: &'a CompilerOptions,
 
     temps: HashMap<(FunctionKeyId, TempId), IrOperand<'a>>,
     blocks: HashMap<(FunctionKeyId, BlockId), BasicBlock<'a>>,
-    locals: HashMap<(FunctionKeyId, LocalId), PointerValue<'a>>,
+    locals: HashMap<(FunctionKeyId, LocalId), Local<'a>>,
     functions: VecMap<FunctionKeyId, FunctionValue<'a>>,
     function_keys: FunctionKeyStore,
 
-    faults: &'a mut Vec<SementicFault>,
+    faults: &'f mut Vec<SementicFault>,
 }
-impl<'a> LlvmBackend<'a> {
-    pub fn new(request: &'a IrRequest<'a>, faults: &'a mut Vec<SementicFault>) -> Self {
+
+#[derive(Debug, Clone, Copy)]
+pub enum Local<'a> {
+    Runtime(PointerValue<'a>),
+    Comptime(IrOperand<'a>),
+} 
+
+impl<'f, 'a> LlvmBackend<'f, 'a> {
+    pub fn new(request: &'a IrRequest<'a>, options: &'a CompilerOptions, faults: &'f mut Vec<SementicFault>) -> Self {
         let module = request.context.create_module("main");
         let builder = request.context.create_builder();
         let function_keys = FunctionKeyStore::new();
@@ -117,6 +125,7 @@ impl<'a> LlvmBackend<'a> {
             locals: HashMap::new(),
             functions: VecMap::new(),
             function_keys,
+            options,
 
             default_int_size: 32,
             default_char_size: 8,
@@ -162,24 +171,34 @@ impl<'a> LlvmBackend<'a> {
         self.lower_function_instance(function_id, key_id, type_args, &generics);
 
         self.current = prev;
-        if self.current.function_key() != self.function_keys.global_key() {
+        if self.is_bodied_function(self.current.function_key()) {
             let block = self.get_block(self.current.block());
             self.builder.position_at_end(block);
         }
         llvm_fn
     }
 
-    fn get_local(&self, id: LocalId) -> PointerValue<'a> {
-        match self
-            .locals
-            .get(&(self.current.function_key(), id))
-        {
+    fn get_local(&self, id: LocalId) -> Local<'a> {
+        match self.locals.get(&(self.current.function_key(), id)) {
             Some(local) => *local,
             _ => {
                 let global = self.function_keys.global_key();
                 self.locals[&(global, id)]
             }
         }
+    }
+
+    fn is_bodied_function(&self, id: FunctionKeyId) -> bool {
+        if id == self.function_keys.global_key() {
+            return false
+        }
+        
+        let key = match self.function_keys.id_to_key(id) {
+            Some(val) => val,
+            None => panic!("should have {:?}", id),
+        };
+        let function = &self.mir.tree.functions[key.function_id()];
+        function.body.is_internal()
     }
 
     fn get_block(&self, id: BlockId) -> BasicBlock<'a> {
@@ -191,10 +210,11 @@ impl<'a> LlvmBackend<'a> {
     }
 
     fn push_global(&mut self, id: LocalId, value: PointerValue<'a>) {
-        self.locals.insert((self.function_keys.global_key(), id), value);
+        self.locals
+            .insert((self.function_keys.global_key(), id), Local::Runtime(value));
     }
 
-    fn push_local(&mut self, id: LocalId, value: PointerValue<'a>) {
+    fn push_local(&mut self, id: LocalId, value: Local<'a>) {
         self.locals.insert((self.current.function_key(), id), value);
     }
 
@@ -220,7 +240,7 @@ impl<'a> LlvmBackend<'a> {
     fn to_ir_reponse(self) -> IrResponse<'a> {
         IrResponse {
             module: self.module,
-            no_errors: self.faults.is_empty(),
+            is_fatal: self.faults.iter().find(|fault| fault.is_fatal(self.options.fault_level)).is_some(),
         }
     }
 }

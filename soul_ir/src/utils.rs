@@ -1,6 +1,9 @@
 use hir::{GenericId, TypeId};
 use mir_parser::mir;
-use soul_utils::{ids::{FunctionId, IdAlloc}, vec_map::VecMap};
+use soul_utils::{
+    ids::{FunctionId, IdAlloc},
+    vec_map::VecMap,
+};
 
 use crate::FunctionKeyId;
 
@@ -42,6 +45,14 @@ pub struct FunctionKey {
 impl FunctionKey {
     pub fn new(id: FunctionId, type_args: Vec<TypeId>) -> Self {
         Self { id, type_args }
+    }
+
+    pub fn function_id(&self) -> FunctionId {
+        self.id
+    }
+
+    pub fn type_args(&self) -> &Vec<TypeId> {
+        &self.type_args
     }
 }
 
