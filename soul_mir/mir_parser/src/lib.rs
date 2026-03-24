@@ -1,5 +1,5 @@
 use ast::Literal;
-use hir::{RefTypeId, TypeId};
+use hir::{HirType, RefTypeId, TypeId};
 use run_hir::HirResponse;
 use soul_utils::{
     error::{SoulError, SoulErrorKind}, ids::{FunctionId, IdAlloc}, sementic_level::SementicFault, soul_error_internal, span::Span, vec_map::VecMap
@@ -32,6 +32,8 @@ struct MirContext<'a> {
     tree: MirTree,
     main: FunctionId,
 
+    /// used for fallback type in some cases
+    error_type: HirType,
     current: CurrentContext,
     id_generators: IdGenerators,
     place_typed: VecMap<mir::PlaceId, TypeId>,
@@ -108,6 +110,7 @@ impl<'a> MirContext<'a> {
             tree,
             faults,
             hir_response: hir_reponse,
+            error_type: HirType::error_type(),
             id_generators: IdGenerators::new(),
             temp_remap: VecMap::const_default(),
             place_typed: VecMap::const_default(),
@@ -261,7 +264,6 @@ impl<'a> MirContext<'a> {
     }
 
     fn id_to_type(&mut self, ty: hir::TypeId) -> &hir::HirType {
-        const ERROR: hir::HirType = hir::HirType::error_type();
 
         match self.hir_response.types.types.id_to_type(ty) {
             Some(val) => val,
@@ -270,7 +272,7 @@ impl<'a> MirContext<'a> {
                     format!("type {:?} not found in typeTable", ty),
                     None
                 ));
-                &ERROR
+                &self.error_type
             }
         }
     }

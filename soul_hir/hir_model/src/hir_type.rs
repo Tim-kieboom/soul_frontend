@@ -17,6 +17,7 @@ type MishmatchReason = String;
 #[derive(Debug, Clone, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct HirType {
     pub kind: HirTypeKind,
+    pub generics: Vec<TypeId>,
     pub modifier: Option<TypeModifier>,
 }
 
@@ -48,6 +49,7 @@ impl HirType {
         Self {
             kind: HirTypeKind::Primitive(PrimitiveTypes::Uint),
             modifier: None,
+            generics: vec![],
         }
     }
 
@@ -55,6 +57,7 @@ impl HirType {
         Self {
             kind: HirTypeKind::None,
             modifier: None,
+            generics: vec![],
         }
     }
 
@@ -62,6 +65,7 @@ impl HirType {
         Self {
             kind: HirTypeKind::Error,
             modifier: None,
+            generics: vec![],
         }
     }
 
@@ -69,6 +73,7 @@ impl HirType {
         Self {
             kind: HirTypeKind::Primitive(PrimitiveTypes::Boolean),
             modifier: None,
+            generics: vec![],
         }
     }
 
@@ -76,6 +81,7 @@ impl HirType {
         Self {
             kind: HirTypeKind::InferType(infer_id, span),
             modifier: None,
+            generics: vec![],
         }
     }
 
@@ -83,6 +89,7 @@ impl HirType {
         Self {
             kind,
             modifier: None,
+            generics: vec![],
         }
     }
 

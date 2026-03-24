@@ -33,7 +33,13 @@ pub enum TypeKind {
     /// Optional type: ?int
     Optional(Box<SoulType>),
     /// unknown type
-    Stub(String),
+    Stub(Stub),
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Stub {
+    pub name: String,
+    pub generics: Vec<SoulType>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

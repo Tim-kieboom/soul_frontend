@@ -32,7 +32,7 @@ impl TypeKind {
             TypeKind::Pointer(_) => "pointer",
             TypeKind::Optional(_) => "optional",
             TypeKind::Reference(_) => "reference",
-            TypeKind::Stub(stub) => stub.as_str(),
+            TypeKind::Stub(stub) => stub.name.as_str(),
             TypeKind::Primitive(primitive_types) => primitive_types.as_str(),
         }
     }
@@ -47,7 +47,7 @@ impl TypeKind {
         let kind = DisplayKind::Parser;
         match self {
             TypeKind::Type => sb.push_str("Type"),
-            TypeKind::Stub(stub) => sb.push_str(stub.as_str()),
+            TypeKind::Stub(stub) => sb.push_str(stub.name.as_str()),
             TypeKind::Reference(r) => {
                 let ref_str = if r.mutable {
                     TypeWrapper::MutRef.as_str()

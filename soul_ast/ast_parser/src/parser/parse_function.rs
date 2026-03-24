@@ -13,7 +13,9 @@ use soul_utils::{
 
 use crate::parser::{
     Parser,
-    parse_utils::{ARROW_LEFT, ARROW_RIGHT, COLON, COMMA, ROUND_CLOSE, ROUND_OPEN, SEMI_COLON},
+    parse_utils::{
+        ARROW_LEFT, ARROW_RIGHT, COLON, COMMA, CURLY_OPEN, ROUND_CLOSE, ROUND_OPEN, SEMI_COLON,
+    },
 };
 
 type FuncResult<T> = TryResult<T, (Ident, Box<SoulError>)>;
@@ -131,6 +133,11 @@ impl<'a, 'f> Parser<'a, 'f> {
         } else {
             vec![]
         };
+
+        if self.current_is(&CURLY_OPEN) {
+            // could be struct constructor
+            return TryNotValue(self.get_expect_error(&CURLY_OPEN));
+        }
 
         let arguments = self.parse_arguments().try_err()?;
         TryOk(Spanned::new(

@@ -18,6 +18,27 @@ impl SyntaxDisplay for ExpressionKind {
 
     fn inner_display(&self, sb: &mut String, kind: DisplayKind, tab: usize, is_last: bool) {
         match self {
+            ExpressionKind::StructConstructor(ctor) => {
+                try_display_node_id(sb, kind, ctor.id);
+                ctor.struct_type.inner_display(sb, kind, tab, is_last);
+                sb.push('{');
+                let last_index = ctor.values.len().saturating_sub(1);
+                for (i, value) in ctor.values.iter().enumerate() {
+                    sb.push_str(value.0.as_str());
+                    sb.push_str(": ");
+                    value.1.node.inner_display(sb, kind, tab, is_last);
+                    if i != last_index {
+                        sb.push_str(", ");
+                    }
+                }
+                if ctor.defaults {
+                    if !ctor.values.is_empty() {
+                        sb.push_str(", ");
+                    }
+                    sb.push_str("..");
+                }
+                sb.push('}');
+            }
             ExpressionKind::Null(_) => {
                 sb.push_str(KeyWord::Null.as_str());
             }

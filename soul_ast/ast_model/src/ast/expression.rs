@@ -7,8 +7,7 @@ use soul_utils::{
 };
 
 use crate::{
-    ast::{Array, Binary, BinaryOperator, Block, Literal, SoulType, Unary, UnaryOperator},
-    scope::NodeId,
+    StructConstructor, ast::{Array, Binary, BinaryOperator, Block, Literal, SoulType, Unary, UnaryOperator}, scope::NodeId
 };
 
 /// An expression in the Soul language, wrapped with source location information.
@@ -54,6 +53,7 @@ pub enum ExpressionKind {
     /// A binary operation (addition, multiplication, comparison, etc.) `1 + 2`.
     Binary(Binary),
     Array(Array),
+    StructConstructor(StructConstructor),
     /// An `if` expression `if true {Println("is true")} else {Println("is else")}`.
     If(If),
     /// A conditional loop `while true {Println("loop")}`.
@@ -200,34 +200,17 @@ impl IfArmHelper for IfArm {
     }
 }
 
-pub trait ExpressionHelpers {
-    fn from_function_call(function_call: Spanned<FunctionCall>) -> Expression;
-    fn from_array(array: Spanned<Array>) -> Expression;
-
-    fn new_block(block: Block, span: Span) -> Expression;
-    fn new_literal(literal: Literal, span: Span) -> Expression;
-    fn new_deref(expression: Expression, span: Span) -> Expression;
-    fn new_ref(mutable: bool, expression: Expression, span: Span) -> Expression;
-    fn new_unary(op: UnaryOperator, rvalue: Expression, span: Span) -> Expression;
-    fn new_index(collection: Expression, index: Expression, span: Span) -> Expression;
-    fn new_binary(
-        lvalue: Expression,
-        op: BinaryOperator,
-        rvalue: Expression,
-        span: Span,
-    ) -> Expression;
-}
-impl ExpressionHelpers for Expression {
-    fn new_block(block: Block, span: Span) -> Expression {
+impl Expression {
+    pub fn new_block(block: Block, span: Span) -> Expression {
         Expression::new(ExpressionKind::Block(block), span)
     }
 
-    fn from_array(array: Spanned<Array>) -> Expression {
+    pub fn from_array(array: Spanned<Array>) -> Expression {
         let Spanned { node, span } = array;
         Expression::new(ExpressionKind::Array(node), span)
     }
 
-    fn new_unary(op: UnaryOperator, rvalue: Expression, span: Span) -> Expression {
+    pub fn new_unary(op: UnaryOperator, rvalue: Expression, span: Span) -> Expression {
         let unary = Unary {
             id: None,
             operator: op,
@@ -236,7 +219,7 @@ impl ExpressionHelpers for Expression {
         Expression::new(ExpressionKind::Unary(unary), span)
     }
 
-    fn new_binary(
+    pub fn new_binary(
         lvalue: Expression,
         op: BinaryOperator,
         rvalue: Expression,
@@ -251,16 +234,29 @@ impl ExpressionHelpers for Expression {
         Expression::new(ExpressionKind::Binary(binary), span)
     }
 
-    fn new_literal(literal: Literal, span: Span) -> Expression {
-        Expression::new(ExpressionKind::Literal((None, literal)), span)
+    pub fn new_literal(literal: Literal, span: Span) -> Expression {
+        Expression::new(ExpressionKind::Literal((None, literal)), span) 
     }
 
-    fn from_function_call(function_call: Spanned<FunctionCall>) -> Expression {
+    pub fn from_function_call(function_call: Spanned<FunctionCall>) -> Expression {
         let Spanned { node, span } = function_call;
         Expression::new(ExpressionKind::FunctionCall(node), span)
     }
 
-    fn new_index(collection: Expression, index: Expression, span: Span) -> Expression {
+    pub fn from_struct_contructor(ctor: Spanned<StructConstructor>) -> Expression {
+        let Spanned { node, span } = ctor;
+        Expression::new(ExpressionKind::StructConstructor(node), span)
+    }
+
+    pub fn new_variable(ident: Ident) -> Expression {
+        let span = ident.span;
+        Expression::new(
+            ExpressionKind::Variable { id: None, ident, resolved: None },
+            span,
+        )
+    }
+
+    pub fn new_index(collection: Expression, index: Expression, span: Span) -> Expression {
         Expression::new(
             ExpressionKind::Index(Index {
                 id: None,
@@ -271,7 +267,7 @@ impl ExpressionHelpers for Expression {
         )
     }
 
-    fn new_ref(mutable: bool, expression: Expression, new_span: Span) -> Expression {
+    pub fn new_ref(mutable: bool, expression: Expression, new_span: Span) -> Expression {
         let Expression { node, span } = expression;
         let new_ref = ExpressionKind::Ref {
             id: None,
@@ -281,7 +277,7 @@ impl ExpressionHelpers for Expression {
         Expression::new(new_ref, new_span)
     }
 
-    fn new_deref(expression: Expression, new_span: Span) -> Expression {
+    pub fn new_deref(expression: Expression, new_span: Span) -> Expression {
         let Expression { node, span } = expression;
         let deref = ExpressionKind::Deref {
             id: None,
@@ -289,6 +285,7 @@ impl ExpressionHelpers for Expression {
         };
         Expression::new(deref, new_span)
     }
+
 }
 
 impl ExpressionKind {
@@ -307,6 +304,7 @@ impl ExpressionKind {
             ExpressionKind::Unary(_) => "Unary",
             ExpressionKind::Binary(_) => "Binary",
             ExpressionKind::Array(_) => "Array",
+            ExpressionKind::StructConstructor(_) => "StructConstructor", 
             ExpressionKind::If(_) => "If",
             ExpressionKind::While(_) => "While",
             ExpressionKind::Deref { .. } => "Deref",

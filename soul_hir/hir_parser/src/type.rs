@@ -1,3 +1,4 @@
+use ast::{Stub};
 use hir::{GenericId, HirType, HirTypeKind, RefTypeId, TypeId, TypesMap};
 use soul_utils::{
     error::{SoulError, SoulResult},
@@ -19,11 +20,18 @@ impl<'a> HirContext<'a> {
         call_generics: &Vec<(String, RefTypeId)>,
         types: &mut TypesMap,
     ) -> SoulResult<hir::TypeId> {
+        let mut generics = vec![];
         let modifier = ty.modifier; 
         let kind = match &ty.kind {
             ast::TypeKind::None => HirTypeKind::None,
             ast::TypeKind::Type => HirTypeKind::Type,
-            ast::TypeKind::Stub(name) => {
+            ast::TypeKind::Stub(Stub{ name, generics: stub_generics }) => {
+                for generic in stub_generics {
+                    generics.push(
+                        Self::convert_type(generic, scopes, call_generics, types)?
+                    )
+                }
+                
                 resolve_stub(scopes, types, call_generics, name).ok_or(SoulError::new(
                     format!("type '{}' not found", name),
                     soul_utils::error::SoulErrorKind::TypeNotFound,
@@ -47,7 +55,7 @@ impl<'a> HirContext<'a> {
             ast::TypeKind::Primitive(prim) => HirTypeKind::Primitive(*prim),
         };
 
-        Ok(types.insert(HirType{kind, modifier}))
+        Ok(types.insert(HirType{kind, modifier, generics}))
     }
 
     pub(crate) fn lower_type(&mut self, ty: &ast::SoulType) -> hir::TypeId {

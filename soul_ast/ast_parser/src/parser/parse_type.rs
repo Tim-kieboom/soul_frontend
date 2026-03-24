@@ -1,9 +1,10 @@
 use ast::{
     ArrayKind, ArrayType, FunctionKind, NamedTupleElement, NamedTupleType, ReferenceType, SoulType,
-    TypeKind,
+    Stub, TypeKind,
 };
 use soul_tokenizer::{Number, TokenKind};
 use soul_utils::{
+    Ident,
     error::{SoulError, SoulErrorKind},
     soul_error_internal,
     soul_names::{PrimitiveTypes, TypeModifier},
@@ -15,7 +16,7 @@ use soul_utils::{
 use crate::parser::{
     Parser,
     parse_utils::{
-        ARRAY, ASSIGN, COLON, COMMA, CONST_REF, CURLY_OPEN, MUT_REF, OPTIONAL, POINTER,
+        ARRAY, ARROW_LEFT, ASSIGN, COLON, COMMA, CONST_REF, CURLY_OPEN, MUT_REF, OPTIONAL, POINTER,
         ROUND_CLOSE, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN,
     },
 };
@@ -29,6 +30,27 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         result
+    }
+
+    pub(crate) fn type_from_ident(&mut self, ident: Ident, generics: Vec<SoulType>) -> SoulType {
+        if ident.as_str() == PrimitiveTypes::None.as_str() {
+            self.bump();
+            return SoulType::none(self.token().span);
+        };
+
+        if let Some(prim) = PrimitiveTypes::from_str(ident.as_str()) {
+            let span = self.token().span;
+            return SoulType::new(None, TypeKind::Primitive(prim), span);
+        }
+
+        SoulType::new(
+            None,
+            TypeKind::Stub(Stub {
+                name: ident.node,
+                generics,
+            }),
+            ident.span,
+        )
     }
 
     pub(crate) fn try_parse_parameters(
@@ -169,7 +191,20 @@ impl<'a, 'f> Parser<'a, 'f> {
             return TryOk(SoulType::new(None, TypeKind::Primitive(prim), span));
         }
 
-        TryOk(SoulType::new(None, TypeKind::Stub(ident.node), ident.span))
+        let generics = if self.current_is(&ARROW_LEFT) {
+            self.parse_generic_define()?
+        } else {
+            vec![]
+        };
+
+        TryOk(SoulType::new(
+            None,
+            TypeKind::Stub(Stub {
+                name: ident.node,
+                generics,
+            }),
+            ident.span,
+        ))
     }
 
     fn inner_parse_named_tuple_kinds(

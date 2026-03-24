@@ -118,5 +118,6 @@ fn create_array(element: TypeId, size: u64) -> HirType {
             kind: ast::ArrayKind::StackArray(size),
         },
         modifier: None,
+        generics: vec![],
     }
 }

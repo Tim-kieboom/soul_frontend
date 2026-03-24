@@ -453,9 +453,10 @@ impl<'a> HirDisplayer<'a> {
             None => &self.hir.types,
         };
 
-        let ty = types.id_to_type(id).unwrap_or(&ERROR);
-        ty.write_display(types, &mut self.sb)
-            .expect("no format error");
+        match types.id_to_type(id) {
+            Some(ty) => ty.write_display(types, &mut self.sb).expect("no format error"),
+            None => ERROR.write_display(types, &mut self.sb).expect("no format error"),
+        }
     }
 
     fn to_string(self) -> String {

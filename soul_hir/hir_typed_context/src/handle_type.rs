@@ -305,9 +305,9 @@ impl<'a> HirTypedContext<'a> {
         base_type: TypeId,
         span: Span,
     ) -> Option<HirType> {
-        let ty = self.id_to_type(base_type);
-        let modifier = ty.modifier;
-        let prim = match &ty.kind {
+        let base_type = self.id_to_type(base_type);
+        let modifier = base_type.modifier;
+        let prim = match &base_type.kind {
             HirTypeKind::Primitive(val) => val,
             HirTypeKind::Pointer(type_id) => {
                 let id = *type_id;
@@ -318,6 +318,7 @@ impl<'a> HirTypedContext<'a> {
                 return Some(HirType {
                     kind: HirTypeKind::Pointer(ty),
                     modifier,
+                    generics: vec![],
                 });
             }
             HirTypeKind::Optional(type_id) => {
@@ -329,6 +330,7 @@ impl<'a> HirTypedContext<'a> {
                 return Some(HirType {
                     kind: HirTypeKind::Optional(ty),
                     modifier,
+                    generics: vec![],
                 });
             }
             HirTypeKind::Array { element, kind } => {
@@ -341,6 +343,7 @@ impl<'a> HirTypedContext<'a> {
                 return Some(HirType {
                     kind: HirTypeKind::Array { element, kind },
                     modifier,
+                    generics: vec![],
                 });
             }
             HirTypeKind::Ref { of_type, mutable } => {
@@ -353,6 +356,7 @@ impl<'a> HirTypedContext<'a> {
                 return Some(HirType {
                     kind: HirTypeKind::Ref { of_type, mutable },
                     modifier,
+                    generics: vec![],
                 });
             }
             _ => return None,
@@ -368,6 +372,7 @@ impl<'a> HirTypedContext<'a> {
         Some(HirType {
             kind: HirTypeKind::Primitive(typed),
             modifier,
+            generics: base_type.generics.clone(),
         })
     }
 

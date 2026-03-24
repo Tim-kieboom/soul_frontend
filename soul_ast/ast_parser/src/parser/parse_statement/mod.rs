@@ -22,8 +22,8 @@ mod from_keyword;
 mod from_modifier;
 mod parse_assign;
 mod parse_import;
-mod parse_variable;
 mod parse_objects;
+mod parse_variable;
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_global_statments(&mut self) -> Vec<Statement> {

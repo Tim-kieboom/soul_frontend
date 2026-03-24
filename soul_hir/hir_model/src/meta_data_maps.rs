@@ -116,6 +116,7 @@ impl TypesMap {
         self.map.get_key(&HirType {
             kind: ty,
             modifier: None,
+            generics: vec![],
         })
     }
 
@@ -150,6 +151,7 @@ impl TypesMap {
         let ty = self.insert(HirType {
             kind: crate::HirTypeKind::InferType(infer, span),
             modifier,
+            generics: vec![],
         });
         ty
     }

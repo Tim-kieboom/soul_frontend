@@ -57,7 +57,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             KeyWord::Import => self.parse_import().try_err()?,
             KeyWord::Extern => self.parse_extern_function().try_err()?,
-            
+
             KeyWord::Struct => self.parse_struct().try_err()?,
 
             KeyWord::New

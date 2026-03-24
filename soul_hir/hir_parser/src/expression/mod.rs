@@ -21,6 +21,7 @@ impl<'a> HirContext<'a> {
 
         let span = expression.span;
         let hir_expression = match &expression.node {
+            ast::ExpressionKind::StructConstructor(_) => todo!(),
             ast::ExpressionKind::Null(_node_id) => hir::Expression {
                 id,
                 ty: self.null_ty(span),
@@ -411,6 +412,7 @@ impl<'a> HirContext<'a> {
         self.add_type(HirType {
             kind: HirTypeKind::Optional(infer),
             modifier: None,
+            generics: vec![],
         })
     }
 }

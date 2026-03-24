@@ -222,6 +222,7 @@ impl InferTable {
     ) -> SoulResult<TypeId> {
         let hir_ty = self.get_type(types, ty)?;
         let modifier = hir_ty.modifier;
+        let generics = hir_ty.generics.clone();
 
         match &hir_ty.kind {
             HirTypeKind::InferType(inf, _) => {
@@ -257,6 +258,7 @@ impl InferTable {
                 Ok(types.insert(HirType {
                     kind: HirTypeKind::Pointer(inner_resolved),
                     modifier,
+                    generics,
                 }))
             }
 
@@ -265,6 +267,7 @@ impl InferTable {
                 Ok(types.insert(HirType {
                     kind: HirTypeKind::Optional(inner_resolved),
                     modifier,
+                    generics,
                 }))
             }
 
@@ -277,6 +280,7 @@ impl InferTable {
                         mutable,
                     },
                     modifier,
+                    generics,
                 }))
             }
 
@@ -294,6 +298,7 @@ impl InferTable {
                 Ok(types.insert(HirType {
                     kind: HirTypeKind::Array { element, kind },
                     modifier,
+                    generics,
                 }))
             }
 
@@ -309,6 +314,7 @@ impl InferTable {
     ) -> SoulResult<TypeId> {
         let hir_ty = self.get_type(types, ty)?;
         let modifier = hir_ty.modifier;
+
         let resolved = match &hir_ty.kind {
             HirTypeKind::InferType(inf, _) => {
                 let root = self.find_root(*inf)?;
@@ -323,20 +329,28 @@ impl InferTable {
             HirTypeKind::None
             | HirTypeKind::Type
             | HirTypeKind::Error
+            | HirTypeKind::Struct(_)
             | HirTypeKind::Generic(_)
             | HirTypeKind::Primitive(_) => return Ok(ty),
 
-            HirTypeKind::Struct(_) => todo!(),
-
-            HirTypeKind::Pointer(id) => HirType {
-                kind: HirTypeKind::Pointer(self.resolve_type_lazy(types, *id, span)?),
-                modifier,
-            },
-            HirTypeKind::Optional(id) => HirType {
-                kind: HirTypeKind::Optional(self.resolve_type_lazy(types, *id, span)?),
-                modifier,
-            },
+            HirTypeKind::Pointer(id) => {
+                let generics = hir_ty.generics.clone();
+                HirType {
+                    kind: HirTypeKind::Pointer(self.resolve_type_lazy(types, *id, span)?),
+                    modifier,
+                    generics,
+                }
+            }
+            HirTypeKind::Optional(id) => {
+                let generics = hir_ty.generics.clone();
+                HirType {
+                    kind: HirTypeKind::Optional(self.resolve_type_lazy(types, *id, span)?),
+                    modifier,
+                    generics,
+                }
+            }
             HirTypeKind::Ref { of_type, mutable } => {
+                let generics = hir_ty.generics.clone();
                 let of_type = *of_type;
                 let mutable = *mutable;
                 HirType {
@@ -345,9 +359,11 @@ impl InferTable {
                         mutable,
                     },
                     modifier,
+                    generics,
                 }
             }
             HirTypeKind::Array { element, kind } => {
+                let generics = hir_ty.generics.clone();
                 let element = *element;
                 let kind = *kind;
                 HirType {
@@ -356,6 +372,7 @@ impl InferTable {
                         kind,
                     },
                     modifier,
+                    generics,
                 }
             }
         };
