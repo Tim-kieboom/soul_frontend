@@ -151,6 +151,7 @@ pub struct ScopeTypeEntry {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ScopeTypeEntryKind {
+    Struct,
     LifeTime,
     GenericType,
 }
@@ -165,7 +166,7 @@ impl<'a> ScopeValueKind<'a> {
         }
     }
 
-    pub fn get_name(&self) -> &Ident {
+    pub fn get_ident(&self) -> &Ident {
         match self {
             ScopeValueKind::Variable(variable) => &variable.name,
         }

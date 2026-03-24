@@ -262,7 +262,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         TryOk(Spanned::new(signature, self.span_combine(start_span)))
     }
 
-    fn parse_generic_declare(&mut self) -> SoulResult<Option<Vec<Generic>>> {
+    pub fn parse_generic_declare(&mut self) -> SoulResult<Option<Vec<Generic>>> {
         if !self.current_is(&ARROW_LEFT) {
             return Ok(None);
         }

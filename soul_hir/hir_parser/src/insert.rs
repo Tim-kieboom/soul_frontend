@@ -1,4 +1,4 @@
-use hir::{ExpressionId, StatementId};
+use hir::{ExpressionId, StatementId, StructId};
 use soul_utils::{
     Ident, span::{ItemMetaData, Span}
 };
@@ -15,6 +15,13 @@ impl<'a> HirContext<'a> {
     pub(crate) fn alloc_statement(&mut self, meta_data: &ItemMetaData, span: Span) -> StatementId {
         let id = self.id_generator.alloc_statement();
         self.store_statement_data(id, meta_data, span);
+        id
+    }
+
+    pub(crate) fn insert_struct(&mut self, obj: hir::Struct) -> StructId {
+        let name = obj.name.to_string();
+        let id = self.hir.types.insert_struct(obj);
+        self.scopes.last_mut().expect("should have scope").created_type.insert(name, hir::HirTypeKind::Struct(id));
         id
     }
 

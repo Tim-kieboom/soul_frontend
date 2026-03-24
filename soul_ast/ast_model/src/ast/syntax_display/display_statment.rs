@@ -1,3 +1,4 @@
+
 use crate::{
     NamedTupleElement,
     ast::{
@@ -17,6 +18,34 @@ impl SyntaxDisplay for StatementKind {
     fn inner_display(&self, sb: &mut String, kind: DisplayKind, tab: usize, is_last: bool) {
         let prefix = tree_prefix(tab, is_last);
         match self {
+            StatementKind::Struct(obj) => {
+                sb.push_str(&prefix);
+                try_display_node_id(sb, kind, obj.id);
+                sb.push_str("Struct >> ");
+                sb.push_str(obj.name.as_str());
+                if !obj.generics.is_empty() {
+                    sb.push('<');
+                    let last_index = obj.generics.len().saturating_sub(1);
+                    for (i, generic) in obj.generics.iter().enumerate() {
+                        sb.push_str(generic.name.as_str());
+                        if i != last_index {
+                            sb.push_str(", ");
+                        }
+                    }
+                    sb.push('>');
+                }
+                
+                let field_prefix = tree_prefix(tab+1, is_last);
+                for field in obj.fields.iter() {
+                    sb.push('\n');
+                    sb.push_str(&field_prefix);
+                    try_display_node_id(sb, kind, field.id);
+                    sb.push_str("Field >> ");
+                    sb.push_str(field.name.as_str());
+                    sb.push_str(": ");
+                    field.ty.inner_display(sb, kind, tab, is_last);
+                }
+            }
             StatementKind::ExternalFunction(function) => {
                 sb.push_str(&prefix);
                 try_display_function_id(sb, kind, function.signature.node.id);

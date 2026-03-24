@@ -22,6 +22,9 @@ impl<'a> NameResolver<'a> {
     fn collect_statement(&mut self, statement: &mut Statement) {
         match &mut statement.node {
             StatementKind::Import(_) => todo!("impl import trait collection"),
+            StatementKind::Struct(obj) => {
+                self.declare_struct(obj);
+            }
             StatementKind::Variable(variable) => {
                 let id = self.declare_value(ScopeValueKind::Variable(variable));
                 self.store.insert_variable_type(id, variable.ty.clone());

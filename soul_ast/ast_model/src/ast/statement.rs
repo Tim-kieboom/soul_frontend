@@ -39,6 +39,23 @@ pub enum StatementKind {
     /// A function declaration (with body block).
     Function(Function),
     ExternalFunction(Function),
+
+    Struct(Struct),
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Struct {
+    pub id: Option<NodeId>,
+    pub name: Ident,
+    pub generics: Vec<Generic>,
+    pub fields: Vec<Field>,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Field {
+    pub id: Option<NodeId>,
+    pub name: Ident,
+    pub ty: SoulType,
 }
 
 /// Imported paths

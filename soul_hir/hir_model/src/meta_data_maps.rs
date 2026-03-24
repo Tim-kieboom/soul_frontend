@@ -1,17 +1,11 @@
 use std::{collections::HashMap, hash::Hash};
 
 use soul_utils::{
-    ids::{FunctionId, IdAlloc, IdGenerator},
-    impl_soul_ids,
-    soul_import_path::SoulImportPath,
-    soul_names::TypeModifier,
-    span::{ItemMetaData, Span},
-    vec_map::{VecMap, VecMapIndex},
+    Ident, ids::{FunctionId, IdAlloc, IdGenerator}, impl_soul_ids, soul_import_path::SoulImportPath, soul_names::TypeModifier, span::{ItemMetaData, Span}, vec_map::{VecMap, VecMapIndex}
 };
 
 use crate::{
-    BlockId, ExpressionId, GenericId, HirType, HirTypeKind, InferTypeId, LocalId, ModuleId,
-    StatementId, TypeId,
+    BlockId, ExpressionId, Field, GenericId, HirType, HirTypeKind, InferTypeId, LocalId, ModuleId, StatementId, StructId, TypeId
 };
 
 /// Maps HIR node IDs to their original source code spans.
@@ -60,24 +54,41 @@ pub struct MetaDataMap {
 impl_soul_ids!(RefTypeId);
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TypesMap {
+    structs: VecMap<StructId, Struct>, 
+
     map: BiMap<TypeId, HirType>,
     /// for expressions like Cast (so you can have a diffrent TypeId in the typedcontext stage)
     ref_map: BiMap<RefTypeId, TypeId>,
     generics: VecMap<GenericId, String>,
     type_generator: IdGenerator<TypeId>,
     ref_generator: IdGenerator<RefTypeId>,
+    struct_generator: IdGenerator<StructId>,
     infer_generator: IdGenerator<InferTypeId>,
 }
 impl TypesMap {
     pub fn new() -> Self {
         Self {
+            structs: VecMap::new(),
             generics: VecMap::new(),
             ref_generator: IdGenerator::new(),
             type_generator: IdGenerator::new(),
             infer_generator: IdGenerator::new(),
+            struct_generator: IdGenerator::new(),
             map: BiMap::from_array([(TypeId::error(), HirType::error_type())]),
             ref_map: BiMap::from_array([(RefTypeId::error(), TypeId::error())]),
         }
+    }
+
+    pub fn set_structs(&mut self, structs: VecMap<StructId, Struct>) {
+        self.structs = structs;
+    }
+
+    pub fn structs(&self) -> &VecMap<StructId, Struct> {
+        &self.structs
+    }
+
+    pub fn id_to_struct(&self, id: StructId) -> Option<&Struct> {
+        self.structs.get(id)
     }
 
     pub fn ref_to_id(&self, id: RefTypeId) -> Option<TypeId> {
@@ -108,12 +119,18 @@ impl TypesMap {
         })
     }
 
+    pub fn insert_struct(&mut self, obj: Struct) -> StructId {
+        let id = self.struct_generator.alloc();
+        self.structs.insert(id, obj);
+        id
+    }
+
     pub fn insert_generic(&mut self, name: String, id: GenericId) {
         self.generics.insert(id, name);
     }
 
-    pub fn generic_name(&self, id: GenericId) -> Option<&String> {
-        self.generics.get(id)
+    pub fn generic_name(&self, id: GenericId) -> Option<&str> {
+        self.generics.get(id).map(|text| text.as_str())
     }
 
     pub fn insert(&mut self, ty: HirType) -> TypeId {
@@ -148,6 +165,13 @@ impl TypesMap {
     pub fn infer_generator(&self) -> &IdGenerator<InferTypeId> {
         &self.infer_generator
     }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Struct {
+    pub name: Ident,
+    pub fields: Vec<Field>,
+    pub generics: Vec<GenericId>,
 }
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]

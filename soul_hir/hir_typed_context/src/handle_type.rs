@@ -1,6 +1,5 @@
 use hir::{
-    BlockId, ExpressionId, GenericId, HirType, HirTypeKind, LocalId, RefTypeId, StatementId,
-    TypeId, TypesMap, UnifyResult,
+    BlockId, ExpressionId, FieldId, GenericId, HirType, HirTypeKind, LocalId, RefTypeId, StatementId, TypeId, TypesMap, UnifyResult
 };
 use soul_utils::{
     error::SoulResult,
@@ -104,6 +103,10 @@ impl<'a> HirTypedContext<'a> {
         }
     }
 
+    pub(crate) fn type_field(&mut self, id: FieldId, ty: RefTypeId) {
+        self.type_table.fields.insert(id, self.ref_to_id(ty));
+    }
+
     pub(crate) fn type_local(
         &mut self,
         id: LocalId,
@@ -166,6 +169,9 @@ impl<'a> HirTypedContext<'a> {
 
     pub(crate) fn finalize_types(&mut self) {
         let mut new_types = TypesMap::new();
+        let structs = self.type_table.types.structs().clone();
+        new_types.set_structs(structs);
+        
         let mut remap = VecMap::<TypeId, TypeId>::new();
 
         let ids: Vec<_> = self.collect_root_types();
@@ -203,6 +209,7 @@ impl<'a> HirTypedContext<'a> {
             .entries()
             .flat_map(|(_, types)| types.entries());
 
+        roots.extend(self.type_table.fields.values().copied());
         roots.extend(self.type_table.locals.values().copied());
         roots.extend(self.type_table.blocks.values().copied());
         roots.extend(self.type_table.functions.values().copied());
@@ -244,6 +251,9 @@ impl<'a> HirTypedContext<'a> {
 
         let modifier = hir_ty.modifier;
         let mut new_ty = match &hir_ty.kind {
+            HirTypeKind::Struct(id) => {
+                HirType::new(HirTypeKind::Struct(*id))
+            }
             HirTypeKind::Optional(id) => {
                 let id = self.finalize_type(*id, new_types, map)?;
                 HirType::new(HirTypeKind::Optional(id))

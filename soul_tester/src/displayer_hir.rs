@@ -30,6 +30,64 @@ pub fn display_typed_hir(hir: &HirTree, type_table: &HirTypedTable) -> String {
     displayer.to_string()
 }
 
+pub fn display_created_types(type_table: &HirTypedTable) -> String {
+    let mut sb = String::new();
+    
+    for ty in type_table.types.iter_types() {
+        match &ty.kind {
+            hir::HirTypeKind::None 
+            | hir::HirTypeKind::Type
+            | hir::HirTypeKind::Error
+            | hir::HirTypeKind::Pointer(_)
+            | hir::HirTypeKind::Generic(_)
+            | hir::HirTypeKind::Ref { .. }
+            | hir::HirTypeKind::Optional(_)
+            | hir::HirTypeKind::Array { .. }
+            | hir::HirTypeKind::Primitive(_)
+            | hir::HirTypeKind::InferType(_, _) => continue,
+
+
+            hir::HirTypeKind::Struct(struct_id) => {
+                let obj = type_table
+                    .types
+                    .id_to_struct(*struct_id)
+                    .expect(&format!("should have {:?}", struct_id));
+                
+                sb.push_str("struct ");
+                sb.push_str(obj.name.as_str());
+                sb.push_str(" {");
+                if !obj.generics.is_empty() {
+                    sb.push('<');
+                    let last_index = obj.generics.len().saturating_sub(1);
+                    for (i, generic) in obj.generics.iter().enumerate() {
+                        sb.push_str(type_table.types.generic_name(*generic).unwrap_or("<error>"));
+                        if i != last_index {
+                            sb.push_str(", ");
+                        }
+                    }
+                    sb.push('>');
+                }
+                
+                for field in &obj.fields {
+                    sb.push_str("\n\t");
+                    sb.push_str(&field.name);
+                    sb.push_str(": ");
+                    let ty = type_table.types.ref_to_id(field.ty).expect("should have type");
+                    match type_table.types.id_to_type(ty) {
+                        Some(ty) => sb.push_str(&ty.display(&type_table.types)),
+                        None => sb.push_str("<error>"),
+                    }
+                }
+                sb.push_str("\n}\n");
+            }
+        }
+        
+        sb.push('\n');
+    }
+
+    sb
+}
+
 struct HirDisplayer<'a> {
     sb: String,
     hir: &'a HirTree,

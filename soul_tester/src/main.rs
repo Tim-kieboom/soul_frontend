@@ -25,7 +25,7 @@ use soul_utils::{
 
 use crate::{
     convert_soul_error::{MessageConfig, ToMessage},
-    displayer_hir::display_typed_hir,
+    displayer_hir::{display_created_types, display_typed_hir},
     displayer_tokenizer::display_tokens,
 };
 
@@ -38,7 +38,7 @@ mod paths;
 static PATHS: &[u8] = include_bytes!("../paths.json");
 
 pub const MESSAGE_CONFIG: MessageConfig = MessageConfig {
-    backtrace: false,
+    backtrace: true,
     colors: true,
 };
 
@@ -82,6 +82,7 @@ fn run_fontend<'a>(paths: &'a Paths) -> Result<Ouput> {
 
     let ast = to_ast(tokens, &COMPILER_OPTIONS, &mut faults);
     display_ast(paths, &ast)?;
+    log_faults(&faults, &source_file);
 
     let hir = to_hir(&ast, &COMPILER_OPTIONS, &mut faults);
     display_hir(paths, &hir)?;
@@ -139,7 +140,8 @@ fn display_ast(paths: &Paths, ast: &AstResponse) -> Result<()> {
 
 fn display_hir(paths: &Paths, hir: &HirResponse) -> Result<()> {
     paths.write_to_output(&displayer_hir::display_hir(&hir.hir), "hir/tree.soulc")?;
-    paths.write_to_output(&display_typed_hir(&hir.hir, &hir.types), "hir/typed.soulc")
+    paths.write_to_output(&display_typed_hir(&hir.hir, &hir.types), "hir/typed.soulc")?;
+    paths.write_to_output(&display_created_types(&hir.types), "hir/created_types.soulc")
 }
 
 fn display_mir(paths: &Paths, mir: &MirResponse, hir: &HirResponse) -> Result<()> {

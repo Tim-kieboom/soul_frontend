@@ -1,6 +1,6 @@
 mod id_generator;
 use ast::{AstResponse, DeclareStore};
-use hir::{BlockId, ExpressionId, GenericId, HirTree, LocalId, TypeId};
+use hir::{BlockId, ExpressionId, GenericId, HirTree, HirTypeKind, LocalId, TypeId};
 use id_generator::IdAllocalors;
 use soul_utils::{
     Ident,
@@ -39,6 +39,7 @@ struct Scope {
     locals: HashMap<String, LocalId>,
     generics: HashMap<String, GenericId>,
     functions: HashMap<String, FunctionId>,
+    created_type: HashMap<String, HirTypeKind>,
 }
 
 #[derive(Debug)]

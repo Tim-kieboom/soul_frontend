@@ -326,6 +326,8 @@ impl InferTable {
             | HirTypeKind::Generic(_)
             | HirTypeKind::Primitive(_) => return Ok(ty),
 
+            HirTypeKind::Struct(_) => todo!(),
+
             HirTypeKind::Pointer(id) => HirType {
                 kind: HirTypeKind::Pointer(self.resolve_type_lazy(types, *id, span)?),
                 modifier,

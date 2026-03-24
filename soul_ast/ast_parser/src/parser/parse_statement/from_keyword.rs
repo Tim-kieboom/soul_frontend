@@ -57,6 +57,8 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             KeyWord::Import => self.parse_import().try_err()?,
             KeyWord::Extern => self.parse_extern_function().try_err()?,
+            
+            KeyWord::Struct => self.parse_struct().try_err()?,
 
             KeyWord::New
             | KeyWord::For
@@ -71,7 +73,6 @@ impl<'a, 'f> Parser<'a, 'f> {
             | KeyWord::Union
             | KeyWord::Match
             | KeyWord::Await
-            | KeyWord::Struct
             | KeyWord::Typeof
             | KeyWord::InForLoop
             | KeyWord::GenericWhere => {

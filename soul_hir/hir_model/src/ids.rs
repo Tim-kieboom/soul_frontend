@@ -7,6 +7,7 @@ impl_soul_ids!(
     LocalId,
     PlaceId,
     ModuleId,
+    StructId,
     GenericId,
     InferTypeId,
     StatementId,

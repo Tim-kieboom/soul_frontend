@@ -48,8 +48,6 @@ pub struct HirTree {
     pub init_global_function: FunctionId,
     pub main_function: FunctionId,
 
-    pub internal_fields: Option<InternalFields>,
-
     pub imports: ImportMap,
     pub fields: VecMap<FieldId, Field>,
     pub blocks: VecMap<BlockId, Block>,
@@ -75,7 +73,6 @@ impl HirTree {
         };
 
         Self {
-            internal_fields: None,
             main_function,
             init_global_function: init_global_function_id,
             types: TypesMap::new(),
@@ -128,10 +125,7 @@ pub struct Field {
     pub id: FieldId,
     /// The name of the field (for readability, debugging, codegen).
     pub name: String,
-    /// The type of the field in HIR.
-    pub type_id: TypeId,
-    /// stores alignmentInfo
-    pub align: Alignment,
+    pub ty: RefTypeId,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

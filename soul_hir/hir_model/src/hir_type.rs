@@ -1,14 +1,10 @@
 use ast::ArrayKind;
 use soul_utils::{
-    error::{SoulError, SoulErrorKind, SoulResult},
-    soul_names::{PrimitiveTypes, TypeModifier, TypeWrapper},
-    span::Span,
-    symbool_kind::SymbolKind,
-    vec_map::VecMapIndex,
+    error::{SoulError, SoulErrorKind, SoulResult}, soul_names::{PrimitiveTypes, TypeModifier, TypeWrapper}, span::Span, symbool_kind::SymbolKind, vec_map::VecMapIndex
 };
 use std::fmt::Write;
 
-use crate::{GenericId, InferTypeId, TypeId, TypesMap};
+use crate::{GenericId, InferTypeId, StructId, TypeId, TypesMap};
 
 pub enum UnifyResult {
     /// fully unifyable
@@ -40,6 +36,7 @@ pub enum HirTypeKind {
     Pointer(TypeId),
     Optional(TypeId),
     Generic(GenericId),
+    Struct(StructId),
 
     Error,
     /// special type for unkown hir type (should not exist in Thir and further)
@@ -288,6 +285,13 @@ impl HirTypeKind {
                     Ok(())
                 }
             },
+            HirTypeKind::Struct(id) => {
+                match types.id_to_struct(*id) {
+                    Some(val) => sb.push_str(val.name.as_str()),
+                    None => sb.push_str("<error>"),
+                }
+                Ok(())
+            },
             HirTypeKind::Primitive(prim) => write!(sb, "{}", prim.as_str()),
             HirTypeKind::Array { element, kind } => {
                 kind.write_to_string(sb)?;
@@ -343,6 +347,7 @@ impl HirTypeKind {
             HirTypeKind::Pointer(_) => "<pointer>",
             HirTypeKind::Generic(_) => "<generic>",
             HirTypeKind::Optional(_) => "<optional>",
+            HirTypeKind::Struct(_) => "<struct>",
             HirTypeKind::Primitive(primitive) => primitive.as_str(),
         }
     }

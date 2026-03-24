@@ -24,6 +24,25 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
                 return self.lower_type(ty, generics);
             }
+            hir::HirTypeKind::Struct(id) => {
+                let obj = self.types.types.id_to_struct(id).expect("should have struct");
+                if !obj.generics.is_empty() {
+                    todo!()
+                }
+
+                let mut fields = vec![];
+                for field in &obj.fields {
+                    let ty = self.types.types.ref_to_id(field.ty).expect("should hev type");
+                    let field = match self.lower_type(ty, generics)? {
+                        Some(val) => val,
+                        None => continue,
+                    };
+                    
+                    fields.push(field);
+                }
+
+                self.context.struct_type(fields.as_slice(), false).into()
+            }
             hir::HirTypeKind::Primitive(primitive_types) => {
                 match self.lower_primitive_type(primitive_types) {
                     Some(val) => val,

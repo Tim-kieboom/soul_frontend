@@ -1,6 +1,5 @@
 use hir::{
-    BlockId, ExpressionId, GenericId, HirTree, HirType, LocalId, PlaceId, RefTypeId, StatementId,
-    TypeId, TypesMap,
+    BlockId, ExpressionId, FieldId, GenericId, HirTree, HirType, LocalId, PlaceId, RefTypeId, StatementId, TypeId, TypesMap
 };
 use soul_utils::{
     error::SoulError,
@@ -21,6 +20,12 @@ mod statement;
 pub fn infer_hir_types(hir: &HirTree, faults: &mut Vec<SementicFault>) -> HirTypedTable {
     let mut context = HirTypedContext::new(hir, faults);
 
+    for obj in hir.types.structs().values() {
+        for field in &obj.fields {
+            context.type_field(field.id, field.ty)
+        }
+    }
+
     for global in &hir.root.globals {
         context.infer_global(global);
     }
@@ -37,6 +42,7 @@ pub struct HirTypedTable {
 
     pub generic_defines: VecMap<GenericId, VecSet<RefTypeId>>,
 
+    pub fields: VecMap<FieldId, TypeId>,
     pub places: VecMap<PlaceId, TypeId>,
     pub locals: VecMap<LocalId, TypeId>,
     pub blocks: VecMap<BlockId, TypeId>,
@@ -92,6 +98,7 @@ impl<'a> HirTypedContext<'a> {
                 none_type: TypeId::error(),
                 bool_type: TypeId::error(),
                 functions,
+                fields: VecMap::const_default(),
                 places: VecMap::const_default(),
                 locals: VecMap::const_default(),
                 generic_defines: VecMap::const_default(),

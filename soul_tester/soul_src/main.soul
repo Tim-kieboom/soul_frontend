@@ -10,12 +10,16 @@ global := 1
 global1 := 10 + 33 * 2
 fmtBuffer := malloc(50) as *char //[for 50 => '\0']
 
-// struct Array {
-//     len: uint
-//     ptr: *u8
-// }
+struct Array {
+    len: uint
+    ptr: *u8
+}
 
 main() {
+    // obj := Array{len: 0, ptr: malloc(0) as *u8}
+    // len := obj.len
+    // ptr := obj.ptr
+    
     // pow := 3 ** 2
     // root := 2 </ 4
     print_int(1)

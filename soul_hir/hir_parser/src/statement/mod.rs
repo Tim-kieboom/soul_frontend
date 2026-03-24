@@ -14,6 +14,10 @@ impl<'a> HirContext<'a> {
         let id = self.alloc_statement(&global.meta_data, global.span);
 
         let hir_global = match &global.node {
+            ast::StatementKind::Struct(obj) => {
+                self.lower_struct(obj);
+                return
+            }
             ast::StatementKind::Variable(variable) => {
                 let hir_variable = self.lower_variable(variable);
 
@@ -50,14 +54,18 @@ impl<'a> HirContext<'a> {
         let id = self.alloc_statement(&statement.meta_data, statement.span);
 
         let hir_statement = match &statement.node {
+            ast::StatementKind::Struct(obj) => {
+                self.lower_struct(obj);
+                return None
+            }
             ast::StatementKind::Import(import) => {
                 self.resolve_import(import);
-                return None;
+                return None
             }
             ast::StatementKind::Function(function) => {
                 let hir_function = self.lower_function(function);
                 self.insert_global(hir::Global::Function(hir_function, id));
-                return None;
+                return None
             }
             ast::StatementKind::ExternalFunction(_) => todo!(),
             ast::StatementKind::Variable(variable) => {
@@ -147,6 +155,37 @@ impl<'a> HirContext<'a> {
         };
 
         id
+    }
+
+    fn lower_struct(&mut self, obj: &ast::Struct) {
+        let name = obj.name.clone();
+        let mut generics = vec![];
+        for generic in &obj.generics {
+            let id = self.id_generator.alloc_generic();
+            self.insert_generic(&generic.name, id);
+            generics.push(id);
+        }
+
+        let mut fields = vec![];
+        for field in &obj.fields {
+            
+            let ty = self.lower_type(&field.ty);
+            let ty = self.hir.types.insert_ref(ty);
+            let id = self.id_generator.alloc_field();
+            let value = hir::Field {
+                id,
+                ty,
+                name: field.name.to_string(),
+            };
+
+            fields.push(value);
+        }
+
+        self.insert_struct(hir::Struct { 
+            name, 
+            fields,
+            generics,
+        });
     }
 
     fn lower_return_like(

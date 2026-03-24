@@ -18,6 +18,7 @@ impl<'a> NameResolver<'a> {
 
     fn resolve_statement(&mut self, statment: &mut Statement) {
         match &mut statment.node {
+            StatementKind::Struct(_) => (),
             StatementKind::Variable(variable) => {
                 if let Some(value) = &mut variable.initialize_value {
                     self.resolve_expression(value);

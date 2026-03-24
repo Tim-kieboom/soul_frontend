@@ -24,20 +24,11 @@ impl<'a> HirContext<'a> {
             ast::TypeKind::None => HirTypeKind::None,
             ast::TypeKind::Type => HirTypeKind::Type,
             ast::TypeKind::Stub(name) => {
-                let id = find_generic(scopes, call_generics, name).ok_or(SoulError::new(
+                resolve_stub(scopes, types, call_generics, name).ok_or(SoulError::new(
                     format!("type '{}' not found", name),
                     soul_utils::error::SoulErrorKind::TypeNotFound,
                     Some(ty.span),
-                ))?;
-                match id {
-                    GenericKind::Generic(generic) => HirTypeKind::Generic(generic),
-                    GenericKind::Resolved(ref_type) => {
-                        return types.ref_to_id(ref_type).ok_or(soul_error_internal!(
-                            format!("{:?} not found", ref_type),
-                            None
-                        ));
-                    }
-                }
+                ))?
             }
             ast::TypeKind::Pointer(inner) => {
                 HirTypeKind::Pointer(Self::convert_type(inner, scopes, call_generics, types)?)
@@ -116,6 +107,37 @@ impl<'a> HirContext<'a> {
 enum GenericKind {
     Generic(GenericId),
     Resolved(RefTypeId),
+}
+
+fn resolve_stub(
+    scopes: &Vec<Scope>,
+    types: &TypesMap,
+    call_generics: &Vec<(String, RefTypeId)>,
+    name: &str,
+) -> Option<HirTypeKind> {
+    if let Some(ty) = find_created_type(scopes, name) {
+        return Some(ty)
+    }
+
+    let id = find_generic(scopes, call_generics, name)?;
+    Some(match id {
+        GenericKind::Generic(generic) => HirTypeKind::Generic(generic),
+        GenericKind::Resolved(ref_type) => types.ref_to_type(ref_type)?.kind,
+    })
+}
+
+fn find_created_type(
+    scopes: &Vec<Scope>,
+    name: &str,
+) -> Option<HirTypeKind> {
+    
+    for store in scopes.iter().rev() {
+        if let Some(ty) = store.created_type.get(name).copied() {
+            return Some(ty);
+        }
+    }
+
+    None
 }
 
 fn find_generic(
