@@ -48,8 +48,8 @@ pub const COMPILER_OPTIONS: CompilerOptions = CompilerOptions {
 };
 
 struct Ouput {
-    mir: MirResponse,
-    hir: HirResponse,
+    mir_response: MirResponse,
+    hir_response: HirResponse,
     source_file: String,
     faults: Vec<SementicFault>,
 }
@@ -90,8 +90,8 @@ fn run_fontend<'a>(paths: &'a Paths) -> Result<Ouput> {
     display_mir(paths, &mir, &hir)?;
 
     Ok(Ouput {
-        mir,
-        hir,
+        mir_response: mir,
+        hir_response: hir,
         faults,
         source_file,
     })
@@ -99,8 +99,8 @@ fn run_fontend<'a>(paths: &'a Paths) -> Result<Ouput> {
 
 fn run_llvm(output: &Ouput) -> bool {
     let request = IrRequest {
-        mir: &output.mir,
-        types: &output.hir.types,
+        mir: &output.mir_response,
+        types: &output.hir_response.types,
         context: &Context::create(),
     };
 

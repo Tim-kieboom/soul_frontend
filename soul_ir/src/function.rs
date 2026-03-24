@@ -28,8 +28,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             };
 
         let mut args = vec![];
-        for _ in &function.parameters {
-            let arg_type = match self.lower_type(function.return_type, generics) {
+        for param in &function.parameters {
+            let ty = self.mir.tree.locals[*param].ty();
+            let arg_type = match self.lower_type(ty, generics) {
                 Ok(Some(val)) => val.into(),
                 Ok(None) => self.context.i8_type().into(),
                 Err(err) => {

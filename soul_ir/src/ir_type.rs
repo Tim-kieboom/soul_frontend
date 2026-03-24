@@ -66,10 +66,11 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 }
             }
 
-            hir::HirTypeKind::None | hir::HirTypeKind::Type | hir::HirTypeKind::InferType(_, _) => {
+            hir::HirTypeKind::None | hir::HirTypeKind::Type => {
                 return Ok(None);
             }
-
+            
+            hir::HirTypeKind::InferType(_, _) => panic!("inferType type should not be in ir"),
             hir::HirTypeKind::Error => panic!("error type should not be in ir"),
         }))
     }

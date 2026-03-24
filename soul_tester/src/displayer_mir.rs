@@ -13,11 +13,12 @@ use std::fmt::Write;
 pub fn display_mir(mir: &MirTree, types: &HirTypedTable) -> String {
     let mut displayer = MirDisplayer::new(mir, types);
 
-    displayer.push_str("Globals [\n");
     for global in mir.globals.values() {
         displayer.display_global(global);
     }
-    displayer.push_str("]\n");
+    if !mir.globals.is_empty() {
+        displayer.push('\n');
+    }
 
     if let Some(main) = mir.functions.get(mir.entry_function).map(|f| f.id) {
         displayer.display_function(main);
@@ -68,12 +69,6 @@ impl<'a> MirDisplayer<'a> {
     }
 
     fn display_global(&mut self, global: &mir::Global) {
-        self.push('\t');
-
-        if global.is_comptime() {
-            self.push_str("Comptime ");
-        }
-
         self.display_local_declare(global.local);
         if let Some(literal) = &global.literal {
             self.push_str(" = ");
@@ -135,10 +130,6 @@ impl<'a> MirDisplayer<'a> {
 
     fn display_local_declare(&mut self, local_id: LocalId) {
         let local = &self.mir.locals[local_id];
-
-        if local.is_comptime() {
-            self.push_str("Comptime ");
-        }
 
         let mut hir_type = self.get_type(local.ty());
         let modifier = hir_type.modifier.unwrap_or(TypeModifier::Const);

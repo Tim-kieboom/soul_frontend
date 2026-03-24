@@ -17,7 +17,7 @@ impl<'a> HirContext<'a> {
             ast::StatementKind::Variable(variable) => {
                 let hir_variable = self.lower_variable(variable);
 
-                self.insert_variable(&variable.name, hir_variable.local, hir_variable.ty);
+                self.insert_variable(&variable.name, hir_variable.local, hir_variable.ty, hir_variable.value);
                 hir::Global::Variable(hir_variable, id)
             }
             ast::StatementKind::ExternalFunction(function)

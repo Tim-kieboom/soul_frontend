@@ -200,10 +200,12 @@ impl<'a> MirContext<'a> {
 
         self.local_remap.insert(local, id);
 
+        let immutable = self.id_to_type(ty).is_immutable();
         let local_kind = match comptime {
-            Some(value) => mir::Local::Comptime{id, ty, value},
-            None => mir::Local::Runtime{ id, ty },
+            Some(value) if immutable => mir::Local::Comptime{ id, ty, value },
+            _ => mir::Local::Runtime{ id, ty },
         };
+
         self.tree.locals.insert(id, local_kind);
 
         self.current.scope.push(id);

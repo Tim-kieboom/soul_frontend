@@ -1,17 +1,47 @@
 use ast::Literal;
-use hir::HirTree;
+use hir::{ExpressionId, HirTree, LocalId};
 
 pub(crate) mod binary;
 pub(crate) mod unary;
 mod utils;
 use hir_typed_context::HirTypedTable;
+use soul_utils::vec_map::VecMap;
 pub(crate) use utils::*;
 
 use crate::{binary::interpret_binary, unary::interpret_unary};
 
-pub fn try_literal_resolve_expression(
+pub fn literal_resolve(hir: &HirTree, types: &HirTypedTable) -> VecMap<ExpressionId, Literal> {
+    let mut literals = VecMap::const_default();
+    let mut locals = VecMap::const_default();
+
+    for (id, local_info) in hir.locals.entries() {
+        let ty = types.types.id_to_type(types.locals[id]).expect("should have type");
+        if ty.is_mutable() {
+            continue;
+        }
+
+        match &local_info.kind {
+            hir::LocalKind::Temp(value) 
+            | hir::LocalKind::Variable(Some(value)) => _ = locals.insert(id, *value),
+            _ => (),
+        }
+    }
+
+    for value_id in hir.expressions.keys() {
+        
+        if let Some(literal) = try_literal_resolve_expression(hir, types, &locals, &literals, value_id) {
+            literals.insert(value_id, literal);
+        }
+    }
+ 
+    literals
+}
+
+fn try_literal_resolve_expression(
     hir: &HirTree,
     types: &HirTypedTable,
+    locals: &VecMap<LocalId, ExpressionId>,
+    literals: &VecMap<ExpressionId, Literal>,
     value_id: hir::ExpressionId,
 ) -> Option<Literal> {
     let value = &hir.expressions[value_id];
@@ -30,20 +60,27 @@ pub fn try_literal_resolve_expression(
         | hir::ExpressionKind::InnerRawStackArray { .. } => None,
 
         hir::ExpressionKind::Load(place) => match place.node {
-            hir::PlaceKind::Temp(_, _)
-            | hir::PlaceKind::Local(_, _)
-            | hir::PlaceKind::Deref(_, _)
+            hir::PlaceKind::Temp(id, _)
+            | hir::PlaceKind::Local(id, _) => match locals.get(id) {
+                Some(value_id) => literals.get(*value_id).cloned(),
+                None => None,
+            },
+            
+            hir::PlaceKind::Deref(_, _)
             | hir::PlaceKind::Index { .. }
             | hir::PlaceKind::Field { .. } => None,
         },
-        hir::ExpressionKind::Local(_) => None,
+        hir::ExpressionKind::Local(id) => match locals.get(*id) {
+            Some(value_id) => literals.get(*value_id).cloned(),
+            None => None,
+        },
         hir::ExpressionKind::Unary(unary) => {
-            let value = get_literal(hir, types, unary.expression)?;
+            let value = get_literal(hir, types, locals, literals, unary.expression)?;
             interpret_unary(&unary.operator, value.get_ref())
         }
         hir::ExpressionKind::Binary(binary) => {
-            let left = get_literal(hir, types, binary.left)?;
-            let right = get_literal(hir, types, binary.right)?;
+            let left = get_literal(hir, types, locals, literals, binary.left)?;
+            let right = get_literal(hir, types, locals, literals, binary.right)?;
             interpret_binary(left.get_ref(), &binary.operator, right.get_ref())
         }
     }
@@ -52,12 +89,14 @@ pub fn try_literal_resolve_expression(
 fn get_literal<'a>(
     hir: &'a HirTree,
     types: &HirTypedTable,
+    locals: &VecMap<LocalId, ExpressionId>,
+    literals: &VecMap<ExpressionId, Literal>,
     value_id: hir::ExpressionId,
 ) -> Option<LiteralRef<'a>> {
     if let hir::ExpressionKind::Literal(literal) = &hir.expressions[value_id].kind {
         return Some(LiteralRef::Ref(literal));
     }
-    try_literal_resolve_expression(hir, types, value_id).map(|literal| LiteralRef::Owner(literal))
+    try_literal_resolve_expression(hir, types, locals, literals, value_id).map(|literal| LiteralRef::Owner(literal))
 }
 
 /// enum to avoid allow owner and ref to avoid .clone()

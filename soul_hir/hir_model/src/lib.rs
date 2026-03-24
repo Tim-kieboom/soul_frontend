@@ -106,15 +106,15 @@ pub struct LocalInfo {
 }
 impl LocalInfo {
     pub fn is_temp(&self) -> bool {
-        self.kind == LocalKind::Temp
+        matches!(self.kind, LocalKind::Temp(_))
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum LocalKind {
-    Variable,
+    Variable(Option<ExpressionId>),
+    Temp(ExpressionId),
     Parameter,
-    Temp,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

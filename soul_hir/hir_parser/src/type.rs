@@ -19,7 +19,8 @@ impl<'a> HirContext<'a> {
         call_generics: &Vec<(String, RefTypeId)>,
         types: &mut TypesMap,
     ) -> SoulResult<hir::TypeId> {
-        let ty = match &ty.kind {
+        let modifier = ty.modifier; 
+        let kind = match &ty.kind {
             ast::TypeKind::None => HirTypeKind::None,
             ast::TypeKind::Type => HirTypeKind::Type,
             ast::TypeKind::Stub(name) => {
@@ -54,7 +55,8 @@ impl<'a> HirContext<'a> {
             },
             ast::TypeKind::Primitive(prim) => HirTypeKind::Primitive(*prim),
         };
-        Ok(types.insert(HirType::new(ty)))
+
+        Ok(types.insert(HirType{kind, modifier}))
     }
 
     pub(crate) fn lower_type(&mut self, ty: &ast::SoulType) -> hir::TypeId {

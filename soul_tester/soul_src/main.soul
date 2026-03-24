@@ -18,14 +18,16 @@ fmtBuffer := malloc(50) as *char //[for 50 => '\0']
 main() {
     // pow := 3 ** 2
     // root := 2 </ 4
+    print_int(1)
     generics()
     prints()
     comptime()
 }
 
 comptime() {
-    var := 1 * 12 / 2
-    print_int(var)
+    var: int = 1 * 12 / 2
+    c := var + 3
+    print_int(c)
 }
 
 prints() {

@@ -1,6 +1,6 @@
 mod id_generator;
 use ast::{AstResponse, DeclareStore};
-use hir::{BlockId, GenericId, HirTree, LocalId, TypeId};
+use hir::{BlockId, ExpressionId, GenericId, HirTree, LocalId, TypeId};
 use id_generator::IdAllocalors;
 use soul_utils::{
     Ident,
@@ -134,24 +134,24 @@ impl<'a> HirContext<'a> {
         );
     }
 
-    fn insert_variable(&mut self, name: &Ident, local: LocalId, ty: TypeId) {
+    fn insert_variable(&mut self, name: &Ident, local: LocalId, ty: TypeId, value: Option<ExpressionId>) {
         self.inner_insert_local(
             name,
             local,
             hir::LocalInfo {
                 ty,
-                kind: hir::LocalKind::Variable,
+                kind: hir::LocalKind::Variable(value),
             },
         );
     }
 
-    fn insert_temp(&mut self, name: &Ident, local: LocalId, ty: TypeId) {
+    fn insert_temp(&mut self, name: &Ident, local: LocalId, ty: TypeId, value: ExpressionId) {
         self.inner_insert_local(
             name,
             local,
             hir::LocalInfo {
                 ty,
-                kind: hir::LocalKind::Temp,
+                kind: hir::LocalKind::Temp(value),
             },
         );
     }

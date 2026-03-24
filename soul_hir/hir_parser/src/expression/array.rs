@@ -14,7 +14,6 @@ impl<'a> HirContext<'a> {
 
         let temp_local = self.id_generator.alloc_local();
         let name = Ident::new(create_local_name(temp_local), span);
-        self.insert_temp(&name, temp_local, ty);
         let temp_place = Place::new(
             PlaceKind::Temp(temp_local, self.id_generator.alloc_place()),
             span,
@@ -24,6 +23,7 @@ impl<'a> HirContext<'a> {
         let element = self.new_infer_type(span);
         let infer_array = self.add_type(create_array(element, size));
         let unalloc = self.create_unallocted_array(infer_array, element, size, span);
+        self.insert_temp(&name, temp_local, ty, unalloc);
 
         let temp_array = hir::Variable {
             ty: self.new_infer_with_modifier(TypeModifier::Mut, span),

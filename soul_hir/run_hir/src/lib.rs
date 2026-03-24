@@ -1,6 +1,6 @@
 use ast::{AstResponse, Literal};
 use hir::{ExpressionId, HirTree};
-use hir_literal_interpreter::try_literal_resolve_expression;
+use hir_literal_interpreter::literal_resolve;
 use hir_parser::hir_lower;
 use hir_typed_context::{HirTypedTable, infer_hir_types};
 use soul_utils::{
@@ -21,16 +21,12 @@ pub fn to_hir(
     let hir = hir_lower(ast, faults);
     let types = infer_hir_types(&hir, faults);
 
-    let mut literal_resolves = VecMap::const_default();
-    for value_id in hir.expressions.keys() {
-
-        let span = hir.spans.expressions[value_id];
-        if let Some(literal) = try_literal_resolve_expression(&hir, &types, value_id) {
-            if options.debug_view_literal_resolve {
-                faults.push(SementicFault::debug(literal_msg(&literal, span)));
-            }
-
-            literal_resolves.insert(value_id, literal);
+    let literal_resolves = literal_resolve(&hir, &types);
+    if options.debug_view_literal_resolve {
+        
+        for (id, literal) in literal_resolves.entries() {
+            let span = hir.spans.expressions[id];
+            faults.push(SementicFault::debug(literal_msg(literal, span)));
         }
     }
 
