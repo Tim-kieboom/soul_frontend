@@ -2,23 +2,21 @@ mod expression;
 mod function;
 mod hir_type;
 mod ids;
-mod meta_data_maps;
 mod place;
+mod hir_maps;
 mod statement;
 use ast::FunctionKind;
 pub use expression::*;
-pub use function::*;
 pub use hir_type::*;
+pub use hir_maps::*;
+pub use function::*;
 pub use ids::*;
-pub use meta_data_maps::*;
 pub use place::*;
 use soul_utils::{
-    Ident,
-    ids::{FunctionId, IdAlloc},
-    span::Span,
-    vec_map::VecMap,
+    Ident, ids::{FunctionId, IdAlloc}, soul_names::INIT_GLOBALS_FUNCTION_NAME, span::Span
 };
 pub use statement::*;
+
 
 /// High-level Intermediate Representation (HIR) tree.
 ///
@@ -29,115 +27,43 @@ pub use statement::*;
 /// in `MetaDataMap` and are indexed by IR node IDs.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct HirTree {
-    /// Root module of the HIR.
     pub root: Module,
+    pub info: InfoMaps,
+    pub nodes: NodeMaps,
 
-    /// Side-table containing all types
-    /// for HIR nodes.
-    pub types: TypesMap,
-
-    /// Side-table containing source spans
-    /// for HIR nodes.
-    pub spans: SpanMap,
-
-    /// Side-table containing auxiliary metadata
-    /// for HIR nodes.
-    pub meta_data: MetaDataMap,
-
-    /// id for initialize runtime globals function created in mir
-    pub init_global_function: FunctionId,
-    pub main_function: FunctionId,
-
-    pub imports: ImportMap,
-    pub fields: VecMap<FieldId, Field>,
-    pub blocks: VecMap<BlockId, Block>,
-    pub locals: VecMap<LocalId, LocalInfo>,
-    pub functions: VecMap<FunctionId, Function>,
-    pub expressions: VecMap<ExpressionId, Expression>,
+    pub main: FunctionId,
+    pub init_globals: FunctionId,
 }
-
 impl HirTree {
     pub fn new(
         root_id: ModuleId,
-        main_function: FunctionId,
-        init_global_function_id: FunctionId,
+        main: FunctionId,
+        init_globals: FunctionId,
     ) -> Self {
         let init_global_function = Function {
-            id: init_global_function_id,
-            name: Ident::new("_start".to_string(), Span::default_const()),
-            parameters: vec![],
-            kind: FunctionKind::Static,
+            id: init_globals,
             generics: vec![],
-            return_type: TypeId::error(),
+            parameters: vec![],
+            return_type: PossibleTypeId::error(),
+            kind: FunctionKind::Static,
             body: FunctionBody::Internal(BlockId::error()),
+            name: Ident::new(INIT_GLOBALS_FUNCTION_NAME.to_string(), Span::default_const()),
         };
 
-        Self {
-            main_function,
-            init_global_function: init_global_function_id,
-            types: TypesMap::new(),
-            spans: SpanMap::default(),
-            blocks: VecMap::default(),
-            locals: VecMap::default(),
-            fields: VecMap::default(),
-            imports: ImportMap::new(),
-            expressions: VecMap::from_slice(&[(
-                ExpressionId::error(),
-                Expression::error(ExpressionId::error()),
-            )]),
-            meta_data: MetaDataMap::default(),
-            functions: VecMap::from_vec(vec![(init_global_function_id, init_global_function)]),
-            root: Module {
-                id: root_id,
-                imports: vec![],
-                globals: vec![],
-            },
+        let root = Module {
+            id: root_id,
+            imports: vec![],
+            globals: vec![],
+        };
+
+        Self { 
+            root, 
+            main, 
+            init_globals, 
+            info: InfoMaps::default(), 
+            nodes: NodeMaps::new(init_global_function), 
         }
     }
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct LocalInfo {
-    pub ty: TypeId,
-    pub kind: LocalKind,
-}
-impl LocalInfo {
-    pub fn is_temp(&self) -> bool {
-        matches!(self.kind, LocalKind::Temp(_))
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum LocalKind {
-    Variable(Option<ExpressionId>),
-    Temp(ExpressionId),
-    Parameter,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct InternalFields {
-    pub array_ptr: FieldId,
-    pub array_len: FieldId,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct Field {
-    pub id: FieldId,
-    /// The name of the field (for readability, debugging, codegen).
-    pub name: String,
-    pub ty: RefTypeId,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct Alignment {
-    /// Byte offset of the start of the field within its parent struct.
-    pub offset: usize,
-    /// Size of the field in bytes (computed from `type_id`).
-    pub size: usize,
-    /// Alignment requirement of this field in bytes.
-    pub align: usize,
-    /// Whether this field is padded or part of a packed struct.
-    pub is_packed: bool,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -154,38 +80,39 @@ pub struct Import {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub enum Global {
-    Function(FunctionId, StatementId),
-    Variable(Variable, StatementId),
+pub struct Global {
+    pub kind: GlobalKind,
+    pub id: StatementId,
+} 
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum GlobalKind {
+    Function(FunctionId),
+    Variable(Variable),
 
     /// (allows mutable) only allowed to be used by hir lowerer not user
-    InternalVariable(Variable, StatementId),
+    InternalVariable(Variable),
     /// only allowed to be used by hir lowerer not user
-    InternalAssign(Assign, StatementId),
+    InternalAssign(Assign),
 }
 impl Global {
-    pub fn get_id(&self) -> StatementId {
-        match self {
-            Global::Function(_, statement_id) => *statement_id,
-            Global::Variable(_, statement_id) => *statement_id,
-            Global::InternalAssign(_, statement_id) => *statement_id,
-            Global::InternalVariable(_, statement_id) => *statement_id,
-        }
+    pub fn new(kind: GlobalKind, id: StatementId) -> Self {
+        Self { kind, id }
     }
 
     pub fn get_span(&self, spans: &SpanMap) -> Span {
-        let span = match self {
-            Global::Variable(variable, _) => spans.locals.get(variable.local),
-            Global::Function(function_id, _) => spans.functions.get(*function_id),
-            Global::InternalAssign(assign, _) => spans.expressions.get(assign.value),
-            Global::InternalVariable(variable, _) => spans.locals.get(variable.local),
+        let span = match &self.kind {
+            GlobalKind::Variable(variable) => spans.locals.get(variable.local),
+            GlobalKind::Function(function_id) => spans.functions.get(*function_id),
+            GlobalKind::InternalAssign(assign) => spans.expressions.get(assign.value),
+            GlobalKind::InternalVariable(variable) => spans.locals.get(variable.local),
         };
 
         match span {
             Some(val) => *val,
             None => {
                 #[cfg(debug_assertions)]
-                panic!("span not found of {:?}", self);
+                panic!("span not found of {:?}", self.kind);
                 #[cfg(not(debug_assertions))]
                 Span::default_const()
             }
@@ -193,17 +120,16 @@ impl Global {
     }
 
     pub const fn should_be_inmutable(&self) -> bool {
-        match self {
-            Global::Function(_, _) | Global::InternalVariable(_, _) => false,
-
-            Global::Variable(_, _) | Global::InternalAssign(_, _) => true,
+        match self.kind {
+            GlobalKind::Function(_) | GlobalKind::InternalVariable(_) => false,
+            GlobalKind::Variable(_) | GlobalKind::InternalAssign(_) => true,
         }
     }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Variable {
-    pub ty: TypeId,
+    pub ty: PossibleTypeId,
     pub is_temp: bool,
     pub local: LocalId,
     pub value: Option<ExpressionId>,

@@ -1,37 +1,32 @@
-use crate::{CurrentBody, HirContext};
 use hir::{Assign, StatementId};
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
     soul_names::KeyWord,
-    symbool_kind::SymbolKind,
 };
 
-pub(crate) mod function;
-pub(crate) mod variable;
+use crate::HirContext;
+mod block;
+mod function;
 
 impl<'a> HirContext<'a> {
-    pub(crate) fn lower_global(&mut self, global: &ast::Statement) {
+    pub fn lower_global(&mut self, global: &ast::Statement) {
         let id = self.alloc_statement(&global.meta_data, global.span);
 
-        let hir_global = match &global.node {
-            ast::StatementKind::Struct(obj) => {
-                self.lower_struct(obj);
-                return
-            }
-            ast::StatementKind::Variable(variable) => {
-                let hir_variable = self.lower_variable(variable);
-
-                self.insert_variable(&variable.name, hir_variable.local, hir_variable.ty, hir_variable.value);
-                hir::Global::Variable(hir_variable, id)
-            }
-            ast::StatementKind::ExternalFunction(function)
-            | ast::StatementKind::Function(function) => {
-                let hir_function = self.lower_function(function);
-                hir::Global::Function(hir_function, id)
-            }
+        let kind = match &global.node {
             ast::StatementKind::Import(import) => {
                 self.resolve_import(import);
                 return;
+            }
+            ast::StatementKind::Struct(object) => {
+                self.lower_struct(object);
+                return;
+            }
+            ast::StatementKind::Variable(variable) => {
+                hir::GlobalKind::Variable(self.lower_variable(variable))
+            }
+            ast::StatementKind::Function(function)
+            | ast::StatementKind::ExternalFunction(function) => {
+                hir::GlobalKind::Function(self.lower_function(function))
             }
 
             ast::StatementKind::Assignment(_) | ast::StatementKind::Expression { .. } => {
@@ -47,38 +42,35 @@ impl<'a> HirContext<'a> {
             }
         };
 
-        self.insert_global(hir_global);
+        self.insert_global(hir::Global::new(kind, id));
     }
 
-    pub(crate) fn lower_statement(&mut self, statement: &ast::Statement) -> Option<hir::Statement> {
-        let id = self.alloc_statement(&statement.meta_data, statement.span);
+    pub fn lower_statement(&mut self, global: &ast::Statement) -> Option<hir::Statement> {
+        let id = self.alloc_statement(&global.meta_data, global.span);
 
-        let hir_statement = match &statement.node {
-            ast::StatementKind::Struct(obj) => {
-                self.lower_struct(obj);
-                return None
-            }
+        let kind = match &global.node {
             ast::StatementKind::Import(import) => {
                 self.resolve_import(import);
-                return None
+                return None;
             }
-            ast::StatementKind::Function(function) => {
-                let hir_function = self.lower_function(function);
-                self.insert_global(hir::Global::Function(hir_function, id));
-                return None
+            ast::StatementKind::Struct(object) => {
+                self.lower_struct(object);
+                return None;
             }
-            ast::StatementKind::ExternalFunction(_) => todo!(),
             ast::StatementKind::Variable(variable) => {
-                let hir_variable = self.lower_variable(variable);
-                hir::Statement::Variable(hir_variable, id)
+                hir::StatementKind::Variable(self.lower_variable(variable))
             }
-            ast::StatementKind::Assignment(assignment) => hir::Statement::Assign(
-                Assign {
-                    place: self.lower_place(&assignment.left),
-                    value: self.lower_expression(&assignment.right),
-                },
-                id,
-            ),
+            ast::StatementKind::Function(function)
+            | ast::StatementKind::ExternalFunction(function) => {
+                let hir_function = self.lower_function(function);
+                let kind = hir::GlobalKind::Function(hir_function);
+                self.insert_global(hir::Global::new(kind, id));
+                return None;
+            }
+            ast::StatementKind::Assignment(assignment) => hir::StatementKind::Assign(Assign {
+                place: self.lower_place(&assignment.left),
+                value: self.lower_expression(&assignment.right),
+            }),
             ast::StatementKind::Expression {
                 id: _,
                 expression,
@@ -87,10 +79,9 @@ impl<'a> HirContext<'a> {
                 use ast::ExpressionKind::ReturnLike;
 
                 if let ReturnLike(return_like) = &expression.node {
-                    self.lower_return_like(return_like, id)
+                    self.lower_return_like(return_like)
                 } else {
-                    hir::Statement::Expression {
-                        id,
+                    hir::StatementKind::Expression {
                         value: self.lower_expression(expression),
                         ends_semicolon: *ends_semicolon,
                     }
@@ -98,119 +89,110 @@ impl<'a> HirContext<'a> {
             }
         };
 
-        Some(hir_statement)
+        Some(hir::Statement::new(kind, id))
     }
 
-    pub(crate) fn lower_block(&mut self, body: &ast::Block) -> hir::BlockId {
-        let id = self.id_generator.alloc_body();
-
-        let prev_body = self.current_body;
-        self.current_body = CurrentBody::Block(id);
-        self.push_scope();
-
-        let block = hir::Block {
-            id,
-            statements: vec![],
-            terminator: None,
-            imports: vec![],
-        };
-        self.insert_block(id, block, body.span);
-
-        let mut last_expression = None;
-
-        for statement in &body.statements {
-            let hir_statement = match self.lower_statement(statement) {
-                Some(val) => val,
-                None => continue,
-            };
-
-            if let hir::Statement::Expression {
-                id: _,
-                value,
-                ends_semicolon,
-            } = &hir_statement
-            {
-                if let Some((_value, ends_semicolon, span)) = last_expression {
-                    if ends_semicolon {
-                        self.log_error(SoulError::new(
-                            format!("'{}' at the end of a line can only be used for expressions at the end of a block", SymbolKind::SemiColon.as_str()), 
-                            SoulErrorKind::InvalidEscapeSequence,
-                            Some(span),
-                        ));
-                    }
-                }
-
-                last_expression = Some((*value, *ends_semicolon, statement.span));
+    fn lower_variable(&mut self, variable: &ast::Variable) -> hir::Variable {
+        let ty = match &variable.ty {
+            ast::VarTypeKind::NonInveredType(soul_type) => self.lower_type(soul_type),
+            ast::VarTypeKind::InveredType(type_modifier) => {
+                self.new_infer_type(vec![], Some(*type_modifier))
             }
-
-            self.insert_in_block(id, hir_statement);
-        }
-
-        self.pop_scope();
-        self.current_body = prev_body;
-
-        self.hir.blocks[id].terminator = match last_expression {
-            Some((value, ends_semicolon, _span)) if !ends_semicolon => Some(value),
-            _ => None,
         };
 
-        id
+        let value = match &variable.initialize_value {
+            Some(val) => Some(self.lower_expression(val)),
+            None => None,
+        };
+
+        let local = self.id_generator.alloc_local();
+        self.insert_variable(&variable.name, local, ty, value);
+
+        hir::Variable {
+            ty,
+            is_temp: false,
+            value,
+            local,
+        }
     }
 
-    fn lower_struct(&mut self, obj: &ast::Struct) {
-        let name = obj.name.clone();
+    fn lower_struct(&mut self, object: &ast::Struct) {
+        let name = object.name.clone();
+
         let mut generics = vec![];
-        for generic in &obj.generics {
-            let id = self.id_generator.alloc_generic();
-            self.insert_generic(&generic.name, id);
+        for generic in &object.generics {
+            let id = self.insert_generic(generic.name.to_string());
             generics.push(id);
         }
 
         let mut fields = vec![];
-        for field in &obj.fields {
-            
+        for field in &object.fields {
             let ty = self.lower_type(&field.ty);
-            let ty = self.hir.types.insert_ref(ty);
             let id = self.id_generator.alloc_field();
-            let value = hir::Field {
+            fields.push(hir::Field {
                 id,
                 ty,
                 name: field.name.to_string(),
-            };
-
-            fields.push(value);
+            });
         }
 
-        self.insert_struct(hir::Struct { 
-            name, 
-            fields,
-            generics,
-        });
+        let _id = self.insert_struct(hir::Struct { name, fields });
     }
 
-    fn lower_return_like(
+    fn resolve_import(&mut self, import: &ast::Import) {
+        for path in &import.paths {
+            let module_id = self
+                .tree
+                .info
+                .imports
+                .insert(&mut self.id_generator.module, path.module.clone());
+
+            let imports = match self.current_body {
+                crate::CurrentBody::Global => &mut self.tree.root.imports,
+                crate::CurrentBody::Block(block_id) => {
+                    &mut self.tree.nodes.blocks[block_id].imports
+                }
+            };
+
+            imports.push(hir::Import {
+                module: module_id,
+                kind: path.kind.clone(),
+            });
+        }
+    }
+
+    pub(crate) fn lower_return_like(
         &mut self,
         return_like: &ast::ReturnLike,
-        id: StatementId,
-    ) -> hir::Statement {
+    ) -> hir::StatementKind {
         let value = match &return_like.value {
             Some(val) => Some(self.lower_expression(val)),
             None => None,
         };
 
-        match return_like.kind {
-            ast::ReturnKind::Return => hir::Statement::Return(value, id),
-            ast::ReturnKind::Break => hir::Statement::Break(value, id),
-            ast::ReturnKind::Continue => {
-                if let Some(value) = &return_like.value {
-                    self.log_error(SoulError::new(
-                        format!("{} can not contain expression", KeyWord::Continue.as_str()),
-                        SoulErrorKind::InvalidContext,
-                        Some(value.span),
-                    ));
-                }
-                hir::Statement::Continue(id)
+        if matches!(
+            return_like.kind,
+            ast::ReturnKind::Break | ast::ReturnKind::Continue
+        ) {
+            if let Some(value) = &return_like.value {
+                self.log_error(SoulError::new(
+                    format!("{} can not contain expression", KeyWord::Continue.as_str()),
+                    SoulErrorKind::InvalidContext,
+                    Some(value.span),
+                ));
             }
         }
+
+        match return_like.kind {
+            ast::ReturnKind::Return => hir::StatementKind::Return(value),
+            ast::ReturnKind::Continue => hir::StatementKind::Continue,
+            ast::ReturnKind::Break => hir::StatementKind::Break,
+        }
+    }
+
+    fn insert_global(&mut self, global: hir::Global) -> StatementId {
+        let id = global.id;
+        self.tree.root.globals.push(global);
+        id
     }
 }

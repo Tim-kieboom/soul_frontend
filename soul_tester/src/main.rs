@@ -9,13 +9,10 @@ use ast::{
     syntax_display::{DisplayKind, SyntaxDisplay},
 };
 use fern::Dispatch;
-use inkwell::context::Context;
 use log::{error, info};
 use paths::Paths;
 use run_ast::to_ast;
 use run_hir::{HirResponse, to_hir};
-use run_mir::{MirResponse, to_mir};
-use soul_ir::{IrRequest, to_llvm_ir};
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
     char_colors::{DEFAULT, GREEN},
@@ -25,13 +22,12 @@ use soul_utils::{
 
 use crate::{
     convert_soul_error::{MessageConfig, ToMessage},
-    displayer_hir::{display_created_types, display_typed_hir},
     displayer_tokenizer::display_tokens,
 };
 
 mod convert_soul_error;
 mod displayer_hir;
-mod displayer_mir;
+// mod displayer_mir;
 mod displayer_tokenizer;
 mod paths;
 
@@ -48,8 +44,8 @@ pub const COMPILER_OPTIONS: CompilerOptions = CompilerOptions {
 };
 
 struct Ouput {
-    mir_response: MirResponse,
-    hir_response: HirResponse,
+    // mir_response: MirResponse,
+    // hir_response: HirResponse,
     source_file: String,
     faults: Vec<SementicFault>,
 }
@@ -66,10 +62,10 @@ fn main() -> Result<()> {
     
     info!("{GREEN}frontend success!!{DEFAULT}");
 
-    let is_success = run_llvm(&output);
-    if is_success {
-        info!("{GREEN}llvm success!!{DEFAULT}")
-    }
+    // let is_success = run_llvm(&output);
+    // if is_success {
+    //     info!("{GREEN}llvm success!!{DEFAULT}")
+    // }
     Ok(())
 }
 
@@ -87,49 +83,49 @@ fn run_fontend<'a>(paths: &'a Paths) -> Result<Ouput> {
     let hir = to_hir(&ast, &COMPILER_OPTIONS, &mut faults);
     display_hir(paths, &hir)?;
 
-    let mir = to_mir(&hir, &COMPILER_OPTIONS, &mut faults);
-    display_mir(paths, &mir, &hir)?;
+    // let mir = to_mir(&hir, &COMPILER_OPTIONS, &mut faults);
+    // display_mir(paths, &mir, &hir)?;
 
     Ok(Ouput {
-        mir_response: mir,
-        hir_response: hir,
+        // mir_response: mir,
+        // hir_response: hir,
         faults,
         source_file,
     })
 }
 
-fn run_llvm(output: &Ouput) -> bool {
-    let request = IrRequest {
-        mir: &output.mir_response,
-        types: &output.hir_response.types,
-        context: &Context::create(),
-    };
+// fn run_llvm(output: &Ouput) -> bool {
+//     let request = IrRequest {
+//         mir: &output.mir_response,
+//         types: &output.hir_response.types,
+//         context: &Context::create(),
+//     };
 
-    let mut faults = vec![];
-    let ir = to_llvm_ir(&request, &COMPILER_OPTIONS, &mut faults);
-    log_faults(&faults, &output.source_file);
+//     let mut faults = vec![];
+//     let ir = to_llvm_ir(&request, &COMPILER_OPTIONS, &mut faults);
+//     log_faults(&faults, &output.source_file);
 
-    #[cfg(not(debug_assertions))]
-    if ir.is_fatal {
-        return false
-    }
+//     #[cfg(not(debug_assertions))]
+//     if ir.is_fatal {
+//         return false
+//     }
 
-    #[cfg(debug_assertions)]
-    if ir.is_fatal {
-        if let Err(err) = ir.module.print_to_file("output/fatal_out.ll") {
-            error!("{err}");
-            return false
-        }
-        return true
-    }
+//     #[cfg(debug_assertions)]
+//     if ir.is_fatal {
+//         if let Err(err) = ir.module.print_to_file("output/fatal_out.ll") {
+//             error!("{err}");
+//             return false
+//         }
+//         return true
+//     }
     
-    if let Err(err) = ir.module.print_to_file("output/out.ll") {
-        error!("{err}");
-        return false
-    };
+//     if let Err(err) = ir.module.print_to_file("output/out.ll") {
+//         error!("{err}");
+//         return false
+//     };
 
-    true
-}
+//     true
+// }
 
 fn display_tokenizer(paths: &Paths, source_file: &str) -> Result<()> {
     let token_stream = to_token_stream(source_file);
@@ -150,16 +146,17 @@ fn display_ast(paths: &Paths, ast: &AstResponse) -> Result<()> {
 
 fn display_hir(paths: &Paths, hir: &HirResponse) -> Result<()> {
     paths.write_to_output(&displayer_hir::display_hir(&hir.hir), "hir/tree.soulc")?;
-    paths.write_to_output(&display_typed_hir(&hir.hir, &hir.types), "hir/typed.soulc")?;
-    paths.write_to_output(&display_created_types(&hir.types), "hir/created_types.soulc")
+    // paths.write_to_output(&display_typed_hir(&hir.hir, &hir.types), "hir/typed.soulc")?;
+    // paths.write_to_output(&display_created_types(&hir.types), "hir/created_types.soulc")?;
+    Ok(())
 }
 
-fn display_mir(paths: &Paths, mir: &MirResponse, hir: &HirResponse) -> Result<()> {
-    paths.write_to_output(
-        &displayer_mir::display_mir(&mir.tree, &hir.types),
-        "mir/tree.soulc",
-    )
-}
+// fn display_mir(paths: &Paths, mir: &MirResponse, hir: &HirResponse) -> Result<()> {
+//     paths.write_to_output(
+//         &displayer_mir::display_mir(&mir.tree, &hir.types),
+//         "mir/tree.soulc",
+//     )
+// }
 
 fn to_source_file(source_path: &str) -> Result<String> {
     let mut file = File::open(source_path)?;

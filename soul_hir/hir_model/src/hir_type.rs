@@ -1,24 +1,36 @@
 use ast::ArrayKind;
 use soul_utils::{
-    error::{SoulError, SoulErrorKind, SoulResult}, soul_names::{PrimitiveTypes, TypeModifier, TypeWrapper}, span::Span, symbool_kind::SymbolKind, vec_map::VecMapIndex
+    Ident, ids::IdAlloc, soul_names::{PrimitiveTypes, TypeModifier}, symbool_kind::SymbolKind, vec_map::VecMapIndex,
 };
-use std::fmt::Write;
 
-use crate::{GenericId, InferTypeId, StructId, TypeId, TypesMap};
+use crate::{FieldId, GenericId, InferTypeId, InferTypesMap, StructId, TypeId, TypesMap};
 
-pub enum UnifyResult {
-    /// fully unifyable
-    Ok,
-    /// error if auto copy not impl
-    NeedsAutoCopy,
-}
+pub type HirType = InnerType<HirTypeKind, PossibleTypeId>;
+pub type InferType = InnerType<InferTypeId, PossibleTypeId>;
 
-type MishmatchReason = String;
 #[derive(Debug, Clone, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct HirType {
-    pub kind: HirTypeKind,
-    pub generics: Vec<TypeId>,
+pub struct InnerType<Kind, TyId> {
+    pub kind: Kind,
+    pub generics: Vec<TyId>,
     pub modifier: Option<TypeModifier>,
+}
+impl<T, V> InnerType<T, V> {
+    pub const fn new(kind: T) -> Self {
+        Self { kind, generics: vec![], modifier: None }
+    }
+}
+impl HirType {
+    pub const fn index_type() -> Self {
+        Self::new(HirTypeKind::Primitive(PrimitiveTypes::Uint))
+    }
+
+    pub const fn none_type() -> Self {
+        Self::new(HirTypeKind::Primitive(PrimitiveTypes::None))
+    }
+
+    pub const fn error_type() -> Self {
+        Self::new(HirTypeKind::Error)
+    }
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -27,256 +39,94 @@ pub enum HirTypeKind {
     Type,
     Primitive(PrimitiveTypes),
     Array {
-        element: TypeId,
+        element: PossibleTypeId,
         kind: ArrayKind,
     },
     Ref {
-        of_type: TypeId,
+        of_type: PossibleTypeId,
         mutable: bool,
     },
-    Pointer(TypeId),
-    Optional(TypeId),
+    Pointer(PossibleTypeId),
+    Optional(PossibleTypeId),
     Generic(GenericId),
     Struct(StructId),
 
     Error,
-    /// special type for unkown hir type (should not exist in Thir and further)
-    InferType(InferTypeId, Span),
 }
 
-impl HirType {
-    pub const fn index_type() -> Self {
-        Self {
-            kind: HirTypeKind::Primitive(PrimitiveTypes::Uint),
-            modifier: None,
-            generics: vec![],
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum CreatedTypes {
+    Struct(StructId),
+}
+impl CreatedTypes {
+    pub fn to_hir_kind(self) -> HirTypeKind {
+        match self {
+            CreatedTypes::Struct(struct_id) => HirTypeKind::Struct(struct_id),
         }
     }
+}
 
-    pub const fn none_type() -> Self {
-        Self {
-            kind: HirTypeKind::None,
-            modifier: None,
-            generics: vec![],
-        }
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum PossibleTypeId {
+    Known(TypeId),
+    Infer(InferTypeId),
+}
+impl PossibleTypeId {
+    pub fn error() -> Self {
+        Self::Known(TypeId::error())
     }
+}
 
-    pub const fn error_type() -> Self {
-        Self {
-            kind: HirTypeKind::Error,
-            modifier: None,
-            generics: vec![],
-        }
-    }
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Struct {
+    pub name: Ident,
+    pub fields: Vec<Field>,
+}
 
-    pub const fn bool_type() -> Self {
-        Self {
-            kind: HirTypeKind::Primitive(PrimitiveTypes::Boolean),
-            modifier: None,
-            generics: vec![],
-        }
-    }
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Field {
+    pub id: FieldId,
+    /// The name of the field (for readability, debugging, codegen).
+    pub name: String,
+    pub ty: PossibleTypeId,
+}
 
-    pub const fn infer_type(infer_id: InferTypeId, span: Span) -> Self {
-        Self {
-            kind: HirTypeKind::InferType(infer_id, span),
-            modifier: None,
-            generics: vec![],
-        }
-    }
+pub trait DisplayType {
+    fn display(&self, types: &TypesMap, infers: &InferTypesMap) -> String;
+    fn write_display(&self, types: &TypesMap, infers: &InferTypesMap, sb: &mut String) -> std::fmt::Result;
+}
 
-    pub const fn new(kind: HirTypeKind) -> Self {
-        Self {
-            kind,
-            modifier: None,
-            generics: vec![],
-        }
-    }
-
-    pub fn is_mutable(&self) -> bool {
-        self.modifier == Some(TypeModifier::Mut)
-    }
-
-    pub fn is_immutable(&self) -> bool {
-        !self.is_mutable()
-    }
-
-    pub const fn is_infer_type(&self) -> bool {
-        matches!(self.kind, HirTypeKind::InferType(_, _))
-    }
-
-    pub fn with_modifier(mut self, modifier: TypeModifier) -> Self {
-        self.modifier = Some(modifier);
-        self
-    }
-
-    pub fn display(&self, types: &TypesMap) -> String {
-        let mut sb = String::new();
-        self.write_display(types, &mut sb)
-            .expect("no format errors");
-        sb
-    }
-
-    pub fn write_display(&self, types: &TypesMap, sb: &mut String) -> std::fmt::Result {
+impl<K: DisplayType, I> DisplayType for InnerType<K, I> {
+    fn write_display(&self, types: &TypesMap, infers: &InferTypesMap, sb: &mut String) -> std::fmt::Result {
         if let Some(modifier) = self.modifier {
             sb.push_str(modifier.as_str());
             sb.push(' ');
         }
 
-        self.kind.write_display(types, sb)
+        self.kind.write_display(types, infers, sb)
     }
-
-    pub fn write_display_no_spaces(&self, types: &TypesMap, sb: &mut String) -> std::fmt::Result {
-        if let Some(modifier) = self.modifier {
-            sb.push_str(modifier.as_str());
-            sb.push('_');
-        }
-
-        self.kind.write_display(types, sb)
-    }
-
-    pub const fn is_untyped_interger_type(&self) -> bool {
-        self.kind.is_untyped_interger()
-    }
-
-    pub const fn is_none_type(&self) -> bool {
-        matches!(self.kind, HirTypeKind::None)
-    }
-
-    pub const fn is_boolean_type(&self) -> bool {
-        matches!(self.kind, HirTypeKind::Primitive(PrimitiveTypes::Boolean))
-    }
-
-    pub const fn is_error_type(&self) -> bool {
-        matches!(self.kind, HirTypeKind::Error)
-    }
-
-    pub const fn is_any_int_type(&self) -> bool {
-        if let HirTypeKind::Primitive(prim) = self.kind {
-            prim.is_signed_interger()
-        } else {
-            false
-        }
-    }
-
-    pub const fn is_any_uint_type(&self) -> bool {
-        if let HirTypeKind::Primitive(prim) = self.kind {
-            prim.is_unsigned_interger()
-        } else {
-            false
-        }
-    }
-
-    pub const fn is_float_type(&self) -> bool {
-        if let HirTypeKind::Primitive(prim) = self.kind {
-            prim.is_float()
-        } else {
-            false
-        }
-    }
-
-    pub const fn is_numeric_type(&self) -> bool {
-        self.is_float_type() || self.is_any_uint_type() || self.is_any_int_type()
-    }
-
-    pub const fn is_primitive_type(&self) -> bool {
-        matches!(self.kind, HirTypeKind::Primitive(_))
-    }
-
-    pub fn try_deref(&self, types: &TypesMap, span: Span) -> SoulResult<TypeId> {
-        match self.kind {
-            HirTypeKind::Ref { of_type, .. } => Ok(of_type),
-            HirTypeKind::Pointer(hir_type) => Ok(hir_type),
-            other => Err(SoulError::new(
-                format!("type {} can not be derefed", other.display(types)),
-                SoulErrorKind::TypeInferenceError,
-                Some(span),
-            )),
-        }
-    }
-
-    pub fn compatible_type_kind(&self, should_be: &Self) -> Result<UnifyResult, MishmatchReason> {
-        debug_assert!(
-            !matches!(self.kind, HirTypeKind::InferType(_, _)),
-            "this fn should be used after infer typed are resolved"
-        );
-        debug_assert!(
-            !matches!(should_be.kind, HirTypeKind::InferType(_, _)),
-            "this fn should be used after infer typed are resolved"
-        );
-
-        let result = match (self.modifier, should_be.modifier) {
-            (Some(self_modifier), Some(should_be_modifier)) => {
-                if !HirTypeKind::modifier_compatible(self_modifier, should_be_modifier) {
-                    Some(UnifyResult::NeedsAutoCopy)
-                } else {
-                    None
-                }
-            }
-            _ => None,
-        };
-
-        if self.is_error_type() || should_be.is_error_type() {
-            return Ok(UnifyResult::Ok);
-        }
-
-        self.kind.compatible_type_kind(&should_be.kind)?;
-        Ok(result.unwrap_or(UnifyResult::Ok))
-    }
-
-    pub fn unify_primitive_cast(
-        &self,
-        types: &TypesMap,
-        should_be: &Self,
-    ) -> Result<(), MishmatchReason> {
-        match (self.modifier, should_be.modifier) {
-            (Some(self_modifier), Some(should_be_modifier)) => {
-                if !HirTypeKind::modifier_compatible(self_modifier, should_be_modifier) {
-                    return Err(format!(
-                        "can not cast from modifier {} to modifier {}",
-                        self_modifier.as_str(),
-                        should_be_modifier.as_str(),
-                    ));
-                }
-            }
-            _ => (),
-        };
-
-        self.kind.unify_primitive_cast(types, &should_be.kind)
-    }
-
-    pub fn resolve_untyped(&mut self, should_be: &Self) {
-        match (&mut self.kind, &should_be.kind) {
-            (HirTypeKind::Primitive(a), HirTypeKind::Primitive(b)) => {
-                a.resolve_untyped(b);
-            }
-            _ => (),
-        }
-    }
-
-    pub fn get_priority(&self, other: &Self) -> Priority {
-        fn number_precendence(ty: &HirType) -> Option<u8> {
-            match &ty.kind {
-                HirTypeKind::Primitive(val) => val.number_precedence(),
-                _ => None,
-            }
-        }
-
-        if self.is_untyped_interger_type() && other.is_untyped_interger_type() {
-            if number_precendence(self) < number_precendence(other) {
-                Priority::Left
-            } else {
-                Priority::Right
-            }
-        } else if self.is_untyped_interger_type() || self.kind.is_unknown() {
-            Priority::Right
-        } else {
-            Priority::Left
-        }
+    
+    fn display(&self, types: &TypesMap, infers: &InferTypesMap) -> String {
+        let mut sb = "".to_string();
+        self.write_display(types, infers, &mut sb).expect("no fmt error");
+        sb
     }
 }
-impl HirTypeKind {
-    pub fn write_display(&self, types: &TypesMap, sb: &mut String) -> std::fmt::Result {
+impl DisplayType for InferTypeId {
+    fn write_display(&self, _types: &TypesMap, _infers: &InferTypesMap, sb: &mut String) -> std::fmt::Result {
+        use std::fmt::Write;
+        write!(sb, "<infer_{}>", self.index())
+    }
+
+    fn display(&self, types: &TypesMap, infers: &InferTypesMap) -> String {
+        let mut sb = "".to_string();
+        self.write_display(types, infers, &mut sb).expect("no fmt error");
+        sb
+    }
+}
+impl DisplayType for HirTypeKind {
+    fn write_display(&self, types: &TypesMap, infers: &InferTypesMap, sb: &mut String) -> std::fmt::Result {
+        use std::fmt::Write;
         const CONST_REF_STR: &str = SymbolKind::ConstRef.as_str();
         const OPTIONAL_STR: &str = SymbolKind::Question.as_str();
         const POINTER_STR: &str = SymbolKind::Star.as_str();
@@ -285,7 +135,7 @@ impl HirTypeKind {
         match self {
             HirTypeKind::None => write!(sb, "{}", PrimitiveTypes::None.as_str()),
             HirTypeKind::Type => write!(sb, "type"),
-            HirTypeKind::Generic(id) => match types.generic_name(*id) {
+            HirTypeKind::Generic(id) => match types.id_to_generic(*id) {
                 None => write!(sb, "{:?}", id),
                 Some(name) => {
                     sb.push_str(name);
@@ -302,7 +152,7 @@ impl HirTypeKind {
             HirTypeKind::Primitive(prim) => write!(sb, "{}", prim.as_str()),
             HirTypeKind::Array { element, kind } => {
                 kind.write_to_string(sb)?;
-                write_display_from_id(types, *element, sb)
+                write_display_from_id(types, infers, *element, sb)
             }
             HirTypeKind::Ref { of_type, mutable } => {
                 let ref_str = match *mutable {
@@ -311,267 +161,37 @@ impl HirTypeKind {
                 };
 
                 sb.push_str(ref_str);
-                write_display_from_id(types, *of_type, sb)
+                write_display_from_id(types, infers, *of_type, sb)
             }
             HirTypeKind::Pointer(type_id) => {
                 sb.push_str(POINTER_STR);
-                write_display_from_id(types, *type_id, sb)
+                write_display_from_id(types, infers, *type_id, sb)
             }
             HirTypeKind::Optional(type_id) => {
                 sb.push_str(OPTIONAL_STR);
-                write_display_from_id(types, *type_id, sb)
+                write_display_from_id(types, infers, *type_id, sb)
             }
             HirTypeKind::Error => write!(sb, "<error>"),
-            HirTypeKind::InferType(id, _) => write!(sb, "<infer_{}>", id.index()),
         }
     }
-
-    pub const fn is_untyped_interger(&self) -> bool {
-        match self {
-            HirTypeKind::Primitive(prim) => prim.is_unsigned_interger(),
-            _ => false,
-        }
-    }
-
-    pub const fn is_unknown(&self) -> bool {
-        matches!(self, HirTypeKind::InferType(_, _))
-    }
-
-    pub fn display(&self, types: &TypesMap) -> String {
-        let mut sb = String::new();
-        self.write_display(types, &mut sb).expect("no format error");
+    
+    fn display(&self, types: &TypesMap, infers: &InferTypesMap) -> String {
+        let mut sb = "".to_string();
+        self.write_display(types, infers, &mut sb).expect("no fmt error");
         sb
     }
-
-    pub const fn display_variant(&self) -> &'static str {
-        match self {
-            HirTypeKind::Type => "type",
-            HirTypeKind::None => "none",
-            HirTypeKind::Error => "<error>",
-            HirTypeKind::Ref { .. } => "<ref>",
-            HirTypeKind::Array { .. } => "<array>",
-            HirTypeKind::InferType(_, _) => "<unknown>",
-            HirTypeKind::Pointer(_) => "<pointer>",
-            HirTypeKind::Generic(_) => "<generic>",
-            HirTypeKind::Optional(_) => "<optional>",
-            HirTypeKind::Struct(_) => "<struct>",
-            HirTypeKind::Primitive(primitive) => primitive.as_str(),
-        }
-    }
-
-    pub fn compatible_type_kind(&self, should_be: &Self) -> Result<(), MishmatchReason> {
-        match (self, should_be) {
-            (HirTypeKind::Primitive(a), HirTypeKind::Primitive(b)) => {
-                if !a.compatible(b) {
-                    return Err(format!(
-                        "'{}' is not compatible with '{}'",
-                        a.as_str(),
-                        b.as_str()
-                    ));
-                }
-                Ok(())
-            }
-
-            (HirTypeKind::None, HirTypeKind::None)
-            | (HirTypeKind::Type, HirTypeKind::Type)
-            | (HirTypeKind::Error, _)
-            | (_, HirTypeKind::Error) => Ok(()),
-
-            _ => {
-                if self == should_be {
-                    Ok(())
-                } else {
-                    Err(format!(
-                        "typekind '{}' not compatible with '{}'",
-                        self.display_variant(),
-                        should_be.display_variant()
-                    ))
-                }
-            }
-        }
-    }
-
-    pub fn unify_primitive_cast(
-        &self,
-        types: &TypesMap,
-        should_be: &Self,
-    ) -> Result<(), MishmatchReason> {
-        Ok(match (self, should_be) {
-            (
-                HirTypeKind::Ref {
-                    of_type: a_id,
-                    mutable: mut_a,
-                },
-                HirTypeKind::Ref {
-                    of_type: b_id,
-                    mutable: mut_b,
-                },
-            ) => {
-                let a = get_type(types, *a_id);
-                let b = get_type(types, *b_id);
-
-                a.unify_primitive_cast(types, b)?;
-                if mut_a != mut_b {
-                    let display = |bool: &bool| {
-                        if *bool {
-                            TypeWrapper::MutRef.as_str()
-                        } else {
-                            TypeWrapper::ConstRef.as_str()
-                        }
-                    };
-                    return Err(format!(
-                        "'{}' can not be cast to '{}'",
-                        display(mut_a),
-                        display(mut_b)
-                    ));
-                }
-            }
-            (HirTypeKind::Array { .. }, HirTypeKind::Array { .. }) => {
-                return Err("can only type cast primitive types".to_string());
-            }
-
-            (_, HirTypeKind::Pointer(_)) => return Ok(()),
-
-            (HirTypeKind::Optional(a_id), HirTypeKind::Optional(b_id)) => {
-                let a = get_type(types, *a_id);
-                let b = get_type(types, *b_id);
-
-                if a.is_infer_type() {
-                    return Ok(());
-                }
-
-                a.unify_primitive_cast(types, b)?
-            }
-
-            (HirTypeKind::None, HirTypeKind::None)
-            | (HirTypeKind::Type, HirTypeKind::Type)
-            | (HirTypeKind::Primitive(_), HirTypeKind::Primitive(_)) => (),
-
-            (a, HirTypeKind::Optional(b_id)) => {
-                let b = get_type(types, *b_id);
-
-                if matches!(a, HirTypeKind::InferType(_, _)) {
-                    return Ok(());
-                }
-
-                a.unify_primitive_cast(types, &b.kind)?
-            }
-            _ => {
-                return Err(format!(
-                    "typekind '{}' not compatible with typekind '{}'",
-                    self.display_variant(),
-                    should_be.display_variant()
-                ));
-            }
-        })
-    }
-
-    pub const fn modifier_compatible(this: TypeModifier, should_be: TypeModifier) -> bool {
-        match (this, should_be) {
-            (TypeModifier::Mut, TypeModifier::Const)
-            | (TypeModifier::Mut, TypeModifier::Literal)
-            | (TypeModifier::Const, TypeModifier::Literal) => false,
-            _ => true,
-        }
-    }
-
-    pub fn arraykind_compatible(is: &ArrayKind, should_be: &ArrayKind) -> Option<String> {
-        let default_format = |a: &ArrayKind, b: &ArrayKind| {
-            format!(
-                "arraykind '{}' is not compatible with arraykind '{}'",
-                a.to_string(),
-                b.to_string(),
-            )
-        };
-
-        match (is, should_be) {
-            (ArrayKind::MutSlice, ArrayKind::MutSlice)
-            | (ArrayKind::HeapArray, ArrayKind::HeapArray)
-            | (ArrayKind::ConstSlice, ArrayKind::ConstSlice) => None,
-
-            (ArrayKind::StackArray(a_num), ArrayKind::StackArray(b_num)) => {
-                if a_num != b_num {
-                    Some(default_format(is, should_be))
-                } else {
-                    None
-                }
-            }
-            (ArrayKind::StackArray(_), ArrayKind::HeapArray) => Some(format!(
-                "{} (maybe try 'new:[....]')",
-                default_format(is, should_be)
-            )),
-            _ => Some(default_format(is, should_be)),
-        }
-    }
+    
 }
-
-fn write_display_from_id(types: &TypesMap, ty: TypeId, sb: &mut String) -> std::fmt::Result {
-    let ty = match types.id_to_type(ty) {
+fn write_display_from_id(types: &TypesMap, infers: &InferTypesMap, ty: PossibleTypeId, sb: &mut String) -> std::fmt::Result {
+    match inner_write_display_from_id(types, infers, ty, sb) {
         Some(val) => val,
-        None => return write!(sb, "/*TypeId({}) not found*/", ty.index()),
-    };
-
-    ty.write_display(types, sb)
-}
-
-pub trait PrimitiveTypesHelper {
-    fn number_precedence(&self) -> Option<u8>;
-    fn compatible(&self, should_be: &Self) -> bool;
-    fn resolve_untyped(&mut self, should_be: &Self);
-}
-impl PrimitiveTypesHelper for PrimitiveTypes {
-    fn resolve_untyped(&mut self, should_be: &Self) {
-        if !self.is_untyped_numeric() {
-            return;
-        }
-
-        if self.number_precedence() > should_be.number_precedence() {
-            *self = should_be.clone();
-            return;
-        }
-
-        match self {
-            PrimitiveTypes::UntypedInt => *self = PrimitiveTypes::Int,
-            PrimitiveTypes::UntypedUint => *self = PrimitiveTypes::Int,
-            PrimitiveTypes::UntypedFloat => *self = PrimitiveTypes::Float32,
-            _ => unreachable!(),
-        }
-    }
-
-    fn compatible(&self, should_be: &Self) -> bool {
-        if self.is_untyped_numeric() || should_be.is_untyped_numeric() {
-            if should_be.is_untyped_numeric() && should_be.is_untyped_numeric() {
-                return true;
-            }
-
-            let a = self.number_precedence();
-            let b = should_be.number_precedence();
-            let both_numbers = a.is_some() && b.is_some();
-            if both_numbers && a >= b {
-                return true;
-            }
-        }
-
-        self == should_be
-    }
-
-    fn number_precedence(&self) -> Option<u8> {
-        if self.is_float() {
-            Some(1)
-        } else if self.is_signed_interger() {
-            Some(2)
-        } else if self.is_unsigned_interger() {
-            Some(3)
-        } else {
-            None
-        }
+        None => HirType::error_type().write_display(types, infers, sb),
     }
 }
-pub enum Priority {
-    Left,
-    Right,
-}
 
-fn get_type(types: &TypesMap, ty: TypeId) -> &HirType {
-    types.id_to_type(ty).expect("should have TypeId")
+fn inner_write_display_from_id(types: &TypesMap, infers: &InferTypesMap, ty: PossibleTypeId, sb: &mut String) -> Option<std::fmt::Result> {
+    Some(match ty {
+        PossibleTypeId::Known(type_id) => types.id_to_type(type_id)?.write_display(types, infers, sb),
+        PossibleTypeId::Infer(infer_type_id) => infers.get_infer(infer_type_id)?.write_display(types, infers, sb),
+    })
 }

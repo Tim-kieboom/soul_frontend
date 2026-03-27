@@ -1,5 +1,6 @@
 use ast::NamedTupleElement;
 use soul_utils::{
+    Ident,
     ids::{FunctionId, IdAlloc},
     soul_error_internal,
 };
@@ -7,7 +8,7 @@ use soul_utils::{
 use crate::HirContext;
 
 impl<'a> HirContext<'a> {
-    pub(crate) fn lower_function(&mut self, function: &ast::Function) -> FunctionId {
+    pub(super) fn lower_function(&mut self, function: &ast::Function) -> FunctionId {
         let id = match function.signature.node.id {
             Some(val) => val,
             None => {
@@ -18,15 +19,14 @@ impl<'a> HirContext<'a> {
                 FunctionId::error()
             }
         };
+
         let signature = &function.signature.node;
         self.insert_function(&signature.name, id);
 
         self.push_scope();
         let mut generics = vec![];
         for generic in &function.signature.node.generics {
-            let id = self.id_generator.alloc_generic();
-            self.insert_generic(&generic.name, id);
-            generics.push(id);
+            generics.push(self.insert_generic(generic.name.to_string()));
         }
 
         let parameters = signature
@@ -66,7 +66,23 @@ impl<'a> HirContext<'a> {
             name: signature.name.clone(),
             kind: signature.function_kind,
         };
-        self.hir.functions.insert(id, hir_function);
+        self.tree.nodes.functions.insert(id, hir_function);
         id
+    }
+
+    fn insert_function(&mut self, name: &Ident, function: FunctionId) {
+        let scope = match self.scopes.last_mut() {
+            Some(val) => val,
+            None => {
+                self.log_error(soul_error_internal!(
+                    "tryed to insert_local in global scope",
+                    Some(name.span)
+                ));
+                return;
+            }
+        };
+
+        self.tree.info.spans.functions.insert(function, name.span);
+        scope.functions.insert(name.to_string(), function);
     }
 }

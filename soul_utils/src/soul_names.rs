@@ -1,5 +1,8 @@
 use crate::{define_str_enum, define_symbols, symbool_kind::SymbolKind};
 
+pub const MAIN_FUNCTION_NAME: &str = "main";
+pub const INIT_GLOBALS_FUNCTION_NAME: &str = "___init_global";
+
 define_symbols!(
     /// Type wrapper symbols that modify how types are referenced or stored.
     ///

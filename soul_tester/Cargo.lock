@@ -89,32 +89,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "hir_literal_interpreter"
-version = "0.1.0"
-dependencies = [
- "ast",
- "hir",
- "hir_typed_context",
- "soul_utils",
-]
-
-[[package]]
 name = "hir_parser"
 version = "0.1.0"
 dependencies = [
  "ast",
  "enum_variant_name_const",
  "hir",
- "soul_utils",
-]
-
-[[package]]
-name = "hir_typed_context"
-version = "0.1.0"
-dependencies = [
- "ast",
- "hir",
- "serde",
  "soul_utils",
 ]
 
@@ -195,18 +175,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
 
 [[package]]
-name = "mir_parser"
-version = "0.1.0"
-dependencies = [
- "ast",
- "hir",
- "hir_typed_context",
- "run_hir",
- "serde",
- "soul_utils",
-]
-
-[[package]]
 name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -276,18 +244,7 @@ version = "0.1.0"
 dependencies = [
  "ast",
  "hir",
- "hir_literal_interpreter",
  "hir_parser",
- "hir_typed_context",
- "soul_utils",
-]
-
-[[package]]
-name = "run_mir"
-version = "0.1.0"
-dependencies = [
- "mir_parser",
- "run_hir",
  "soul_utils",
 ]
 
@@ -347,20 +304,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
-name = "soul_ir"
-version = "0.1.0"
-dependencies = [
- "ast",
- "hir",
- "hir_typed_context",
- "inkwell",
- "mir_parser",
- "run_mir",
- "serde",
- "soul_utils",
-]
-
-[[package]]
 name = "soul_name_resolver"
 version = "0.1.0"
 dependencies = [
@@ -377,18 +320,13 @@ dependencies = [
  "ast_parser",
  "fern",
  "hir",
- "hir_literal_interpreter",
  "hir_parser",
- "hir_typed_context",
  "inkwell",
  "log",
- "mir_parser",
  "run_ast",
  "run_hir",
- "run_mir",
  "serde",
  "serde_json",
- "soul_ir",
  "soul_name_resolver",
  "soul_tokenizer",
  "soul_utils",

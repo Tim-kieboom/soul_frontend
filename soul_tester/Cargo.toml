@@ -14,13 +14,14 @@ ast = { version = "0.1.0", path = "../soul_ast/ast_model" }
 soul_tokenizer = { version = "0.1.0", path = "../soul_tokenizer" }
 hir_parser = { version = "0.1.0", path = "../soul_hir/hir_parser" }
 hir = { version = "0.1.0", path = "../soul_hir/hir_model" }
-hir_typed_context = { version = "0.1.0", path = "../soul_hir/hir_typed_context" }
 fern = "0.6"
 log = "0.4.29"
-mir_parser = { version = "0.1.0", path = "../soul_mir/mir_parser" }
-hir_literal_interpreter = { version = "0.1.0", path = "../soul_hir/hir_literal_interpreter" }
 run_ast = { version = "0.1.0", path = "../soul_ast/run_ast" }
 run_hir = { version = "0.1.0", path = "../soul_hir/run_hir" }
-run_mir = { version = "0.1.0", path = "../soul_mir/run_mir" }
 inkwell = { version = "0.8", features = ["llvm16-0"] }
-soul_ir = { version = "0.1.0", path = "../soul_ir" }
+
+# soul_ir = { version = "0.1.0", path = "../soul_ir" }
+# run_mir = { version = "0.1.0", path = "../soul_mir/run_mir" }
+# mir_parser = { version = "0.1.0", path = "../soul_mir/mir_parser" }
+# hir_typed_context = { version = "0.1.0", path = "../soul_hir/hir_typed_context" }
+# hir_literal_interpreter = { version = "0.1.0", path = "../soul_hir/hir_literal_interpreter" }

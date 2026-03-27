@@ -1,6 +1,6 @@
-use crate::{BlockId, ExpressionId, LocalId, Place, RefTypeId, StructId, TypeId};
+use crate::{BlockId, ExpressionId, LocalId, PlaceId, StructId, TypeId, hir_type::PossibleTypeId};
 use ast::{BinaryOperator, Literal, UnaryOperator};
-use soul_utils::{Ident, ids::{FunctionId, IdAlloc}};
+use soul_utils::{Ident, ids::{FunctionId}};
 
 /// A typed HIR expression.
 ///
@@ -9,7 +9,7 @@ use soul_utils::{Ident, ids::{FunctionId, IdAlloc}};
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Expression {
     pub id: ExpressionId,
-    pub ty: TypeId,
+    pub ty: PossibleTypeId,
     pub kind: ExpressionKind,
 }
 impl Expression {
@@ -20,7 +20,7 @@ impl Expression {
     pub fn error(id: ExpressionId) -> Self {
         Self {
             id,
-            ty: TypeId::error(),
+            ty: PossibleTypeId::error(),
             kind: ExpressionKind::Error,
         }
     }
@@ -51,21 +51,21 @@ pub enum ExpressionKind {
     /// Loads the value from a place.
     ///
     /// This represents reading from a variable, dereference, or indexed location.
-    Load(Place),
+    Load(PlaceId),
 
     /// Creates a reference to a place.
     ///
     /// The `mutable` flag indicates whether this is a mutable (`&`)
     /// or immutable (`@`) reference.
     Ref {
-        place: Place,
+        place: PlaceId,
         mutable: bool,
     },
 
     /// Dereferences a pointer or reference expression.
     DeRef(ExpressionId),
 
-    InnerRawStackArray(RefTypeId),
+    InnerRawStackArray(PossibleTypeId),
 
     // --- Operators ---
     /// A unary operation.
@@ -102,7 +102,7 @@ pub enum ExpressionKind {
     /// If `callee` is present, this represents a method-style call.
     Call {
         function: FunctionId,
-        generics: Vec<RefTypeId>,
+        generics: Vec<TypeId>,
         callee: Option<ExpressionId>,
         arguments: Vec<ExpressionId>,
     },
@@ -111,7 +111,7 @@ pub enum ExpressionKind {
     /// An explicit type cast.
     Cast {
         value: ExpressionId,
-        cast_to: RefTypeId,
+        cast_to: PossibleTypeId,
     },
 
     StructConstructor {

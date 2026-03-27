@@ -39,32 +39,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "hir_literal_interpreter"
-version = "0.1.0"
-dependencies = [
- "ast",
- "hir",
- "hir_typed_context",
- "soul_utils",
-]
-
-[[package]]
 name = "hir_parser"
 version = "0.1.0"
 dependencies = [
  "ast",
  "enum_variant_name_const",
  "hir",
- "soul_utils",
-]
-
-[[package]]
-name = "hir_typed_context"
-version = "0.1.0"
-dependencies = [
- "ast",
- "hir",
- "serde",
  "soul_utils",
 ]
 
@@ -113,9 +93,7 @@ version = "0.1.0"
 dependencies = [
  "ast",
  "hir",
- "hir_literal_interpreter",
  "hir_parser",
- "hir_typed_context",
  "soul_utils",
 ]
 

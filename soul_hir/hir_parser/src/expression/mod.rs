@@ -1,204 +1,129 @@
-use ast::{Argument, NamedTupleElement, NamedTupleType, VarTypeKind, scope::NodeId};
-use hir::{
-    Binary, Expression, ExpressionId, HirType, HirTypeKind, LocalId, Place, PlaceKind, TypeId,
-    Unary,
-};
+use ast::{AsTypeCast, VarTypeKind, scope::NodeId};
+use hir::{ExpressionId, HirType, HirTypeKind, LocalId, Place, PlaceKind};
+#[cfg(debug_assertions)]
+use soul_utils::soul_error_internal;
 use soul_utils::{
     Ident,
     error::{SoulError, SoulErrorKind},
     ids::IdAlloc,
-    soul_error_internal,
     span::Span,
 };
 
 use crate::HirContext;
+
 mod array;
+mod call;
 mod r#if;
 
 impl<'a> HirContext<'a> {
-    pub fn lower_expression(&mut self, expression: &ast::Expression) -> hir::ExpressionId {
-        let id = self.alloc_expression(expression.span);
-
+    pub(crate) fn lower_expression(&mut self, expression: &ast::Expression) -> hir::ExpressionId {
         let span = expression.span;
-        let hir_expression = match &expression.node {
-            ast::ExpressionKind::FieldAccess(field) => {
-                
-                let place = self.lower_field_access(field, span);
-                hir::Expression {
-                    id,
-                    ty: self.new_infer_type(span),
-                    kind: hir::ExpressionKind::Load(place),
-                }
-            }
-            ast::ExpressionKind::StructConstructor(ctor) => {
-                let ty = self.lower_type(&ctor.struct_type);
-                let hir_type = self.hir.types.id_to_type(ty).expect("have type");
-                let struct_type = match &hir_type.kind {
-                    HirTypeKind::Struct(val) => *val,
-                    _ => {
-                        self.log_error(SoulError::new("should be struct type", SoulErrorKind::InvalidContext, Some(span)));
-                        return hir::ExpressionId::error()
-                    }
-                };
+        let id = self.alloc_expression(span);
 
-                let values = ctor.values
-                    .iter()
-                    .map(|(name, value)| (name.clone(), self.lower_expression(value)))
-                    .collect();
-                
-                hir::Expression {
-                    id,
-                    ty,
-                    kind: hir::ExpressionKind::StructConstructor { ty: struct_type, values, defaults: ctor.defaults },
-                }
-            }
-            ast::ExpressionKind::Null(_node_id) => hir::Expression {
-                id,
-                ty: self.null_ty(span),
-                kind: hir::ExpressionKind::Null,
-            },
-            ast::ExpressionKind::Literal((_id, literal)) => hir::Expression {
-                id,
-                ty: self.type_from_literal(literal),
-                kind: hir::ExpressionKind::Literal(literal.clone()),
-            },
-            ast::ExpressionKind::Index(index) => {
-                let place = Place::new(
-                    PlaceKind::Index {
-                        id: self.id_generator.alloc_place(),
-                        base: Box::new(self.lower_place(&index.collection)),
-                        index: self.lower_expression(&index.index),
-                    },
-                    span,
-                );
-
-                hir::Expression {
-                    id,
-                    ty: self.new_infer_type(span),
-                    kind: hir::ExpressionKind::Load(place),
-                }
-            }
-            ast::ExpressionKind::FunctionCall(function_call) => self.lower_call(id, function_call),
-            ast::ExpressionKind::Variable {
-                ident,
-                resolved: _,
-                id: option_id,
-            } => self.lower_expression_variable(id, ident, *option_id),
-            ast::ExpressionKind::If(r#if) => self.lower_if(id, r#if, span),
-            ast::ExpressionKind::As(cast) => {
-                let value = self.lower_expression(&cast.left);
-                let cast_to = self.lower_type(&cast.type_cast);
-                let ref_type = self.hir.types.insert_ref(cast_to);
-                hir::Expression {
-                    id,
-                    ty: cast_to,
-                    kind: hir::ExpressionKind::Cast {
-                        value,
-                        cast_to: ref_type,
-                    },
-                }
-            }
-            ast::ExpressionKind::Unary(unary) => {
-                let expression = self.lower_expression(&unary.expression);
-                let operator = unary.operator.clone();
-                hir::Expression {
-                    id,
-                    ty: self.new_infer_type(span),
-                    kind: hir::ExpressionKind::Unary(Unary {
-                        operator,
-                        expression,
-                    }),
-                }
-            }
+        let value = match &expression.node {
+            ast::ExpressionKind::If(ast_if) => self.lower_if(id, ast_if),
+            ast::ExpressionKind::Unary(unary) => self.lower_unary(id, unary),
             ast::ExpressionKind::Array(array) => self.lower_array(id, array, span),
             ast::ExpressionKind::Block(block) => return self.lower_block_expression(block),
-            ast::ExpressionKind::While(r#while) => {
-                let condition = r#while
-                    .condition
-                    .as_ref()
-                    .map(|value| self.lower_expression(value));
-
-                let body = self.lower_block(&r#while.block);
-                hir::Expression {
-                    id,
-                    ty: self.add_type(HirType::none_type()),
-                    kind: hir::ExpressionKind::While { condition, body },
-                }
+            ast::ExpressionKind::Index(index) => self.lower_index(id, index, span),
+            ast::ExpressionKind::Null(_node_id) => self.lower_null(id),
+            ast::ExpressionKind::Binary(binary) => self.lower_binary(id, binary),
+            ast::ExpressionKind::While(ast_while) => self.lower_while(id, ast_while),
+            ast::ExpressionKind::As(as_type_cast) => self.lower_cast(id, as_type_cast),
+            ast::ExpressionKind::Deref { id: _, inner } => self.lower_deref(id, inner),
+            ast::ExpressionKind::FieldAccess(field_access) => {
+                self.lower_field(id, field_access, span)
             }
-            ast::ExpressionKind::Binary(binary) => {
-                let left = self.lower_expression(&binary.left);
-                let operator = binary.operator.clone();
-                let right = self.lower_expression(&binary.right);
-                hir::Expression {
-                    id,
-                    ty: self.new_infer_type(span),
-                    kind: hir::ExpressionKind::Binary(Binary {
-                        left,
-                        operator,
-                        right,
-                    }),
-                }
-            }
-            ast::ExpressionKind::Deref { id: _, inner } => hir::Expression {
-                id,
-                ty: self.new_infer_type(span),
-                kind: hir::ExpressionKind::DeRef(self.lower_expression(inner)),
-            },
+            ast::ExpressionKind::FunctionCall(function_call) => self.lower_call(id, function_call),
+            ast::ExpressionKind::Literal((_node_id, literal)) => self.lower_literal(id, literal),
+            ast::ExpressionKind::Variable {
+                id: _,
+                ident,
+                resolved,
+            } => self.lower_expression_variable(id, ident, *resolved),
             ast::ExpressionKind::Ref {
                 id: _,
                 is_mutable,
                 expression,
             } => self.lower_ref(id, expression, is_mutable, span),
-            ast::ExpressionKind::Default(_) => {
-                todo!("desugar Default")
+            ast::ExpressionKind::StructConstructor(struct_constructor) => {
+                self.lower_struct_contructor(id, struct_constructor, span)
             }
-            ast::ExpressionKind::ExternalExpression(external) => {
-                let _module_id = match self.hir.imports.get_id(&external.path) {
-                    Some(id) => id,
-                    None => self
-                        .hir
-                        .imports
-                        .insert(&mut self.id_generator.module, external.path.clone()),
-                };
 
-                todo!("impl externalExpression")
+            ast::ExpressionKind::ExternalExpression(_external_expression) => {
+                self.log_error(soul_error_internal!(
+                    "ExternalExpression expression is unstable",
+                    Some(span)
+                ));
+                hir::Expression::error(id)
+            }
+            ast::ExpressionKind::Default(_node_id) => {
+                self.log_error(soul_error_internal!(
+                    "Default expression is unstable",
+                    Some(span)
+                ));
+                hir::Expression::error(id)
             }
             ast::ExpressionKind::ReturnLike(_) => {
-                panic!("return_like should be unreachable")
+                self.log_error(soul_error_internal!(
+                    "return like should be unreachable in HirContext::lower_expression",
+                    Some(span)
+                ));
+                hir::Expression::error(id)
             }
         };
 
-        self.insert_expression(id, hir_expression)
+        self.insert_expression(id, value)
     }
 
-    fn lower_block_expression(&mut self, block: &ast::Block) -> hir::ExpressionId {
-        let body = self.lower_block(block);
+    fn lower_struct_contructor(
+        &mut self,
+        id: ExpressionId,
+        ctor: &ast::StructConstructor,
+        span: Span,
+    ) -> hir::Expression {
+        let ty = self.lower_type(&ctor.struct_type);
+        let kown = match ty {
+            hir::PossibleTypeId::Known(type_id) => type_id,
+            hir::PossibleTypeId::Infer(_) => {
+                self.log_error(SoulError::new(
+                    "struct type should be known at this point",
+                    SoulErrorKind::TypeInferenceError,
+                    Some(span),
+                ));
 
-        let ty = match &self.hir.blocks[body].terminator {
-            Some(value) => self.hir.expressions[*value].ty,
-            None => self.add_type(HirType::none_type()),
+                return hir::Expression::error(id);
+            }
         };
 
-        let id = self.alloc_expression(block.span);
-        let return_value = hir::Expression {
+        let hir_type = self.tree.info.types.id_to_type(kown).expect("have type");
+        let struct_type = match &hir_type.kind {
+            HirTypeKind::Struct(val) => *val,
+            _ => {
+                self.log_error(SoulError::new(
+                    "should be struct type",
+                    SoulErrorKind::InvalidContext,
+                    Some(span),
+                ));
+                return hir::Expression::error(id);
+            }
+        };
+
+        let values = ctor
+            .values
+            .iter()
+            .map(|(name, value)| (name.clone(), self.lower_expression(value)))
+            .collect();
+
+        hir::Expression {
             id,
             ty,
-            kind: hir::ExpressionKind::Block(body),
-        };
-
-        self.insert_expression(id, return_value)
-    }
-
-    fn lower_field_access(&mut self, field: &ast::FieldAccess, span: Span) -> Place {
-        let object = self.lower_place(&field.object);
-        let place_id = self.id_generator.alloc_place();
-        let field = hir::PlaceKind::Field { 
-            id: place_id, 
-            base: Box::new(object), 
-            field: field.field.clone() 
-        };
-    
-        hir::Place::new(field, span)
+            kind: hir::ExpressionKind::StructConstructor {
+                ty: struct_type,
+                values,
+                defaults: ctor.defaults,
+            },
+        }
     }
 
     fn lower_ref(
@@ -209,7 +134,7 @@ impl<'a> HirContext<'a> {
         span: Span,
     ) -> hir::Expression {
         let inner = self.lower_expression(expression);
-        let of_type = self.hir.expressions[inner].ty;
+        let of_type = self.tree.nodes.expressions[inner].ty;
 
         let local = match &expression.node {
             ast::ExpressionKind::Variable { ident, .. } => match self.find_local(ident) {
@@ -238,18 +163,21 @@ impl<'a> HirContext<'a> {
         };
 
         let place = Place::new(
-            PlaceKind::Local(local, self.id_generator.alloc_place()),
+            self.id_generator.alloc_place(),
+            PlaceKind::Local(local),
             span,
         );
+
         let ty = self.add_type(HirType::new(HirTypeKind::Ref {
             of_type,
             mutable: *is_mutable,
         }));
+
         hir::Expression {
             id,
-            ty,
+            ty: hir::PossibleTypeId::Known(ty),
             kind: hir::ExpressionKind::Ref {
-                place,
+                place: self.insert_place(place),
                 mutable: *is_mutable,
             },
         }
@@ -265,11 +193,11 @@ impl<'a> HirContext<'a> {
         let var_type_kind = self.ast_store.get_variable_type(node_id);
 
         let ty = match var_type_kind {
-            None => self.new_infer_type(ident.span),
+            None => self.new_infer_type(vec![], None),
             Some(VarTypeKind::NonInveredType(ty)) => self.lower_type(ty),
             Some(VarTypeKind::InveredType(modifier)) => {
                 let modifier = *modifier;
-                self.new_infer_with_modifier(modifier, ident.span)
+                self.new_infer_type(vec![], Some(modifier))
             }
         };
 
@@ -287,185 +215,158 @@ impl<'a> HirContext<'a> {
         };
 
         let place_id = self.id_generator.alloc_place();
-        let place_kind = match self.hir.locals.get(local) {
-            Some(local_info) if local_info.is_temp() => PlaceKind::Temp(local, place_id),
-            _ => PlaceKind::Local(local, place_id),
+        let place_kind = match self.tree.nodes.locals.get(local) {
+            Some(local_info) if local_info.is_temp() => PlaceKind::Temp(local),
+            _ => PlaceKind::Local(local),
         };
 
-        let place = Place::new(place_kind, ident.span);
+        let place = Place::new(place_id, place_kind, ident.span);
 
         hir::Expression {
             id,
             ty,
+            kind: hir::ExpressionKind::Load(self.insert_place(place)),
+        }
+    }
+
+    fn lower_field(
+        &mut self,
+        id: ExpressionId,
+        field: &ast::FieldAccess,
+        span: Span,
+    ) -> hir::Expression {
+        let base = self.lower_place(&field.object);
+        let field = hir::PlaceKind::Field {
+            base,
+            field: field.field.clone(),
+        };
+        let place_id = self.id_generator.alloc_place();
+        let place = self.insert_place(hir::Place::new(place_id, field, span));
+
+        hir::Expression {
+            id,
+            ty: self.new_infer_type(vec![], None),
             kind: hir::ExpressionKind::Load(place),
         }
     }
 
-    fn lower_call(
-        &mut self,
-        id: hir::ExpressionId,
-        function_call: &ast::FunctionCall,
-    ) -> hir::Expression {
-        let resolved = match function_call.resolved {
-            Some(val) => val,
-            None => {
-                return hir::Expression::error(id);
-            }
-        };
+    fn lower_deref(&mut self, id: ExpressionId, inner: &Box<ast::Expression>) -> hir::Expression {
+        hir::Expression {
+            id,
+            ty: self.new_infer_type(vec![], None),
+            kind: hir::ExpressionKind::DeRef(self.lower_expression(inner)),
+        }
+    }
 
-        let signature = match self.ast_store.get_function(resolved) {
-            Some(signature) => signature,
-            None => {
-                #[cfg(debug_assertions)]
-                self.log_error(soul_error_internal!(
-                    "could not find function",
-                    Some(function_call.name.span)
-                ));
-                return hir::Expression::error(id);
-            }
-        };
+    fn lower_cast(&mut self, id: ExpressionId, cast: &Box<AsTypeCast>) -> hir::Expression {
+        let value = self.lower_expression(&cast.left);
+        let cast_to = self.lower_type(&cast.type_cast);
+        hir::Expression {
+            id,
+            ty: cast_to,
+            kind: hir::ExpressionKind::Cast { value, cast_to },
+        }
+    }
 
-        let callee = function_call
-            .callee
+    fn lower_while(&mut self, id: ExpressionId, ast_while: &ast::While) -> hir::Expression {
+        let condition = ast_while
+            .condition
             .as_ref()
-            .map(|el| self.lower_expression(el));
+            .map(|value| self.lower_expression(value));
 
-        let mut arguments = vec![];
-        arguments.resize(signature.parameters.len(), ExpressionId::error());
-
-        for (i, argument) in function_call.arguments.iter().enumerate() {
-            let parameter_i = match self.get_parameter_index(
-                i,
-                argument,
-                &signature.parameters,
-                function_call.name.span,
-            ) {
-                Ok(val) => val,
-                Err(span) => {
-                    self.log_error(SoulError::new(
-                        format!("parameters of {} argument not found", i),
-                        SoulErrorKind::InvalidContext,
-                        Some(span),
-                    ));
-                    continue;
-                }
-            };
-            arguments[parameter_i] = self.lower_expression(&argument.value);
+        let body = self.lower_block(&ast_while.block);
+        hir::Expression {
+            id,
+            ty: hir::PossibleTypeId::Known(self.add_type(HirType::none_type())),
+            kind: hir::ExpressionKind::While { condition, body },
         }
+    }
 
-        for (i, argument) in arguments.iter_mut().enumerate() {
-            if *argument != ExpressionId::error() {
-                continue;
-            }
-
-            *argument = match &signature.parameters[i].default {
-                Some(val) => self.lower_expression(val),
-                None => {
-                    let span = function_call.name.span;
-                    self.log_error(SoulError::new(
-                        format!("argument {} not found in function declation", i + 1),
-                        SoulErrorKind::InvalidContext,
-                        Some(span),
-                    ));
-                    let id = self.alloc_expression(span);
-                    let err = Expression::error(id);
-                    self.insert_expression(id, err)
-                }
-            };
+    fn lower_literal(&mut self, id: ExpressionId, literal: &ast::Literal) -> hir::Expression {
+        hir::Expression {
+            id,
+            ty: hir::PossibleTypeId::Known(self.type_from_literal(literal)),
+            kind: hir::ExpressionKind::Literal(literal.clone()),
         }
+    }
 
-        let mut generics = vec![];
-        for soul_type in &function_call.generics {
-            let ty = self.lower_type(soul_type);
-            let ref_ty = self.hir.types.insert_ref(ty);
-            generics.push(ref_ty);
+    fn lower_binary(&mut self, id: ExpressionId, binary: &ast::Binary) -> hir::Expression {
+        let left = self.lower_expression(&binary.left);
+        let operator = binary.operator.clone();
+        let right = self.lower_expression(&binary.right);
+        hir::Expression {
+            id,
+            ty: self.new_infer_type(vec![], None),
+            kind: hir::ExpressionKind::Binary(hir::Binary {
+                left,
+                operator,
+                right,
+            }),
         }
+    }
 
-        let call_generics = signature
-            .generics
-            .iter()
-            .map(|generic| generic.name.to_string())
-            .zip(generics.iter().copied())
-            .collect();
+    fn lower_null(&mut self, id: ExpressionId) -> hir::Expression {
+        hir::Expression {
+            id,
+            ty: self.new_null_infer(),
+            kind: hir::ExpressionKind::Null,
+        }
+    }
 
-        let ty = match Self::convert_type(
-            &signature.return_type,
-            &self.scopes,
-            &call_generics,
-            &mut self.hir.types,
-        ) {
-            Ok(val) => val,
-            Err(err) => {
-                self.log_error(err);
-                TypeId::error()
-            }
-        };
+    fn lower_index(&mut self, id: ExpressionId, index: &ast::Index, span: Span) -> hir::Expression {
+        let place = Place::new(
+            self.id_generator.alloc_place(),
+            PlaceKind::Index {
+                base: self.lower_place(&index.collection),
+                index: self.lower_expression(&index.index),
+            },
+            span,
+        );
 
         hir::Expression {
             id,
+            ty: self.new_infer_type(vec![], None),
+            kind: hir::ExpressionKind::Load(self.insert_place(place)),
+        }
+    }
+
+    fn lower_block_expression(&mut self, block: &ast::Block) -> hir::ExpressionId {
+        let body = self.lower_block(block);
+
+        let ty = match &self.tree.nodes.blocks[body].terminator {
+            Some(value) => self.tree.nodes.expressions[*value].ty,
+            None => hir::PossibleTypeId::Known(self.add_type(HirType::none_type())),
+        };
+
+        let id = self.alloc_expression(block.span);
+        let return_value = hir::Expression {
+            id,
             ty,
-            kind: hir::ExpressionKind::Call {
-                callee,
-                generics,
-                arguments,
-                function: resolved,
-            },
+            kind: hir::ExpressionKind::Block(body),
+        };
+
+        self.insert_expression(id, return_value)
+    }
+
+    fn lower_unary(&mut self, id: ExpressionId, unary: &ast::Unary) -> hir::Expression {
+        let expression = self.lower_expression(&unary.expression);
+        let operator = unary.operator.clone();
+        hir::Expression {
+            id,
+            ty: self.new_infer_type(vec![], None),
+            kind: hir::ExpressionKind::Unary(hir::Unary {
+                operator,
+                expression,
+            }),
         }
     }
 
-    fn get_parameter_index(
+    pub(crate) fn insert_expression(
         &mut self,
-        i: usize,
-        argument: &Argument,
-        parameters: &Vec<NamedTupleElement>,
-        span: Span,
-    ) -> Result<usize, Span> {
-        if let Some(name) = &argument.name {
-            let (parameter_i, parameter) =
-                find_default_parameter(name.as_str(), parameters).ok_or(name.span)?;
-            if parameter.default.is_none() {
-                self.log_error(SoulError::new(
-                    format!("{} is not a default parameter", name.as_str()),
-                    SoulErrorKind::InvalidContext,
-                    Some(argument.value.span),
-                ));
-            }
-            Ok(parameter_i)
-        } else {
-            let parameter = parameters.get(i).ok_or(span)?;
-            if parameter.default.is_some() {
-                let name = &parameter.name;
-                self.log_error(SoulError::new(
-                    format!(
-                        "argument {} is a default parameter should add name (so '{}: <value>')",
-                        i + 1,
-                        name.as_str()
-                    ),
-                    SoulErrorKind::InvalidContext,
-                    Some(argument.value.span),
-                ));
-            }
-            Ok(i)
-        }
+        id: ExpressionId,
+        expression: hir::Expression,
+    ) -> ExpressionId {
+        self.tree.nodes.expressions.insert(id, expression);
+        id
     }
-
-    fn null_ty(&mut self, span: Span) -> TypeId {
-        let infer = self.new_infer_type(span);
-        self.add_type(HirType {
-            kind: HirTypeKind::Optional(infer),
-            modifier: None,
-            generics: vec![],
-        })
-    }
-}
-
-fn find_default_parameter<'a>(
-    name: &str,
-    parameters: &'a NamedTupleType,
-) -> Option<(usize, &'a NamedTupleElement)> {
-    parameters
-        .iter()
-        .enumerate()
-        .filter(|(_, parameter)| parameter.name.as_str() == name)
-        .next()
 }
