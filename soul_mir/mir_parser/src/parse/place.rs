@@ -1,4 +1,5 @@
 use hir::TypeId;
+use hir_typed_context::{FieldInfo};
 use soul_utils::{ids::IdAlloc, soul_error_internal};
 
 use crate::{
@@ -46,7 +47,14 @@ impl<'a> MirContext<'a> {
                 self.new_place(mir::Place::Deref(operand))
             }
             hir::PlaceKind::Index { .. } => todo!("mir desugar index"),
-            hir::PlaceKind::Field { .. } => todo!("mir desugar field"),
+            hir::PlaceKind::Field { id, base, .. } => {
+                let base = self.lower_place(base).pass(is_end);
+                let field_id = self.hir_response.types.place_fields[*id];
+                let FieldInfo{ base_type, field_type:_, index } = self.hir_response.types.fields[field_id];
+                let base_type = self.ref_to_id(base_type);
+                
+                self.new_place(mir::Place::Field{base, base_type, field_id, index})
+            },
         };
 
         let ty = self.place_type(place.node.get_id());
@@ -71,6 +79,19 @@ impl<'a> MirContext<'a> {
 
     pub(crate) fn place_to_operand(&mut self, place_id: mir::PlaceId, ty: TypeId) -> mir::Operand {
         match &self.tree.places[place_id] {
+            mir::Place::Field{base, base_type:_, field_id, index} => {
+                let field_id = *field_id;
+                let index = *index;
+                let base = *base;
+                let field_temp = self.new_temp(ty);
+
+                let statement = mir::Statement::new(mir::StatementKind::Assign {
+                    place: self.new_place(mir::Place::Temp(field_temp)),
+                    value: Rvalue::new(mir::RvalueKind::Field { base, index, base_type: ty, field_id }),
+                });
+                self.push_statement(statement);
+                mir::Operand::new(ty, mir::OperandKind::Temp(field_temp))
+            }
             mir::Place::Local(local_id) => {
                 mir::Operand::new(ty, mir::OperandKind::Local(*local_id))
             }

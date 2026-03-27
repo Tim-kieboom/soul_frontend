@@ -1,6 +1,6 @@
-use soul_utils::span::Spanned;
+use soul_utils::{Ident, span::Spanned};
 
-use crate::{ExpressionId, FieldId, LocalId, PlaceId};
+use crate::{ExpressionId, LocalId, PlaceId};
 
 /// A memory location that can be read from or written to.
 ///
@@ -34,7 +34,7 @@ pub enum PlaceKind {
     Field {
         id: PlaceId,
         base: Box<Place>,
-        index: FieldId,
+        field: Ident,
     },
 }
 impl PlaceKind {

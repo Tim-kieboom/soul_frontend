@@ -20,9 +20,12 @@ mod statement;
 pub fn infer_hir_types(hir: &HirTree, faults: &mut Vec<SementicFault>) -> HirTypedTable {
     let mut context = HirTypedContext::new(hir, faults);
 
-    for obj in hir.types.structs().values() {
-        for field in &obj.fields {
-            context.type_field(field.id, field.ty)
+    for (struct_id, obj) in hir.types.get_structs().entries() {
+        
+        for (i, field) in obj.fields.iter().enumerate() {
+            let base_type = context.add_type(HirType::new(hir::HirTypeKind::Struct(struct_id)));
+            let base = context.type_table.types.insert_ref(base_type);
+            context.type_field(field, base, i);
         }
     }
 
@@ -42,8 +45,10 @@ pub struct HirTypedTable {
 
     pub generic_defines: VecMap<GenericId, VecSet<RefTypeId>>,
 
-    pub fields: VecMap<FieldId, TypeId>,
+    pub fields: VecMap<FieldId, FieldInfo>,
     pub places: VecMap<PlaceId, TypeId>,
+    pub field_names: VecMap<FieldId, String>,
+    pub place_fields: VecMap<PlaceId, FieldId>,
     pub locals: VecMap<LocalId, TypeId>,
     pub blocks: VecMap<BlockId, TypeId>,
     pub functions: VecMap<FunctionId, TypeId>,
@@ -70,6 +75,12 @@ impl HirTypedTable {
         remap!(statements);
         remap!(expressions);
     }
+}
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FieldInfo {
+    pub base_type: RefTypeId,
+    pub field_type: RefTypeId,
+    pub index: usize,
 }
 
 struct HirTypedContext<'a> {
@@ -101,6 +112,8 @@ impl<'a> HirTypedContext<'a> {
                 fields: VecMap::const_default(),
                 places: VecMap::const_default(),
                 locals: VecMap::const_default(),
+                field_names: VecMap::const_default(),
+                place_fields: VecMap::const_default(),
                 generic_defines: VecMap::const_default(),
                 blocks: VecMap::with_capacity(hir.blocks.len()),
                 expressions: VecMap::with_capacity(hir.expressions.len()),

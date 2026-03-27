@@ -267,6 +267,29 @@ impl<'a> HirDisplayer<'a> {
             hir::ExpressionKind::Literal(literal) => self.push_str(&literal.value_to_string()),
             hir::ExpressionKind::Local(local_id) => self.display_local(*local_id),
             hir::ExpressionKind::Function(_) => self.push_str("<function>"),
+            hir::ExpressionKind::StructConstructor { ty, values, defaults } => {
+            
+                let types = match self.type_table {
+                    Some(val) => &val.types,
+                    None => &self.hir.types,
+                };
+
+                self.push_str(types.id_to_struct(*ty).expect("should have struct").name.as_str());
+                self.push('{');
+                let last_index = values.len().saturating_sub(1);
+                for (i, (name, value)) in values.iter().enumerate() {
+                    self.push_str(name.as_str());
+                    self.push_str(": ");
+                    self.display_expression(value);
+                    if i != last_index {
+                        self.push_str(", ");
+                    }
+                }
+                if *defaults {
+                    self.push_str(", ..");
+                }
+                self.push('}');
+            }
             hir::ExpressionKind::Load(place) => {
                 self.push_str("/*Load*/");
                 self.display_place(place);
@@ -390,10 +413,10 @@ impl<'a> HirDisplayer<'a> {
                 self.display_expression(index);
                 self.push(']');
             }
-            hir::PlaceKind::Field { base, index, .. } => {
+            hir::PlaceKind::Field { base, field: index, .. } => {
                 self.display_place(base);
                 self.push('.');
-                write!(self.sb, "{:?}", index).expect("no fromat error");
+                self.push_str(index.as_str());
             }
         }
     }

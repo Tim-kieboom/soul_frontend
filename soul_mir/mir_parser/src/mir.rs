@@ -1,5 +1,5 @@
 use ast::{BinaryOperator, ExternLanguage, Literal, UnaryOperator};
-use hir::{GenericId, TypeId};
+use hir::{FieldId, GenericId, StructId, TypeId};
 use soul_utils::{Ident, ids::FunctionId, impl_soul_ids, vec_map::VecMap};
 
 impl_soul_ids!(GlobalId, BlockId, LocalId, StatementId, PlaceId, TempId);
@@ -183,6 +183,7 @@ pub struct Rvalue {
 pub enum RvalueKind {
     /// Move or copy an operand.
     Use(Operand),
+    Field{base: PlaceId, base_type: TypeId, field_id: FieldId, index: usize},
     CastUse {
         value: Operand,
         cast_to: TypeId,
@@ -201,7 +202,18 @@ pub enum RvalueKind {
         value: Operand,
     },
 
+    Aggregate {
+        struct_type: StructId,
+        body: AggregateBody,
+    },
+
     StackAlloc(TypeId),
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum AggregateBody {
+    Runtime(Vec<Operand>),
+    Comptime(Vec<(Literal, TypeId)>),
 }
 
 /// Block terminators describe control flow edges.
@@ -264,6 +276,8 @@ pub enum Place {
 
     /// Local variable place.
     Local(LocalId),
+
+    Field{base: PlaceId, base_type: TypeId, field_id: FieldId, index: usize},
 }
 
 impl Statement {

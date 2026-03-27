@@ -83,7 +83,7 @@ impl TypesMap {
         self.structs = structs;
     }
 
-    pub fn structs(&self) -> &VecMap<StructId, Struct> {
+    pub fn get_structs(&self) -> &VecMap<StructId, Struct> {
         &self.structs
     }
 

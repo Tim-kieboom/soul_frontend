@@ -1,10 +1,9 @@
+use std::{collections::HashMap};
+
 use ast::{ArrayKind, BinaryOperator, BinaryOperatorKind, UnaryOperator};
-use hir::{Binary, BlockId, ExpressionId, HirType, HirTypeKind, RefTypeId, TypeId, Unary};
+use hir::{Binary, BlockId, ExpressionId, HirType, HirTypeKind, RefTypeId, Struct, TypeId, Unary};
 use soul_utils::{
-    error::{SoulError, SoulErrorKind},
-    ids::{FunctionId, IdAlloc},
-    span::Span,
-    vec_map::VecMap,
+    error::{SoulError, SoulErrorKind, SoulResult}, ids::{FunctionId, IdAlloc}, soul_error_internal, span::Span, vec_map::VecMap
 };
 
 use crate::HirTypedContext;
@@ -27,6 +26,41 @@ impl<'a> HirTypedContext<'a> {
             hir::ExpressionKind::Block(body) => self.infer_block(*body),
             hir::ExpressionKind::Local(local) => self.type_table.locals[*local],
             hir::ExpressionKind::Literal(_) => value.ty, /*already handled by hir*/
+            hir::ExpressionKind::StructConstructor { ty:_, values, defaults:_ } => {
+                let ty = value.ty;
+                let mut fields = match self.expect_struct(ty, span) {
+                    Ok(struct_info) => {
+                        struct_info.fields
+                            .iter()
+                            .map(|field| (field.name.clone(), field.ty))
+                            .collect::<HashMap<String, RefTypeId>>()
+                    }
+                    Err(err) => {
+                        self.log_error(err);
+                        return TypeId::error()
+                    }
+                };  
+
+
+                for (name, value) in values {
+                    let field_type = match fields.remove(name.as_str()) {
+                        Some(val) => self.ref_to_id(val),
+                        None => {
+                            self.log_error(SoulError::new(format!("{} is not a valid field", name.as_str()), SoulErrorKind::InvalidIdent, Some(name.span)));
+                            continue
+                        }
+                    };
+
+                    let value_type = self.infer_expression(*value);
+                    self.unify(*value, field_type, value_type, span);
+                }
+
+                for name in fields.keys() {
+                    self.log_error(SoulError::new(format!("missing {} field", name.as_str()), SoulErrorKind::InvalidIdent, Some(span)));
+                }
+
+                ty
+            }
             hir::ExpressionKind::DeRef(inner) => {
                 let inner = self.infer_expression(*inner);
                 let ty = match self.resolve_type_strict(inner, span) {
@@ -120,6 +154,23 @@ impl<'a> HirTypedContext<'a> {
 
         self.type_expression(expression_id, ty);
         ty
+    }
+
+    fn expect_struct(&mut self, ty: TypeId, span: Span) -> SoulResult<&Struct> {
+        let hir_type = self.id_to_type(ty);
+        match &hir_type.kind {
+            HirTypeKind::Struct(id) => {
+                self.type_table.types.id_to_struct(*id)
+                    .ok_or(soul_error_internal!(format!("{:?} not found", id), None))
+            }
+            _ => {
+                Err(SoulError::new(
+                    format!("{} should be a struct to use StructContructor", hir_type.display(&self.type_table.types)), 
+                    SoulErrorKind::UnifyTypeError, 
+                    Some(span),
+                ))
+            }
+        }
     }
 
     fn infer_if(

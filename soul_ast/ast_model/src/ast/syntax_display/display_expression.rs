@@ -18,6 +18,12 @@ impl SyntaxDisplay for ExpressionKind {
 
     fn inner_display(&self, sb: &mut String, kind: DisplayKind, tab: usize, is_last: bool) {
         match self {
+            ExpressionKind::FieldAccess(field) => {
+                try_display_node_id(sb, kind, field.id);
+                field.object.node.inner_display(sb, kind, tab, is_last);
+                sb.push('.');
+                sb.push_str(field.field.as_str());
+            }
             ExpressionKind::StructConstructor(ctor) => {
                 try_display_node_id(sb, kind, ctor.id);
                 ctor.struct_type.inner_display(sb, kind, tab, is_last);

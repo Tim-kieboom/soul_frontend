@@ -5,6 +5,9 @@ use soul_utils::error::{SoulError, SoulErrorKind};
 impl<'a> NameResolver<'a> {
     pub(super) fn collect_expression(&mut self, expression: &mut Expression) {
         match &mut expression.node {
+            ExpressionKind::FieldAccess(field) => {
+                self.collect_expression(&mut field.object);
+            }
             ExpressionKind::StructConstructor(ctor) => {
                 self.collect_type(&mut ctor.struct_type);
                 for (_, value) in &mut ctor.values {

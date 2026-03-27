@@ -118,6 +118,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 };
                 self.push_temp(*temp_id, value);
             }
+            Place::Field{..} => panic!("call return value should be Place::Temp not Place::Field"),
             Place::Deref(_) => panic!("call return value should be Place::Temp not Place::Deref"),
             Place::Local(_) => panic!("call return value should be Place::Temp not Place::Local"),
         }

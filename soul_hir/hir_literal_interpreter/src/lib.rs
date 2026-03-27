@@ -59,6 +59,8 @@ fn try_literal_resolve_expression(
         | hir::ExpressionKind::While { .. }
         | hir::ExpressionKind::InnerRawStackArray { .. } => None,
 
+        hir::ExpressionKind::StructConstructor { .. } => None,
+
         hir::ExpressionKind::Load(place) => match place.node {
             hir::PlaceKind::Temp(id, _)
             | hir::PlaceKind::Local(id, _) => match locals.get(id) {

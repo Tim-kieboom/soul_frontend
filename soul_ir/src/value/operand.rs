@@ -7,11 +7,11 @@ use crate::{GenericSubstitute, IrOperand, LlvmBackend, build_error};
 impl<'f, 'a> LlvmBackend<'f, 'a> {
     pub(crate) fn lower_operand(
         &self,
-        condition: &Operand,
+        operand: &Operand,
         generics: &GenericSubstitute,
     ) -> SoulResult<IrOperand<'a>> {
-        Ok(match &condition.kind {
-            OperandKind::Temp(temp_id) => self.get_temp(*temp_id),
+        Ok(match &operand.kind {
+            OperandKind::Temp(temp_id) => self.get_temp(*temp_id)?,
             OperandKind::Local(local_id) => {
                 let mir_local = &self.mir.tree.locals[*local_id];
 
@@ -45,7 +45,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     })
                     .map_err(|err| build_error(err))
             }
-            OperandKind::Comptime(literal) => self.lower_literal(literal, condition.ty)?,
+            OperandKind::Comptime(literal) => self.lower_literal(literal, operand.ty)?,
             OperandKind::Ref { .. } => {
                 todo!("ref not yet impl")
             }
@@ -99,11 +99,13 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 }
             }
             ast::Literal::Uint(value) => {
-                let size = match self
+                let hir_type = self
                     .types
                     .types
                     .id_to_type(should_be)
-                    .expect("should have type")
+                    .expect("should have type");
+
+                let size = match hir_type
                     .kind
                 {
                     hir::HirTypeKind::Primitive(primitive_types) => {
@@ -111,7 +113,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     }
                     _ => {
                         return Err(soul_error_internal!(
-                            "literal should be primitive type",
+                            format!("literal should be primitive type is `{}`", hir_type.display(&self.types.types)),
                             None
                         ));
                     }

@@ -1,7 +1,7 @@
-use hir::TypeId;
+use hir::{StructId, TypeId};
 use inkwell::{
     AddressSpace,
-    types::{BasicType, BasicTypeEnum},
+    types::{BasicType, BasicTypeEnum, StructType},
 };
 use soul_utils::{error::SoulResult, soul_error_internal, soul_names::PrimitiveTypes};
 
@@ -25,23 +25,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 return self.lower_type(ty, generics);
             }
             hir::HirTypeKind::Struct(id) => {
-                let obj = self.types.types.id_to_struct(id).expect("should have struct");
-                if !obj.generics.is_empty() {
-                    todo!()
-                }
-
-                let mut fields = vec![];
-                for field in &obj.fields {
-                    let ty = self.types.types.ref_to_id(field.ty).expect("should hev type");
-                    let field = match self.lower_type(ty, generics)? {
-                        Some(val) => val,
-                        None => continue,
-                    };
-                    
-                    fields.push(field);
-                }
-
-                self.context.struct_type(fields.as_slice(), false).into()
+                self.lower_struct(id, generics).map(|s| s.into())?
             }
             hir::HirTypeKind::Primitive(primitive_types) => {
                 match self.lower_primitive_type(primitive_types) {
@@ -92,6 +76,45 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             hir::HirTypeKind::InferType(_, _) => panic!("inferType type should not be in ir"),
             hir::HirTypeKind::Error => panic!("error type should not be in ir"),
         }))
+    }
+
+    pub(crate) fn get_or_create_struct(
+        &self,
+        id: StructId,
+        generics: &GenericSubstitute,
+    ) -> SoulResult<StructType<'a>> {
+        
+        match self.structs.borrow().get(id).copied() {
+            Some(val) => Ok(val),
+            None => self.lower_struct(id, generics),
+        }
+    }
+
+    pub(crate) fn lower_struct(
+        &self, 
+        id: StructId,
+        generics: &GenericSubstitute,
+    ) -> SoulResult<StructType<'a>> {
+        let obj = self.types.types.id_to_struct(id).expect("should have struct");
+        if !obj.generics.is_empty() {
+            todo!()
+        }
+
+        let mut fields = vec![];
+        for (i, field) in obj.fields.iter().enumerate() {
+            let ty = self.types.types.ref_to_id(field.ty).expect("should hev type");
+            let ir_field = match self.lower_type(ty, generics)? {
+                Some(val) => val,
+                None => continue,
+            };
+            
+            self.field_indexs.borrow_mut().insert(field.id, i);
+            fields.push(ir_field);
+        }
+
+        let ty = self.context.struct_type(fields.as_slice(), false);
+        self.structs.borrow_mut().insert(id, ty);
+        Ok(ty)
     }
 
     fn lower_primitive_type(&self, primitive: PrimitiveTypes) -> Option<BasicTypeEnum<'a>> {

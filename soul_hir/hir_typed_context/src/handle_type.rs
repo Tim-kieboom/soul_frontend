@@ -1,15 +1,11 @@
 use hir::{
-    BlockId, ExpressionId, FieldId, GenericId, HirType, HirTypeKind, LocalId, RefTypeId, StatementId, TypeId, TypesMap, UnifyResult
+    BlockId, ExpressionId, Field, FieldId, GenericId, HirType, HirTypeKind, LocalId, RefTypeId, StatementId, StructId, TypeId, TypesMap, UnifyResult
 };
 use soul_utils::{
-    error::SoulResult,
-    ids::{FunctionId, IdAlloc},
-    soul_names::{PrimitiveTypes, TypeModifier},
-    span::Span,
-    vec_map::{VecMap, VecMapIndex},
+    error::{SoulError, SoulErrorKind, SoulResult}, ids::{FunctionId, IdAlloc}, soul_names::{PrimitiveTypes, TypeModifier}, span::Span, vec_map::{VecMap, VecMapIndex}
 };
 
-use crate::HirTypedContext;
+use crate::{HirTypedContext};
 
 impl<'a> HirTypedContext<'a> {
     pub(crate) fn type_block(&mut self, id: BlockId, ty: TypeId) {
@@ -103,8 +99,13 @@ impl<'a> HirTypedContext<'a> {
         }
     }
 
-    pub(crate) fn type_field(&mut self, id: FieldId, ty: RefTypeId) {
-        self.type_table.fields.insert(id, self.ref_to_id(ty));
+    pub(crate) fn type_field(&mut self, field: &Field, base: RefTypeId, index: usize) {
+        let info = crate::FieldInfo { 
+            base_type: base, 
+            index,
+            field_type: field.ty, 
+        };
+        self.type_table.fields.insert(field.id, info);
     }
 
     pub(crate) fn type_local(
@@ -169,7 +170,7 @@ impl<'a> HirTypedContext<'a> {
 
     pub(crate) fn finalize_types(&mut self) {
         let mut new_types = TypesMap::new();
-        let structs = self.type_table.types.structs().clone();
+        let structs = self.type_table.types.get_structs().clone();
         new_types.set_structs(structs);
         
         let mut remap = VecMap::<TypeId, TypeId>::new();
@@ -200,6 +201,44 @@ impl<'a> HirTypedContext<'a> {
             .expect("should have none type in table");
     }
 
+    pub(crate) fn get_field_access(
+        &mut self, 
+        object: TypeId,
+        field: &str,
+        span: Span,
+    ) -> Option<FieldId> {
+        let object_type = self.resolve_type_strict(object, span)?;
+        match &self.id_to_type(object_type).kind {
+            HirTypeKind::Struct(struct_id) => self.get_struct_field(*struct_id, field, span),
+            other => {
+                self.log_error(SoulError::new(
+                    format!("typekind '{}' can not do field access", other.display_variant()), 
+                    SoulErrorKind::InvalidType, 
+                    Some(span)
+                ));
+                return None
+            }
+        }
+    }
+
+    fn get_struct_field(
+        &mut self,
+        object: StructId,
+        field_ident: &str,
+        span: Span
+    ) -> Option<FieldId> {
+        let object_struct = self.type_table.types.id_to_struct(object)?;
+        let field = match object_struct.fields.iter().find(|field| field.name == field_ident) {
+            Some(val) => val,
+            None => {
+                self.log_error(SoulError::new(format!("field '{}' not found", field_ident), SoulErrorKind::FieldNotFound, Some(span)));
+                return None
+            }
+        };
+
+        Some(field.id)
+    }
+
     fn collect_root_types(&self) -> Vec<TypeId> {
         let mut roots = Vec::new();
 
@@ -209,7 +248,6 @@ impl<'a> HirTypedContext<'a> {
             .entries()
             .flat_map(|(_, types)| types.entries());
 
-        roots.extend(self.type_table.fields.values().copied());
         roots.extend(self.type_table.locals.values().copied());
         roots.extend(self.type_table.blocks.values().copied());
         roots.extend(self.type_table.functions.values().copied());

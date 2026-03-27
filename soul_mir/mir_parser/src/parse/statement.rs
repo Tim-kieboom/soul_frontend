@@ -188,6 +188,7 @@ fn is_valid_statement_expression(kind: &hir::ExpressionKind) -> bool {
         | hir::ExpressionKind::Cast { .. }
         | hir::ExpressionKind::Unary { .. }
         | hir::ExpressionKind::Binary { .. }
+        | hir::ExpressionKind::StructConstructor { .. }
         | hir::ExpressionKind::InnerRawStackArray { .. } => false,
 
         hir::ExpressionKind::Block(_)

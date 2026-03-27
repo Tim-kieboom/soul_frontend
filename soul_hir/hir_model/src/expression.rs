@@ -1,6 +1,6 @@
-use crate::{BlockId, ExpressionId, LocalId, Place, RefTypeId, TypeId};
+use crate::{BlockId, ExpressionId, LocalId, Place, RefTypeId, StructId, TypeId};
 use ast::{BinaryOperator, Literal, UnaryOperator};
-use soul_utils::ids::{FunctionId, IdAlloc};
+use soul_utils::{Ident, ids::{FunctionId, IdAlloc}};
 
 /// A typed HIR expression.
 ///
@@ -112,6 +112,12 @@ pub enum ExpressionKind {
     Cast {
         value: ExpressionId,
         cast_to: RefTypeId,
+    },
+
+    StructConstructor {
+        ty: StructId,
+        values: Vec<(Ident, ExpressionId)>,
+        defaults: bool,
     },
 }
 

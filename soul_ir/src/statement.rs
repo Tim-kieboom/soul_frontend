@@ -11,6 +11,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             let statement = &self.mir.tree.statements[*statement_id];
             match &statement.kind {
                 StatementKind::Assign { place, value } => {
+
                     if let Err(err) = self.lower_assign(*place, value, generics) {
                         self.log_error(err);
                     }
@@ -52,6 +53,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
         let ir_value = self.lower_rvalue(value, generics)?;
         match &self.mir.tree.places[place_id] {
+            Place::Field{..} => todo!(),
             Place::Temp(temp_id) => {
                 self.push_temp(*temp_id, ir_value);
             }

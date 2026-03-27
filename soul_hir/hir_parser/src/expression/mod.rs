@@ -21,7 +21,37 @@ impl<'a> HirContext<'a> {
 
         let span = expression.span;
         let hir_expression = match &expression.node {
-            ast::ExpressionKind::StructConstructor(_) => todo!(),
+            ast::ExpressionKind::FieldAccess(field) => {
+                
+                let place = self.lower_field_access(field, span);
+                hir::Expression {
+                    id,
+                    ty: self.new_infer_type(span),
+                    kind: hir::ExpressionKind::Load(place),
+                }
+            }
+            ast::ExpressionKind::StructConstructor(ctor) => {
+                let ty = self.lower_type(&ctor.struct_type);
+                let hir_type = self.hir.types.id_to_type(ty).expect("have type");
+                let struct_type = match &hir_type.kind {
+                    HirTypeKind::Struct(val) => *val,
+                    _ => {
+                        self.log_error(SoulError::new("should be struct type", SoulErrorKind::InvalidContext, Some(span)));
+                        return hir::ExpressionId::error()
+                    }
+                };
+
+                let values = ctor.values
+                    .iter()
+                    .map(|(name, value)| (name.clone(), self.lower_expression(value)))
+                    .collect();
+                
+                hir::Expression {
+                    id,
+                    ty,
+                    kind: hir::ExpressionKind::StructConstructor { ty: struct_type, values, defaults: ctor.defaults },
+                }
+            }
             ast::ExpressionKind::Null(_node_id) => hir::Expression {
                 id,
                 ty: self.null_ty(span),
@@ -157,6 +187,18 @@ impl<'a> HirContext<'a> {
         };
 
         self.insert_expression(id, return_value)
+    }
+
+    fn lower_field_access(&mut self, field: &ast::FieldAccess, span: Span) -> Place {
+        let object = self.lower_place(&field.object);
+        let place_id = self.id_generator.alloc_place();
+        let field = hir::PlaceKind::Field { 
+            id: place_id, 
+            base: Box::new(object), 
+            field: field.field.clone() 
+        };
+    
+        hir::Place::new(field, span)
     }
 
     fn lower_ref(

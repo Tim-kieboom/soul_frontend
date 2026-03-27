@@ -1,7 +1,6 @@
 use crate::HirTypedContext;
 use hir::{
-    Assign, BlockId, ExpressionId, Global, HirType, LocalId, Place, PlaceKind, Statement, TypeId,
-    Variable,
+    Assign, BlockId, ExpressionId, Global, HirType, LocalId, Place, PlaceKind, RefTypeId, Statement, TypeId, Variable
 };
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
@@ -146,7 +145,19 @@ impl<'a> HirTypedContext<'a> {
                     }
                 }
             }
-            PlaceKind::Field { .. } => todo!("field not yet impl"),
+            PlaceKind::Field { id, base, field } => {
+                let object = self.infer_place(&base);
+                let ref_type = match self.get_field_access(object, field.as_str(), span) {
+                    Some(field_id) => {
+                        self.type_table.field_names.insert(field_id, field.to_string());
+                        self.type_table.place_fields.insert(*id, field_id);
+                        self.type_table.fields[field_id].field_type
+                    }
+                    None => RefTypeId::error(),
+                };
+
+                self.ref_to_id(ref_type)
+            }
         };
         self.type_table.places.insert(place.node.get_id(), ty);
         ty

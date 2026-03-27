@@ -38,7 +38,7 @@ mod paths;
 static PATHS: &[u8] = include_bytes!("../paths.json");
 
 pub const MESSAGE_CONFIG: MessageConfig = MessageConfig {
-    backtrace: true,
+    backtrace: false,
     colors: true,
 };
 
@@ -109,10 +109,20 @@ fn run_llvm(output: &Ouput) -> bool {
     let ir = to_llvm_ir(&request, &COMPILER_OPTIONS, &mut faults);
     log_faults(&faults, &output.source_file);
 
+    #[cfg(not(debug_assertions))]
     if ir.is_fatal {
         return false
     }
 
+    #[cfg(debug_assertions)]
+    if ir.is_fatal {
+        if let Err(err) = ir.module.print_to_file("output/fatal_out.ll") {
+            error!("{err}");
+            return false
+        }
+        return true
+    }
+    
     if let Err(err) = ir.module.print_to_file("output/out.ll") {
         error!("{err}");
         return false

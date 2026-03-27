@@ -1,13 +1,14 @@
-use ast::{Array, SoulType};
-use soul_utils::{error::SoulResult, span::Spanned, try_result::TryError};
+use ast::{Array, Expression, SoulType, StructConstructor};
+use soul_tokenizer::TokenKind;
+use soul_utils::{Ident, error::{SoulError, SoulErrorKind, SoulResult}, span::{Span, Spanned}, symbool_kind::SymbolKind, try_result::TryError};
 
 use crate::parser::{
     Parser,
-    parse_utils::{COLON, COMMA, SQUARE_CLOSE, SQUARE_OPEN},
+    parse_utils::{COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, SQUARE_CLOSE, SQUARE_OPEN},
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
-    pub fn parse_array(&mut self, ty: Option<SoulType>) -> SoulResult<Spanned<Array>> {
+    pub(super) fn parse_array(&mut self, ty: Option<SoulType>) -> SoulResult<Spanned<Array>> {
         let start_span = self.token().span;
         self.expect(&SQUARE_OPEN)?;
 
@@ -51,4 +52,76 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.span_combine(start_span),
         ))
     }
+
+    pub(super) fn parse_struct_contructor(
+        &mut self,
+        ident: Ident,
+        generics: Vec<SoulType>,
+        start_span: Span,
+    ) -> SoulResult<Spanned<StructConstructor>> {
+        self.expect(&CURLY_OPEN)?;
+
+        let struct_type = self.type_from_ident(ident, generics);
+
+        let mut defaults = false;
+        let mut values = vec![];
+        loop {
+            self.skip_end_lines();
+
+            if self.current_is(&TokenKind::Symbol(SymbolKind::DoubleDot)) {
+                if defaults {
+                    return Err(SoulError::new(
+                        "StructConstructor already has '..'",
+                        SoulErrorKind::InvalidEscapeSequence,
+                        Some(self.token().span),
+                    ));
+                }
+
+                defaults = true;
+                self.bump();
+                self.skip_end_lines();
+                if !self.current_is(&CURLY_CLOSE) {
+                    return Err(SoulError::new(
+                        "StructConstructor's '..' should only be used at the end expected '}'",
+                        SoulErrorKind::InvalidEscapeSequence,
+                        Some(self.token().span),
+                    ));
+                }
+                break;
+            }
+
+            let ident = self.try_bump_consume_ident()?;
+            let value = if self.current_is(&COMMA) || self.current_is(&CURLY_CLOSE) {
+                Expression::new_variable(ident.clone())
+            } else {
+                self.expect(&COLON)?;
+                self.parse_expression(&[COMMA, CURLY_CLOSE])?
+            };
+
+            values.push((ident, value));
+            self.skip_end_lines();
+            if !self.current_is(&COMMA) {
+                break;
+            }
+
+            self.bump();
+            self.skip_end_lines();
+            if self.current_is(&CURLY_CLOSE) {
+                break;
+            }
+
+            continue;
+        }
+        self.skip_end_lines();
+        self.expect(&CURLY_CLOSE)?;
+
+        let ctor = StructConstructor {
+            id: None,
+            values,
+            defaults,
+            struct_type,
+        };
+        Ok(Spanned::new(ctor, self.span_combine(start_span)))
+    }
+
 }

@@ -36,6 +36,8 @@ pub enum ExpressionKind {
 
     /// Indexing into a collection, e.g., `arr[i]`.
     Index(Index),
+    /// 
+    FieldAccess(FieldAccess),
     /// A function call, e.g., `foo(x, y)`.
     FunctionCall(FunctionCall),
 
@@ -90,6 +92,13 @@ pub struct Index {
     pub collection: BoxExpression,
     /// The index expression.
     pub index: BoxExpression,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct FieldAccess {
+    pub id: Option<NodeId>,
+    pub object: BoxExpression,
+    pub field: Ident,
 }
 
 /// A function call expression.
@@ -201,6 +210,11 @@ impl IfArmHelper for IfArm {
 }
 
 impl Expression {
+    pub fn new_field(object: Expression, field: Ident) -> Expression {
+        let span = object.span.combine(field.span);
+        Expression::new(ExpressionKind::FieldAccess(FieldAccess { id: None, object: Box::new(object), field }), span)
+    }
+
     pub fn new_block(block: Block, span: Span) -> Expression {
         Expression::new(ExpressionKind::Block(block), span)
     }
@@ -291,6 +305,7 @@ impl Expression {
 impl ExpressionKind {
     pub fn variant_str(&self) -> &'static str {
         match self {
+            ExpressionKind::FieldAccess(_) => "Field",
             ExpressionKind::Null(_) => "Null",
             ExpressionKind::Default(_) => "Default",
             ExpressionKind::Literal(_) => "Literal",

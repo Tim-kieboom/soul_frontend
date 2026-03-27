@@ -1,13 +1,13 @@
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap};
 
-use hir::{HirType, TypeId};
+use hir::{FieldId, HirType, StructId, TypeId};
 use hir_typed_context::HirTypedTable;
 use inkwell::{
     basic_block::BasicBlock,
     builder::{Builder, BuilderError},
     context::Context,
     module::Module,
-    types::IntType,
+    types::{IntType, StructType},
     values::{BasicValueEnum, FunctionValue, PointerValue},
 };
 use mir_parser::mir::{BlockId, LocalId, TempId};
@@ -87,15 +87,18 @@ pub struct LlvmBackend<'f, 'a> {
     mir: &'a MirResponse,
     builder: Builder<'a>,
     types: HirTypedTable,
-    exit_function: Option<FunctionValue<'a>>,
     options: &'a CompilerOptions,
+    exit_function: Option<FunctionValue<'a>>,
 
     temps: HashMap<(FunctionKeyId, TempId), IrOperand<'a>>,
-    blocks: HashMap<(FunctionKeyId, BlockId), BasicBlock<'a>>,
     locals: HashMap<(FunctionKeyId, LocalId), Local<'a>>,
-    functions: VecMap<FunctionKeyId, FunctionValue<'a>>,
+    blocks: HashMap<(FunctionKeyId, BlockId), BasicBlock<'a>>,
+    
     function_keys: FunctionKeyStore,
-
+    field_indexs: RefCell<VecMap<FieldId, usize>>,
+    structs: RefCell<VecMap<StructId, StructType<'a>>>,
+    functions: VecMap<FunctionKeyId, FunctionValue<'a>>,
+    
     faults: &'f mut Vec<SementicFault>,
 }
 
@@ -115,22 +118,24 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             faults,
             module,
             builder,
+            options,
             mir: request.mir,
             exit_function: None,
-            types: request.types.clone(),
-            context: request.context,
-            current: Current::start(function_keys.global_key()),
             temps: HashMap::new(),
             blocks: HashMap::new(),
             locals: HashMap::new(),
             functions: VecMap::new(),
-            function_keys,
-            options,
+            context: request.context,
+            types: request.types.clone(),
+            structs: RefCell::new(VecMap::const_default()),
+            field_indexs: RefCell::new(VecMap::const_default()),
+            current: Current::start(function_keys.global_key()),
 
+            function_keys,
             default_int_size: 32,
             default_char_size: 8,
-            default_char_type: request.context.i8_type(),
             default_int_type: request.context.i32_type(),
+            default_char_type: request.context.i8_type(),
         }
     }
 
@@ -205,8 +210,11 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         self.blocks[&(self.current.function_key(), id)]
     }
 
-    fn get_temp(&self, id: TempId) -> IrOperand<'a> {
-        self.temps[&(self.current.function_key(), id)]
+    fn get_temp(&self, id: TempId) -> SoulResult<IrOperand<'a>> {
+        self.temps
+            .get(&(self.current.function_key(), id))
+            .copied()
+            .ok_or(soul_error_internal!(format!("{:?} not found current: {:?}", id, self.current), None))
     }
 
     fn push_global(&mut self, id: LocalId, value: PointerValue<'a>) {

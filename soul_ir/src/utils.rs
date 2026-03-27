@@ -61,15 +61,15 @@ pub struct GenericSubstitute {
 }
 impl GenericSubstitute {
     pub fn new(generics: &[GenericId], type_args: &[TypeId]) -> Self {
-        let mut substitude = Self {
+        let mut this = Self {
             store: VecMap::const_default(),
         };
 
         for (generic, ty) in generics.iter().zip(type_args.iter()) {
-            substitude.insert(*generic, *ty);
+            this.insert(*generic, *ty);
         }
 
-        substitude
+        this
     }
 
     pub fn insert(&mut self, id: GenericId, ty: TypeId) {

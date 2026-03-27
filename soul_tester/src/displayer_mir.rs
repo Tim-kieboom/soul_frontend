@@ -1,4 +1,4 @@
-use hir::{HirType, TypeId};
+use hir::{FieldId, HirType, TypeId};
 use hir_typed_context::HirTypedTable;
 use mir_parser::mir::{
     self, BlockId, FunctionBody, Local, LocalId, MirTree, Operand, Place, PlaceId, Rvalue, StatementId, TempId
@@ -16,6 +16,7 @@ pub fn display_mir(mir: &MirTree, types: &HirTypedTable) -> String {
     for global in mir.globals.values() {
         displayer.display_global(global);
     }
+
     if !mir.globals.is_empty() {
         displayer.push('\n');
     }
@@ -34,6 +35,7 @@ pub fn display_mir(mir: &MirTree, types: &HirTypedTable) -> String {
         .functions
         .keys()
         .filter(|id| *id != mir.init_global_function && *id != mir.entry_function);
+
     for function in keys {
         displayer.display_function(function);
         displayer.push('\n');
@@ -80,6 +82,9 @@ impl<'a> MirDisplayer<'a> {
     fn display_function(&mut self, function_id: FunctionId) {
         let function = &self.mir.functions[function_id];
 
+        self.push_str("/*");
+        self.push_str(&format!("{}", function_id.index()));
+        self.push_str("*/");
         if let FunctionBody::External(language) = function.body {
             self.push_str("extern \"");
             self.push_str(language.as_str());
@@ -255,6 +260,34 @@ impl<'a> MirDisplayer<'a> {
 
     fn display_rvalue(&mut self, value: &Rvalue) {
         match &value.kind {
+            mir::RvalueKind::Field {base, base_type:_, field_id, index:_} => {
+                self.display_field(base, *field_id);
+            }
+            mir::RvalueKind::Aggregate{ struct_type, body } => {
+                self.push_str(self.types.types.id_to_struct(*struct_type).expect("should have strcut").name.as_str());
+                self.push('{');
+                match body {
+                    mir::AggregateBody::Runtime(fields) => {
+                        let last_index = fields.len().saturating_sub(1);
+                        for (i, field) in fields.iter().enumerate() {
+                            self.display_operand(field);
+                            if i != last_index {
+                                self.push_str(", ");
+                            }
+                        }
+                    }
+                    mir::AggregateBody::Comptime(literals) => {
+                        let last_index = literals.len().saturating_sub(1);
+                        for (i, (literal, _)) in literals.iter().enumerate() {
+                            self.push_str(&literal.value_to_string());
+                            if i != last_index {
+                                self.push_str(", ");
+                            }
+                        }
+                    }
+                }
+                self.push('}');
+            }
             mir::RvalueKind::StackAlloc(ty) => {
                 self.push_str("/*stack alloc ");
                 self.display_type(*ty);
@@ -308,6 +341,9 @@ impl<'a> MirDisplayer<'a> {
     fn display_place(&mut self, place_id: &PlaceId) {
         let place = &self.mir.places[*place_id];
         match place {
+            Place::Field{ base, base_type:_, field_id, index:_ } => {
+                self.display_field(base, *field_id);
+            }
             Place::Temp(temp_id) => {
                 self.display_temp_name(*temp_id);
             }
@@ -354,6 +390,12 @@ impl<'a> MirDisplayer<'a> {
         self.get_type(ty)
             .write_display(&self.types.types, &mut self.sb)
             .expect("no fmt error");
+    }
+
+    fn display_field(&mut self, base: &PlaceId, field: FieldId) {
+        self.display_place(base);
+        self.push('.');
+        self.push_str(&self.types.field_names[field]);
     }
 
     fn get_type(&self, ty: TypeId) -> HirType {

@@ -1,11 +1,9 @@
-use hir::{Binary, RefTypeId, TypeId, Unary};
+use hir::{Binary, ExpressionId, RefTypeId, StructId, TypeId, Unary};
 use soul_utils::{
-    ids::{FunctionId, IdAlloc},
-    soul_error_internal,
-    span::Span,
+    Ident, ids::{FunctionId, IdAlloc}, soul_error_internal, span::Span
 };
 
-use crate::{EndBlock, MirContext, mir};
+use crate::{EndBlock, MirContext, mir::{self, Operand}};
 
 mod conditionals;
 
@@ -13,17 +11,20 @@ impl<'a> MirContext<'a> {
     pub(crate) fn lower_operand(&mut self, value_id: hir::ExpressionId) -> EndBlock<mir::Operand> {
         let value = &self.hir_response.hir.expressions[value_id];
         let span = self.expression_span(value_id);
-        let ty = self.expression_type(value_id);
+        let value_type = self.expression_type(value_id);
         let is_end = &mut false;
 
         if let Some(literal) = self.get_expression_literal(value_id) {
-            let operand = mir::Operand::new(ty, mir::OperandKind::Comptime(literal.clone()));
+            let operand = mir::Operand::new(value_type, mir::OperandKind::Comptime(literal.clone()));
             return EndBlock::new(operand, is_end);
         }
 
         let operand = match &value.kind {
+            hir::ExpressionKind::StructConstructor { ty, values, defaults:_ } => {
+                self.lower_struct_constructor(values, *ty, value_type).pass(is_end)
+            }
             hir::ExpressionKind::Literal(literal) => {
-                mir::Operand::new(ty, mir::OperandKind::Comptime(literal.clone()))
+                mir::Operand::new(value_type, mir::OperandKind::Comptime(literal.clone()))
             }
             hir::ExpressionKind::Local(local_id) => {
                 let local_type = self.local_type(*local_id);
@@ -45,7 +46,7 @@ impl<'a> MirContext<'a> {
             }) => {
                 let inner = self.lower_operand(*expression).pass(is_end);
 
-                let temp = self.new_temp(ty);
+                let temp = self.new_temp(value_type);
 
                 let statement = mir::Statement::new(mir::StatementKind::Assign {
                     place: self.new_place(mir::Place::Temp(temp)),
@@ -55,7 +56,7 @@ impl<'a> MirContext<'a> {
                     }),
                 });
                 self.push_statement(statement);
-                mir::Operand::new(ty, mir::OperandKind::Temp(temp))
+                mir::Operand::new(value_type, mir::OperandKind::Temp(temp))
             }
             hir::ExpressionKind::Binary(Binary {
                 left,
@@ -65,7 +66,7 @@ impl<'a> MirContext<'a> {
                 let left = self.lower_operand(*left).pass(is_end);
                 let right = self.lower_operand(*right).pass(is_end);
 
-                let temp = self.new_temp(ty);
+                let temp = self.new_temp(value_type);
 
                 let statement = mir::Statement::new(mir::StatementKind::Assign {
                     place: self.new_place(mir::Place::Temp(temp)),
@@ -76,7 +77,7 @@ impl<'a> MirContext<'a> {
                     }),
                 });
                 self.push_statement(statement);
-                mir::Operand::new(ty, mir::OperandKind::Temp(temp))
+                mir::Operand::new(value_type, mir::OperandKind::Temp(temp))
             }
             hir::ExpressionKind::Call {
                 function,
@@ -84,7 +85,7 @@ impl<'a> MirContext<'a> {
                 generics,
                 arguments: hir_arguments,
             } => self
-                .lower_call(*function, callee, generics, hir_arguments, ty, span)
+                .lower_call(*function, callee, generics, hir_arguments, value_type, span)
                 .pass(is_end),
             hir::ExpressionKind::Block(block_id) => {
                 let main_body = self.expect_current_block();
@@ -102,9 +103,9 @@ impl<'a> MirContext<'a> {
                             value: mir::Rvalue::new(mir::RvalueKind::Use(inner)),
                         }));
 
-                        mir::Operand::new(ty, mir::OperandKind::Temp(temp))
+                        mir::Operand::new(value_type, mir::OperandKind::Temp(temp))
                     }
-                    None => mir::Operand::new(ty, mir::OperandKind::None),
+                    None => mir::Operand::new(value_type, mir::OperandKind::None),
                 };
 
                 operand
@@ -115,21 +116,21 @@ impl<'a> MirContext<'a> {
                     "ExpressionKind::Null  not yet impl in mir",
                     Some(span)
                 ));
-                mir::Operand::new(ty, mir::OperandKind::None)
+                mir::Operand::new(value_type, mir::OperandKind::None)
             }
             hir::ExpressionKind::Function(_) => {
                 self.log_error(soul_error_internal!(
                     "ExpressionKind::Function not yet impl in mir",
                     Some(span)
                 ));
-                mir::Operand::new(ty, mir::OperandKind::None)
+                mir::Operand::new(value_type, mir::OperandKind::None)
             }
 
-            hir::ExpressionKind::Load(place) => self.lower_load(ty, place, is_end),
+            hir::ExpressionKind::Load(place) => self.lower_load(value_type, place, is_end),
 
             hir::ExpressionKind::DeRef(inner) => {
                 let ptr = self.lower_operand(*inner).pass(is_end);
-                let temp = self.new_temp(ty);
+                let temp = self.new_temp(value_type);
 
                 let statement = mir::Statement::new(mir::StatementKind::Assign {
                     place: self.new_place(mir::Place::Temp(temp)),
@@ -137,7 +138,7 @@ impl<'a> MirContext<'a> {
                 });
 
                 self.push_statement(statement);
-                mir::Operand::new(ty, mir::OperandKind::Temp(temp))
+                mir::Operand::new(value_type, mir::OperandKind::Temp(temp))
             }
 
             hir::ExpressionKind::Ref { place, mutable } => {
@@ -173,7 +174,7 @@ impl<'a> MirContext<'a> {
 
                     self.push_statement(statement);
 
-                    mir::Operand::new(ty, mir::OperandKind::Temp(temp))
+                    mir::Operand::new(value_type, mir::OperandKind::Temp(temp))
                 }
             }
 
@@ -279,6 +280,69 @@ impl<'a> MirContext<'a> {
             None => mir::Operand::new(ty, mir::OperandKind::None),
         };
 
+        EndBlock::new(operand, is_end)
+    }
+
+    fn lower_struct_constructor(&mut self, values: &Vec<(Ident, ExpressionId)>, struct_id: StructId, struct_type: TypeId) -> EndBlock<Operand> {
+        let r#struct = self.hir_response
+            .types
+            .types
+            .id_to_struct(struct_id)
+            .expect("should have struct");
+
+        let dummy = Operand::new(TypeId::error(), mir::OperandKind::None);
+        let is_end = &mut false;
+        
+        let mut runtime = false;
+        let mut fields = Vec::new();
+
+        fields.resize(r#struct.fields.len(), dummy);
+
+        for (name, value) in values {
+
+            
+            let (i, _) = match r#struct.fields.iter().enumerate().find(|(_i, field)| field.name == name.as_str()) {
+                Some(val) => val,
+                None => continue,
+            };
+
+            let value_type = self.expression_type(*value);
+            let operand = match self.get_expression_literal(*value) {
+                Some(literal) => Operand::new(value_type, mir::OperandKind::Comptime(literal.clone())),
+                None => {
+                    runtime = true;
+                    self.lower_operand(*value).pass(is_end)
+                }
+            };
+            fields[i] = operand;
+        }
+        
+        let body = if runtime {
+            mir::AggregateBody::Runtime(fields)
+        } else {
+            let literals = fields
+                .into_iter()
+                .enumerate()
+                .map(|(i, op)| {
+                    let ty = self.ref_to_id(r#struct.fields[i].ty);
+                    match op.kind {
+                        mir::OperandKind::Comptime(literal) => (literal, ty),
+                        _ => unreachable!(),
+                    }
+                }).collect();
+            
+            mir::AggregateBody::Comptime(literals)
+        };
+
+        let ctor = mir::RvalueKind::Aggregate { struct_type: struct_id, body };
+        let temp = self.new_temp(struct_type);
+
+        let statement = mir::Statement::new(mir::StatementKind::Assign {
+            place: self.new_place(mir::Place::Temp(temp)),
+            value: mir::Rvalue::new(ctor),
+        });
+        self.push_statement(statement);
+        let operand = mir::Operand::new(struct_type, mir::OperandKind::Temp(temp));
         EndBlock::new(operand, is_end)
     }
 

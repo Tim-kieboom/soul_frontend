@@ -7,6 +7,7 @@ impl<'a> NameResolver<'a> {
     pub(super) fn resolve_expression(&mut self, expression: &mut Expression) {
         let span = expression.span;
         match &mut expression.node {
+            ExpressionKind::FieldAccess(_) => (),
             ExpressionKind::StructConstructor(ctor) => {
                 for (_, value) in &mut ctor.values {
                     self.resolve_expression(value);

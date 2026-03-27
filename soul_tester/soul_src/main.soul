@@ -1,96 +1,107 @@
 // extern "C" free(ptr: *none)
 extern "C" malloc(len: int): *none
-extern "C" __clib_printChar(ch: char)
-extern "C" __clib_printStr(text: *char)
-extern "C" __clib_fmtInt(value: int, base: u8, buffer: *char/*[50]char*/, capital: bool): *char
-extern "C" __clib_fmtUint(value: uint, base: u8, buffer: *char/*[50]char*/, capital: bool): *char
-extern "C" __clib_fmtFloat(value: f64, base: u8, buffer: *char/*[50]char*/, precision: u8, capital: bool): *char
+// extern "C" __clib_printChar(ch: char)
+// extern "C" __clib_printStr(text: *char)
+// extern "C" __clib_fmtInt(value: int, base: u8, buffer: *char/*[50]char*/, capital: bool): *char
+// extern "C" __clib_fmtUint(value: uint, base: u8, buffer: *char/*[50]char*/, capital: bool): *char
+// extern "C" __clib_fmtFloat(value: f64, base: u8, buffer: *char/*[50]char*/, precision: u8, capital: bool): *char
 
-global := 1
-global1 := 10 + 33 * 2
-fmtBuffer := malloc(50) as *char //[for 50 => '\0']
+// global := 1
+// global1 := 10 + 33 * 2
+// fmtBuffer := malloc(50) as *char //[for 50 => '\0']
+
 struct Array {
     len: uint
-    ptr: *u8
+    ptr: *none
+}
+
+struct Inner {
+    array: Array
 }
 
 main() {
-    obj := Array{len: 0, ptr: malloc(0) as *u8}
-    // len := obj.len
-    // ptr := obj.ptr
+    array := Array{
+        len: 0, 
+        ptr: malloc(0),
+    }
+    mut len = array.len
+    // mut ptr = array.ptr
+
+    inner := Inner{array}
+    // len = inner.array.len
 
     // pow := 3 ** 2
     // root := 2 </ 4
-    print_int(1)
-    generics()
-    prints()
-    comptime()
+    // print_int(1)
+    // generics()
+    // prints()
+    // comptime()
 }
 
-comptime() {
-    var: int = 1 * 12 / 2
-    c := var + 3
-    print_int(c)
-}
+// comptime() {
+//     var: int = 1 * 12 / 2
+//     c := var + 3
+//     print_int(c)
+// }
 
-prints() {
-    print_int(-123)
-    endln()
+// prints() {
+//     print_int(-123)
+//     endln()
 
-    print_uint(123)
-    endln()
-    print_float(123.4567)
-    endln()
-}
+//     print_uint(123)
+//     endln()
+//     print_float(123.4567)
+//     endln()
+// }
 
-generics() {
-    gen<T>(value: T): T {
-        value
-    }
+// generics() {
+//     gen<T>(value: T): T {
+//         value
+//     }
 
-    gen2<T, V>(one: T, two: V): T {
-        one
-    }
+//     gen2<T, V>(one: T, two: V): T {
+//         one
+//     }
 
-    val := gen<int>(1)
-    print_int(val)
-    endln()
-    letter := gen2<char, u64>('g', 1)
-    print_char(letter)
-    endln()
-}
+//     val := gen<int>(1)
+//     print_int(val)
+//     endln()
+//     letter := gen2<char, u64>('g', 1)
+//     print_char(letter)
+//     endln()
+// }
 
-endln() {
-    __clib_printChar('\n')
-}
+// endln() {
+//     __clib_printChar('\n')
+// }
 
-print_char(char: char) {
-    __clib_printChar(char)
-}
+// print_char(char: char) {
+//     __clib_printChar(char)
+// }
 
-print_int(value: int, base: u8 = 10, capital: bool = true) {
-    cstr := __clib_fmtInt(value, base, fmtBuffer, capital)
-    __clib_printStr(cstr)
-}
+// print_int(value: int, base: u8 = 10, capital: bool = true) {
+//     cstr := __clib_fmtInt(value, base, fmtBuffer, capital)
+//     __clib_printStr(cstr)
+// }
 
-print_uint(value: uint, base: u8 = 10, capital: bool = true) {
-    cstr := __clib_fmtUint(value, base, fmtBuffer, capital)
-    __clib_printStr(cstr)
-}
+// print_uint(value: uint, base: u8 = 10, capital: bool = true) {
+//     cstr := __clib_fmtUint(value, base, fmtBuffer, capital)
+//     __clib_printStr(cstr)
+// }
 
-print_float(value: f64, base: u8 = 10, capital: bool = true, precision: u8 = 4) {
-    cstr := __clib_fmtFloat(value, base, fmtBuffer, precision, capital)
-    __clib_printStr(cstr)
-}
+// print_float(value: f64, base: u8 = 10, capital: bool = true, precision: u8 = 4) {
+//     cstr := __clib_fmtFloat(value, base, fmtBuffer, precision, capital)
+//     __clib_printStr(cstr)
+// }
 
-sum(a: int, b: int): int {
-    a + b
-}
+// sum(a: int, b: int): int {
+//     a + b
+// }
 
-ptr() {
-    ptr := malloc(32) as *int
-    // *ptr = sum(1, 2)
-    // number: int = *ptr
-    // print_int(number)
-    // endln()
-}
+// ptr() {
+//     ptr := malloc(32) as *int
+//     // *ptr = sum(1, 2)
+//     // number: int = *ptr
+//     // print_int(number)
+//     // endln()
+// }

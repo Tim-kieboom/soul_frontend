@@ -1,10 +1,9 @@
 use ast::{
     Array, AsTypeCast, BinaryOperator, BinaryOperatorKind, Expression, ExpressionKind, Literal,
-    SoulType, StructConstructor, UnaryOperator, UnaryOperatorKind,
+    UnaryOperator, UnaryOperatorKind,
 };
 use soul_tokenizer::{Number, Token, TokenKind};
 use soul_utils::{
-    Ident,
     error::{SoulError, SoulErrorKind, SoulResult},
     precedence::Precedence,
     soul_error_internal,
@@ -17,7 +16,7 @@ use soul_utils::{
 use crate::parser::{
     Parser,
     parse_utils::{
-        ARRAY, ARROW_LEFT, COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, DECREMENT, INCREMENT, ROUND_OPEN,
+        ARRAY, ARROW_LEFT, COLON, CURLY_OPEN, DECREMENT, INCREMENT, ROUND_OPEN,
         SQUARE_CLOSE, SQUARE_OPEN,
     },
 };
@@ -71,7 +70,12 @@ impl<'a, 'f> Parser<'a, 'f> {
                         Expression::new_binary(left, operator, right, self.span_combine(start_span))
                 }
                 ExpressionOperator::Access(AccessType::AccessThis) => {
-                    todo!("impl access this")
+                    let ident = self.try_bump_consume_ident()?;
+                    left = match self.try_parse_function_call(start_span, Some(&left), &ident) {
+                        Ok(call) => Expression::from_function_call(call),
+                        Err(TryError::IsNotValue(_)) => Expression::new_field(left, ident),
+                        Err(TryError::IsErr(err)) => return Err(err)
+                    };
                 }
                 ExpressionOperator::Access(AccessType::AccessIndex) => {
                     let index = self.parse_expression(&[
@@ -266,73 +270,6 @@ impl<'a, 'f> Parser<'a, 'f> {
                 ))
             }
         }
-    }
-
-    fn parse_struct_contructor(
-        &mut self,
-        ident: Ident,
-        generics: Vec<SoulType>,
-        start_span: Span,
-    ) -> SoulResult<Spanned<StructConstructor>> {
-        self.expect(&CURLY_OPEN)?;
-
-        let struct_type = self.type_from_ident(ident, generics);
-
-        let mut defaults = false;
-        let mut values = vec![];
-        loop {
-            self.skip_end_lines();
-
-            if self.current_is(&TokenKind::Symbol(SymbolKind::DoubleDot)) {
-                if defaults {
-                    return Err(SoulError::new(
-                        "StructConstructor already has '..'",
-                        SoulErrorKind::InvalidEscapeSequence,
-                        Some(self.token().span),
-                    ));
-                }
-
-                defaults = true;
-                self.bump();
-                self.skip_end_lines();
-                if !self.current_is(&CURLY_CLOSE) {
-                    return Err(SoulError::new(
-                        "StructConstructor's '..' should only be used at the end expected '}'",
-                        SoulErrorKind::InvalidEscapeSequence,
-                        Some(self.token().span),
-                    ));
-                }
-                break;
-            }
-
-            let ident = self.try_bump_consume_ident()?;
-            let value = if self.current_is(&COMMA) {
-                Expression::new_variable(ident.clone())
-            } else {
-                self.expect(&COLON)?;
-                self.parse_expression(&[COMMA, CURLY_CLOSE])?
-            };
-
-            values.push((ident, value));
-            self.skip_end_lines();
-            if self.current_is(&COMMA) {
-                self.bump();
-                continue;
-            } else if self.current_is(&CURLY_CLOSE) {
-                break;
-            } else {
-                return Err(self.get_expect_any_error(&[COMMA, CURLY_CLOSE]));
-            }
-        }
-        self.expect(&CURLY_CLOSE)?;
-
-        let ctor = StructConstructor {
-            id: None,
-            values,
-            defaults,
-            struct_type,
-        };
-        Ok(Spanned::new(ctor, self.span_combine(start_span)))
     }
 
     fn parse_as_typecast(&mut self, left: Expression, start_span: Span) -> SoulResult<Expression> {
