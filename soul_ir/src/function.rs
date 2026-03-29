@@ -5,6 +5,7 @@ use inkwell::{
 };
 use mir_parser::mir::FunctionBody;
 use soul_utils::{Ident, ids::FunctionId};
+use typed_hir::display_thir::DisplayThirType;
 
 use crate::{FunctionKeyId, GenericSubstitute, LlvmBackend};
 
@@ -90,7 +91,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             sb.push_str("_this_");
             match self.get_type(this) {
                 Ok(ty) => ty
-                    .write_display_no_spaces(&self.types.types, &mut sb)
+                    .write_display_no_spaces(&self.types.types_map, &mut sb)
                     .expect("expect not fmt error"),
                 Err(err) => {
                     self.log_error(err);
@@ -105,7 +106,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             sb.push_str(SEPARATOR);
             match self.get_type(*ty) {
                 Ok(ty) => ty
-                    .write_display_no_spaces(&self.types.types, &mut sb)
+                    .write_display_no_spaces(&self.types.types_map, &mut sb)
                     .expect("expect not fmt error"),
                 Err(err) => {
                     self.log_error(err);

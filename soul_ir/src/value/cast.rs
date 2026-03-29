@@ -1,7 +1,8 @@
-use hir::{HirType, HirTypeKind, TypeId};
+use hir::TypeId;
 use inkwell::{types::BasicTypeEnum, values::BasicValueEnum};
 use mir_parser::mir;
 use soul_utils::{error::SoulResult, soul_error_internal, soul_names::PrimitiveTypes};
+use typed_hir::{ThirType, ThirTypeKind};
 
 use crate::{GenericSubstitute, IrOperand, LlvmBackend, build_error};
 
@@ -21,11 +22,11 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         let mir_source_type = self.get_type(value.ty)?;
         let mir_cast_type = self.get_type(cast_to)?;
         match (mir_source_type.kind, mir_cast_type.kind) {
-            (HirTypeKind::Pointer(_), HirTypeKind::Pointer(_)) => {
+            (ThirTypeKind::Pointer(_), ThirTypeKind::Pointer(_)) => {
                 //llvm doesn't care ptr's are ptr's
                 Ok(source_operand)
             }
-            (HirTypeKind::Primitive(_), HirTypeKind::Pointer(_)) => {
+            (ThirTypeKind::Primitive(_), ThirTypeKind::Pointer(_)) => {
                 // int → ptr
                 let (source, cast) = (
                     source_operand.value.into_int_value(),
@@ -40,7 +41,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     is_signed_interger: false,
                 })
             }
-            (HirTypeKind::Pointer(_), HirTypeKind::Primitive(_)) => {
+            (ThirTypeKind::Pointer(_), ThirTypeKind::Primitive(_)) => {
                 // ptr → int
                 let (source, cast) = (
                     source_operand.value.into_pointer_value(),
@@ -55,7 +56,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     is_signed_interger: false,
                 })
             }
-            (HirTypeKind::Primitive(_), HirTypeKind::Primitive(_)) => {
+            (ThirTypeKind::Primitive(_), ThirTypeKind::Primitive(_)) => {
                 let info = self.get_primitive_cast_info(
                     mir_source_type,
                     mir_cast_type,
@@ -191,13 +192,13 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
     fn get_primitive_cast_info(
         &self,
-        mir_source_type: &HirType,
-        mir_cast_type: &HirType,
+        mir_source_type: &ThirType,
+        mir_cast_type: &ThirType,
         source_operand: IrOperand<'a>,
         destination_type: BasicTypeEnum<'a>,
     ) -> SoulResult<PrimCastInfo<'a>> {
         let (source_prim, cast_prim) = match (mir_source_type.kind, mir_cast_type.kind) {
-            (HirTypeKind::Primitive(source), HirTypeKind::Primitive(cast)) => (source, cast),
+            (ThirTypeKind::Primitive(source), ThirTypeKind::Primitive(cast)) => (source, cast),
             _ => unreachable!(),
         };
 

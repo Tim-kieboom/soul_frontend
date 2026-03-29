@@ -4,11 +4,21 @@ use soul_utils::{soul_names::PrimitiveTypes, symbool_kind::SymbolKind};
 use crate::{ThirType, ThirTypeKind, ThirTypesMap};
 
 pub trait DisplayThirType {
+    fn write_display_no_spaces(&self, types: &ThirTypesMap, sb: &mut String) -> std::fmt::Result;
     fn write_display(&self, types: &ThirTypesMap, sb: &mut String) -> std::fmt::Result;
     fn display(&self, types: &ThirTypesMap) -> String;
 }
 
 impl DisplayThirType for ThirType {
+    fn write_display_no_spaces(&self, types: &ThirTypesMap, sb: &mut String) -> std::fmt::Result {
+        if let Some(modifier) = self.modifier {
+            sb.push_str(modifier.as_str());
+            sb.push(' ');
+        }
+
+        self.kind.write_display_no_spaces(types, sb)
+    }
+
     fn write_display(&self, types: &ThirTypesMap, sb: &mut String) -> std::fmt::Result {
         if let Some(modifier) = self.modifier {
             sb.push_str(modifier.as_str());
@@ -25,6 +35,10 @@ impl DisplayThirType for ThirType {
     }
 }
 impl DisplayThirType for ThirTypeKind {
+    fn write_display_no_spaces(&self, types: &ThirTypesMap, sb: &mut String) -> std::fmt::Result {
+        self.write_display(types, sb)
+    }
+
     fn write_display(&self, types: &ThirTypesMap, sb: &mut String) -> std::fmt::Result {
         use std::fmt::Write;
         const CONST_REF_STR: &str = SymbolKind::ConstRef.as_str();

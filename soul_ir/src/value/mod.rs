@@ -3,6 +3,7 @@ use ast::Literal;
 use hir::{StructId, TypeId};
 use mir_parser::mir::{self, AggregateBody, Operand, PlaceId, Rvalue, RvalueKind};
 use soul_utils::{error::SoulResult, soul_error_internal};
+use typed_hir::{ThirTypeKind, display_thir::DisplayThirType};
 
 mod binary_unary;
 mod cast;
@@ -62,8 +63,8 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         
         let hir_type = self.get_type(base_type)?;
         match &hir_type.kind {
-            hir::HirTypeKind::Struct(_) => Ok(()),
-            _ => Err(soul_error_internal!(format!("trying to access field but base type '{}' is not struct like", hir_type.display(&self.types.types)), None)),
+            ThirTypeKind::Struct(_) => Ok(()),
+            _ => Err(soul_error_internal!(format!("trying to access field but base type '{}' is not struct like", hir_type.display(&self.types.types_map)), None)),
         }
     }
 

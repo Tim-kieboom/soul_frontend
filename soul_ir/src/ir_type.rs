@@ -4,6 +4,7 @@ use inkwell::{
     types::{BasicType, BasicTypeEnum, StructType},
 };
 use soul_utils::{error::SoulResult, soul_error_internal, soul_names::PrimitiveTypes};
+use typed_hir::ThirTypeKind;
 
 use crate::{GenericSubstitute, LlvmBackend};
 
@@ -16,7 +17,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         let hir_type = self.get_type(ty)?;
 
         Ok(Some(match hir_type.kind {
-            hir::HirTypeKind::Generic(id) => {
+            ThirTypeKind::Generic(id) => {
                 let ty = generics.resolve(id).ok_or(soul_error_internal!(
                     format!("generic {:?} substitute type not found", ty),
                     None
@@ -24,21 +25,21 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
                 return self.lower_type(ty, generics);
             }
-            hir::HirTypeKind::Struct(id) => {
+            ThirTypeKind::Struct(id) => {
                 self.lower_struct(id, generics).map(|s| s.into())?
             }
-            hir::HirTypeKind::Primitive(primitive_types) => {
+            ThirTypeKind::Primitive(primitive_types) => {
                 match self.lower_primitive_type(primitive_types) {
                     Some(val) => val,
                     None => return Ok(None),
                 }
             }
 
-            hir::HirTypeKind::Ref { .. } | hir::HirTypeKind::Pointer(_) => {
+            ThirTypeKind::Ref { .. } | ThirTypeKind::Pointer(_) => {
                 let ptr_type = self.context.ptr_type(AddressSpace::default());
                 ptr_type.into()
             }
-            hir::HirTypeKind::Optional(type_id) => {
+            ThirTypeKind::Optional(type_id) => {
                 let element_type = match self.lower_type(type_id, generics)? {
                     Some(ty) => ty,
                     None => self.context.i8_type().into(),
@@ -48,7 +49,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     .struct_type(&[is_null, element_type], false)
                     .into()
             }
-            hir::HirTypeKind::Array { element, kind } => {
+            ThirTypeKind::Array { element, kind } => {
                 let ptr_type = self.context.ptr_type(AddressSpace::default()).into();
                 let len_type = self.default_int_type.into();
 
@@ -69,12 +70,11 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 }
             }
 
-            hir::HirTypeKind::None | hir::HirTypeKind::Type => {
+            ThirTypeKind::None | ThirTypeKind::Type => {
                 return Ok(None);
             }
             
-            hir::HirTypeKind::InferType(_, _) => panic!("inferType type should not be in ir"),
-            hir::HirTypeKind::Error => panic!("error type should not be in ir"),
+            ThirTypeKind::Error => panic!("error type should not be in ir"),
         }))
     }
 
@@ -95,14 +95,11 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         id: StructId,
         generics: &GenericSubstitute,
     ) -> SoulResult<StructType<'a>> {
-        let obj = self.types.types.id_to_struct(id).expect("should have struct");
-        if !obj.generics.is_empty() {
-            todo!()
-        }
+        let object = self.types.types_map.id_to_struct(id).expect("should have struct");
 
         let mut fields = vec![];
-        for (i, field) in obj.fields.iter().enumerate() {
-            let ty = self.types.types.ref_to_id(field.ty).expect("should hev type");
+        for (i, field) in object.fields.iter().enumerate() {
+            let ty = field.ty;
             let ir_field = match self.lower_type(ty, generics)? {
                 Some(val) => val,
                 None => continue,

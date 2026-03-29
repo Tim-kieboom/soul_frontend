@@ -22,8 +22,6 @@ inkwell = { version = "0.8", features = ["llvm16-0"] }
 typed_hir = { version = "0.1.0", path = "../soul_hir/typed_hir_model" }
 typed_hir_parser = { version = "0.1.0", path = "../soul_hir/typed_hir_parser" }
 
-# soul_ir = { version = "0.1.0", path = "../soul_ir" }
-# run_mir = { version = "0.1.0", path = "../soul_mir/run_mir" }
-# mir_parser = { version = "0.1.0", path = "../soul_mir/mir_parser" }
-# hir_typed_context = { version = "0.1.0", path = "../soul_hir/hir_typed_context" }
-# hir_literal_interpreter = { version = "0.1.0", path = "../soul_hir/hir_literal_interpreter" }
+soul_ir = { version = "0.1.0", path = "../soul_ir" }
+run_mir = { version = "0.1.0", path = "../soul_mir/run_mir" }
+mir_parser = { version = "0.1.0", path = "../soul_mir/mir_parser" }

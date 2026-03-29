@@ -1,6 +1,7 @@
 use hir::TypeId;
 use mir_parser::mir::{Operand, OperandKind};
 use soul_utils::{error::SoulResult, soul_error_internal, soul_names::PrimitiveSize};
+use typed_hir::{ThirTypeKind, display_thir::DisplayThirType};
 
 use crate::{GenericSubstitute, IrOperand, LlvmBackend, build_error};
 
@@ -23,7 +24,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 let local = self.get_local(*local_id);
                 let is_signed_interger = self
                     .types
-                    .types
+                    .types_map
                     .id_to_type(mir_local.ty())
                     .ok_or(soul_error_internal!(
                         format!("{:?} not found", mir_local.ty()),
@@ -64,12 +65,12 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             ast::Literal::Int(value) => {
                 let size = match self
                     .types
-                    .types
+                    .types_map
                     .id_to_type(should_be)
                     .expect("should have type")
                     .kind
                 {
-                    hir::HirTypeKind::Primitive(primitive_types) => {
+                    ThirTypeKind::Primitive(primitive_types) => {
                         primitive_types.to_primitive_size()
                     }
                     _ => {
@@ -101,19 +102,19 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             ast::Literal::Uint(value) => {
                 let hir_type = self
                     .types
-                    .types
+                    .types_map
                     .id_to_type(should_be)
                     .expect("should have type");
 
                 let size = match hir_type
                     .kind
                 {
-                    hir::HirTypeKind::Primitive(primitive_types) => {
+                    ThirTypeKind::Primitive(primitive_types) => {
                         primitive_types.to_primitive_size()
                     }
                     _ => {
                         return Err(soul_error_internal!(
-                            format!("literal should be primitive type is `{}`", hir_type.display(&self.types.types)),
+                            format!("literal should be primitive type is `{}`", hir_type.display(&self.types.types_map)),
                             None
                         ));
                     }
@@ -139,12 +140,12 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             ast::Literal::Float(value) => {
                 let size = match self
                     .types
-                    .types
+                    .types_map
                     .id_to_type(should_be)
                     .expect("should have type")
                     .kind
                 {
-                    hir::HirTypeKind::Primitive(primitive_types) => {
+                    ThirTypeKind::Primitive(primitive_types) => {
                         primitive_types.to_primitive_size()
                     }
                     _ => {

@@ -38,6 +38,14 @@ impl ThirType {
     pub fn is_mutable(&self) -> bool {
         self.modifier == Some(TypeModifier::Mut)
     }
+
+    pub const fn is_any_int_type(&self) -> bool {
+        if let ThirTypeKind::Primitive(prim) = self.kind {
+            prim.is_signed_interger()
+        } else {
+            false
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

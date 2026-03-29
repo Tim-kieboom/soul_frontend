@@ -123,11 +123,15 @@ impl<'a> HirContext<'a> {
         for field in &object.fields {
             let ty = self.lower_type(&field.ty);
             let id = self.id_generator.alloc_field();
-            fields.push(hir::Field {
+            
+            let hir_field = hir::Field {
                 id,
                 ty,
                 name: field.name.to_string(),
-            });
+            };
+
+            fields.push(hir_field.clone());
+            self.tree.nodes.fields.insert(id, hir_field);
         }
 
         let _id = self.insert_struct(hir::Struct { name, fields });

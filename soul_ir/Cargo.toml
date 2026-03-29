@@ -6,9 +6,9 @@ edition = "2024"
 [dependencies]
 ast = { version = "0.1.0", path = "../soul_ast/ast_model" }
 hir = { version = "0.1.0", path = "../soul_hir/hir_model" }
-hir_typed_context = { version = "0.1.0", path = "../soul_hir/hir_typed_context" }
 inkwell = { version = "0.8", features = ["llvm16-0"] }
 mir_parser = { version = "0.1.0", path = "../soul_mir/mir_parser" }
 run_mir = { version = "0.1.0", path = "../soul_mir/run_mir" }
 serde = { version = "1.0.228", features = ["derive"] }
 soul_utils = { version = "0.1.0", path = "../soul_utils" }
+typed_hir = { version = "0.1.0", path = "../soul_hir/typed_hir_model" }

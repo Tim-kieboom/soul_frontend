@@ -1,17 +1,18 @@
-use hir::{FieldId, HirType, TypeId};
-use hir_typed_context::HirTypedTable;
+use hir::{FieldId, HirTree, TypeId};
 use mir_parser::mir::{
     self, BlockId, FunctionBody, Local, LocalId, MirTree, Operand, Place, PlaceId, Rvalue, StatementId, TempId
 };
+use run_hir::HirResponse;
 use soul_utils::{
     ids::{FunctionId, IdAlloc},
     soul_names::{TypeModifier, TypeWrapper},
     vec_map::VecMapIndex,
 };
+use typed_hir::{ThirType, TypedHir, display_thir::DisplayThirType};
 use std::fmt::Write;
 
-pub fn display_mir(mir: &MirTree, types: &HirTypedTable) -> String {
-    let mut displayer = MirDisplayer::new(mir, types);
+pub fn display_mir(mir: &MirTree, hir: &HirResponse) -> String {
+    let mut displayer = MirDisplayer::new(mir, hir);
 
     for global in mir.globals.values() {
         displayer.display_global(global);
@@ -47,13 +48,15 @@ pub fn display_mir(mir: &MirTree, types: &HirTypedTable) -> String {
 struct MirDisplayer<'a> {
     sb: String,
     mir: &'a MirTree,
-    types: &'a HirTypedTable,
+    hir: &'a HirTree,
+    types: &'a TypedHir,
 }
 impl<'a> MirDisplayer<'a> {
-    fn new(mir: &'a MirTree, types: &'a HirTypedTable) -> Self {
+    fn new(mir: &'a MirTree, hir: &'a HirResponse) -> Self {
         Self {
             mir,
-            types,
+            hir: &hir.hir,
+            types: &hir.typed,
             sb: String::new(),
         }
     }
@@ -103,7 +106,7 @@ impl<'a> MirDisplayer<'a> {
         }
         self.push_str("): ");
         self.get_type(function.return_type)
-            .write_display(&self.types.types, &mut self.sb)
+            .write_display(&self.types.types_map, &mut self.sb)
             .expect("no fmt error");
         self.push(' ');
 
@@ -145,7 +148,7 @@ impl<'a> MirDisplayer<'a> {
         self.display_local_name(local.id());
         self.push_str(": ");
         hir_type
-            .write_display(&self.types.types, &mut self.sb)
+            .write_display(&self.types.types_map, &mut self.sb)
             .expect("no fmt error");
 
         match local {
@@ -264,7 +267,7 @@ impl<'a> MirDisplayer<'a> {
                 self.display_field(base, *field_id);
             }
             mir::RvalueKind::Aggregate{ struct_type, body } => {
-                self.push_str(self.types.types.id_to_struct(*struct_type).expect("should have strcut").name.as_str());
+                self.push_str(&format!("{:?}", struct_type));
                 self.push('{');
                 match body {
                     mir::AggregateBody::Runtime(fields) => {
@@ -388,21 +391,21 @@ impl<'a> MirDisplayer<'a> {
 
     fn display_type(&mut self, ty: TypeId) {
         self.get_type(ty)
-            .write_display(&self.types.types, &mut self.sb)
+            .write_display(&self.types.types_map, &mut self.sb)
             .expect("no fmt error");
     }
 
     fn display_field(&mut self, base: &PlaceId, field: FieldId) {
         self.display_place(base);
         self.push('.');
-        self.push_str(&self.types.field_names[field]);
+        self.push_str(&self.hir.nodes.fields[field].name);
     }
 
-    fn get_type(&self, ty: TypeId) -> HirType {
+    fn get_type(&self, ty: TypeId) -> ThirType {
         self.types
-            .types
+            .types_map
             .id_to_type(ty)
             .cloned()
-            .unwrap_or(HirType::error_type())
+            .unwrap_or(ThirType{ kind: typed_hir::ThirTypeKind::Error, generics: vec![], modifier: None })
     }
 }

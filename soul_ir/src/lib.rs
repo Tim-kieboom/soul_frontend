@@ -1,7 +1,6 @@
 use std::{cell::RefCell, collections::HashMap};
 
-use hir::{FieldId, HirType, StructId, TypeId};
-use hir_typed_context::HirTypedTable;
+use hir::{FieldId, StructId, TypeId};
 use inkwell::{
     basic_block::BasicBlock,
     builder::{Builder, BuilderError},
@@ -29,15 +28,16 @@ mod local;
 mod statement;
 mod utils;
 mod value;
+use typed_hir::{ThirType, TypedHir};
 use utils::*;
 
 pub struct IrRequest<'ctx> {
     pub context: &'ctx Context,
     pub mir: &'ctx MirResponse,
-    pub types: &'ctx HirTypedTable,
+    pub types: &'ctx TypedHir,
 }
 impl<'ctx> IrRequest<'ctx> {
-    pub fn new(mir: &'ctx MirResponse, types: &'ctx HirTypedTable, context: &'ctx Context) -> Self {
+    pub fn new(mir: &'ctx MirResponse, types: &'ctx TypedHir, context: &'ctx Context) -> Self {
         Self {
             mir,
             types,
@@ -86,7 +86,7 @@ pub struct LlvmBackend<'f, 'a> {
     context: &'a Context,
     mir: &'a MirResponse,
     builder: Builder<'a>,
-    types: HirTypedTable,
+    types: TypedHir,
     options: &'a CompilerOptions,
     exit_function: Option<FunctionValue<'a>>,
 
@@ -234,9 +234,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         self.temps.insert((self.current.function_key(), id), value);
     }
 
-    fn get_type(&self, ty: TypeId) -> SoulResult<&HirType> {
+    fn get_type(&self, ty: TypeId) -> SoulResult<&ThirType> {
         self.types
-            .types
+            .types_map
             .id_to_type(ty)
             .ok_or(soul_error_internal!(format!("{:?} not found", ty), None))
     }
