@@ -1,4 +1,4 @@
-use crate::{BlockId, ExpressionId, LocalId, PlaceId, StructId, TypeId, hir_type::PossibleTypeId};
+use crate::{BlockId, ExpressionId, LocalId, PlaceId, StructId, TypeId, hir_type::LazyTypeId};
 use ast::{BinaryOperator, Literal, UnaryOperator};
 use soul_utils::{Ident, ids::{FunctionId}};
 
@@ -9,7 +9,7 @@ use soul_utils::{Ident, ids::{FunctionId}};
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Expression {
     pub id: ExpressionId,
-    pub ty: PossibleTypeId,
+    pub ty: LazyTypeId,
     pub kind: ExpressionKind,
 }
 impl Expression {
@@ -20,7 +20,7 @@ impl Expression {
     pub fn error(id: ExpressionId) -> Self {
         Self {
             id,
-            ty: PossibleTypeId::error(),
+            ty: LazyTypeId::error(),
             kind: ExpressionKind::Error,
         }
     }
@@ -65,7 +65,7 @@ pub enum ExpressionKind {
     /// Dereferences a pointer or reference expression.
     DeRef(ExpressionId),
 
-    InnerRawStackArray(PossibleTypeId),
+    InnerRawStackArray(LazyTypeId),
 
     // --- Operators ---
     /// A unary operation.
@@ -111,7 +111,7 @@ pub enum ExpressionKind {
     /// An explicit type cast.
     Cast {
         value: ExpressionId,
-        cast_to: PossibleTypeId,
+        cast_to: LazyTypeId,
     },
 
     StructConstructor {

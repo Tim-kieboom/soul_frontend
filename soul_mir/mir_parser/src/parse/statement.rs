@@ -1,3 +1,4 @@
+use hir::LocalKind;
 use soul_utils::soul_error_internal;
 
 use crate::{
@@ -18,24 +19,24 @@ impl<'a> MirContext<'a> {
         &mut self,
         statement: &hir::Statement,
     ) -> EndBlock<StatementResponse> {
-        let statement_id = statement.get_id();
+        let statement_id = statement.id;
         let is_end = &mut false;
 
         let mut last_operand = None;
 
         let span = self.statement_span(statement_id);
-        let terminator = match statement {
-            hir::Statement::Variable(variable, _) => {
+        let terminator = match &statement.kind {
+            hir::StatementKind::Variable(variable) => {
                 self.lower_variable(variable, is_end);
                 None
             }
-            hir::Statement::Assign(assign, _) => {
+            hir::StatementKind::Assign(assign) => {
                 self.lower_assign(assign, is_end);
                 None
             }
-            hir::Statement::Expression { value, .. } => {
+            hir::StatementKind::Expression { value, .. } => {
                 let operand = self.lower_operand(*value).pass(is_end);
-                let kind = &self.hir_response.hir.expressions[*value].kind;
+                let kind = &self.hir_response.hir.nodes.expressions[*value].kind;
 
                 if is_valid_statement_expression(kind)
                     && !matches!(operand.kind, mir::OperandKind::None)
@@ -47,7 +48,7 @@ impl<'a> MirContext<'a> {
                 last_operand = Some(operand);
                 None
             }
-            hir::Statement::Return(value, _) => {
+            hir::StatementKind::Return(value) => {
                 let operand = match value {
                     Some(val) => {
                         let operand = self.lower_operand(*val).pass(is_end);
@@ -63,7 +64,7 @@ impl<'a> MirContext<'a> {
                 *is_end = true;
                 Some(mir::Terminator::Return(operand))
             }
-            hir::Statement::Continue(_) => {
+            hir::StatementKind::Continue => {
                 let current = self.expect_current_block();
                 match self.current.loop_continue {
                     Some(block_id) => {
@@ -80,13 +81,7 @@ impl<'a> MirContext<'a> {
 
                 None
             }
-            hir::Statement::Break(value, _) => {
-                if value.is_some() {
-                    self.log_error(soul_error_internal!(
-                        "'break' with value is not yet impl",
-                        Some(span)
-                    ));
-                }
+            hir::StatementKind::Break => {
 
                 let current = self.expect_current_block();
                 match self.current.loop_finish {
@@ -104,7 +99,7 @@ impl<'a> MirContext<'a> {
 
                 None
             }
-            hir::Statement::Fall(_, _) => {
+            hir::StatementKind::Fall(_) => {
                 let span = self.statement_span(statement_id);
                 self.log_error(soul_error_internal!("statement not yet impl", Some(span)));
                 None
@@ -121,7 +116,8 @@ impl<'a> MirContext<'a> {
     pub(crate) fn lower_variable(&mut self, variable: &hir::Variable, is_end: &mut bool) {
         
         let should_assign;
-        let place_kind = if variable.is_temp {
+        let local_info = &self.hir_response.hir.nodes.locals[variable.local];
+        let place_kind = if local_info.is_temp() {
             should_assign = true;
             mir::Place::Temp(match self.temp_remap.get(variable.local) {
                 Some(val) => *val,
@@ -129,9 +125,9 @@ impl<'a> MirContext<'a> {
             })
         } else {
 
-            let literal = match variable.value {
-                Some(value) => self.get_expression_literal(value).cloned(),
-                None => None,
+            let literal = match local_info.kind {
+                LocalKind::Variable(Some(value)) => self.get_expression_literal(value).cloned(),
+                _ => None,
             };
 
             let local = match self.local_remap.get(variable.local) {
@@ -147,7 +143,7 @@ impl<'a> MirContext<'a> {
             return
         }
 
-        if let Some(value) = variable.value {
+        if let LocalKind::Variable(Some(value)) = local_info.kind {
             let operand = self.lower_operand(value).pass(is_end);
             let place = self.new_place(place_kind);
 
@@ -161,7 +157,7 @@ impl<'a> MirContext<'a> {
     }
 
     pub(crate) fn lower_assign(&mut self, assign: &hir::Assign, is_end: &mut bool) {
-        let place = self.lower_place(&assign.place).pass(is_end);
+        let place = self.lower_place(assign.place).pass(is_end);
         let value = self.lower_operand(assign.value).pass(is_end);
         if matches!(value.kind, mir::OperandKind::None) {
             return;

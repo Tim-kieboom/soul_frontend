@@ -1,4 +1,4 @@
-use hir::{Expression, ExpressionId, PossibleTypeId, TypeId};
+use hir::{Expression, ExpressionId, LazyTypeId, TypeId};
 
 #[cfg(debug_assertions)]
 use soul_utils::soul_error_internal;
@@ -88,8 +88,8 @@ impl<'a> HirContext<'a> {
         for soul_type in &function_call.generics {
             let ty = self.lower_type(soul_type);
             let kown = match ty {
-                PossibleTypeId::Known(type_id) => type_id,
-                PossibleTypeId::Infer(_) => {
+                LazyTypeId::Known(type_id) => type_id,
+                LazyTypeId::Infer(_) => {
                     self.log_error(SoulError::new(
                         "type should be known at this point",
                         SoulErrorKind::TypeInferenceError,
@@ -119,7 +119,7 @@ impl<'a> HirContext<'a> {
             Ok(val) => val,
             Err(err) => {
                 self.log_error(err);
-                PossibleTypeId::error()
+                LazyTypeId::error()
             }
         };
 

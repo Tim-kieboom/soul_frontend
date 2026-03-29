@@ -20,6 +20,11 @@ where
         }
     }
 
+    pub fn clear(&mut self) {
+        self.key_to_value.clear();
+        self.value_to_key.clear();
+    }
+
     pub fn from_array<const N: usize>(vec: [(K, V); N]) -> Self {
         let mut this = Self::new();
 
@@ -52,6 +57,18 @@ where
 
     pub fn get_key(&self, value: &V) -> Option<K> {
         self.value_to_key.get(value).copied()
+    }
+
+    pub fn entries(&self) -> impl Iterator<Item = (K, &V)> {
+        self.key_to_value.entries()
+    }
+
+    pub fn into_entries(self) -> impl IntoIterator<Item = (K, V)> {
+        self.key_to_value.into_entries()
+    }
+
+    pub fn keys(&self) -> impl Iterator<Item = K> {
+        self.key_to_value.keys()
     }
 }
 impl<K, V> Default for BiMap<K, V>

@@ -5,31 +5,83 @@ use soul_utils::{
 
 use crate::{FieldId, GenericId, InferTypeId, InferTypesMap, StructId, TypeId, TypesMap};
 
-pub type HirType = InnerType<HirTypeKind, PossibleTypeId>;
-pub type InferType = InnerType<InferTypeId, PossibleTypeId>;
+pub type HirType = InnerType<HirTypeKind>;
+pub type InferType = InnerType<InferTypeId>;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct InnerType<Kind, TyId> {
+pub struct InnerType<Kind> {
     pub kind: Kind,
-    pub generics: Vec<TyId>,
+    pub generics: Vec<TypeId>,
     pub modifier: Option<TypeModifier>,
 }
-impl<T, V> InnerType<T, V> {
+impl<T> InnerType<T> {
     pub const fn new(kind: T) -> Self {
         Self { kind, generics: vec![], modifier: None }
     }
 }
 impl HirType {
     pub const fn index_type() -> Self {
-        Self::new(HirTypeKind::Primitive(PrimitiveTypes::Uint))
+        Self::primitive_type(PrimitiveTypes::Uint)
     }
 
     pub const fn none_type() -> Self {
-        Self::new(HirTypeKind::Primitive(PrimitiveTypes::None))
+        Self::new(HirTypeKind::None)
+    }
+
+    pub const fn bool_type() -> Self {
+        Self::primitive_type(PrimitiveTypes::Boolean)
+    }
+
+    pub const fn primitive_type(prim: PrimitiveTypes) -> Self {
+        Self::new(HirTypeKind::Primitive(prim))
     }
 
     pub const fn error_type() -> Self {
         Self::new(HirTypeKind::Error)
+    }
+
+    pub fn is_mutable(&self) -> bool {
+        self.modifier == Some(TypeModifier::Mut)
+    }
+
+    pub const fn is_untyped_interger_type(&self) -> bool {
+        self.kind.is_untyped_interger()
+    }
+
+    pub const fn is_any_int_type(&self) -> bool {
+        if let HirTypeKind::Primitive(prim) = self.kind {
+            prim.is_signed_interger()
+        } else {
+            false
+        }
+    }
+
+    pub const fn is_any_uint_type(&self) -> bool {
+        if let HirTypeKind::Primitive(prim) = self.kind {
+            prim.is_unsigned_interger()
+        } else {
+            false
+        }
+    }
+
+    pub const fn is_boolean_type(&self) -> bool {
+        matches!(self.kind, HirTypeKind::Primitive(PrimitiveTypes::Boolean))
+    }
+
+    pub const fn is_float_type(&self) -> bool {
+        if let HirTypeKind::Primitive(prim) = self.kind {
+            prim.is_float()
+        } else {
+            false
+        }
+    }
+
+    pub const fn is_numeric_type(&self) -> bool {
+        self.is_float_type() || self.is_any_uint_type() || self.is_any_int_type()
+    }
+
+    pub const fn is_error(&self) -> bool {
+        matches!(self.kind, HirTypeKind::Error)
     }
 }
 
@@ -39,19 +91,27 @@ pub enum HirTypeKind {
     Type,
     Primitive(PrimitiveTypes),
     Array {
-        element: PossibleTypeId,
+        element: LazyTypeId,
         kind: ArrayKind,
     },
     Ref {
-        of_type: PossibleTypeId,
+        of_type: LazyTypeId,
         mutable: bool,
     },
-    Pointer(PossibleTypeId),
-    Optional(PossibleTypeId),
+    Pointer(LazyTypeId),
+    Optional(LazyTypeId),
     Generic(GenericId),
     Struct(StructId),
 
     Error,
+}
+impl HirTypeKind {
+    pub const fn is_untyped_interger(&self) -> bool {
+        match self {
+            HirTypeKind::Primitive(prim) => prim.is_unsigned_interger(),
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -67,13 +127,18 @@ impl CreatedTypes {
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum PossibleTypeId {
+pub enum LazyTypeId {
     Known(TypeId),
     Infer(InferTypeId),
 }
-impl PossibleTypeId {
+impl LazyTypeId {
     pub fn error() -> Self {
         Self::Known(TypeId::error())
+    }
+}
+impl TypeId {
+    pub fn to_lazy(self) -> LazyTypeId {
+        LazyTypeId::Known(self)
     }
 }
 
@@ -88,7 +153,7 @@ pub struct Field {
     pub id: FieldId,
     /// The name of the field (for readability, debugging, codegen).
     pub name: String,
-    pub ty: PossibleTypeId,
+    pub ty: LazyTypeId,
 }
 
 pub trait DisplayType {
@@ -96,7 +161,7 @@ pub trait DisplayType {
     fn write_display(&self, types: &TypesMap, infers: &InferTypesMap, sb: &mut String) -> std::fmt::Result;
 }
 
-impl<K: DisplayType, I> DisplayType for InnerType<K, I> {
+impl<K: DisplayType> DisplayType for InnerType<K> {
     fn write_display(&self, types: &TypesMap, infers: &InferTypesMap, sb: &mut String) -> std::fmt::Result {
         if let Some(modifier) = self.modifier {
             sb.push_str(modifier.as_str());
@@ -182,16 +247,33 @@ impl DisplayType for HirTypeKind {
     }
     
 }
-fn write_display_from_id(types: &TypesMap, infers: &InferTypesMap, ty: PossibleTypeId, sb: &mut String) -> std::fmt::Result {
+impl HirTypeKind {
+    pub const fn display_variant(&self) -> &'static str {
+        match self {
+            HirTypeKind::Type => "type",
+            HirTypeKind::None => "none",
+            HirTypeKind::Error => "<error>",
+            HirTypeKind::Ref { .. } => "<ref>",
+            HirTypeKind::Array { .. } => "<array>",
+            HirTypeKind::Pointer(_) => "<pointer>",
+            HirTypeKind::Generic(_) => "<generic>",
+            HirTypeKind::Optional(_) => "<optional>",
+            HirTypeKind::Struct(_) => "<struct>",
+            HirTypeKind::Primitive(primitive) => primitive.as_str(),
+        }
+    }
+}
+
+fn write_display_from_id(types: &TypesMap, infers: &InferTypesMap, ty: LazyTypeId, sb: &mut String) -> std::fmt::Result {
     match inner_write_display_from_id(types, infers, ty, sb) {
         Some(val) => val,
         None => HirType::error_type().write_display(types, infers, sb),
     }
 }
 
-fn inner_write_display_from_id(types: &TypesMap, infers: &InferTypesMap, ty: PossibleTypeId, sb: &mut String) -> Option<std::fmt::Result> {
+fn inner_write_display_from_id(types: &TypesMap, infers: &InferTypesMap, ty: LazyTypeId, sb: &mut String) -> Option<std::fmt::Result> {
     Some(match ty {
-        PossibleTypeId::Known(type_id) => types.id_to_type(type_id)?.write_display(types, infers, sb),
-        PossibleTypeId::Infer(infer_type_id) => infers.get_infer(infer_type_id)?.write_display(types, infers, sb),
+        LazyTypeId::Known(type_id) => types.id_to_type(type_id)?.write_display(types, infers, sb),
+        LazyTypeId::Infer(infer_type_id) => infers.get_infer(infer_type_id)?.write_display(types, infers, sb),
     })
 }

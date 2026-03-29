@@ -89,6 +89,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "hir_literal_interpreter"
+version = "0.1.0"
+dependencies = [
+ "ast",
+ "hir",
+ "soul_utils",
+ "typed_hir",
+ "typed_hir_parser",
+]
+
+[[package]]
 name = "hir_parser"
 version = "0.1.0"
 dependencies = [
@@ -244,8 +255,11 @@ version = "0.1.0"
 dependencies = [
  "ast",
  "hir",
+ "hir_literal_interpreter",
  "hir_parser",
  "soul_utils",
+ "typed_hir",
+ "typed_hir_parser",
 ]
 
 [[package]]
@@ -330,6 +344,8 @@ dependencies = [
  "soul_name_resolver",
  "soul_tokenizer",
  "soul_utils",
+ "typed_hir",
+ "typed_hir_parser",
 ]
 
 [[package]]
@@ -377,6 +393,28 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "typed_hir"
+version = "0.1.0"
+dependencies = [
+ "ast",
+ "hir",
+ "serde",
+ "soul_utils",
+]
+
+[[package]]
+name = "typed_hir_parser"
+version = "0.1.0"
+dependencies = [
+ "ast",
+ "hir",
+ "hir_parser",
+ "serde",
+ "soul_utils",
+ "typed_hir",
 ]
 
 [[package]]

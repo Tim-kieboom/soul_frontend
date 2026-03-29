@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use ast::{AstResponse, DeclareStore};
 use hir::{
-    BlockId, CreatedTypes, ExpressionId, GenericId, HirTree, LocalId, PossibleTypeId, StatementId,
+    BlockId, CreatedTypes, ExpressionId, GenericId, HirTree, LocalId, LazyTypeId, StatementId,
 };
 use soul_utils::{
     Ident,
@@ -88,7 +88,7 @@ impl<'a> HirContext<'a> {
         id
     }
 
-    fn insert_parameter(&mut self, name: &Ident, local: LocalId, ty: PossibleTypeId) {
+    fn insert_parameter(&mut self, name: &Ident, local: LocalId, ty: LazyTypeId) {
         self.inner_insert_local(
             name,
             local,
@@ -103,7 +103,7 @@ impl<'a> HirContext<'a> {
         &mut self,
         name: &Ident,
         local: LocalId,
-        ty: PossibleTypeId,
+        ty: LazyTypeId,
         value: Option<ExpressionId>,
     ) {
         self.inner_insert_local(
@@ -120,7 +120,7 @@ impl<'a> HirContext<'a> {
         &mut self,
         name: &Ident,
         local: LocalId,
-        ty: PossibleTypeId,
+        ty: LazyTypeId,
         value: ExpressionId,
     ) {
         self.inner_insert_local(

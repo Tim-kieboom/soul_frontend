@@ -1,3 +1,4 @@
+use hir::LocalKind;
 #[cfg(debug_assertions)]
 use soul_utils::soul_error_internal;
 
@@ -5,22 +6,24 @@ use crate::{MirContext, mir};
 
 impl<'a> MirContext<'a> {
     pub(crate) fn lower_global(&mut self, global: &hir::Global, is_end: &mut bool) {
-        match global {
-            hir::Global::Function(function, _) => {
-                if *function == self.hir_response.hir.main_function {
+        match &global.kind {
+            hir::GlobalKind::Function(function) => {
+                if *function == self.hir_response.hir.main {
                     return // lower main later
                 }
                 self.lower_function(*function)
             }
-            hir::Global::Variable(variable, _) | hir::Global::InternalVariable(variable, _) => {
+            hir::GlobalKind::Variable(variable) | hir::GlobalKind::InternalVariable(variable) => {
                 let local = match self.lower_global_variable(variable) {
                     Some(val) => val,
                     None => return,
                 };
 
-                let value = match variable.value {
-                    Some(val) => val,
-                    None => return,
+                let local_info = &self.hir_response.hir.nodes.locals[variable.local];
+
+                let value = match &local_info.kind {
+                    LocalKind::Variable(Some(val)) => *val,
+                    _ => return,
                 };
 
                 self.current.function = self.tree.init_global_function;
@@ -34,11 +37,11 @@ impl<'a> MirContext<'a> {
                 }));
             }
 
-            hir::Global::InternalAssign(assign, _) => {
+            hir::GlobalKind::InternalAssign(assign) => {
                 self.current.function = self.tree.init_global_function;
                 self.current.block = Some(self.expect_init_global_block());
 
-                let place = self.lower_place(&assign.place).pass(is_end);
+                let place = self.lower_place(assign.place).pass(is_end);
                 let value = self.lower_operand(assign.value).pass(is_end);
                 self.push_statement(mir::Statement::new(mir::StatementKind::Assign {
                     place,
@@ -49,7 +52,9 @@ impl<'a> MirContext<'a> {
     }
 
     fn lower_global_variable(&mut self, variable: &hir::Variable) -> Option<mir::Place> {
-        if variable.is_temp {
+        
+        let local_info = &self.hir_response.hir.nodes.locals[variable.local];
+        if local_info.is_temp() {
             return Some(mir::Place::Temp(
                 self.new_temp(self.local_type(variable.local)),
             ));
@@ -59,9 +64,9 @@ impl<'a> MirContext<'a> {
         let local = self.new_local_global(variable.local, ty);
         let id = self.id_generators.alloc_global();
 
-        let value_id = match variable.value {
-            Some(val) => val,
-            None => {
+        let value_id = match local_info.kind {
+            LocalKind::Variable(Some(val)) => val,
+            _ => {
                 #[cfg(debug_assertions)]
                 self.log_error(soul_error_internal!(
                     "global variables should have Some(_) value",

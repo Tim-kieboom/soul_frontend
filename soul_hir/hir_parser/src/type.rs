@@ -1,9 +1,9 @@
 use ast::Stub;
 use hir::{
-    GenericId, HirType, HirTypeKind, InferTypesMap, PossibleTypeId, StructId, TypeId, TypesMap,
+    GenericId, HirType, HirTypeKind, InferTypesMap, LazyTypeId, StructId, TypeId, TypesMap,
 };
 use soul_utils::{
-    error::{SoulError, SoulResult},
+    error::{SoulError, SoulErrorKind, SoulResult},
     ids::IdAlloc,
     soul_error_internal,
     soul_names::{PrimitiveTypes, TypeModifier},
@@ -14,7 +14,7 @@ use crate::{HirContext, Scope};
 const CHAR: HirType = HirType::new(hir::HirTypeKind::Primitive(PrimitiveTypes::Char));
 
 impl<'a> HirContext<'a> {
-    pub(crate) fn lower_type(&mut self, ty: &ast::SoulType) -> hir::PossibleTypeId {
+    pub(crate) fn lower_type(&mut self, ty: &ast::SoulType) -> hir::LazyTypeId {
         match Self::convert_type(
             ty,
             &self.scopes,
@@ -25,7 +25,7 @@ impl<'a> HirContext<'a> {
             Ok(val) => val,
             Err(err) => {
                 self.log_error(err);
-                PossibleTypeId::error()
+                LazyTypeId::error()
             }
         }
     }
@@ -42,7 +42,7 @@ impl<'a> HirContext<'a> {
         let kind = ast::ArrayKind::StackArray(array.values.len() as u64);
         let element = match &array.element_type {
             Some(val) => self.lower_type(val),
-            None => self.new_infer_type(vec![], None),
+            None => self.new_infer_type(vec![], None, span),
         };
 
         let array_ty = self.add_type(HirType::new(HirTypeKind::Array { element, kind }));
@@ -60,7 +60,7 @@ impl<'a> HirContext<'a> {
         call_generics: &Vec<(String, TypeId)>,
         types: &mut TypesMap,
         infers: &mut InferTypesMap,
-    ) -> SoulResult<hir::PossibleTypeId> {
+    ) -> SoulResult<hir::LazyTypeId> {
         let mut generics = vec![];
         let modifier = ty.modifier;
         let kind = match &ty.kind {
@@ -71,13 +71,18 @@ impl<'a> HirContext<'a> {
                 generics: stub_generics,
             }) => {
                 for generic in stub_generics {
-                    generics.push(Self::convert_type(
+                    let ty = Self::convert_type(
                         generic,
                         scopes,
                         call_generics,
                         types,
                         infers,
-                    )?)
+                    )?;
+
+                    match ty {
+                        LazyTypeId::Known(type_id) => generics.push(type_id),
+                        LazyTypeId::Infer(_) => return Err(SoulError::new("type should be known at this time", SoulErrorKind::TypeInferenceError, Some(generic.span)))
+                    }
                 }
 
                 resolve_stub(scopes, types, call_generics, name).ok_or(SoulError::new(
@@ -122,7 +127,7 @@ impl<'a> HirContext<'a> {
             modifier,
             generics,
         });
-        Ok(PossibleTypeId::Known(ty))
+        Ok(LazyTypeId::Known(ty))
     }
 
     pub(crate) fn insert_generic(&mut self, name: String) -> GenericId {
@@ -142,15 +147,16 @@ impl<'a> HirContext<'a> {
 
     pub(crate) fn new_infer_type(
         &mut self,
-        generics: Vec<PossibleTypeId>,
+        generics: Vec<TypeId>,
         modifier: Option<TypeModifier>,
-    ) -> PossibleTypeId {
-        PossibleTypeId::Infer(self.tree.info.infers.insert_infer(generics, modifier))
+        span: Span,
+    ) -> LazyTypeId {
+        LazyTypeId::Infer(self.tree.info.infers.insert_infer(generics, modifier, span))
     }
 
-    pub(crate) fn new_null_infer(&mut self) -> PossibleTypeId {
-        let infer = self.new_infer_type(vec![], None);
-        PossibleTypeId::Known(self.add_type(HirType {
+    pub(crate) fn new_null_infer(&mut self, span: Span) -> LazyTypeId {
+        let infer = self.new_infer_type(vec![], None, span);
+        LazyTypeId::Known(self.add_type(HirType {
             kind: HirTypeKind::Optional(infer),
             modifier: None,
             generics: vec![],
@@ -161,7 +167,7 @@ impl<'a> HirContext<'a> {
         let ty = match literal.get_literal_type().to_internal_primitive_type() {
             ast::TypeResult::Primitive(val) => HirTypeKind::Primitive(val),
             ast::TypeResult::Str => HirTypeKind::Array {
-                element: PossibleTypeId::Known(self.add_type(CHAR)),
+                element: LazyTypeId::Known(self.add_type(CHAR)),
                 kind: ast::ArrayKind::ConstSlice,
             },
         };

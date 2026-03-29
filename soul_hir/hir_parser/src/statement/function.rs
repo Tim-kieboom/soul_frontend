@@ -1,8 +1,7 @@
 use ast::NamedTupleElement;
+use hir::TypeId;
 use soul_utils::{
-    Ident,
-    ids::{FunctionId, IdAlloc},
-    soul_error_internal,
+    Ident, error::{SoulError, SoulErrorKind}, ids::{FunctionId, IdAlloc}, soul_error_internal
 };
 
 use crate::HirContext;
@@ -54,7 +53,18 @@ impl<'a> HirContext<'a> {
             None => hir::FunctionBody::Internal(self.lower_block(&function.block)),
         };
 
-        let return_type = self.lower_type(&signature.return_type);
+        let return_type = match self.lower_type(&signature.return_type) {
+            hir::LazyTypeId::Known(type_id) => type_id,
+            hir::LazyTypeId::Infer(_) => {
+                self.log_error(SoulError::new(
+                    "function return type should be known", 
+                    SoulErrorKind::TypeInferenceError, 
+                    Some(function.signature.span),
+                ));
+                TypeId::error()
+            }
+        };
+        
         self.pop_scope();
 
         let hir_function = hir::Function {

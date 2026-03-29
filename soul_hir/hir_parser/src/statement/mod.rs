@@ -96,7 +96,7 @@ impl<'a> HirContext<'a> {
         let ty = match &variable.ty {
             ast::VarTypeKind::NonInveredType(soul_type) => self.lower_type(soul_type),
             ast::VarTypeKind::InveredType(type_modifier) => {
-                self.new_infer_type(vec![], Some(*type_modifier))
+                self.new_infer_type(vec![], Some(*type_modifier), variable.name.span)
             }
         };
 
@@ -107,13 +107,7 @@ impl<'a> HirContext<'a> {
 
         let local = self.id_generator.alloc_local();
         self.insert_variable(&variable.name, local, ty, value);
-
-        hir::Variable {
-            ty,
-            is_temp: false,
-            value,
-            local,
-        }
+        hir::Variable {local}
     }
 
     fn lower_struct(&mut self, object: &ast::Struct) {

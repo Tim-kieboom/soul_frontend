@@ -4,18 +4,18 @@ use hir::{ExpressionId, HirTree, LocalId};
 pub(crate) mod binary;
 pub(crate) mod unary;
 mod utils;
-use hir_typed_context::HirTypedTable;
 use soul_utils::vec_map::VecMap;
+use typed_hir::TypedHir;
 pub(crate) use utils::*;
 
 use crate::{binary::interpret_binary, unary::interpret_unary};
 
-pub fn literal_resolve(hir: &HirTree, types: &HirTypedTable) -> VecMap<ExpressionId, Literal> {
+pub fn literal_resolve(hir: &HirTree, types: &TypedHir) -> VecMap<ExpressionId, Literal> {
     let mut literals = VecMap::const_default();
     let mut locals = VecMap::const_default();
 
-    for (id, local_info) in hir.locals.entries() {
-        let ty = types.types.id_to_type(types.locals[id]).expect("should have type");
+    for (id, local_info) in hir.nodes.locals.entries() {
+        let ty = types.types_map.id_to_type(types.types_table.locals[id]).expect("should have type");
         if ty.is_mutable() {
             continue;
         }
@@ -27,7 +27,7 @@ pub fn literal_resolve(hir: &HirTree, types: &HirTypedTable) -> VecMap<Expressio
         }
     }
 
-    for value_id in hir.expressions.keys() {
+    for value_id in hir.nodes.expressions.keys() {
         
         if let Some(literal) = try_literal_resolve_expression(hir, types, &locals, &literals, value_id) {
             literals.insert(value_id, literal);
@@ -39,12 +39,12 @@ pub fn literal_resolve(hir: &HirTree, types: &HirTypedTable) -> VecMap<Expressio
 
 fn try_literal_resolve_expression(
     hir: &HirTree,
-    types: &HirTypedTable,
+    types: &TypedHir,
     locals: &VecMap<LocalId, ExpressionId>,
     literals: &VecMap<ExpressionId, Literal>,
     value_id: hir::ExpressionId,
 ) -> Option<Literal> {
-    let value = &hir.expressions[value_id];
+    let value = &hir.nodes.expressions[value_id];
     match &value.kind {
         hir::ExpressionKind::Null
         | hir::ExpressionKind::Error
@@ -61,14 +61,14 @@ fn try_literal_resolve_expression(
 
         hir::ExpressionKind::StructConstructor { .. } => None,
 
-        hir::ExpressionKind::Load(place) => match place.node {
-            hir::PlaceKind::Temp(id, _)
-            | hir::PlaceKind::Local(id, _) => match locals.get(id) {
+        hir::ExpressionKind::Load(place) => match &hir.nodes.places[*place].kind {
+            hir::PlaceKind::Temp(id)
+            | hir::PlaceKind::Local(id) => match locals.get(*id) {
                 Some(value_id) => literals.get(*value_id).cloned(),
                 None => None,
             },
             
-            hir::PlaceKind::Deref(_, _)
+            hir::PlaceKind::Deref(_)
             | hir::PlaceKind::Index { .. }
             | hir::PlaceKind::Field { .. } => None,
         },
@@ -90,12 +90,12 @@ fn try_literal_resolve_expression(
 
 fn get_literal<'a>(
     hir: &'a HirTree,
-    types: &HirTypedTable,
+    types: &TypedHir,
     locals: &VecMap<LocalId, ExpressionId>,
     literals: &VecMap<ExpressionId, Literal>,
     value_id: hir::ExpressionId,
 ) -> Option<LiteralRef<'a>> {
-    if let hir::ExpressionKind::Literal(literal) = &hir.expressions[value_id].kind {
+    if let hir::ExpressionKind::Literal(literal) = &hir.nodes.expressions[value_id].kind {
         return Some(LiteralRef::Ref(literal));
     }
     try_literal_resolve_expression(hir, types, locals, literals, value_id).map(|literal| LiteralRef::Owner(literal))

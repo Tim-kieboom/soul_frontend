@@ -1,119 +1,64 @@
-use hir::{BlockId, ExpressionId, FieldId, LocalId, ModuleId, PlaceId, StatementId, StructId, TypeId};
-use soul_utils::{ids::FunctionId, span::Span};
+use ast::ArrayKind;
+use hir::{BlockId, ExpressionId, FieldId, GenericId, LazyTypeId, LocalId, PlaceId, StatementId, StructId, TypeId};
+use soul_utils::{bimap::BiMap, ids::FunctionId, soul_names::{PrimitiveTypes, TypeModifier}, vec_map::VecMap, vec_set::VecSet};
 
-mod function;
-mod thir_maps;
-mod statement;
-mod expression;
-pub use function::*;
-pub use statement::*;
-pub use thir_maps::*; 
-pub use expression::*;
+pub mod display_thir;
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct TypedHirTree {
-    pub root: TypedModule,
-    pub info: InfoMaps,
-    pub nodes: NodeMaps,
-
-    pub main: FunctionId,
-    pub init_globals: FunctionId,
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct TypedHir {
+    pub types_map: ThirTypesMap,
+    pub types_table: TypeTable,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct TypedModule {
-    pub id: ModuleId,
-    pub imports: Vec<Import>,
-    pub globals: Vec<Global>,
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct ThirTypesMap {
+    pub types: BiMap<TypeId, ThirType>,
+    pub structs: VecMap<StructId, Struct>,
+    pub generics: VecMap<GenericId, String>,
 }
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct Import {
-    pub module: ModuleId,
-    pub kind: ast::ImportKind,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct Global {
-    pub id: StatementId,
-    pub kind: crate::GlobalKind,
-} 
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub enum GlobalKind {
-    Function(FunctionId),
-    Variable(crate::Variable),
-
-    /// (allows mutable) only allowed to be used by hir lowerer not user
-    InternalVariable(crate::Variable),
-    /// only allowed to be used by hir lowerer not user
-    InternalAssign(crate::Assign),
+impl ThirTypesMap {
+    pub fn id_to_type(&self, id: TypeId) -> Option<&ThirType> {
+        self.types.get_value(id)
+    }
+    pub fn id_to_struct(&self, id: StructId) -> Option<&Struct> {
+        self.structs.get(id)
+    }
+    pub fn id_to_generic(&self, id: GenericId) -> Option<&str> {
+        self.generics.get(id).map(|s| s.as_str())
+    }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct Variable {
-    pub ty: TypeId,
-    pub is_temp: bool,
-    pub local: LocalId,
-    pub value: Option<ExpressionId>,
+#[derive(Debug, Clone, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ThirType {
+    pub kind: ThirTypeKind,
+    pub generics: Vec<TypeId>,
+    pub modifier: Option<TypeModifier>,
+}
+impl ThirType {
+    pub fn is_mutable(&self) -> bool {
+        self.modifier == Some(TypeModifier::Mut)
+    }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct Block {
-    pub id: BlockId,
-    pub imports: Vec<Import>,
-    pub statements: Vec<crate::Statement>,
-    pub terminator: Option<ExpressionId>,
-}
-
-/// A memory location that can be read from or written to.
-///
-/// Places represent l-values in the language and are used for
-/// assignments, loads, references, and indexing.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct Place {
-    pub id: PlaceId,
-    pub kind: PlaceKind,
-    pub span: Span,
-}
-/// A memory location that can be read from or written to.
-///
-/// Places represent l-values in the language and are used for
-/// assignments, loads, references, and indexing.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub enum PlaceKind {
-    /// A local variable.
-    Local(LocalId),
-
-    /// A temperary local variable.
-    Temp(LocalId),
-
-    /// Dereference of another place.
-    Deref(PlaceId),
-
-    /// Indexed access into an aggregate.
-    Index {
-        base: PlaceId,
-        index: ExpressionId,
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum ThirTypeKind {
+    None,
+    Type,
+    Primitive(PrimitiveTypes),
+    Array {
+        element: TypeId,
+        kind: ArrayKind,
     },
-
-    /// Field access within a composite type.
-    Field {
-        base: PlaceId,
-        field: FieldId,
+    Ref {
+        of_type: TypeId,
+        mutable: bool,
     },
-}
+    Pointer(TypeId),
+    Optional(TypeId),
+    Generic(GenericId),
+    Struct(StructId),
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct LocalInfo {
-    pub ty: TypeId,
-    pub kind: LocalKind,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum LocalKind {
-    Variable(Option<ExpressionId>),
-    Temp(ExpressionId),
-    Parameter,
+    Error,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -125,7 +70,38 @@ pub struct Struct {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Field {
     pub id: FieldId,
-    /// The name of the field (for readability, debugging, codegen).
-    pub name: String,
     pub ty: TypeId,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TypeTable {
+    pub none_type: TypeId,
+    pub bool_type: TypeId,
+
+    pub expressions: VecMap<ExpressionId, TypeId>,
+    pub statements: VecMap<StatementId, TypeId>,
+    pub functions: VecMap<FunctionId, TypeId>,
+    pub places: VecMap<PlaceId, TypeId>,
+    pub locals: VecMap<LocalId, TypeId>,
+    pub blocks: VecMap<BlockId, TypeId>,
+
+    pub fields: VecMap<FieldId, FieldInfo>,
+    pub place_fields: VecMap<PlaceId, FieldId>,
+
+    pub auto_copy: VecSet<ExpressionId>,
+    pub generic_instantiations: VecMap<GenericId, VecSet<TypeId>>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct LazyFieldInfo {
+    pub base_type: TypeId,
+    pub field_type: LazyTypeId,
+    pub field_index: usize,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FieldInfo {
+    pub base_type: TypeId,
+    pub field_type: TypeId,
+    pub field_index: usize,
 }

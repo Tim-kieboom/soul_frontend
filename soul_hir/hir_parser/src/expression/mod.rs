@@ -21,13 +21,13 @@ impl<'a> HirContext<'a> {
         let id = self.alloc_expression(span);
 
         let value = match &expression.node {
-            ast::ExpressionKind::If(ast_if) => self.lower_if(id, ast_if),
-            ast::ExpressionKind::Unary(unary) => self.lower_unary(id, unary),
+            ast::ExpressionKind::If(ast_if) => self.lower_if(id, ast_if, span),
+            ast::ExpressionKind::Unary(unary) => self.lower_unary(id, unary, span),
             ast::ExpressionKind::Array(array) => self.lower_array(id, array, span),
             ast::ExpressionKind::Block(block) => return self.lower_block_expression(block),
             ast::ExpressionKind::Index(index) => self.lower_index(id, index, span),
-            ast::ExpressionKind::Null(_node_id) => self.lower_null(id),
-            ast::ExpressionKind::Binary(binary) => self.lower_binary(id, binary),
+            ast::ExpressionKind::Null(_node_id) => self.lower_null(id, span),
+            ast::ExpressionKind::Binary(binary) => self.lower_binary(id, binary, span),
             ast::ExpressionKind::While(ast_while) => self.lower_while(id, ast_while),
             ast::ExpressionKind::As(as_type_cast) => self.lower_cast(id, as_type_cast),
             ast::ExpressionKind::Deref { id: _, inner } => self.lower_deref(id, inner),
@@ -84,8 +84,8 @@ impl<'a> HirContext<'a> {
     ) -> hir::Expression {
         let ty = self.lower_type(&ctor.struct_type);
         let kown = match ty {
-            hir::PossibleTypeId::Known(type_id) => type_id,
-            hir::PossibleTypeId::Infer(_) => {
+            hir::LazyTypeId::Known(type_id) => type_id,
+            hir::LazyTypeId::Infer(_) => {
                 self.log_error(SoulError::new(
                     "struct type should be known at this point",
                     SoulErrorKind::TypeInferenceError,
@@ -152,12 +152,9 @@ impl<'a> HirContext<'a> {
                 let temp_local = self.id_generator.alloc_local();
 
                 let variable = hir::Variable {
-                    ty: of_type,
-                    is_temp: false,
                     local: temp_local,
-                    value: Some(inner),
                 };
-                self.insert_desugar_variable(variable, span);
+                self.insert_desugar_variable(variable, of_type, inner, span);
                 temp_local
             }
         };
@@ -175,7 +172,7 @@ impl<'a> HirContext<'a> {
 
         hir::Expression {
             id,
-            ty: hir::PossibleTypeId::Known(ty),
+            ty: hir::LazyTypeId::Known(ty),
             kind: hir::ExpressionKind::Ref {
                 place: self.insert_place(place),
                 mutable: *is_mutable,
@@ -193,11 +190,11 @@ impl<'a> HirContext<'a> {
         let var_type_kind = self.ast_store.get_variable_type(node_id);
 
         let ty = match var_type_kind {
-            None => self.new_infer_type(vec![], None),
+            None => self.new_infer_type(vec![], None, ident.span),
             Some(VarTypeKind::NonInveredType(ty)) => self.lower_type(ty),
             Some(VarTypeKind::InveredType(modifier)) => {
                 let modifier = *modifier;
-                self.new_infer_type(vec![], Some(modifier))
+                self.new_infer_type(vec![], Some(modifier), ident.span)
             }
         };
 
@@ -245,7 +242,7 @@ impl<'a> HirContext<'a> {
 
         hir::Expression {
             id,
-            ty: self.new_infer_type(vec![], None),
+            ty: self.new_infer_type(vec![], None, span),
             kind: hir::ExpressionKind::Load(place),
         }
     }
@@ -253,7 +250,7 @@ impl<'a> HirContext<'a> {
     fn lower_deref(&mut self, id: ExpressionId, inner: &Box<ast::Expression>) -> hir::Expression {
         hir::Expression {
             id,
-            ty: self.new_infer_type(vec![], None),
+            ty: self.new_infer_type(vec![], None, inner.span),
             kind: hir::ExpressionKind::DeRef(self.lower_expression(inner)),
         }
     }
@@ -277,7 +274,7 @@ impl<'a> HirContext<'a> {
         let body = self.lower_block(&ast_while.block);
         hir::Expression {
             id,
-            ty: hir::PossibleTypeId::Known(self.add_type(HirType::none_type())),
+            ty: hir::LazyTypeId::Known(self.add_type(HirType::none_type())),
             kind: hir::ExpressionKind::While { condition, body },
         }
     }
@@ -285,18 +282,18 @@ impl<'a> HirContext<'a> {
     fn lower_literal(&mut self, id: ExpressionId, literal: &ast::Literal) -> hir::Expression {
         hir::Expression {
             id,
-            ty: hir::PossibleTypeId::Known(self.type_from_literal(literal)),
+            ty: hir::LazyTypeId::Known(self.type_from_literal(literal)),
             kind: hir::ExpressionKind::Literal(literal.clone()),
         }
     }
 
-    fn lower_binary(&mut self, id: ExpressionId, binary: &ast::Binary) -> hir::Expression {
+    fn lower_binary(&mut self, id: ExpressionId, binary: &ast::Binary, span: Span) -> hir::Expression {
         let left = self.lower_expression(&binary.left);
         let operator = binary.operator.clone();
         let right = self.lower_expression(&binary.right);
         hir::Expression {
             id,
-            ty: self.new_infer_type(vec![], None),
+            ty: self.new_infer_type(vec![], None, span),
             kind: hir::ExpressionKind::Binary(hir::Binary {
                 left,
                 operator,
@@ -305,10 +302,10 @@ impl<'a> HirContext<'a> {
         }
     }
 
-    fn lower_null(&mut self, id: ExpressionId) -> hir::Expression {
+    fn lower_null(&mut self, id: ExpressionId, span: Span) -> hir::Expression {
         hir::Expression {
             id,
-            ty: self.new_null_infer(),
+            ty: self.new_null_infer(span),
             kind: hir::ExpressionKind::Null,
         }
     }
@@ -325,7 +322,7 @@ impl<'a> HirContext<'a> {
 
         hir::Expression {
             id,
-            ty: self.new_infer_type(vec![], None),
+            ty: self.new_infer_type(vec![], None, span),
             kind: hir::ExpressionKind::Load(self.insert_place(place)),
         }
     }
@@ -335,7 +332,7 @@ impl<'a> HirContext<'a> {
 
         let ty = match &self.tree.nodes.blocks[body].terminator {
             Some(value) => self.tree.nodes.expressions[*value].ty,
-            None => hir::PossibleTypeId::Known(self.add_type(HirType::none_type())),
+            None => hir::LazyTypeId::Known(self.add_type(HirType::none_type())),
         };
 
         let id = self.alloc_expression(block.span);
@@ -348,12 +345,12 @@ impl<'a> HirContext<'a> {
         self.insert_expression(id, return_value)
     }
 
-    fn lower_unary(&mut self, id: ExpressionId, unary: &ast::Unary) -> hir::Expression {
+    fn lower_unary(&mut self, id: ExpressionId, unary: &ast::Unary, span: Span) -> hir::Expression {
         let expression = self.lower_expression(&unary.expression);
         let operator = unary.operator.clone();
         hir::Expression {
             id,
-            ty: self.new_infer_type(vec![], None),
+            ty: self.new_infer_type(vec![], None, span),
             kind: hir::ExpressionKind::Unary(hir::Unary {
                 operator,
                 expression,

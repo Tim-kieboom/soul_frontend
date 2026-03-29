@@ -1,13 +1,12 @@
 [package]
-name = "run_hir"
+name = "typed_hir_parser"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 ast = { version = "0.1.0", path = "../../soul_ast/ast_model" }
 hir = { version = "0.1.0", path = "../hir_model" }
-hir_literal_interpreter = { version = "0.1.0", path = "../hir_literal_interpreter" }
 hir_parser = { version = "0.1.0", path = "../hir_parser" }
+serde = { version = "1.0.228", features = ["derive"] }
 soul_utils = { version = "0.1.0", path = "../../soul_utils" }
 typed_hir = { version = "0.1.0", path = "../typed_hir_model" }
-typed_hir_parser = { version = "0.1.0", path = "../typed_hir_parser" }

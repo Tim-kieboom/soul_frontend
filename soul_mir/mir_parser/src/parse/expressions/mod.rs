@@ -1,7 +1,8 @@
-use hir::{Binary, ExpressionId, RefTypeId, StructId, TypeId, Unary};
+use hir::{Binary, ExpressionId, StructId, TypeId, Unary};
 use soul_utils::{
     Ident, ids::{FunctionId, IdAlloc}, soul_error_internal, span::Span
 };
+use typed_hir::ThirTypeKind;
 
 use crate::{EndBlock, MirContext, mir::{self, Operand}};
 
@@ -9,7 +10,7 @@ mod conditionals;
 
 impl<'a> MirContext<'a> {
     pub(crate) fn lower_operand(&mut self, value_id: hir::ExpressionId) -> EndBlock<mir::Operand> {
-        let value = &self.hir_response.hir.expressions[value_id];
+        let value = &self.hir_response.hir.nodes.expressions[value_id];
         let span = self.expression_span(value_id);
         let value_type = self.expression_type(value_id);
         let is_end = &mut false;
@@ -91,7 +92,7 @@ impl<'a> MirContext<'a> {
                 let main_body = self.expect_current_block();
                 self.lower_block(*block_id, main_body).pass(is_end);
 
-                let operand = match self.hir_response.hir.blocks[*block_id].terminator {
+                let operand = match self.hir_response.hir.nodes.blocks[*block_id].terminator {
                     Some(terminator) => {
                         let inner = self.lower_operand(terminator).pass(is_end);
                         let terminator_type = self.expression_type(terminator);
@@ -126,7 +127,7 @@ impl<'a> MirContext<'a> {
                 mir::Operand::new(value_type, mir::OperandKind::None)
             }
 
-            hir::ExpressionKind::Load(place) => self.lower_load(value_type, place, is_end),
+            hir::ExpressionKind::Load(place) => self.lower_load(value_type, *place, is_end),
 
             hir::ExpressionKind::DeRef(inner) => {
                 let ptr = self.lower_operand(*inner).pass(is_end);
@@ -142,9 +143,9 @@ impl<'a> MirContext<'a> {
             }
 
             hir::ExpressionKind::Ref { place, mutable } => {
-                let ty = self.hir_response.types.places[place.node.get_id()];
+                let ty = self.hir_response.typed.types_table.places[*place];
 
-                let place_id = self.lower_place(place).pass(is_end);
+                let place_id = self.lower_place(*place).pass(is_end);
 
                 mir::Operand::new(
                     ty,
@@ -155,20 +156,21 @@ impl<'a> MirContext<'a> {
                 )
             }
 
-            hir::ExpressionKind::Cast { value, cast_to } => {
-                let cast_id = self.ref_to_id(*cast_to);
+            hir::ExpressionKind::Cast { value, cast_to:_ } => {
+
+                let cast_to = self.hir_response.typed.types_table.expressions[value_id];
                 let inner_type = self.expression_type(*value);
-                if inner_type == cast_id {
+                if inner_type == cast_to {
                     self.lower_operand(*value).pass(is_end)
                 } else {
                     let value = self.lower_operand(*value).pass(is_end);
-                    let temp = self.new_temp(cast_id);
+                    let temp = self.new_temp(cast_to);
 
                     let statement = mir::Statement::new(mir::StatementKind::Assign {
                         place: self.new_place(mir::Place::Temp(temp)),
                         value: mir::Rvalue::new(mir::RvalueKind::CastUse {
                             value,
-                            cast_to: cast_id,
+                            cast_to,
                         }),
                     });
 
@@ -179,7 +181,7 @@ impl<'a> MirContext<'a> {
             }
 
             hir::ExpressionKind::InnerRawStackArray { .. } => {
-                mir::Operand::new(self.hir_response.types.none_type, mir::OperandKind::None)
+                mir::Operand::new(self.hir_response.typed.types_table.none_type, mir::OperandKind::None)
             }
 
             hir::ExpressionKind::If {
@@ -187,12 +189,12 @@ impl<'a> MirContext<'a> {
                 then_block,
                 else_block,
                 ends_with_else: _,
-            } => self.lower_if(*condition, *then_block, *else_block, value.ty, is_end),
+            } => self.lower_if(*condition, *then_block, *else_block, self.hir_response.typed.types_table.expressions[value_id], is_end),
             hir::ExpressionKind::While { condition, body } => {
                 self.lower_while(*condition, *body, is_end)
             }
             hir::ExpressionKind::Error => {
-                mir::Operand::new(self.hir_response.types.none_type, mir::OperandKind::None)
+                mir::Operand::new(self.hir_response.typed.types_table.none_type, mir::OperandKind::None)
             }
         };
 
@@ -203,7 +205,7 @@ impl<'a> MirContext<'a> {
         &mut self,
         function_id: FunctionId,
         callee: &Option<hir::ExpressionId>,
-        hir_generics: &Vec<RefTypeId>,
+        hir_generics: &Vec<TypeId>,
         hir_arguments: &Vec<hir::ExpressionId>,
         ty: hir::TypeId,
         span: Span,
@@ -217,7 +219,7 @@ impl<'a> MirContext<'a> {
             ));
         }
 
-        let function = &self.hir_response.hir.functions[function_id];
+        let function = &self.hir_response.hir.nodes.functions[function_id];
         let parameters = &function.parameters;
         let mut arguments = vec![];
         for (i, parameter) in parameters.iter().enumerate() {
@@ -229,17 +231,16 @@ impl<'a> MirContext<'a> {
                 },
             };
 
-            let expression = &self.hir_response.hir.expressions[arg];
+            let expression = &self.hir_response.hir.nodes.expressions[arg];
             let mut value = self.lower_operand(arg).pass(is_end);
 
             let ty = self.local_type(parameters[i].local);
 
             let param_type = self.id_to_type(ty).clone();
             let arg_type = self.id_to_type(self.expression_type(arg)).clone();
-            let is_castable = arg_type
-                .unify_primitive_cast(&self.hir_response.types.types, &param_type)
-                .is_ok();
-            if expression.is_literal() && is_castable {
+            
+            let warning = "check for primitive catablility";
+            if expression.is_literal() {
                 let temp = self.new_temp(ty);
                 let place = self.new_place(mir::Place::Temp(temp));
                 let rvalue = mir::Rvalue::new(mir::RvalueKind::CastUse { value, cast_to: ty });
@@ -254,22 +255,16 @@ impl<'a> MirContext<'a> {
             arguments.push(value);
         }
 
-        let temp = if self.id_to_type(ty).is_none_type() {
+        let temp = if self.id_to_type(ty).kind == ThirTypeKind::None {
             None
         } else {
             Some(self.new_temp(ty))
         };
-
-        let type_args = hir_generics
-            .iter()
-            .map(|ref_type| self.ref_to_id(*ref_type))
-            .collect();
-
         let return_place = temp.map(|val| self.new_place(mir::Place::Temp(val)));
 
         let statement = mir::Statement::new(mir::StatementKind::Call {
             id: function_id,
-            type_args,
+            type_args: hir_generics.clone(),
             arguments,
             return_place,
         });
@@ -285,8 +280,8 @@ impl<'a> MirContext<'a> {
 
     fn lower_struct_constructor(&mut self, values: &Vec<(Ident, ExpressionId)>, struct_id: StructId, struct_type: TypeId) -> EndBlock<Operand> {
         let r#struct = self.hir_response
-            .types
-            .types
+            .typed
+            .types_map
             .id_to_struct(struct_id)
             .expect("should have struct");
 
@@ -301,7 +296,7 @@ impl<'a> MirContext<'a> {
         for (name, value) in values {
 
             
-            let (i, _) = match r#struct.fields.iter().enumerate().find(|(_i, field)| field.name == name.as_str()) {
+            let (i, _) = match r#struct.fields.iter().enumerate().find(|(_i, field)| self.hir_response.hir.nodes.fields[field.id].name == name.as_str()) {
                 Some(val) => val,
                 None => continue,
             };
@@ -324,7 +319,7 @@ impl<'a> MirContext<'a> {
                 .into_iter()
                 .enumerate()
                 .map(|(i, op)| {
-                    let ty = self.ref_to_id(r#struct.fields[i].ty);
+                    let ty = r#struct.fields[i].ty;
                     match op.kind {
                         mir::OperandKind::Comptime(literal) => (literal, ty),
                         _ => unreachable!(),
@@ -346,7 +341,7 @@ impl<'a> MirContext<'a> {
         EndBlock::new(operand, is_end)
     }
 
-    fn lower_load(&mut self, ty: TypeId, place: &hir::Place, is_end: &mut bool) -> mir::Operand {
+    fn lower_load(&mut self, ty: TypeId, place: hir::PlaceId, is_end: &mut bool) -> mir::Operand {
         let place_id = self.lower_place(place).pass(is_end);
         let operand = match &self.tree.places[place_id] {
             mir::Place::Local(local) => {

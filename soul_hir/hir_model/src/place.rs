@@ -1,6 +1,6 @@
 use soul_utils::{Ident, span::{Span}};
 
-use crate::{ExpressionId, LocalId, PlaceId, hir_type::PossibleTypeId};
+use crate::{ExpressionId, LocalId, PlaceId, hir_type::LazyTypeId};
 
 /// A memory location that can be read from or written to.
 ///
@@ -52,7 +52,7 @@ pub enum PlaceKind {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LocalInfo {
-    pub ty: PossibleTypeId,
+    pub ty: LazyTypeId,
     pub kind: LocalKind,
 }
 impl LocalInfo {

@@ -44,7 +44,7 @@ impl HirTree {
             id: init_globals,
             generics: vec![],
             parameters: vec![],
-            return_type: PossibleTypeId::error(),
+            return_type: TypeId::error(),
             kind: FunctionKind::Static,
             body: FunctionBody::Internal(BlockId::error()),
             name: Ident::new(INIT_GLOBALS_FUNCTION_NAME.to_string(), Span::default_const()),
@@ -129,10 +129,7 @@ impl Global {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Variable {
-    pub ty: PossibleTypeId,
-    pub is_temp: bool,
     pub local: LocalId,
-    pub value: Option<ExpressionId>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

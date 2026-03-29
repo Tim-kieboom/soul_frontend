@@ -20,7 +20,7 @@ impl<'a> MirContext<'a> {
 
         self.current.block = Some(this_block);
         let (live_i, parent_scope) = self.start_scope(this_block);
-        let block = &self.hir_response.hir.blocks[hir_block];
+        let block = &self.hir_response.hir.nodes.blocks[hir_block];
 
         let mut terminator = None;
         let mut block_operand = None;

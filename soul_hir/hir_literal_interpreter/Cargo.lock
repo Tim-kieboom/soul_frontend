@@ -44,17 +44,18 @@ version = "0.1.0"
 dependencies = [
  "ast",
  "hir",
- "hir_typed_context",
  "soul_utils",
+ "typed_hir",
+ "typed_hir_parser",
 ]
 
 [[package]]
-name = "hir_typed_context"
+name = "hir_parser"
 version = "0.1.0"
 dependencies = [
  "ast",
+ "enum_variant_name_const",
  "hir",
- "serde",
  "soul_utils",
 ]
 
@@ -157,6 +158,28 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "typed_hir"
+version = "0.1.0"
+dependencies = [
+ "ast",
+ "hir",
+ "serde",
+ "soul_utils",
+]
+
+[[package]]
+name = "typed_hir_parser"
+version = "0.1.0"
+dependencies = [
+ "ast",
+ "hir",
+ "hir_parser",
+ "serde",
+ "soul_utils",
+ "typed_hir",
 ]
 
 [[package]]

@@ -1,6 +1,6 @@
 use hir::TypeId;
-use hir_typed_context::{FieldInfo};
-use soul_utils::{ids::IdAlloc, soul_error_internal};
+use soul_utils::{ids::IdAlloc, soul_error_internal, span::Span};
+use typed_hir::FieldInfo;
 
 use crate::{
     EndBlock, MirContext,
@@ -8,16 +8,18 @@ use crate::{
 };
 
 impl<'a> MirContext<'a> {
-    pub fn lower_place(&mut self, place: &hir::Place) -> EndBlock<mir::PlaceId> {
+
+    pub fn lower_place(&mut self, place_id: hir::PlaceId) -> EndBlock<mir::PlaceId> {
         let is_end = &mut false;
-        let mir_place = match &place.node {
-            hir::PlaceKind::Local(local_id, _) => {
+        let span = self.place_span(place_id);
+        let mir_place = match &self.hir_response.hir.nodes.places[place_id].kind {
+            hir::PlaceKind::Local(local_id) => {
                 let local = match self.local_remap.get(*local_id) {
                     Some(val) => *val,
                     None => {
                         self.log_error(soul_error_internal!(
                             format!("{:?} not found in remap", local_id),
-                            Some(place.span)
+                            Some(span)
                         ));
                         mir::LocalId::error()
                     }
@@ -25,8 +27,8 @@ impl<'a> MirContext<'a> {
 
                 self.new_place(mir::Place::Local(local))
             }
-            hir::PlaceKind::Temp(local_id, id) => {
-                let ty = self.place_type(*id);
+            hir::PlaceKind::Temp(local_id) => {
+                let ty = self.place_type(place_id);
                 let temp = match self.temp_remap.get(*local_id) {
                     Some(val) => *val,
                     None => {
@@ -38,26 +40,24 @@ impl<'a> MirContext<'a> {
 
                 self.new_place(mir::Place::Temp(temp))
             }
-            hir::PlaceKind::Deref(inner, _) => {
-                let id = inner.node.get_id();
-                let ty = self.place_type(id);
+            hir::PlaceKind::Deref(inner) => {
+                let ty = self.place_type(place_id);
 
-                let base_place = self.lower_place(inner).pass(is_end);
+                let base_place = self.lower_place(*inner).pass(is_end);
                 let operand = self.place_to_operand(base_place, ty);
                 self.new_place(mir::Place::Deref(operand))
             }
             hir::PlaceKind::Index { .. } => todo!("mir desugar index"),
-            hir::PlaceKind::Field { id, base, .. } => {
-                let base = self.lower_place(base).pass(is_end);
-                let field_id = self.hir_response.types.place_fields[*id];
-                let FieldInfo{ base_type, field_type:_, index } = self.hir_response.types.fields[field_id];
-                let base_type = self.ref_to_id(base_type);
+            hir::PlaceKind::Field { base, .. } => {
+                let base = self.lower_place(*base).pass(is_end);
+                let field_id = self.hir_response.typed.types_table.place_fields[place_id];
+                let FieldInfo{ base_type, field_type:_, field_index } = self.hir_response.typed.types_table.fields[field_id];
                 
-                self.new_place(mir::Place::Field{base, base_type, field_id, index})
+                self.new_place(mir::Place::Field{base, base_type, field_id, index: field_index})
             },
         };
 
-        let ty = self.place_type(place.node.get_id());
+        let ty = self.place_type(place_id);
         self.place_typed.insert(mir_place, ty);
         EndBlock::new(mir_place, is_end)
     }
@@ -114,5 +114,9 @@ impl<'a> MirContext<'a> {
         self.push_statement(statement);
 
         mir::Operand::new(ty, mir::OperandKind::Temp(deref_temp))
+    }
+
+    fn place_span(&self, place_id: hir::PlaceId) -> Span {
+        self.hir_response.hir.nodes.places[place_id].span
     }
 }

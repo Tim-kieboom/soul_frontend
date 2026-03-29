@@ -1,11 +1,12 @@
 use hir::{
-    Binary, BlockId, DisplayType, ExpressionId, FunctionBody, HirTree, HirType, LocalId, PossibleTypeId, Unary
+    Binary, BlockId, DisplayType, ExpressionId, FunctionBody, HirTree, HirType, LazyTypeId, LocalId, LocalKind, Unary
 };
 use soul_utils::{
     ids::{FunctionId, IdAlloc},
     soul_names::KeyWord,
     vec_map::VecMapIndex,
 };
+use typed_hir::{TypedHir, display_thir::DisplayThirType};
 use std::fmt::Write;
 
 pub fn display_hir(hir: &HirTree) -> String {
@@ -18,9 +19,20 @@ pub fn display_hir(hir: &HirTree) -> String {
     displayer.to_string()
 }
 
+pub fn display_thir(hir: &HirTree, typed: &TypedHir) -> String {
+    let mut displayer = HirDisplayer::new_thir(hir, typed);
+
+    for global in &hir.root.globals {
+        displayer.display_global(global);
+    }
+
+    displayer.to_string()
+}
+
 struct HirDisplayer<'a> {
     sb: String,
     hir: &'a HirTree,
+    typed: Option<&'a TypedHir>,
 
     depth: usize,
     terminate: Option<ExpressionId>,
@@ -30,8 +42,19 @@ impl<'a> HirDisplayer<'a> {
         Self {
             hir,
             depth: 0,
-            sb: String::new(),
+            typed: None,
             terminate: None,
+            sb: String::new(),
+        }
+    }
+
+    fn new_thir(hir: &'a HirTree, typed: &'a TypedHir) -> Self {
+        Self {
+            hir,
+            depth: 0,
+            terminate: None,
+            sb: String::new(),
+            typed: Some(typed),
         }
     }
 
@@ -66,14 +89,14 @@ impl<'a> HirDisplayer<'a> {
         for (i, arg) in function.parameters.iter().enumerate() {
             self.display_local(arg.local);
             self.push_str(": ");
-            self.display_type(function.return_type);
+            self.display_type(function.return_type.to_lazy());
             if i != last_index {
                 self.push_str(", ");
             }
         }
         self.push_str("): ");
 
-        self.display_type(function.return_type);
+        self.display_type(function.return_type.to_lazy());
         if let FunctionBody::Internal(body) = &function.body {
             self.push(' ');
             self.display_block(body);
@@ -81,15 +104,21 @@ impl<'a> HirDisplayer<'a> {
     }
 
     fn display_variable(&mut self, variable: &hir::Variable) {
-        if variable.is_temp {
+        let local_info = &self.hir.nodes.locals[variable.local];
+        if local_info.is_temp() {
             self.display_temp(variable.local);
         } else {
             self.display_local(variable.local);
         }
 
         self.push_str(": ");
-        self.display_type(variable.ty);
-        if let Some(value) = &variable.value {
+        let local_type = match self.typed {
+            Some(typed) => typed.types_table.locals[variable.local].to_lazy(),
+            None => local_info.ty,
+        };
+
+        self.display_type(local_type);
+        if let LocalKind::Variable(Some(value)) = &local_info.kind {
             self.push_str(" := ");
             self.display_expression(value);
         }
@@ -171,8 +200,7 @@ impl<'a> HirDisplayer<'a> {
             hir::ExpressionKind::Function(_) => self.push_str("<function>"),
             hir::ExpressionKind::StructConstructor { ty, values, defaults } => {
             
-                let types = &self.hir.info.types;
-                self.push_str(types.id_to_struct(*ty).expect("should have struct").name.as_str());
+                self.push_str(&format!("{:?}", ty));
                 self.push('{');
                 let last_index = values.len().saturating_sub(1);
                 for (i, (name, value)) in values.iter().enumerate() {
@@ -199,7 +227,7 @@ impl<'a> HirDisplayer<'a> {
             hir::ExpressionKind::DeRef(expression_id) => {
                 self.push('*');
                 self.display_expression(expression_id);
-                self.display_expression_astype(value.ty);
+                self.display_expression_astype(*id, value.ty);
             }
             hir::ExpressionKind::Unary(Unary {
                 operator,
@@ -207,7 +235,7 @@ impl<'a> HirDisplayer<'a> {
             }) => {
                 self.push_str(operator.node.as_str());
                 self.display_expression(expression);
-                self.display_expression_astype(value.ty);
+                self.display_expression_astype(*id, value.ty);
             }
             hir::ExpressionKind::Binary(Binary {
                 left,
@@ -219,7 +247,7 @@ impl<'a> HirDisplayer<'a> {
                 self.push_str(operator.node.as_str());
                 self.display_expression(right);
                 self.push(')');
-                self.display_expression_astype(value.ty);
+                self.display_expression_astype(*id, value.ty);
             }
             hir::ExpressionKind::If {
                 condition,
@@ -237,7 +265,7 @@ impl<'a> HirDisplayer<'a> {
                     self.push_str("else ");
                     self.display_block(arm);
                 }
-                self.display_expression_astype(value.ty);
+                self.display_expression_astype(*id, value.ty);
                 self.push('\n');
             }
             hir::ExpressionKind::While { condition, body } => {
@@ -247,7 +275,7 @@ impl<'a> HirDisplayer<'a> {
                     self.push(' ');
                 }
                 self.display_block(body);
-                self.display_expression_astype(value.ty);
+                self.display_expression_astype(*id, value.ty);
                 self.push('\n');
             }
             hir::ExpressionKind::Call {
@@ -266,7 +294,8 @@ impl<'a> HirDisplayer<'a> {
                     self.push('<');
                     let last_index = generics.len().saturating_sub(1);
                     for (i, generic) in generics.iter().enumerate() {
-                        self.display_type(PossibleTypeId::Known(*generic));
+
+                        self.display_type(generic.to_lazy());
                         if i != last_index {
                             self.push_str(", ");
                         }
@@ -282,16 +311,20 @@ impl<'a> HirDisplayer<'a> {
                     }
                 }
                 self.push(')');
-                self.display_expression_astype(value.ty);
+                self.display_expression_astype(*id, value.ty);
             }
             hir::ExpressionKind::Cast { value, cast_to } => {
                 self.display_expression(value);
                 self.push_str(" as ");
-                self.display_type(*cast_to);
+                let cast_to = match self.typed {
+                    Some(typed) => typed.types_table.expressions[*id].to_lazy(),
+                    None => *cast_to,
+                };
+                self.display_type(cast_to);
             }
             hir::ExpressionKind::InnerRawStackArray(ty) => {
                 self.push_str("/*stack alloc ");
-                self.display_expression_astype(*ty);
+                self.display_expression_astype(*id, *ty);
                 self.push_str("*/");
             }
         };
@@ -341,29 +374,43 @@ impl<'a> HirDisplayer<'a> {
         write!(self.sb, "temp{}", id.index()).expect("no format error")
     }
 
-    fn display_expression_astype(&mut self, id: PossibleTypeId) {
+    fn display_expression_astype(&mut self, value: ExpressionId, id: LazyTypeId) {
+        let id = match self.typed {
+            Some(typed) => typed.types_table.expressions[value].to_lazy(),
+            None => id,
+        };
         self.display_astype(id);
     }
 
-    fn display_astype(&mut self, id: PossibleTypeId) {
+    fn display_astype(&mut self, id: LazyTypeId) {
         self.push_str("<as: ");
         self.display_type(id);
         self.push('>');
     }
 
-    fn display_type(&mut self, id: PossibleTypeId) {
+    fn display_type(&mut self, id: LazyTypeId) {
 
         if let None = self.inner_type(id) {
             HirType::error_type().write_display(&self.hir.info.types, &self.hir.info.infers, &mut self.sb).expect("no format error")
         }
     }
 
-    fn inner_type(&mut self, id: PossibleTypeId) -> Option<()> {
+    fn inner_type(&mut self, id: LazyTypeId) -> Option<()> {
+        
+        match (self.typed, id) {
+            (Some(typed), LazyTypeId::Known(ty)) => {
+                typed.types_map.id_to_type(ty)?.write_display(&typed.types_map, &mut self.sb).expect("no fmt error");
+                return Some(());
+            }
+            (Some(_), LazyTypeId::Infer(_)) => panic!("should not have infer in thir"),
+            _ => (),
+        }
+        
         let types = &self.hir.info.types;
         let infers = &self.hir.info.infers;
         match id {
-            PossibleTypeId::Known(type_id) => types.id_to_type(type_id)?.write_display(types, infers, &mut self.sb).expect("no fmt error"),
-            PossibleTypeId::Infer(infer_type_id) => infers.get_infer(infer_type_id)?.write_display(types, infers, &mut self.sb).expect("no fmt error"),
+            LazyTypeId::Known(type_id) => types.id_to_type(type_id)?.write_display(types, infers, &mut self.sb).expect("no fmt error"),
+            LazyTypeId::Infer(infer_type_id) => infers.get_infer(infer_type_id)?.write_display(types, infers, &mut self.sb).expect("no fmt error"),
         }
 
         Some(())

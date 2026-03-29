@@ -19,6 +19,8 @@ log = "0.4.29"
 run_ast = { version = "0.1.0", path = "../soul_ast/run_ast" }
 run_hir = { version = "0.1.0", path = "../soul_hir/run_hir" }
 inkwell = { version = "0.8", features = ["llvm16-0"] }
+typed_hir = { version = "0.1.0", path = "../soul_hir/typed_hir_model" }
+typed_hir_parser = { version = "0.1.0", path = "../soul_hir/typed_hir_parser" }
 
 # soul_ir = { version = "0.1.0", path = "../soul_ir" }
 # run_mir = { version = "0.1.0", path = "../soul_mir/run_mir" }

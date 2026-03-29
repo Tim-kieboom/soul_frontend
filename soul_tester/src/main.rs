@@ -45,7 +45,7 @@ pub const COMPILER_OPTIONS: CompilerOptions = CompilerOptions {
 
 struct Ouput {
     // mir_response: MirResponse,
-    // hir_response: HirResponse,
+    hir_response: HirResponse,
     source_file: String,
     faults: Vec<SementicFault>,
 }
@@ -80,15 +80,16 @@ fn run_fontend<'a>(paths: &'a Paths) -> Result<Ouput> {
     display_ast(paths, &ast)?;
     log_faults(&faults, &source_file);
 
-    let hir = to_hir(&ast, &COMPILER_OPTIONS, &mut faults);
+    let mut hir = to_hir(&ast, &COMPILER_OPTIONS, &mut faults);
     display_hir(paths, &hir)?;
+    clear_hir_type_map(&mut hir);
 
     // let mir = to_mir(&hir, &COMPILER_OPTIONS, &mut faults);
     // display_mir(paths, &mir, &hir)?;
 
     Ok(Ouput {
         // mir_response: mir,
-        // hir_response: hir,
+        hir_response: hir,
         faults,
         source_file,
     })
@@ -146,9 +147,14 @@ fn display_ast(paths: &Paths, ast: &AstResponse) -> Result<()> {
 
 fn display_hir(paths: &Paths, hir: &HirResponse) -> Result<()> {
     paths.write_to_output(&displayer_hir::display_hir(&hir.hir), "hir/tree.soulc")?;
-    // paths.write_to_output(&display_typed_hir(&hir.hir, &hir.types), "hir/typed.soulc")?;
-    // paths.write_to_output(&display_created_types(&hir.types), "hir/created_types.soulc")?;
+    paths.write_to_output(&displayer_hir::display_thir(&hir.hir, &hir.typed), "thir/tree.soulc")?;
     Ok(())
+}
+
+/// make sure that hir types are not used but thir types are
+fn clear_hir_type_map(hir: &mut HirResponse) {
+    hir.hir.info.types.clear();
+    hir.hir.info.infers.clear();
 }
 
 // fn display_mir(paths: &Paths, mir: &MirResponse, hir: &HirResponse) -> Result<()> {

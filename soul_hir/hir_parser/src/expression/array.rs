@@ -1,4 +1,4 @@
-use hir::{Assign, ExpressionId, HirType, Place, PlaceId, PlaceKind, PossibleTypeId};
+use hir::{Assign, ExpressionId, HirType, Place, PlaceId, PlaceKind, LazyTypeId};
 use soul_utils::{
     Ident,
     soul_names::TypeModifier,
@@ -14,7 +14,7 @@ impl<'a> HirContext<'a> {
         array: &ast::Array,
         span: Span,
     ) -> hir::Expression {
-        let ty = hir::PossibleTypeId::Known(self.type_from_array(array, span));
+        let ty = hir::LazyTypeId::Known(self.type_from_array(array, span));
 
         let temp_local = self.id_generator.alloc_local();
         let name = Ident::new(create_local_name(temp_local), span);
@@ -25,20 +25,18 @@ impl<'a> HirContext<'a> {
         );
 
         let size = array.values.len() as u64;
-        let element = self.new_infer_type(vec![], None);
-        let infer_array = PossibleTypeId::Known(self.add_type(create_array(element, size)));
+        let element = self.new_infer_type(vec![], None, span);
+        let infer_array = LazyTypeId::Known(self.add_type(create_array(element, size)));
 
         let unalloc = self.create_unallocted_array(infer_array, element, size, span);
         self.insert_temp(&name, temp_local, ty, unalloc);
 
+        let temp_type = self.new_infer_type(vec![], Some(TypeModifier::Mut), span);
         let temp_array = hir::Variable {
-            ty: self.new_infer_type(vec![], Some(TypeModifier::Mut)),
-            is_temp: true,
             local: temp_local,
-            value: Some(unalloc),
         };
 
-        self.insert_desugar_variable(temp_array, span);
+        self.insert_desugar_variable(temp_array, temp_type, unalloc, span);
 
         for (i, element) in array.values.iter().enumerate() {
             let value = self.lower_expression(element);
@@ -48,19 +46,19 @@ impl<'a> HirContext<'a> {
 
         hir::Expression {
             id,
-            ty,
+            ty: temp_type,
             kind: hir::ExpressionKind::Load(self.insert_place(temp_place)),
         }
     }
 
     fn create_unallocted_array(
         &mut self,
-        ty: PossibleTypeId,
-        element_type: PossibleTypeId,
+        ty: LazyTypeId,
+        element_type: LazyTypeId,
         size: u64,
         span: Span,
     ) -> ExpressionId {
-        let uint = PossibleTypeId::Known(self.add_type(HirType::index_type()));
+        let uint = LazyTypeId::Known(self.add_type(HirType::index_type()));
 
         let len = self.alloc_expression(span);
         self.insert_expression(
@@ -91,7 +89,7 @@ impl<'a> HirContext<'a> {
         value: ExpressionId,
         span: Span,
     ) -> Assign {
-        let ty = PossibleTypeId::Known(self.add_type(HirType::index_type()));
+        let ty = LazyTypeId::Known(self.add_type(HirType::index_type()));
 
         let id = self.alloc_expression(span);
         let index = self.insert_expression(
@@ -115,10 +113,10 @@ impl<'a> HirContext<'a> {
         }
     }
 
-    pub(super) fn insert_desugar_variable(&mut self, variable: hir::Variable, span: Span) {
+    pub(super) fn insert_desugar_variable(&mut self, variable: hir::Variable, ty: LazyTypeId, value: ExpressionId, span: Span) {
         let name = Ident::new(create_local_name(variable.local), span);
 
-        self.insert_variable(&name, variable.local, variable.ty, variable.value);
+        self.insert_temp(&name, variable.local, ty, value);
 
         match self.current_body {
             crate::CurrentBody::Global => {
@@ -150,7 +148,7 @@ impl<'a> HirContext<'a> {
     }
 }
 
-fn create_array(element: PossibleTypeId, size: u64) -> HirType {
+fn create_array(element: LazyTypeId, size: u64) -> HirType {
     HirType {
         kind: hir::HirTypeKind::Array {
             element,
