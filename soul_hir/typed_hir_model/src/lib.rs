@@ -72,6 +72,7 @@ pub enum ThirTypeKind {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Struct {
     pub id: StructId,
+    pub name: String,
     pub fields: Vec<Field>,
 }
 

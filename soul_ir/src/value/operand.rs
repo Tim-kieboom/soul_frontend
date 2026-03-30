@@ -3,7 +3,7 @@ use mir_parser::mir::{Operand, OperandKind};
 use soul_utils::{error::SoulResult, soul_error_internal, soul_names::PrimitiveSize};
 use typed_hir::{ThirTypeKind, display_thir::DisplayThirType};
 
-use crate::{GenericSubstitute, IrOperand, LlvmBackend, build_error};
+use crate::{GenericSubstitute, IrOperand, LlvmBackend, OperandInfo, build_error};
 
 impl<'f, 'a> LlvmBackend<'f, 'a> {
     pub(crate) fn lower_operand(
@@ -22,15 +22,6 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 };
 
                 let local = self.get_local(*local_id);
-                let is_signed_interger = self
-                    .types
-                    .types_map
-                    .id_to_type(mir_local.ty())
-                    .ok_or(soul_error_internal!(
-                        format!("{:?} not found", mir_local.ty()),
-                        None
-                    ))?
-                    .is_any_int_type();
 
                 let ptr = match local {
                     crate::Local::Runtime(val) => val,
@@ -42,7 +33,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     .build_load(ty, ptr, "load")
                     .map(|value| IrOperand {
                         value,
-                        is_signed_interger,
+                        info: OperandInfo::new_loaded(mir_local.ty()),
                     })
                     .map_err(|err| build_error(err))
             }
@@ -96,7 +87,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
                 IrOperand {
                     value,
-                    is_signed_interger: true,
+                    info: OperandInfo::new_loaded(should_be),
                 }
             }
             ast::Literal::Uint(value) => {
@@ -134,7 +125,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
                 IrOperand {
                     value,
-                    is_signed_interger: false,
+                    info: OperandInfo::new_loaded(should_be),
                 }
             }
             ast::Literal::Float(value) => {
@@ -167,7 +158,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
                 IrOperand {
                     value,
-                    is_signed_interger: false,
+                    info: OperandInfo::new_loaded(should_be),
                 }
             }
             ast::Literal::Bool(value) => {
@@ -179,7 +170,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
                 IrOperand {
                     value,
-                    is_signed_interger: false,
+                    info: OperandInfo::new_loaded(should_be),
                 }
             }
             ast::Literal::Char(value) => {
@@ -191,7 +182,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
                 IrOperand {
                     value,
-                    is_signed_interger: false,
+                    info: OperandInfo::new_loaded(should_be),
                 }
             }
             ast::Literal::Str(_) => {

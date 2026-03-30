@@ -34,7 +34,6 @@ typedef float f32;
 typedef double f64;
 
 typedef char* str;
-typedef const char* cstr;
 
 typedef struct {
     u64 sec;

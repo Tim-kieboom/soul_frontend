@@ -1,8 +1,8 @@
-use inkwell::values::BasicValueEnum;
-use mir_parser::mir::{BlockId, OperandKind, Place, PlaceId, Rvalue, RvalueKind, StatementKind};
+use inkwell::values::{BasicValueEnum, InstructionValue, PointerValue};
+use mir_parser::mir::{BlockId, OperandKind, PlaceId, PlaceKind, Rvalue, RvalueKind, StatementKind};
 use soul_utils::{error::{SoulError, SoulErrorKind, SoulResult}, soul_error_internal};
 
-use crate::{GenericSubstitute, LlvmBackend, build_error};
+use crate::{GenericSubstitute, IrOperand, LlvmBackend, build_error};
 
 impl<'f, 'a> LlvmBackend<'f, 'a> {
     pub(crate) fn lower_block(&mut self, block_id: BlockId, generics: &GenericSubstitute) {
@@ -27,13 +27,11 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     return_place,
                     type_args: call_type_args,
                 } => {
-                    let prev = self.current;
                     if let Err(err) =
                         self.lower_call(*id, arguments, *return_place, call_type_args, generics)
                     {
                         self.log_error(err);
                     }
-                    self.current = prev;
                 }
                 StatementKind::StorageDead(_) => (),
                 StatementKind::StorageStart(_) => (),
@@ -51,13 +49,14 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             return Ok(());
         }
 
-        let ir_value = self.lower_rvalue(value, generics)?;
-        match &self.mir.tree.places[place_id] {
-            Place::Field{..} => todo!(),
-            Place::Temp(temp_id) => {
+        let ty = self.mir.tree.places[place_id].ty;
+        let ir_value = self.lower_rvalue(value, ty, generics)?;
+        match &self.mir.tree.places[place_id].kind {
+            PlaceKind::Field{..} => todo!(),
+            PlaceKind::Temp(temp_id) => {
                 self.push_temp(*temp_id, ir_value);
             }
-            Place::Local(local_id) => {
+            PlaceKind::Local(local_id) => {
                 let local = self.get_local(*local_id);
                 let ptr = match local {
                     crate::Local::Runtime(val) => val,
@@ -66,11 +65,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     }
                 };
 
-                self.builder
-                    .build_store(ptr, ir_value.value)
-                    .map_err(build_error)?;
+                self.store_operand(ptr, ir_value, generics)?;
             }
-            Place::Deref(operand) => {
+            PlaceKind::Deref(operand) => {
                 let ptr_value = self.lower_operand(operand, generics)?.value;
 
                 let ptr = match ptr_value {
@@ -84,13 +81,27 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     }
                 };
 
-                self.builder
-                    .build_store(ptr, ir_value.value)
-                    .map_err(build_error)?;
+                self.store_operand(ptr, ir_value, generics)?;
             }
         }
 
         Ok(())
+    }
+
+    pub(crate) fn store_operand(&self, destination_ptr: PointerValue<'a>, operand: IrOperand<'a>, generics: &GenericSubstitute) -> SoulResult<InstructionValue<'a>> {
+        
+        let value = if operand.info.is_unloaded {
+            let ty = self.lower_type(operand.info.type_id, generics)?
+                .unwrap_or(self.context.i8_type().into());
+
+            self.builder.build_load(ty, operand.value.into_pointer_value(), "source_value").map_err(build_error)?
+        } else {
+            operand.value
+        };
+        
+        self.builder
+            .build_store(destination_ptr, value)
+            .map_err(build_error)
     }
 }
 

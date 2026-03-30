@@ -119,7 +119,10 @@ impl<'a> MirContext<'a> {
                 }
             };
 
-            let place = self.new_place(mir::Place::Temp(temp_id));
+            let place = self.new_place(mir::Place::new(
+                mir::PlaceKind::Temp(temp_id),
+                ty,
+            ));
 
             self.push_statement_from(
                 mir::Statement::new(mir::StatementKind::Assign {

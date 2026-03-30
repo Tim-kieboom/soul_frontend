@@ -1,6 +1,6 @@
-use hir::{FieldId, HirTree, TypeId};
+use hir::{FieldId, HirTree, StructId, TypeId};
 use mir_parser::mir::{
-    self, BlockId, FunctionBody, Local, LocalId, MirTree, Operand, Place, PlaceId, Rvalue, StatementId, TempId
+    self, BlockId, FunctionBody, Local, LocalId, MirTree, Operand, Place, PlaceId, PlaceKind, Rvalue, StatementId, TempId
 };
 use run_hir::HirResponse;
 use soul_utils::{
@@ -263,11 +263,11 @@ impl<'a> MirDisplayer<'a> {
 
     fn display_rvalue(&mut self, value: &Rvalue) {
         match &value.kind {
-            mir::RvalueKind::Field {base, base_type:_, field_id, index:_} => {
+            mir::RvalueKind::Field {base, field_id, } => {
                 self.display_field(base, *field_id);
             }
             mir::RvalueKind::Aggregate{ struct_type, body } => {
-                self.push_str(&format!("{:?}", struct_type));
+                self.display_struct_name(*struct_type);
                 self.push('{');
                 match body {
                     mir::AggregateBody::Runtime(fields) => {
@@ -343,18 +343,18 @@ impl<'a> MirDisplayer<'a> {
 
     fn display_place(&mut self, place_id: &PlaceId) {
         let place = &self.mir.places[*place_id];
-        match place {
-            Place::Field{ base, base_type:_, field_id, index:_ } => {
+        match &place.kind {
+            PlaceKind::Field{ base, field_id} => {
                 self.display_field(base, *field_id);
             }
-            Place::Temp(temp_id) => {
+            PlaceKind::Temp(temp_id) => {
                 self.display_temp_name(*temp_id);
             }
-            Place::Deref(operand) => {
+            PlaceKind::Deref(operand) => {
                 self.push('*');
                 self.display_operand(operand);
             }
-            Place::Local(local_id) => self.display_local_name(*local_id),
+            PlaceKind::Local(local_id) => self.display_local_name(*local_id),
         }
     }
 
@@ -398,7 +398,7 @@ impl<'a> MirDisplayer<'a> {
     fn display_field(&mut self, base: &PlaceId, field: FieldId) {
         self.display_place(base);
         self.push('.');
-        self.push_str(&self.hir.nodes.fields[field].name);
+        self.push_str(&self.hir.nodes.fields.get(field).map(|f| f.name.as_str()).unwrap_or("<error>"));
     }
 
     fn get_type(&self, ty: TypeId) -> ThirType {
@@ -408,4 +408,12 @@ impl<'a> MirDisplayer<'a> {
             .cloned()
             .unwrap_or(ThirType{ kind: typed_hir::ThirTypeKind::Error, generics: vec![], modifier: None })
     }
+
+    fn display_struct_name(&mut self, id: StructId) {
+        match self.types.types_map.id_to_struct(id) {
+            Some(val) => self.push_str(val.name.as_str()),
+            None => self.push_str("<error>"),
+        }
+    }
 }
+

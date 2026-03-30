@@ -70,7 +70,22 @@ pub fn to_llvm_ir<'f, 'a>(
 #[derive(Debug, Clone, Copy)]
 pub struct IrOperand<'a> {
     pub value: BasicValueEnum<'a>,
-    pub is_signed_interger: bool,
+    pub info: OperandInfo,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct OperandInfo {
+    pub is_unloaded: bool,
+    pub type_id: TypeId,
+}
+impl OperandInfo {
+    fn new_loaded(type_id: TypeId) -> Self {
+        Self { is_unloaded: false, type_id }
+    }
+
+    fn new_unloaded(type_id: TypeId) -> Self {
+        Self { is_unloaded: true, type_id }
+    }
 }
 
 impl_soul_ids!(FunctionKeyId);

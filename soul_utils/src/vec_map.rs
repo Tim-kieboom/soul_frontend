@@ -6,6 +6,8 @@ use std::{
 
 use serde::{Serialize, Serializer, ser::SerializeMap};
 
+use crate::ids::IdAlloc;
+
 /// A trait representing a type that can act as an index into a [`VecMap`].
 ///
 /// Implementers of this trait define how to create a new index from a raw `usize`
@@ -118,6 +120,17 @@ impl<I: VecMapIndex, T> VecMap<I, T> {
         match self.vec.get(index.index()) {
             Some(Some(val)) => Some(val),
             _ => None,
+        }
+    }
+
+    /// Returns a reference to the value at the given index, if present.
+    pub fn get_or_error_id(&self, index: I) -> T
+    where 
+        T: IdAlloc + Copy
+    {
+        match self.vec.get(index.index()) {
+            Some(Some(val)) => *val,
+            _ => T::error(),
         }
     }
 

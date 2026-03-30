@@ -183,7 +183,7 @@ pub struct Rvalue {
 pub enum RvalueKind {
     /// Move or copy an operand.
     Use(Operand),
-    Field{base: PlaceId, base_type: TypeId, field_id: FieldId, index: usize},
+    Field{base: PlaceId, field_id: FieldId},
     CastUse {
         value: Operand,
         cast_to: TypeId,
@@ -266,9 +266,20 @@ pub enum OperandKind {
     None,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Place {
+    pub kind: PlaceKind,
+    pub ty: TypeId,
+}
+impl Place {
+    pub fn new(kind: PlaceKind, ty: TypeId) -> Self {
+        Self { kind, ty }
+    }
+}
+
 /// A memory location that can be assigned to.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub enum Place {
+pub enum PlaceKind {
     Temp(TempId),
 
     /// Dereference of a pointer operand: `*ptr`
@@ -277,7 +288,7 @@ pub enum Place {
     /// Local variable place.
     Local(LocalId),
 
-    Field{base: PlaceId, base_type: TypeId, field_id: FieldId, index: usize},
+    Field{base: PlaceId, field_id: FieldId},
 }
 
 impl Statement {

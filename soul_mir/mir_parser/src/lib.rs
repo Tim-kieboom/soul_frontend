@@ -68,13 +68,7 @@ impl CurrentContext {
 impl<'a> MirContext<'a> {
     fn new(hir_reponse: &'a HirResponse, faults: &'a mut Vec<SementicFault>) -> Self {
         let init_global_function = hir_reponse.hir.init_globals;
-        let main = hir_reponse.hir
-            .nodes
-            .functions
-            .values()
-            .find(|func| func.name.as_str() == "main")
-            .map(|f| f.id)
-            .unwrap_or(FunctionId::error());
+        let main = hir_reponse.hir.main;
 
         if main == FunctionId::error() {
             faults.push(SementicFault::error(SoulError::new(

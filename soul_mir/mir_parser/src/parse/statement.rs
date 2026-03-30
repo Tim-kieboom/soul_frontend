@@ -119,7 +119,7 @@ impl<'a> MirContext<'a> {
         let local_info = &self.hir_response.hir.nodes.locals[variable.local];
         let place_kind = if local_info.is_temp() {
             should_assign = true;
-            mir::Place::Temp(match self.temp_remap.get(variable.local) {
+            mir::PlaceKind::Temp(match self.temp_remap.get(variable.local) {
                 Some(val) => *val,
                 None => self.new_temp(self.local_type(variable.local)),
             })
@@ -136,7 +136,7 @@ impl<'a> MirContext<'a> {
             };
 
             should_assign = self.tree.locals[local].is_runtime();
-            mir::Place::Local(local)
+            mir::PlaceKind::Local(local)
         };
 
         if !should_assign {
@@ -145,7 +145,7 @@ impl<'a> MirContext<'a> {
 
         if let LocalKind::Variable(Some(value)) = local_info.kind {
             let operand = self.lower_operand(value).pass(is_end);
-            let place = self.new_place(place_kind);
+            let place = self.new_place(mir::Place::new(place_kind, self.local_type(variable.local)));
 
             let statement = mir::Statement::new(mir::StatementKind::Assign {
                 place,

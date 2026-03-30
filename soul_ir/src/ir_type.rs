@@ -6,7 +6,7 @@ use inkwell::{
 use soul_utils::{error::SoulResult, soul_error_internal, soul_names::PrimitiveTypes};
 use typed_hir::ThirTypeKind;
 
-use crate::{GenericSubstitute, LlvmBackend};
+use crate::{GenericSubstitute, LlvmBackend, OperandInfo};
 
 impl<'f, 'a> LlvmBackend<'f, 'a> {
     pub fn lower_type(
@@ -88,6 +88,15 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             Some(val) => Ok(val),
             None => self.lower_struct(id, generics),
         }
+    }
+
+    pub(crate) fn is_signed_interger(&self, info: &OperandInfo) -> bool {
+        let ty = match self.get_type(info.type_id) {
+            Ok(val) => val,
+            Err(_) => return false,
+        };
+
+        ty.is_any_int_type()
     }
 
     pub(crate) fn lower_struct(

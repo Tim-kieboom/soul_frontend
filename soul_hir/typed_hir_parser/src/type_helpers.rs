@@ -247,6 +247,14 @@ impl UnifyPrimitiveCast for HirTypeKind {
                     ));
                 }
             }
+            (HirTypeKind::Pointer(_), HirTypeKind::Primitive(prim)) => {
+                
+                return if !prim.is_numeric() {
+                    Err("can only cast pointer to numaric or other pointers".to_string())
+                } else {
+                    Ok(())
+                }
+            }
             (HirTypeKind::Array { .. }, HirTypeKind::Array { .. }) => {
                 return Err("can only type cast primitive types".to_string());
             }

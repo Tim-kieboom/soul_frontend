@@ -6,8 +6,8 @@ extern "C" __clib_fmtInt(value: int, base: u8, buffer: *char/*[50]char*/, capita
 extern "C" __clib_fmtUint(value: uint, base: u8, buffer: *char/*[50]char*/, capital: bool): *char
 extern "C" __clib_fmtFloat(value: f64, base: u8, buffer: *char/*[50]char*/, precision: u8, capital: bool): *char
 
-global := 1
-global1 := 10 + 33 * 2
+// global := 1
+// global1 := 10 + 33 * 2
 fmtBuffer := malloc(50) as *char //[for 50 => '\0']
 
 struct Array {
@@ -21,21 +21,26 @@ struct Inner {
 
 main() {
     array := Array{
-        len: 0, 
         ptr: malloc(0),
+        len: 12, 
     }
+    endln()
     mut len = array.len
-    // mut ptr = array.ptr
+    mut ptr = array.ptr
+    print_uint(len)
+    endln()
 
     inner := Inner{array}
-    // len = inner.array.len
-
+    len = inner.array.len
+    print_uint(len)
+    endln()
+    
     // pow := 3 ** 2
     // root := 2 </ 4
-    // print_int(1)
+    print_int(1)
     // generics()
-    // prints()
-    // comptime()
+    prints()
+    comptime()
 }
 
 comptime() {
@@ -45,7 +50,7 @@ comptime() {
 }
 
 prints() {
-    print_int(-123)
+    print_int(-123, base: 10)
     endln()
 
     print_uint(123)

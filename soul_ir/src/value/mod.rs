@@ -1,9 +1,9 @@
-use crate::{GenericSubstitute, IrOperand, LlvmBackend, Local, build_error};
+use crate::{GenericSubstitute, IrOperand, LlvmBackend, Local, OperandInfo, build_error};
 use ast::Literal;
 use hir::{StructId, TypeId};
 use mir_parser::mir::{self, AggregateBody, Operand, PlaceId, Rvalue, RvalueKind};
 use soul_utils::{error::SoulResult, soul_error_internal};
-use typed_hir::{ThirTypeKind, display_thir::DisplayThirType};
+use typed_hir::{FieldInfo, ThirTypeKind, display_thir::DisplayThirType};
 
 mod binary_unary;
 mod cast;
@@ -13,11 +13,13 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
     pub(crate) fn lower_rvalue(
         &self,
         value: &Rvalue,
+        ty: TypeId,
         generics: &GenericSubstitute,
     ) -> SoulResult<IrOperand<'a>> {
         match &value.kind {
-            RvalueKind::Field { base, base_type, field_id:_, index } => {
-                self.lower_field_access(*base, *base_type, *index, generics)
+            RvalueKind::Field{base, field_id} => {
+                let field_info = &self.types.types_table.fields[*field_id];
+                self.lower_field_access(*base, field_info, generics)
             }
             RvalueKind::CastUse { value, cast_to } => self.lower_cast(value, *cast_to, generics),
             RvalueKind::Use(operand) => self.lower_operand(operand, generics),
@@ -28,31 +30,48 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             } => self.lower_binary(left, operator, right, generics),
             RvalueKind::Unary { operator, value } => self.lower_unary(value, operator, generics),
             RvalueKind::StackAlloc(ty) => self.lower_stack_alloc(*ty, generics),
-            RvalueKind::Aggregate { struct_type, body } => self.lower_struct_contructor(*struct_type, body, generics),
+            RvalueKind::Aggregate { struct_type, body } => self.lower_struct_contructor(*struct_type, ty, body, generics),
         }
     }
 
     fn lower_field_access(
         &self,
         base: PlaceId,
-        base_type: TypeId,
-        index: usize,
+        field_info: &FieldInfo,
         generics: &GenericSubstitute,
     ) -> SoulResult<IrOperand<'a>> {
         let base_operand = self.lower_place_to_operand(base, generics)?;
         let base_ptr = base_operand.value.into_pointer_value();
 
-        self.expect_type_can_field(base_type)?;
-        let base_type = self.lower_type(base_type, generics)?
+        self.expect_type_can_field(field_info.base_type)?;
+        let base_type = self.lower_type(field_info.base_type, generics)?
             .ok_or(soul_error_internal!("none type found as base_type in field", None))?;
 
-        let field = self.builder
-            .build_struct_gep(base_type, base_ptr, index as u32, "gep_struct")
+        let field_ptr = self.builder
+            .build_struct_gep(base_type, base_ptr, field_info.field_index as u32, "gep_struct")
             .map_err(build_error)?;
         
+        let field_type = self.lower_type(field_info.field_type, generics)?
+            .ok_or(soul_error_internal!("type should be Some", None))?;
+        
+        let loaded_value = self.builder
+            .build_load(field_type, field_ptr, "load_field")
+            .map_err(build_error)?;
+
+        let field_alloca = self.builder
+            .build_alloca(field_type, "field_tmp")
+            .map_err(build_error)?;
+
+        self.builder
+            .build_store(field_alloca, loaded_value)
+            .map_err(build_error)?;
+
         Ok(IrOperand {
-            value: field.into(),
-            is_signed_interger: false,
+            value: field_alloca.into(),
+            info: OperandInfo{ 
+                is_unloaded: true, 
+                type_id: field_info.field_type,
+            },
         })
     }
 
@@ -70,16 +89,17 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
     fn lower_struct_contructor(
         &self, 
-        struct_type: StructId, 
+        struct_id: StructId, 
+        ty: TypeId,
         body: &AggregateBody,
         generics: &GenericSubstitute,
     ) -> SoulResult<IrOperand<'a>> {
         match body {
             AggregateBody::Runtime(operands) => {
-                self.lower_aggregate(struct_type, operands, generics)
+                self.lower_aggregate(struct_id, ty, operands, generics)
             }
             AggregateBody::Comptime(literals) => {
-                self.lower_const_aggregate(struct_type, literals, generics)
+                self.lower_const_aggregate(struct_id, ty, literals, generics)
             }
         }
     }
@@ -87,10 +107,11 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
     fn lower_aggregate(
         &self, 
         struct_id: StructId, 
+        ty: TypeId,
         operands: &Vec<Operand>,
         generics: &GenericSubstitute,
     ) -> SoulResult<IrOperand<'a>> {
-        let struct_type = self.get_or_create_struct(struct_id, generics)?;
+        let struct_ir = self.get_or_create_struct(struct_id, generics)?;
 
         let mut fields = Vec::with_capacity(operands.len());
         for operand in operands {
@@ -99,20 +120,33 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             );   
         }
 
-        let aggregate = struct_type.const_named_struct(fields.as_slice());
+        let ptr = self.builder.build_alloca(struct_ir, "tmp_struct").map_err(build_error)?;
+
+        for (i, field) in fields.into_iter().enumerate() {
+            
+            let geb = self.builder.build_struct_gep(
+                struct_ir,
+                ptr,
+                i as u32,
+                "gep_x",
+            ).map_err(build_error)?;
+            self.builder.build_store(geb, field).map_err(build_error)?;
+        }
+
         Ok(IrOperand{
-            value: aggregate.into(),
-            is_signed_interger: false,
+            value: ptr.into(),
+            info: OperandInfo::new_unloaded(ty),
         })
     }
 
     fn lower_const_aggregate(
         &self, 
         struct_id: StructId, 
+        ty: TypeId, 
         literals: &Vec<(Literal, TypeId)>,
         generics: &GenericSubstitute,
     ) -> SoulResult<IrOperand<'a>> {
-        let struct_type = self.get_or_create_struct(struct_id, generics)?;
+        let struct_ir = self.get_or_create_struct(struct_id, generics)?;
 
         let mut fields = Vec::with_capacity(literals.len());
         for (literal, ty) in literals {
@@ -121,10 +155,10 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             );   
         }
 
-        let aggregate = struct_type.const_named_struct(fields.as_slice());
+        let aggregate = struct_ir.const_named_struct(fields.as_slice());
         Ok(IrOperand{
             value: aggregate.into(),
-            is_signed_interger: false,
+            info: OperandInfo::new_loaded(ty),
         })
     }
 
@@ -133,19 +167,20 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         place: PlaceId,
         generics: &GenericSubstitute,
     ) -> SoulResult<IrOperand<'a>> {
-        match &self.mir.tree.places[place] {
-            mir::Place::Local(local_id) => {
+        let ty = self.mir.tree.places[place].ty;
+        match &self.mir.tree.places[place].kind {
+            mir::PlaceKind::Local(local_id) => {
                 let local = self.get_local(*local_id);
                 match local {
-                    Local::Runtime(ptr) => Ok(IrOperand { value: ptr.into(), is_signed_interger: false }),
+                    Local::Runtime(ptr) => Ok(IrOperand { value: ptr.into(), info: OperandInfo::new_loaded(ty), }),
                     Local::Comptime(op) => Ok(op.clone()),
                 }
             }
-            mir::Place::Temp(temp_id) => {
+            mir::PlaceKind::Temp(temp_id) => {
                 let temp_op = self.get_temp(*temp_id)?;
                 Ok(temp_op.clone())
             }
-            mir::Place::Deref(operand) => {
+            mir::PlaceKind::Deref(operand) => {
                 let ty = self.lower_type(operand.ty, generics)?
                     .unwrap_or(self.context.i8_type().into());
                 
@@ -153,11 +188,12 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 let ptr = ptr_op.value.into_pointer_value();
                 Ok(IrOperand { 
                     value: self.builder.build_load(ty, ptr, "deref").map_err(build_error)?.into(), 
-                    is_signed_interger: false 
+                    info: OperandInfo::new_loaded(operand.ty), 
                 })
             }
-            mir::Place::Field { base, base_type, field_id:_, index } => {
-                self.lower_field_access(*base, *base_type, *index, generics)
+            mir::PlaceKind::Field { base, field_id } => {
+                let field_info = &self.types.types_table.fields[*field_id];
+                self.lower_field_access(*base, field_info, generics)
             }
         }
     }
@@ -178,7 +214,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             .into();
         Ok(IrOperand {
             value: ptr,
-            is_signed_interger: false,
+            info: OperandInfo::new_loaded(ty),
         })
     }
 }

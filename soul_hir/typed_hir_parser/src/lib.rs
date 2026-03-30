@@ -102,9 +102,10 @@ impl<'a> TypedHirContext<'a> {
     }
 
     fn id_to_type(&self, ty: TypeId) -> &HirType {
+        static ERROR: HirType = HirType::error_type();
         self.types
             .id_to_type(ty)
-            .expect("TypeId should always have a type")
+            .unwrap_or(&ERROR)
     }
 
     fn id_to_infer(&self, ty: InferTypeId) -> &InferType {

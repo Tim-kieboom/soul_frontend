@@ -1,5 +1,5 @@
 use hir::{
-    Binary, BlockId, DisplayType, ExpressionId, FunctionBody, HirTree, HirType, LazyTypeId, LocalId, LocalKind, Unary
+    Binary, BlockId, DisplayType, ExpressionId, FunctionBody, HirTree, HirType, LazyTypeId, LocalId, LocalKind, StructId, Unary
 };
 use soul_utils::{
     ids::{FunctionId, IdAlloc},
@@ -27,6 +27,32 @@ pub fn display_thir(hir: &HirTree, typed: &TypedHir) -> String {
     }
 
     displayer.to_string()
+}
+
+pub fn display_created_types(hir: &HirTree, typed: &TypedHir) -> String {
+    
+    let mut sb = String::new();
+    for (id, struct_type) in typed.types_map.structs.entries() {
+        let name = &hir.info.types.id_to_struct(id).expect("should have struct").name;
+        sb.push_str("struct ");
+        sb.push_str(name.as_str());
+        sb.push_str(" {\n");
+        for field in &struct_type.fields {
+            let field_name = &hir.nodes.fields[field.id].name;
+            sb.push('\t');
+            sb.push_str(field_name);
+            sb.push_str(": ");
+            typed.types_map
+            .id_to_type(field.ty)
+            .expect("should have type")
+            .write_display(&typed.types_map, &mut sb)
+            .expect("no fmt error");
+            sb.push('\n');
+        }
+        sb.push_str("}\n");
+    }
+
+    sb
 }
 
 struct HirDisplayer<'a> {
@@ -89,7 +115,7 @@ impl<'a> HirDisplayer<'a> {
         for (i, arg) in function.parameters.iter().enumerate() {
             self.display_local(arg.local);
             self.push_str(": ");
-            self.display_type(function.return_type.to_lazy());
+            self.display_type(arg.ty);
             if i != last_index {
                 self.push_str(", ");
             }
@@ -200,7 +226,7 @@ impl<'a> HirDisplayer<'a> {
             hir::ExpressionKind::Function(_) => self.push_str("<function>"),
             hir::ExpressionKind::StructConstructor { ty, values, defaults } => {
             
-                self.push_str(&format!("{:?}", ty));
+                self.display_struct_name(*ty);
                 self.push('{');
                 let last_index = values.len().saturating_sub(1);
                 for (i, (name, value)) in values.iter().enumerate() {
@@ -386,6 +412,15 @@ impl<'a> HirDisplayer<'a> {
         self.push_str("<as: ");
         self.display_type(id);
         self.push('>');
+    }
+
+    fn display_struct_name(&mut self, id: StructId) {
+        let name = self.hir.info.types
+            .id_to_struct(id)
+            .map(|s| s.name.as_str())
+            .unwrap_or("<error>");
+        
+        self.push_str(name);
     }
 
     fn display_type(&mut self, id: LazyTypeId) {

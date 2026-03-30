@@ -1,6 +1,6 @@
 use std::{
     fs::{File, OpenOptions},
-    io::{Read, stdout},
+    io::{Read, stdout}, time::Instant,
 };
 
 use anyhow::Result;
@@ -36,7 +36,7 @@ mod paths;
 static PATHS: &[u8] = include_bytes!("../paths.json");
 
 pub const MESSAGE_CONFIG: MessageConfig = MessageConfig {
-    backtrace: false,
+    backtrace: true,
     colors: true,
 };
 
@@ -55,17 +55,19 @@ struct Ouput {
 fn main() -> Result<()> {
     let paths: Paths = serde_json::from_slice(PATHS)?;
     init_logger(&paths.log_file)?;
-
+    
+    let mut timer = Instant::now();
     let output = run_fontend(&paths)?;
     log_faults(&output.faults, &output.source_file);
     if is_fatal(&output.faults, SementicLevel::Error) {
         return Ok(());
     }
     
-    info!("{GREEN}frontend success!!{DEFAULT}");
-    
+    info!("{GREEN}frontend success: {}ms{DEFAULT}", timer.elapsed().as_millis());
+
+    timer = Instant::now();
     if run_llvm(&output) {
-        info!("{GREEN}llvm success!!{DEFAULT}")
+        info!("{GREEN}llvm success: {}ms{DEFAULT}", timer.elapsed().as_millis())
     }
     Ok(())
 }
@@ -149,6 +151,7 @@ fn display_ast(paths: &Paths, ast: &AstResponse) -> Result<()> {
 fn display_hir(paths: &Paths, hir: &HirResponse) -> Result<()> {
     paths.write_to_output(&displayer_hir::display_hir(&hir.hir), "hir/tree.soulc")?;
     paths.write_to_output(&displayer_hir::display_thir(&hir.hir, &hir.typed), "thir/tree.soulc")?;
+    paths.write_to_output(&displayer_hir::display_created_types(&hir.hir, &hir.typed), "thir/types.soulc")?;
     Ok(())
 }
 

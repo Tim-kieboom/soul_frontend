@@ -92,7 +92,7 @@ impl<'a> TypedHirContext<'a> {
             
             out.structs.insert(
                 id,
-                typed_hir::Struct {id, fields},
+                typed_hir::Struct {name: s.name.to_string(), id, fields},
             );
         }
 
@@ -156,9 +156,9 @@ impl<'a> TypedHirContext<'a> {
         map: VecMap<K, LazyTypeId>,
     ) -> VecMap<K, TypeId>
     where
-        K: VecMapIndex,
+        K: VecMapIndex + IdAlloc,
     {
-        map.into_entries()
+        let mut new_map = map.into_entries()
             .map(|(k, lazy)| {
                 let ty = self
                     .infer_table
@@ -167,6 +167,9 @@ impl<'a> TypedHirContext<'a> {
 
                 (k, ty)
             })
-            .collect()
+            .collect::<VecMap<K, TypeId>>();
+
+        new_map.insert(K::error(), TypeId::error());
+        new_map
     }
 }

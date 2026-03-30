@@ -58,7 +58,7 @@ impl DisplayThirType for ThirTypeKind {
             },
             ThirTypeKind::Struct(id) => {
                 match types.id_to_struct(*id) {
-                    Some(_) => sb.push_str(&format!("{:?}", id)),
+                    Some(s) => sb.push_str(&s.name),
                     None => sb.push_str("<error>"),
                 }
                 Ok(())

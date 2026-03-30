@@ -7,7 +7,7 @@ use soul_utils::{
     vec_map::VecMapIndex,
 };
 
-use crate::{GenericSubstitute, IrOperand, LlvmBackend, build_error};
+use crate::{GenericSubstitute, IrOperand, LlvmBackend, OperandInfo, build_error};
 
 impl<'f, 'a> LlvmBackend<'f, 'a> {
     pub(crate) fn allocate_function_locals(
@@ -139,7 +139,8 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     continue
                 }
             };
-    }
+        }
+        
     }
 
     fn build_runtime_local(&mut self, ty: BasicTypeEnum<'a>, local_id: LocalId, name: &str) -> SoulResult<PointerValue<'a>> {
@@ -153,7 +154,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             Ok(val) => val,
             Err(err) => {
                 self.log_error(err);
-                IrOperand { value: ty.const_zero(), is_signed_interger: false }
+                IrOperand { value: ty.const_zero(), info: OperandInfo::new_loaded(hir_type) }
             }
         };
         let local = crate::Local::Comptime(const_operand);

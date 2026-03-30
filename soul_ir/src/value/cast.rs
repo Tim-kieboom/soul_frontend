@@ -4,7 +4,7 @@ use mir_parser::mir;
 use soul_utils::{error::SoulResult, soul_error_internal, soul_names::PrimitiveTypes};
 use typed_hir::{ThirType, ThirTypeKind};
 
-use crate::{GenericSubstitute, IrOperand, LlvmBackend, build_error};
+use crate::{GenericSubstitute, IrOperand, LlvmBackend, OperandInfo, build_error};
 
 impl<'f, 'a> LlvmBackend<'f, 'a> {
     pub(super) fn lower_cast(
@@ -38,7 +38,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     .map_err(build_error)?;
                 Ok(IrOperand {
                     value: res.into(),
-                    is_signed_interger: false,
+                    info: OperandInfo::new_loaded(cast_to),
                 })
             }
             (ThirTypeKind::Pointer(_), ThirTypeKind::Primitive(_)) => {
@@ -53,13 +53,14 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     .map_err(build_error)?;
                 Ok(IrOperand {
                     value: res.into(),
-                    is_signed_interger: false,
+                    info: OperandInfo::new_loaded(cast_to),
                 })
             }
             (ThirTypeKind::Primitive(_), ThirTypeKind::Primitive(_)) => {
                 let info = self.get_primitive_cast_info(
                     mir_source_type,
                     mir_cast_type,
+                    cast_to,
                     source_operand,
                     cast_type,
                 )?;
@@ -88,10 +89,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             self.int_trunc(&info)?
         };
 
-        let is_signed_interger = info.cast_prim.is_signed_interger();
         Ok(IrOperand {
             value,
-            is_signed_interger,
+            info: OperandInfo::new_loaded(info.cast_type_id),
         })
     }
 
@@ -194,6 +194,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         &self,
         mir_source_type: &ThirType,
         mir_cast_type: &ThirType,
+        mir_cast_type_id: TypeId,
         source_operand: IrOperand<'a>,
         destination_type: BasicTypeEnum<'a>,
     ) -> SoulResult<PrimCastInfo<'a>> {
@@ -209,6 +210,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             source_prim,
             source_operand,
             cast_type: destination_type,
+            cast_type_id: mir_cast_type_id,
             cast_size: cast_prim.to_size_bit_u8(int_size, char_size),
             one_is_float: source_prim.is_float() != cast_prim.is_float(),
             source_size: source_prim.to_size_bit_u8(int_size, char_size),
@@ -228,6 +230,7 @@ struct PrimCastInfo<'a> {
     /// cast type size
     source_size: u8,
 
+    cast_type_id: TypeId,
     cast_prim: PrimitiveTypes,
     source_prim: PrimitiveTypes,
     cast_type: BasicTypeEnum<'a>,

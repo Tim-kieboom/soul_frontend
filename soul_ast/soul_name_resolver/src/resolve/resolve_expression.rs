@@ -1,5 +1,5 @@
 use ast::{Expression, ExpressionKind};
-use soul_utils::error::{SoulError, SoulErrorKind};
+use soul_utils::{error::{SoulError, SoulErrorKind}, ids::{FunctionId, IdAlloc}};
 
 use crate::NameResolver;
 
@@ -32,6 +32,8 @@ impl<'a> NameResolver<'a> {
                         SoulErrorKind::NotFoundInScope,
                         Some(span),
                     ));
+
+                    function_call.resolved = Some(FunctionId::error());
                 };
 
                 for arg in &mut function_call.arguments {

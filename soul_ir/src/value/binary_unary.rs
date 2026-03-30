@@ -96,7 +96,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
         Ok(IrOperand {
             value,
-            is_signed_interger: left.is_signed_interger,
+            info: left.info.clone(),
         })
     }
 
@@ -124,7 +124,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
         Ok(IrOperand {
             value,
-            is_signed_interger: left.is_signed_interger,
+            info: left.info.clone(),
         })
     }
 
@@ -152,14 +152,14 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
         Ok(IrOperand {
             value,
-            is_signed_interger: left.is_signed_interger,
+            info: left.info.clone(),
         })
     }
 
     fn div(&self, left: IrOperand<'a>, right: IrOperand<'a>) -> SoulResult<IrOperand<'a>> {
         let value = match (left.value, right.value) {
             (BasicValueEnum::IntValue(l), BasicValueEnum::IntValue(r)) => {
-                if left.is_signed_interger {
+                if self.is_signed_interger(&left.info) {
                     self.builder
                         .build_int_signed_div(l, r, "rvalue")
                         .map_err(build_error)
@@ -188,14 +188,14 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
         Ok(IrOperand {
             value,
-            is_signed_interger: left.is_signed_interger,
+            info: left.info.clone(),
         })
     }
 
     fn modulo(&self, left: IrOperand<'a>, right: IrOperand<'a>) -> SoulResult<IrOperand<'a>> {
         let value = match (left.value, right.value) {
             (BasicValueEnum::IntValue(l), BasicValueEnum::IntValue(r)) => {
-                if left.is_signed_interger {
+                if self.is_signed_interger(&left.info) {
                     self.builder
                         .build_int_signed_rem(l, r, "rvalue")
                         .map_err(build_error)
@@ -219,7 +219,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
         Ok(IrOperand {
             value,
-            is_signed_interger: left.is_signed_interger,
+            info: left.info.clone(),
         })
     }
 
@@ -247,7 +247,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
         Ok(IrOperand {
             value,
-            is_signed_interger: left.is_signed_interger,
+            info: left.info.clone(),
         })
     }
 
@@ -275,7 +275,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
         Ok(IrOperand {
             value,
-            is_signed_interger: left.is_signed_interger,
+            info: left.info.clone(),
         })
     }
 
@@ -303,7 +303,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
         Ok(IrOperand {
             value,
-            is_signed_interger: left.is_signed_interger,
+            info: left.info.clone(),
         })
     }
 
@@ -315,7 +315,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
     ) -> SoulResult<IrOperand<'a>> {
         let value = match (left.value, right.value) {
             (BasicValueEnum::IntValue(l), BasicValueEnum::IntValue(r)) => {
-                let predict = if left.is_signed_interger {
+                let predict = if self.is_signed_interger(&left.info) {
                     cmp.to_signed_int_cmp()
                 } else {
                     cmp.to_unsigned_int_cmp()
@@ -343,7 +343,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
         Ok(IrOperand {
             value,
-            is_signed_interger: left.is_signed_interger,
+            info: left.info.clone(),
         })
     }
 
@@ -371,7 +371,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
         Ok(IrOperand {
             value,
-            is_signed_interger: operand.is_signed_interger,
+            info: operand.info.clone(),
         })
     }
 
@@ -399,7 +399,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
         Ok(IrOperand {
             value,
-            is_signed_interger: operand.is_signed_interger,
+            info: operand.info.clone(),
         })
     }
 }

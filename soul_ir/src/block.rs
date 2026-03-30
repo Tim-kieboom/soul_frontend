@@ -1,7 +1,7 @@
-use crate::{GenericSubstitute, IrOperand, LlvmBackend, build_error};
+use crate::{GenericSubstitute, IrOperand, LlvmBackend, OperandInfo, build_error};
 use hir::TypeId;
 use inkwell::values::FunctionValue;
-use mir_parser::mir::{BlockId, FunctionBody, Operand, Place, PlaceId, Terminator};
+use mir_parser::mir::{BlockId, FunctionBody, Operand, PlaceId, PlaceKind, Terminator};
 use soul_utils::{error::SoulResult, ids::FunctionId, vec_map::VecMapIndex};
 
 impl<'f, 'a> LlvmBackend<'f, 'a> {
@@ -98,29 +98,32 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             ir_arguments.push(meta_data_value);
         }
         
+        let prev = self.current;
+        
         let function = self.get_or_create_function(id, type_args);
         let call = self
-            .builder
-            .build_call(function, ir_arguments.as_slice(), "call_result")
-            .map_err(build_error)?;
-
+        .builder
+        .build_call(function, ir_arguments.as_slice(), "call_result")
+        .map_err(build_error)?;
+    
+        self.current = prev;
         let place = match return_place {
             Some(val) => &self.mir.tree.places[val],
             None => return Ok(()),
         };
 
         let return_value = call.try_as_basic_value().unwrap_basic();
-        match place {
-            Place::Temp(temp_id) => {
+        match &place.kind {
+            PlaceKind::Temp(temp_id) => {
                 let value = IrOperand {
                     value: return_value,
-                    is_signed_interger: false,
+                    info: OperandInfo::new_loaded(place.ty),
                 };
                 self.push_temp(*temp_id, value);
             }
-            Place::Field{..} => panic!("call return value should be Place::Temp not Place::Field"),
-            Place::Deref(_) => panic!("call return value should be Place::Temp not Place::Deref"),
-            Place::Local(_) => panic!("call return value should be Place::Temp not Place::Local"),
+            PlaceKind::Field{..} => panic!("call return value should be Place::Temp not Place::Field"),
+            PlaceKind::Deref(_) => panic!("call return value should be Place::Temp not Place::Deref"),
+            PlaceKind::Local(_) => panic!("call return value should be Place::Temp not Place::Local"),
         }
 
         Ok(())

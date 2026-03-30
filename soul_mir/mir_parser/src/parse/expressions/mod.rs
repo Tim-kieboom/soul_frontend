@@ -50,7 +50,7 @@ impl<'a> MirContext<'a> {
                 let temp = self.new_temp(value_type);
 
                 let statement = mir::Statement::new(mir::StatementKind::Assign {
-                    place: self.new_place(mir::Place::Temp(temp)),
+                    place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp), value_type)),
                     value: mir::Rvalue::new(mir::RvalueKind::Unary {
                         operator: operator.clone(),
                         value: inner,
@@ -70,7 +70,7 @@ impl<'a> MirContext<'a> {
                 let temp = self.new_temp(value_type);
 
                 let statement = mir::Statement::new(mir::StatementKind::Assign {
-                    place: self.new_place(mir::Place::Temp(temp)),
+                    place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp), value_type)),
                     value: mir::Rvalue::new(mir::RvalueKind::Binary {
                         left,
                         operator: operator.clone(),
@@ -98,7 +98,7 @@ impl<'a> MirContext<'a> {
                         let terminator_type = self.expression_type(terminator);
                         let temp = self.new_temp(terminator_type);
 
-                        let place = self.new_place(mir::Place::Temp(temp));
+                        let place = self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp), value_type));
                         self.push_statement(mir::Statement::new(mir::StatementKind::Assign {
                             place,
                             value: mir::Rvalue::new(mir::RvalueKind::Use(inner)),
@@ -134,7 +134,7 @@ impl<'a> MirContext<'a> {
                 let temp = self.new_temp(value_type);
 
                 let statement = mir::Statement::new(mir::StatementKind::Assign {
-                    place: self.new_place(mir::Place::Temp(temp)),
+                    place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp), value_type)),
                     value: mir::Rvalue::new(mir::RvalueKind::Use(ptr)),
                 });
 
@@ -167,7 +167,7 @@ impl<'a> MirContext<'a> {
                     let temp = self.new_temp(cast_to);
 
                     let statement = mir::Statement::new(mir::StatementKind::Assign {
-                        place: self.new_place(mir::Place::Temp(temp)),
+                        place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp), value_type)),
                         value: mir::Rvalue::new(mir::RvalueKind::CastUse {
                             value,
                             cast_to,
@@ -242,7 +242,7 @@ impl<'a> MirContext<'a> {
             let warning = "check for primitive catablility";
             if expression.is_literal() {
                 let temp = self.new_temp(ty);
-                let place = self.new_place(mir::Place::Temp(temp));
+                let place = self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp), ty));
                 let rvalue = mir::Rvalue::new(mir::RvalueKind::CastUse { value, cast_to: ty });
                 let cast = mir::Statement::new(mir::StatementKind::Assign {
                     place,
@@ -260,7 +260,7 @@ impl<'a> MirContext<'a> {
         } else {
             Some(self.new_temp(ty))
         };
-        let return_place = temp.map(|val| self.new_place(mir::Place::Temp(val)));
+        let return_place = temp.map(|val| self.new_place(mir::Place::new(mir::PlaceKind::Temp(val), ty)));
 
         let statement = mir::Statement::new(mir::StatementKind::Call {
             id: function_id,
@@ -333,7 +333,7 @@ impl<'a> MirContext<'a> {
         let temp = self.new_temp(struct_type);
 
         let statement = mir::Statement::new(mir::StatementKind::Assign {
-            place: self.new_place(mir::Place::Temp(temp)),
+            place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp), struct_type)),
             value: mir::Rvalue::new(ctor),
         });
         self.push_statement(statement);
@@ -343,8 +343,8 @@ impl<'a> MirContext<'a> {
 
     fn lower_load(&mut self, ty: TypeId, place: hir::PlaceId, is_end: &mut bool) -> mir::Operand {
         let place_id = self.lower_place(place).pass(is_end);
-        let operand = match &self.tree.places[place_id] {
-            mir::Place::Local(local) => {
+        let operand = match &self.tree.places[place_id].kind {
+            mir::PlaceKind::Local(local) => {
                 return mir::Operand::new(ty, mir::OperandKind::Local(*local));
             }
             _ => mir::Operand::new(ty, mir::OperandKind::Temp(self.place_to_temp(place_id, ty))),
@@ -353,7 +353,7 @@ impl<'a> MirContext<'a> {
         let temp = self.new_temp(ty);
 
         let statement = mir::Statement::new(mir::StatementKind::Assign {
-            place: self.new_place(mir::Place::Temp(temp)),
+            place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp), ty)),
             value: mir::Rvalue::new(mir::RvalueKind::Use(operand)),
         });
 

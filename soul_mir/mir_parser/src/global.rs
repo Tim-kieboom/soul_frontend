@@ -54,13 +54,14 @@ impl<'a> MirContext<'a> {
     fn lower_global_variable(&mut self, variable: &hir::Variable) -> Option<mir::Place> {
         
         let local_info = &self.hir_response.hir.nodes.locals[variable.local];
+        let ty = self.local_type(variable.local);
         if local_info.is_temp() {
-            return Some(mir::Place::Temp(
-                self.new_temp(self.local_type(variable.local)),
-            ));
+            let temp = self.new_temp(self.local_type(variable.local));
+            return Some(
+                mir::Place::new(mir::PlaceKind::Temp(temp), ty), 
+            );
         }
 
-        let ty = self.local_type(variable.local);
         let local = self.new_local_global(variable.local, ty);
         let id = self.id_generators.alloc_global();
 
@@ -89,6 +90,9 @@ impl<'a> MirContext<'a> {
             return None;
         }
 
-        Some(mir::Place::Local(local))
+        Some(mir::Place::new(
+            mir::PlaceKind::Local(local),
+            ty,
+        ))
     }
 }

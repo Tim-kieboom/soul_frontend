@@ -1,6 +1,5 @@
 use ast::{AsTypeCast, VarTypeKind, scope::NodeId};
 use hir::{ExpressionId, HirType, HirTypeKind, LocalId, Place, PlaceKind};
-#[cfg(debug_assertions)]
 use soul_utils::soul_error_internal;
 use soul_utils::{
     Ident,
@@ -32,7 +31,12 @@ impl<'a> HirContext<'a> {
             ast::ExpressionKind::As(as_type_cast) => self.lower_cast(id, as_type_cast),
             ast::ExpressionKind::Deref { id: _, inner } => self.lower_deref(id, inner),
             ast::ExpressionKind::FieldAccess(field_access) => {
-                self.lower_field(id, field_access, span)
+                let place = self.lower_field(field_access, span);
+                hir::Expression {
+                    id,
+                    ty: self.new_infer_type(vec![], None, span),
+                    kind: hir::ExpressionKind::Load(place),
+                }
             }
             ast::ExpressionKind::FunctionCall(function_call) => self.lower_call(id, function_call),
             ast::ExpressionKind::Literal((_node_id, literal)) => self.lower_literal(id, literal),
@@ -96,7 +100,11 @@ impl<'a> HirContext<'a> {
             }
         };
 
-        let hir_type = self.tree.info.types.id_to_type(kown).expect("have type");
+        let hir_type = match self.tree.info.types.id_to_type(kown){
+            Some(val) => val,
+            None => return hir::Expression::error(id),
+        };
+
         let struct_type = match &hir_type.kind {
             HirTypeKind::Struct(val) => *val,
             _ => {
@@ -186,7 +194,13 @@ impl<'a> HirContext<'a> {
         ident: &Ident,
         option_id: Option<NodeId>,
     ) -> hir::Expression {
-        let node_id = option_id.expect("node_id should be Some(_) in hir");
+        let node_id = match option_id.ok_or(soul_error_internal!("node_id should be Some(_) in hir", None)) {
+            Ok(val) => val,
+            Err(err) => {
+                self.log_error(err);
+                return hir::Expression::error(id)
+            }
+        };
         let var_type_kind = self.ast_store.get_variable_type(node_id);
 
         let ty = match var_type_kind {
@@ -226,25 +240,18 @@ impl<'a> HirContext<'a> {
         }
     }
 
-    fn lower_field(
+    pub(crate) fn lower_field(
         &mut self,
-        id: ExpressionId,
         field: &ast::FieldAccess,
         span: Span,
-    ) -> hir::Expression {
+    ) -> hir::PlaceId {
         let base = self.lower_place(&field.object);
         let field = hir::PlaceKind::Field {
             base,
             field: field.field.clone(),
         };
         let place_id = self.id_generator.alloc_place();
-        let place = self.insert_place(hir::Place::new(place_id, field, span));
-
-        hir::Expression {
-            id,
-            ty: self.new_infer_type(vec![], None, span),
-            kind: hir::ExpressionKind::Load(place),
-        }
+        self.insert_place(hir::Place::new(place_id, field, span))
     }
 
     fn lower_deref(&mut self, id: ExpressionId, inner: &Box<ast::Expression>) -> hir::Expression {
