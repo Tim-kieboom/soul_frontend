@@ -1,4 +1,4 @@
-use soul_utils::{bimap::BiMap, ids::{IdAlloc, IdGenerator}, soul_names::TypeModifier, span::Span, vec_map::VecMap};
+use soul_utils::{bimap::BiMap, ids::IdGenerator, soul_names::TypeModifier, span::Span, vec_map::VecMap};
 
 use crate::{GenericId, InferTypeId, StructId, TypeId, hir_type::{HirType, InferType, Struct}};
 

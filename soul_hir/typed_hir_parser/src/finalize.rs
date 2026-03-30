@@ -62,7 +62,7 @@ impl<'a> TypedHirContext<'a> {
     }
 
     fn lower_types_map(&mut self) -> ThirTypesMap {
-        let mut out = ThirTypesMap::default();
+        let mut out = ThirTypesMap::new();
 
         let keys = self.types.types_keys().collect::<Vec<_>>();
         for id in keys {

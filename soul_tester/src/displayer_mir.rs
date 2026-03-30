@@ -1,6 +1,6 @@
 use hir::{FieldId, HirTree, StructId, TypeId};
 use mir_parser::mir::{
-    self, BlockId, FunctionBody, Local, LocalId, MirTree, Operand, Place, PlaceId, PlaceKind, Rvalue, StatementId, TempId
+    self, BlockId, FunctionBody, Local, LocalId, MirTree, Operand, PlaceId, PlaceKind, Rvalue, StatementId, TempId
 };
 use run_hir::HirResponse;
 use soul_utils::{

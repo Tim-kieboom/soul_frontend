@@ -10,34 +10,41 @@ extern "C" __clib_fmtFloat(value: f64, base: u8, buffer: *char/*[50]char*/, prec
 // global1 := 10 + 33 * 2
 fmtBuffer := malloc(50) as *char //[for 50 => '\0']
 
-struct Array {
+struct Object {
     len: uint
-    ptr: *none
+    letter: char
 }
 
 struct Inner {
-    array: Array
+    object: Object
 }
 
 main() {
-    array := Array{
-        ptr: malloc(0),
+    object := Object{
         len: 12, 
+        letter: 'a',
     }
     endln()
-    mut len = array.len
-    mut ptr = array.ptr
+    mut len = object.len
+    mut letter = object.letter
     print_uint(len)
     endln()
 
-    inner := Inner{array}
-    len = inner.array.len
+    // object.len = 1
+    // len = object.len
+    // print_uint(len)
+    // endln()
+
+    print_char(letter)
+    endln()
+
+    inner := Inner{object}
+    len = inner.object.len
     print_uint(len)
     endln()
-    
+
     // pow := 3 ** 2
     // root := 2 </ 4
-    print_int(1)
     // generics()
     prints()
     comptime()

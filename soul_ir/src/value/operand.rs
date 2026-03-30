@@ -3,7 +3,7 @@ use mir_parser::mir::{Operand, OperandKind};
 use soul_utils::{error::SoulResult, soul_error_internal, soul_names::PrimitiveSize};
 use typed_hir::{ThirTypeKind, display_thir::DisplayThirType};
 
-use crate::{GenericSubstitute, IrOperand, LlvmBackend, OperandInfo, build_error};
+use crate::{GenericSubstitute, IrOperand, LlvmBackend};
 
 impl<'f, 'a> LlvmBackend<'f, 'a> {
     pub(crate) fn lower_operand(
@@ -28,16 +28,13 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     crate::Local::Comptime(literal_operand) => return Ok(literal_operand),
                 };
 
-                return self
+                let value = self
                     .builder
-                    .build_load(ty, ptr, "load")
-                    .map(|value| IrOperand {
-                        value,
-                        info: OperandInfo::new_loaded(mir_local.ty()),
-                    })
-                    .map_err(|err| build_error(err))
+                    .build_load(ty, ptr, "load")?;
+
+                self.new_loaded_operand(value, mir_local.ty(), generics)?
             }
-            OperandKind::Comptime(literal) => self.lower_literal(literal, operand.ty)?,
+            OperandKind::Comptime(literal) => self.lower_literal(literal, operand.ty, generics)?,
             OperandKind::Ref { .. } => {
                 todo!("ref not yet impl")
             }
@@ -51,6 +48,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         &self,
         literal: &ast::Literal,
         should_be: TypeId,
+        generics: &GenericSubstitute,
     ) -> SoulResult<IrOperand<'a>> {
         Ok(match literal {
             ast::Literal::Int(value) => {
@@ -85,10 +83,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
                 let value = int_type.const_int(*value as u64, negative).into();
 
-                IrOperand {
-                    value,
-                    info: OperandInfo::new_loaded(should_be),
-                }
+                self.new_loaded_operand(value, should_be, generics)?
             }
             ast::Literal::Uint(value) => {
                 let hir_type = self
@@ -123,10 +118,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
                 let value = int_type.const_int(*value as u64, false).into();
 
-                IrOperand {
-                    value,
-                    info: OperandInfo::new_loaded(should_be),
-                }
+                self.new_loaded_operand(value, should_be, generics)?
             }
             ast::Literal::Float(value) => {
                 let size = match self
@@ -156,10 +148,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 };
                 let value = int_type.const_float(*value).into();
 
-                IrOperand {
-                    value,
-                    info: OperandInfo::new_loaded(should_be),
-                }
+                self.new_loaded_operand(value, should_be, generics)?
             }
             ast::Literal::Bool(value) => {
                 let value = self
@@ -168,10 +157,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     .const_int(*value as u64, false)
                     .into();
 
-                IrOperand {
-                    value,
-                    info: OperandInfo::new_loaded(should_be),
-                }
+                self.new_loaded_operand(value, should_be, generics)?
             }
             ast::Literal::Char(value) => {
                 let value = self
@@ -180,10 +166,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     .const_int(*value as u64, false)
                     .into();
 
-                IrOperand {
-                    value,
-                    info: OperandInfo::new_loaded(should_be),
-                }
+                self.new_loaded_operand(value, should_be, generics)?
             }
             ast::Literal::Str(_) => {
                 todo!("string literal not yet impl")

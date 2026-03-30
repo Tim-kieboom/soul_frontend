@@ -7,7 +7,7 @@ use soul_utils::{
     vec_map::VecMapIndex,
 };
 
-use crate::{GenericSubstitute, IrOperand, LlvmBackend, OperandInfo, build_error};
+use crate::{GenericSubstitute, LlvmBackend};
 
 impl<'f, 'a> LlvmBackend<'f, 'a> {
     pub(crate) fn allocate_function_locals(
@@ -34,7 +34,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         self.alloc_locals(locals, generics);
     }
 
-    pub(crate) fn allocate_globals(&mut self) {
+    pub(crate) fn allocate_globals(&mut self, generics: &GenericSubstitute) {
         let empty_generics = GenericSubstitute::new(&[], &[]);
         for global in self.mir.tree.globals.values() {
             let local = global.local;
@@ -59,7 +59,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             let ir_global = self.module.add_global(ty, None, &self.local_name(local));
             self.push_global(local, ir_global.as_pointer_value());
             if let Some(comptime) = &global.literal {
-                let ir_operand = match self.lower_literal(comptime, global.ty) {
+                let ir_operand = match self.lower_literal(comptime, global.ty, generics) {
                     Ok(val) => val,
                     Err(err) => {
                         self.log_error(err);
@@ -91,7 +91,10 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             };
 
             if let mir::Local::Comptime { value, .. } = local {
-                self.build_comptime_local(ty, local.ty(), *local_id, value);
+                if let Err(err) = self.build_comptime_local(ty, local.ty(), *local_id, value, generics) {
+                    self.log_error(err);
+                }
+
                 continue;
             }
 
@@ -107,8 +110,8 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 .get_nth_param(i as u32)
                 .expect("should have parameter");
 
-            if let Err(err) = self.builder.build_store(ptr, param) {
-                self.log_error(build_error(err));
+            if let Err(err) = self.builder.store_parameter(ptr, param) {
+                self.log_error(err);
             }
         }
     }
@@ -128,7 +131,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             };
 
             if let mir::Local::Comptime { value, .. } = local {
-                self.build_comptime_local(ty, local.ty(), *local_id, value);
+                if let Err(err) = self.build_comptime_local(ty, local.ty(), *local_id, value, generics) {
+                    self.log_error(err);
+                }
                 continue;
             }
 
@@ -144,21 +149,22 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
     }
 
     fn build_runtime_local(&mut self, ty: BasicTypeEnum<'a>, local_id: LocalId, name: &str) -> SoulResult<PointerValue<'a>> {
-        let ptr = self.builder.build_alloca(ty, name).map_err(build_error)?;
+        let ptr = self.builder.build_alloca(ty, name)?;
         self.push_local(local_id, crate::Local::Runtime(ptr));
         Ok(ptr)
     }
 
-    fn build_comptime_local(&mut self, ty: BasicTypeEnum<'a>, hir_type: TypeId, id: LocalId, literal: &Literal) {
-        let const_operand = match self.lower_literal(literal, hir_type) {
+    fn build_comptime_local(&mut self, ty: BasicTypeEnum<'a>, hir_type: TypeId, id: LocalId, literal: &Literal, generics: &GenericSubstitute) -> SoulResult<()> {
+        let const_operand = match self.lower_literal(literal, hir_type, generics) {
             Ok(val) => val,
             Err(err) => {
                 self.log_error(err);
-                IrOperand { value: ty.const_zero(), info: OperandInfo::new_loaded(hir_type) }
+                self.new_loaded_operand(ty.const_zero(), hir_type, generics)?
             }
         };
         let local = crate::Local::Comptime(const_operand);
         self.push_local(id, local);
+        Ok(())
     }
 
     fn insert_dummy_global(&mut self, local: LocalId) {

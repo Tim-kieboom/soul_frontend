@@ -4,7 +4,7 @@ use mir_parser::mir;
 use soul_utils::{error::SoulResult, soul_error_internal, soul_names::PrimitiveTypes};
 use typed_hir::{ThirType, ThirTypeKind};
 
-use crate::{GenericSubstitute, IrOperand, LlvmBackend, OperandInfo, build_error};
+use crate::{GenericSubstitute, IrOperand, LlvmBackend};
 
 impl<'f, 'a> LlvmBackend<'f, 'a> {
     pub(super) fn lower_cast(
@@ -34,12 +34,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 );
                 let res = self
                     .builder
-                    .build_int_to_ptr(source, cast, "castNumPtr")
-                    .map_err(build_error)?;
-                Ok(IrOperand {
-                    value: res.into(),
-                    info: OperandInfo::new_loaded(cast_to),
-                })
+                    .build_int_to_ptr(source, cast)?;
+                
+                self.new_loaded_operand(res.into(), cast_to, generics)
             }
             (ThirTypeKind::Pointer(_), ThirTypeKind::Primitive(_)) => {
                 // ptr → int
@@ -49,12 +46,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 );
                 let res = self
                     .builder
-                    .build_ptr_to_int(source, cast, "castPtrNum")
-                    .map_err(build_error)?;
-                Ok(IrOperand {
-                    value: res.into(),
-                    info: OperandInfo::new_loaded(cast_to),
-                })
+                    .build_ptr_to_int(source, cast)?;
+
+                self.new_loaded_operand(res.into(), cast_to, generics)
             }
             (ThirTypeKind::Primitive(_), ThirTypeKind::Primitive(_)) => {
                 let info = self.get_primitive_cast_info(
@@ -64,7 +58,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     source_operand,
                     cast_type,
                 )?;
-                self.cast_primitives(info)
+                self.cast_primitives(info, generics)
             }
             _ => Err(soul_error_internal!(
                 format!(
@@ -76,7 +70,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         }
     }
 
-    fn cast_primitives(&self, info: PrimCastInfo<'a>) -> SoulResult<IrOperand<'a>> {
+    fn cast_primitives(&self, info: PrimCastInfo<'a>, generics: &GenericSubstitute) -> SoulResult<IrOperand<'a>> {
         let value = if info.source_size == info.cast_size {
             self.same_size_cast(&info)?
         } else if info.both_are_float {
@@ -89,10 +83,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             self.int_trunc(&info)?
         };
 
-        Ok(IrOperand {
-            value,
-            info: OperandInfo::new_loaded(info.cast_type_id),
-        })
+        self.new_loaded_operand(value, info.cast_type_id, generics)
     }
 
     fn int_extend(&self, info: &PrimCastInfo<'a>) -> SoulResult<BasicValueEnum<'a>> {
@@ -103,12 +94,10 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         );
         let res = if info.source_prim.can_be_negative() {
             self.builder
-                .build_int_s_extend(source, cast, "castIntExt")
-                .map_err(build_error)?
+                .build_int_s_extend(source, cast)?
         } else {
             self.builder
-                .build_int_z_extend(source, cast, "castUintExt")
-                .map_err(build_error)?
+                .build_int_z_extend(source, cast)?
         };
 
         Ok(res.into())
@@ -121,8 +110,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         );
         let res = self
             .builder
-            .build_int_truncate(source, cast, "castIntTrunc")
-            .map_err(build_error)?;
+            .build_int_truncate(source, cast)?;
         Ok(res.into())
     }
 
@@ -135,12 +123,11 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             );
             let result = if info.cast_prim.can_be_negative() {
                 self.builder
-                    .build_float_to_signed_int(source, cast, "castFloatInt")
+                    .build_float_to_signed_int(source, cast)?
             } else {
                 self.builder
-                    .build_float_to_unsigned_int(source, cast, "castFloatUint")
-            }
-            .map_err(build_error)?;
+                    .build_float_to_unsigned_int(source, cast)?
+            };
 
             Ok(result.into())
         } else {
@@ -151,12 +138,11 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             );
             let result = if info.source_prim.can_be_negative() {
                 self.builder
-                    .build_signed_int_to_float(source, cast, "castIntFloat")
+                    .build_signed_int_to_float(source, cast)?
             } else {
                 self.builder
-                    .build_unsigned_int_to_float(source, cast, "castUintFloat")
-            }
-            .map_err(build_error)?;
+                    .build_unsigned_int_to_float(source, cast)?
+            };
 
             Ok(result.into())
         }
@@ -165,8 +151,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
     fn same_size_cast(&self, info: &PrimCastInfo<'a>) -> SoulResult<BasicValueEnum<'a>> {
         if info.one_is_float {
             self.builder
-                .build_bit_cast(info.source_operand.value, info.cast_type, "castBitcast")
-                .map_err(build_error)
+                .build_bit_cast(info.source_operand.value, info.cast_type)
         } else {
             Ok(info.source_operand.value)
         }
@@ -179,12 +164,10 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         );
         let float = if info.source_size < info.cast_size {
             self.builder
-                .build_float_ext(source, cast, "castFloatExt")
-                .map_err(build_error)?
+                .build_float_ext(source, cast)?
         } else {
             self.builder
-                .build_float_trunc(source, cast, "castFloatTrunc")
-                .map_err(build_error)?
+                .build_float_trunc(source, cast)?
         };
 
         Ok(float.into())

@@ -43,10 +43,10 @@ pub fn display_created_types(hir: &HirTree, typed: &TypedHir) -> String {
             sb.push_str(field_name);
             sb.push_str(": ");
             typed.types_map
-            .id_to_type(field.ty)
-            .expect("should have type")
-            .write_display(&typed.types_map, &mut sb)
-            .expect("no fmt error");
+                .id_to_type(field.ty)
+                .expect(&format!("{:?} not found", field.ty))
+                .write_display(&typed.types_map, &mut sb)
+                .expect("no fmt error");
             sb.push('\n');
         }
         sb.push_str("}\n");

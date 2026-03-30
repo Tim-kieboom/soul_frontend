@@ -1,4 +1,4 @@
-use hir::{FieldId, TypeId};
+use hir::TypeId;
 use soul_utils::{ids::IdAlloc, soul_error_internal, span::Span};
 
 use crate::{

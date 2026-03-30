@@ -3,10 +3,9 @@ use std::{cell::RefCell, collections::HashMap};
 use hir::{FieldId, StructId, TypeId};
 use inkwell::{
     basic_block::BasicBlock,
-    builder::{Builder, BuilderError},
     context::Context,
     module::Module,
-    types::{IntType, StructType},
+    types::{BasicTypeEnum, IntType, StructType},
     values::{BasicValueEnum, FunctionValue, PointerValue},
 };
 use mir_parser::mir::{BlockId, LocalId, TempId};
@@ -28,8 +27,12 @@ mod local;
 mod statement;
 mod utils;
 mod value;
+mod llvm_builder;
 use typed_hir::{ThirType, TypedHir};
 use utils::*;
+
+use crate::llvm_builder::IrBuilder;
+
 
 pub struct IrRequest<'ctx> {
     pub context: &'ctx Context,
@@ -59,7 +62,7 @@ pub fn to_llvm_ir<'f, 'a>(
     let mut backend = LlvmBackend::new(request, options, faults);
 
     backend.declare_exit();
-    backend.allocate_globals();
+    backend.allocate_globals(&GenericSubstitute::new(&[], &[]));
 
     let entry = request.mir.tree.entry_function;
     backend.get_or_create_function(entry, &vec![]);
@@ -70,21 +73,22 @@ pub fn to_llvm_ir<'f, 'a>(
 #[derive(Debug, Clone, Copy)]
 pub struct IrOperand<'a> {
     pub value: BasicValueEnum<'a>,
-    pub info: OperandInfo,
+    pub info: OperandInfo<'a>,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct OperandInfo {
+pub struct OperandInfo<'a> {
     pub is_unloaded: bool,
     pub type_id: TypeId,
+    pub ir_type: BasicTypeEnum<'a>,
 }
-impl OperandInfo {
-    fn new_loaded(type_id: TypeId) -> Self {
-        Self { is_unloaded: false, type_id }
+impl<'a> OperandInfo<'a> {
+    fn new_loaded(type_id: TypeId, ir_type: BasicTypeEnum<'a>) -> Self {
+        Self { is_unloaded: false, ir_type, type_id }
     }
 
-    fn new_unloaded(type_id: TypeId) -> Self {
-        Self { is_unloaded: true, type_id }
+    fn new_unloaded(type_id: TypeId, ir_type: BasicTypeEnum<'a>) -> Self {
+        Self { is_unloaded: true, ir_type, type_id }
     }
 }
 
@@ -96,12 +100,12 @@ pub struct LlvmBackend<'f, 'a> {
     default_int_type: IntType<'a>,
     default_char_type: IntType<'a>,
 
+    types: TypedHir,
     current: Current,
     module: Module<'a>,
     context: &'a Context,
     mir: &'a MirResponse,
-    builder: Builder<'a>,
-    types: TypedHir,
+    builder: IrBuilder<'a>,
     options: &'a CompilerOptions,
     exit_function: Option<FunctionValue<'a>>,
 
@@ -126,7 +130,7 @@ pub enum Local<'a> {
 impl<'f, 'a> LlvmBackend<'f, 'a> {
     pub fn new(request: &'a IrRequest<'a>, options: &'a CompilerOptions, faults: &'f mut Vec<SementicFault>) -> Self {
         let module = request.context.create_module("main");
-        let builder = request.context.create_builder();
+        let builder = IrBuilder::new(request.context);
         let function_keys = FunctionKeyStore::new();
 
         Self {
@@ -266,15 +270,6 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             is_fatal: self.faults.iter().find(|fault| fault.is_fatal(self.options.fault_level)).is_some(),
         }
     }
-}
-
-/// From [`BuilderError`] to [`SoulError`] of [`soul_utils::error::SoulErrorKind::LlvmError`]
-fn build_error(value: BuilderError) -> SoulError {
-    SoulError::new(
-        value.to_string(),
-        soul_utils::error::SoulErrorKind::LlvmError,
-        None,
-    )
 }
 
 pub struct FunctionKeyStore {
