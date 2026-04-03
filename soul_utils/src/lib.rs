@@ -1,3 +1,4 @@
+pub mod bimap;
 pub mod char_colors;
 pub mod compile_options;
 pub mod define_enums;
@@ -13,7 +14,6 @@ pub mod symbool_kind;
 pub mod try_result;
 pub mod vec_map;
 pub mod vec_set;
-pub mod bimap;
 
 #[cfg(test)]
 mod vec_map_tests;

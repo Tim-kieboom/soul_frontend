@@ -1,4 +1,4 @@
-use hir::TypeId;
+use hir::{StructId, TypeId};
 use soul_utils::{ids::IdAlloc, soul_error_internal, span::Span};
 
 use crate::{
@@ -7,7 +7,6 @@ use crate::{
 };
 
 impl<'a> MirContext<'a> {
-
     pub fn lower_place(&mut self, place_id: hir::PlaceId) -> EndBlock<mir::PlaceId> {
         let is_end = &mut false;
         let span = self.place_span(place_id);
@@ -16,6 +15,7 @@ impl<'a> MirContext<'a> {
                 let local = match self.local_remap.get(*local_id) {
                     Some(val) => *val,
                     None => {
+                        #[cfg(debug_assertions)]
                         self.log_error(soul_error_internal!(
                             format!("{:?} not found in remap", local_id),
                             Some(span)
@@ -50,11 +50,30 @@ impl<'a> MirContext<'a> {
             hir::PlaceKind::Index { .. } => todo!("mir desugar index"),
             hir::PlaceKind::Field { base, .. } => {
                 let base = self.lower_place(*base).pass(is_end);
-                let ty = self.hir_response.typed.types_table.places.get_or_error_id(place_id);
-                let field_id = self.hir_response.typed.types_table.place_fields.get_or_error_id(place_id);
+                let ty = self
+                    .hir_response
+                    .typed
+                    .types_table
+                    .places
+                    .get_or_error_id(place_id);
 
-                self.new_place(mir::Place::new(mir::PlaceKind::Field{base, field_id}, ty))
-            },
+                let field_id = self
+                    .hir_response
+                    .typed
+                    .types_table
+                    .place_fields
+                    .get_or_error_id(place_id);
+
+                let struct_type = self.hir_response.hir.nodes.fields
+                    .get(field_id)
+                    .map(|f| f.struct_id)
+                    .unwrap_or(StructId::error());
+
+                self.new_place(mir::Place::new(
+                    mir::PlaceKind::Field { struct_type, base, field_id },
+                    ty,
+                ))
+            }
         };
 
         let ty = self.place_type(place_id);
@@ -79,7 +98,7 @@ impl<'a> MirContext<'a> {
 
     pub(crate) fn place_to_operand(&mut self, place_id: mir::PlaceId, ty: TypeId) -> mir::Operand {
         match &self.tree.places[place_id].kind {
-            mir::PlaceKind::Field{base, field_id} => {
+            mir::PlaceKind::Field { base, field_id, struct_type:_ } => {
                 let field_id = *field_id;
                 let base = *base;
                 let field_temp = self.new_temp(ty);

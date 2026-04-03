@@ -1,4 +1,4 @@
-use hir::{Assign, ExpressionId, HirType, Place, PlaceId, PlaceKind, LazyTypeId};
+use hir::{Assign, ExpressionId, HirType, LazyTypeId, Place, PlaceId, PlaceKind};
 use soul_utils::{
     Ident,
     soul_names::TypeModifier,
@@ -32,9 +32,7 @@ impl<'a> HirContext<'a> {
         self.insert_temp(&name, temp_local, ty, unalloc);
 
         let temp_type = self.new_infer_type(vec![], Some(TypeModifier::Mut), span);
-        let temp_array = hir::Variable {
-            local: temp_local,
-        };
+        let temp_array = hir::Variable { local: temp_local };
 
         self.insert_desugar_variable(temp_array, temp_type, unalloc, span);
 
@@ -113,7 +111,13 @@ impl<'a> HirContext<'a> {
         }
     }
 
-    pub(super) fn insert_desugar_variable(&mut self, variable: hir::Variable, ty: LazyTypeId, value: ExpressionId, span: Span) {
+    pub(super) fn insert_desugar_variable(
+        &mut self,
+        variable: hir::Variable,
+        ty: LazyTypeId,
+        value: ExpressionId,
+        span: Span,
+    ) {
         let name = Ident::new(create_local_name(variable.local), span);
 
         self.insert_temp(&name, variable.local, ty, value);

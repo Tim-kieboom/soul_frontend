@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use ast::{AstResponse, DeclareStore};
 use hir::{
-    BlockId, CreatedTypes, ExpressionId, GenericId, HirTree, LocalId, LazyTypeId, StatementId,
+    BlockId, CreatedTypes, ExpressionId, GenericId, HirTree, LazyTypeId, LocalId, StatementId,
 };
 use soul_utils::{
     Ident,
@@ -95,6 +95,7 @@ impl<'a> HirContext<'a> {
             hir::LocalInfo {
                 ty,
                 kind: hir::LocalKind::Parameter,
+                span: self.tree.info.spans.locals.get(local).copied(),
             },
         );
     }
@@ -112,23 +113,19 @@ impl<'a> HirContext<'a> {
             hir::LocalInfo {
                 ty,
                 kind: hir::LocalKind::Variable(value),
+                span: self.tree.info.spans.locals.get(local).copied(),
             },
         );
     }
 
-    fn insert_temp(
-        &mut self,
-        name: &Ident,
-        local: LocalId,
-        ty: LazyTypeId,
-        value: ExpressionId,
-    ) {
+    fn insert_temp(&mut self, name: &Ident, local: LocalId, ty: LazyTypeId, value: ExpressionId) {
         self.inner_insert_local(
             name,
             local,
             hir::LocalInfo {
                 ty,
                 kind: hir::LocalKind::Temp(value),
+                span: self.tree.info.spans.locals.get(local).copied(),
             },
         );
     }

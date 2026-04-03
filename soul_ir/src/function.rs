@@ -1,7 +1,6 @@
 use hir::TypeId;
 use inkwell::{
-    types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FunctionType, VoidType},
-    values::FunctionValue,
+    types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FunctionType, VoidType}, values::FunctionValue
 };
 use mir_parser::mir::FunctionBody;
 use soul_utils::{Ident, ids::FunctionId};
@@ -46,6 +45,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         let function_type = return_type.fn_type(&args, false);
         let name = self.mangle(&function.name, function.callee, type_args);
         let llvm_function = self.module.add_function(&name, function_type, None);
+
         self.create_block(function_id, llvm_function);
         llvm_function
     }

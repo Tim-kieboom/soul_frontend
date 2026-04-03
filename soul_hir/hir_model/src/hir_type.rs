@@ -1,12 +1,37 @@
-use ast::ArrayKind;
+use ast::{ArrayKind, Literal};
 use soul_utils::{
-    Ident, ids::IdAlloc, soul_names::{PrimitiveTypes, TypeModifier}, symbool_kind::SymbolKind, vec_map::VecMapIndex,
+    Ident,
+    ids::IdAlloc,
+    soul_names::{PrimitiveTypes, TypeModifier},
+    symbool_kind::SymbolKind,
+    vec_map::VecMapIndex,
 };
 
 use crate::{FieldId, GenericId, InferTypeId, InferTypesMap, StructId, TypeId, TypesMap};
 
 pub type HirType = InnerType<HirTypeKind>;
 pub type InferType = InnerType<InferTypeId>;
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum ComplexLiteral {
+    Basic(Literal),
+    Struct {
+        struct_id: StructId,
+        struct_type: TypeId,
+        values: Vec<(ComplexLiteral, TypeId)>,
+        all_fields_const: bool,
+    },
+}
+impl ComplexLiteral {
+    
+    /// for example `Struct{mut field: i32}` should be alloced becouse you can change value of field
+    pub fn is_mutable(&self) -> bool {
+        match self {
+            ComplexLiteral::Basic(_) => false,
+            ComplexLiteral::Struct { all_fields_const, .. } => !*all_fields_const,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct InnerType<Kind> {
@@ -16,7 +41,21 @@ pub struct InnerType<Kind> {
 }
 impl<T> InnerType<T> {
     pub const fn new(kind: T) -> Self {
-        Self { kind, generics: vec![], modifier: None }
+        Self {
+            kind,
+            generics: vec![],
+            modifier: None,
+        }
+    }
+
+    pub const fn apply_modfier(mut self, modifier: Option<TypeModifier>) -> Self {
+        self.modifier = modifier;
+        self
+    }
+}
+impl InferType {
+    pub fn is_mutable(&self) -> bool {
+        self.modifier == Some(TypeModifier::Mut)
     }
 }
 impl HirType {
@@ -112,6 +151,10 @@ impl HirTypeKind {
             _ => false,
         }
     }
+
+    pub const fn is_error(&self) -> bool {
+        matches!(self, HirTypeKind::Error)
+    }
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -150,6 +193,7 @@ pub struct Struct {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Field {
+    pub struct_id: StructId,
     pub id: FieldId,
     /// The name of the field (for readability, debugging, codegen).
     pub name: String,
@@ -158,11 +202,21 @@ pub struct Field {
 
 pub trait DisplayType {
     fn display(&self, types: &TypesMap, infers: &InferTypesMap) -> String;
-    fn write_display(&self, types: &TypesMap, infers: &InferTypesMap, sb: &mut String) -> std::fmt::Result;
+    fn write_display(
+        &self,
+        types: &TypesMap,
+        infers: &InferTypesMap,
+        sb: &mut String,
+    ) -> std::fmt::Result;
 }
 
 impl<K: DisplayType> DisplayType for InnerType<K> {
-    fn write_display(&self, types: &TypesMap, infers: &InferTypesMap, sb: &mut String) -> std::fmt::Result {
+    fn write_display(
+        &self,
+        types: &TypesMap,
+        infers: &InferTypesMap,
+        sb: &mut String,
+    ) -> std::fmt::Result {
         if let Some(modifier) = self.modifier {
             sb.push_str(modifier.as_str());
             sb.push(' ');
@@ -170,27 +224,39 @@ impl<K: DisplayType> DisplayType for InnerType<K> {
 
         self.kind.write_display(types, infers, sb)
     }
-    
+
     fn display(&self, types: &TypesMap, infers: &InferTypesMap) -> String {
         let mut sb = "".to_string();
-        self.write_display(types, infers, &mut sb).expect("no fmt error");
+        self.write_display(types, infers, &mut sb)
+            .expect("no fmt error");
         sb
     }
 }
 impl DisplayType for InferTypeId {
-    fn write_display(&self, _types: &TypesMap, _infers: &InferTypesMap, sb: &mut String) -> std::fmt::Result {
+    fn write_display(
+        &self,
+        _types: &TypesMap,
+        _infers: &InferTypesMap,
+        sb: &mut String,
+    ) -> std::fmt::Result {
         use std::fmt::Write;
         write!(sb, "<infer_{}>", self.index())
     }
 
     fn display(&self, types: &TypesMap, infers: &InferTypesMap) -> String {
         let mut sb = "".to_string();
-        self.write_display(types, infers, &mut sb).expect("no fmt error");
+        self.write_display(types, infers, &mut sb)
+            .expect("no fmt error");
         sb
     }
 }
 impl DisplayType for HirTypeKind {
-    fn write_display(&self, types: &TypesMap, infers: &InferTypesMap, sb: &mut String) -> std::fmt::Result {
+    fn write_display(
+        &self,
+        types: &TypesMap,
+        infers: &InferTypesMap,
+        sb: &mut String,
+    ) -> std::fmt::Result {
         use std::fmt::Write;
         const CONST_REF_STR: &str = SymbolKind::ConstRef.as_str();
         const OPTIONAL_STR: &str = SymbolKind::Question.as_str();
@@ -213,7 +279,7 @@ impl DisplayType for HirTypeKind {
                     None => sb.push_str("<error>"),
                 }
                 Ok(())
-            },
+            }
             HirTypeKind::Primitive(prim) => write!(sb, "{}", prim.as_str()),
             HirTypeKind::Array { element, kind } => {
                 kind.write_to_string(sb)?;
@@ -239,13 +305,13 @@ impl DisplayType for HirTypeKind {
             HirTypeKind::Error => write!(sb, "<error>"),
         }
     }
-    
+
     fn display(&self, types: &TypesMap, infers: &InferTypesMap) -> String {
         let mut sb = "".to_string();
-        self.write_display(types, infers, &mut sb).expect("no fmt error");
+        self.write_display(types, infers, &mut sb)
+            .expect("no fmt error");
         sb
     }
-    
 }
 impl HirTypeKind {
     pub const fn display_variant(&self) -> &'static str {
@@ -264,16 +330,28 @@ impl HirTypeKind {
     }
 }
 
-fn write_display_from_id(types: &TypesMap, infers: &InferTypesMap, ty: LazyTypeId, sb: &mut String) -> std::fmt::Result {
+fn write_display_from_id(
+    types: &TypesMap,
+    infers: &InferTypesMap,
+    ty: LazyTypeId,
+    sb: &mut String,
+) -> std::fmt::Result {
     match inner_write_display_from_id(types, infers, ty, sb) {
         Some(val) => val,
         None => HirType::error_type().write_display(types, infers, sb),
     }
 }
 
-fn inner_write_display_from_id(types: &TypesMap, infers: &InferTypesMap, ty: LazyTypeId, sb: &mut String) -> Option<std::fmt::Result> {
+fn inner_write_display_from_id(
+    types: &TypesMap,
+    infers: &InferTypesMap,
+    ty: LazyTypeId,
+    sb: &mut String,
+) -> Option<std::fmt::Result> {
     Some(match ty {
         LazyTypeId::Known(type_id) => types.id_to_type(type_id)?.write_display(types, infers, sb),
-        LazyTypeId::Infer(infer_type_id) => infers.get_infer(infer_type_id)?.write_display(types, infers, sb),
+        LazyTypeId::Infer(infer_type_id) => infers
+            .get_infer(infer_type_id)?
+            .write_display(types, infers, sb),
     })
 }

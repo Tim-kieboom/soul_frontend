@@ -151,6 +151,11 @@ str __clib_fmtFloat(double num, u8 base, char buf[50], u8 percision, bool capita
 
 // ---------------- #Time ----------------
 
+void __clib_delay(int seconds) {
+    clock_t start = clock();
+    while (((double)(clock() - start)) / CLOCKS_PER_SEC < seconds) {}
+}
+
 Duration __clib_Duration_now() {
     struct timespec ts = {0};
 

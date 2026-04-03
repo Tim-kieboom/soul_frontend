@@ -9,7 +9,7 @@ impl<'a> MirContext<'a> {
         match &global.kind {
             hir::GlobalKind::Function(function) => {
                 if *function == self.hir_response.hir.main {
-                    return // lower main later
+                    return; // lower main later
                 }
                 self.lower_function(*function)
             }
@@ -52,32 +52,30 @@ impl<'a> MirContext<'a> {
     }
 
     fn lower_global_variable(&mut self, variable: &hir::Variable) -> Option<mir::Place> {
-        
         let local_info = &self.hir_response.hir.nodes.locals[variable.local];
         let ty = self.local_type(variable.local);
         if local_info.is_temp() {
             let temp = self.new_temp(self.local_type(variable.local));
-            return Some(
-                mir::Place::new(mir::PlaceKind::Temp(temp), ty), 
-            );
+            return Some(mir::Place::new(mir::PlaceKind::Temp(temp), ty));
         }
 
         let local = self.new_local_global(variable.local, ty);
         let id = self.id_generators.alloc_global();
 
+        let span = local_info.span; 
         let value_id = match local_info.kind {
             LocalKind::Variable(Some(val)) => val,
             _ => {
                 #[cfg(debug_assertions)]
                 self.log_error(soul_error_internal!(
                     "global variables should have Some(_) value",
-                    None
+                    span
                 ));
                 return None;
             }
         };
 
-        let literal = self.get_expression_literal(value_id).cloned();
+        let literal = self.get_expression_literal(value_id);
         let is_literal = literal.is_some();
         let global = mir::Global {
             id,
@@ -90,9 +88,6 @@ impl<'a> MirContext<'a> {
             return None;
         }
 
-        Some(mir::Place::new(
-            mir::PlaceKind::Local(local),
-            ty,
-        ))
+        Some(mir::Place::new(mir::PlaceKind::Local(local), ty))
     }
 }

@@ -1,8 +1,17 @@
 use std::vec;
 
 use ast::ArrayKind;
-use hir::{BlockId, ExpressionId, FieldId, GenericId, LazyTypeId, LocalId, PlaceId, StatementId, StructId, TypeId};
-use soul_utils::{bimap::BiMap, ids::{FunctionId, IdAlloc}, soul_names::{PrimitiveTypes, TypeModifier}, vec_map::VecMap, vec_set::VecSet};
+use hir::{
+    BlockId, ExpressionId, FieldId, GenericId, LazyTypeId, LocalId, PlaceId, StatementId, StructId,
+    TypeId,
+};
+use soul_utils::{
+    bimap::BiMap,
+    ids::{FunctionId, IdAlloc},
+    soul_names::{PrimitiveTypes, TypeModifier},
+    vec_map::VecMap,
+    vec_set::VecSet,
+};
 
 pub mod display_thir;
 
@@ -19,9 +28,19 @@ pub struct ThirTypesMap {
     pub generics: VecMap<GenericId, String>,
 }
 impl ThirTypesMap {
-
     pub fn new() -> Self {
-        Self { types: BiMap::from_array([(TypeId::error(), ThirType{kind: ThirTypeKind::Error, generics: vec![], modifier: None})]), structs: VecMap::const_default(), generics: VecMap::const_default() }
+        Self {
+            types: BiMap::from_array([(
+                TypeId::error(),
+                ThirType {
+                    kind: ThirTypeKind::Error,
+                    generics: vec![],
+                    modifier: None,
+                },
+            )]),
+            structs: VecMap::const_default(),
+            generics: VecMap::const_default(),
+        }
     }
 
     pub fn id_to_type(&self, id: TypeId) -> Option<&ThirType> {
@@ -60,14 +79,8 @@ pub enum ThirTypeKind {
     None,
     Type,
     Primitive(PrimitiveTypes),
-    Array {
-        element: TypeId,
-        kind: ArrayKind,
-    },
-    Ref {
-        of_type: TypeId,
-        mutable: bool,
-    },
+    Array { element: TypeId, kind: ArrayKind },
+    Ref { of_type: TypeId, mutable: bool },
     Pointer(TypeId),
     Optional(TypeId),
     Generic(GenericId),

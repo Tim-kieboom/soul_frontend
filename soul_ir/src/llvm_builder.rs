@@ -1,5 +1,5 @@
 use inkwell::{FloatPredicate, IntPredicate, basic_block::BasicBlock, builder::{Builder, BuilderError}, context::Context, types::{BasicType, FloatMathType, IntMathType, PointerMathType}, values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, CallSiteValue, FloatMathValue, FunctionValue, InstructionValue, IntMathValue, IntValue, PointerMathValue, PointerValue}};
-use soul_utils::error::{SoulError, SoulResult};
+use soul_utils::{error::{SoulError, SoulResult}, soul_error_internal};
 use typed_hir::FieldInfo;
 
 use crate::{IrOperand};
@@ -60,9 +60,12 @@ impl<'ctx> IrBuilder<'ctx> {
     pub fn store_operand(&self, destination_ptr: PointerValue<'ctx>, operand: IrOperand<'ctx>) -> SoulResult<InstructionValue<'ctx>> {
         
         let value = if operand.info.is_unloaded {
-            self.inkwell
-                .build_load(operand.info.ir_type, operand.value.into_pointer_value(), "source_value")
-                .map_err(build_error)?
+            if !operand.value.is_pointer_value() {
+                return Err(soul_error_internal!(format!("expected ptr value in unloaded operand but got {:?}", operand), None))
+            }
+
+            let ptr = operand.value.into_pointer_value();
+            self.build_load(operand.info.ir_type, ptr, "source_value")?
         } else {
             operand.value
         };
@@ -316,14 +319,21 @@ impl<'ctx> IrBuilder<'ctx> {
         self.inkwell.build_float_trunc(float, float_type, "cast_float_trunc").map_err(build_error)
     }
 
+    pub fn get_field_ptr<T>(&self, base_type: T, base_ptr: PointerValue<'ctx>, field_info: &FieldInfo) -> SoulResult<PointerValue<'ctx>>
+    where 
+        T: BasicType<'ctx>,
+    {
+        self.inkwell
+            .build_struct_gep(base_type, base_ptr, field_info.field_index as u32, "gep_struct")
+            .map_err(build_error)
+    }
+
     pub fn build_field_access<T, F>(&self, base_type: T, field_type: F, base_ptr: PointerValue<'ctx>, field_info: &FieldInfo) -> SoulResult<PointerValue<'ctx>>
     where 
         T: BasicType<'ctx>,
         F: BasicType<'ctx> + Copy,
     {
-        let field_ptr = self.inkwell
-            .build_struct_gep(base_type, base_ptr, field_info.field_index as u32, "gep_struct")
-            .map_err(build_error)?;
+        let field_ptr = self.get_field_ptr(base_type, base_ptr, field_info)?;
 
         let loaded_value = self.inkwell
             .build_load(field_type, field_ptr, "load_field")

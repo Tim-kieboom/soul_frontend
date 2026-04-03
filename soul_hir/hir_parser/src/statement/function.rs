@@ -1,7 +1,7 @@
 use ast::NamedTupleElement;
 use hir::TypeId;
 use soul_utils::{
-    Ident, error::{SoulError, SoulErrorKind}, ids::{FunctionId, IdAlloc}, soul_error_internal
+    Ident, error::{SoulError, SoulErrorKind}, ids::{FunctionId, IdAlloc}, print_breakpoint, soul_error_internal
 };
 
 use crate::HirContext;
@@ -26,6 +26,10 @@ impl<'a> HirContext<'a> {
         let mut generics = vec![];
         for generic in &function.signature.node.generics {
             generics.push(self.insert_generic(generic.name.to_string()));
+        }
+
+        if function.signature.node.name.as_str() == "gen" {
+            print_breakpoint!();
         }
 
         let parameters = signature
@@ -57,14 +61,14 @@ impl<'a> HirContext<'a> {
             hir::LazyTypeId::Known(type_id) => type_id,
             hir::LazyTypeId::Infer(_) => {
                 self.log_error(SoulError::new(
-                    "function return type should be known", 
-                    SoulErrorKind::TypeInferenceError, 
+                    "function return type should be known",
+                    SoulErrorKind::TypeInferenceError,
                     Some(function.signature.span),
                 ));
                 TypeId::error()
             }
         };
-        
+
         self.pop_scope();
 
         let hir_function = hir::Function {

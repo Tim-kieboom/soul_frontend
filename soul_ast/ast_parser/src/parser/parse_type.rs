@@ -219,13 +219,14 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let mut types = NamedTupleType::new();
         let mut function_kind = FunctionKind::Static;
-        if self.current_is(close) {
-            self.bump();
-            return TryOk((types, function_kind));
-        }
 
         let mut has_default = false;
         loop {
+            self.skip_end_lines();
+            if self.current_is(close) {
+                break;
+            }
+
             match self.inner_parse_named_this(&mut function_kind, can_have_this)? {
                 Loop::None => (),
                 Loop::Break => break,
@@ -275,6 +276,8 @@ impl<'a, 'f> Parser<'a, 'f> {
                 node_id: None,
                 default,
             });
+
+            self.skip_end_lines();
             if self.current_is(close) {
                 break;
             }

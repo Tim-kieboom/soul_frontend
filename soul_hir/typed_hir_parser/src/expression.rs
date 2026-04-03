@@ -1,10 +1,18 @@
 use std::collections::HashMap;
 
 use ast::{ArrayKind, BinaryOperator, BinaryOperatorKind, UnaryOperator};
-use hir::{Binary, BlockId, DisplayType, ExpressionId, HirType, HirTypeKind, LazyTypeId, PlaceId, Struct, TypeId, Unary};
-use soul_utils::{Ident, error::{SoulError, SoulErrorKind, SoulResult}, ids::{FunctionId, IdAlloc}, soul_error_internal, span::Span, vec_map::VecMap};
+use hir::{
+    Binary, BlockId, DisplayType, ExpressionId, HirType, HirTypeKind, LazyTypeId, PlaceId, Struct,
+    TypeId, Unary,
+};
+use soul_utils::{
+    Ident, error::{SoulError, SoulErrorKind, SoulResult}, ids::{FunctionId, IdAlloc}, soul_error_internal, soul_names::TypeModifier, span::Span, vec_map::VecMap
+};
 
-use crate::{TypedHirContext, type_helpers::{TypeHelpers, UnifyPrimitiveCast}};
+use crate::{
+    TypedHirContext,
+    type_helpers::{TypeHelpers, UnifyPrimitiveCastLazy},
+};
 const MUT: bool = true;
 const CONST: bool = false;
 
@@ -20,22 +28,18 @@ impl<'a> TypedHirContext<'a> {
             hir::ExpressionKind::Error => LazyTypeId::error(),
             hir::ExpressionKind::Null => self.new_infer_optional(span),
             hir::ExpressionKind::Load(place) => self.infer_place(*place),
-            hir::ExpressionKind::Block(body) => self.infer_block(*body),
+            hir::ExpressionKind::Block(body) => self.infer_block_expression(*body),
             hir::ExpressionKind::Local(local) => self.locals[*local],
             hir::ExpressionKind::Literal(_) => value.ty, /*already handled by hir*/
-            hir::ExpressionKind::StructConstructor { ty:_, values, defaults:_ } => {
-                self.infer_struct_constructor(value.ty, values, span)
-            }
-            hir::ExpressionKind::DeRef(inner) => {
-                self.infer_deref(*inner, span)
-            }
+            hir::ExpressionKind::StructConstructor {
+                ty: _,
+                values,
+                defaults: _,
+            } => self.infer_struct_constructor(value.ty, values, span),
+            hir::ExpressionKind::DeRef(inner) => self.infer_deref(*inner, span),
             hir::ExpressionKind::Function(function) => self.functions[*function].to_lazy(),
-            hir::ExpressionKind::Ref { place, mutable } => {
-                self.infer_ref(*place, *mutable, span)
-            }
-            hir::ExpressionKind::Cast { value, cast_to } => {
-                self.infer_cast(*value, *cast_to)
-            }
+            hir::ExpressionKind::Ref { place, mutable } => self.infer_ref(*place, *mutable, span),
+            hir::ExpressionKind::Cast { value, cast_to } => self.infer_cast(*value, *cast_to),
             hir::ExpressionKind::While { condition, body } => {
                 self.infer_while(*condition, *body, span)
             }
@@ -79,12 +83,16 @@ impl<'a> TypedHirContext<'a> {
         ends_with_else: bool,
         if_span: Span,
     ) -> LazyTypeId {
-
         let condition_span = self.expression_span(condition);
         let condition_type = self.infer_expression(condition);
-        _ = self.unify(condition, self.bool_type.to_lazy(), condition_type, condition_span);
+        _ = self.unify(
+            condition,
+            self.bool_type.to_lazy(),
+            condition_type,
+            condition_span,
+        );
 
-        let then_type = self.infer_block(then_block);
+        let then_type = self.infer_block_expression(then_block);
         let then_span = self.block_span(then_block);
         let else_block = match else_block {
             Some(val) => val,
@@ -109,13 +117,12 @@ impl<'a> TypedHirContext<'a> {
             return LazyTypeId::error();
         }
 
-        let else_type = self.infer_block(else_block);
+        let else_type = self.infer_block_expression(else_block);
         let else_span = self.block_span(else_block);
 
         _ = self.unify(ExpressionId::error(), then_type, else_type, else_span);
         self.get_priority_lazy_type(then_type, else_type)
     }
-
 
     fn infer_call(
         &mut self,
@@ -216,7 +223,7 @@ impl<'a> TypedHirContext<'a> {
 
                 let left_type = self.id_to_type(left_id);
                 let right_type = self.id_to_type(right_id);
-                if !left_type.is_numeric_type() {
+                if !left_type.is_error() && !left_type.is_numeric_type() {
                     self.log_error(SoulError::new(
                         format!(
                             "type is '{}' but can only be used for number types (f32, uint, int, i32, ect..)", 
@@ -228,11 +235,11 @@ impl<'a> TypedHirContext<'a> {
                     return LazyTypeId::error();
                 }
 
-                if !right_type.is_numeric_type() {
+                if !right_type.is_error() && !right_type.is_numeric_type() {
                     self.log_error(SoulError::new(
                         format!(
                             "type is '{}' but can only be used for number types (f32, uint, int, i32, ect..)", 
-                            left_type.display(&self.types, &self.infers)
+                            right_type.display(&self.types, &self.infers)
                         ),
                         SoulErrorKind::UnifyTypeError,
                         Some(self.expression_span(left)),
@@ -245,7 +252,12 @@ impl<'a> TypedHirContext<'a> {
         }
     }
 
-    fn infer_unary(&mut self, operator: &UnaryOperator, value: ExpressionId, span: Span) -> LazyTypeId {
+    fn infer_unary(
+        &mut self,
+        operator: &UnaryOperator,
+        value: ExpressionId,
+        span: Span,
+    ) -> LazyTypeId {
         use ast::UnaryOperatorKind as Unary;
 
         match operator.node {
@@ -325,7 +337,7 @@ impl<'a> TypedHirContext<'a> {
         body: BlockId,
         span: Span,
     ) -> LazyTypeId {
-        let return_type = self.infer_block(body);
+        let return_type = self.infer_block_expression(body);
 
         let condition = match condition {
             Some(val) => val,
@@ -355,7 +367,7 @@ impl<'a> TypedHirContext<'a> {
             Some(val) => val,
             None => return LazyTypeId::error(),
         };
-            
+
         let cast_to = match self.resolve_type_strict(cast_to, span) {
             Some(val) => val,
             None => return LazyTypeId::error(),
@@ -380,7 +392,10 @@ impl<'a> TypedHirContext<'a> {
         let resolved = self.resolve_type_lazy(place_type, span);
         let ty = match resolved {
             LazyTypeId::Known(val) => val,
-            LazyTypeId::Infer(_) => return resolved,
+            LazyTypeId::Infer(infer) => {
+                let modifier = self.id_to_infer(infer).modifier;
+                return self.create_ref(resolved, mutable, modifier, span)
+            }
         };
 
         let resolved_ty = self.id_to_type(ty);
@@ -393,14 +408,40 @@ impl<'a> TypedHirContext<'a> {
                     MUT => ArrayKind::MutSlice,
                     CONST => ArrayKind::ConstSlice,
                 };
-                self.add_type(HirType::new(hir::HirTypeKind::Array {
+
+                let array_type = HirType::new(hir::HirTypeKind::Array {
                     element: *element,
                     kind,
-                })).to_lazy()
+                });
+                self.add_type(array_type).to_lazy()
             }
 
-            _ => resolved,
+            _ => {
+                let modifier = self.id_to_type(ty).modifier;
+                self.create_ref(ty.to_lazy(), mutable, modifier, span)
+            }
         }
+    }
+
+    fn create_ref(&mut self, type_id: LazyTypeId, mutable: bool, inner_modifier: Option<TypeModifier>, span: Span) -> LazyTypeId {
+        
+        if mutable && inner_modifier != Some(TypeModifier::Mut) {
+
+            let type_str = match type_id {
+                LazyTypeId::Known(type_id) => self.id_to_type(type_id).display(&self.types, &self.hir.info.infers),
+                LazyTypeId::Infer(infer) => self.id_to_infer(infer).display(&self.types, &self.hir.info.infers),
+            };
+
+            self.log_error(SoulError::new(format!("can only call mutRef on mutable variables type '{type_str}' is not mutable"), SoulErrorKind::InvalidMutability, Some(span)));
+            return LazyTypeId::error()
+        }
+
+        let of_type = self.lazy_id_insure_modifier(type_id, None);
+
+        let ref_type = HirType::new(HirTypeKind::Ref { of_type, mutable })
+            .apply_modfier(inner_modifier);
+
+        self.add_type(ref_type).to_lazy()
     }
 
     fn infer_deref(&mut self, inner: ExpressionId, span: Span) -> LazyTypeId {
@@ -410,7 +451,9 @@ impl<'a> TypedHirContext<'a> {
             None => return LazyTypeId::error(),
         };
 
-        let deref = self.id_to_type(ty).try_deref(&self.types, &self.infers, span);
+        let deref = self
+            .id_to_type(ty)
+            .try_deref(&self.types, &self.infers, span);
         match deref {
             Ok(val) => val,
             Err(err) => {
@@ -420,17 +463,21 @@ impl<'a> TypedHirContext<'a> {
         }
     }
 
-    fn infer_struct_constructor(&mut self, ty: LazyTypeId, values: &Vec<(Ident, ExpressionId)>, span: Span) -> LazyTypeId {
+    fn infer_struct_constructor(
+        &mut self,
+        ty: LazyTypeId,
+        values: &Vec<(Ident, ExpressionId)>,
+        span: Span,
+    ) -> LazyTypeId {
         let mut fields = match self.expect_struct(ty, span) {
-            Ok(struct_info) => {
-                struct_info.fields
-                    .iter()
-                    .map(|field| (field.name.clone(), field.ty))
-                    .collect::<HashMap<String, LazyTypeId>>()
-            }
+            Ok(struct_info) => struct_info
+                .fields
+                .iter()
+                .map(|field| (field.name.clone(), field.ty))
+                .collect::<HashMap<String, LazyTypeId>>(),
             Err(err) => {
                 self.log_error(err);
-                return LazyTypeId::error()
+                return LazyTypeId::error();
             }
         };
 
@@ -438,8 +485,12 @@ impl<'a> TypedHirContext<'a> {
             let field_type = match fields.remove(name.as_str()) {
                 Some(val) => val,
                 None => {
-                    self.log_error(SoulError::new(format!("{} is not a valid field", name.as_str()), SoulErrorKind::InvalidIdent, Some(name.span)));
-                    continue
+                    self.log_error(SoulError::new(
+                        format!("{} is not a valid field", name.as_str()),
+                        SoulErrorKind::InvalidIdent,
+                        Some(name.span),
+                    ));
+                    continue;
                 }
             };
 
@@ -448,7 +499,11 @@ impl<'a> TypedHirContext<'a> {
         }
 
         for name in fields.keys() {
-            self.log_error(SoulError::new(format!("missing {} field", name.as_str()), SoulErrorKind::InvalidIdent, Some(span)));
+            self.log_error(SoulError::new(
+                format!("missing {} field", name.as_str()),
+                SoulErrorKind::InvalidIdent,
+                Some(span),
+            ));
         }
 
         ty
@@ -459,30 +514,33 @@ impl<'a> TypedHirContext<'a> {
         self.infer_table.alloc(new_infer, span);
         hir::LazyTypeId::Infer(new_infer)
     }
-    
+
     fn expect_struct(&mut self, ty: LazyTypeId, span: Span) -> SoulResult<&Struct> {
         let ty = match ty {
             LazyTypeId::Known(val) => val,
-            LazyTypeId::Infer(_) => return Err(SoulError::new(
-                "type shoul dbe known at this point", 
-                SoulErrorKind::TypeInferenceError, 
-                Some(span),
-            ))
+            LazyTypeId::Infer(_) => {
+                return Err(SoulError::new(
+                    "type shoul dbe known at this point",
+                    SoulErrorKind::TypeInferenceError,
+                    Some(span),
+                ));
+            }
         };
 
         let hir_type = self.id_to_type(ty);
         match &hir_type.kind {
-            HirTypeKind::Struct(id) => {
-                self.types.id_to_struct(*id)
-                    .ok_or(soul_error_internal!(format!("{:?} not found", id), None))
-            }
-            _ => {
-                Err(SoulError::new(
-                    format!("{} should be a struct to use StructContructor", hir_type.display(&self.types, &self.infers)), 
-                    SoulErrorKind::UnifyTypeError, 
-                    Some(span),
-                ))
-            }
+            HirTypeKind::Struct(id) => self
+                .types
+                .id_to_struct(*id)
+                .ok_or(soul_error_internal!(format!("{:?} not found", id), None)),
+            _ => Err(SoulError::new(
+                format!(
+                    "{} should be a struct to use StructContructor",
+                    hir_type.display(&self.types, &self.infers)
+                ),
+                SoulErrorKind::UnifyTypeError,
+                Some(span),
+            )),
         }
     }
 }

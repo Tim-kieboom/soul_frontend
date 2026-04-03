@@ -125,8 +125,8 @@ impl<I: VecMapIndex, T> VecMap<I, T> {
 
     /// Returns a reference to the value at the given index, if present.
     pub fn get_or_error_id(&self, index: I) -> T
-    where 
-        T: IdAlloc + Copy
+    where
+        T: IdAlloc + Copy,
     {
         match self.vec.get(index.index()) {
             Some(Some(val)) => *val,

@@ -1,54 +1,107 @@
-extern "C" free(ptr: *none)
+struct Duration {
+    mut sec: u64
+    mut nano: u32
+}
+
+// extern "C" free(ptr: *none)
 extern "C" malloc(len: int): *none
 extern "C" __clib_printChar(ch: char)
 extern "C" __clib_printStr(text: *char)
-extern "C" __clib_fmtInt(value: int, base: u8, buffer: *char/*[50]char*/, capital: bool): *char
-extern "C" __clib_fmtUint(value: uint, base: u8, buffer: *char/*[50]char*/, capital: bool): *char
-extern "C" __clib_fmtFloat(value: f64, base: u8, buffer: *char/*[50]char*/, precision: u8, capital: bool): *char
 
-// global := 1
-// global1 := 10 + 33 * 2
+global := 1
+global1 := 10 + 33 * 2
 fmtBuffer := malloc(50) as *char //[for 50 => '\0']
 
-struct Object {
-    len: uint
-    letter: char
+Now(): Duration {
+    extern "C" __clib_Duration_now(duration: &Duration)
+    
+    mut start := Duration{sec: 0, nano: 0} 
+    ref := &start
+    __clib_Duration_now(ref)
+    return start
 }
 
-struct Inner {
-    object: Object
-}
+// // use Duration {
+// Delay(sec: int) {
+//     extern "C" __clib_delay(time: int)
+
+//     __clib_delay(sec)
+// }
+
+// Duration_Sub(self: Duration, right: Duration): Duration {
+//     literal NANOS_PER_SEC: u32 = 10 ** 9
+
+//     if self.sec > right.sec {
+//         return Duration{sec: 0, nano: 0}
+//     }
+
+//     mut sec = self.sec - right.sec
+//     nano := if self.nano >= right.nano {
+//         self.nano - right.nano
+//     } else if sec == 0 {
+//         0 as u32
+//     } else {
+//         sec -= 1
+//         self.nano + NANOS_PER_SEC - right.nano
+//     }
+
+//     s := Duration{sec, nano}
+//     s
+// }
+
+// Elapsed(self: Duration): Duration {
+//     Duration_Sub(Now(), self)
+// }
+
+// Print(self: Duration) {
+//     sec := self.sec
+//     nano := self.nano
+//     print_char('{')
+//     print_uint(sec as uint)
+//     print_char(',')
+//     print_char(' ')
+//     print_uint(nano as uint)
+//     print_char('}')
+// }
+// // }
+
+/*
+    if this.nanoSeconds >= other.nanoSeconds {
+        seconds := this.seconds - other.seconds
+        nanoSeconds := this.nanoSeconds - other.nanoSeconds
+        return This{seconds, nanoSeconds}
+    }
+
+    seconds := this.seconds - other.seconds - 1
+    nanoSeconds := this.nanoSeconds + NANOS_PER_SEC - other.nanoSeconds
+    This{seconds, nanoSeconds}
+*/
 
 main() {
-    object := Object{
-        len: 12, 
-        letter: 'a',
-    }
-    endln()
-    mut len = object.len
-    mut letter = object.letter
-    print_uint(len)
-    endln()
-
-    // object.len = 1
-    // len = object.len
-    // print_uint(len)
+    // mut time = /*Duration.*/Now()
+    // /*Duration.*/Delay(1)
+    // time = /*Duration.*/Elapsed(time)
+    // /*Duration.*/Print(time)
     // endln()
 
-    print_char(letter)
-    endln()
-
-    inner := Inner{object}
-    len = inner.object.len
-    print_uint(len)
-    endln()
-
-    // pow := 3 ** 2
-    // root := 2 </ 4
+    // // pow := 3 ** 2
+    // // root := 2 </ 4
     // generics()
-    prints()
+    // prints()
     comptime()
+    // num := ifs()
+    // print_int(num)
 }
+
+// ifs(): int {
+
+//     if true {
+//         num := 1
+//         return num
+//     }
+
+//     0
+// }
 
 comptime() {
     var: int = 1 * 12 / 2
@@ -92,28 +145,53 @@ print_char(char: char) {
 }
 
 print_int(value: int, base: u8 = 10, capital: bool = true) {
+    
+    extern "C" __clib_fmtInt(
+        value: int, 
+        base: u8, 
+        buffer: *char/*[50]char*/, 
+        capital: bool,
+    ): *char
+    
     cstr := __clib_fmtInt(value, base, fmtBuffer, capital)
     __clib_printStr(cstr)
 }
 
 print_uint(value: uint, base: u8 = 10, capital: bool = true) {
+    
+    extern "C" __clib_fmtUint(
+        value: uint, 
+        base: u8, 
+        buffer: *char/*[50]char*/, 
+        capital: bool,
+    ): *char
+    
     cstr := __clib_fmtUint(value, base, fmtBuffer, capital)
     __clib_printStr(cstr)
 }
 
 print_float(value: f64, base: u8 = 10, capital: bool = true, precision: u8 = 4) {
+    
+    extern "C" __clib_fmtFloat(
+        value: f64, 
+        base: u8, 
+        buffer: *char/*[50]char*/, 
+        precision: u8, 
+        capital: bool,
+    ): *char
+
     cstr := __clib_fmtFloat(value, base, fmtBuffer, precision, capital)
     __clib_printStr(cstr)
 }
 
-sum(a: int, b: int): int {
-    a + b
-}
+// sum(a: int, b: int): int {
+//     a + b
+// }
 
-ptr() {
-    ptr := malloc(32) as *int
-    // *ptr = sum(1, 2)
-    // number: int = *ptr
-    // print_int(number)
-    // endln()
-}
+// ptr() {
+//     ptr := malloc(32) as *int
+//     // *ptr = sum(1, 2)
+//     // number: int = *ptr
+//     // print_int(number)
+//     // endln()
+// }

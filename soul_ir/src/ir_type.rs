@@ -25,9 +25,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
                 return self.lower_type(ty, generics);
             }
-            ThirTypeKind::Struct(id) => {
-                self.lower_struct(id, generics).map(|s| s.into())?
-            }
+            ThirTypeKind::Struct(id) => self.lower_struct(id, generics).map(|s| s.into())?,
             ThirTypeKind::Primitive(primitive_types) => {
                 match self.lower_primitive_type(primitive_types) {
                     Some(val) => val,
@@ -73,7 +71,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             ThirTypeKind::None | ThirTypeKind::Type => {
                 return Ok(None);
             }
-            
+
             ThirTypeKind::Error => panic!("error type should not be in ir"),
         }))
     }
@@ -83,7 +81,6 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         id: StructId,
         generics: &GenericSubstitute,
     ) -> SoulResult<StructType<'a>> {
-        
         match self.structs.borrow().get(id).copied() {
             Some(val) => Ok(val),
             None => self.lower_struct(id, generics),
@@ -100,11 +97,15 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
     }
 
     pub(crate) fn lower_struct(
-        &self, 
+        &self,
         id: StructId,
         generics: &GenericSubstitute,
     ) -> SoulResult<StructType<'a>> {
-        let object = self.types.types_map.id_to_struct(id).expect("should have struct");
+        let object = self
+            .types
+            .types_map
+            .id_to_struct(id)
+            .expect("should have struct");
 
         let mut fields = vec![];
         for (i, field) in object.fields.iter().enumerate() {
@@ -113,7 +114,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 Some(val) => val,
                 None => continue,
             };
-            
+
             self.field_indexs.borrow_mut().insert(field.id, i);
             fields.push(ir_field);
         }

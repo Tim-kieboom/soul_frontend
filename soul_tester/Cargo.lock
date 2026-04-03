@@ -94,6 +94,7 @@ version = "0.1.0"
 dependencies = [
  "ast",
  "hir",
+ "serde",
  "soul_utils",
  "typed_hir",
  "typed_hir_parser",
@@ -191,10 +192,12 @@ version = "0.1.0"
 dependencies = [
  "ast",
  "hir",
+ "hir_literal_interpreter",
  "run_hir",
  "serde",
  "soul_utils",
  "typed_hir",
+ "typed_hir_parser",
 ]
 
 [[package]]
@@ -344,6 +347,7 @@ version = "0.1.0"
 dependencies = [
  "ast",
  "hir",
+ "hir_literal_interpreter",
  "inkwell",
  "mir_parser",
  "run_mir",

@@ -49,8 +49,7 @@ impl<'a> TypedHirContext<'a> {
                         self.log_error(SoulError::new(
                             format!(
                                 "can only use index on an array type '{}' is not an array type",
-                                self.id_to_type(resolved)
-                                    .display(&self.types, &self.infers)
+                                self.id_to_type(resolved).display(&self.types, &self.infers)
                             ),
                             SoulErrorKind::UnifyTypeError,
                             Some(span),

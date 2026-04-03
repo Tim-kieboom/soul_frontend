@@ -1,5 +1,7 @@
 use hir::{
-    BlockId, ExpressionId, Field, FieldId, GenericId, HirTree, HirType, HirTypeKind, InferType, InferTypeId, InferTypesMap, LazyTypeId, LocalId, Place, PlaceId, StatementId, TypeId, TypesMap, Variable
+    BlockId, ExpressionId, Field, FieldId, GenericId, HirTree, HirType, HirTypeKind, InferType,
+    InferTypeId, InferTypesMap, LazyTypeId, LocalId, Place, PlaceId, StatementId, TypeId, TypesMap,
+    Variable,
 };
 use soul_utils::{
     error::SoulError,
@@ -15,22 +17,19 @@ use typed_hir::{LazyFieldInfo, TypedHir};
 use crate::infer_table::InferTable;
 
 mod expression;
+mod finalize;
 mod handle_type;
 mod infer_table;
 mod place;
 mod statement;
 mod type_helpers;
-mod finalize;
+pub use type_helpers::UnifyPrimitiveCast;
 
-pub fn lower_typed_hir<'a>(
-    hir: &'a HirTree,
-    faults: &'a mut Vec<SementicFault>,
-) -> TypedHir {
+pub fn lower_typed_hir<'a>(hir: &'a HirTree, faults: &'a mut Vec<SementicFault>) -> TypedHir {
     let mut context = TypedHirContext::new(hir, faults);
 
     for (struct_id, object) in hir.info.types.structs_entries() {
-
-        for (i, field) in object.fields.iter().enumerate()  {
+        for (i, field) in object.fields.iter().enumerate() {
             let struct_type = HirType::new(HirTypeKind::Struct(struct_id));
             let base = context.add_type(struct_type);
             context.type_field(field, base, i);
@@ -57,7 +56,7 @@ struct TypedHirContext<'a> {
     auto_copys: VecSet<ExpressionId>,
 
     field_names: VecMap<FieldId, String>,
-    
+
     generic_defines: VecMap<GenericId, VecSet<TypeId>>,
     expressions: VecMap<ExpressionId, LazyTypeId>,
     statements: VecMap<StatementId, LazyTypeId>,
@@ -82,7 +81,7 @@ impl<'a> TypedHirContext<'a> {
             current_function: None,
             infer_table: InferTable::new(&hir.info.infers),
 
-            generic_defines: VecMap::new(), 
+            generic_defines: VecMap::new(),
             expressions: VecMap::with_capacity(hir.nodes.expressions.len()),
             functions: VecMap::with_capacity(hir.nodes.functions.len()),
             field_names: VecMap::with_capacity(hir.nodes.fields.len()),
@@ -103,9 +102,7 @@ impl<'a> TypedHirContext<'a> {
 
     fn id_to_type(&self, ty: TypeId) -> &HirType {
         static ERROR: HirType = HirType::error_type();
-        self.types
-            .id_to_type(ty)
-            .unwrap_or(&ERROR)
+        self.types.id_to_type(ty).unwrap_or(&ERROR)
     }
 
     fn id_to_infer(&self, ty: InferTypeId) -> &InferType {
@@ -121,11 +118,15 @@ impl<'a> TypedHirContext<'a> {
         }
     }
 
-    fn lazy_id_insure_modifier(&mut self, id: LazyTypeId, modifier: Option<TypeModifier>) -> LazyTypeId {
+    fn lazy_id_insure_modifier(
+        &mut self,
+        id: LazyTypeId,
+        modifier: Option<TypeModifier>,
+    ) -> LazyTypeId {
         match id {
             LazyTypeId::Known(type_id) => {
                 if self.id_to_type(type_id).modifier == modifier {
-                    return id
+                    return id;
                 }
 
                 let mut kown = self.id_to_type(type_id).clone();
@@ -134,11 +135,14 @@ impl<'a> TypedHirContext<'a> {
             }
             LazyTypeId::Infer(infer_id) => {
                 if self.id_to_infer(infer_id).modifier == modifier {
-                    return id
+                    return id;
                 }
 
                 let mut infer = self.id_to_infer(infer_id).clone();
-                let span = self.infers.get_span(infer_id).unwrap_or(Span::default_const());
+                let span = self
+                    .infers
+                    .get_span(infer_id)
+                    .unwrap_or(Span::default_const());
                 infer.modifier = modifier;
                 hir::LazyTypeId::Infer(self.infers.insert(infer, span))
             }
@@ -177,25 +181,25 @@ impl<'a> TypedHirContext<'a> {
     }
 
     fn get_priority_lazy_type(&mut self, left: LazyTypeId, right: LazyTypeId) -> LazyTypeId {
-        let (left, right) = match (left, right)  {
+        let (left, right) = match (left, right) {
             (LazyTypeId::Known(l), LazyTypeId::Known(r)) => (l, r),
 
-            (LazyTypeId::Known(known), LazyTypeId::Infer(infer)) 
+            (LazyTypeId::Known(known), LazyTypeId::Infer(infer))
             | (LazyTypeId::Infer(infer), LazyTypeId::Known(known)) => {
                 let ty = known.to_lazy();
                 self.infer_table.add_infer_binding(infer, ty);
-                return ty
+                return ty;
             }
             (LazyTypeId::Infer(_), LazyTypeId::Infer(_)) => return left,
         };
-        
+
         self.infer_table
-            .get_priority_type(&self.types, left, right).to_lazy()
+            .get_priority_type(&self.types, left, right)
+            .to_lazy()
     }
 
     fn get_priority_type(&mut self, left: TypeId, right: TypeId) -> TypeId {
-        self.infer_table
-            .get_priority_type(&self.types, left, right)
+        self.infer_table.get_priority_type(&self.types, left, right)
     }
 
     fn get_place(&self, place: PlaceId) -> &Place {
@@ -238,6 +242,7 @@ impl<'a> TypedHirContext<'a> {
     }
 
     fn type_field(&mut self, field: &Field, base: TypeId, index: usize) {
+        
         let info = LazyFieldInfo {
             base_type: base,
             field_index: index,

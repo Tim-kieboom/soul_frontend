@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
+use crate::{
+    ids::{IdAlloc, IdGenerator},
+    vec_map::{VecMap, VecMapIndex},
+};
 use std::hash::Hash;
-use crate::{ids::{IdAlloc, IdGenerator}, vec_map::{VecMap, VecMapIndex}};
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct BiMap<K: VecMapIndex, V: Hash + PartialEq + Eq> {

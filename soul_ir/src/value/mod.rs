@@ -1,6 +1,5 @@
 use crate::{GenericSubstitute, IrOperand, LlvmBackend, Local, OperandInfo};
-use ast::Literal;
-use hir::{StructId, TypeId};
+use hir::{ComplexLiteral, StructId, TypeId};
 use inkwell::values::BasicValueEnum;
 use mir_parser::mir::{self, AggregateBody, Operand, PlaceId, Rvalue, RvalueKind};
 use soul_utils::{error::SoulResult, soul_error_internal};
@@ -18,7 +17,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         generics: &GenericSubstitute,
     ) -> SoulResult<IrOperand<'a>> {
         match &value.kind {
-            RvalueKind::Field{base, field_id} => {
+            RvalueKind::Field { base, field_id } => {
                 let field_info = &self.types.types_table.fields[*field_id];
                 self.lower_field_access(*base, field_info, generics)
             }
@@ -31,22 +30,42 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             } => self.lower_binary(left, operator, right, generics),
             RvalueKind::Unary { operator, value } => self.lower_unary(value, operator, generics),
             RvalueKind::StackAlloc(ty) => self.lower_stack_alloc(*ty, generics),
-            RvalueKind::Aggregate { struct_type, body } => self.lower_struct_contructor(*struct_type, ty, body, generics),
+            RvalueKind::Aggregate { struct_type, body } => {
+                self.lower_struct_contructor(*struct_type, ty, body, generics)
+            }
         }
     }
 
-    pub(crate) fn new_loaded_operand(&self, value: BasicValueEnum<'a>, ty: TypeId, generics: &GenericSubstitute) -> SoulResult<IrOperand<'a>> {
-        let ir_type = self.lower_type(ty, generics)?
+    pub(crate) fn new_loaded_operand(
+        &self,
+        value: BasicValueEnum<'a>,
+        ty: TypeId,
+        generics: &GenericSubstitute,
+    ) -> SoulResult<IrOperand<'a>> {
+        let ir_type = self
+            .lower_type(ty, generics)?
             .unwrap_or(self.context.i8_type().into());
 
-        Ok(IrOperand{ value, info: OperandInfo::new_loaded(ty, ir_type) })
+        Ok(IrOperand {
+            value,
+            info: OperandInfo::new_loaded(ty, ir_type),
+        })
     }
 
-    pub(crate) fn new_unloaded_operand(&self, value: BasicValueEnum<'a>, ty: TypeId, generics: &GenericSubstitute) -> SoulResult<IrOperand<'a>> {
-        let ir_type = self.lower_type(ty, generics)?
+    pub(crate) fn new_unloaded_operand(
+        &self,
+        value: BasicValueEnum<'a>,
+        ty: TypeId,
+        generics: &GenericSubstitute,
+    ) -> SoulResult<IrOperand<'a>> {
+        let ir_type = self
+            .lower_type(ty, generics)?
             .unwrap_or(self.context.i8_type().into());
 
-        Ok(IrOperand{ value, info: OperandInfo::new_unloaded(ty, ir_type) })
+        Ok(IrOperand {
+            value,
+            info: OperandInfo::new_unloaded(ty, ir_type),
+        })
     }
 
     fn lower_field_access(
@@ -56,37 +75,44 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         generics: &GenericSubstitute,
     ) -> SoulResult<IrOperand<'a>> {
         let base_operand = self.lower_place_to_operand(base, generics)?;
-        let base_ptr = base_operand.value.into_pointer_value();
+        let base_ptr = base_operand.get_or_convert_pointer(&self.builder)?;
 
         self.expect_type_can_field(field_info.base_type)?;
-        let base_type = self.lower_type(field_info.base_type, generics)?
-            .ok_or(soul_error_internal!("none type found as base_type in field", None))?;
+        let base_type =
+            self.lower_type(field_info.base_type, generics)?
+                .ok_or(soul_error_internal!(
+                    "none type found as base_type in field",
+                    None
+                ))?;
 
-
-        
-        let field_type = self.lower_type(field_info.field_type, generics)?
+        let field_type = self
+            .lower_type(field_info.field_type, generics)?
             .ok_or(soul_error_internal!("type should be Some", None))?;
-        
-        let field = self.builder.build_field_access(base_type, field_type, base_ptr, field_info)?;
+
+        let field = self
+            .builder
+            .build_field_access(base_type, field_type, base_ptr, field_info)?;
 
         self.new_unloaded_operand(field.into(), field_info.field_type, generics)
     }
 
-    fn expect_type_can_field(
-        &self,
-        base_type: TypeId,
-    ) -> SoulResult<()> {
-        
+    pub(crate) fn expect_type_can_field(&self, base_type: TypeId) -> SoulResult<()> {
         let hir_type = self.get_type(base_type)?;
         match &hir_type.kind {
             ThirTypeKind::Struct(_) => Ok(()),
-            _ => Err(soul_error_internal!(format!("trying to access field but base type '{}' is not struct like", hir_type.display(&self.types.types_map)), None)),
+            _ => Err(soul_error_internal!(
+                format!(
+                    "trying to access field but base type '{}' is not struct like",
+                    hir_type.display(&self.types.types_map)
+                ),
+                None
+            )),
         }
     }
 
     fn lower_struct_contructor(
-        &self, 
-        struct_id: StructId, 
+        &self,
+        struct_id: StructId,
         ty: TypeId,
         body: &AggregateBody,
         generics: &GenericSubstitute,
@@ -102,8 +128,8 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
     }
 
     fn lower_aggregate(
-        &self, 
-        struct_id: StructId, 
+        &self,
+        struct_id: StructId,
         ty: TypeId,
         operands: &Vec<Operand>,
         generics: &GenericSubstitute,
@@ -112,9 +138,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
         let mut fields = Vec::with_capacity(operands.len());
         for operand in operands {
-            fields.push(
-                self.lower_operand(operand, generics)?.value
-            );   
+            fields.push(self.lower_operand(operand, generics)?.value);
         }
 
         let ptr = self.builder.build_alloca(struct_ir, "tmp_struct")?;
@@ -126,27 +150,25 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         self.new_unloaded_operand(ptr.into(), ty, generics)
     }
 
-    fn lower_const_aggregate(
-        &self, 
-        struct_id: StructId, 
-        ty: TypeId, 
-        literals: &Vec<(Literal, TypeId)>,
+    pub(crate) fn lower_const_aggregate(
+        &self,
+        struct_id: StructId,
+        ty: TypeId,
+        literals: &Vec<(ComplexLiteral, TypeId)>,
         generics: &GenericSubstitute,
     ) -> SoulResult<IrOperand<'a>> {
         let struct_ir = self.get_or_create_struct(struct_id, generics)?;
 
         let mut fields = Vec::with_capacity(literals.len());
         for (literal, ty) in literals {
-            fields.push(
-                self.lower_literal(literal, *ty, generics)?.value
-            );   
+            fields.push(self.lower_literal(literal, *ty, generics)?.value);
         }
 
         let aggregate = struct_ir.const_named_struct(fields.as_slice());
         self.new_loaded_operand(aggregate.into(), ty, generics)
     }
 
-    fn lower_place_to_operand(
+    pub(crate) fn lower_place_to_operand(
         &self,
         place: PlaceId,
         generics: &GenericSubstitute,
@@ -165,15 +187,16 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 Ok(temp_op.clone())
             }
             mir::PlaceKind::Deref(operand) => {
-                let ty = self.lower_type(operand.ty, generics)?
+                let ty = self
+                    .lower_type(operand.ty, generics)?
                     .unwrap_or(self.context.i8_type().into());
-                
+
                 let ptr_op = self.lower_operand(operand, generics)?;
                 let ptr = ptr_op.value.into_pointer_value();
                 let value = self.builder.build_load(ty, ptr, "load")?.into();
                 self.new_loaded_operand(value, operand.ty, generics)
             }
-            mir::PlaceKind::Field { base, field_id } => {
+            mir::PlaceKind::Field { struct_type:_, base, field_id } => {
                 let field_info = &self.types.types_table.fields[*field_id];
                 self.lower_field_access(*base, field_info, generics)
             }
@@ -189,10 +212,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             .lower_type(ty, generics)?
             .ok_or(soul_error_internal!("stackalloc type should be Some", None))?;
 
-        let ptr = self
-            .builder
-            .build_alloca(ir_type, "rvalue")?
-            .into();
+        let ptr = self.builder.build_alloca(ir_type, "rvalue")?.into();
 
         self.new_loaded_operand(ptr, ty, generics)
     }

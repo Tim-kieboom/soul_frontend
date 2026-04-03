@@ -1,8 +1,11 @@
 use ast::ArrayKind;
-use hir::{DisplayType, HirType, HirTypeKind, InferTypesMap, LazyTypeId, TypesMap};
+use hir::{DisplayType, HirType, HirTypeKind, InferTypesMap, LazyTypeId, TypeId, TypesMap};
 use soul_utils::{
-    error::{SoulError, SoulErrorKind, SoulResult}, soul_names::{PrimitiveTypes, TypeModifier, TypeWrapper}, span::Span
+    error::{SoulError, SoulErrorKind, SoulResult},
+    soul_names::{PrimitiveTypes, TypeModifier, TypeWrapper},
+    span::Span,
 };
+use typed_hir::{ThirType, ThirTypeKind, ThirTypesMap};
 
 use crate::infer_table::UnifyResult;
 
@@ -29,11 +32,19 @@ pub(crate) trait TypeHelpers {
     ) -> SoulResult<LazyTypeId>;
 }
 
-pub(crate) trait UnifyPrimitiveCast {
+pub(crate) trait UnifyPrimitiveCastLazy {
     fn unify_primitive_cast(
         &self,
         types: &TypesMap,
         infers: &InferTypesMap,
+        should_be: &Self,
+    ) -> Result<(), MishmatchReason>;
+}
+
+pub trait UnifyPrimitiveCast {
+    fn unify_primitive_cast(
+        &self,
+        types: &ThirTypesMap,
         should_be: &Self,
     ) -> Result<(), MishmatchReason>;
 }
@@ -91,7 +102,6 @@ impl TypeHelpers for HirType {
 
 impl TypeCompatible for HirType {
     fn compatible_type_kind(&self, should_be: &Self) -> Result<UnifyResult, MishmatchReason> {
-
         let result = match (self.modifier, should_be.modifier) {
             (Some(self_modifier), Some(should_be_modifier)) => {
                 if !modifier_compatible(self_modifier, should_be_modifier) {
@@ -179,7 +189,7 @@ impl ArrayKindCompatible for HirTypeKind {
     }
 }
 
-impl UnifyPrimitiveCast for HirType {
+impl UnifyPrimitiveCastLazy for HirType {
     fn unify_primitive_cast(
         &self,
         types: &TypesMap,
@@ -199,17 +209,22 @@ impl UnifyPrimitiveCast for HirType {
             _ => (),
         };
 
-        self.kind.unify_primitive_cast(types, infers, &should_be.kind) 
+        self.kind
+            .unify_primitive_cast(types, infers, &should_be.kind)
     }
 }
 
-impl UnifyPrimitiveCast for HirTypeKind {
+impl UnifyPrimitiveCastLazy for HirTypeKind {
     fn unify_primitive_cast(
         &self,
         types: &TypesMap,
         infers: &InferTypesMap,
         should_be: &Self,
     ) -> Result<(), MishmatchReason> {
+        if self.is_error() || should_be.is_error() {
+            return Ok(())
+        }
+
         Ok(match (self, should_be) {
             (
                 HirTypeKind::Ref {
@@ -221,14 +236,14 @@ impl UnifyPrimitiveCast for HirTypeKind {
                     mutable: mut_b,
                 },
             ) => {
-                let a = match try_get_type(types, *a_id) {
+                let a = match try_get_type_lazy(types, *a_id) {
                     Some(val) => val,
-                    None => return Err(display_msg(self, should_be)),
+                    None => return Err(display_msg_lazy(self, should_be)),
                 };
-                
-                let b = match try_get_type(types, *b_id) {
+
+                let b = match try_get_type_lazy(types, *b_id) {
                     Some(val) => val,
-                    None => return Err(display_msg(self, should_be)),
+                    None => return Err(display_msg_lazy(self, should_be)),
                 };
 
                 a.unify_primitive_cast(types, infers, b)?;
@@ -248,12 +263,11 @@ impl UnifyPrimitiveCast for HirTypeKind {
                 }
             }
             (HirTypeKind::Pointer(_), HirTypeKind::Primitive(prim)) => {
-                
                 return if !prim.is_numeric() {
                     Err("can only cast pointer to numaric or other pointers".to_string())
                 } else {
                     Ok(())
-                }
+                };
             }
             (HirTypeKind::Array { .. }, HirTypeKind::Array { .. }) => {
                 return Err("can only type cast primitive types".to_string());
@@ -262,14 +276,14 @@ impl UnifyPrimitiveCast for HirTypeKind {
             (_, HirTypeKind::Pointer(_)) => return Ok(()),
 
             (HirTypeKind::Optional(a_id), HirTypeKind::Optional(b_id)) => {
-                let a = match try_get_type(types, *a_id) {
+                let a = match try_get_type_lazy(types, *a_id) {
                     Some(val) => val,
                     None => return Ok(()),
                 };
-                
-                let b = match try_get_type(types, *b_id) {
+
+                let b = match try_get_type_lazy(types, *b_id) {
                     Some(val) => val,
-                    None => return Err(display_msg(self, should_be)),
+                    None => return Err(display_msg_lazy(self, should_be)),
                 };
 
                 a.unify_primitive_cast(types, infers, b)?
@@ -280,12 +294,125 @@ impl UnifyPrimitiveCast for HirTypeKind {
             | (HirTypeKind::Primitive(_), HirTypeKind::Primitive(_)) => (),
 
             (a, HirTypeKind::Optional(b_id)) => {
-                let b = match try_get_type(types, *b_id) {
+                let b = match try_get_type_lazy(types, *b_id) {
                     Some(val) => val,
                     None => return Ok(()),
                 };
 
                 a.unify_primitive_cast(types, infers, &b.kind)?
+            }
+            _ => {
+                return Err(display_msg_lazy(self, should_be));
+            }
+        })
+    }
+}
+
+impl UnifyPrimitiveCast for ThirType {
+    fn unify_primitive_cast(
+        &self,
+        types: &ThirTypesMap,
+        should_be: &Self,
+    ) -> Result<(), MishmatchReason> {
+        match (self.modifier, should_be.modifier) {
+            (Some(self_modifier), Some(should_be_modifier)) => {
+                if !modifier_compatible(self_modifier, should_be_modifier) {
+                    return Err(format!(
+                        "can not cast from modifier {} to modifier {}",
+                        self_modifier.as_str(),
+                        should_be_modifier.as_str(),
+                    ));
+                }
+            }
+            _ => (),
+        };
+
+        self.kind
+            .unify_primitive_cast(types, &should_be.kind)
+    }
+}
+
+impl UnifyPrimitiveCast for ThirTypeKind {
+    fn unify_primitive_cast(
+        &self,
+        types: &ThirTypesMap,
+        should_be: &Self,
+    ) -> Result<(), MishmatchReason> {
+        Ok(match (self, should_be) {
+            (
+                ThirTypeKind::Ref {
+                    of_type: a_id,
+                    mutable: mut_a,
+                },
+                ThirTypeKind::Ref {
+                    of_type: b_id,
+                    mutable: mut_b,
+                },
+            ) => {
+                let a = match try_get_type(types, *a_id) {
+                    Some(val) => val,
+                    None => return Err(display_msg(self, should_be)),
+                };
+
+                let b = match try_get_type(types, *b_id) {
+                    Some(val) => val,
+                    None => return Err(display_msg(self, should_be)),
+                };
+
+                a.unify_primitive_cast(types, b)?;
+                if mut_a != mut_b {
+                    let display = |bool: &bool| {
+                        if *bool {
+                            TypeWrapper::MutRef.as_str()
+                        } else {
+                            TypeWrapper::ConstRef.as_str()
+                        }
+                    };
+                    return Err(format!(
+                        "'{}' can not be cast to '{}'",
+                        display(mut_a),
+                        display(mut_b)
+                    ));
+                }
+            }
+            (ThirTypeKind::Pointer(_), ThirTypeKind::Primitive(prim)) => {
+                return if !prim.is_numeric() {
+                    Err("can only cast pointer to numaric or other pointers".to_string())
+                } else {
+                    Ok(())
+                };
+            }
+            (ThirTypeKind::Array { .. }, ThirTypeKind::Array { .. }) => {
+                return Err("can only type cast primitive types".to_string());
+            }
+
+            (_, ThirTypeKind::Pointer(_)) => return Ok(()),
+
+            (ThirTypeKind::Optional(a_id), ThirTypeKind::Optional(b_id)) => {
+                let a = match try_get_type(types, *a_id) {
+                    Some(val) => val,
+                    None => return Ok(()),
+                };
+
+                let b = match try_get_type(types, *b_id) {
+                    Some(val) => val,
+                    None => return Err(display_msg(self, should_be)),
+                };
+
+                a.unify_primitive_cast(types, b)?
+            }
+
+            (ThirTypeKind::None, ThirTypeKind::None)
+            | (ThirTypeKind::Type, ThirTypeKind::Type)
+            | (ThirTypeKind::Primitive(_), ThirTypeKind::Primitive(_)) => (),
+
+            (a, ThirTypeKind::Optional(b_id)) => {
+                let b = match try_get_type(types, *b_id) {
+                    Some(val) => val,
+                    None => return Ok(()),
+                };
+
+                a.unify_primitive_cast(types, &b.kind)?
             }
             _ => {
                 return Err(display_msg(self, should_be));
@@ -294,8 +421,7 @@ impl UnifyPrimitiveCast for HirTypeKind {
     }
 }
 
-
-fn display_msg(this: &HirTypeKind, should_be: &HirTypeKind) -> MishmatchReason {
+fn display_msg_lazy(this: &HirTypeKind, should_be: &HirTypeKind) -> MishmatchReason {
     format!(
         "typekind '{}' not compatible with typekind '{}'",
         this.display_variant(),
@@ -303,7 +429,7 @@ fn display_msg(this: &HirTypeKind, should_be: &HirTypeKind) -> MishmatchReason {
     )
 }
 
-fn try_get_type(types: &TypesMap, ty: LazyTypeId) -> Option<&HirType> {
+fn try_get_type_lazy(types: &TypesMap, ty: LazyTypeId) -> Option<&HirType> {
     let ty = match ty {
         LazyTypeId::Known(val) => val,
         LazyTypeId::Infer(_) => return None,
@@ -312,6 +438,17 @@ fn try_get_type(types: &TypesMap, ty: LazyTypeId) -> Option<&HirType> {
     types.id_to_type(ty)
 }
 
+fn display_msg(this: &ThirTypeKind, should_be: &ThirTypeKind) -> MishmatchReason {
+    format!(
+        "typekind '{}' not compatible with typekind '{}'",
+        this.display_variant(),
+        should_be.display_variant()
+    )
+}
+
+fn try_get_type(types: &ThirTypesMap, ty: TypeId) -> Option<&ThirType> {
+    types.id_to_type(ty)
+}
 
 const fn modifier_compatible(this: TypeModifier, should_be: TypeModifier) -> bool {
     match (this, should_be) {

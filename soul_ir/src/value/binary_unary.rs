@@ -13,8 +13,18 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         right: &mir::Operand,
         generics: &GenericSubstitute,
     ) -> SoulResult<IrOperand<'a>> {
-        let ir_left = self.lower_operand(left, generics)?;
-        let ir_right = self.lower_operand(right, generics)?;
+        let mut ir_left = self.lower_operand(left, generics)?;
+        let mut ir_right = self.lower_operand(right, generics)?;
+
+        if ir_left.info.is_unloaded {
+            let ptr = ir_left.get_or_convert_pointer(&self.builder)?;
+            ir_left.value = self.builder.build_load(ir_left.info.ir_type, ptr, "load_left")?;
+        } 
+
+        if ir_right.info.is_unloaded {
+            let ptr = ir_right.get_or_convert_pointer(&self.builder)?;
+            ir_right.value = self.builder.build_load(ir_right.info.ir_type, ptr, "load_left")?;
+        }
 
         match operator.node {
             ast::BinaryOperatorKind::Invalid => {
@@ -74,14 +84,12 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
     fn add(&self, left: IrOperand<'a>, right: IrOperand<'a>) -> SoulResult<IrOperand<'a>> {
         let value = match (left.value, right.value) {
-            (BasicValueEnum::IntValue(l), BasicValueEnum::IntValue(r)) => self
-                .builder
-                .build_int_add(l, r)
-                .map(BasicValueEnum::from),
-            (BasicValueEnum::FloatValue(l), BasicValueEnum::FloatValue(r)) => self
-                .builder
-                .build_float_add(l, r)
-                .map(BasicValueEnum::from),
+            (BasicValueEnum::IntValue(l), BasicValueEnum::IntValue(r)) => {
+                self.builder.build_int_add(l, r).map(BasicValueEnum::from)
+            }
+            (BasicValueEnum::FloatValue(l), BasicValueEnum::FloatValue(r)) => {
+                self.builder.build_float_add(l, r).map(BasicValueEnum::from)
+            }
             _ => Err(SoulError::new(
                 format!(
                     "add requires int or float values (left: {:?}, right: {:?})",
@@ -100,14 +108,12 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
     fn sub(&self, left: IrOperand<'a>, right: IrOperand<'a>) -> SoulResult<IrOperand<'a>> {
         let value = match (left.value, right.value) {
-            (BasicValueEnum::IntValue(l), BasicValueEnum::IntValue(r)) => self
-                .builder
-                .build_int_sub(l, r)
-                .map(BasicValueEnum::from),
-            (BasicValueEnum::FloatValue(l), BasicValueEnum::FloatValue(r)) => self
-                .builder
-                .build_float_sub(l, r)
-                .map(BasicValueEnum::from),
+            (BasicValueEnum::IntValue(l), BasicValueEnum::IntValue(r)) => {
+                self.builder.build_int_sub(l, r).map(BasicValueEnum::from)
+            }
+            (BasicValueEnum::FloatValue(l), BasicValueEnum::FloatValue(r)) => {
+                self.builder.build_float_sub(l, r).map(BasicValueEnum::from)
+            }
             _ => Err(SoulError::new(
                 format!(
                     "sub requires int or float values (left: {:?}, right: {:?})",
@@ -126,14 +132,12 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
     fn mul(&self, left: IrOperand<'a>, right: IrOperand<'a>) -> SoulResult<IrOperand<'a>> {
         let value = match (left.value, right.value) {
-            (BasicValueEnum::IntValue(l), BasicValueEnum::IntValue(r)) => self
-                .builder
-                .build_int_mul(l, r)
-                .map(BasicValueEnum::from),
-            (BasicValueEnum::FloatValue(l), BasicValueEnum::FloatValue(r)) => self
-                .builder
-                .build_float_mul(l, r)
-                .map(BasicValueEnum::from),
+            (BasicValueEnum::IntValue(l), BasicValueEnum::IntValue(r)) => {
+                self.builder.build_int_mul(l, r).map(BasicValueEnum::from)
+            }
+            (BasicValueEnum::FloatValue(l), BasicValueEnum::FloatValue(r)) => {
+                self.builder.build_float_mul(l, r).map(BasicValueEnum::from)
+            }
             _ => Err(SoulError::new(
                 format!(
                     "mul requires int or float values (left: {:?}, right: {:?})",
@@ -163,10 +167,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                         .map(BasicValueEnum::from)
                 }
             }
-            (BasicValueEnum::FloatValue(l), BasicValueEnum::FloatValue(r)) => self
-                .builder
-                .build_float_div(l, r)
-                .map(BasicValueEnum::from),
+            (BasicValueEnum::FloatValue(l), BasicValueEnum::FloatValue(r)) => {
+                self.builder.build_float_div(l, r).map(BasicValueEnum::from)
+            }
             _ => Err(SoulError::new(
                 format!(
                     "div requires int or float values (left: {:?}, right: {:?})",
@@ -214,10 +217,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
     fn bit_and(&self, left: IrOperand<'a>, right: IrOperand<'a>) -> SoulResult<IrOperand<'a>> {
         let value = match (left.value, right.value) {
-            (BasicValueEnum::IntValue(l), BasicValueEnum::IntValue(r)) => self
-                .builder
-                .build_and(l, r)
-                .map(BasicValueEnum::from),
+            (BasicValueEnum::IntValue(l), BasicValueEnum::IntValue(r)) => {
+                self.builder.build_and(l, r).map(BasicValueEnum::from)
+            }
             (BasicValueEnum::FloatValue(_), BasicValueEnum::FloatValue(_)) => Err(SoulError::new(
                 "bitwise_and does not work in float",
                 SoulErrorKind::LlvmError,
@@ -241,10 +243,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
     fn bit_or(&self, left: IrOperand<'a>, right: IrOperand<'a>) -> SoulResult<IrOperand<'a>> {
         let value = match (left.value, right.value) {
-            (BasicValueEnum::IntValue(l), BasicValueEnum::IntValue(r)) => self
-                .builder
-                .build_or(l, r)
-                .map(BasicValueEnum::from),
+            (BasicValueEnum::IntValue(l), BasicValueEnum::IntValue(r)) => {
+                self.builder.build_or(l, r).map(BasicValueEnum::from)
+            }
             (BasicValueEnum::FloatValue(_), BasicValueEnum::FloatValue(_)) => Err(SoulError::new(
                 "bitwise_or does not work in float",
                 SoulErrorKind::LlvmError,
@@ -268,10 +269,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
     fn bit_xor(&self, left: IrOperand<'a>, right: IrOperand<'a>) -> SoulResult<IrOperand<'a>> {
         let value = match (left.value, right.value) {
-            (BasicValueEnum::IntValue(l), BasicValueEnum::IntValue(r)) => self
-                .builder
-                .build_xor(l, r)
-                .map(BasicValueEnum::from),
+            (BasicValueEnum::IntValue(l), BasicValueEnum::IntValue(r)) => {
+                self.builder.build_xor(l, r).map(BasicValueEnum::from)
+            }
             (BasicValueEnum::FloatValue(_), BasicValueEnum::FloatValue(_)) => Err(SoulError::new(
                 "bitwise_xor does not work in float",
                 SoulErrorKind::LlvmError,
@@ -333,14 +333,10 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
     fn neg(&self, operand: IrOperand<'a>) -> SoulResult<IrOperand<'a>> {
         let value = match operand.value {
-            BasicValueEnum::IntValue(l) => self
-                .builder
-                .build_int_neg(l)
-                .map(BasicValueEnum::from),
-            BasicValueEnum::FloatValue(l) => self
-                .builder
-                .build_float_neg(l)
-                .map(BasicValueEnum::from),
+            BasicValueEnum::IntValue(l) => self.builder.build_int_neg(l).map(BasicValueEnum::from),
+            BasicValueEnum::FloatValue(l) => {
+                self.builder.build_float_neg(l).map(BasicValueEnum::from)
+            }
             _ => Err(SoulError::new(
                 format!(
                     "negative requires int or float values operand: {:?}",
@@ -359,10 +355,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
     fn not(&self, operand: IrOperand<'a>) -> SoulResult<IrOperand<'a>> {
         let value = match operand.value {
-            BasicValueEnum::IntValue(l) => self
-                .builder
-                .build_not(l)
-                .map(BasicValueEnum::from),
+            BasicValueEnum::IntValue(l) => self.builder.build_not(l).map(BasicValueEnum::from),
             BasicValueEnum::FloatValue(_) => Err(SoulError::new(
                 "not does not work in float",
                 SoulErrorKind::LlvmError,

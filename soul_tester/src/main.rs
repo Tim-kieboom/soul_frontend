@@ -1,6 +1,7 @@
 use std::{
     fs::{File, OpenOptions},
-    io::{Read, stdout}, time::Instant,
+    io::{Read, stdout},
+    time::{Instant},
 };
 
 use anyhow::Result;
@@ -24,7 +25,8 @@ use soul_utils::{
 };
 
 use crate::{
-    convert_soul_error::{MessageConfig, ToMessage}, displayer_tokenizer::display_tokens
+    convert_soul_error::{MessageConfig, ToMessage},
+    displayer_tokenizer::display_tokens,
 };
 
 mod convert_soul_error;
@@ -52,22 +54,29 @@ struct Ouput {
     faults: Vec<SementicFault>,
 }
 
+
 fn main() -> Result<()> {
     let paths: Paths = serde_json::from_slice(PATHS)?;
     init_logger(&paths.log_file)?;
-    
+
     let mut timer = Instant::now();
     let output = run_fontend(&paths)?;
     log_faults(&output.faults, &output.source_file);
-    if is_fatal(&output.faults, SementicLevel::Error) {
+    if is_fatal(&output.faults, COMPILER_OPTIONS.fault_level) {
         return Ok(());
     }
-    
-    info!("{GREEN}frontend success: {}ms{DEFAULT}", timer.elapsed().as_millis());
+
+    info!(
+        "{GREEN}frontend success: {}ms{DEFAULT}",
+        timer.elapsed().as_millis()
+    );
 
     timer = Instant::now();
     if run_llvm(&output) {
-        info!("{GREEN}llvm success: {}ms{DEFAULT}", timer.elapsed().as_millis())
+        info!(
+            "{GREEN}llvm success: {}ms{DEFAULT}",
+            timer.elapsed().as_millis()
+        )
     }
     Ok(())
 }
@@ -111,21 +120,21 @@ fn run_llvm(output: &Ouput) -> bool {
 
     #[cfg(not(debug_assertions))]
     if ir.is_fatal {
-        return false
+        return false;
     }
 
     #[cfg(debug_assertions)]
     if ir.is_fatal {
         if let Err(err) = ir.module.print_to_file("output/fatal_out.ll") {
             error!("{err}");
-            return false
+            return false;
         }
-        return false
+        return false;
     }
-    
+
     if let Err(err) = ir.module.print_to_file("output/out.ll") {
         error!("{err}");
-        return false
+        return false;
     };
 
     true
@@ -150,8 +159,14 @@ fn display_ast(paths: &Paths, ast: &AstResponse) -> Result<()> {
 
 fn display_hir(paths: &Paths, hir: &HirResponse) -> Result<()> {
     paths.write_to_output(&displayer_hir::display_hir(&hir.hir), "hir/tree.soulc")?;
-    paths.write_to_output(&displayer_hir::display_thir(&hir.hir, &hir.typed), "thir/tree.soulc")?;
-    paths.write_to_output(&displayer_hir::display_created_types(&hir.hir, &hir.typed), "thir/types.soulc")?;
+    paths.write_to_output(
+        &displayer_hir::display_thir(&hir.hir, &hir.typed),
+        "thir/tree.soulc",
+    )?;
+    paths.write_to_output(
+        &displayer_hir::display_created_types(&hir.hir, &hir.typed),
+        "thir/types.soulc",
+    )?;
     Ok(())
 }
 
@@ -204,9 +219,9 @@ fn init_logger(log_file: &str) -> Result<()> {
 fn is_fatal(faults: &Vec<SementicFault>, fatal_level: SementicLevel) -> bool {
     for fault in faults {
         if fault.is_fatal(fatal_level) {
-            return true
+            return true;
         }
-    } 
+    }
 
     false
 }

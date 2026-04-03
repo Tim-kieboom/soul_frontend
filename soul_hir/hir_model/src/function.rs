@@ -1,7 +1,7 @@
 use ast::{ExternLanguage, FunctionKind};
 use soul_utils::{Ident, ids::FunctionId};
 
-use crate::{BlockId, ExpressionId, GenericId, LocalId, LazyTypeId, TypeId};
+use crate::{BlockId, ExpressionId, GenericId, LazyTypeId, LocalId, TypeId};
 
 /// A function definition in HIR.
 ///

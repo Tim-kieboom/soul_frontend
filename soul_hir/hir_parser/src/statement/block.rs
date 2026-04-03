@@ -1,4 +1,4 @@
-use hir::BlockId;
+use hir::{BlockId, ExpressionId, Terminator};
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
     span::Span,
@@ -6,6 +6,29 @@ use soul_utils::{
 };
 
 use crate::{CurrentBody, HirContext, Scope};
+
+struct CurrentTerminator {
+    span: Span,
+    value: Terminator,
+    ends_semicolon: bool,
+}
+impl CurrentTerminator {
+    fn new_return(value: ExpressionId, ends_semicolon: bool, span: Span) -> Self {
+        Self {
+            span,
+            ends_semicolon,
+            value: Terminator::Return(value),
+        }
+    }
+
+    fn new_expression(value: ExpressionId, ends_semicolon: bool, span: Span) -> Self {
+        Self {
+            span,
+            ends_semicolon,
+            value: Terminator::Expression(value),
+        }
+    }
+}
 
 impl<'a> HirContext<'a> {
     pub(crate) fn lower_block(&mut self, body: &ast::Block) -> hir::BlockId {
@@ -23,22 +46,46 @@ impl<'a> HirContext<'a> {
         };
         self.insert_block(id, block, body.span);
 
-        let mut last_expression = None;
+        let mut terminate_expression = None;
 
         for statement in &body.statements {
-            use hir::StatementKind::Expression;
 
             let hir_statement = match self.lower_statement(statement) {
                 Some(val) => val,
                 None => continue,
             };
 
-            if let Expression {
+            terminate_expression = match &hir_statement.kind {
+                hir::StatementKind::Return(Some(value)) => Some(CurrentTerminator::new_return(value.clone(), false, statement.span)),
+                hir::StatementKind::Expression {
+                    value,
+                    ends_semicolon,
+                } => {
+                    if let Some(CurrentTerminator{value:_, ends_semicolon, span}) = terminate_expression {
+                        if ends_semicolon {
+                            self.log_error(SoulError::new(
+                                format!("'{}' at the end of a line can only be used for expressions at the end of a block", SymbolKind::SemiColon.as_str()), 
+                                SoulErrorKind::InvalidEscapeSequence,
+                                Some(span),
+                            ));
+                        }
+                    }
+
+                    Some(CurrentTerminator::new_expression(
+                        *value, 
+                        *ends_semicolon, 
+                        statement.span,
+                    ))
+                }
+                _ => None,
+            };
+
+            if let hir::StatementKind::Expression {
                 value,
                 ends_semicolon,
             } = &hir_statement.kind
             {
-                if let Some((_value, ends_semicolon, span)) = last_expression {
+                if let Some(CurrentTerminator{value:_, ends_semicolon, span}) = terminate_expression {
                     if ends_semicolon {
                         self.log_error(SoulError::new(
                             format!("'{}' at the end of a line can only be used for expressions at the end of a block", SymbolKind::SemiColon.as_str()), 
@@ -48,7 +95,11 @@ impl<'a> HirContext<'a> {
                     }
                 }
 
-                last_expression = Some((*value, *ends_semicolon, statement.span));
+                terminate_expression = Some(CurrentTerminator::new_expression(
+                    *value, 
+                    *ends_semicolon, 
+                    statement.span,
+                ));
             }
 
             self.insert_in_block(id, hir_statement);
@@ -57,8 +108,8 @@ impl<'a> HirContext<'a> {
         self.pop_scope();
         self.current_body = prev_body;
 
-        match last_expression {
-            Some((value, ends_semicolon, _span)) if !ends_semicolon => {
+        match terminate_expression {
+            Some(CurrentTerminator{value, ends_semicolon, span:_}) if !ends_semicolon => {
                 self.insert_block_terminator(id, value);
             }
             _ => (),
@@ -76,7 +127,7 @@ impl<'a> HirContext<'a> {
         self.tree.nodes.blocks[id].statements.push(statement);
     }
 
-    pub(crate) fn insert_block_terminator(&mut self, id: BlockId, terminator: hir::ExpressionId) {
+    pub(crate) fn insert_block_terminator(&mut self, id: BlockId, terminator: hir::Terminator) {
         self.tree.nodes.blocks[id].terminator = Some(terminator)
     }
 

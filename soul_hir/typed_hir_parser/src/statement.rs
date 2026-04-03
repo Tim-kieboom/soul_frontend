@@ -1,6 +1,5 @@
 use hir::{
-    Assign, BlockId, ExpressionId, Global, GlobalKind, LazyTypeId, Statement, StatementKind,
-    TypeId, Variable,
+    Assign, Block, BlockId, ExpressionId, Global, GlobalKind, LazyTypeId, Statement, StatementKind, Terminator, TypeId, Variable
 };
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
@@ -22,7 +21,7 @@ impl<'a> TypedHirContext<'a> {
             }
             GlobalKind::Function(function) => {
                 self.infer_function(*function);
-                return
+                return;
             }
         };
 
@@ -70,6 +69,15 @@ impl<'a> TypedHirContext<'a> {
     fn infer_assign(&mut self, assign: &Assign) -> TypeId {
         let span = self.expression_span(assign.value);
         let expected = self.infer_place(assign.place);
+        if !self.is_mutable(expected) {
+            self.log_error(SoulError::new(
+                "trying to reassign but type is 'const' or 'literal' (make it 'mut' instead)", 
+                SoulErrorKind::InvalidMutability, 
+                Some(span),
+            ));
+            return TypeId::error()
+        }
+
         let value_type = self.infer_expression(assign.value);
         self.unify(assign.value, expected, value_type, span);
 
@@ -96,7 +104,7 @@ impl<'a> TypedHirContext<'a> {
         };
 
         let span = self.hir.info.spans.blocks[body];
-        let block_type = self.infer_block(body);
+        let block_type = self.infer_block_returnable(body);
         self.unify(
             ExpressionId::error(),
             function.return_type.to_lazy(),
@@ -107,12 +115,24 @@ impl<'a> TypedHirContext<'a> {
         self.current_function = None;
     }
 
-    pub(crate) fn infer_block(&mut self, body: BlockId) -> LazyTypeId {
+    pub(crate) fn infer_block_expression(&mut self, body: BlockId) -> LazyTypeId {
+        self.inner_infer_block(body, false)
+    }
+
+    pub(crate) fn infer_block_returnable(&mut self, body: BlockId) -> LazyTypeId {
+        self.inner_infer_block(body, true)
+    }
+
+    fn inner_infer_block(&mut self, body: BlockId, returnable: bool) -> LazyTypeId {
         let mut return_type = None;
 
         let block = &self.hir.nodes.blocks[body];
         for statement in &block.statements {
             self.infer_statement(statement);
+            if !returnable {
+                continue
+            }
+
             if let hir::StatementKind::Return(value) = statement.kind {
                 let span = self.statement_span(statement.id);
                 let got = match value {
@@ -128,18 +148,27 @@ impl<'a> TypedHirContext<'a> {
             }
         }
 
-        if let Some(terminator) = block.terminator {
-            let span = self.expression_span(terminator);
-            let got = self.infer_expression(terminator);
-            match return_type {
-                Some(ty) => _ = self.unify(terminator, ty, got, span),
-                None => return_type = Some(got),
-            }
-        }
+        self.handle_block_terminator(block, &mut return_type, returnable);
 
         let ty = return_type.unwrap_or(self.none_type.to_lazy());
         self.type_block(body, ty);
         ty
+    }
+
+    fn handle_block_terminator(&mut self, block: &Block, return_type: &mut Option<LazyTypeId>, returnable: bool) {
+        if let Some(terminator) = block.terminator {
+            if matches!(terminator, Terminator::Return(_)) && !returnable {
+                return;
+            }
+
+            let value = terminator.get_expression_id();
+            let span = self.expression_span(value);
+            let got = self.infer_expression(value);
+            match return_type {
+                Some(ty) => _ = self.unify(value, *ty, got, span),
+                None => *return_type = Some(got),
+            }
+        }
     }
 
     fn infer_variable(&mut self, variable: &Variable, span: Span) -> LazyTypeId {

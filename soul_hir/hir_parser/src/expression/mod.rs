@@ -1,5 +1,5 @@
 use ast::{AsTypeCast, VarTypeKind, scope::NodeId};
-use hir::{ExpressionId, HirType, HirTypeKind, LocalId, Place, PlaceKind};
+use hir::{ExpressionId, HirType, HirTypeKind, LocalId, Place, PlaceKind, Terminator};
 use soul_utils::soul_error_internal;
 use soul_utils::{
     Ident,
@@ -100,7 +100,7 @@ impl<'a> HirContext<'a> {
             }
         };
 
-        let hir_type = match self.tree.info.types.id_to_type(kown){
+        let hir_type = match self.tree.info.types.id_to_type(kown) {
             Some(val) => val,
             None => return hir::Expression::error(id),
         };
@@ -159,9 +159,7 @@ impl<'a> HirContext<'a> {
             _ => {
                 let temp_local = self.id_generator.alloc_local();
 
-                let variable = hir::Variable {
-                    local: temp_local,
-                };
+                let variable = hir::Variable { local: temp_local };
                 self.insert_desugar_variable(variable, of_type, inner, span);
                 temp_local
             }
@@ -194,11 +192,14 @@ impl<'a> HirContext<'a> {
         ident: &Ident,
         option_id: Option<NodeId>,
     ) -> hir::Expression {
-        let node_id = match option_id.ok_or(soul_error_internal!("node_id should be Some(_) in hir", None)) {
+        let node_id = match option_id.ok_or(soul_error_internal!(
+            "node_id should be Some(_) in hir",
+            None
+        )) {
             Ok(val) => val,
             Err(err) => {
                 self.log_error(err);
-                return hir::Expression::error(id)
+                return hir::Expression::error(id);
             }
         };
         let var_type_kind = self.ast_store.get_variable_type(node_id);
@@ -240,11 +241,7 @@ impl<'a> HirContext<'a> {
         }
     }
 
-    pub(crate) fn lower_field(
-        &mut self,
-        field: &ast::FieldAccess,
-        span: Span,
-    ) -> hir::PlaceId {
+    pub(crate) fn lower_field(&mut self, field: &ast::FieldAccess, span: Span) -> hir::PlaceId {
         let base = self.lower_place(&field.object);
         let field = hir::PlaceKind::Field {
             base,
@@ -294,7 +291,12 @@ impl<'a> HirContext<'a> {
         }
     }
 
-    fn lower_binary(&mut self, id: ExpressionId, binary: &ast::Binary, span: Span) -> hir::Expression {
+    fn lower_binary(
+        &mut self,
+        id: ExpressionId,
+        binary: &ast::Binary,
+        span: Span,
+    ) -> hir::Expression {
         let left = self.lower_expression(&binary.left);
         let operator = binary.operator.clone();
         let right = self.lower_expression(&binary.right);
@@ -338,7 +340,8 @@ impl<'a> HirContext<'a> {
         let body = self.lower_block(block);
 
         let ty = match &self.tree.nodes.blocks[body].terminator {
-            Some(value) => self.tree.nodes.expressions[*value].ty,
+            Some(Terminator::Return(value)) 
+            | Some(Terminator::Expression(value))=> self.tree.nodes.expressions[*value].ty,
             None => hir::LazyTypeId::Known(self.add_type(HirType::none_type())),
         };
 

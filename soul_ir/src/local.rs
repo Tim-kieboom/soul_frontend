@@ -1,5 +1,4 @@
-use ast::Literal;
-use hir::TypeId;
+use hir::{ComplexLiteral, TypeId};
 use inkwell::{types::BasicTypeEnum, values::PointerValue};
 use mir_parser::mir::{self, Function, FunctionBody, LocalId};
 use soul_utils::{
@@ -76,7 +75,12 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         }
     }
 
-    fn alloc_parameter(&mut self, function: &Function, type_args: &Vec<TypeId>, generics: &GenericSubstitute) {
+    fn alloc_parameter(
+        &mut self,
+        function: &Function,
+        type_args: &Vec<TypeId>,
+        generics: &GenericSubstitute,
+    ) {
         for (i, local_id) in function.parameters.iter().enumerate() {
             let local = &self.mir.tree.locals[*local_id];
             let name = self.local_name(*local_id);
@@ -91,7 +95,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             };
 
             if let mir::Local::Comptime { value, .. } = local {
-                if let Err(err) = self.build_comptime_local(ty, local.ty(), *local_id, value, generics) {
+                if let Err(err) =
+                    self.build_comptime_local(ty, local.ty(), *local_id, value, generics)
+                {
                     self.log_error(err);
                 }
 
@@ -102,7 +108,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 Ok(val) => val,
                 Err(err) => {
                     self.log_error(err);
-                    continue
+                    continue;
                 }
             };
             let function = self.get_or_create_function(function.id, type_args);
@@ -131,7 +137,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             };
 
             if let mir::Local::Comptime { value, .. } = local {
-                if let Err(err) = self.build_comptime_local(ty, local.ty(), *local_id, value, generics) {
+                if let Err(err) =
+                    self.build_comptime_local(ty, local.ty(), *local_id, value, generics)
+                {
                     self.log_error(err);
                 }
                 continue;
@@ -141,20 +149,31 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 Ok(val) => val,
                 Err(err) => {
                     self.log_error(err);
-                    continue
+                    continue;
                 }
             };
         }
-        
     }
 
-    fn build_runtime_local(&mut self, ty: BasicTypeEnum<'a>, local_id: LocalId, name: &str) -> SoulResult<PointerValue<'a>> {
+    fn build_runtime_local(
+        &mut self,
+        ty: BasicTypeEnum<'a>,
+        local_id: LocalId,
+        name: &str,
+    ) -> SoulResult<PointerValue<'a>> {
         let ptr = self.builder.build_alloca(ty, name)?;
         self.push_local(local_id, crate::Local::Runtime(ptr));
         Ok(ptr)
     }
 
-    fn build_comptime_local(&mut self, ty: BasicTypeEnum<'a>, hir_type: TypeId, id: LocalId, literal: &Literal, generics: &GenericSubstitute) -> SoulResult<()> {
+    fn build_comptime_local(
+        &mut self,
+        ty: BasicTypeEnum<'a>,
+        hir_type: TypeId,
+        id: LocalId,
+        literal: &ComplexLiteral,
+        generics: &GenericSubstitute,
+    ) -> SoulResult<()> {
         let const_operand = match self.lower_literal(literal, hir_type, generics) {
             Ok(val) => val,
             Err(err) => {

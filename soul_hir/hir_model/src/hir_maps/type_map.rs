@@ -1,6 +1,11 @@
-use soul_utils::{bimap::BiMap, ids::IdGenerator, soul_names::TypeModifier, span::Span, vec_map::VecMap};
+use soul_utils::{
+    bimap::BiMap, ids::{IdAlloc, IdGenerator}, soul_names::TypeModifier, span::Span, vec_map::VecMap,
+};
 
-use crate::{GenericId, InferTypeId, StructId, TypeId, hir_type::{HirType, InferType, Struct}};
+use crate::{
+    GenericId, InferTypeId, StructId, TypeId,
+    hir_type::{HirType, InferType, Struct},
+};
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct TypesMap {
@@ -14,12 +19,13 @@ pub struct TypesMap {
 }
 impl TypesMap {
     pub fn new() -> Self {
-        Self::default()
+        let mut this = Self::default();
+        this.types.force_insert(TypeId::error(), HirType::error_type());
+        this
     }
 
     pub fn clear(&mut self) {
         self.types.clear();
-        self.structs.clear();
         self.generics.clear();
     }
 
@@ -35,10 +41,12 @@ impl TypesMap {
         self.types.get_key(ty)
     }
 
-    pub fn insert_struct(&mut self, obj: Struct) -> StructId {
-        let id = self.struct_alloc.alloc();
+    pub fn alloc_struct(&mut self) -> StructId {
+        self.struct_alloc.alloc()
+    }
+
+    pub fn insert_struct(&mut self, id: StructId, obj: Struct) {
         self.structs.insert(id, obj);
-        id
     }
 
     pub fn id_to_struct(&self, id: StructId) -> Option<&Struct> {
@@ -99,9 +107,24 @@ impl InferTypesMap {
         Some(self.infers.get(id)?.1)
     }
 
-    pub fn insert_infer(&mut self, generics: Vec<TypeId>, modifier: Option<TypeModifier>, span: Span) -> InferTypeId {
+    pub fn insert_infer(
+        &mut self,
+        generics: Vec<TypeId>,
+        modifier: Option<TypeModifier>,
+        span: Span,
+    ) -> InferTypeId {
         let id = self.infer_alloc.alloc();
-        self.infers.insert(id, (InferType{ kind: id, generics, modifier }, span));
+        self.infers.insert(
+            id,
+            (
+                InferType {
+                    kind: id,
+                    generics,
+                    modifier,
+                },
+                span,
+            ),
+        );
         id
     }
 

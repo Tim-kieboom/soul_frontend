@@ -1,7 +1,7 @@
 use ast::{Field, Statement, Struct};
 use soul_utils::{
     error::{SoulError, SoulResult},
-    soul_names::KeyWord,
+    soul_names::{KeyWord, TypeModifier},
     try_result::{ResultTryErr, ResultTryNotValue, ToResult, TryErr, TryOk, TryResult},
 };
 
@@ -52,9 +52,15 @@ impl<'f, 'a> Parser<'f, 'a> {
     }
 
     fn parse_field(&mut self) -> TryResult<Field, SoulError> {
-        let name = self.try_bump_consume_ident().try_err()?;
+        let mut name = self.try_bump_consume_ident().try_err()?;
+        let modifier = TypeModifier::from_str(name.as_str());
+        if modifier.is_some() {
+            name = self.try_bump_consume_ident().try_err()?;
+        }
+        
         self.expect(&COLON).try_not_value()?;
-        let ty = self.try_parse_type()?;
+        let mut ty = self.try_parse_type()?;
+        ty.modifier = Some(modifier.unwrap_or(TypeModifier::Const));
 
         if !self.current_is_any(STAMENT_END_TOKENS) {
             return TryErr(self.get_expect_any_error(STAMENT_END_TOKENS));

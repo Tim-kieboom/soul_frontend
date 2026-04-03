@@ -3,11 +3,7 @@ use hir::{
     TypesMap,
 };
 use soul_utils::{
-    error::{SoulError, SoulErrorKind, SoulResult},
-    soul_error_internal,
-    soul_names::TypeModifier,
-    span::Span,
-    vec_map::VecMap,
+    error::{SoulError, SoulErrorKind, SoulResult}, soul_error_internal, soul_names::TypeModifier, span::Span, vec_map::VecMap
 };
 
 use crate::type_helpers::{ArrayKindCompatible, GetPriority, TypeCompatible};
@@ -30,9 +26,7 @@ impl InferTable {
             .map(|(id, (_, span))| (id, InferBinding::Unbound(*span)))
             .collect::<VecMap<_, _>>();
 
-        Self {
-            table,
-        }
+        Self { table }
     }
 
     pub(crate) fn alloc(&mut self, infer: InferTypeId, span: Span) {
@@ -40,15 +34,13 @@ impl InferTable {
             #[cfg(debug_assertions)]
             panic!("already has {:?} is InferTable", infer);
             #[cfg(not(debug_assertions))]
-            return
+            return;
         }
-
 
         self.table.insert(infer, InferBinding::Unbound(span));
     }
 
     pub(crate) fn add_infer_binding(&mut self, id: InferTypeId, kown: LazyTypeId) {
-        
         let binding = match kown {
             LazyTypeId::Known(type_id) => InferBinding::Bound(type_id),
             LazyTypeId::Infer(infer) => InferBinding::Alias(infer),
@@ -62,14 +54,20 @@ impl InferTable {
         left: TypeId,
         right: TypeId,
     ) -> TypeId {
-        let left_type = self.get_type(types, left).expect("should have id");
-        let right_type = self.get_type(types, right).expect("should have id");
+        let left_type = match self.get_type(types, left) {
+            Ok(val) => val,
+            Err(_) => return right,
+        };
+        let right_type = match self.get_type(types, right) {
+            Ok(val) => val,
+            Err(_) => return left,
+        };
+
         match left_type.get_priority(right_type) {
             crate::type_helpers::Priority::Left => left,
             crate::type_helpers::Priority::Right => right,
         }
     }
-
 
     pub(crate) fn unify_type_type(
         &mut self,
@@ -81,6 +79,10 @@ impl InferTable {
     ) -> SoulResult<UnifyResult> {
         let a_id = self.resolve_type_lazy(types, infers, expected, span)?;
         let b_id = self.resolve_type_lazy(types, infers, got_type, span)?;
+        if a_id == LazyTypeId::error() || b_id == LazyTypeId::error() {
+            return Ok(UnifyResult::Ok)
+        }
+
         let (a_id, b_id) = match (a_id, b_id) {
             (LazyTypeId::Infer(a_infer), LazyTypeId::Infer(b_infer)) => {
                 return self.unify_var_var(types, infers, a_infer, b_infer, span);
@@ -152,7 +154,7 @@ impl InferTable {
             _ => a_ty.compatible_type_kind(b_ty).map_err(|reason| {
                 SoulError::new(
                     format!(
-                        "Type mismatch: expected {} got {} because {reason}",
+                        "Type mismatch: expected '{}' got '{}' because {reason}",
                         a_ty.display(types, infers),
                         b_ty.display(types, infers)
                     ),
@@ -170,6 +172,10 @@ impl InferTable {
         ty: LazyTypeId,
         span: Span,
     ) -> SoulResult<LazyTypeId> {
+        if ty == LazyTypeId::error() {
+            return Ok(ty)
+        }
+
         let ty = match ty {
             LazyTypeId::Known(val) => val,
             LazyTypeId::Infer(infer) => return self.resolve_infer_lazy(types, infers, infer),
@@ -383,7 +389,11 @@ impl InferTable {
         Ok(UnifyResult::Ok)
     }
 
-    fn resolve_infer_strict(&mut self, infer: InferTypeId, span: Option<Span>) -> SoulResult<TypeId> {
+    fn resolve_infer_strict(
+        &mut self,
+        infer: InferTypeId,
+        span: Option<Span>,
+    ) -> SoulResult<TypeId> {
         let root = self.find_root(infer)?;
         match self.table.get(root) {
             Some(InferBinding::Bound(ty)) => Ok(*ty),
@@ -403,10 +413,7 @@ impl InferTable {
             }
             Some(_) => unreachable!(),
             None => {
-                return Err(soul_error_internal!(
-                    format!("{:?} not found", root),
-                    span
-                ));
+                return Err(soul_error_internal!(format!("{:?} not found", root), span));
             }
         }
     }
@@ -487,16 +494,18 @@ impl InferTable {
         }
     }
 
-    fn get_type<'b>(&self, types: &'b TypesMap, ty: TypeId) -> SoulResult<&'b HirType> {
+    fn get_type<'b>(&self, types: &'b TypesMap, ty: TypeId) -> SoulResult<&'b HirType> {        
         match types.id_to_type(ty) {
             Some(val) => Ok(val),
-            None => {
-                Err(soul_error_internal!(format!("{:?} not found", ty), None))
-            }
+            None => Err(soul_error_internal!(format!("{:?} not found", ty), None)),
         }
     }
 
-    fn get_infer<'d>(&self, infers: &'d InferTypesMap, infer: InferTypeId) -> SoulResult<&'d InferType> {
+    fn get_infer<'d>(
+        &self,
+        infers: &'d InferTypesMap,
+        infer: InferTypeId,
+    ) -> SoulResult<&'d InferType> {
         match infers.get_infer(infer) {
             Some(val) => Ok(val),
             None => Err(soul_error_internal!(format!("{:?} not found", infer), None)),

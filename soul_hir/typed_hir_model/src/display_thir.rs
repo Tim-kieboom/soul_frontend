@@ -27,7 +27,7 @@ impl DisplayThirType for ThirType {
 
         self.kind.write_display(types, sb)
     }
-    
+
     fn display(&self, types: &ThirTypesMap) -> String {
         let mut sb = "".to_string();
         self.write_display(types, &mut sb).expect("no fmt error");
@@ -62,7 +62,7 @@ impl DisplayThirType for ThirTypeKind {
                     None => sb.push_str("<error>"),
                 }
                 Ok(())
-            },
+            }
             ThirTypeKind::Primitive(prim) => write!(sb, "{}", prim.as_str()),
             ThirTypeKind::Array { element, kind } => {
                 kind.write_to_string(sb)?;
@@ -88,13 +88,12 @@ impl DisplayThirType for ThirTypeKind {
             ThirTypeKind::Error => write!(sb, "<error>"),
         }
     }
-    
+
     fn display(&self, types: &ThirTypesMap) -> String {
         let mut sb = "".to_string();
         self.write_display(types, &mut sb).expect("no fmt error");
         sb
     }
-    
 }
 impl ThirTypeKind {
     pub const fn display_variant(&self) -> &'static str {
@@ -113,7 +112,7 @@ impl ThirTypeKind {
     }
 }
 
-const ERROR: ThirType = ThirType{
+const ERROR: ThirType = ThirType {
     kind: ThirTypeKind::Error,
     generics: vec![],
     modifier: None,
@@ -126,8 +125,10 @@ fn write_display_from_id(types: &ThirTypesMap, ty: TypeId, sb: &mut String) -> s
     }
 }
 
-fn inner_write_display_from_id(types: &ThirTypesMap, ty: TypeId, sb: &mut String) -> Option<std::fmt::Result> {
-    Some(
-        types.id_to_type(ty)?.write_display(types, sb)
-    )
+fn inner_write_display_from_id(
+    types: &ThirTypesMap,
+    ty: TypeId,
+    sb: &mut String,
+) -> Option<std::fmt::Result> {
+    Some(types.id_to_type(ty)?.write_display(types, sb))
 }

@@ -1,6 +1,15 @@
-use soul_utils::{bimap::BiMap, ids::{FunctionId, IdAlloc, IdGenerator}, soul_import_path::SoulImportPath, span::{ItemMetaData, Span}, vec_map::VecMap};
+use soul_utils::{
+    bimap::BiMap,
+    ids::{FunctionId, IdAlloc, IdGenerator},
+    soul_import_path::SoulImportPath,
+    span::{ItemMetaData, Span},
+    vec_map::VecMap,
+};
 
-use crate::{Block, BlockId, Expression, ExpressionId, FieldId, Function, LocalId, LocalInfo, ModuleId, Place, PlaceId, StatementId, hir_type::Field};
+use crate::{
+    Block, BlockId, Expression, ExpressionId, FieldId, Function, LocalId, LocalInfo, ModuleId,
+    Place, PlaceId, StatementId, hir_type::Field,
+};
 
 mod type_map;
 pub use type_map::*;
@@ -59,13 +68,16 @@ pub struct NodeMaps {
 }
 impl NodeMaps {
     pub fn new(init_globals: Function) -> Self {
-        Self { 
+        Self {
             places: VecMap::const_default(),
             fields: VecMap::const_default(),
             blocks: VecMap::const_default(),
             locals: VecMap::const_default(),
             functions: VecMap::from_slice(&[(init_globals.id, init_globals)]),
-            expressions: VecMap::from_slice(&[(ExpressionId::error(), Expression::error(ExpressionId::error()))]),
+            expressions: VecMap::from_slice(&[(
+                ExpressionId::error(),
+                Expression::error(ExpressionId::error()),
+            )]),
         }
     }
 }

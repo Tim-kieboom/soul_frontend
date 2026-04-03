@@ -1,4 +1,4 @@
-use soul_utils::{Ident, span::{Span}};
+use soul_utils::{Ident, span::Span};
 
 use crate::{ExpressionId, LocalId, PlaceId, hir_type::LazyTypeId};
 
@@ -13,11 +13,7 @@ pub struct Place {
     pub span: Span,
 }
 impl Place {
-    pub fn new(
-        id: PlaceId,
-        kind: PlaceKind,
-        span: Span,
-    ) -> Self {
+    pub fn new(id: PlaceId, kind: PlaceKind, span: Span) -> Self {
         Self { id, kind, span }
     }
 }
@@ -38,22 +34,17 @@ pub enum PlaceKind {
     Deref(PlaceId),
 
     /// Indexed access into an aggregate.
-    Index {
-        base: PlaceId,
-        index: ExpressionId,
-    },
+    Index { base: PlaceId, index: ExpressionId },
 
     /// Field access within a composite type.
-    Field {
-        base: PlaceId,
-        field: Ident,
-    },
+    Field { base: PlaceId, field: Ident },
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LocalInfo {
     pub ty: LazyTypeId,
     pub kind: LocalKind,
+    pub span: Option<Span>,
 }
 impl LocalInfo {
     pub fn is_temp(&self) -> bool {

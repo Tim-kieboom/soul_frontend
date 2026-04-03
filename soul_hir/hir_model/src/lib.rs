@@ -1,22 +1,24 @@
 mod expression;
 mod function;
+mod hir_maps;
 mod hir_type;
 mod ids;
 mod place;
-mod hir_maps;
 mod statement;
 use ast::FunctionKind;
 pub use expression::*;
-pub use hir_type::*;
-pub use hir_maps::*;
 pub use function::*;
+pub use hir_maps::*;
+pub use hir_type::*;
 pub use ids::*;
 pub use place::*;
 use soul_utils::{
-    Ident, ids::{FunctionId, IdAlloc}, soul_names::INIT_GLOBALS_FUNCTION_NAME, span::Span
+    Ident,
+    ids::{FunctionId, IdAlloc},
+    soul_names::INIT_GLOBALS_FUNCTION_NAME,
+    span::Span,
 };
 pub use statement::*;
-
 
 /// High-level Intermediate Representation (HIR) tree.
 ///
@@ -35,11 +37,7 @@ pub struct HirTree {
     pub init_globals: FunctionId,
 }
 impl HirTree {
-    pub fn new(
-        root_id: ModuleId,
-        main: FunctionId,
-        init_globals: FunctionId,
-    ) -> Self {
+    pub fn new(root_id: ModuleId, main: FunctionId, init_globals: FunctionId) -> Self {
         let init_global_function = Function {
             id: init_globals,
             generics: vec![],
@@ -47,7 +45,10 @@ impl HirTree {
             return_type: TypeId::error(),
             kind: FunctionKind::Static,
             body: FunctionBody::Internal(BlockId::error()),
-            name: Ident::new(INIT_GLOBALS_FUNCTION_NAME.to_string(), Span::default_const()),
+            name: Ident::new(
+                INIT_GLOBALS_FUNCTION_NAME.to_string(),
+                Span::default_const(),
+            ),
         };
 
         let root = Module {
@@ -56,12 +57,12 @@ impl HirTree {
             globals: vec![],
         };
 
-        Self { 
-            root, 
-            main, 
-            init_globals, 
-            info: InfoMaps::default(), 
-            nodes: NodeMaps::new(init_global_function), 
+        Self {
+            root,
+            main,
+            init_globals,
+            info: InfoMaps::default(),
+            nodes: NodeMaps::new(init_global_function),
         }
     }
 }
@@ -83,7 +84,7 @@ pub struct Import {
 pub struct Global {
     pub kind: GlobalKind,
     pub id: StatementId,
-} 
+}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum GlobalKind {
@@ -137,7 +138,7 @@ pub struct Block {
     pub id: BlockId,
     pub imports: Vec<Import>,
     pub statements: Vec<Statement>,
-    pub terminator: Option<ExpressionId>,
+    pub terminator: Option<Terminator>,
 }
 impl Block {
     pub fn new(id: BlockId) -> Self {
@@ -146,6 +147,20 @@ impl Block {
             imports: vec![],
             terminator: None,
             statements: vec![],
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+pub enum Terminator {
+    Return(ExpressionId),
+    Expression(ExpressionId),
+}
+impl Terminator {
+    pub fn get_expression_id(&self) -> ExpressionId {
+        match self {
+            Terminator::Return(expression_id) => *expression_id,
+            Terminator::Expression(expression_id) => *expression_id,
         }
     }
 }

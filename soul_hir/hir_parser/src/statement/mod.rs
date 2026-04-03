@@ -1,7 +1,6 @@
 use hir::{Assign, StatementId};
 use soul_utils::{
-    error::{SoulError, SoulErrorKind},
-    soul_names::KeyWord,
+    error::{SoulError, SoulErrorKind}, soul_names::KeyWord
 };
 
 use crate::HirContext;
@@ -107,7 +106,7 @@ impl<'a> HirContext<'a> {
 
         let local = self.id_generator.alloc_local();
         self.insert_variable(&variable.name, local, ty, value);
-        hir::Variable {local}
+        hir::Variable { local }
     }
 
     fn lower_struct(&mut self, object: &ast::Struct) {
@@ -119,14 +118,17 @@ impl<'a> HirContext<'a> {
             generics.push(id);
         }
 
+        let struct_id = self.tree.info.types.alloc_struct();
+
         let mut fields = vec![];
         for field in &object.fields {
             let ty = self.lower_type(&field.ty);
             let id = self.id_generator.alloc_field();
-            
+
             let hir_field = hir::Field {
                 id,
                 ty,
+                struct_id,
                 name: field.name.to_string(),
             };
 
@@ -134,7 +136,7 @@ impl<'a> HirContext<'a> {
             self.tree.nodes.fields.insert(id, hir_field);
         }
 
-        let _id = self.insert_struct(hir::Struct { name, fields });
+        self.insert_struct(struct_id, hir::Struct { name, fields });
     }
 
     fn resolve_import(&mut self, import: &ast::Import) {

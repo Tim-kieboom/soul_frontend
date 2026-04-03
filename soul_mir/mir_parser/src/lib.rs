@@ -1,8 +1,13 @@
-use ast::Literal;
-use hir::{TypeId};
+use hir::{ComplexLiteral, TypeId};
+use hir_literal_interpreter::{ToComplex};
 use run_hir::HirResponse;
 use soul_utils::{
-    error::{SoulError, SoulErrorKind}, ids::{FunctionId, IdAlloc}, sementic_level::SementicFault, soul_error_internal, span::Span, vec_map::VecMap
+    error::{SoulError, SoulErrorKind},
+    ids::{FunctionId, IdAlloc},
+    sementic_level::SementicFault,
+    soul_error_internal,
+    span::Span,
+    vec_map::VecMap,
 };
 
 use typed_hir::ThirType;
@@ -106,7 +111,11 @@ impl<'a> MirContext<'a> {
             tree,
             faults,
             hir_response: hir_reponse,
-            error_type: ThirType{ kind: typed_hir::ThirTypeKind::Error, generics: vec![], modifier: None },
+            error_type: ThirType {
+                kind: typed_hir::ThirTypeKind::Error,
+                generics: vec![],
+                modifier: None,
+            },
             id_generators: IdGenerators::new(),
             temp_remap: VecMap::const_default(),
             place_typed: VecMap::const_default(),
@@ -188,21 +197,26 @@ impl<'a> MirContext<'a> {
         let id = self.id_generators.alloc_local();
 
         self.local_remap.insert(local, id);
-        self.tree.locals.insert(id, mir::Local::Runtime{ id, ty });
+        self.tree.locals.insert(id, mir::Local::Runtime { id, ty });
 
         self.current.scope.push(id);
         id
     }
 
-    fn new_local(&mut self, local: hir::LocalId, ty: hir::TypeId, comptime: Option<Literal>) -> mir::LocalId {
+    fn new_local(
+        &mut self,
+        local: hir::LocalId,
+        ty: hir::TypeId,
+        comptime: Option<ComplexLiteral>,
+    ) -> mir::LocalId {
         let id = self.id_generators.alloc_local();
 
         self.local_remap.insert(local, id);
 
         let immutable = !self.id_to_type(ty).is_mutable();
         let local_kind = match comptime {
-            Some(value) if immutable => mir::Local::Comptime{ id, ty, value },
-            _ => mir::Local::Runtime{ id, ty },
+            Some(value) if immutable => mir::Local::Comptime { id, ty, value },
+            _ => mir::Local::Runtime { id, ty },
         };
 
         self.tree.locals.insert(id, local_kind);
@@ -221,7 +235,7 @@ impl<'a> MirContext<'a> {
         let id = self.id_generators.alloc_local();
 
         self.local_remap.insert(local, id);
-        self.tree.locals.insert(id, mir::Local::Runtime{ id, ty });
+        self.tree.locals.insert(id, mir::Local::Runtime { id, ty });
 
         self.current.scope.push(id);
         id
@@ -260,7 +274,6 @@ impl<'a> MirContext<'a> {
     }
 
     fn id_to_type(&mut self, ty: hir::TypeId) -> &ThirType {
-
         match self.hir_response.typed.types_map.id_to_type(ty) {
             Some(val) => val,
             None => {
@@ -323,11 +336,11 @@ impl<'a> MirContext<'a> {
             .get(id)
             .copied()
             .unwrap_or(hir::TypeId::error())
-    } 
+    }
 
     fn function_span(&self, id: FunctionId) -> Span {
         self.hir_response.hir.info.spans.functions[id]
-    } 
+    }
 
     fn function_type(&self, id: FunctionId) -> hir::TypeId {
         self.hir_response
@@ -353,19 +366,15 @@ impl<'a> MirContext<'a> {
             .unwrap_or(hir::TypeId::error())
     }
 
-    fn get_expression_literal(&self, id: hir::ExpressionId) -> Option<&Literal> {
+    fn get_expression_literal(&self, id: hir::ExpressionId) -> Option<ComplexLiteral> {
         match &self.hir_response.hir.nodes.expressions[id].kind {
-            hir::ExpressionKind::Literal(literal) => Some(literal),
-            _ => self.hir_response.literal_resolves.get(id),
+            hir::ExpressionKind::Literal(literal) => Some(literal.clone().to_complex()),
+            _ => self.hir_response.literal_resolves.get(id).cloned(),
         }
     }
 
     fn statement_span(&self, id: hir::StatementId) -> Span {
-        self.hir_response
-            .hir
-            .info
-            .spans
-            .statements[id]
+        self.hir_response.hir.info.spans.statements[id]
     }
 
     fn to_mir_tree(self) -> MirTree {

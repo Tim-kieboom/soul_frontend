@@ -23,16 +23,15 @@ use soul_utils::{
 mod block;
 mod function;
 mod ir_type;
+mod llvm_builder;
 mod local;
 mod statement;
 mod utils;
 mod value;
-mod llvm_builder;
 use typed_hir::{ThirType, TypedHir};
 use utils::*;
 
 use crate::llvm_builder::IrBuilder;
-
 
 pub struct IrRequest<'ctx> {
     pub context: &'ctx Context,
@@ -75,7 +74,19 @@ pub struct IrOperand<'a> {
     pub value: BasicValueEnum<'a>,
     pub info: OperandInfo<'a>,
 }
-
+impl<'a> IrOperand<'a> {
+    pub fn get_or_convert_pointer(self, builder: &IrBuilder<'a>) -> SoulResult<PointerValue<'a>> {
+        
+        if self.value.is_pointer_value() {
+            Ok(self.value.into_pointer_value())
+        } else {
+            let pointee_ty = self.value.get_type();
+            let alloca_ptr = builder.build_alloca(pointee_ty, "temp_base_ptr")?;
+            builder.store_operand(alloca_ptr, self)?;
+            Ok(alloca_ptr)
+        }
+    }
+}
 #[derive(Debug, Clone, Copy)]
 pub struct OperandInfo<'a> {
     pub is_unloaded: bool,
@@ -84,11 +95,19 @@ pub struct OperandInfo<'a> {
 }
 impl<'a> OperandInfo<'a> {
     fn new_loaded(type_id: TypeId, ir_type: BasicTypeEnum<'a>) -> Self {
-        Self { is_unloaded: false, ir_type, type_id }
+        Self {
+            is_unloaded: false,
+            ir_type,
+            type_id,
+        }
     }
 
     fn new_unloaded(type_id: TypeId, ir_type: BasicTypeEnum<'a>) -> Self {
-        Self { is_unloaded: true, ir_type, type_id }
+        Self {
+            is_unloaded: true,
+            ir_type,
+            type_id,
+        }
     }
 }
 
@@ -112,12 +131,12 @@ pub struct LlvmBackend<'f, 'a> {
     temps: HashMap<(FunctionKeyId, TempId), IrOperand<'a>>,
     locals: HashMap<(FunctionKeyId, LocalId), Local<'a>>,
     blocks: HashMap<(FunctionKeyId, BlockId), BasicBlock<'a>>,
-    
+
     function_keys: FunctionKeyStore,
     field_indexs: RefCell<VecMap<FieldId, usize>>,
     structs: RefCell<VecMap<StructId, StructType<'a>>>,
     functions: VecMap<FunctionKeyId, FunctionValue<'a>>,
-    
+
     faults: &'f mut Vec<SementicFault>,
 }
 
@@ -125,10 +144,14 @@ pub struct LlvmBackend<'f, 'a> {
 pub enum Local<'a> {
     Runtime(PointerValue<'a>),
     Comptime(IrOperand<'a>),
-} 
+}
 
 impl<'f, 'a> LlvmBackend<'f, 'a> {
-    pub fn new(request: &'a IrRequest<'a>, options: &'a CompilerOptions, faults: &'f mut Vec<SementicFault>) -> Self {
+    pub fn new(
+        request: &'a IrRequest<'a>,
+        options: &'a CompilerOptions,
+        faults: &'f mut Vec<SementicFault>,
+    ) -> Self {
         let module = request.context.create_module("main");
         let builder = IrBuilder::new(request.context);
         let function_keys = FunctionKeyStore::new();
@@ -214,9 +237,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
     fn is_bodied_function(&self, id: FunctionKeyId) -> bool {
         if id == self.function_keys.global_key() {
-            return false
+            return false;
         }
-        
+
         let key = match self.function_keys.id_to_key(id) {
             Some(val) => val,
             None => panic!("should have {:?}", id),
@@ -233,7 +256,10 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         self.temps
             .get(&(self.current.function_key(), id))
             .copied()
-            .ok_or(soul_error_internal!(format!("{:?} not found current: {:?}", id, self.current), None))
+            .ok_or(soul_error_internal!(
+                format!("{:?} not found current: {:?}", id, self.current),
+                None
+            ))
     }
 
     fn push_global(&mut self, id: LocalId, value: PointerValue<'a>) {
@@ -267,7 +293,11 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
     fn to_ir_reponse(self) -> IrResponse<'a> {
         IrResponse {
             module: self.module,
-            is_fatal: self.faults.iter().find(|fault| fault.is_fatal(self.options.fault_level)).is_some(),
+            is_fatal: self
+                .faults
+                .iter()
+                .find(|fault| fault.is_fatal(self.options.fault_level))
+                .is_some(),
         }
     }
 }

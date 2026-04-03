@@ -1,5 +1,5 @@
-use ast::{BinaryOperator, ExternLanguage, Literal, UnaryOperator};
-use hir::{FieldId, GenericId, StructId, TypeId};
+use ast::{BinaryOperator, ExternLanguage, UnaryOperator};
+use hir::{ComplexLiteral, FieldId, GenericId, StructId, TypeId};
 use soul_utils::{Ident, ids::FunctionId, impl_soul_ids, vec_map::VecMap};
 
 impl_soul_ids!(GlobalId, BlockId, LocalId, StatementId, PlaceId, TempId);
@@ -40,14 +40,14 @@ pub struct MirTree {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum Local {
-    Runtime{
+    Runtime {
         id: LocalId,
         ty: TypeId,
     },
-    Comptime{
-        id: LocalId, 
-        ty: TypeId, 
-        value: Literal,
+    Comptime {
+        id: LocalId,
+        ty: TypeId,
+        value: ComplexLiteral,
     },
 }
 impl Local {
@@ -104,7 +104,7 @@ pub enum FunctionBody {
 }
 impl FunctionBody {
     pub fn is_internal(&self) -> bool {
-        matches!(self, FunctionBody::Internal{..})
+        matches!(self, FunctionBody::Internal { .. })
     }
 }
 
@@ -113,7 +113,7 @@ pub struct Global {
     pub id: GlobalId,
     pub local: LocalId,
     pub ty: TypeId,
-    pub literal: Option<Literal>,
+    pub literal: Option<ComplexLiteral>,
 }
 impl Global {
     pub fn is_comptime(&self) -> bool {
@@ -183,7 +183,10 @@ pub struct Rvalue {
 pub enum RvalueKind {
     /// Move or copy an operand.
     Use(Operand),
-    Field{base: PlaceId, field_id: FieldId},
+    Field {
+        base: PlaceId,
+        field_id: FieldId,
+    },
     CastUse {
         value: Operand,
         cast_to: TypeId,
@@ -213,7 +216,7 @@ pub enum RvalueKind {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum AggregateBody {
     Runtime(Vec<Operand>),
-    Comptime(Vec<(Literal, TypeId)>),
+    Comptime(Vec<(ComplexLiteral, TypeId)>),
 }
 
 /// Block terminators describe control flow edges.
@@ -255,7 +258,7 @@ pub enum OperandKind {
     Local(LocalId),
 
     /// A compile-time constant value.
-    Comptime(Literal),
+    Comptime(ComplexLiteral),
 
     /// Ref Place (e.g. `&a` or `@a`)
     Ref {
@@ -288,7 +291,11 @@ pub enum PlaceKind {
     /// Local variable place.
     Local(LocalId),
 
-    Field{base: PlaceId, field_id: FieldId},
+    Field {
+        base: PlaceId,
+        field_id: FieldId,
+        struct_type: StructId,
+    },
 }
 
 impl Statement {

@@ -41,9 +41,7 @@ impl<'a> HirContext<'a> {
                 };
                 Place::new(id, PlaceKind::Local(local), ident.span)
             }
-            ast::ExpressionKind::FieldAccess(field) => {
-                return self.lower_field(field, place.span)
-            }
+            ast::ExpressionKind::FieldAccess(field) => return self.lower_field(field, place.span),
             other => {
                 self.log_error(soul_error_internal!(
                     format!("{} can not be a Place", other.variant_str()),

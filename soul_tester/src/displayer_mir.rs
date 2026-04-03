@@ -1,6 +1,7 @@
-use hir::{FieldId, HirTree, StructId, TypeId};
+use hir::{ComplexLiteral, FieldId, HirTree, StructId, TypeId};
 use mir_parser::mir::{
-    self, BlockId, FunctionBody, Local, LocalId, MirTree, Operand, PlaceId, PlaceKind, Rvalue, StatementId, TempId
+    self, BlockId, FunctionBody, Local, LocalId, MirTree, Operand, PlaceId, PlaceKind, Rvalue,
+    StatementId, TempId,
 };
 use run_hir::HirResponse;
 use soul_utils::{
@@ -8,8 +9,8 @@ use soul_utils::{
     soul_names::{TypeModifier, TypeWrapper},
     vec_map::VecMapIndex,
 };
-use typed_hir::{ThirType, TypedHir, display_thir::DisplayThirType};
 use std::fmt::Write;
+use typed_hir::{ThirType, TypedHir, display_thir::DisplayThirType};
 
 pub fn display_mir(mir: &MirTree, hir: &HirResponse) -> String {
     let mut displayer = MirDisplayer::new(mir, hir);
@@ -77,7 +78,7 @@ impl<'a> MirDisplayer<'a> {
         self.display_local_declare(global.local);
         if let Some(literal) = &global.literal {
             self.push_str(" = ");
-            self.push_str(&literal.value_to_string());
+            self.display_literal(literal);
         }
         self.push('\n');
     }
@@ -85,9 +86,6 @@ impl<'a> MirDisplayer<'a> {
     fn display_function(&mut self, function_id: FunctionId) {
         let function = &self.mir.functions[function_id];
 
-        self.push_str("/*");
-        self.push_str(&format!("{}", function_id.index()));
-        self.push_str("*/");
         if let FunctionBody::External(language) = function.body {
             self.push_str("extern \"");
             self.push_str(language.as_str());
@@ -95,6 +93,7 @@ impl<'a> MirDisplayer<'a> {
         }
 
         self.push_str(function.name.as_str());
+
         self.push('(');
 
         let last_index = function.parameters.len().saturating_sub(1);
@@ -104,14 +103,18 @@ impl<'a> MirDisplayer<'a> {
                 self.push_str(", ");
             }
         }
-        self.push_str("): ");
+        self.push(')');
+        self.push_str(": ");
         self.get_type(function.return_type)
             .write_display(&self.types.types_map, &mut self.sb)
             .expect("no fmt error");
         self.push(' ');
 
         let (entry_block, locals, blocks) = match &function.body {
-            FunctionBody::External(_) => return,
+            FunctionBody::External(_) => {
+                write!(self.sb, "/*{}*/", function_id.index()).expect("no fmt error");
+                return
+            }
             FunctionBody::Internal {
                 entry_block,
                 locals,
@@ -119,7 +122,9 @@ impl<'a> MirDisplayer<'a> {
             } => (*entry_block, locals, blocks),
         };
 
-        self.push_str(" {\n\t");
+        self.push_str(" {");
+        write!(self.sb, "/*{}*/", function_id.index()).expect("no fmt error");
+        self.push_str("\n\t");
         self.display_goto(entry_block);
         self.push('\n');
 
@@ -154,7 +159,7 @@ impl<'a> MirDisplayer<'a> {
         match local {
             Local::Comptime { value, .. } => {
                 self.push_str(" = ");
-                self.push_str(&value.value_to_string());
+                self.display_literal(value);
             }
             _ => (),
         }
@@ -163,6 +168,7 @@ impl<'a> MirDisplayer<'a> {
     fn display_block(&mut self, block_id: BlockId) {
         let block = &self.mir.blocks[block_id];
 
+        self.push('\n');
         self.display_block_name(block_id);
         self.push_str(": \n");
         for statement in &block.statements {
@@ -197,6 +203,8 @@ impl<'a> MirDisplayer<'a> {
             }
             mir::Terminator::Unreachable => self.push_str("// unreachable"),
         }
+        self.push('\n');
+        
     }
 
     fn display_statement(&mut self, statement_id: StatementId) {
@@ -263,16 +271,24 @@ impl<'a> MirDisplayer<'a> {
 
     fn display_rvalue(&mut self, value: &Rvalue) {
         match &value.kind {
-            mir::RvalueKind::Field {base, field_id, } => {
+            mir::RvalueKind::Field { base, field_id } => {
                 self.display_field(base, *field_id);
             }
-            mir::RvalueKind::Aggregate{ struct_type, body } => {
+            mir::RvalueKind::Aggregate { struct_type, body } => {
+                let object = self.hir.info.types.id_to_struct(*struct_type);
                 self.display_struct_name(*struct_type);
                 self.push('{');
                 match body {
                     mir::AggregateBody::Runtime(fields) => {
+                        self.push_str("/*runtime*/");
                         let last_index = fields.len().saturating_sub(1);
                         for (i, field) in fields.iter().enumerate() {
+                            match object {
+                                Some(obj) => self.push_str(&obj.fields[i].name),
+                                None => write!(self.sb, "_{i}").expect("no fmt error"),
+                            }
+
+                            self.push_str(": ");
                             self.display_operand(field);
                             if i != last_index {
                                 self.push_str(", ");
@@ -280,9 +296,16 @@ impl<'a> MirDisplayer<'a> {
                         }
                     }
                     mir::AggregateBody::Comptime(literals) => {
+                        self.push_str("/*comptime*/");
                         let last_index = literals.len().saturating_sub(1);
                         for (i, (literal, _)) in literals.iter().enumerate() {
-                            self.push_str(&literal.value_to_string());
+                            match object {
+                                Some(obj) => self.push_str(&obj.fields[i].name),
+                                None => write!(self.sb, "_{i}").expect("no fmt error"),
+                            }
+
+                            self.push_str(": ");
+                            self.display_literal(literal);
                             if i != last_index {
                                 self.push_str(", ");
                             }
@@ -335,16 +358,20 @@ impl<'a> MirDisplayer<'a> {
             mir::OperandKind::Temp(temp_id) => self.display_temp_name(*temp_id),
             mir::OperandKind::Local(local_id) => self.display_local_name(*local_id),
             mir::OperandKind::Comptime(literal) => {
-                write!(self.sb, "{:?}", literal).expect("no fmt error");
+                self.display_literal(literal);
             }
             mir::OperandKind::None => self.push_str("<none>"),
         }
     }
 
+    fn display_literal(&mut self, literal: &ComplexLiteral) {
+        run_hir::literal_display(literal, self.hir, &mut self.sb);
+    }
+
     fn display_place(&mut self, place_id: &PlaceId) {
         let place = &self.mir.places[*place_id];
         match &place.kind {
-            PlaceKind::Field{ base, field_id} => {
+            PlaceKind::Field { struct_type:_, base, field_id } => {
                 self.display_field(base, *field_id);
             }
             PlaceKind::Temp(temp_id) => {
@@ -398,7 +425,15 @@ impl<'a> MirDisplayer<'a> {
     fn display_field(&mut self, base: &PlaceId, field: FieldId) {
         self.display_place(base);
         self.push('.');
-        self.push_str(&self.hir.nodes.fields.get(field).map(|f| f.name.as_str()).unwrap_or("<error>"));
+        self.push_str(
+            &self
+                .hir
+                .nodes
+                .fields
+                .get(field)
+                .map(|f| f.name.as_str())
+                .unwrap_or("<error>"),
+        );
     }
 
     fn get_type(&self, ty: TypeId) -> ThirType {
@@ -406,7 +441,11 @@ impl<'a> MirDisplayer<'a> {
             .types_map
             .id_to_type(ty)
             .cloned()
-            .unwrap_or(ThirType{ kind: typed_hir::ThirTypeKind::Error, generics: vec![], modifier: None })
+            .unwrap_or(ThirType {
+                kind: typed_hir::ThirTypeKind::Error,
+                generics: vec![],
+                modifier: None,
+            })
     }
 
     fn display_struct_name(&mut self, id: StructId) {
@@ -416,4 +455,3 @@ impl<'a> MirDisplayer<'a> {
         }
     }
 }
-

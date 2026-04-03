@@ -1,4 +1,4 @@
-use hir::LocalKind;
+use hir::{ComplexLiteral, LocalInfo, LocalKind};
 use soul_utils::soul_error_internal;
 
 use crate::{
@@ -82,7 +82,6 @@ impl<'a> MirContext<'a> {
                 None
             }
             hir::StatementKind::Break => {
-
                 let current = self.expect_current_block();
                 match self.current.loop_finish {
                     Some(bock_id) => {
@@ -114,38 +113,17 @@ impl<'a> MirContext<'a> {
     }
 
     pub(crate) fn lower_variable(&mut self, variable: &hir::Variable, is_end: &mut bool) {
-        
-        let should_assign;
         let local_info = &self.hir_response.hir.nodes.locals[variable.local];
-        let place_kind = if local_info.is_temp() {
-            should_assign = true;
-            mir::PlaceKind::Temp(match self.temp_remap.get(variable.local) {
-                Some(val) => *val,
-                None => self.new_temp(self.local_type(variable.local)),
-            })
-        } else {
-
-            let literal = match local_info.kind {
-                LocalKind::Variable(Some(value)) => self.get_expression_literal(value).cloned(),
-                _ => None,
-            };
-
-            let local = match self.local_remap.get(variable.local) {
-                Some(val) => *val,
-                None => self.new_local(variable.local, self.local_type(variable.local), literal),
-            };
-
-            should_assign = self.tree.locals[local].is_runtime();
-            mir::PlaceKind::Local(local)
-        };
+        let (should_assign, place_kind) = self.lower_variable_place(variable, local_info);
 
         if !should_assign {
-            return
+            return;
         }
 
         if let LocalKind::Variable(Some(value)) = local_info.kind {
             let operand = self.lower_operand(value).pass(is_end);
-            let place = self.new_place(mir::Place::new(place_kind, self.local_type(variable.local)));
+            let place =
+                self.new_place(mir::Place::new(place_kind, self.local_type(variable.local)));
 
             let statement = mir::Statement::new(mir::StatementKind::Assign {
                 place,
@@ -153,6 +131,46 @@ impl<'a> MirContext<'a> {
             });
 
             self.push_statement(statement);
+        }
+    }
+
+    fn lower_variable_place(&mut self, variable: &hir::Variable, local_info: &LocalInfo) -> (bool, mir::PlaceKind) {
+        const SHOULD_ASSIGN: bool = true;
+        
+        if local_info.is_temp() {
+            return (
+                SHOULD_ASSIGN, 
+                mir::PlaceKind::Temp(match self.temp_remap.get(variable.local) {
+                    Some(val) => *val,
+                    None => self.new_temp(self.local_type(variable.local)),
+                })
+            )
+        } 
+
+        let local = match self.local_remap.get(variable.local) {
+            Some(val) => *val,
+            None => {
+                let literal = self.try_get_variable_literal(local_info); 
+                self.new_local(variable.local, self.local_type(variable.local), literal)
+            },
+        };
+
+        let should_assign = self.tree.locals[local].is_runtime();
+        (should_assign, mir::PlaceKind::Local(local))
+    }
+
+    fn try_get_variable_literal(&mut self, local_info: &LocalInfo) -> Option<ComplexLiteral> {
+        match local_info.kind {
+            LocalKind::Variable(Some(value)) => {
+                let literal = self.get_expression_literal(value)?;
+                if literal.is_mutable() {
+                    None
+                }
+                else {
+                    Some(literal)
+                }
+            }
+            _ => None,        
         }
     }
 

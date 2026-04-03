@@ -66,12 +66,11 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     .lower_operand(condition, generics)?
                     .value
                     .into_int_value();
-                self.builder
-                    .build_conditional_branch(
-                        condition,
-                        self.get_block(*then),
-                        self.get_block(*arm),
-                    )?;
+                self.builder.build_conditional_branch(
+                    condition,
+                    self.get_block(*then),
+                    self.get_block(*arm),
+                )?;
             }
             Terminator::Unreachable => panic!("should not have unreachable"),
         };
@@ -92,14 +91,12 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             let meta_data_value = self.lower_operand(arg, generics)?.value.into();
             ir_arguments.push(meta_data_value);
         }
-        
+
         let prev = self.current;
-        
+
         let function = self.get_or_create_function(id, type_args);
-        let call = self
-            .builder
-            .build_call(function, ir_arguments.as_slice())?;
-    
+        let call = self.builder.build_call(function, ir_arguments.as_slice())?;
+
         self.current = prev;
         let place = match return_place {
             Some(val) => &self.mir.tree.places[val],
@@ -112,9 +109,15 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 let value = self.new_loaded_operand(return_value, place.ty, generics)?;
                 self.push_temp(*temp_id, value);
             }
-            PlaceKind::Field{..} => panic!("call return value should be Place::Temp not Place::Field"),
-            PlaceKind::Deref(_) => panic!("call return value should be Place::Temp not Place::Deref"),
-            PlaceKind::Local(_) => panic!("call return value should be Place::Temp not Place::Local"),
+            PlaceKind::Field { .. } => {
+                panic!("call return value should be Place::Temp not Place::Field")
+            }
+            PlaceKind::Deref(_) => {
+                panic!("call return value should be Place::Temp not Place::Deref")
+            }
+            PlaceKind::Local(_) => {
+                panic!("call return value should be Place::Temp not Place::Local")
+            }
         }
 
         Ok(())

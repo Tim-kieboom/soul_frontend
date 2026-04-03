@@ -1,11 +1,13 @@
 use hir::{FieldId, HirTypeKind, LazyTypeId, TypeId};
-use soul_utils::{ids::IdAlloc, vec_map::{VecMap, VecMapIndex}};
+use soul_utils::{
+    ids::IdAlloc,
+    vec_map::{VecMap, VecMapIndex},
+};
 use typed_hir::{FieldInfo, ThirType, ThirTypeKind, ThirTypesMap, TypedHir};
 
 use crate::{TypedHirContext, infer_table::InferBinding};
 
 impl<'a> TypedHirContext<'a> {
-
     pub(crate) fn finalize(mut self) -> TypedHir {
         self.finalize_infers();
         use std::mem::take;
@@ -45,18 +47,21 @@ impl<'a> TypedHirContext<'a> {
 
     fn resolve_fields(&mut self) -> VecMap<FieldId, FieldInfo> {
         let mut fields = VecMap::with_capacity(self.fields.len());
-        
+
         let mut temp = VecMap::new();
-        std::mem::swap(&mut self.fields, &mut temp); 
+        std::mem::swap(&mut self.fields, &mut temp);
 
         for (id, field) in temp.entries() {
-            fields.insert(id, FieldInfo{
-                base_type: field.base_type,
-                field_type: self.to_known(field.field_type),
-                field_index: field.field_index,
-            });
+            fields.insert(
+                id,
+                FieldInfo {
+                    base_type: field.base_type,
+                    field_type: self.to_known(field.field_type),
+                    field_index: field.field_index,
+                },
+            );
         }
-        std::mem::swap(&mut temp, &mut self.fields); 
+        std::mem::swap(&mut temp, &mut self.fields);
 
         fields
     }
@@ -84,15 +89,16 @@ impl<'a> TypedHirContext<'a> {
             for field in &s.fields {
                 let id = field.id;
                 let ty = self.to_known(self.fields[id].field_type);
-                fields.push(typed_hir::Field {
-                    id,
-                    ty, 
-                })
+                fields.push(typed_hir::Field { id, ty })
             }
-            
+
             out.structs.insert(
                 id,
-                typed_hir::Struct {name: s.name.to_string(), id, fields},
+                typed_hir::Struct {
+                    name: s.name.to_string(),
+                    id,
+                    fields,
+                },
             );
         }
 
@@ -139,26 +145,27 @@ impl<'a> TypedHirContext<'a> {
     }
 
     fn finalize_infers(&mut self) {
-        
-        let unbounds = self.infer_table.table
+        let unbounds = self
+            .infer_table
+            .table
             .entries()
             .filter(|(_, value)| matches!(value, InferBinding::Unbound(_)))
             .map(|(key, _)| key)
             .collect::<Vec<_>>();
 
         for id in unbounds {
-            self.infer_table.table.insert(id, InferBinding::Bound(TypeId::error()));
+            self.infer_table
+                .table
+                .insert(id, InferBinding::Bound(TypeId::error()));
         }
     }
 
-    fn resolve_map<K>(
-        &mut self,
-        map: VecMap<K, LazyTypeId>,
-    ) -> VecMap<K, TypeId>
+    fn resolve_map<K>(&mut self, map: VecMap<K, LazyTypeId>) -> VecMap<K, TypeId>
     where
         K: VecMapIndex + IdAlloc,
     {
-        let mut new_map = map.into_entries()
+        let mut new_map = map
+            .into_entries()
             .map(|(k, lazy)| {
                 let ty = self
                     .infer_table

@@ -46,7 +46,10 @@ impl<'a> MirContext<'a> {
         self.current.block = Some(join_bb);
         self.current.loop_finish = prev_finish;
         self.current.loop_continue = prev_continue;
-        mir::Operand::new(self.hir_response.typed.types_table.none_type, mir::OperandKind::None)
+        mir::Operand::new(
+            self.hir_response.typed.types_table.none_type,
+            mir::OperandKind::None,
+        )
     }
 
     pub(super) fn lower_if(
@@ -119,10 +122,7 @@ impl<'a> MirContext<'a> {
                 }
             };
 
-            let place = self.new_place(mir::Place::new(
-                mir::PlaceKind::Temp(temp_id),
-                ty,
-            ));
+            let place = self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp_id), ty));
 
             self.push_statement_from(
                 mir::Statement::new(mir::StatementKind::Assign {

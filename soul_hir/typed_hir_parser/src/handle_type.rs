@@ -1,12 +1,13 @@
 use hir::{ExpressionId, FieldId, HirType, HirTypeKind, LazyTypeId, LocalId, StructId, TypeId};
 use soul_utils::{
-    error::{SoulError, SoulErrorKind}, soul_names::{PrimitiveTypes, TypeModifier}, span::Span,
+    error::{SoulError, SoulErrorKind},
+    soul_names::{PrimitiveTypes, TypeModifier},
+    span::Span,
 };
 
-use crate::{TypedHirContext, infer_table::{UnifyResult}};
+use crate::{TypedHirContext, infer_table::UnifyResult};
 
 impl<'a> TypedHirContext<'a> {
-    
     pub(crate) fn unify(
         &mut self,
         value: ExpressionId,
@@ -32,6 +33,10 @@ impl<'a> TypedHirContext<'a> {
     }
 
     pub(crate) fn resolve_type_strict(&mut self, ty: LazyTypeId, span: Span) -> Option<TypeId> {
+        if ty == LazyTypeId::error() {
+            return None
+        }
+        
         match self
             .infer_table
             .resolve_type_strict(&mut self.types, ty, Some(span))
@@ -45,6 +50,10 @@ impl<'a> TypedHirContext<'a> {
     }
 
     pub(crate) fn resolve_type_lazy(&mut self, ty: LazyTypeId, span: Span) -> LazyTypeId {
+        if ty == LazyTypeId::error() {
+            return ty
+        }
+        
         match self
             .infer_table
             .resolve_type_lazy(&mut self.types, &self.infers, ty, span)
@@ -66,6 +75,9 @@ impl<'a> TypedHirContext<'a> {
         let object_type = self.resolve_type_strict(object, span)?;
         match &self.id_to_type(object_type).kind {
             HirTypeKind::Struct(struct_id) => self.get_struct_field(*struct_id, field, span),
+            HirTypeKind::Ref { of_type, .. } => {
+                self.get_field_access(*of_type, field, span)
+            }
             other => {
                 self.log_error(SoulError::new(
                     format!(
@@ -93,9 +105,7 @@ impl<'a> TypedHirContext<'a> {
                 ty.modifier = Some(modifier);
                 self.add_type(ty).to_lazy()
             }
-            None => {
-                self.lazy_id_insure_modifier(type_id, Some(modifier))
-            }
+            None => self.lazy_id_insure_modifier(type_id, Some(modifier)),
         };
 
         match local_type_id {
@@ -212,6 +222,17 @@ impl<'a> TypedHirContext<'a> {
         };
 
         Some(field.id)
+    }
+
+    pub(crate) fn is_mutable(&self, ty: LazyTypeId) -> bool {
+        if ty == LazyTypeId::error() {
+            return true
+        } 
+        
+        match ty {
+            LazyTypeId::Known(type_id) => self.id_to_type(type_id).is_mutable(),
+            LazyTypeId::Infer(infer_type_id) => self.id_to_infer(infer_type_id).is_mutable(),
+        }
     }
 
     fn posion_expression(&mut self, value: ExpressionId) {

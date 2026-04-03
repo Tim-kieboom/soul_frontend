@@ -1,13 +1,14 @@
 use hir::{
-    Binary, BlockId, DisplayType, ExpressionId, FunctionBody, HirTree, HirType, LazyTypeId, LocalId, LocalKind, StructId, Unary
+    Binary, BlockId, DisplayType, ExpressionId, FunctionBody, HirTree, HirType, LazyTypeId,
+    LocalId, LocalKind, StructId, Unary,
 };
 use soul_utils::{
     ids::{FunctionId, IdAlloc},
     soul_names::KeyWord,
     vec_map::VecMapIndex,
 };
-use typed_hir::{TypedHir, display_thir::DisplayThirType};
 use std::fmt::Write;
+use typed_hir::{TypedHir, display_thir::DisplayThirType};
 
 pub fn display_hir(hir: &HirTree) -> String {
     let mut displayer = HirDisplayer::new_hir(hir);
@@ -30,10 +31,14 @@ pub fn display_thir(hir: &HirTree, typed: &TypedHir) -> String {
 }
 
 pub fn display_created_types(hir: &HirTree, typed: &TypedHir) -> String {
-    
     let mut sb = String::new();
     for (id, struct_type) in typed.types_map.structs.entries() {
-        let name = &hir.info.types.id_to_struct(id).expect("should have struct").name;
+        let name = &hir
+            .info
+            .types
+            .id_to_struct(id)
+            .expect("should have struct")
+            .name;
         sb.push_str("struct ");
         sb.push_str(name.as_str());
         sb.push_str(" {\n");
@@ -42,7 +47,8 @@ pub fn display_created_types(hir: &HirTree, typed: &TypedHir) -> String {
             sb.push('\t');
             sb.push_str(field_name);
             sb.push_str(": ");
-            typed.types_map
+            typed
+                .types_map
                 .id_to_type(field.ty)
                 .expect(&format!("{:?} not found", field.ty))
                 .write_display(&typed.types_map, &mut sb)
@@ -160,7 +166,7 @@ impl<'a> HirDisplayer<'a> {
         let block = &self.hir.nodes.blocks[*id];
 
         let prev = self.terminate;
-        self.terminate = block.terminator;
+        self.terminate = block.terminator.map(|t| t.get_expression_id());
 
         self.display_block_id(*id);
         self.push_str("{\n");
@@ -224,8 +230,11 @@ impl<'a> HirDisplayer<'a> {
             hir::ExpressionKind::Literal(literal) => self.push_str(&literal.value_to_string()),
             hir::ExpressionKind::Local(local_id) => self.display_local(*local_id),
             hir::ExpressionKind::Function(_) => self.push_str("<function>"),
-            hir::ExpressionKind::StructConstructor { ty, values, defaults } => {
-            
+            hir::ExpressionKind::StructConstructor {
+                ty,
+                values,
+                defaults,
+            } => {
                 self.display_struct_name(*ty);
                 self.push('{');
                 let last_index = values.len().saturating_sub(1);
@@ -243,7 +252,6 @@ impl<'a> HirDisplayer<'a> {
                 self.push('}');
             }
             hir::ExpressionKind::Load(place) => {
-                self.push_str("/*Load*/");
                 self.display_place(place);
             }
             hir::ExpressionKind::Ref { place, mutable } => {
@@ -320,7 +328,6 @@ impl<'a> HirDisplayer<'a> {
                     self.push('<');
                     let last_index = generics.len().saturating_sub(1);
                     for (i, generic) in generics.iter().enumerate() {
-
                         self.display_type(generic.to_lazy());
                         if i != last_index {
                             self.push_str(", ");
@@ -370,7 +377,9 @@ impl<'a> HirDisplayer<'a> {
                 self.display_expression(index);
                 self.push(']');
             }
-            hir::PlaceKind::Field { base, field: index, .. } => {
+            hir::PlaceKind::Field {
+                base, field: index, ..
+            } => {
                 self.display_place(base);
                 self.push('.');
                 self.push_str(index.as_str());
@@ -415,37 +424,50 @@ impl<'a> HirDisplayer<'a> {
     }
 
     fn display_struct_name(&mut self, id: StructId) {
-        let name = self.hir.info.types
+        let name = self
+            .hir
+            .info
+            .types
             .id_to_struct(id)
             .map(|s| s.name.as_str())
             .unwrap_or("<error>");
-        
+
         self.push_str(name);
     }
 
     fn display_type(&mut self, id: LazyTypeId) {
-
         if let None = self.inner_type(id) {
-            HirType::error_type().write_display(&self.hir.info.types, &self.hir.info.infers, &mut self.sb).expect("no format error")
+            HirType::error_type()
+                .write_display(&self.hir.info.types, &self.hir.info.infers, &mut self.sb)
+                .expect("no format error")
         }
     }
 
     fn inner_type(&mut self, id: LazyTypeId) -> Option<()> {
-        
         match (self.typed, id) {
             (Some(typed), LazyTypeId::Known(ty)) => {
-                typed.types_map.id_to_type(ty)?.write_display(&typed.types_map, &mut self.sb).expect("no fmt error");
+                typed
+                    .types_map
+                    .id_to_type(ty)?
+                    .write_display(&typed.types_map, &mut self.sb)
+                    .expect("no fmt error");
                 return Some(());
             }
             (Some(_), LazyTypeId::Infer(_)) => panic!("should not have infer in thir"),
             _ => (),
         }
-        
+
         let types = &self.hir.info.types;
         let infers = &self.hir.info.infers;
         match id {
-            LazyTypeId::Known(type_id) => types.id_to_type(type_id)?.write_display(types, infers, &mut self.sb).expect("no fmt error"),
-            LazyTypeId::Infer(infer_type_id) => infers.get_infer(infer_type_id)?.write_display(types, infers, &mut self.sb).expect("no fmt error"),
+            LazyTypeId::Known(type_id) => types
+                .id_to_type(type_id)?
+                .write_display(types, infers, &mut self.sb)
+                .expect("no fmt error"),
+            LazyTypeId::Infer(infer_type_id) => infers
+                .get_infer(infer_type_id)?
+                .write_display(types, infers, &mut self.sb)
+                .expect("no fmt error"),
         }
 
         Some(())

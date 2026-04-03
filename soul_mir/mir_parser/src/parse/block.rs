@@ -70,7 +70,7 @@ impl<'a> MirContext<'a> {
                             "block_operand should be Some(_)",
                             None
                         ));
-                        self.lower_operand(expression).pass(is_end)
+                        self.lower_operand(expression.get_expression_id()).pass(is_end)
                     }
                 };
 

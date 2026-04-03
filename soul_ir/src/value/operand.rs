@@ -1,4 +1,6 @@
-use hir::TypeId;
+use ast::Literal;
+use hir::{ComplexLiteral, TypeId};
+use inkwell::values::{AsValueRef, BasicValueEnum};
 use mir_parser::mir::{Operand, OperandKind};
 use soul_utils::{error::SoulResult, soul_error_internal, soul_names::PrimitiveSize};
 use typed_hir::{ThirTypeKind, display_thir::DisplayThirType};
@@ -28,15 +30,14 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     crate::Local::Comptime(literal_operand) => return Ok(literal_operand),
                 };
 
-                let value = self
-                    .builder
-                    .build_load(ty, ptr, "load")?;
+                let value = self.builder.build_load(ty, ptr, "load")?;
 
                 self.new_loaded_operand(value, mir_local.ty(), generics)?
             }
             OperandKind::Comptime(literal) => self.lower_literal(literal, operand.ty, generics)?,
-            OperandKind::Ref { .. } => {
-                todo!("ref not yet impl")
+            OperandKind::Ref { place, .. } => {
+                let inner = self.lower_place_to_operand(*place, generics)?;
+                IrOperand { value: unsafe { BasicValueEnum::new(inner.value.as_value_ref()) }, info: inner.info.clone() }
             }
             OperandKind::None => {
                 return Err(soul_error_internal!("operand should be Some(_)", None));
@@ -46,7 +47,21 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
     pub(crate) fn lower_literal(
         &self,
-        literal: &ast::Literal,
+        literal: &ComplexLiteral,
+        should_be: TypeId,
+        generics: &GenericSubstitute,
+    ) -> SoulResult<IrOperand<'a>> {
+        match literal {
+            ComplexLiteral::Basic(literal) => self.lower_basic_literal(literal, should_be, generics),
+            ComplexLiteral::Struct { struct_id, struct_type, values, all_fields_const:_ } => {
+                self.lower_const_aggregate(*struct_id, *struct_type, values, generics)
+            },
+        }
+    }
+
+    fn lower_basic_literal(
+        &self,
+        literal: &Literal,
         should_be: TypeId,
         generics: &GenericSubstitute,
     ) -> SoulResult<IrOperand<'a>> {
@@ -59,9 +74,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     .expect("should have type")
                     .kind
                 {
-                    ThirTypeKind::Primitive(primitive_types) => {
-                        primitive_types.to_primitive_size()
-                    }
+                    ThirTypeKind::Primitive(primitive_types) => primitive_types.to_primitive_size(),
                     _ => {
                         return Err(soul_error_internal!(
                             "literal should be primitive type",
@@ -92,15 +105,14 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     .id_to_type(should_be)
                     .expect("should have type");
 
-                let size = match hir_type
-                    .kind
-                {
-                    ThirTypeKind::Primitive(primitive_types) => {
-                        primitive_types.to_primitive_size()
-                    }
+                let size = match hir_type.kind {
+                    ThirTypeKind::Primitive(primitive_types) => primitive_types.to_primitive_size(),
                     _ => {
                         return Err(soul_error_internal!(
-                            format!("literal should be primitive type is `{}`", hir_type.display(&self.types.types_map)),
+                            format!(
+                                "literal should be primitive type is `{}`",
+                                hir_type.display(&self.types.types_map)
+                            ),
                             None
                         ));
                     }
@@ -128,9 +140,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     .expect("should have type")
                     .kind
                 {
-                    ThirTypeKind::Primitive(primitive_types) => {
-                        primitive_types.to_primitive_size()
-                    }
+                    ThirTypeKind::Primitive(primitive_types) => primitive_types.to_primitive_size(),
                     _ => {
                         return Err(soul_error_internal!(
                             "literal should be primitive type",

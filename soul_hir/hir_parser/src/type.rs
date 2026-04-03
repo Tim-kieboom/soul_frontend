@@ -1,7 +1,5 @@
 use ast::Stub;
-use hir::{
-    GenericId, HirType, HirTypeKind, InferTypesMap, LazyTypeId, StructId, TypeId, TypesMap,
-};
+use hir::{GenericId, HirType, HirTypeKind, InferTypesMap, LazyTypeId, StructId, TypeId, TypesMap};
 use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},
     ids::IdAlloc,
@@ -71,17 +69,17 @@ impl<'a> HirContext<'a> {
                 generics: stub_generics,
             }) => {
                 for generic in stub_generics {
-                    let ty = Self::convert_type(
-                        generic,
-                        scopes,
-                        call_generics,
-                        types,
-                        infers,
-                    )?;
+                    let ty = Self::convert_type(generic, scopes, call_generics, types, infers)?;
 
                     match ty {
                         LazyTypeId::Known(type_id) => generics.push(type_id),
-                        LazyTypeId::Infer(_) => return Err(SoulError::new("type should be known at this time", SoulErrorKind::TypeInferenceError, Some(generic.span)))
+                        LazyTypeId::Infer(_) => {
+                            return Err(SoulError::new(
+                                "type should be known at this time",
+                                SoulErrorKind::TypeInferenceError,
+                                Some(generic.span),
+                            ));
+                        }
                     }
                 }
 
@@ -131,18 +129,24 @@ impl<'a> HirContext<'a> {
     }
 
     pub(crate) fn insert_generic(&mut self, name: String) -> GenericId {
-        self.tree.info.types.insert_generic(name)
+        let id = self.tree.info.types.insert_generic(name.clone());
+        self.scopes
+            .last_mut()
+            .expect("should have scope")
+            .generics
+            .insert(name, id);
+        
+        id
     }
 
-    pub(crate) fn insert_struct(&mut self, obj: hir::Struct) -> StructId {
+    pub(crate) fn insert_struct(&mut self, id: StructId, obj: hir::Struct) {
         let name = obj.name.to_string();
-        let id = self.tree.info.types.insert_struct(obj);
+        self.tree.info.types.insert_struct(id, obj);
         self.scopes
             .last_mut()
             .expect("should have scope")
             .created_type
             .insert(name, hir::CreatedTypes::Struct(id));
-        id
     }
 
     pub(crate) fn new_infer_type(
