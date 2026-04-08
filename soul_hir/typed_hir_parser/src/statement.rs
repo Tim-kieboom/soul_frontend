@@ -69,7 +69,7 @@ impl<'a> TypedHirContext<'a> {
     fn infer_assign(&mut self, assign: &Assign) -> TypeId {
         let span = self.expression_span(assign.value);
         let expected = self.infer_place(assign.place);
-        if !self.is_mutable(expected) {
+        if !self.is_mutable_or_modifier_none(expected) {
             self.log_error(SoulError::new(
                 "trying to reassign but type is 'const' or 'literal' (make it 'mut' instead)", 
                 SoulErrorKind::InvalidMutability, 

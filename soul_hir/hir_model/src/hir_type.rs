@@ -52,11 +52,19 @@ impl<T> InnerType<T> {
         self.modifier = modifier;
         self
     }
+
+    pub fn apply_generics(mut self, generics: Vec<TypeId>) -> Self {
+        self.generics = generics;
+        self
+    }
 }
 impl InferType {
     pub fn is_mutable(&self) -> bool {
         self.modifier == Some(TypeModifier::Mut)
     }
+    pub fn is_modifier_none(&self) -> bool {
+        self.modifier == None
+    } 
 }
 impl HirType {
     pub const fn index_type() -> Self {
@@ -75,12 +83,24 @@ impl HirType {
         Self::new(HirTypeKind::Primitive(prim))
     }
 
+    pub const fn pointer_type(inner: LazyTypeId) -> Self {
+        Self::new(HirTypeKind::Pointer(inner))
+    }
+
+    pub const fn generic_type(id: GenericId) -> Self {
+        Self::new(HirTypeKind::Generic(id))
+    }
+
     pub const fn error_type() -> Self {
         Self::new(HirTypeKind::Error)
     }
 
     pub fn is_mutable(&self) -> bool {
         self.modifier == Some(TypeModifier::Mut)
+    }
+
+    pub fn is_modifier_none(&self) -> bool {
+        self.modifier == None
     }
 
     pub const fn is_untyped_interger_type(&self) -> bool {
@@ -107,6 +127,10 @@ impl HirType {
         matches!(self.kind, HirTypeKind::Primitive(PrimitiveTypes::Boolean))
     }
 
+    pub const fn is_pointer(&self) -> bool {
+        matches!(self.kind, HirTypeKind::Pointer(_))
+    }
+
     pub const fn is_float_type(&self) -> bool {
         if let HirTypeKind::Primitive(prim) = self.kind {
             prim.is_float()
@@ -117,6 +141,10 @@ impl HirType {
 
     pub const fn is_numeric_type(&self) -> bool {
         self.is_float_type() || self.is_any_uint_type() || self.is_any_int_type()
+    }
+
+    pub const fn is_non_float_numeric_type(&self) -> bool {
+        self.is_any_uint_type() || self.is_any_int_type()
     }
 
     pub const fn is_error(&self) -> bool {

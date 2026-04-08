@@ -366,6 +366,16 @@ impl<'a> MirContext<'a> {
             .unwrap_or(hir::TypeId::error())
     }
 
+    fn sizeof_type(&self, id: hir::ExpressionId) -> hir::TypeId {
+        self.hir_response
+        .typed
+        .types_table
+        .sizeofs
+        .get(id)
+        .copied()
+        .unwrap_or(hir::TypeId::error())
+    }
+
     fn get_expression_literal(&self, id: hir::ExpressionId) -> Option<ComplexLiteral> {
         match &self.hir_response.hir.nodes.expressions[id].kind {
             hir::ExpressionKind::Literal(literal) => Some(literal.clone().to_complex()),

@@ -1,13 +1,12 @@
 use hir::{
-    Binary, BlockId, DisplayType, ExpressionId, FunctionBody, HirTree, HirType, LazyTypeId,
-    LocalId, LocalKind, StructId, Unary,
+    TypeId, Binary, BlockId, DisplayType, ExpressionId, FieldId, FunctionBody, HirTree, HirType, LazyTypeId, LocalId, LocalKind, StructId, Unary
 };
 use soul_utils::{
     ids::{FunctionId, IdAlloc},
     soul_names::KeyWord,
     vec_map::VecMapIndex,
 };
-use std::fmt::Write;
+use std::{fmt::Write};
 use typed_hir::{TypedHir, display_thir::DisplayThirType};
 
 pub fn display_hir(hir: &HirTree) -> String {
@@ -43,7 +42,7 @@ pub fn display_created_types(hir: &HirTree, typed: &TypedHir) -> String {
         sb.push_str(name.as_str());
         sb.push_str(" {\n");
         for field in &struct_type.fields {
-            let field_name = &hir.nodes.fields[field.id].name;
+            let field_name = hir.nodes.fields.get(field.id).map(|f| f.name.as_str()).unwrap_or("<error>");
             sb.push('\t');
             sb.push_str(field_name);
             sb.push_str(": ");
@@ -224,11 +223,17 @@ impl<'a> HirDisplayer<'a> {
         let value = &self.hir.nodes.expressions[*id];
 
         match &value.kind {
+            hir::ExpressionKind::Sizeof(ty) => {
+                self.display_type(*ty);
+                self.push_str(".sizeof");
+            }
             hir::ExpressionKind::Error => self.push_str("<error>"),
             hir::ExpressionKind::Block(block_id) => self.display_block(block_id),
             hir::ExpressionKind::Null => self.push_str("null"),
             hir::ExpressionKind::Literal(literal) => self.push_str(&literal.value_to_string()),
-            hir::ExpressionKind::Local(local_id) => self.display_local(*local_id),
+            hir::ExpressionKind::Local(local_id) => {
+                self.display_local(*local_id);
+            }
             hir::ExpressionKind::Function(_) => self.push_str("<function>"),
             hir::ExpressionKind::StructConstructor {
                 ty,
@@ -378,11 +383,21 @@ impl<'a> HirDisplayer<'a> {
                 self.push(']');
             }
             hir::PlaceKind::Field {
-                base, field: index, ..
+                base, field
             } => {
                 self.display_place(base);
                 self.push('.');
-                self.push_str(index.as_str());
+                self.push_str(field.as_str());
+                match self.typed {
+                    Some(typed) => {
+                        let field = typed.types_table.place_fields.get(*place).copied().unwrap_or(FieldId::error());
+                        let ty = typed.types_table.fields.get(field).map(|f| f.field_type).unwrap_or(TypeId::error());
+                        self.push_str("<as: ");
+                        self.display_type(ty.to_lazy());
+                        self.push('>');
+                    }
+                    None => (),
+                }
             }
         }
     }
@@ -402,7 +417,7 @@ impl<'a> HirDisplayer<'a> {
     }
 
     fn display_local(&mut self, id: LocalId) {
-        write!(self.sb, "_{}", id.index()).expect("no format error")
+        write!(self.sb, "_{}", id.index()).expect("no format error");
     }
 
     fn display_temp(&mut self, id: LocalId) {

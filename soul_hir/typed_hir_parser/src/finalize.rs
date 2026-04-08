@@ -14,6 +14,7 @@ impl<'a> TypedHirContext<'a> {
 
         let expressions = take(&mut self.expressions);
         let statements = take(&mut self.statements);
+        let sizeofs = take(&mut self.sizeofs);
         let places = take(&mut self.places);
         let locals = take(&mut self.locals);
         let blocks = take(&mut self.blocks);
@@ -21,8 +22,10 @@ impl<'a> TypedHirContext<'a> {
         let table = typed_hir::TypeTable {
             none_type: self.none_type,
             bool_type: self.bool_type,
+            u32_type: self.u32_type,
 
             expressions: self.resolve_map(expressions),
+            sizeofs: self.resolve_map(sizeofs),
             statements: self.resolve_map(statements),
             functions: take(&mut self.functions),
             places: self.resolve_map(places),
@@ -67,7 +70,7 @@ impl<'a> TypedHirContext<'a> {
     }
 
     fn lower_types_map(&mut self) -> ThirTypesMap {
-        let mut out = ThirTypesMap::new();
+        let mut out = ThirTypesMap::new(self.hir.info.types.array_struct);
 
         let keys = self.types.types_keys().collect::<Vec<_>>();
         for id in keys {
@@ -86,11 +89,15 @@ impl<'a> TypedHirContext<'a> {
 
         for (id, s) in self.hir.info.types.structs_entries() {
             let mut fields = Vec::with_capacity(s.fields.len());
+            
             for field in &s.fields {
                 let id = field.id;
                 let ty = self.to_known(self.fields[id].field_type);
+                
                 fields.push(typed_hir::Field { id, ty })
             }
+
+            let warning = "to do impl check resursive inclusion";
 
             out.structs.insert(
                 id,

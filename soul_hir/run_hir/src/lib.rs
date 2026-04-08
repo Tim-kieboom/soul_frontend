@@ -21,7 +21,7 @@ pub fn to_hir(
     faults: &mut Vec<SementicFault>,
 ) -> HirResponse {
     let hir = lower_hir(ast, faults);
-    let typed = lower_typed_hir(&hir, faults);
+    let typed = lower_typed_hir(&hir, options, faults);
 
     let literal_resolves = literal_resolve(&hir, &typed);
     if options.debug_view_literal_resolve {

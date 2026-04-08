@@ -1,8 +1,7 @@
 use soul_utils::Ident;
 
 use crate::{
-    ast::{Expression, SoulType},
-    scope::NodeId,
+    BoxExpression, ast::{Expression, SoulType}, scope::NodeId
 };
 
 /// An array literal, e.g., `[1, 2, 3]`.
@@ -15,6 +14,16 @@ pub struct Array {
     pub element_type: Option<SoulType>,
     /// The array element expressions.
     pub values: Vec<Expression>,
+}
+
+/// An array ctor, e.g., `[for 3 => 0] //creates [0, 0, 0]`.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ArrayContructor {
+    pub id: Option<NodeId>,
+    pub collection_type: Option<SoulType>,
+    pub element_type: Option<SoulType>,
+    pub amount: BoxExpression,
+    pub element: BoxExpression,
 }
 
 /// An struct literal, e.g., `Struct{field: 1, field2: 2}`.

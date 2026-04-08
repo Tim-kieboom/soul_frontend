@@ -181,12 +181,9 @@ pub struct Rvalue {
 /// Different kinds of MIR rvalues.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum RvalueKind {
+    Place(Place),
     /// Move or copy an operand.
-    Use(Operand),
-    Field {
-        base: PlaceId,
-        field_id: FieldId,
-    },
+    Operand(Operand),
     CastUse {
         value: Operand,
         cast_to: TypeId,
@@ -266,6 +263,7 @@ pub enum OperandKind {
         mutable: bool,
     },
 
+    Sizeof(TypeId),
     None,
 }
 

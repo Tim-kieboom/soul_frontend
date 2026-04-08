@@ -134,7 +134,10 @@ impl FromLexer for SymbolKind {
                 if peek == Some('=') {
                     lexer.next_char();
                     Some(SymbolKind::Le)
-                } else {
+                } else if peek == Some('/') {
+                    lexer.next_char();
+                    Some(SymbolKind::Root)
+                }else {
                     Some(SymbolKind::LeftArray)
                 }
             }

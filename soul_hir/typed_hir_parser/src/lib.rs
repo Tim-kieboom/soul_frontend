@@ -4,13 +4,7 @@ use hir::{
     Variable,
 };
 use soul_utils::{
-    error::SoulError,
-    ids::{FunctionId, IdAlloc},
-    sementic_level::SementicFault,
-    soul_names::TypeModifier,
-    span::Span,
-    vec_map::VecMap,
-    vec_set::VecSet,
+    compile_options::CompilerOptions, error::SoulError, ids::{FunctionId, IdAlloc}, sementic_level::SementicFault, soul_error_internal, soul_names::{PrimitiveTypes, TypeModifier}, span::Span, vec_map::VecMap, vec_set::VecSet
 };
 use typed_hir::{LazyFieldInfo, TypedHir};
 
@@ -25,7 +19,7 @@ mod statement;
 mod type_helpers;
 pub use type_helpers::UnifyPrimitiveCast;
 
-pub fn lower_typed_hir<'a>(hir: &'a HirTree, faults: &'a mut Vec<SementicFault>) -> TypedHir {
+pub fn lower_typed_hir<'a>(hir: &'a HirTree, _options: &'a CompilerOptions, faults: &'a mut Vec<SementicFault>) -> TypedHir {
     let mut context = TypedHirContext::new(hir, faults);
 
     for (struct_id, object) in hir.info.types.structs_entries() {
@@ -48,55 +42,59 @@ pub fn lower_typed_hir<'a>(hir: &'a HirTree, faults: &'a mut Vec<SementicFault>)
 }
 
 struct TypedHirContext<'a> {
-    hir: &'a HirTree,
     types: TypesMap,
+    hir: &'a HirTree,
     infers: InferTypesMap,
     infer_table: InferTable,
-    current_function: Option<FunctionId>,
     auto_copys: VecSet<ExpressionId>,
-
+    current_function: Option<FunctionId>,
     field_names: VecMap<FieldId, String>,
 
-    generic_defines: VecMap<GenericId, VecSet<TypeId>>,
-    expressions: VecMap<ExpressionId, LazyTypeId>,
-    statements: VecMap<StatementId, LazyTypeId>,
-    fields: VecMap<FieldId, LazyFieldInfo>,
-    place_fields: VecMap<PlaceId, FieldId>,
-    functions: VecMap<FunctionId, TypeId>,
+    u32_type: TypeId,
+    none_type: TypeId,
+    bool_type: TypeId,
     places: VecMap<PlaceId, LazyTypeId>,
     locals: VecMap<LocalId, LazyTypeId>,
     blocks: VecMap<BlockId, LazyTypeId>,
-    none_type: TypeId,
-    bool_type: TypeId,
+    functions: VecMap<FunctionId, TypeId>,
+    fields: VecMap<FieldId, LazyFieldInfo>,
+    place_fields: VecMap<PlaceId, FieldId>,
+    statements: VecMap<StatementId, LazyTypeId>,
+    sizeofs: VecMap<ExpressionId, LazyTypeId>,
+    expressions: VecMap<ExpressionId, LazyTypeId>,
+    generic_defines: VecMap<GenericId, VecSet<TypeId>>,
 
     faults: &'a mut Vec<SementicFault>,
 }
 impl<'a> TypedHirContext<'a> {
     fn new(hir: &'a HirTree, faults: &'a mut Vec<SementicFault>) -> Self {
         let mut this = Self {
-            faults,
             hir,
+            faults,
+            current_function: None,
             types: hir.info.types.clone(),
             infers: hir.info.infers.clone(),
-            current_function: None,
             infer_table: InferTable::new(&hir.info.infers),
 
+            fields: VecMap::new(),
+            auto_copys: VecSet::new(),
+            none_type: TypeId::error(),
+            bool_type: TypeId::error(),
+            u32_type: TypeId::error(),
+            place_fields: VecMap::new(),
             generic_defines: VecMap::new(),
-            expressions: VecMap::with_capacity(hir.nodes.expressions.len()),
-            functions: VecMap::with_capacity(hir.nodes.functions.len()),
-            field_names: VecMap::with_capacity(hir.nodes.fields.len()),
-            statements: VecMap::with_capacity(hir.root.globals.len()),
+            sizeofs: VecMap::new(),
             places: VecMap::with_capacity(hir.nodes.places.len()),
             locals: VecMap::with_capacity(hir.nodes.locals.len()),
             blocks: VecMap::with_capacity(hir.nodes.blocks.len()),
-            none_type: TypeId::error(),
-            bool_type: TypeId::error(),
-            auto_copys: VecSet::new(),
-            place_fields: VecMap::new(),
-            fields: VecMap::new(),
+            statements: VecMap::with_capacity(hir.root.globals.len()),
+            field_names: VecMap::with_capacity(hir.nodes.fields.len()),
+            functions: VecMap::with_capacity(hir.nodes.functions.len()),
+            expressions: VecMap::with_capacity(hir.nodes.expressions.len()),
         };
         this.none_type = this.add_type(HirType::none_type());
         this.bool_type = this.add_type(HirType::bool_type());
+        this.u32_type = this.add_type(HirType::primitive_type(PrimitiveTypes::Uint32));
         this
     }
 
@@ -234,10 +232,17 @@ impl<'a> TypedHirContext<'a> {
         self.expressions.insert(id, ty);
     }
 
-    fn get_variable_value(&self, variable: &Variable) -> Option<ExpressionId> {
-        match self.hir.nodes.locals[variable.local].kind {
-            hir::LocalKind::Variable(expression_id) => expression_id,
-            _ => panic!("should be unreachable"),
+    fn get_variable_value(&mut self, variable: &Variable) -> Option<ExpressionId> {
+        let info = &self.hir.nodes.locals[variable.local];
+        match &info.kind {
+            hir::LocalKind::Variable(expression_id) => *expression_id,
+            other => {
+                self.log_error(soul_error_internal!(
+                    format!("LocalKind::{} should be unreachable in TypedHirContext::get_variable_value", other.display_variant()), 
+                    info.span
+                ));
+                None
+            }
         }
     }
 

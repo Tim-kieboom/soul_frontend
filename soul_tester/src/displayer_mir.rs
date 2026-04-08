@@ -1,7 +1,6 @@
 use hir::{ComplexLiteral, FieldId, HirTree, StructId, TypeId};
 use mir_parser::mir::{
-    self, BlockId, FunctionBody, Local, LocalId, MirTree, Operand, PlaceId, PlaceKind, Rvalue,
-    StatementId, TempId,
+    self, BlockId, FunctionBody, Local, LocalId, MirTree, Operand, Place, PlaceId, PlaceKind, Rvalue, StatementId, TempId
 };
 use run_hir::HirResponse;
 use soul_utils::{
@@ -271,8 +270,8 @@ impl<'a> MirDisplayer<'a> {
 
     fn display_rvalue(&mut self, value: &Rvalue) {
         match &value.kind {
-            mir::RvalueKind::Field { base, field_id } => {
-                self.display_field(base, *field_id);
+            mir::RvalueKind::Place(place) => {
+                self.inner_display_place(place);
             }
             mir::RvalueKind::Aggregate { struct_type, body } => {
                 let object = self.hir.info.types.id_to_struct(*struct_type);
@@ -319,7 +318,7 @@ impl<'a> MirDisplayer<'a> {
                 self.display_type(*ty);
                 self.push_str("*/");
             }
-            mir::RvalueKind::Use(operand) => self.display_operand(operand),
+            mir::RvalueKind::Operand(operand) => self.display_operand(operand),
             mir::RvalueKind::Binary {
                 left,
                 operator,
@@ -348,6 +347,10 @@ impl<'a> MirDisplayer<'a> {
         const CONST: bool = false;
 
         match &operand.kind {
+            mir::OperandKind::Sizeof(ty) => {
+                self.display_type(*ty);
+                self.push_str(".typeof");
+            }
             mir::OperandKind::Ref { place, mutable } => {
                 match *mutable {
                     MUT => self.push_str(TypeWrapper::MutRef.as_str()),
@@ -370,6 +373,10 @@ impl<'a> MirDisplayer<'a> {
 
     fn display_place(&mut self, place_id: &PlaceId) {
         let place = &self.mir.places[*place_id];
+        self.inner_display_place(place);
+    }
+
+    fn inner_display_place(&mut self, place: &Place) {
         match &place.kind {
             PlaceKind::Field { struct_type:_, base, field_id } => {
                 self.display_field(base, *field_id);

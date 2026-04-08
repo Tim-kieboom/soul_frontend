@@ -181,3 +181,9 @@ Duration __clib_Duration_now() {
         .nano = (u32)ts.tv_nsec, 
     };
 }
+
+// ---------------- #Pointers ----------------
+
+u8* __clib_offset(u8* ptr, uint index) {
+    return ptr + index;
+}

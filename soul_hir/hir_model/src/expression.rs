@@ -119,6 +119,8 @@ pub enum ExpressionKind {
         values: Vec<(Ident, ExpressionId)>,
         defaults: bool,
     },
+
+    Sizeof(LazyTypeId),
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

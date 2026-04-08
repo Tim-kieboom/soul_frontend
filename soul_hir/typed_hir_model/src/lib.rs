@@ -23,13 +23,15 @@ pub struct TypedHir {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ThirTypesMap {
+    pub array_struct: StructId,
     pub types: BiMap<TypeId, ThirType>,
     pub structs: VecMap<StructId, Struct>,
     pub generics: VecMap<GenericId, String>,
 }
 impl ThirTypesMap {
-    pub fn new() -> Self {
+    pub fn new(array_struct: StructId) -> Self {
         Self {
+            array_struct,
             types: BiMap::from_array([(
                 TypeId::error(),
                 ThirType {
@@ -102,13 +104,16 @@ pub struct Field {
     pub ty: TypeId,
 }
 
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TypeTable {
     pub none_type: TypeId,
     pub bool_type: TypeId,
+    pub u32_type: TypeId,
 
     pub expressions: VecMap<ExpressionId, TypeId>,
     pub statements: VecMap<StatementId, TypeId>,
+    pub sizeofs: VecMap<ExpressionId, TypeId>,
     pub functions: VecMap<FunctionId, TypeId>,
     pub places: VecMap<PlaceId, TypeId>,
     pub locals: VecMap<LocalId, TypeId>,

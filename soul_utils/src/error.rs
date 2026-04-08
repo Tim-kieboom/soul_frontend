@@ -87,6 +87,7 @@ pub enum SoulErrorKind {
     NotFoundInScope,
     AlreadyFoundInScope,
 
+    NeedsToBeLiteralError,
     UnifyTypeError,
     PlaceTypeError,
     TypeNotFound,

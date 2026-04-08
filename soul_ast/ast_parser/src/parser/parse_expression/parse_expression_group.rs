@@ -1,14 +1,14 @@
-use ast::{Array, Expression, SoulType, StructConstructor};
+use ast::{AnyArray, Array, ArrayContructor, Expression, SoulType, StructConstructor};
 use soul_tokenizer::TokenKind;
-use soul_utils::{Ident, error::{SoulError, SoulErrorKind, SoulResult}, span::{Span, Spanned}, symbool_kind::SymbolKind, try_result::TryError};
+use soul_utils::{Ident, error::{SoulError, SoulErrorKind, SoulResult}, soul_names::KeyWord, span::{Span, Spanned}, symbool_kind::SymbolKind, try_result::TryError};
 
 use crate::parser::{
     Parser,
-    parse_utils::{COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, SQUARE_CLOSE, SQUARE_OPEN},
+    parse_utils::{COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, LAMBDA_ARROW, SQUARE_CLOSE, SQUARE_OPEN},
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
-    pub(super) fn parse_array(&mut self, ty: Option<SoulType>) -> SoulResult<Spanned<Array>> {
+    pub(super) fn parse_array(&mut self, collection_type: Option<SoulType>) -> SoulResult<Spanned<AnyArray>> {
         let start_span = self.token().span;
         self.expect(&SQUARE_OPEN)?;
 
@@ -22,6 +22,16 @@ impl<'a, 'f> Parser<'a, 'f> {
             Err(TryError::IsNotValue(_)) => None,
         };
 
+        if self.current_is_keyword(KeyWord::For) {
+            self.parse_array_contructor(collection_type, element_type, start_span)
+                .map(AnyArray::from_constructor)
+        } else {
+            self.parse_array_literal(collection_type, element_type, start_span)
+                .map(AnyArray::from_literal)
+        }
+    }
+
+    fn parse_array_literal(&mut self, collection_type: Option<SoulType>, element_type: Option<SoulType>, start_span: Span) -> SoulResult<Spanned<Array>> {
         let mut values = vec![];
         loop {
             self.skip_end_lines();
@@ -44,7 +54,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.expect(&SQUARE_CLOSE)?;
         Ok(Spanned::new(
             Array {
-                collection_type: ty,
+                collection_type,
                 element_type,
                 values,
                 id: None,
@@ -52,6 +62,25 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.span_combine(start_span),
         ))
     }
+
+    fn parse_array_contructor(&mut self, collection_type: Option<SoulType>, element_type: Option<SoulType>, start_span: Span) -> SoulResult<Spanned<ArrayContructor>> {
+        self.expect_ident(KeyWord::For.as_str())?;
+        let amount = self.parse_expression(&[LAMBDA_ARROW, SQUARE_CLOSE])?;
+        self.expect(&LAMBDA_ARROW)?;
+        let element = self.parse_expression(&[SQUARE_CLOSE])?;
+        self.expect(&SQUARE_CLOSE)?;
+        Ok(Spanned::new(
+            ArrayContructor { 
+                collection_type,
+                element_type, 
+                amount: Box::new(amount), 
+                element: Box::new(element),
+                id: None, 
+            }, 
+            self.span_combine(start_span)
+        ))
+    }
+
 
     pub(super) fn parse_struct_contructor(
         &mut self,

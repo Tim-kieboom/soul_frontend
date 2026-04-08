@@ -5,6 +5,14 @@ use soul_utils::error::{SoulError, SoulErrorKind};
 impl<'a> NameResolver<'a> {
     pub(super) fn collect_expression(&mut self, expression: &mut Expression) {
         match &mut expression.node {
+            ExpressionKind::Sizeof(ty) => self.collect_type(ty),
+            ExpressionKind::ArrayContructor(ctor) => {
+                ctor.id = Some(self.alloc_node());
+                ctor.collection_type.as_mut().map(|ty| self.collect_type(ty));
+                ctor.element_type.as_mut().map(|ty| self.collect_type(ty));
+                self.collect_expression(&mut ctor.amount);
+                self.collect_expression(&mut ctor.element);
+            }
             ExpressionKind::FieldAccess(field) => {
                 self.collect_expression(&mut field.object);
             }
@@ -94,6 +102,8 @@ impl<'a> NameResolver<'a> {
             }
             ExpressionKind::Array(array) => {
                 array.id = Some(self.alloc_node());
+                array.collection_type.as_mut().map(|ty| self.collect_type(ty));
+                array.element_type.as_mut().map(|ty| self.collect_type(ty));
                 for value in &mut array.values {
                     self.collect_expression(value);
                 }

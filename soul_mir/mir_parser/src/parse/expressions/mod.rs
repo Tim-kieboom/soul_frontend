@@ -30,6 +30,10 @@ impl<'a> MirContext<'a> {
         }
 
         let operand = match &value.kind {
+            hir::ExpressionKind::Sizeof(_) => {
+                let ty = self.sizeof_type(value_id);
+                mir::Operand::new(value_type, mir::OperandKind::Sizeof(ty))
+            }
             hir::ExpressionKind::StructConstructor {
                 ty,
                 values,
@@ -115,7 +119,7 @@ impl<'a> MirContext<'a> {
                             self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp), value_type));
                         self.push_statement(mir::Statement::new(mir::StatementKind::Assign {
                             place,
-                            value: mir::Rvalue::new(mir::RvalueKind::Use(inner)),
+                            value: mir::Rvalue::new(mir::RvalueKind::Operand(inner)),
                         }));
 
                         mir::Operand::new(value_type, mir::OperandKind::Temp(temp))
@@ -149,7 +153,7 @@ impl<'a> MirContext<'a> {
 
                 let statement = mir::Statement::new(mir::StatementKind::Assign {
                     place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp), value_type)),
-                    value: mir::Rvalue::new(mir::RvalueKind::Use(ptr)),
+                    value: mir::Rvalue::new(mir::RvalueKind::Operand(ptr)),
                 });
 
                 self.push_statement(statement);
@@ -393,7 +397,7 @@ impl<'a> MirContext<'a> {
 
         let statement = mir::Statement::new(mir::StatementKind::Assign {
             place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp), ty)),
-            value: mir::Rvalue::new(mir::RvalueKind::Use(operand)),
+            value: mir::Rvalue::new(mir::RvalueKind::Operand(operand)),
         });
 
         self.push_statement(statement);

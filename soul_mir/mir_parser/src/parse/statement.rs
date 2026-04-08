@@ -127,7 +127,7 @@ impl<'a> MirContext<'a> {
 
             let statement = mir::Statement::new(mir::StatementKind::Assign {
                 place,
-                value: mir::Rvalue::new(mir::RvalueKind::Use(operand)),
+                value: mir::Rvalue::new(mir::RvalueKind::Operand(operand)),
             });
 
             self.push_statement(statement);
@@ -183,7 +183,7 @@ impl<'a> MirContext<'a> {
 
         let statement = mir::Statement::new(mir::StatementKind::Assign {
             place,
-            value: mir::Rvalue::new(mir::RvalueKind::Use(value)),
+            value: mir::Rvalue::new(mir::RvalueKind::Operand(value)),
         });
 
         self.push_statement(statement);
@@ -197,6 +197,7 @@ fn is_valid_statement_expression(kind: &hir::ExpressionKind) -> bool {
         | hir::ExpressionKind::Load(_)
         | hir::ExpressionKind::Local(_)
         | hir::ExpressionKind::DeRef(_)
+        | hir::ExpressionKind::Sizeof(_)
         | hir::ExpressionKind::Literal(_)
         | hir::ExpressionKind::Ref { .. }
         | hir::ExpressionKind::Cast { .. }

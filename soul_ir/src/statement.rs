@@ -107,7 +107,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
 fn rvalue_is_none(rvalue: &Rvalue) -> bool {
     match &rvalue.kind {
-        RvalueKind::Use(operand) => matches!(operand.kind, OperandKind::None),
+        RvalueKind::Operand(operand) => matches!(operand.kind, OperandKind::None),
         _ => false,
     }
 }

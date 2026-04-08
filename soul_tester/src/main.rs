@@ -20,7 +20,7 @@ use soul_ir::{IrRequest, to_llvm_ir};
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
     char_colors::{DEFAULT, GREEN},
-    compile_options::CompilerOptions,
+    compile_options::{CompilerOptions, TargetInfo},
     sementic_level::{SementicFault, SementicLevel},
 };
 
@@ -38,13 +38,14 @@ mod paths;
 static PATHS: &[u8] = include_bytes!("../paths.json");
 
 pub const MESSAGE_CONFIG: MessageConfig = MessageConfig {
-    backtrace: false,
+    backtrace: true,
     colors: true,
 };
 
 pub const COMPILER_OPTIONS: CompilerOptions = CompilerOptions {
     debug_view_literal_resolve: false,
     fault_level: SementicLevel::Error,
+    target_info: TargetInfo::new(soul_utils::compile_options::Target::X86_64),
 };
 
 struct Ouput {
@@ -108,6 +109,7 @@ fn run_fontend<'a>(paths: &'a Paths) -> Result<Ouput> {
 }
 
 fn run_llvm(output: &Ouput) -> bool {
+
     let request = IrRequest {
         mir: &output.mir_response,
         types: &output.hir_response.typed,

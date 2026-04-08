@@ -22,13 +22,14 @@ pub const CONST_REF: TokenKind = TokenKind::Symbol(SymbolKind::ConstRef);
 pub const CURLY_OPEN: TokenKind = TokenKind::Symbol(SymbolKind::CurlyOpen);
 pub const ROUND_OPEN: TokenKind = TokenKind::Symbol(SymbolKind::RoundOpen);
 pub const ARROW_LEFT: TokenKind = TokenKind::Symbol(SymbolKind::LeftArray);
-pub const ARROW_RIGHT: TokenKind = TokenKind::Symbol(SymbolKind::RightArray);
 pub const SEMI_COLON: TokenKind = TokenKind::Symbol(SymbolKind::SemiColon);
 pub const INCREMENT: TokenKind = TokenKind::Symbol(SymbolKind::DoublePlus);
 pub const DECREMENT: TokenKind = TokenKind::Symbol(SymbolKind::DoubleMinus);
+pub const ARROW_RIGHT: TokenKind = TokenKind::Symbol(SymbolKind::RightArray);
 pub const SQUARE_OPEN: TokenKind = TokenKind::Symbol(SymbolKind::SquareOpen);
 pub const CURLY_CLOSE: TokenKind = TokenKind::Symbol(SymbolKind::CurlyClose);
 pub const ROUND_CLOSE: TokenKind = TokenKind::Symbol(SymbolKind::RoundClose);
+pub const LAMBDA_ARROW: TokenKind = TokenKind::Symbol(SymbolKind::LambdaArray);
 pub const SQUARE_CLOSE: TokenKind = TokenKind::Symbol(SymbolKind::SquareClose);
 pub const COLON_ASSIGN: TokenKind = TokenKind::Symbol(SymbolKind::ColonAssign);
 pub const STAMENT_END_TOKENS: &[TokenKind] = &[
@@ -67,7 +68,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
     }
 
-    pub(crate) fn current_keyword(&self, expected: KeyWord) -> bool {
+    pub(crate) fn current_is_keyword(&self, expected: KeyWord) -> bool {
         match &self.token().kind {
             TokenKind::Ident(ident) => KeyWord::from_str(ident.as_str()) == Some(expected),
             _ => false,

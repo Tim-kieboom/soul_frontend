@@ -1,16 +1,9 @@
 use ast::{
-    Array, AsTypeCast, BinaryOperator, BinaryOperatorKind, Expression, ExpressionKind, Literal,
-    UnaryOperator, UnaryOperatorKind,
+    Array, AsTypeCast, BinaryOperator, BinaryOperatorKind, Expression, ExpressionKind, Literal, UnaryOperator, UnaryOperatorKind
 };
 use soul_tokenizer::{Number, Token, TokenKind};
 use soul_utils::{
-    error::{SoulError, SoulErrorKind, SoulResult},
-    precedence::Precedence,
-    soul_error_internal,
-    soul_names::{AccessType, KeyWord, Operator, TypeModifier},
-    span::{Span, Spanned},
-    symbool_kind::SymbolKind,
-    try_result::{ToResult, TryError},
+    Ident, error::{SoulError, SoulErrorKind, SoulResult}, precedence::Precedence, soul_error_internal, soul_names::{AccessType, KeyWord, Operator, TypeModifier}, span::{Span, Spanned}, symbool_kind::SymbolKind, try_result::{ToResult, TryError}
 };
 
 use crate::parser::{
@@ -73,7 +66,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                     let ident = self.try_bump_consume_ident()?;
                     left = match self.try_parse_function_call(start_span, Some(&left), &ident) {
                         Ok(call) => Expression::from_function_call(call),
-                        Err(TryError::IsNotValue(_)) => Expression::new_field(left, ident),
+                        Err(TryError::IsNotValue(_)) => self.parse_field_access(left, ident)?,
                         Err(TryError::IsErr(err)) => return Err(err)
                     };
                 }
@@ -92,6 +85,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok(left)
     }
 
+
     fn parse_primary(&mut self) -> SoulResult<Expression> {
         let start_span = self.token().span;
 
@@ -102,7 +96,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
             &SQUARE_OPEN => {
                 let array = self.parse_array(None)?;
-                Expression::from_array(array)
+                Expression::from_any_array(array)
             }
             &ROUND_OPEN => {
                 return Err(soul_error_internal!("tuple not yet impl", Some(start_span)));
@@ -182,7 +176,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             ));
         }
 
-        if self.current_keyword(KeyWord::As) {
+        if self.current_is_keyword(KeyWord::As) {
             return self.parse_as_typecast(expression, start_span);
         }
 
@@ -407,6 +401,33 @@ impl<'a, 'f> Parser<'a, 'f> {
                 }
             }
             _ => binary,
+        }
+    }
+
+    fn parse_field_access(&mut self, left: Expression, ident: Ident) -> SoulResult<Expression> {
+        
+        match KeyWord::from_str(ident.as_str()) {
+            Some(KeyWord::Sizeof) => self.parse_sizeof(left, ident),
+            _ => Ok(Expression::new_field(left, ident)),
+        }
+    }
+
+    fn parse_sizeof(&mut self, left: Expression, ident: Ident) -> SoulResult<Expression> {
+        match left.node {
+            ExpressionKind::Variable { ident, .. } => {
+                let span = ident.span;
+                let ty = self.type_from_ident(ident, vec![]);
+                Ok(
+                    Expression::new(ExpressionKind::Sizeof(ty), span.combine(left.span))
+                )
+            }
+            _ => {
+                Err(SoulError::new(
+                    "can only do '.sizeof' to types", 
+                    SoulErrorKind::InvalidContext, 
+                    Some(ident.span),
+                ))
+            }
         }
     }
 }

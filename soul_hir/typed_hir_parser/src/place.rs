@@ -1,7 +1,7 @@
 use hir::{DisplayType, LazyTypeId, LocalId, PlaceId, PlaceKind};
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
-    ids::IdAlloc,
+    ids::IdAlloc, span::Span, vec_map::VecMap,
 };
 
 use crate::{TypedHirContext, type_helpers::TypeHelpers};
@@ -66,7 +66,9 @@ impl<'a> TypedHirContext<'a> {
                     Some(field_id) => {
                         self.field_names.insert(field_id, name);
                         self.place_fields.insert(place_id, field_id);
-                        self.fields[field_id].field_type
+                        let field_type = self.fields[field_id].field_type;
+                        self.try_resolve_array_generic(object, field_type, span)
+                            .unwrap_or(LazyTypeId::error())
                     }
                     None => LazyTypeId::error(),
                 }
@@ -74,5 +76,22 @@ impl<'a> TypedHirContext<'a> {
         };
         self.places.insert(place_id, ty);
         ty
+    }
+
+    fn try_resolve_array_generic(&mut self, lazy_object: LazyTypeId, lazy_field: LazyTypeId, span: Span) -> Option<LazyTypeId> {
+        let object = self.resolve_type_strict(lazy_object, span)?;
+        let field = self.resolve_type_strict(lazy_field, span)?;
+        
+        let element = match &self.id_to_type(object).kind {
+            hir::HirTypeKind::Array { element, .. } => self.resolve_type_strict(*element, span)?,
+            _ => return None,
+        };
+
+        let generic = match &self.id_to_type(field).kind {
+            hir::HirTypeKind::Generic(generic_id) => *generic_id,
+            _ => return None,
+        };
+
+        Some(self.resolve_generic(&VecMap::from_slice(&[(generic, element)]), lazy_object))
     }
 }

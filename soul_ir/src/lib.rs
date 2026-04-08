@@ -1,11 +1,11 @@
 use std::{cell::RefCell, collections::HashMap};
 
-use hir::{FieldId, StructId, TypeId};
+use hir::{FieldId, TypeId};
 use inkwell::{
     basic_block::BasicBlock,
     context::Context,
     module::Module,
-    types::{BasicTypeEnum, IntType, StructType},
+    types::{BasicTypeEnum, IntType},
     values::{BasicValueEnum, FunctionValue, PointerValue},
 };
 use mir_parser::mir::{BlockId, LocalId, TempId};
@@ -114,6 +114,7 @@ impl<'a> OperandInfo<'a> {
 impl_soul_ids!(FunctionKeyId);
 
 pub struct LlvmBackend<'f, 'a> {
+    default_ptr_size: u8,
     default_int_size: u8,
     default_char_size: u8,
     default_int_type: IntType<'a>,
@@ -134,7 +135,7 @@ pub struct LlvmBackend<'f, 'a> {
 
     function_keys: FunctionKeyStore,
     field_indexs: RefCell<VecMap<FieldId, usize>>,
-    structs: RefCell<VecMap<StructId, StructType<'a>>>,
+    structs: StructStore<'a>,
     functions: VecMap<FunctionKeyId, FunctionValue<'a>>,
 
     faults: &'f mut Vec<SementicFault>,
@@ -168,14 +169,15 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             locals: HashMap::new(),
             functions: VecMap::new(),
             context: request.context,
+            structs: StructStore::new(),
             types: request.types.clone(),
-            structs: RefCell::new(VecMap::const_default()),
             field_indexs: RefCell::new(VecMap::const_default()),
             current: Current::start(function_keys.global_key()),
 
             function_keys,
-            default_int_size: 32,
-            default_char_size: 8,
+            default_ptr_size: options.target_info.ptr_bit_size,
+            default_int_size: options.target_info.int_bit_size,
+            default_char_size: options.target_info.char_bit_size,
             default_int_type: request.context.i32_type(),
             default_char_type: request.context.i8_type(),
         }

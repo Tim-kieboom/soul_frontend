@@ -1,3 +1,4 @@
+use ast::{ArrayContructor, Literal};
 use ast::{AsTypeCast, VarTypeKind, scope::NodeId};
 use hir::{ExpressionId, HirType, HirTypeKind, LocalId, Place, PlaceKind, Terminator};
 use soul_utils::soul_error_internal;
@@ -20,6 +21,11 @@ impl<'a> HirContext<'a> {
         let id = self.alloc_expression(span);
 
         let value = match &expression.node {
+            ast::ExpressionKind::Sizeof(ty) => {
+                let ty = self.lower_type(ty);
+                hir::Expression{ id, ty, kind: hir::ExpressionKind::Sizeof(ty) }
+            }
+            ast::ExpressionKind::ArrayContructor(ctor) => self.desugar_array_contructor(id, ctor, span),
             ast::ExpressionKind::If(ast_if) => self.lower_if(id, ast_if, span),
             ast::ExpressionKind::Unary(unary) => self.lower_unary(id, unary, span),
             ast::ExpressionKind::Array(array) => self.lower_array(id, array, span),
@@ -78,6 +84,45 @@ impl<'a> HirContext<'a> {
         };
 
         self.insert_expression(id, value)
+    }
+
+    fn desugar_array_contructor(&mut self, id: ExpressionId, ctor: &ArrayContructor, span: Span) -> hir::Expression {
+        
+        let amount = match &ctor.amount.node {
+            ast::ExpressionKind::Literal((_, literal)) => match literal {
+                Literal::Uint(num) => *num,
+                _ => {
+                    self.log_error(SoulError::new(
+                        "expression needs to be a uint literal (so no negative and no decimal)",
+                        SoulErrorKind::InvalidContext, 
+                        Some(ctor.amount.span),
+                    ));
+                    return hir::Expression::error(id)
+                }
+            },
+            _ => {
+                self.log_error(SoulError::new(
+                    "expression should be a literal", 
+                    SoulErrorKind::NeedsToBeLiteralError, 
+                    Some(ctor.amount.span),
+                ));
+                return hir::Expression::error(id)
+            }
+        };
+
+        let mut values = Vec::with_capacity(amount as usize);
+        for _ in 0..amount {
+            values.push(ctor.element.as_ref().clone());
+        }
+
+        let literal_array = ast::Array {
+            values,
+            id: ctor.id,
+            element_type: ctor.element_type.clone(),
+            collection_type: ctor.collection_type.clone(),
+        };
+
+        self.lower_array(id, &literal_array, span)
     }
 
     fn lower_struct_contructor(

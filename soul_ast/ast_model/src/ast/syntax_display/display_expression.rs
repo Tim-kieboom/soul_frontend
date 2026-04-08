@@ -1,4 +1,4 @@
-use soul_utils::soul_names::{KeyWord, TypeWrapper};
+use soul_utils::{soul_names::{KeyWord, TypeWrapper}, symbool_kind::SymbolKind};
 use std::fmt::Write;
 
 use crate::{
@@ -18,6 +18,30 @@ impl SyntaxDisplay for ExpressionKind {
 
     fn inner_display(&self, sb: &mut String, kind: DisplayKind, tab: usize, is_last: bool) {
         match self {
+            ExpressionKind::Sizeof(ty) => {
+                ty.inner_display(sb, kind, tab, is_last);
+                sb.push_str(".sizeof");
+            }
+            ExpressionKind::ArrayContructor(ctor) => {
+                try_display_node_id(sb, kind, ctor.id);
+                if let Some(ty) = &ctor.collection_type {
+                    ty.inner_display(sb, kind, tab, is_last);
+                    sb.push(':');
+                }
+                sb.push('[');
+                if let Some(ty) = &ctor.element_type {
+                    ty.inner_display(sb, kind, tab, is_last);
+                    sb.push_str(": ");
+                }
+                sb.push_str(KeyWord::For.as_str());
+                sb.push(' ');
+                ctor.amount.node.inner_display(sb, kind, tab, is_last);
+                sb.push(' ');
+                sb.push_str(SymbolKind::LambdaArray.as_str());
+                sb.push(' ');
+                ctor.element.node.inner_display(sb, kind, tab, is_last);
+                sb.push(']');
+            }
             ExpressionKind::FieldAccess(field) => {
                 try_display_node_id(sb, kind, field.id);
                 field.object.node.inner_display(sb, kind, tab, is_last);

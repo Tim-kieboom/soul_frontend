@@ -48,8 +48,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     .into()
             }
             ThirTypeKind::Array { element, kind } => {
-                let ptr_type = self.context.ptr_type(AddressSpace::default()).into();
-                let len_type = self.default_int_type.into();
+                let array_struct = self.types.types_map.array_struct;
 
                 match kind {
                     ast::ArrayKind::StackArray(num) => {
@@ -61,10 +60,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     }
                     ast::ArrayKind::MutSlice
                     | ast::ArrayKind::HeapArray
-                    | ast::ArrayKind::ConstSlice => self
-                        .context
-                        .struct_type(&[ptr_type, len_type], false)
-                        .into(),
+                    | ast::ArrayKind::ConstSlice => self.get_or_create_struct(array_struct, generics)?.into(),
                 }
             }
 
@@ -81,7 +77,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         id: StructId,
         generics: &GenericSubstitute,
     ) -> SoulResult<StructType<'a>> {
-        match self.structs.borrow().get(id).copied() {
+        match self.structs.get(id) {
             Some(val) => Ok(val),
             None => self.lower_struct(id, generics),
         }
@@ -120,7 +116,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         }
 
         let ty = self.context.struct_type(fields.as_slice(), false);
-        self.structs.borrow_mut().insert(id, ty);
+        self.structs.insert(id, ty);
         Ok(ty)
     }
 

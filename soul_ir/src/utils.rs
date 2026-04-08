@@ -1,4 +1,7 @@
-use hir::{GenericId, TypeId};
+use std::cell::RefCell;
+
+use hir::{GenericId, StructId, TypeId};
+use inkwell::types::StructType;
 use mir_parser::mir;
 use soul_utils::{
     ids::{FunctionId, IdAlloc},
@@ -6,6 +9,23 @@ use soul_utils::{
 };
 
 use crate::FunctionKeyId;
+
+pub struct StructStore<'a> {
+    map: RefCell<VecMap<StructId, StructType<'a>>>
+}
+impl<'a> StructStore<'a> {
+    pub fn new() -> Self {
+        Self{map: RefCell::new(VecMap::const_default())}
+    }
+
+    pub fn get(&self, id: StructId) -> Option<StructType<'a>> {
+        self.map.borrow().get(id).copied()
+    }
+
+    pub fn insert(&self, id: StructId, value: StructType<'a>) {
+        self.map.borrow_mut().insert(id, value);
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct Current {

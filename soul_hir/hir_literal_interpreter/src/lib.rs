@@ -67,6 +67,7 @@ impl<'a> LiteralInterpreter<'a> {
             | hir::ExpressionKind::Error
             | hir::ExpressionKind::Block(_)
             | hir::ExpressionKind::DeRef(_)
+            | hir::ExpressionKind::Sizeof(_)
             | hir::ExpressionKind::Literal(_)
             | hir::ExpressionKind::If { .. }
             | hir::ExpressionKind::Ref { .. }

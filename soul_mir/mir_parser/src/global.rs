@@ -33,7 +33,7 @@ impl<'a> MirContext<'a> {
                 let value = self.lower_operand(value).pass(is_end);
                 self.push_statement(mir::Statement::new(mir::StatementKind::Assign {
                     place,
-                    value: mir::Rvalue::new(mir::RvalueKind::Use(value)),
+                    value: mir::Rvalue::new(mir::RvalueKind::Operand(value)),
                 }));
             }
 
@@ -45,7 +45,7 @@ impl<'a> MirContext<'a> {
                 let value = self.lower_operand(assign.value).pass(is_end);
                 self.push_statement(mir::Statement::new(mir::StatementKind::Assign {
                     place,
-                    value: mir::Rvalue::new(mir::RvalueKind::Use(value)),
+                    value: mir::Rvalue::new(mir::RvalueKind::Operand(value)),
                 }));
             }
         }

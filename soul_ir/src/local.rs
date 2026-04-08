@@ -5,7 +5,6 @@ use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},
     vec_map::VecMapIndex,
 };
-
 use crate::{GenericSubstitute, LlvmBackend};
 
 impl<'f, 'a> LlvmBackend<'f, 'a> {
@@ -30,7 +29,12 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         self.builder.position_at_end(entry);
 
         self.alloc_parameter(function, type_args, generics);
-        self.alloc_locals(locals, generics);
+        for local_id in locals {
+        
+            if let Err(err) = self.alloc_local(*local_id, generics) {
+                self.log_error(err);
+            }
+        }
     }
 
     pub(crate) fn allocate_globals(&mut self, generics: &GenericSubstitute) {
@@ -122,37 +126,28 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         }
     }
 
-    fn alloc_locals(&mut self, locals: &Vec<LocalId>, generics: &GenericSubstitute) {
-        for local_id in locals {
-            let local = &self.mir.tree.locals[*local_id];
-            let name = self.local_name(*local_id);
+    fn alloc_local(&mut self, local_id: LocalId, generics: &GenericSubstitute) -> SoulResult<()> {
+        let local = &self.mir.tree.locals[local_id];
+        let name = self.local_name(local_id);
 
-            let ty = match self.lower_type(local.ty(), generics) {
-                Ok(Some(ty)) => ty,
-                Err(err) => {
-                    self.log_error(err);
-                    self.context.i8_type().into()
-                }
-                Ok(None) => self.context.i8_type().into(),
-            };
+        let type_id = local.ty();
 
-            if let mir::Local::Comptime { value, .. } = local {
-                if let Err(err) =
-                    self.build_comptime_local(ty, local.ty(), *local_id, value, generics)
-                {
-                    self.log_error(err);
-                }
-                continue;
+        let ty = match self.lower_type(type_id, generics) {
+            Ok(Some(ty)) => ty,
+            Err(err) => {
+                self.log_error(err);
+                self.context.i8_type().into()
             }
+            Ok(None) => self.context.i8_type().into(),
+        };
 
-            match self.build_runtime_local(ty, *local_id, &name) {
-                Ok(val) => val,
-                Err(err) => {
-                    self.log_error(err);
-                    continue;
-                }
-            };
+        if let mir::Local::Comptime { value, .. } = local {
+            self.build_comptime_local(ty, type_id, local_id, value, generics)?;
+            return Ok(());
         }
+
+        _ = self.build_runtime_local(ty, local_id, &name)?;
+        Ok(())
     }
 
     fn build_runtime_local(

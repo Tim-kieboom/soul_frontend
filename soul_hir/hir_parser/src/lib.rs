@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use ast::{AstResponse, DeclareStore};
 use hir::{
-    BlockId, CreatedTypes, ExpressionId, GenericId, HirTree, LazyTypeId, LocalId, StatementId,
+    BlockId, CreatedTypes, ExpressionId, Field, GenericId, HirTree, HirType, LazyTypeId, LocalId, StatementId, Struct
 };
 use soul_utils::{
     Ident,
@@ -25,6 +25,7 @@ mod r#type;
 pub fn lower_hir(response: &AstResponse, faults: &mut Vec<SementicFault>) -> HirTree {
     let mut context = HirContext::new(response, faults);
 
+    context.lower_internal_structs();
     for global in &response.tree.root.statements {
         context.lower_global(global);
     }
@@ -69,6 +70,25 @@ impl<'a> HirContext<'a> {
             current_body: CurrentBody::Global,
             tree: HirTree::new(root_id, main, init_global_function),
         }
+    }
+
+    fn lower_internal_structs(&mut self) {
+        let struct_id = self.tree.info.types.alloc_struct();
+        let generic_id = self.tree.info.types.insert_generic("T".to_string());
+        let name = Ident::new("___Array".to_string(), Span::default_const());
+
+        let generic_type = self.add_type(HirType::generic_type(generic_id)).to_lazy();
+        let ptr_type = self.add_type(HirType::pointer_type(generic_type)).to_lazy();
+        let len_type = self.add_type(HirType::index_type());
+        let fields = vec![
+            Field{ struct_id, id: self.id_generator.alloc_field(), name: "ptr".to_string(), ty: ptr_type },
+            Field{ struct_id, id: self.id_generator.alloc_field(), name: "len".to_string(), ty: len_type.to_lazy() },
+        ];
+
+        self.tree.info.types.array_struct = struct_id;
+        // to insure struct is in compiler
+        self.add_type(HirType::new(hir::HirTypeKind::Struct(struct_id)).apply_generics(vec![len_type]));
+        self.insert_struct(struct_id, Struct{ name, fields });
     }
 
     fn alloc_statement(&mut self, meta_data: &ItemMetaData, span: Span) -> StatementId {

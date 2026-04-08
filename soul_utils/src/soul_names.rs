@@ -322,6 +322,7 @@ define_str_enum!(
         Use => "use", 0,
         Dyn => "dyn", 0,
         Impl => "impl", 0,
+        Sizeof => "sizeof", 0,
         Typeof => "typeof", 0,
         Import => "import", 0,
         Extern => "extern", 0,

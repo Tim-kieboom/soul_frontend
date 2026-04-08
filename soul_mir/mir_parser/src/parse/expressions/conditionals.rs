@@ -127,7 +127,7 @@ impl<'a> MirContext<'a> {
             self.push_statement_from(
                 mir::Statement::new(mir::StatementKind::Assign {
                     place,
-                    value: mir::Rvalue::new(mir::RvalueKind::Use(value)),
+                    value: mir::Rvalue::new(mir::RvalueKind::Operand(value)),
                 }),
                 end_block,
             );

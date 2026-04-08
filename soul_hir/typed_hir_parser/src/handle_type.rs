@@ -1,8 +1,6 @@
 use hir::{ExpressionId, FieldId, HirType, HirTypeKind, LazyTypeId, LocalId, StructId, TypeId};
 use soul_utils::{
-    error::{SoulError, SoulErrorKind},
-    soul_names::{PrimitiveTypes, TypeModifier},
-    span::Span,
+    error::{SoulError, SoulErrorKind}, soul_names::{PrimitiveTypes, TypeModifier}, span::Span
 };
 
 use crate::{TypedHirContext, infer_table::UnifyResult};
@@ -77,6 +75,10 @@ impl<'a> TypedHirContext<'a> {
             HirTypeKind::Struct(struct_id) => self.get_struct_field(*struct_id, field, span),
             HirTypeKind::Ref { of_type, .. } => {
                 self.get_field_access(*of_type, field, span)
+            }
+            HirTypeKind::Array { .. } => {
+                let struct_id = self.hir.info.types.array_struct;
+                self.get_struct_field(struct_id, field, span)
             }
             other => {
                 self.log_error(SoulError::new(
@@ -224,14 +226,20 @@ impl<'a> TypedHirContext<'a> {
         Some(field.id)
     }
 
-    pub(crate) fn is_mutable(&self, ty: LazyTypeId) -> bool {
+    pub(crate) fn is_mutable_or_modifier_none(&self, ty: LazyTypeId) -> bool {
         if ty == LazyTypeId::error() {
             return true
         } 
         
         match ty {
-            LazyTypeId::Known(type_id) => self.id_to_type(type_id).is_mutable(),
-            LazyTypeId::Infer(infer_type_id) => self.id_to_infer(infer_type_id).is_mutable(),
+            LazyTypeId::Known(type_id) => {
+                let ty = self.id_to_type(type_id);
+                ty.is_mutable() || ty.is_modifier_none()
+            },
+            LazyTypeId::Infer(infer_type_id) => {
+                let ty = self.id_to_infer(infer_type_id);
+                ty.is_mutable() || ty.is_modifier_none()
+            },
         }
     }
 

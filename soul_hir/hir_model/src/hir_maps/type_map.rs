@@ -7,8 +7,9 @@ use crate::{
     hir_type::{HirType, InferType, Struct},
 };
 
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TypesMap {
+    pub array_struct: StructId,
     types: BiMap<TypeId, HirType>,
     structs: VecMap<StructId, Struct>,
     generics: VecMap<GenericId, String>,
@@ -16,6 +17,20 @@ pub struct TypesMap {
     type_alloc: IdGenerator<TypeId>,
     struct_alloc: IdGenerator<StructId>,
     generic_alloc: IdGenerator<GenericId>,
+}
+impl Default for TypesMap {
+    fn default() -> Self {
+        Self { 
+            array_struct: StructId::error(),
+            
+            types: Default::default(), 
+            structs: Default::default(), 
+            generics: Default::default(), 
+            type_alloc: Default::default(), 
+            struct_alloc: Default::default(), 
+            generic_alloc: Default::default(),
+        }
+    }
 }
 impl TypesMap {
     pub fn new() -> Self {

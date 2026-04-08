@@ -7,7 +7,7 @@ use soul_utils::{
 };
 
 use crate::{
-    StructConstructor, ast::{Array, Binary, BinaryOperator, Block, Literal, SoulType, Unary, UnaryOperator}, scope::NodeId
+    ArrayContructor, StructConstructor, ast::{Array, Binary, BinaryOperator, Block, Literal, SoulType, Unary, UnaryOperator}, scope::NodeId
 };
 
 /// An expression in the Soul language, wrapped with source location information.
@@ -55,6 +55,7 @@ pub enum ExpressionKind {
     /// A binary operation (addition, multiplication, comparison, etc.) `1 + 2`.
     Binary(Binary),
     Array(Array),
+    ArrayContructor(ArrayContructor),
     StructConstructor(StructConstructor),
     /// An `if` expression `if true {Println("is true")} else {Println("is else")}`.
     If(If),
@@ -76,6 +77,9 @@ pub enum ExpressionKind {
     Block(Block),
     /// Return-like expressions (`return`, `break`) `return 1`.
     ReturnLike(ReturnLike),
+    
+    /// `i32.sizeof // returns 4`
+    Sizeof(SoulType),
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -193,6 +197,21 @@ impl ReturnKind {
     }
 }
 
+/// helper enum in parser
+pub enum AnyArray {
+    ArrayLiteral(Array),
+    ArrayConstructor(ArrayContructor),
+}
+impl AnyArray {
+    pub fn from_literal(arr: Spanned<Array>) -> Spanned<Self> {
+        Spanned::new(Self::ArrayLiteral(arr.node), arr.span) 
+    }
+
+    pub fn from_constructor(ctor: Spanned<ArrayContructor>) -> Spanned<Self> {
+        Spanned::new(Self::ArrayConstructor(ctor.node), ctor.span) 
+    }
+}
+
 pub trait IfArmHelper {
     fn new_arm(kind: ElseKind, span: Span) -> Self;
     fn try_next_mut(&mut self) -> Option<&mut Option<IfArm>>;
@@ -222,6 +241,14 @@ impl Expression {
     pub fn from_array(array: Spanned<Array>) -> Expression {
         let Spanned { node, span } = array;
         Expression::new(ExpressionKind::Array(node), span)
+    }
+
+    pub fn from_any_array(array: Spanned<AnyArray>) -> Expression {
+        let Spanned { node, span } = array;
+        match node {
+            AnyArray::ArrayLiteral(array) => Expression::new(ExpressionKind::Array(array), span),
+            AnyArray::ArrayConstructor(array_contructor) => Expression::new(ExpressionKind::ArrayContructor(array_contructor), span),
+        }
     }
 
     pub fn new_unary(op: UnaryOperator, rvalue: Expression, span: Span) -> Expression {
@@ -305,6 +332,8 @@ impl Expression {
 impl ExpressionKind {
     pub fn variant_str(&self) -> &'static str {
         match self {
+            ExpressionKind::Sizeof(_) => "sizeof",
+            ExpressionKind::ArrayContructor(_) => "ArrayContructor",
             ExpressionKind::FieldAccess(_) => "Field",
             ExpressionKind::Null(_) => "Null",
             ExpressionKind::Default(_) => "Default",

@@ -2,8 +2,6 @@ use ast::Stub;
 use hir::{GenericId, HirType, HirTypeKind, InferTypesMap, LazyTypeId, StructId, TypeId, TypesMap};
 use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},
-    ids::IdAlloc,
-    soul_error_internal,
     soul_names::{PrimitiveTypes, TypeModifier},
     span::Span,
 };
@@ -26,25 +24,6 @@ impl<'a> HirContext<'a> {
                 LazyTypeId::error()
             }
         }
-    }
-
-    pub(crate) fn type_from_array(&mut self, array: &ast::Array, span: Span) -> TypeId {
-        if array.collection_type.is_some() {
-            self.log_error(soul_error_internal!(
-                "collection type in array is unstable",
-                Some(span)
-            ));
-            return TypeId::error();
-        }
-
-        let kind = ast::ArrayKind::StackArray(array.values.len() as u64);
-        let element = match &array.element_type {
-            Some(val) => self.lower_type(val),
-            None => self.new_infer_type(vec![], None, span),
-        };
-
-        let array_ty = self.add_type(HirType::new(HirTypeKind::Array { element, kind }));
-        array_ty
     }
 
     pub(crate) fn add_type(&mut self, ty: HirType) -> TypeId {

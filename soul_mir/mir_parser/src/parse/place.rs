@@ -47,7 +47,9 @@ impl<'a> MirContext<'a> {
                 let operand = self.place_to_operand(base_place, ty);
                 self.new_place(mir::Place::new(mir::PlaceKind::Deref(operand), ty))
             }
-            hir::PlaceKind::Index { .. } => todo!("mir desugar index"),
+            hir::PlaceKind::Index { ..  } => {
+                todo!()
+            }
             hir::PlaceKind::Field { base, .. } => {
                 let base = self.lower_place(*base).pass(is_end);
                 let ty = self
@@ -90,22 +92,22 @@ impl<'a> MirContext<'a> {
         let value = self.place_to_operand(place_id, ty);
         let statement = mir::Statement::new(mir::StatementKind::Assign {
             place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp), ty)),
-            value: Rvalue::new(mir::RvalueKind::Use(value)),
+            value: Rvalue::new(mir::RvalueKind::Operand(value)),
         });
         self.push_statement(statement);
         temp
     }
 
     pub(crate) fn place_to_operand(&mut self, place_id: mir::PlaceId, ty: TypeId) -> mir::Operand {
-        match &self.tree.places[place_id].kind {
-            mir::PlaceKind::Field { base, field_id, struct_type:_ } => {
-                let field_id = *field_id;
-                let base = *base;
+        let place = &self.tree.places[place_id];
+        match &place.kind {
+            mir::PlaceKind::Field { .. } => {
+                let place = place.clone();
                 let field_temp = self.new_temp(ty);
 
                 let statement = mir::Statement::new(mir::StatementKind::Assign {
                     place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(field_temp), ty)),
-                    value: Rvalue::new(mir::RvalueKind::Field { base, field_id }),
+                    value: Rvalue::new(mir::RvalueKind::Place(place)),
                 });
                 self.push_statement(statement);
                 mir::Operand::new(ty, mir::OperandKind::Temp(field_temp))
@@ -127,7 +129,7 @@ impl<'a> MirContext<'a> {
 
         let statement = mir::Statement::new(mir::StatementKind::Assign {
             place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(deref_temp), ty)),
-            value: Rvalue::new(mir::RvalueKind::Use(operand)),
+            value: Rvalue::new(mir::RvalueKind::Operand(operand)),
         });
         self.push_statement(statement);
 

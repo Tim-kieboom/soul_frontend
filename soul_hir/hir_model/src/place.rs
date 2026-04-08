@@ -58,3 +58,12 @@ pub enum LocalKind {
     Temp(ExpressionId),
     Parameter,
 }
+impl LocalKind {
+    pub fn display_variant(&self) -> &str {
+        match self {
+            LocalKind::Variable(_) => "Variable",
+            LocalKind::Temp(_) => "Temp",
+            LocalKind::Parameter => "Parameter",
+        }
+    }
+}
