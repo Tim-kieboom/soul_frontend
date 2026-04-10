@@ -222,7 +222,7 @@ impl UnifyPrimitiveCastLazy for HirTypeKind {
         should_be: &Self,
     ) -> Result<(), MishmatchReason> {
         if self.is_error() || should_be.is_error() {
-            return Ok(())
+            return Ok(());
         }
 
         Ok(match (self, should_be) {
@@ -327,8 +327,7 @@ impl UnifyPrimitiveCast for ThirType {
             _ => (),
         };
 
-        self.kind
-            .unify_primitive_cast(types, &should_be.kind)
+        self.kind.unify_primitive_cast(types, &should_be.kind)
     }
 }
 

@@ -41,9 +41,10 @@ impl<'a> MirContext<'a> {
             } => self
                 .lower_struct_constructor(values, *ty, value_type)
                 .pass(is_end),
-            hir::ExpressionKind::Literal(literal) => {
-                mir::Operand::new(value_type, mir::OperandKind::Comptime(literal.clone().to_complex()))
-            }
+            hir::ExpressionKind::Literal(literal) => mir::Operand::new(
+                value_type,
+                mir::OperandKind::Comptime(literal.clone().to_complex()),
+            ),
             hir::ExpressionKind::Local(local_id) => {
                 let local_type = self.local_type(*local_id);
                 let id = match self.local_remap.get(*local_id) {
@@ -111,7 +112,9 @@ impl<'a> MirContext<'a> {
 
                 let operand = match self.hir_response.hir.nodes.blocks[*block_id].terminator {
                     Some(terminator) => {
-                        let inner = self.lower_operand(terminator.get_expression_id()).pass(is_end);
+                        let inner = self
+                            .lower_operand(terminator.get_expression_id())
+                            .pass(is_end);
                         let terminator_type = self.expression_type(terminator.get_expression_id());
                         let temp = self.new_temp(terminator_type);
 
@@ -262,7 +265,9 @@ impl<'a> MirContext<'a> {
             let param_type = self.id_to_type(ty).clone();
             let arg_type = self.id_to_type(self.expression_type(arg)).clone();
 
-            let primitive_castable = arg_type.unify_primitive_cast(&self.hir_response.typed.types_map, &param_type).is_ok();
+            let primitive_castable = arg_type
+                .unify_primitive_cast(&self.hir_response.typed.types_map, &param_type)
+                .is_ok();
             if expression.is_literal() && primitive_castable {
                 let temp = self.new_temp(ty);
                 let place = self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp), ty));
@@ -377,8 +382,10 @@ impl<'a> MirContext<'a> {
 
     fn find_field_index(&self, r#struct: &Struct, name: &str) -> Option<usize> {
         let field_name = |field: &Field| &self.hir_response.hir.nodes.fields[field.id].name;
-        
-        r#struct.fields.iter()
+
+        r#struct
+            .fields
+            .iter()
             .enumerate()
             .find(|(_i, field)| field_name(field) == name)
             .map(|(i, _)| i)

@@ -1,5 +1,8 @@
 use ast::{Expression, ExpressionKind};
-use soul_utils::{error::{SoulError, SoulErrorKind}, ids::{FunctionId, IdAlloc}};
+use soul_utils::{
+    error::{SoulError, SoulErrorKind},
+    ids::{FunctionId, IdAlloc},
+};
 
 use crate::NameResolver;
 
@@ -16,7 +19,7 @@ impl<'a> NameResolver<'a> {
             ExpressionKind::StructConstructor(ctor) => {
                 for (_, value) in &mut ctor.values {
                     self.resolve_expression(value);
-                } 
+                }
             }
             ExpressionKind::As(type_cast) => {
                 self.resolve_expression(&mut type_cast.left);

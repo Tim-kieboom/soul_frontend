@@ -1,4 +1,7 @@
-use soul_utils::{soul_names::{KeyWord, TypeWrapper}, symbool_kind::SymbolKind};
+use soul_utils::{
+    soul_names::{KeyWord, TypeWrapper},
+    symbool_kind::SymbolKind,
+};
 use std::fmt::Write;
 
 use crate::{

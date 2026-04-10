@@ -1,4 +1,3 @@
-
 use crate::{
     NamedTupleElement,
     ast::{
@@ -34,8 +33,8 @@ impl SyntaxDisplay for StatementKind {
                     }
                     sb.push('>');
                 }
-                
-                let field_prefix = tree_prefix(tab+1, is_last);
+
+                let field_prefix = tree_prefix(tab + 1, is_last);
                 for field in obj.fields.iter() {
                     sb.push('\n');
                     sb.push_str(&field_prefix);

@@ -1,7 +1,7 @@
 use std::{
     fs::{File, OpenOptions},
     io::{Read, stdout},
-    time::{Instant},
+    time::Instant,
 };
 
 use anyhow::Result;
@@ -20,7 +20,7 @@ use soul_ir::{IrRequest, to_llvm_ir};
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
     char_colors::{DEFAULT, GREEN},
-    compile_options::{CompilerOptions, TargetInfo},
+    compile_options::{Arch, CompilerOptions, Os, TargetInfo},
     sementic_level::{SementicFault, SementicLevel},
 };
 
@@ -42,11 +42,10 @@ pub const MESSAGE_CONFIG: MessageConfig = MessageConfig {
     colors: true,
 };
 
-pub const COMPILER_OPTIONS: CompilerOptions = CompilerOptions {
-    debug_view_literal_resolve: false,
-    fault_level: SementicLevel::Error,
-    target_info: TargetInfo::new(soul_utils::compile_options::Target::X86_64),
-};
+const OS: Os = Os::Windows;
+const ARCH: Arch = Arch::X86_64;
+pub const COMPILER_OPTIONS: CompilerOptions =
+    CompilerOptions::new_default(TargetInfo::new(ARCH, OS));
 
 struct Ouput {
     mir_response: MirResponse,
@@ -55,7 +54,6 @@ struct Ouput {
     faults: Vec<SementicFault>,
 }
 
-
 fn main() -> Result<()> {
     let paths: Paths = serde_json::from_slice(PATHS)?;
     init_logger(&paths.log_file)?;
@@ -63,7 +61,7 @@ fn main() -> Result<()> {
     let mut timer = Instant::now();
     let output = run_fontend(&paths)?;
     log_faults(&output.faults, &output.source_file);
-    if is_fatal(&output.faults, COMPILER_OPTIONS.fault_level) {
+    if is_fatal(&output.faults, COMPILER_OPTIONS.fatal_level()) {
         return Ok(());
     }
 
@@ -109,7 +107,6 @@ fn run_fontend<'a>(paths: &'a Paths) -> Result<Ouput> {
 }
 
 fn run_llvm(output: &Ouput) -> bool {
-
     let request = IrRequest {
         mir: &output.mir_response,
         types: &output.hir_response.typed,

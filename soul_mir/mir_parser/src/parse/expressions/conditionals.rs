@@ -112,7 +112,7 @@ impl<'a> MirContext<'a> {
         let value = self.lower_block(hir_block, arm).pass(is_end);
         let end_block = self.expect_current_block();
 
-        if let Some(value) = value {
+        if let Some(value) = value.filter(|value| !matches!(value.kind, mir::OperandKind::None)) {
             let temp_id = match temp {
                 Some(id) => *id,
                 None => {

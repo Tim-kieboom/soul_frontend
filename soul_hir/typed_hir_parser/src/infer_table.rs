@@ -3,7 +3,11 @@ use hir::{
     TypesMap,
 };
 use soul_utils::{
-    error::{SoulError, SoulErrorKind, SoulResult}, soul_error_internal, soul_names::TypeModifier, span::Span, vec_map::VecMap
+    error::{SoulError, SoulErrorKind, SoulResult},
+    soul_error_internal,
+    soul_names::TypeModifier,
+    span::Span,
+    vec_map::VecMap,
 };
 
 use crate::type_helpers::{ArrayKindCompatible, GetPriority, TypeCompatible};
@@ -80,7 +84,7 @@ impl InferTable {
         let a_id = self.resolve_type_lazy(types, infers, expected, span)?;
         let b_id = self.resolve_type_lazy(types, infers, got_type, span)?;
         if a_id == LazyTypeId::error() || b_id == LazyTypeId::error() {
-            return Ok(UnifyResult::Ok)
+            return Ok(UnifyResult::Ok);
         }
 
         let (a_id, b_id) = match (a_id, b_id) {
@@ -173,7 +177,7 @@ impl InferTable {
         span: Span,
     ) -> SoulResult<LazyTypeId> {
         if ty == LazyTypeId::error() {
-            return Ok(ty)
+            return Ok(ty);
         }
 
         let ty = match ty {
@@ -494,7 +498,7 @@ impl InferTable {
         }
     }
 
-    fn get_type<'b>(&self, types: &'b TypesMap, ty: TypeId) -> SoulResult<&'b HirType> {        
+    fn get_type<'b>(&self, types: &'b TypesMap, ty: TypeId) -> SoulResult<&'b HirType> {
         match types.id_to_type(ty) {
             Some(val) => Ok(val),
             None => Err(soul_error_internal!(format!("{:?} not found", ty), None)),

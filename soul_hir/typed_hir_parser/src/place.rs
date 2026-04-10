@@ -1,7 +1,9 @@
 use hir::{DisplayType, LazyTypeId, LocalId, PlaceId, PlaceKind};
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
-    ids::IdAlloc, span::Span, vec_map::VecMap,
+    ids::IdAlloc,
+    span::Span,
+    vec_map::VecMap,
 };
 
 use crate::{TypedHirContext, type_helpers::TypeHelpers};
@@ -68,7 +70,7 @@ impl<'a> TypedHirContext<'a> {
                         self.place_fields.insert(place_id, field_id);
                         let field_type = self.fields[field_id].field_type;
                         self.try_resolve_array_generic(object, field_type, span)
-                            .unwrap_or(LazyTypeId::error())
+                            .unwrap_or(field_type)
                     }
                     None => LazyTypeId::error(),
                 }
@@ -78,10 +80,15 @@ impl<'a> TypedHirContext<'a> {
         ty
     }
 
-    fn try_resolve_array_generic(&mut self, lazy_object: LazyTypeId, lazy_field: LazyTypeId, span: Span) -> Option<LazyTypeId> {
+    fn try_resolve_array_generic(
+        &mut self,
+        lazy_object: LazyTypeId,
+        lazy_field: LazyTypeId,
+        span: Span,
+    ) -> Option<LazyTypeId> {
         let object = self.resolve_type_strict(lazy_object, span)?;
         let field = self.resolve_type_strict(lazy_field, span)?;
-        
+
         let element = match &self.id_to_type(object).kind {
             hir::HirTypeKind::Array { element, .. } => self.resolve_type_strict(*element, span)?,
             _ => return None,

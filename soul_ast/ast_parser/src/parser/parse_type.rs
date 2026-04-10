@@ -187,10 +187,10 @@ impl<'a, 'f> Parser<'a, 'f> {
         let ident = self.try_bump_consume_ident().try_not_value()?;
         if let Some(keyword) = KeyWord::from_str(ident.as_str()) {
             return TryNotValue(SoulError::new(
-                format!("keyword '{}' can not be type", keyword.as_str()), 
-                SoulErrorKind::TypeNotFound, 
+                format!("keyword '{}' can not be type", keyword.as_str()),
+                SoulErrorKind::TypeNotFound,
                 Some(ident.span),
-            ))
+            ));
         }
 
         if let Some(prim) = PrimitiveTypes::from_str(ident.as_str()) {

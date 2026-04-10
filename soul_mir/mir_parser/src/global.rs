@@ -62,7 +62,7 @@ impl<'a> MirContext<'a> {
         let local = self.new_local_global(variable.local, ty);
         let id = self.id_generators.alloc_global();
 
-        let span = local_info.span; 
+        let span = local_info.span;
         let value_id = match local_info.kind {
             LocalKind::Variable(Some(val)) => val,
             _ => {

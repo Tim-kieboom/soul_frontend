@@ -40,6 +40,7 @@ define_str_enum!(
 pub enum PrimitiveSize {
     CharSize,
     IntSize,
+    CIntSize,
     Bit8,
     Bit16,
     Bit32,
@@ -70,9 +71,11 @@ define_str_enum!(
         /// boolean (`true` or `false`) type
         Boolean => "bool", 8,
 
+        /// c sized interger type
+        CInt => "c_int", 3,
         /// undecided integer type
         UntypedInt => "untypedInt", 1,
-        /// default-size integer type
+        /// system-sizes integer type
         Int => "int", 1,
         /// 8-bit integer type
         Int8 => "i8", 8,
@@ -85,9 +88,11 @@ define_str_enum!(
         /// 128-bit integer type
         Int128 => "i128", 128,
 
+        /// c sized interger type
+        CUint => "c_uint", 3,
         /// undecided unsigned integer type
         UntypedUint => "untypedUint", 1,
-        /// default-size unsigned integer type
+        /// system-sized unsigned integer type
         Uint => "uint", 1,
         /// 8-bit unsigned integer type
         Uint8 => "u8", 8,
@@ -114,6 +119,7 @@ impl PrimitiveTypes {
     pub const fn is_numeric(&self) -> bool {
         match self {
             PrimitiveTypes::UntypedInt
+            | PrimitiveTypes::CInt
             | PrimitiveTypes::Int
             | PrimitiveTypes::Int8
             | PrimitiveTypes::Int16
@@ -121,6 +127,7 @@ impl PrimitiveTypes {
             | PrimitiveTypes::Int64
             | PrimitiveTypes::Int128
             | PrimitiveTypes::UntypedUint
+            | PrimitiveTypes::CUint
             | PrimitiveTypes::Uint
             | PrimitiveTypes::Uint8
             | PrimitiveTypes::Uint16
@@ -139,6 +146,7 @@ impl PrimitiveTypes {
     pub const fn is_any_interger(&self) -> bool {
         match self {
             PrimitiveTypes::UntypedInt
+            | PrimitiveTypes::CInt
             | PrimitiveTypes::Int
             | PrimitiveTypes::Int8
             | PrimitiveTypes::Int16
@@ -146,6 +154,7 @@ impl PrimitiveTypes {
             | PrimitiveTypes::Int64
             | PrimitiveTypes::Int128
             | PrimitiveTypes::UntypedUint
+            | PrimitiveTypes::CUint
             | PrimitiveTypes::Uint
             | PrimitiveTypes::Uint8
             | PrimitiveTypes::Uint16
@@ -171,6 +180,7 @@ impl PrimitiveTypes {
     pub const fn is_unsigned_interger(&self) -> bool {
         match self {
             PrimitiveTypes::UntypedUint
+            | PrimitiveTypes::CUint
             | PrimitiveTypes::Uint
             | PrimitiveTypes::Uint8
             | PrimitiveTypes::Uint16
@@ -185,6 +195,7 @@ impl PrimitiveTypes {
     pub const fn is_signed_interger(&self) -> bool {
         match self {
             PrimitiveTypes::UntypedInt
+            | PrimitiveTypes::CInt
             | PrimitiveTypes::Int
             | PrimitiveTypes::Int8
             | PrimitiveTypes::Int16
@@ -225,6 +236,7 @@ impl PrimitiveTypes {
         match self.precedence().as_usize() {
             1 => PrimitiveSize::IntSize,
             2 => PrimitiveSize::CharSize,
+            3 => PrimitiveSize::CIntSize,
             8 => PrimitiveSize::Bit8,
             16 => PrimitiveSize::Bit16,
             32 => PrimitiveSize::Bit32,
@@ -234,8 +246,9 @@ impl PrimitiveTypes {
         }
     }
 
-    pub const fn to_size_bit_u8(&self, int_size: u8, char_size: u8) -> u8 {
+    pub const fn to_size_bit_u8(&self, c_int_size: u8, int_size: u8, char_size: u8) -> u8 {
         match self.to_primitive_size() {
+            PrimitiveSize::CIntSize => c_int_size,
             PrimitiveSize::CharSize => char_size,
             PrimitiveSize::IntSize => int_size,
             PrimitiveSize::Bit8 => 8,

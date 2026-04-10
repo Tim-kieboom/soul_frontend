@@ -1,6 +1,7 @@
 use hir::TypeId;
 use inkwell::{
-    types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FunctionType, VoidType}, values::FunctionValue
+    types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FunctionType, VoidType},
+    values::FunctionValue,
 };
 use mir_parser::mir::FunctionBody;
 use soul_utils::{Ident, ids::FunctionId};
@@ -84,11 +85,11 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         callee: Option<TypeId>,
         type_args: &Vec<TypeId>,
     ) -> String {
-        const SEPARATOR: &str = "__";
+        const SEPARATOR: &str = "_";
 
         let mut sb = name.to_string();
         if let Some(this) = callee {
-            sb.push_str("_this_");
+            sb.push_str("___t_");
             match self.get_type(this) {
                 Ok(ty) => ty
                     .write_display_no_spaces(&self.types.types_map, &mut sb)
@@ -100,7 +101,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             };
         }
         if !type_args.is_empty() {
-            sb.push_str("_Genrc");
+            sb.push_str("___g");
         }
         for ty in type_args {
             sb.push_str(SEPARATOR);

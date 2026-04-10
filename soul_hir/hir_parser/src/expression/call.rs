@@ -86,7 +86,7 @@ impl<'a> HirContext<'a> {
 
         let mut generics = vec![];
         for soul_type in &function_call.generics {
-            let ty = self.lower_type(soul_type);
+            let ty = self.lower_type(soul_type, soul_type.span);
             let kown = match ty {
                 LazyTypeId::Known(type_id) => type_id,
                 LazyTypeId::Infer(_) => {
@@ -115,6 +115,7 @@ impl<'a> HirContext<'a> {
             &call_generics,
             &mut self.tree.info.types,
             &mut self.tree.info.infers,
+            signature.return_type.span,
         ) {
             Ok(val) => val,
             Err(err) => {

@@ -1,6 +1,7 @@
 use hir::{ComplexLiteral, FieldId, HirTree, StructId, TypeId};
 use mir_parser::mir::{
-    self, BlockId, FunctionBody, Local, LocalId, MirTree, Operand, Place, PlaceId, PlaceKind, Rvalue, StatementId, TempId
+    self, BlockId, FunctionBody, Local, LocalId, MirTree, Operand, Place, PlaceId, PlaceKind,
+    Rvalue, StatementId, TempId,
 };
 use run_hir::HirResponse;
 use soul_utils::{
@@ -112,7 +113,7 @@ impl<'a> MirDisplayer<'a> {
         let (entry_block, locals, blocks) = match &function.body {
             FunctionBody::External(_) => {
                 write!(self.sb, "/*{}*/", function_id.index()).expect("no fmt error");
-                return
+                return;
             }
             FunctionBody::Internal {
                 entry_block,
@@ -203,7 +204,6 @@ impl<'a> MirDisplayer<'a> {
             mir::Terminator::Unreachable => self.push_str("// unreachable"),
         }
         self.push('\n');
-        
     }
 
     fn display_statement(&mut self, statement_id: StatementId) {
@@ -378,7 +378,11 @@ impl<'a> MirDisplayer<'a> {
 
     fn inner_display_place(&mut self, place: &Place) {
         match &place.kind {
-            PlaceKind::Field { struct_type:_, base, field_id } => {
+            PlaceKind::Field {
+                struct_type: _,
+                base,
+                field_id,
+            } => {
                 self.display_field(base, *field_id);
             }
             PlaceKind::Temp(temp_id) => {

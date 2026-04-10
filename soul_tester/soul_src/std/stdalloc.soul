@@ -1,26 +1,23 @@
-extern "C" malloc(len: int): !*none
-extern "C" free(ptr: !*none)
+extern "C" malloc(len: uint): RawPtr<none>
+extern "C" free(ptr: RawPtr<none>)
 
-unsafe alloc(len: uint): *none {
-    malloc(len as int) ?? panic("alloc failed")
-}
-
-unsafe [*]T This(ptr: *T, len: uint) {
-    This{ptr, len}
+unsafe alloc(len: uint): Res<*none> {
+    ptr := malloc(len as int) as ?*none
+    ptr.ToRes(Err("alloc failed"))
 }
 
 #[public]
 class new<T> {
-    This(value: T): *T {
+    This(value: T): Res<*T> {
         unsafe{
-            alloc(T.sizeof) as *T 
+            alloc(T.sizeof).Ok{ptr => ptr as *T} 
         }
     }
 
-    This:[T](array): [*]T {
+    This:[T](array): Res<[*]T> {
         unsafe{
-            len := array.Len()
-            mut ptr = alloc(T.sizeof * len) as *T
+            len := array.len
+            mut ptr = alloc(T.sizeof * len).pass as *T
         
             mut i = 0
             while i < len {
@@ -28,7 +25,8 @@ class new<T> {
                 i++
             }
 
-            [*]T(ptr, len)
+            arr := [*]T(ptr, len)
+            Ok(arr)
         }
     }
 }
@@ -36,7 +34,7 @@ class new<T> {
 use<T> *T impl Drop {
     Drop(ptr: *T) {
         unsafe{ 
-            free(ptr as !*none)
+            free(RawPtr<none>(ptr))
         }
     }
 }

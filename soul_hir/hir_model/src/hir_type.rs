@@ -23,12 +23,13 @@ pub enum ComplexLiteral {
     },
 }
 impl ComplexLiteral {
-    
     /// for example `Struct{mut field: i32}` should be alloced becouse you can change value of field
     pub fn is_mutable(&self) -> bool {
         match self {
             ComplexLiteral::Basic(_) => false,
-            ComplexLiteral::Struct { all_fields_const, .. } => !*all_fields_const,
+            ComplexLiteral::Struct {
+                all_fields_const, ..
+            } => !*all_fields_const,
         }
     }
 }
@@ -64,7 +65,7 @@ impl InferType {
     }
     pub fn is_modifier_none(&self) -> bool {
         self.modifier == None
-    } 
+    }
 }
 impl HirType {
     pub const fn index_type() -> Self {

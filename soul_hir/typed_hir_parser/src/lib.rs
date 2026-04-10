@@ -4,7 +4,15 @@ use hir::{
     Variable,
 };
 use soul_utils::{
-    compile_options::CompilerOptions, error::SoulError, ids::{FunctionId, IdAlloc}, sementic_level::SementicFault, soul_error_internal, soul_names::{PrimitiveTypes, TypeModifier}, span::Span, vec_map::VecMap, vec_set::VecSet
+    compile_options::CompilerOptions,
+    error::SoulError,
+    ids::{FunctionId, IdAlloc},
+    sementic_level::SementicFault,
+    soul_error_internal,
+    soul_names::{PrimitiveTypes, TypeModifier},
+    span::Span,
+    vec_map::VecMap,
+    vec_set::VecSet,
 };
 use typed_hir::{LazyFieldInfo, TypedHir};
 
@@ -19,8 +27,12 @@ mod statement;
 mod type_helpers;
 pub use type_helpers::UnifyPrimitiveCast;
 
-pub fn lower_typed_hir<'a>(hir: &'a HirTree, _options: &'a CompilerOptions, faults: &'a mut Vec<SementicFault>) -> TypedHir {
-    let mut context = TypedHirContext::new(hir, faults);
+pub fn lower_typed_hir<'a>(
+    hir: &'a HirTree,
+    options: &'a CompilerOptions,
+    faults: &'a mut Vec<SementicFault>,
+) -> TypedHir {
+    let mut context = TypedHirContext::new(hir, options, faults);
 
     for (struct_id, object) in hir.info.types.structs_entries() {
         for (i, field) in object.fields.iter().enumerate() {
@@ -46,6 +58,7 @@ struct TypedHirContext<'a> {
     hir: &'a HirTree,
     infers: InferTypesMap,
     infer_table: InferTable,
+    options: &'a CompilerOptions,
     auto_copys: VecSet<ExpressionId>,
     current_function: Option<FunctionId>,
     field_names: VecMap<FieldId, String>,
@@ -67,10 +80,15 @@ struct TypedHirContext<'a> {
     faults: &'a mut Vec<SementicFault>,
 }
 impl<'a> TypedHirContext<'a> {
-    fn new(hir: &'a HirTree, faults: &'a mut Vec<SementicFault>) -> Self {
+    fn new(
+        hir: &'a HirTree,
+        options: &'a CompilerOptions,
+        faults: &'a mut Vec<SementicFault>,
+    ) -> Self {
         let mut this = Self {
             hir,
             faults,
+            options,
             current_function: None,
             types: hir.info.types.clone(),
             infers: hir.info.infers.clone(),
@@ -247,7 +265,6 @@ impl<'a> TypedHirContext<'a> {
     }
 
     fn type_field(&mut self, field: &Field, base: TypeId, index: usize) {
-        
         let info = LazyFieldInfo {
             base_type: base,
             field_index: index,

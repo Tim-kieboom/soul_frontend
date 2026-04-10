@@ -66,15 +66,23 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         })
     }
 
-    fn lower_rvalue_place(&self, place: &Place, generics: &GenericSubstitute) -> SoulResult<IrOperand<'a>> {
+    fn lower_rvalue_place(
+        &self,
+        place: &Place,
+        generics: &GenericSubstitute,
+    ) -> SoulResult<IrOperand<'a>> {
         match &place.kind {
-            mir::PlaceKind::Field { base, field_id, struct_type:_ } => {
+            mir::PlaceKind::Field {
+                base,
+                field_id,
+                struct_type: _,
+            } => {
                 let field_info = &self.types.types_table.fields[*field_id];
                 self.lower_field_access(*base, field_info, generics)
             }
-            mir::PlaceKind::Temp(_) |
-            mir::PlaceKind::Deref(_) |
-            mir::PlaceKind::Local(_) => unreachable!(),
+            mir::PlaceKind::Temp(_) | mir::PlaceKind::Deref(_) | mir::PlaceKind::Local(_) => {
+                unreachable!()
+            }
         }
     }
 
@@ -89,10 +97,10 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
         if let Some(len) = self.is_stack_array_len_field(field_info, base) {
             let value = self.default_int_type.const_int(len, false).into();
-            return Ok(IrOperand{
+            return Ok(IrOperand {
                 value,
                 info: OperandInfo::new_loaded(field_info.field_type, self.default_int_type.into()),
-            })
+            });
         }
 
         self.expect_type_can_field(field_info.base_type)?;
@@ -113,7 +121,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
         self.new_unloaded_operand(field.into(), field_info.field_type, generics)
     }
- 
+
     pub(crate) fn expect_type_can_field(&self, base_type: TypeId) -> SoulResult<()> {
         let hir_type = self.get_type(base_type)?;
         match &hir_type.kind {
@@ -128,11 +136,18 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         }
     }
 
-    pub(crate) fn is_stack_array_len_field(&self, field_info: &FieldInfo, base: mir::PlaceId) -> Option<u64> {
+    pub(crate) fn is_stack_array_len_field(
+        &self,
+        field_info: &FieldInfo,
+        base: mir::PlaceId,
+    ) -> Option<u64> {
         let ty = self.mir.tree.places[base].ty;
-        let hir_type = self.get_type(ty).ok()?;   
+        let hir_type = self.get_type(ty).ok()?;
         match &hir_type.kind {
-            ThirTypeKind::Array { kind: ArrayKind::StackArray(num), .. } => {
+            ThirTypeKind::Array {
+                kind: ArrayKind::StackArray(num),
+                ..
+            } => {
                 if field_info.field_index == 1 {
                     Some(*num)
                 } else {
@@ -168,7 +183,6 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         operands: &Vec<Operand>,
         generics: &GenericSubstitute,
     ) -> SoulResult<IrOperand<'a>> {
-
         let mut fields = Vec::with_capacity(operands.len());
         for operand in operands {
             fields.push(self.lower_operand(operand, generics)?.value);
@@ -227,7 +241,11 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 let value = self.builder.build_load(ty, ptr, "load")?.into();
                 self.new_loaded_operand(value, operand.ty, generics)
             }
-            mir::PlaceKind::Field { struct_type:_, base, field_id } => {
+            mir::PlaceKind::Field {
+                struct_type: _,
+                base,
+                field_id,
+            } => {
                 let field_info = &self.types.types_table.fields[*field_id];
                 self.lower_field_access(*base, field_info, generics)
             }

@@ -7,7 +7,9 @@ use soul_utils::{
 };
 
 use crate::{
-    ArrayContructor, StructConstructor, ast::{Array, Binary, BinaryOperator, Block, Literal, SoulType, Unary, UnaryOperator}, scope::NodeId
+    ArrayContructor, StructConstructor,
+    ast::{Array, Binary, BinaryOperator, Block, Literal, SoulType, Unary, UnaryOperator},
+    scope::NodeId,
 };
 
 /// An expression in the Soul language, wrapped with source location information.
@@ -36,7 +38,7 @@ pub enum ExpressionKind {
 
     /// Indexing into a collection, e.g., `arr[i]`.
     Index(Index),
-    /// 
+    ///
     FieldAccess(FieldAccess),
     /// A function call, e.g., `foo(x, y)`.
     FunctionCall(FunctionCall),
@@ -77,7 +79,7 @@ pub enum ExpressionKind {
     Block(Block),
     /// Return-like expressions (`return`, `break`) `return 1`.
     ReturnLike(ReturnLike),
-    
+
     /// `i32.sizeof // returns 4`
     Sizeof(SoulType),
 }
@@ -204,11 +206,11 @@ pub enum AnyArray {
 }
 impl AnyArray {
     pub fn from_literal(arr: Spanned<Array>) -> Spanned<Self> {
-        Spanned::new(Self::ArrayLiteral(arr.node), arr.span) 
+        Spanned::new(Self::ArrayLiteral(arr.node), arr.span)
     }
 
     pub fn from_constructor(ctor: Spanned<ArrayContructor>) -> Spanned<Self> {
-        Spanned::new(Self::ArrayConstructor(ctor.node), ctor.span) 
+        Spanned::new(Self::ArrayConstructor(ctor.node), ctor.span)
     }
 }
 
@@ -231,7 +233,14 @@ impl IfArmHelper for IfArm {
 impl Expression {
     pub fn new_field(object: Expression, field: Ident) -> Expression {
         let span = object.span.combine(field.span);
-        Expression::new(ExpressionKind::FieldAccess(FieldAccess { id: None, object: Box::new(object), field }), span)
+        Expression::new(
+            ExpressionKind::FieldAccess(FieldAccess {
+                id: None,
+                object: Box::new(object),
+                field,
+            }),
+            span,
+        )
     }
 
     pub fn new_block(block: Block, span: Span) -> Expression {
@@ -247,7 +256,9 @@ impl Expression {
         let Spanned { node, span } = array;
         match node {
             AnyArray::ArrayLiteral(array) => Expression::new(ExpressionKind::Array(array), span),
-            AnyArray::ArrayConstructor(array_contructor) => Expression::new(ExpressionKind::ArrayContructor(array_contructor), span),
+            AnyArray::ArrayConstructor(array_contructor) => {
+                Expression::new(ExpressionKind::ArrayContructor(array_contructor), span)
+            }
         }
     }
 
@@ -276,7 +287,7 @@ impl Expression {
     }
 
     pub fn new_literal(literal: Literal, span: Span) -> Expression {
-        Expression::new(ExpressionKind::Literal((None, literal)), span) 
+        Expression::new(ExpressionKind::Literal((None, literal)), span)
     }
 
     pub fn from_function_call(function_call: Spanned<FunctionCall>) -> Expression {
@@ -292,7 +303,11 @@ impl Expression {
     pub fn new_variable(ident: Ident) -> Expression {
         let span = ident.span;
         Expression::new(
-            ExpressionKind::Variable { id: None, ident, resolved: None },
+            ExpressionKind::Variable {
+                id: None,
+                ident,
+                resolved: None,
+            },
             span,
         )
     }
@@ -326,7 +341,6 @@ impl Expression {
         };
         Expression::new(deref, new_span)
     }
-
 }
 
 impl ExpressionKind {
@@ -348,7 +362,7 @@ impl ExpressionKind {
             ExpressionKind::Unary(_) => "Unary",
             ExpressionKind::Binary(_) => "Binary",
             ExpressionKind::Array(_) => "Array",
-            ExpressionKind::StructConstructor(_) => "StructConstructor", 
+            ExpressionKind::StructConstructor(_) => "StructConstructor",
             ExpressionKind::If(_) => "If",
             ExpressionKind::While(_) => "While",
             ExpressionKind::Deref { .. } => "Deref",

@@ -134,25 +134,29 @@ impl<'a> MirContext<'a> {
         }
     }
 
-    fn lower_variable_place(&mut self, variable: &hir::Variable, local_info: &LocalInfo) -> (bool, mir::PlaceKind) {
+    fn lower_variable_place(
+        &mut self,
+        variable: &hir::Variable,
+        local_info: &LocalInfo,
+    ) -> (bool, mir::PlaceKind) {
         const SHOULD_ASSIGN: bool = true;
-        
+
         if local_info.is_temp() {
             return (
-                SHOULD_ASSIGN, 
+                SHOULD_ASSIGN,
                 mir::PlaceKind::Temp(match self.temp_remap.get(variable.local) {
                     Some(val) => *val,
                     None => self.new_temp(self.local_type(variable.local)),
-                })
-            )
-        } 
+                }),
+            );
+        }
 
         let local = match self.local_remap.get(variable.local) {
             Some(val) => *val,
             None => {
-                let literal = self.try_get_variable_literal(local_info); 
+                let literal = self.try_get_variable_literal(local_info);
                 self.new_local(variable.local, self.local_type(variable.local), literal)
-            },
+            }
         };
 
         let should_assign = self.tree.locals[local].is_runtime();
@@ -165,12 +169,11 @@ impl<'a> MirContext<'a> {
                 let literal = self.get_expression_literal(value)?;
                 if literal.is_mutable() {
                     None
-                }
-                else {
+                } else {
                     Some(literal)
                 }
             }
-            _ => None,        
+            _ => None,
         }
     }
 

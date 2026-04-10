@@ -1,7 +1,10 @@
 use ast::NamedTupleElement;
 use hir::TypeId;
 use soul_utils::{
-    Ident, error::{SoulError, SoulErrorKind}, ids::{FunctionId, IdAlloc}, print_breakpoint, soul_error_internal
+    Ident,
+    error::{SoulError, SoulErrorKind},
+    ids::{FunctionId, IdAlloc},
+    soul_error_internal,
 };
 
 use crate::HirContext;
@@ -28,10 +31,6 @@ impl<'a> HirContext<'a> {
             generics.push(self.insert_generic(generic.name.to_string()));
         }
 
-        if function.signature.node.name.as_str() == "gen" {
-            print_breakpoint!();
-        }
-
         let parameters = signature
             .parameters
             .iter()
@@ -42,7 +41,7 @@ impl<'a> HirContext<'a> {
                      default,
                      node_id: _,
                  }| {
-                    let ty = self.lower_type(ty);
+                    let ty = self.lower_type(ty, name.span);
                     let local = self.id_generator.alloc_local();
                     self.insert_parameter(name, local, ty);
 
@@ -57,7 +56,8 @@ impl<'a> HirContext<'a> {
             None => hir::FunctionBody::Internal(self.lower_block(&function.block)),
         };
 
-        let return_type = match self.lower_type(&signature.return_type) {
+        let return_type = match self.lower_type(&signature.return_type, signature.return_type.span)
+        {
             hir::LazyTypeId::Known(type_id) => type_id,
             hir::LazyTypeId::Infer(_) => {
                 self.log_error(SoulError::new(

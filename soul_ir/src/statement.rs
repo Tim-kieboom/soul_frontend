@@ -56,15 +56,24 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         let ty = self.mir.tree.places[place_id].ty;
         let ir_value = self.lower_rvalue(value, ty, generics)?;
         match &self.mir.tree.places[place_id].kind {
-            PlaceKind::Field { struct_type, base, field_id } => {
+            PlaceKind::Field {
+                struct_type,
+                base,
+                field_id,
+            } => {
                 let field_info = &self.types.types_table.fields[*field_id];
                 self.expect_type_can_field(field_info.base_type)?;
-            
+
                 let struct_ir = self.get_or_create_struct(*struct_type, generics)?;
                 let base_operand = self.lower_place_to_operand(*base, generics)?;
                 let base_ptr = base_operand.get_or_convert_pointer(&self.builder)?;
 
-                self.builder.store_field(struct_ir, base_ptr, ir_value.value, field_info.field_index)?;
+                self.builder.store_field(
+                    struct_ir,
+                    base_ptr,
+                    ir_value.value,
+                    field_info.field_index,
+                )?;
             }
             PlaceKind::Temp(temp_id) => {
                 self.push_temp(*temp_id, ir_value);

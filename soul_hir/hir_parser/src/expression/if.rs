@@ -63,7 +63,6 @@ impl<'a> HirContext<'a> {
         self.insert_block(block_id, block, arm.span);
 
         let expression_id = self.insert_expression(id, if_expression);
-        
 
         let _ = self.alloc_statement(&ItemMetaData::default_const(), arm.span);
         let kind = hir::StatementKind::Expression {

@@ -1,9 +1,13 @@
 use ast::{ArrayKind, Literal};
-use hir::{ComplexLiteral, TypeId};
-use inkwell::{values::{AsValueRef, BasicValueEnum}};
+use hir::{ComplexLiteral, StructId, TypeId};
+use inkwell::values::{AsValueRef, BasicValueEnum};
 use mir_parser::mir::{Operand, OperandKind, PlaceId};
-use soul_utils::{error::{SoulError, SoulErrorKind, SoulResult}, soul_error_internal, soul_names::PrimitiveSize};
-use typed_hir::{ThirTypeKind, display_thir::DisplayThirType};
+use soul_utils::{
+    error::{SoulError, SoulErrorKind, SoulResult},
+    soul_error_internal,
+    soul_names::PrimitiveSize,
+};
+use typed_hir::{Field, ThirTypeKind, display_thir::DisplayThirType};
 
 use crate::{GenericSubstitute, IrOperand, LlvmBackend};
 
@@ -15,12 +19,13 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
     ) -> SoulResult<IrOperand<'a>> {
         Ok(match &operand.kind {
             OperandKind::Sizeof(ty) => {
-                let Sizeof { size, alignment:_ } = self.sizeof(*ty, generics)?;
+                let Sizeof { size, alignment: _ } = self.sizeof(*ty, generics)?;
                 let value = self.context.i32_type().const_int(size as u64, false).into();
                 let u32 = self.types.types_table.u32_type;
-                let ir_u32 = self.lower_type(u32, generics)?
+                let ir_u32 = self
+                    .lower_type(u32, generics)?
                     .ok_or(soul_error_internal!("u32 have none type", None))?;
-                
+
                 IrOperand {
                     value,
                     info: crate::OperandInfo::new_loaded(u32, ir_u32),
@@ -61,11 +66,18 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         generics: &GenericSubstitute,
     ) -> SoulResult<IrOperand<'a>> {
         match literal {
-            ComplexLiteral::Basic(literal) => self.lower_basic_literal(literal, should_be, generics),
-            ComplexLiteral::Struct { struct_id, struct_type, values, all_fields_const:_ } => {
+            ComplexLiteral::Basic(literal) => {
+                self.lower_basic_literal(literal, should_be, generics)
+            }
+            ComplexLiteral::Struct {
+                struct_id,
+                struct_type,
+                values,
+                all_fields_const: _,
+            } => {
                 let struct_ir = self.get_or_create_struct(*struct_id, generics)?;
                 self.lower_const_aggregate(struct_ir, *struct_type, values, generics)
-            },
+            }
         }
     }
 
@@ -75,15 +87,24 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         let hir_type = self.get_type(ty)?;
 
         Ok(match hir_type.kind {
-            ThirTypeKind::Array { kind: ArrayKind::HeapArray, .. } => {
+            ThirTypeKind::Array {
+                kind: ArrayKind::HeapArray,
+                ..
+            } => {
                 todo!()
             }
-            ThirTypeKind::Array { kind: ArrayKind::StackArray(_), .. } => {
+            ThirTypeKind::Array {
+                kind: ArrayKind::StackArray(_),
+                ..
+            } => {
                 todo!()
             }
             _ => {
                 let value = unsafe { BasicValueEnum::new(inner.value.as_value_ref()) };
-                IrOperand { value, info: inner.info.clone() }
+                IrOperand {
+                    value,
+                    info: inner.info.clone(),
+                }
             }
         })
     }
@@ -114,6 +135,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
                 let negative = *value < 0;
                 let int_type = match size {
+                    PrimitiveSize::CIntSize => self.default_c_int_type,
                     PrimitiveSize::CharSize => self.default_char_type,
                     PrimitiveSize::IntSize => self.default_int_type,
                     PrimitiveSize::Bit8 => self.context.i8_type(),
@@ -148,6 +170,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 };
 
                 let int_type = match size {
+                    PrimitiveSize::CIntSize => self.default_c_int_type,
                     PrimitiveSize::CharSize => self.default_char_type,
                     PrimitiveSize::IntSize => self.default_int_type,
                     PrimitiveSize::Bit8 => self.context.i8_type(),
@@ -213,72 +236,126 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         })
     }
 
-    pub(crate) fn sizeof(&self, sizeof: TypeId, generics: &GenericSubstitute) -> SoulResult<Sizeof> {
+    pub(crate) fn sizeof(
+        &self,
+        sizeof: TypeId,
+        generics: &GenericSubstitute,
+    ) -> SoulResult<Sizeof> {
         let sizeof = self.get_type(sizeof)?;
 
         if !sizeof.generics.is_empty() {
             todo!("impl generic sizeof")
         }
 
+        let c_int = self.default_c_int_size as u32;
         let int = self.default_int_size as u32;
-        let char = self.default_char_size as u32;
         let ptr = self.default_ptr_size as u32;
+        let char = self.default_char_size as u32;
         let ptr_align = Alignment::from_u8(ptr as u8).expect("should be value in alignment");
 
         Ok(match sizeof.kind {
-            ThirTypeKind::Error 
-            | ThirTypeKind::Type => return Err(SoulError::new(format!("type '{}' does not have a size", sizeof.display(&self.types.types_map)), SoulErrorKind::InvalidContext, None)),
+            ThirTypeKind::Error | ThirTypeKind::Type => {
+                return Err(SoulError::new(
+                    format!(
+                        "type '{}' does not have a size",
+                        sizeof.display(&self.types.types_map)
+                    ),
+                    SoulErrorKind::InvalidContext,
+                    None,
+                ));
+            }
 
-            ThirTypeKind::None => Sizeof{size: 0, alignment: Alignment::Null},
-            ThirTypeKind::Primitive(primitive_types) => {
-                let size = primitive_types.to_size_bit_u8(int as u8, char as u8) as u32;
-                let alignment = Alignment::from_u8(size as u8).expect("should be value in alignment");
-                Sizeof{ size, alignment }
+            ThirTypeKind::None => Sizeof {
+                size: 0,
+                alignment: Alignment::Null,
             },
+            ThirTypeKind::Primitive(primitive_types) => {
+                let size = primitive_types.to_size_bit_u8(c_int as u8, int as u8, char as u8) as u32;
+                let alignment =
+                    Alignment::from_u8(size as u8).expect("should be value in alignment");
+                Sizeof { size, alignment }
+            }
             ThirTypeKind::Array { kind, element } => {
                 let size = match kind {
                     ArrayKind::StackArray(num) => num as u32 * self.sizeof(element, generics)?.size,
                     _ => int + ptr,
                 };
-                Sizeof{ size, alignment: ptr_align }
+                Sizeof {
+                    size,
+                    alignment: ptr_align,
+                }
             }
-            ThirTypeKind::Ref { .. } |
-            ThirTypeKind::Pointer(_) => Sizeof{ size: ptr, alignment: ptr_align },
+            ThirTypeKind::Ref { .. } | ThirTypeKind::Pointer(_) => Sizeof {
+                size: ptr,
+                alignment: ptr_align,
+            },
             ThirTypeKind::Optional(_) => todo!("impl"),
             ThirTypeKind::Generic(generic_id) => {
                 let ty = match generics.resolve(generic_id) {
                     Some(val) => val,
                     None => {
-                        return Err(SoulError::new("generic not found", SoulErrorKind::TypeNotFound, None))
+                        return Err(SoulError::new(
+                            "generic not found",
+                            SoulErrorKind::TypeNotFound,
+                            None,
+                        ));
                     }
                 };
                 self.sizeof(ty, generics)?
             }
-            ThirTypeKind::Struct(struct_id) => {
-                let struct_type = self.types.types_map.id_to_struct(struct_id)
-                    .ok_or(soul_error_internal!(format!("{:?} not found", struct_id), None))?;
-                
-                let mut max_alignment = Alignment::Null;
-                for field in &struct_type.fields {
-                    let Sizeof { alignment,.. } = self.sizeof(field.ty, generics)?;
-
-                    if max_alignment < alignment {
-                        max_alignment = alignment;
-                        if alignment == Alignment::max() {
-                            break
-                        }
-                    }
-                }
-
-                let mut struct_size = 0;
-                for field in &struct_type.fields {
-                    let Sizeof { size,.. } = self.sizeof(field.ty, generics)?;
-                    struct_size += max_alignment.pack_size(size);
-                }
-
-                Sizeof { size: struct_size, alignment: max_alignment }
-            }
+            ThirTypeKind::Struct(struct_id) => self.sizeof_struct(struct_id, generics)?,
         })
+    }
+
+    fn sizeof_struct(
+        &self,
+        struct_id: StructId,
+        generics: &GenericSubstitute,
+    ) -> SoulResult<Sizeof> {
+        let struct_type =
+            self.types
+                .types_map
+                .id_to_struct(struct_id)
+                .ok_or(soul_error_internal!(
+                    format!("{:?} not found", struct_id),
+                    None
+                ))?;
+
+        let is_packed = struct_type.packed;
+
+        let mut alignment = Alignment::Null;
+        for field in &struct_type.fields {
+            let inner_alignment = self.sizeof(field.ty, generics)?.alignment;
+
+            if alignment < inner_alignment {
+                alignment = inner_alignment;
+                if inner_alignment == Alignment::max() {
+                    break;
+                }
+            }
+        }
+
+        let mut offset = 0u32;
+        let mut size = 0u32;
+
+        for Field { ty, .. } in &struct_type.fields {
+            let field = self.sizeof(*ty, generics)?;
+
+            if !is_packed {
+                let padding = field.alignment.get_padding(offset);
+                offset += padding;
+            }
+
+            offset += field.size;
+            size = offset;
+        }
+
+        if !is_packed {
+            let align = alignment.as_u32();
+            size = (size + align - 1) / align * align;
+        }
+
+        Ok(Sizeof { size, alignment })
     }
 }
 
@@ -287,7 +364,6 @@ pub(crate) struct Sizeof {
     pub alignment: Alignment,
 }
 
-#[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Alignment {
     Null = 0,
@@ -297,27 +373,27 @@ pub(crate) enum Alignment {
     Bit64 = 64,
 }
 impl Alignment {
-    pub fn from_u8(sizeof_bit: u8) -> Option<Self> {
+    const fn from_u8(sizeof_bit: u8) -> Option<Self> {
         match sizeof_bit {
             0 => Some(Self::Null),
             8 => Some(Self::Bit8),
             16 => Some(Self::Bit16),
             32 => Some(Self::Bit32),
             64 => Some(Self::Bit64),
-            _ => None
+            _ => None,
         }
     }
 
-    pub const fn max() -> Self {
+    const fn get_padding(self, offset: u32) -> u32 {
+        let align = self.as_u32();
+        (align - (offset % align)) % align
+    }
+
+    const fn max() -> Self {
         Self::Bit64
     }
 
-    pub fn pack_size(&self, size: u32) -> u32 {
-        let alignment = *self as u32;
-        if size < alignment {
-            alignment
-        } else {
-            size
-        }
+    pub const fn as_u32(self) -> u32 {
+        self as u32
     }
 }

@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use ast::{AstResponse, DeclareStore};
 use hir::{
-    BlockId, CreatedTypes, ExpressionId, Field, GenericId, HirTree, HirType, LazyTypeId, LocalId, StatementId, Struct
+    BlockId, CreatedTypes, ExpressionId, Field, GenericId, HirTree, HirType, LazyTypeId, LocalId,
+    StatementId, Struct,
 };
 use soul_utils::{
     Ident,
@@ -81,14 +82,26 @@ impl<'a> HirContext<'a> {
         let ptr_type = self.add_type(HirType::pointer_type(generic_type)).to_lazy();
         let len_type = self.add_type(HirType::index_type());
         let fields = vec![
-            Field{ struct_id, id: self.id_generator.alloc_field(), name: "ptr".to_string(), ty: ptr_type },
-            Field{ struct_id, id: self.id_generator.alloc_field(), name: "len".to_string(), ty: len_type.to_lazy() },
+            Field {
+                struct_id,
+                id: self.id_generator.alloc_field(),
+                name: "ptr".to_string(),
+                ty: ptr_type,
+            },
+            Field {
+                struct_id,
+                id: self.id_generator.alloc_field(),
+                name: "len".to_string(),
+                ty: len_type.to_lazy(),
+            },
         ];
 
         self.tree.info.types.array_struct = struct_id;
         // to insure struct is in compiler
-        self.add_type(HirType::new(hir::HirTypeKind::Struct(struct_id)).apply_generics(vec![len_type]));
-        self.insert_struct(struct_id, Struct{ name, fields });
+        self.add_type(
+            HirType::new(hir::HirTypeKind::Struct(struct_id)).apply_generics(vec![len_type]),
+        );
+        self.insert_struct(struct_id, Struct { name, fields });
     }
 
     fn alloc_statement(&mut self, meta_data: &ItemMetaData, span: Span) -> StatementId {

@@ -2,6 +2,7 @@ use ast::{
     Block, Function, FunctionSignature, Statement, StatementKind, TypeKind, VarTypeKind,
     scope::ScopeValueKind,
 };
+use soul_utils::error::{SoulError, SoulErrorKind};
 
 use crate::NameResolver;
 
@@ -26,7 +27,21 @@ impl<'a> NameResolver<'a> {
                 self.declare_struct(obj);
             }
             StatementKind::Variable(variable) => {
-                let id = self.declare_value(ScopeValueKind::Variable(variable));
+                self.check_variable_name(&variable.name);
+                let id = if let Some(id) = self.flat_check_variable(&variable.name) {
+                    self.log_error(SoulError::new(
+                        format!(
+                            "variable '{}' already defined in scope",
+                            variable.name.as_str()
+                        ),
+                        SoulErrorKind::AlreadyFoundInScope,
+                        Some(variable.name.span),
+                    ));
+                    id
+                } else {
+                    self.declare_value(ScopeValueKind::Variable(variable))
+                };
+
                 self.store.insert_variable_type(id, variable.ty.clone());
 
                 match &mut variable.ty {
@@ -39,6 +54,7 @@ impl<'a> NameResolver<'a> {
                 }
             }
             StatementKind::ExternalFunction(function) | StatementKind::Function(function) => {
+                self.check_function_name(&function.signature.node.name);
                 self.collect_function(function);
             }
             StatementKind::Expression {

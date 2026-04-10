@@ -1,5 +1,9 @@
 use soul_utils::{
-    bimap::BiMap, ids::{IdAlloc, IdGenerator}, soul_names::TypeModifier, span::Span, vec_map::VecMap,
+    bimap::BiMap,
+    ids::{IdAlloc, IdGenerator},
+    soul_names::TypeModifier,
+    span::Span,
+    vec_map::VecMap,
 };
 
 use crate::{
@@ -20,14 +24,14 @@ pub struct TypesMap {
 }
 impl Default for TypesMap {
     fn default() -> Self {
-        Self { 
+        Self {
             array_struct: StructId::error(),
-            
-            types: Default::default(), 
-            structs: Default::default(), 
-            generics: Default::default(), 
-            type_alloc: Default::default(), 
-            struct_alloc: Default::default(), 
+
+            types: Default::default(),
+            structs: Default::default(),
+            generics: Default::default(),
+            type_alloc: Default::default(),
+            struct_alloc: Default::default(),
             generic_alloc: Default::default(),
         }
     }
@@ -35,7 +39,8 @@ impl Default for TypesMap {
 impl TypesMap {
     pub fn new() -> Self {
         let mut this = Self::default();
-        this.types.force_insert(TypeId::error(), HirType::error_type());
+        this.types
+            .force_insert(TypeId::error(), HirType::error_type());
         this
     }
 

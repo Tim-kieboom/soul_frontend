@@ -1,6 +1,6 @@
-use ast::{AstResponse};
+use ast::AstResponse;
 use hir::{ComplexLiteral, ExpressionId, HirTree};
-use hir_literal_interpreter::{literal_resolve};
+use hir_literal_interpreter::literal_resolve;
 use hir_parser::lower_hir;
 use soul_utils::{
     compile_options::CompilerOptions, error::SoulError, sementic_level::SementicFault, span::Span,
@@ -24,7 +24,7 @@ pub fn to_hir(
     let typed = lower_typed_hir(&hir, options, faults);
 
     let literal_resolves = literal_resolve(&hir, &typed);
-    if options.debug_view_literal_resolve {
+    if options.debug_view_literal_resolve() {
         for (id, literal) in literal_resolves.entries() {
             let span = hir.info.spans.expressions[id];
             faults.push(SementicFault::debug(literal_msg(literal, &hir, span)));
@@ -39,7 +39,6 @@ pub fn to_hir(
 }
 
 fn literal_msg(literal: &ComplexLiteral, hir: &HirTree, span: Span) -> SoulError {
-    
     let mut literal_str = String::new();
     literal_display(literal, hir, &mut literal_str);
 
@@ -55,8 +54,12 @@ pub fn literal_display(literal: &ComplexLiteral, hir: &HirTree, sb: &mut String)
 
     match literal {
         ComplexLiteral::Basic(literal) => sb.push_str(&literal.value_to_string()),
-        ComplexLiteral::Struct { struct_id, values, struct_type:_, all_fields_const:_ } => {
-            
+        ComplexLiteral::Struct {
+            struct_id,
+            values,
+            struct_type: _,
+            all_fields_const: _,
+        } => {
             let object = hir.info.types.id_to_struct(*struct_id);
             match object {
                 Some(obj) => sb.push_str(obj.name.as_str()),
@@ -70,7 +73,7 @@ pub fn literal_display(literal: &ComplexLiteral, hir: &HirTree, sb: &mut String)
                     Some(obj) => obj.fields.get(i),
                     None => None,
                 };
-                
+
                 match field {
                     Some(val) => sb.push_str(&val.name),
                     None => write!(sb, "_{}", i).expect("no fmt error"),
@@ -83,6 +86,6 @@ pub fn literal_display(literal: &ComplexLiteral, hir: &HirTree, sb: &mut String)
                 }
             }
             sb.push('}');
-        },
+        }
     }
 }

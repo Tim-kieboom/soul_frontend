@@ -1,6 +1,6 @@
 use ast::Literal;
 use hir::{ComplexLiteral, ExpressionId, HirTree, LocalId, PlaceId, StructId, TypeId};
-use typed_hir::{Struct, Field};
+use typed_hir::{Field, Struct};
 
 pub(crate) mod binary;
 pub(crate) mod unary;
@@ -100,9 +100,14 @@ impl<'a> LiteralInterpreter<'a> {
         }
     }
 
-    fn interpret_struct_contructor(&self, struct_id: StructId, values: &Vec<(Ident, ExpressionId)>, expression_id: hir::ExpressionId) -> Option<ComplexLiteral> {
+    fn interpret_struct_contructor(
+        &self,
+        struct_id: StructId,
+        values: &Vec<(Ident, ExpressionId)>,
+        expression_id: hir::ExpressionId,
+    ) -> Option<ComplexLiteral> {
         let r#struct = self.types.types_map.id_to_struct(struct_id)?;
-                
+
         let mut literals = Vec::new();
 
         let dummy = (ComplexLiteral::Basic(Literal::Bool(false)), TypeId::error());
@@ -169,7 +174,12 @@ impl<'a> LiteralInterpreter<'a> {
     }
 
     fn expression_type(&self, id: ExpressionId) -> TypeId {
-        self.types.types_table.expressions.get(id).copied().unwrap_or(TypeId::error())
+        self.types
+            .types_table
+            .expressions
+            .get(id)
+            .copied()
+            .unwrap_or(TypeId::error())
     }
 
     fn to_literals(self) -> VecMap<ExpressionId, ComplexLiteral> {
@@ -178,8 +188,10 @@ impl<'a> LiteralInterpreter<'a> {
 
     fn find_field_index(&self, r#struct: &Struct, name: &str) -> Option<usize> {
         let field_name = |field: &Field| &self.hir.nodes.fields[field.id].name;
-        
-        r#struct.fields.iter()
+
+        r#struct
+            .fields
+            .iter()
             .enumerate()
             .find(|(_i, field)| field_name(field) == name)
             .map(|(i, _)| i)

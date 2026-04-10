@@ -11,7 +11,7 @@ class List<T> {
         TryFromArray(array).Err{panic}        
     }
 
-    TryFromArray(array: [_]T): Err<This> {
+    TryFromArray(array: [_]T): Res<This> {
         mut self = TryNew(0).pass
         self.ExtendArray(array).pass
         self

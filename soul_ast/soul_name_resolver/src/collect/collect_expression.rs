@@ -1,6 +1,5 @@
 use crate::NameResolver;
 use ast::{ElseKind, Expression, ExpressionKind, If};
-use soul_utils::error::{SoulError, SoulErrorKind};
 
 impl<'a> NameResolver<'a> {
     pub(super) fn collect_expression(&mut self, expression: &mut Expression) {
@@ -8,7 +7,9 @@ impl<'a> NameResolver<'a> {
             ExpressionKind::Sizeof(ty) => self.collect_type(ty),
             ExpressionKind::ArrayContructor(ctor) => {
                 ctor.id = Some(self.alloc_node());
-                ctor.collection_type.as_mut().map(|ty| self.collect_type(ty));
+                ctor.collection_type
+                    .as_mut()
+                    .map(|ty| self.collect_type(ty));
                 ctor.element_type.as_mut().map(|ty| self.collect_type(ty));
                 self.collect_expression(&mut ctor.amount);
                 self.collect_expression(&mut ctor.element);
@@ -85,24 +86,15 @@ impl<'a> NameResolver<'a> {
             ExpressionKind::ExternalExpression(_) => todo!("impl external expressions"),
             ExpressionKind::Default(id) => *id = Some(self.alloc_node()),
             ExpressionKind::Literal((id, _)) => *id = Some(self.alloc_node()),
-            ExpressionKind::Variable { id, ident, .. } => {
-                let variable_id = match self.check_variable(ident) {
-                    Some(id) => id,
-                    _ => {
-                        self.log_error(SoulError::new(
-                            format!("variable '{}' not found in scope", ident.as_str()),
-                            SoulErrorKind::NotFoundInScope,
-                            Some(ident.span),
-                        ));
-                        self.alloc_node()
-                    }
-                };
-
-                *id = Some(variable_id);
+            ExpressionKind::Variable { id, .. } => {
+                *id = Some(self.alloc_node());
             }
             ExpressionKind::Array(array) => {
                 array.id = Some(self.alloc_node());
-                array.collection_type.as_mut().map(|ty| self.collect_type(ty));
+                array
+                    .collection_type
+                    .as_mut()
+                    .map(|ty| self.collect_type(ty));
                 array.element_type.as_mut().map(|ty| self.collect_type(ty));
                 for value in &mut array.values {
                     self.collect_expression(value);

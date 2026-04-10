@@ -36,8 +36,10 @@ main() {
     num := resFunc()
         .Err{return}
 
-    op: ?int = 1
-    text: ?str = op?.To<str>()
+    option := try{
+        op: ?int = 1
+        text: ?str = op?.To<str>()
+    }
 }
 
 passErr(): Res {

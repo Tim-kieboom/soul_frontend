@@ -18,12 +18,16 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
         if ir_left.info.is_unloaded {
             let ptr = ir_left.get_or_convert_pointer(&self.builder)?;
-            ir_left.value = self.builder.build_load(ir_left.info.ir_type, ptr, "load_left")?;
-        } 
+            ir_left.value = self
+                .builder
+                .build_load(ir_left.info.ir_type, ptr, "load_left")?;
+        }
 
         if ir_right.info.is_unloaded {
             let ptr = ir_right.get_or_convert_pointer(&self.builder)?;
-            ir_right.value = self.builder.build_load(ir_right.info.ir_type, ptr, "load_left")?;
+            ir_right.value = self
+                .builder
+                .build_load(ir_right.info.ir_type, ptr, "load_left")?;
         }
 
         match operator.node {

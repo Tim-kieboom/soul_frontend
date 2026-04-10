@@ -11,11 +11,13 @@ use soul_utils::{
 use crate::FunctionKeyId;
 
 pub struct StructStore<'a> {
-    map: RefCell<VecMap<StructId, StructType<'a>>>
+    map: RefCell<VecMap<StructId, StructType<'a>>>,
 }
 impl<'a> StructStore<'a> {
     pub fn new() -> Self {
-        Self{map: RefCell::new(VecMap::const_default())}
+        Self {
+            map: RefCell::new(VecMap::const_default()),
+        }
     }
 
     pub fn get(&self, id: StructId) -> Option<StructType<'a>> {

@@ -57,7 +57,7 @@ impl<'f, 'a> Parser<'f, 'a> {
         if modifier.is_some() {
             name = self.try_bump_consume_ident().try_err()?;
         }
-        
+
         self.expect(&COLON).try_not_value()?;
         let mut ty = self.try_parse_type()?;
         ty.modifier = Some(modifier.unwrap_or(TypeModifier::Const));

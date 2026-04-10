@@ -96,6 +96,7 @@ pub struct Struct {
     pub id: StructId,
     pub name: String,
     pub fields: Vec<Field>,
+    pub packed: bool,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -103,7 +104,6 @@ pub struct Field {
     pub id: FieldId,
     pub ty: TypeId,
 }
-
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TypeTable {

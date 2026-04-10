@@ -60,7 +60,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     }
                     ast::ArrayKind::MutSlice
                     | ast::ArrayKind::HeapArray
-                    | ast::ArrayKind::ConstSlice => self.get_or_create_struct(array_struct, generics)?.into(),
+                    | ast::ArrayKind::ConstSlice => {
+                        self.get_or_create_struct(array_struct, generics)?.into()
+                    }
                 }
             }
 
@@ -68,7 +70,12 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 return Ok(None);
             }
 
-            ThirTypeKind::Error => panic!("error type should not be in ir"),
+            ThirTypeKind::Error => {
+                #[cfg(debug_assertions)]
+                panic!("error type should not be in ir");
+                #[cfg(not(debug_assertions))]
+                return Err(soul_error_internal!("error type should not be in ir", None))
+            }
         }))
     }
 
@@ -115,7 +122,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             fields.push(ir_field);
         }
 
-        let ty = self.context.struct_type(fields.as_slice(), false);
+        let ty = self.context.struct_type(fields.as_slice(), object.packed);
         self.structs.insert(id, ty);
         Ok(ty)
     }
@@ -138,6 +145,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             PrimitiveTypes::Int32 | PrimitiveTypes::Char32 | PrimitiveTypes::Uint32 => {
                 self.context.i32_type().into()
             }
+
+            PrimitiveTypes::CInt 
+            | PrimitiveTypes::CUint => self.default_c_int_type.into(),
 
             PrimitiveTypes::Int
             | PrimitiveTypes::Uint

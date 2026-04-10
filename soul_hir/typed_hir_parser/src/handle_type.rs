@@ -1,6 +1,8 @@
 use hir::{ExpressionId, FieldId, HirType, HirTypeKind, LazyTypeId, LocalId, StructId, TypeId};
 use soul_utils::{
-    error::{SoulError, SoulErrorKind}, soul_names::{PrimitiveTypes, TypeModifier}, span::Span
+    error::{SoulError, SoulErrorKind},
+    soul_names::{PrimitiveTypes, TypeModifier},
+    span::Span,
 };
 
 use crate::{TypedHirContext, infer_table::UnifyResult};
@@ -32,9 +34,9 @@ impl<'a> TypedHirContext<'a> {
 
     pub(crate) fn resolve_type_strict(&mut self, ty: LazyTypeId, span: Span) -> Option<TypeId> {
         if ty == LazyTypeId::error() {
-            return None
+            return None;
         }
-        
+
         match self
             .infer_table
             .resolve_type_strict(&mut self.types, ty, Some(span))
@@ -49,9 +51,9 @@ impl<'a> TypedHirContext<'a> {
 
     pub(crate) fn resolve_type_lazy(&mut self, ty: LazyTypeId, span: Span) -> LazyTypeId {
         if ty == LazyTypeId::error() {
-            return ty
+            return ty;
         }
-        
+
         match self
             .infer_table
             .resolve_type_lazy(&mut self.types, &self.infers, ty, span)
@@ -73,9 +75,7 @@ impl<'a> TypedHirContext<'a> {
         let object_type = self.resolve_type_strict(object, span)?;
         match &self.id_to_type(object_type).kind {
             HirTypeKind::Struct(struct_id) => self.get_struct_field(*struct_id, field, span),
-            HirTypeKind::Ref { of_type, .. } => {
-                self.get_field_access(*of_type, field, span)
-            }
+            HirTypeKind::Ref { of_type, .. } => self.get_field_access(*of_type, field, span),
             HirTypeKind::Array { .. } => {
                 let struct_id = self.hir.info.types.array_struct;
                 self.get_struct_field(struct_id, field, span)
@@ -228,18 +228,18 @@ impl<'a> TypedHirContext<'a> {
 
     pub(crate) fn is_mutable_or_modifier_none(&self, ty: LazyTypeId) -> bool {
         if ty == LazyTypeId::error() {
-            return true
-        } 
-        
+            return true;
+        }
+
         match ty {
             LazyTypeId::Known(type_id) => {
                 let ty = self.id_to_type(type_id);
                 ty.is_mutable() || ty.is_modifier_none()
-            },
+            }
             LazyTypeId::Infer(infer_type_id) => {
                 let ty = self.id_to_infer(infer_type_id);
                 ty.is_mutable() || ty.is_modifier_none()
-            },
+            }
         }
     }
 

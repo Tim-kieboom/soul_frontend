@@ -1,16 +1,22 @@
 use std::collections::HashMap;
 
+use crate::{
+    TypedHirContext,
+    type_helpers::{TypeHelpers, UnifyPrimitiveCastLazy},
+};
 use ast::{ArrayKind, BinaryOperator, BinaryOperatorKind, UnaryOperator};
 use hir::{
     Binary, BlockId, DisplayType, ExpressionId, HirType, HirTypeKind, LazyTypeId, PlaceId, Struct,
     TypeId, Unary,
 };
 use soul_utils::{
-    Ident, error::{SoulError, SoulErrorKind, SoulResult}, ids::{FunctionId, IdAlloc}, soul_error_internal, soul_names::{PrimitiveTypes, TypeModifier}, span::Span, vec_map::VecMap
-};
-use crate::{
-    TypedHirContext,
-    type_helpers::{TypeHelpers, UnifyPrimitiveCastLazy},
+    Ident,
+    error::{SoulError, SoulErrorKind, SoulResult},
+    ids::{FunctionId, IdAlloc},
+    soul_error_internal,
+    soul_names::{PrimitiveTypes, TypeModifier},
+    span::Span,
+    vec_map::VecMap,
 };
 const MUT: bool = true;
 const CONST: bool = false;
@@ -26,7 +32,8 @@ impl<'a> TypedHirContext<'a> {
         let ty = match &value.kind {
             hir::ExpressionKind::Sizeof(ty) => {
                 self.sizeofs.insert(expression_id, *ty);
-                self.add_type(HirType::primitive_type(PrimitiveTypes::Uint32)).to_lazy()
+                self.add_type(HirType::primitive_type(PrimitiveTypes::Uint32))
+                    .to_lazy()
             }
             hir::ExpressionKind::Error => LazyTypeId::error(),
             hir::ExpressionKind::Null => self.new_infer_optional(span),
@@ -213,7 +220,9 @@ impl<'a> TypedHirContext<'a> {
                 self.unify(right, left_id, right_id, span);
                 self.bool_type.to_lazy()
             }
-            BinaryTypeCheck::Bitwise => self.infer_bitwise_numaric(left, left_id, operator, right, right_id, span),
+            BinaryTypeCheck::Bitwise => {
+                self.infer_bitwise_numaric(left, left_id, operator, right, right_id, span)
+            }
             BinaryTypeCheck::Numeric => {
                 let left_strict = match self.resolve_type_strict(left_id, span) {
                     Some(val) => val,
@@ -224,8 +233,10 @@ impl<'a> TypedHirContext<'a> {
                     None => return LazyTypeId::error(),
                 };
 
-                if self.id_to_type(left_strict).is_pointer() && self.id_to_type(right_strict).is_non_float_numeric_type() {
-                    return left_strict.to_lazy()
+                if self.id_to_type(left_strict).is_pointer()
+                    && self.id_to_type(right_strict).is_non_float_numeric_type()
+                {
+                    return left_strict.to_lazy();
                 }
 
                 self.infer_bitwise_numaric(left, left_id, operator, right, right_id, span)
@@ -402,7 +413,7 @@ impl<'a> TypedHirContext<'a> {
             LazyTypeId::Known(val) => val,
             LazyTypeId::Infer(infer) => {
                 let modifier = self.id_to_infer(infer).modifier;
-                return self.create_ref(resolved, mutable, modifier, span)
+                return self.create_ref(resolved, mutable, modifier, span);
             }
         };
 
@@ -431,23 +442,37 @@ impl<'a> TypedHirContext<'a> {
         }
     }
 
-    fn create_ref(&mut self, type_id: LazyTypeId, mutable: bool, inner_modifier: Option<TypeModifier>, span: Span) -> LazyTypeId {
-        
+    fn create_ref(
+        &mut self,
+        type_id: LazyTypeId,
+        mutable: bool,
+        inner_modifier: Option<TypeModifier>,
+        span: Span,
+    ) -> LazyTypeId {
         if mutable && inner_modifier != Some(TypeModifier::Mut) {
-
             let type_str = match type_id {
-                LazyTypeId::Known(type_id) => self.id_to_type(type_id).display(&self.types, &self.hir.info.infers),
-                LazyTypeId::Infer(infer) => self.id_to_infer(infer).display(&self.types, &self.hir.info.infers),
+                LazyTypeId::Known(type_id) => self
+                    .id_to_type(type_id)
+                    .display(&self.types, &self.hir.info.infers),
+                LazyTypeId::Infer(infer) => self
+                    .id_to_infer(infer)
+                    .display(&self.types, &self.hir.info.infers),
             };
 
-            self.log_error(SoulError::new(format!("can only call mutRef on mutable variables type '{type_str}' is not mutable"), SoulErrorKind::InvalidMutability, Some(span)));
-            return LazyTypeId::error()
+            self.log_error(SoulError::new(
+                format!(
+                    "can only call mutRef on mutable variables type '{type_str}' is not mutable"
+                ),
+                SoulErrorKind::InvalidMutability,
+                Some(span),
+            ));
+            return LazyTypeId::error();
         }
 
         let of_type = self.lazy_id_insure_modifier(type_id, None);
 
-        let ref_type = HirType::new(HirTypeKind::Ref { of_type, mutable })
-            .apply_modfier(inner_modifier);
+        let ref_type =
+            HirType::new(HirTypeKind::Ref { of_type, mutable }).apply_modfier(inner_modifier);
 
         self.add_type(ref_type).to_lazy()
     }
@@ -553,18 +578,17 @@ impl<'a> TypedHirContext<'a> {
     }
 
     fn is_correct_binary(
-        &mut self, 
-        left: ExpressionId, 
-        left_id: TypeId, 
+        &mut self,
+        left: ExpressionId,
+        left_id: TypeId,
         operator: &BinaryOperator,
-        right: ExpressionId, 
+        right: ExpressionId,
         right_id: TypeId,
     ) -> SoulResult<()> {
-        
         let err_wrong_type = |ty: &hir::InnerType<HirTypeKind>, value: ExpressionId| -> SoulError {
             SoulError::new(
                 format!(
-                    "type is '{}' but operator '{}' only allows number types (f32, uint, int, i32, ect..)", 
+                    "type is '{}' but operator '{}' only allows number types (f32, uint, int, i32, ect..)",
                     ty.display(&self.types, &self.infers),
                     operator.node.as_str(),
                 ),
@@ -576,13 +600,13 @@ impl<'a> TypedHirContext<'a> {
         let left_type = self.id_to_type(left_id);
         let right_type = self.id_to_type(right_id);
         if !left_type.is_error() && !left_type.is_numeric_type() {
-            return Err(err_wrong_type(left_type, left))
+            return Err(err_wrong_type(left_type, left));
         }
-        
+
         if !right_type.is_error() && !right_type.is_numeric_type() {
-            return Err(err_wrong_type(right_type, right))
+            return Err(err_wrong_type(right_type, right));
         }
-        
+
         Ok(())
     }
 }

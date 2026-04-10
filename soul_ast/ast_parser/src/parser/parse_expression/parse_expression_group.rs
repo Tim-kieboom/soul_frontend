@@ -1,6 +1,13 @@
 use ast::{AnyArray, Array, ArrayContructor, Expression, SoulType, StructConstructor};
 use soul_tokenizer::TokenKind;
-use soul_utils::{Ident, error::{SoulError, SoulErrorKind, SoulResult}, soul_names::KeyWord, span::{Span, Spanned}, symbool_kind::SymbolKind, try_result::TryError};
+use soul_utils::{
+    Ident,
+    error::{SoulError, SoulErrorKind, SoulResult},
+    soul_names::KeyWord,
+    span::{Span, Spanned},
+    symbool_kind::SymbolKind,
+    try_result::TryError,
+};
 
 use crate::parser::{
     Parser,
@@ -8,7 +15,10 @@ use crate::parser::{
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
-    pub(super) fn parse_array(&mut self, collection_type: Option<SoulType>) -> SoulResult<Spanned<AnyArray>> {
+    pub(super) fn parse_array(
+        &mut self,
+        collection_type: Option<SoulType>,
+    ) -> SoulResult<Spanned<AnyArray>> {
         let start_span = self.token().span;
         self.expect(&SQUARE_OPEN)?;
 
@@ -31,7 +41,12 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
     }
 
-    fn parse_array_literal(&mut self, collection_type: Option<SoulType>, element_type: Option<SoulType>, start_span: Span) -> SoulResult<Spanned<Array>> {
+    fn parse_array_literal(
+        &mut self,
+        collection_type: Option<SoulType>,
+        element_type: Option<SoulType>,
+        start_span: Span,
+    ) -> SoulResult<Spanned<Array>> {
         let mut values = vec![];
         loop {
             self.skip_end_lines();
@@ -63,24 +78,28 @@ impl<'a, 'f> Parser<'a, 'f> {
         ))
     }
 
-    fn parse_array_contructor(&mut self, collection_type: Option<SoulType>, element_type: Option<SoulType>, start_span: Span) -> SoulResult<Spanned<ArrayContructor>> {
+    fn parse_array_contructor(
+        &mut self,
+        collection_type: Option<SoulType>,
+        element_type: Option<SoulType>,
+        start_span: Span,
+    ) -> SoulResult<Spanned<ArrayContructor>> {
         self.expect_ident(KeyWord::For.as_str())?;
         let amount = self.parse_expression(&[LAMBDA_ARROW, SQUARE_CLOSE])?;
         self.expect(&LAMBDA_ARROW)?;
         let element = self.parse_expression(&[SQUARE_CLOSE])?;
         self.expect(&SQUARE_CLOSE)?;
         Ok(Spanned::new(
-            ArrayContructor { 
+            ArrayContructor {
                 collection_type,
-                element_type, 
-                amount: Box::new(amount), 
+                element_type,
+                amount: Box::new(amount),
                 element: Box::new(element),
-                id: None, 
-            }, 
-            self.span_combine(start_span)
+                id: None,
+            },
+            self.span_combine(start_span),
         ))
     }
-
 
     pub(super) fn parse_struct_contructor(
         &mut self,
@@ -152,5 +171,4 @@ impl<'a, 'f> Parser<'a, 'f> {
         };
         Ok(Spanned::new(ctor, self.span_combine(start_span)))
     }
-
 }

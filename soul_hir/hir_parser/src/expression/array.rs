@@ -14,7 +14,6 @@ impl<'a> HirContext<'a> {
         array: &ast::Array,
         span: Span,
     ) -> hir::Expression {
-        
         let temp_local = self.id_generator.alloc_local();
         let name = Ident::new(create_local_name(temp_local), span);
         let temp_place = Place::new(
@@ -22,11 +21,14 @@ impl<'a> HirContext<'a> {
             PlaceKind::Temp(temp_local),
             span,
         );
-        
+
         let size = array.values.len() as u64;
         let element = self.new_infer_type(vec![], None, span);
         let infer_array = LazyTypeId::Known(self.add_type(create_array(element, size)));
-        let ty = hir::LazyTypeId::Known(self.add_type(HirType::new(hir::HirTypeKind::Array { element, kind: ast::ArrayKind::StackArray(size) })));
+        let ty = hir::LazyTypeId::Known(self.add_type(HirType::new(hir::HirTypeKind::Array {
+            element,
+            kind: ast::ArrayKind::StackArray(size),
+        })));
 
         let unalloc = self.create_unallocted_array(infer_array, element, size, span);
         self.insert_temp(&name, temp_local, ty, unalloc);

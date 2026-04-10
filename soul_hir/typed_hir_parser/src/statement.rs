@@ -1,5 +1,6 @@
 use hir::{
-    Assign, Block, BlockId, ExpressionId, Global, GlobalKind, LazyTypeId, Statement, StatementKind, Terminator, TypeId, Variable
+    Assign, Block, BlockId, ExpressionId, Global, GlobalKind, LazyTypeId, Statement, StatementKind,
+    Terminator, TypeId, Variable,
 };
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
@@ -71,11 +72,11 @@ impl<'a> TypedHirContext<'a> {
         let expected = self.infer_place(assign.place);
         if !self.is_mutable_or_modifier_none(expected) {
             self.log_error(SoulError::new(
-                "trying to reassign but type is 'const' or 'literal' (make it 'mut' instead)", 
-                SoulErrorKind::InvalidMutability, 
+                "trying to reassign but type is 'const' or 'literal' (make it 'mut' instead)",
+                SoulErrorKind::InvalidMutability,
                 Some(span),
             ));
-            return TypeId::error()
+            return TypeId::error();
         }
 
         let value_type = self.infer_expression(assign.value);
@@ -130,7 +131,7 @@ impl<'a> TypedHirContext<'a> {
         for statement in &block.statements {
             self.infer_statement(statement);
             if !returnable {
-                continue
+                continue;
             }
 
             if let hir::StatementKind::Return(value) = statement.kind {
@@ -155,7 +156,12 @@ impl<'a> TypedHirContext<'a> {
         ty
     }
 
-    fn handle_block_terminator(&mut self, block: &Block, return_type: &mut Option<LazyTypeId>, returnable: bool) {
+    fn handle_block_terminator(
+        &mut self,
+        block: &Block,
+        return_type: &mut Option<LazyTypeId>,
+        returnable: bool,
+    ) {
         if let Some(terminator) = block.terminator {
             if matches!(terminator, Terminator::Return(_)) && !returnable {
                 return;

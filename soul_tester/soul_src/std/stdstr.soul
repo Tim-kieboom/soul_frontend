@@ -1,5 +1,5 @@
 trait Fmt {
-    Fmt(@this, fmt: &StringBuilder): Err
+    Fmt(@this, fmt: &StringBuilder): Res
 }
 
 class StringBuilder {
@@ -19,8 +19,17 @@ class StringBuilder {
         }
     }
 
+    PushIter(iter: impl Iter<char>) {
+        buffer.PushIter(iter)
+    }
+
     ToStr(this): str {
         buffer.ToArray() as str
+    }
+
+    ToCstr(mut this): Cstr {
+        buffer.Push('\0')
+        buffer.ToArray().ptr as Cstr
     }
 
     impl Iter<char> {
@@ -30,52 +39,121 @@ class StringBuilder {
     }
 }
 
-struct FmtStr<'a> {
-    pieces: [@'a]@'a str
-    args: [@'a]Arg<'a>
+struct FmtStr {
+    pieces: [@]@str
+    args: [@]Arg
 }
 
-union Arg<'a> {
+union Arg {
     Empty(),
     Int(i128),
     Uint(u128),
     Char(char),
     Float(f64),
+    String(@str),
     Boolean(bool),
-    String(@'a str),
-    Other(@'a dyn Fmt),
+    Other(@dyn Fmt),
 }
 
-use int impl Fmt {
-    Fmt(@this, fmt: &StringBuilder): Err {
-        literal NUMBERS = "0123456789";
-
-        mut num = *this
-        is_negative := num < 0
-        if num == 0 {
-            fmt.Push('0')
-            return
-        }
-
-        if is_negative {
-            num = -num
-        }
-
-        digits := [for 16 => '\0']
-
-        mut i = 0
-        while num > 0 {
-            digits[i] = NUMBERS[num % 10]
-            num /= 10
-            i++
-        }
-
-        if is_negative {
-            fmt.Push('-')
-        }
-
-        for ch in digits.Select().Rev() {
-            fmt.Push(ch)
-        }
+use char impl Fmt {
+    Fmt(@this, fmt: &StringBuilder): Res {
+        fmt.Push(*this)
     }
+}
+
+use bool impl Fmt {
+    Fmt(@this, fmt: &StringBuilder): Res {
+        fmt.PushStr(*this ? "true" : "false")
+    }
+}
+
+use str impl Fmt {
+    Fmt(@this, fmt: &StringBuilder): Res {
+        fmt.PushStr(this)
+    }
+}
+
+use [f16, f32, f64] impl Fmt {
+    Fmt(@this, fmt: &StringBuilder): Res {
+        f64Fmt(*this as f64, fmt)
+    }
+}
+
+use [c_int, int, i8, i16, i32, i64, i128] impl Fmt {
+    Fmt(@this, fmt: &StringBuilder): Res {
+        is_negative := *this < 0
+        mut num = if is_negative {
+            fmt.Push('-')
+            -*this as u128
+        } else {
+            *this as u128
+        }
+        
+        u128Fmt(num, fmt)
+    }
+}
+
+use [c_uint, uint, u8, u16, u32, u64, u128] impl Fmt {
+    Fmt(@this, fmt: &StringBuilder): Res {
+        u128Fmt(*this as u128, fmt)
+    }
+}
+
+u128Fmt(mut num: u128, fmt: &StringBuilder): Res {
+    literal NUMBERS = "0123456789ABCDEF";
+    literal LOWER_NUMBERS = "0123456789abcdef";
+    base := 10
+    capital := true
+
+    if num == 0 {
+        fmt.Push('0')
+        return
+    }
+    
+    digits := [for 40 => '\0']
+    numbers := capital ? @NUMBERS : @LOWER_NUMBERS
+
+    mut i = 0
+    while num > 0 {
+        digit := (num % 10) as uint
+        digits[i] = numbers[digit]
+        num /= base
+        i++
+    }
+
+    if is_negative {
+        fmt.Push('-')
+    }
+
+    iter := digits.Select().Rev()
+    fmt.PushIter(iter)
+    Ok()
+}
+
+f64Fmt(mut num: f64, fmt: &StringBuilder): Res {
+    literal NUMBERS = "0123456789ABCDEF"
+    literal LOWER_NUMBERS = "0123456789abcdef";
+    percision := 4
+    capital := true
+    base := 10
+
+    if num < 0.0 {
+        fmt.Push('-')
+        num = -num
+    }
+
+    whole := num as u128
+    u128Fmt(whole, fmt).pass
+
+    fmt.Push('.')
+    mut frac = num - whole as f64;
+
+    numbers := capital ? @NUMBERS : @LOWER_NUMBERS
+    for i in 0..percision {
+        frac *= base as f64
+        digit := frac as uint
+        fmt.Push(numbers[digit])
+        frac -= digit as f64
+    }
+    Ok()
 }

@@ -76,7 +76,6 @@ pub struct IrOperand<'a> {
 }
 impl<'a> IrOperand<'a> {
     pub fn get_or_convert_pointer(self, builder: &IrBuilder<'a>) -> SoulResult<PointerValue<'a>> {
-        
         if self.value.is_pointer_value() {
             Ok(self.value.into_pointer_value())
         } else {
@@ -117,8 +116,10 @@ pub struct LlvmBackend<'f, 'a> {
     default_ptr_size: u8,
     default_int_size: u8,
     default_char_size: u8,
+    default_c_int_size: u8,
     default_int_type: IntType<'a>,
     default_char_type: IntType<'a>,
+    default_c_int_type: IntType<'a>,
 
     types: TypedHir,
     current: Current,
@@ -153,9 +154,26 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         options: &'a CompilerOptions,
         faults: &'f mut Vec<SementicFault>,
     ) -> Self {
+
+        fn to_int_type<'a>(context: &'a Context, size: u8) -> IntType<'a> {
+            match size {
+                8 => context.i8_type(),
+                16 => context.i16_type(),
+                32 => context.i32_type(),
+                64 => context.i64_type(),
+                _ => unreachable!()
+            }
+        }
+
         let module = request.context.create_module("main");
         let builder = IrBuilder::new(request.context);
         let function_keys = FunctionKeyStore::new();
+        let default_char_size = options.target_info().char_bit_size;
+        let default_int_size = options.target_info().int_bit_size;
+        let default_c_int_size = options.target_info().c_int_bit_size;
+        let default_int_type = to_int_type(&request.context, default_int_size);
+        let default_char_type = to_int_type(&request.context, default_char_size);
+        let default_c_int_type = to_int_type(&request.context, default_c_int_size);
 
         Self {
             faults,
@@ -175,11 +193,13 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             current: Current::start(function_keys.global_key()),
 
             function_keys,
-            default_ptr_size: options.target_info.ptr_bit_size,
-            default_int_size: options.target_info.int_bit_size,
-            default_char_size: options.target_info.char_bit_size,
-            default_int_type: request.context.i32_type(),
-            default_char_type: request.context.i8_type(),
+            default_int_size,
+            default_char_size,
+            default_int_type,
+            default_char_type,
+            default_c_int_size,
+            default_c_int_type,
+            default_ptr_size: options.target_info().ptr_bit_size,
         }
     }
 
@@ -298,7 +318,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             is_fatal: self
                 .faults
                 .iter()
-                .find(|fault| fault.is_fatal(self.options.fault_level))
+                .find(|fault| fault.is_fatal(self.options.fatal_level()))
                 .is_some(),
         }
     }

@@ -47,7 +47,7 @@ impl<'a> MirContext<'a> {
                 let operand = self.place_to_operand(base_place, ty);
                 self.new_place(mir::Place::new(mir::PlaceKind::Deref(operand), ty))
             }
-            hir::PlaceKind::Index { ..  } => {
+            hir::PlaceKind::Index { .. } => {
                 todo!()
             }
             hir::PlaceKind::Field { base, .. } => {
@@ -66,13 +66,21 @@ impl<'a> MirContext<'a> {
                     .place_fields
                     .get_or_error_id(place_id);
 
-                let struct_type = self.hir_response.hir.nodes.fields
+                let struct_type = self
+                    .hir_response
+                    .hir
+                    .nodes
+                    .fields
                     .get(field_id)
                     .map(|f| f.struct_id)
                     .unwrap_or(StructId::error());
 
                 self.new_place(mir::Place::new(
-                    mir::PlaceKind::Field { struct_type, base, field_id },
+                    mir::PlaceKind::Field {
+                        struct_type,
+                        base,
+                        field_id,
+                    },
                     ty,
                 ))
             }

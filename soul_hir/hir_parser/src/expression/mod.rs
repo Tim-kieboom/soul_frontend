@@ -22,10 +22,16 @@ impl<'a> HirContext<'a> {
 
         let value = match &expression.node {
             ast::ExpressionKind::Sizeof(ty) => {
-                let ty = self.lower_type(ty);
-                hir::Expression{ id, ty, kind: hir::ExpressionKind::Sizeof(ty) }
+                let ty = self.lower_type(ty, span);
+                hir::Expression {
+                    id,
+                    ty,
+                    kind: hir::ExpressionKind::Sizeof(ty),
+                }
             }
-            ast::ExpressionKind::ArrayContructor(ctor) => self.desugar_array_contructor(id, ctor, span),
+            ast::ExpressionKind::ArrayContructor(ctor) => {
+                self.desugar_array_contructor(id, ctor, span)
+            }
             ast::ExpressionKind::If(ast_if) => self.lower_if(id, ast_if, span),
             ast::ExpressionKind::Unary(unary) => self.lower_unary(id, unary, span),
             ast::ExpressionKind::Array(array) => self.lower_array(id, array, span),
@@ -86,27 +92,31 @@ impl<'a> HirContext<'a> {
         self.insert_expression(id, value)
     }
 
-    fn desugar_array_contructor(&mut self, id: ExpressionId, ctor: &ArrayContructor, span: Span) -> hir::Expression {
-        
+    fn desugar_array_contructor(
+        &mut self,
+        id: ExpressionId,
+        ctor: &ArrayContructor,
+        span: Span,
+    ) -> hir::Expression {
         let amount = match &ctor.amount.node {
             ast::ExpressionKind::Literal((_, literal)) => match literal {
                 Literal::Uint(num) => *num,
                 _ => {
                     self.log_error(SoulError::new(
                         "expression needs to be a uint literal (so no negative and no decimal)",
-                        SoulErrorKind::InvalidContext, 
+                        SoulErrorKind::InvalidContext,
                         Some(ctor.amount.span),
                     ));
-                    return hir::Expression::error(id)
+                    return hir::Expression::error(id);
                 }
             },
             _ => {
                 self.log_error(SoulError::new(
-                    "expression should be a literal", 
-                    SoulErrorKind::NeedsToBeLiteralError, 
+                    "expression should be a literal",
+                    SoulErrorKind::NeedsToBeLiteralError,
                     Some(ctor.amount.span),
                 ));
-                return hir::Expression::error(id)
+                return hir::Expression::error(id);
             }
         };
 
@@ -131,7 +141,7 @@ impl<'a> HirContext<'a> {
         ctor: &ast::StructConstructor,
         span: Span,
     ) -> hir::Expression {
-        let ty = self.lower_type(&ctor.struct_type);
+        let ty = self.lower_type(&ctor.struct_type, span);
         let kown = match ty {
             hir::LazyTypeId::Known(type_id) => type_id,
             hir::LazyTypeId::Infer(_) => {
@@ -237,21 +247,18 @@ impl<'a> HirContext<'a> {
         ident: &Ident,
         option_id: Option<NodeId>,
     ) -> hir::Expression {
-        let node_id = match option_id.ok_or(soul_error_internal!(
-            "node_id should be Some(_) in hir",
-            None
-        )) {
-            Ok(val) => val,
-            Err(err) => {
-                self.log_error(err);
+        let node_id = match option_id {
+            Some(val) => val,
+            None => {
                 return hir::Expression::error(id);
             }
         };
+
         let var_type_kind = self.ast_store.get_variable_type(node_id);
 
         let ty = match var_type_kind {
             None => self.new_infer_type(vec![], None, ident.span),
-            Some(VarTypeKind::NonInveredType(ty)) => self.lower_type(ty),
+            Some(VarTypeKind::NonInveredType(ty)) => self.lower_type(ty, ident.span),
             Some(VarTypeKind::InveredType(modifier)) => {
                 let modifier = *modifier;
                 self.new_infer_type(vec![], Some(modifier), ident.span)
@@ -306,7 +313,7 @@ impl<'a> HirContext<'a> {
 
     fn lower_cast(&mut self, id: ExpressionId, cast: &Box<AsTypeCast>) -> hir::Expression {
         let value = self.lower_expression(&cast.left);
-        let cast_to = self.lower_type(&cast.type_cast);
+        let cast_to = self.lower_type(&cast.type_cast, cast.left.span);
         hir::Expression {
             id,
             ty: cast_to,
@@ -385,8 +392,9 @@ impl<'a> HirContext<'a> {
         let body = self.lower_block(block);
 
         let ty = match &self.tree.nodes.blocks[body].terminator {
-            Some(Terminator::Return(value)) 
-            | Some(Terminator::Expression(value))=> self.tree.nodes.expressions[*value].ty,
+            Some(Terminator::Return(value)) | Some(Terminator::Expression(value)) => {
+                self.tree.nodes.expressions[*value].ty
+            }
             None => hir::LazyTypeId::Known(self.add_type(HirType::none_type())),
         };
 

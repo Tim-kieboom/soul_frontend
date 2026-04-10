@@ -89,11 +89,11 @@ impl<'a> TypedHirContext<'a> {
 
         for (id, s) in self.hir.info.types.structs_entries() {
             let mut fields = Vec::with_capacity(s.fields.len());
-            
+
             for field in &s.fields {
                 let id = field.id;
                 let ty = self.to_known(self.fields[id].field_type);
-                
+
                 fields.push(typed_hir::Field { id, ty })
             }
 
@@ -102,9 +102,10 @@ impl<'a> TypedHirContext<'a> {
             out.structs.insert(
                 id,
                 typed_hir::Struct {
-                    name: s.name.to_string(),
                     id,
                     fields,
+                    name: s.name.to_string(),
+                    packed: self.options.default_packed(),
                 },
             );
         }

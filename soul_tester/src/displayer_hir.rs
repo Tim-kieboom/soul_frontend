@@ -1,12 +1,13 @@
 use hir::{
-    TypeId, Binary, BlockId, DisplayType, ExpressionId, FieldId, FunctionBody, HirTree, HirType, LazyTypeId, LocalId, LocalKind, StructId, Unary
+    Binary, BlockId, DisplayType, ExpressionId, FieldId, FunctionBody, HirTree, HirType,
+    LazyTypeId, LocalId, LocalKind, StructId, TypeId, Unary,
 };
 use soul_utils::{
     ids::{FunctionId, IdAlloc},
     soul_names::KeyWord,
     vec_map::VecMapIndex,
 };
-use std::{fmt::Write};
+use std::fmt::Write;
 use typed_hir::{TypedHir, display_thir::DisplayThirType};
 
 pub fn display_hir(hir: &HirTree) -> String {
@@ -42,7 +43,12 @@ pub fn display_created_types(hir: &HirTree, typed: &TypedHir) -> String {
         sb.push_str(name.as_str());
         sb.push_str(" {\n");
         for field in &struct_type.fields {
-            let field_name = hir.nodes.fields.get(field.id).map(|f| f.name.as_str()).unwrap_or("<error>");
+            let field_name = hir
+                .nodes
+                .fields
+                .get(field.id)
+                .map(|f| f.name.as_str())
+                .unwrap_or("<error>");
             sb.push('\t');
             sb.push_str(field_name);
             sb.push_str(": ");
@@ -382,16 +388,24 @@ impl<'a> HirDisplayer<'a> {
                 self.display_expression(index);
                 self.push(']');
             }
-            hir::PlaceKind::Field {
-                base, field
-            } => {
+            hir::PlaceKind::Field { base, field } => {
                 self.display_place(base);
                 self.push('.');
                 self.push_str(field.as_str());
                 match self.typed {
                     Some(typed) => {
-                        let field = typed.types_table.place_fields.get(*place).copied().unwrap_or(FieldId::error());
-                        let ty = typed.types_table.fields.get(field).map(|f| f.field_type).unwrap_or(TypeId::error());
+                        let field = typed
+                            .types_table
+                            .place_fields
+                            .get(*place)
+                            .copied()
+                            .unwrap_or(FieldId::error());
+                        let ty = typed
+                            .types_table
+                            .fields
+                            .get(field)
+                            .map(|f| f.field_type)
+                            .unwrap_or(TypeId::error());
                         self.push_str("<as: ");
                         self.display_type(ty.to_lazy());
                         self.push('>');

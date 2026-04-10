@@ -1,7 +1,14 @@
 use ast::{
-    Block, FunctionSignature, NamedTupleElement, NamedTupleType, Struct, VarTypeKind, scope::{NodeId, Scope, ScopeId, ScopeTypeEntry, ScopeTypeEntryKind, ScopeValue, ScopeValueKind}
+    Block, FunctionSignature, NamedTupleElement, NamedTupleType, Struct, VarTypeKind,
+    scope::{
+        NodeId, Scope, ScopeId, ScopeTypeEntry, ScopeTypeEntryKind, ScopeValue, ScopeValueKind,
+    },
 };
-use soul_utils::{error::{SoulError, SoulErrorKind}, ids::FunctionId, span::Spanned};
+use soul_utils::{
+    error::{SoulError, SoulErrorKind},
+    ids::FunctionId,
+    span::Spanned,
+};
 
 use crate::NameResolver;
 mod collect_expression;
@@ -15,7 +22,8 @@ impl<'a> NameResolver<'a> {
     }
 
     fn push_scope(&mut self, set_scope_id: &mut Option<ScopeId>) {
-        self.info.scopes.push_scope();
+        let parent = self.info.scopes.current_scope_id();
+        self.info.scopes.push_scope(parent);
         *set_scope_id = Some(self.info.scopes.current_scope_id())
     }
 
@@ -52,7 +60,7 @@ impl<'a> NameResolver<'a> {
     fn declare_struct(&mut self, obj: &mut Struct) -> NodeId {
         let id = self.alloc_node();
         obj.id = Some(id);
-        
+
         let name = &obj.name;
         let scope_type = ScopeTypeEntry {
             node_id: id,
@@ -61,9 +69,16 @@ impl<'a> NameResolver<'a> {
             kind: ScopeTypeEntryKind::Struct,
         };
 
-        let old_entry = self.current_scope_mut().types.insert(name.to_string(), scope_type);
+        let old_entry = self
+            .current_scope_mut()
+            .insert_types(name.as_str(), scope_type);
+        
         if old_entry.is_some() {
-            self.log_error(SoulError::new(format!("type of name {} already exists in scope", name.as_str()), SoulErrorKind::AlreadyFoundInScope, Some(name.span)));
+            self.log_error(SoulError::new(
+                format!("type of name {} already exists in scope", name.as_str()),
+                SoulErrorKind::AlreadyFoundInScope,
+                Some(name.span),
+            ));
         }
 
         id
@@ -76,7 +91,11 @@ impl<'a> NameResolver<'a> {
         let name = value.get_ident();
         let old_entry = self.insert_value(name.as_str(), id, value.to_entry_kind());
         if old_entry.is_some() {
-            self.log_error(SoulError::new(format!("name {} already exists in scope", name.as_str()), SoulErrorKind::AlreadyFoundInScope, Some(name.span)));
+            self.log_error(SoulError::new(
+                format!("name {} already exists in scope", name.as_str()),
+                SoulErrorKind::AlreadyFoundInScope,
+                Some(name.span),
+            ));
         }
         id
     }
@@ -92,16 +111,18 @@ impl<'a> NameResolver<'a> {
         id
     }
 
-    fn insert_function<S: Into<String>>(&mut self, name: S, id: FunctionId) {
-        self.current_scope_mut().functions.insert(name.into(), id);
+    fn insert_function(&mut self, name: &str, id: FunctionId) {
+        self.current_scope_mut().insert_function(name, id);
     }
 
-    fn insert_value<S: Into<String>>(&mut self, name: S, id: NodeId, kind: ScopeValue) -> Option<NodeId> {
+    fn insert_value(
+        &mut self,
+        name: &str,
+        id: NodeId,
+        kind: ScopeValue,
+    ) -> Option<NodeId> {
         self.current_scope_mut()
-            .values
-            .entry(name.into())
-            .or_default()
-            .insert(kind, id)
+            .insert_value(name, kind, id)
     }
 
     fn current_scope_mut(&mut self) -> &mut Scope {

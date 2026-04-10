@@ -10,13 +10,14 @@ use crate::{HirContext, Scope};
 const CHAR: HirType = HirType::new(hir::HirTypeKind::Primitive(PrimitiveTypes::Char));
 
 impl<'a> HirContext<'a> {
-    pub(crate) fn lower_type(&mut self, ty: &ast::SoulType) -> hir::LazyTypeId {
+    pub(crate) fn lower_type(&mut self, ty: &ast::SoulType, span: Span) -> hir::LazyTypeId {
         match Self::convert_type(
             ty,
             &self.scopes,
             &vec![],
             &mut self.tree.info.types,
             &mut self.tree.info.infers,
+            span,
         ) {
             Ok(val) => val,
             Err(err) => {
@@ -37,6 +38,7 @@ impl<'a> HirContext<'a> {
         call_generics: &Vec<(String, TypeId)>,
         types: &mut TypesMap,
         infers: &mut InferTypesMap,
+        span: Span,
     ) -> SoulResult<hir::LazyTypeId> {
         let mut generics = vec![];
         let modifier = ty.modifier;
@@ -48,7 +50,8 @@ impl<'a> HirContext<'a> {
                 generics: stub_generics,
             }) => {
                 for generic in stub_generics {
-                    let ty = Self::convert_type(generic, scopes, call_generics, types, infers)?;
+                    let ty =
+                        Self::convert_type(generic, scopes, call_generics, types, infers, span)?;
 
                     match ty {
                         LazyTypeId::Known(type_id) => generics.push(type_id),
@@ -65,7 +68,7 @@ impl<'a> HirContext<'a> {
                 resolve_stub(scopes, types, call_generics, name).ok_or(SoulError::new(
                     format!("type '{}' not found", name),
                     soul_utils::error::SoulErrorKind::TypeNotFound,
-                    Some(ty.span),
+                    Some(span),
                 ))?
             }
             ast::TypeKind::Pointer(inner) => HirTypeKind::Pointer(Self::convert_type(
@@ -74,6 +77,7 @@ impl<'a> HirContext<'a> {
                 call_generics,
                 types,
                 infers,
+                span,
             )?),
             ast::TypeKind::Optional(inner) => HirTypeKind::Optional(Self::convert_type(
                 inner,
@@ -81,9 +85,17 @@ impl<'a> HirContext<'a> {
                 call_generics,
                 types,
                 infers,
+                span,
             )?),
             ast::TypeKind::Array(array) => HirTypeKind::Array {
-                element: Self::convert_type(&array.of_type, scopes, call_generics, types, infers)?,
+                element: Self::convert_type(
+                    &array.of_type,
+                    scopes,
+                    call_generics,
+                    types,
+                    infers,
+                    span,
+                )?,
                 kind: array.kind,
             },
             ast::TypeKind::Reference(reference) => HirTypeKind::Ref {
@@ -93,6 +105,7 @@ impl<'a> HirContext<'a> {
                     call_generics,
                     types,
                     infers,
+                    span,
                 )?,
                 mutable: reference.mutable,
             },
@@ -114,7 +127,7 @@ impl<'a> HirContext<'a> {
             .expect("should have scope")
             .generics
             .insert(name, id);
-        
+
         id
     }
 

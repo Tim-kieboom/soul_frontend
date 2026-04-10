@@ -45,8 +45,12 @@ impl<'a> MirContext<'a> {
         this_block = self.expect_current_block();
         if !self.tree.blocks[this_block].returnable {
             let terminator = match terminator {
-                Some(mir::Terminator::Return(operand)) => operand,
-                Some(mir::Terminator::Goto(_)) | None => block_operand,
+                Some(mir::Terminator::Return(operand)) => {
+                    operand.filter(|value| !matches!(value.kind, OperandKind::None))
+                }
+                Some(mir::Terminator::Goto(_)) | None => {
+                    block_operand.filter(|value| !matches!(value.kind, OperandKind::None))
+                }
                 _ => {
                     self.log_error(soul_error_internal!(
                         "should not have this terminator kind in block",
@@ -70,7 +74,8 @@ impl<'a> MirContext<'a> {
                             "block_operand should be Some(_)",
                             None
                         ));
-                        self.lower_operand(expression.get_expression_id()).pass(is_end)
+                        self.lower_operand(expression.get_expression_id())
+                            .pass(is_end)
                     }
                 };
 

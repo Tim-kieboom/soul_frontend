@@ -1,3 +1,4 @@
+use ast::ArrayKind;
 use hir::TypeId;
 use inkwell::{types::BasicTypeEnum, values::BasicValueEnum};
 use mir_parser::mir;
@@ -22,6 +23,10 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         let mir_source_type = self.get_type(value.ty)?;
         let mir_cast_type = self.get_type(cast_to)?;
         match (mir_source_type.kind, mir_cast_type.kind) {
+            (ThirTypeKind::Array { kind: ArrayKind::StackArray(_), .. }, ThirTypeKind::Pointer(_)) => {
+                let value = source_operand.get_or_convert_pointer(&self.builder)?.into();
+                Ok(IrOperand { value, info: crate::OperandInfo::new_loaded(cast_to, cast_type) })
+            }
             (ThirTypeKind::Pointer(_), ThirTypeKind::Pointer(_)) => {
                 //llvm doesn't care ptr's are ptr's
                 Ok(source_operand)
@@ -178,15 +183,16 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
         let int_size = self.default_int_size;
         let char_size = self.default_char_size;
+        let c_int_size = self.default_c_int_size;
         Ok(PrimCastInfo {
             cast_prim,
             source_prim,
             source_operand,
             cast_type: destination_type,
             cast_type_id: mir_cast_type_id,
-            cast_size: cast_prim.to_size_bit_u8(int_size, char_size),
+            cast_size: cast_prim.to_size_bit_u8(c_int_size, int_size, char_size),
             one_is_float: source_prim.is_float() != cast_prim.is_float(),
-            source_size: source_prim.to_size_bit_u8(int_size, char_size),
+            source_size: source_prim.to_size_bit_u8(c_int_size, int_size, char_size),
             both_are_float: source_prim.is_float() && cast_prim.is_float(),
         })
     }

@@ -1,5 +1,5 @@
 use hir::{ComplexLiteral, TypeId};
-use hir_literal_interpreter::{ToComplex};
+use hir_literal_interpreter::ToComplex;
 use run_hir::HirResponse;
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
@@ -368,12 +368,12 @@ impl<'a> MirContext<'a> {
 
     fn sizeof_type(&self, id: hir::ExpressionId) -> hir::TypeId {
         self.hir_response
-        .typed
-        .types_table
-        .sizeofs
-        .get(id)
-        .copied()
-        .unwrap_or(hir::TypeId::error())
+            .typed
+            .types_table
+            .sizeofs
+            .get(id)
+            .copied()
+            .unwrap_or(hir::TypeId::error())
     }
 
     fn get_expression_literal(&self, id: hir::ExpressionId) -> Option<ComplexLiteral> {

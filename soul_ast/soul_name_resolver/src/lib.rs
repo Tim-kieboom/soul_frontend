@@ -5,13 +5,14 @@ use ast::{
 };
 use soul_utils::{
     Ident,
-    error::SoulError,
+    error::{SoulError},
     ids::{FunctionId, IdGenerator},
     sementic_level::SementicFault,
 };
 
 mod collect;
 mod resolve;
+mod check_name;
 
 pub fn name_resolve(request: &mut AstResponse, faults: &mut Vec<SementicFault>) {
     let mut resolver = NameResolver::new(
@@ -56,6 +57,10 @@ impl<'a> NameResolver<'a> {
     }
 
     fn check_variable(&mut self, name: &Ident) -> Option<NodeId> {
+        self.info.scopes.lookup_value(name, ScopeValue::Variable)
+    }
+
+    fn flat_check_variable(&mut self, name: &Ident) -> Option<NodeId> {
         self.info.scopes.lookup_value(name, ScopeValue::Variable)
     }
 }

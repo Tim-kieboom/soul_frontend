@@ -1,3 +1,4 @@
+use crate::{GenericSubstitute, LlvmBackend};
 use hir::{ComplexLiteral, TypeId};
 use inkwell::{types::BasicTypeEnum, values::PointerValue};
 use mir_parser::mir::{self, Function, FunctionBody, LocalId};
@@ -5,7 +6,6 @@ use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},
     vec_map::VecMapIndex,
 };
-use crate::{GenericSubstitute, LlvmBackend};
 
 impl<'f, 'a> LlvmBackend<'f, 'a> {
     pub(crate) fn allocate_function_locals(
@@ -30,7 +30,6 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
         self.alloc_parameter(function, type_args, generics);
         for local_id in locals {
-        
             if let Err(err) = self.alloc_local(*local_id, generics) {
                 self.log_error(err);
             }

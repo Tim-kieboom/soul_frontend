@@ -12,7 +12,7 @@ use ResIndex<T> = Res<T, ErrIndex>
 use<T, N as uint> [N]T {
 
     const Len(@this): uint {
-        N
+        this.len
     }
 
     impl const ConsumeIndex<T> {

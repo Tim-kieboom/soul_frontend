@@ -1,6 +1,7 @@
 use hir::{Assign, StatementId};
 use soul_utils::{
-    error::{SoulError, SoulErrorKind}, soul_names::KeyWord
+    error::{SoulError, SoulErrorKind},
+    soul_names::KeyWord,
 };
 
 use crate::HirContext;
@@ -93,7 +94,9 @@ impl<'a> HirContext<'a> {
 
     fn lower_variable(&mut self, variable: &ast::Variable) -> hir::Variable {
         let ty = match &variable.ty {
-            ast::VarTypeKind::NonInveredType(soul_type) => self.lower_type(soul_type),
+            ast::VarTypeKind::NonInveredType(soul_type) => {
+                self.lower_type(soul_type, variable.name.span)
+            }
             ast::VarTypeKind::InveredType(type_modifier) => {
                 self.new_infer_type(vec![], Some(*type_modifier), variable.name.span)
             }
@@ -122,7 +125,7 @@ impl<'a> HirContext<'a> {
 
         let mut fields = vec![];
         for field in &object.fields {
-            let ty = self.lower_type(&field.ty);
+            let ty = self.lower_type(&field.ty, field.name.span);
             let id = self.id_generator.alloc_field();
 
             let hir_field = hir::Field {

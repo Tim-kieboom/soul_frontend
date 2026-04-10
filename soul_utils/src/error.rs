@@ -98,6 +98,8 @@ pub enum SoulErrorKind {
     InvalidMutability,
     InvalidIdent,
     InvalidNumber,
+    InvalidVariableName,
+    InvalidFunctionName,
     InvalidContext,
     InvalidType,
     InvalidOperator,
