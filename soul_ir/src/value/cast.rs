@@ -1,6 +1,6 @@
 use ast::ArrayKind;
 use hir::TypeId;
-use inkwell::{types::BasicTypeEnum, values::BasicValueEnum};
+use inkwell::{AddressSpace, types::BasicTypeEnum, values::BasicValueEnum};
 use mir_parser::mir;
 use soul_utils::{error::SoulResult, soul_error_internal, soul_names::PrimitiveTypes};
 use typed_hir::{ThirType, ThirTypeKind};
@@ -60,6 +60,34 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     cast_type,
                 )?;
                 self.cast_primitives(info, generics)
+            }
+            (ThirTypeKind::Array { .. }, ThirTypeKind::Pointer(_)) => {
+                let base_ptr = source_operand.get_or_convert_pointer(&self.builder)?;
+                if source_operand.info.ir_type.is_struct_type() {
+                    let struct_ty = source_operand.info.ir_type.into_struct_type();
+                    let data_ptr_ptr = self.builder.build_struct_gep_index(
+                        struct_ty,
+                        base_ptr,
+                        0,
+                        "array_data_ptr",
+                    )?;
+                    let loaded_data_ptr = self
+                        .builder
+                        .build_load(cast_type.into_pointer_type(), data_ptr_ptr, "array_data")?
+                        .into_pointer_value();
+                    let info = crate::OperandInfo::new_loaded(cast_to, cast_type);
+                    Ok(IrOperand {
+                        value: loaded_data_ptr.into(),
+                        info,
+                    })
+                } else {
+                    let ptr_type = self.context.ptr_type(AddressSpace::default()).into();
+                    let info = crate::OperandInfo::new_loaded(cast_to, ptr_type);
+                    Ok(IrOperand {
+                        value: base_ptr.into(),
+                        info,
+                    })
+                }
             }
             _ => Err(soul_error_internal!(
                 format!(

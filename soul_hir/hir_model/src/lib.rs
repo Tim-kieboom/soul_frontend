@@ -42,6 +42,7 @@ impl HirTree {
             id: init_globals,
             generics: vec![],
             parameters: vec![],
+            owner_type: TypeId::error(),
             return_type: TypeId::error(),
             kind: FunctionKind::Static,
             body: FunctionBody::Internal(BlockId::error()),

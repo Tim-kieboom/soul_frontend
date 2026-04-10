@@ -4,7 +4,7 @@ use crate::{
     TypedHirContext,
     type_helpers::{TypeHelpers, UnifyPrimitiveCastLazy},
 };
-use ast::{ArrayKind, BinaryOperator, BinaryOperatorKind, UnaryOperator};
+use ast::{ArrayKind, BinaryOperator, BinaryOperatorKind, FunctionKind, UnaryOperator};
 use hir::{
     Binary, BlockId, DisplayType, ExpressionId, HirType, HirTypeKind, LazyTypeId, PlaceId, Struct,
     TypeId, Unary,
@@ -171,8 +171,39 @@ impl<'a> TypedHirContext<'a> {
         let unresolved_return_type = self.functions[function_id].to_lazy();
         let return_type = self.resolve_generic(&generic_defines, unresolved_return_type);
 
+        let has_callee = callee.is_some();
+        let needs_callee = !matches!(function.kind, FunctionKind::Static);
+        if has_callee && !needs_callee {
+            self.log_error(SoulError::new(
+                format!(
+                    "function '{}' is static and can not be called on an instance",
+                    function.name.as_str()
+                ),
+                SoulErrorKind::InvalidContext,
+                Some(span),
+            ));
+        } else if !has_callee && needs_callee {
+            self.log_error(SoulError::new(
+                format!(
+                    "method '{}' requires a receiver (this/@this/&this)",
+                    function.name.as_str()
+                ),
+                SoulErrorKind::InvalidContext,
+                Some(span),
+            ));
+        }
+
         if let Some(callee) = callee {
-            self.infer_expression(callee);
+            let callee_ty = self.infer_expression(callee);
+            if matches!(function.kind, FunctionKind::MutRef)
+                && self.lazy_id_get_modifier(callee_ty) != Some(TypeModifier::Mut)
+            {
+                self.log_error(SoulError::new(
+                    "method expects '&this' but receiver is not mutable",
+                    SoulErrorKind::InvalidMutability,
+                    Some(self.expression_span(callee)),
+                ));
+            }
         }
 
         if function.parameters.len() != arguments.len() {

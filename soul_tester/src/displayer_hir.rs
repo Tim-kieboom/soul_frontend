@@ -1,6 +1,5 @@
 use hir::{
-    Binary, BlockId, DisplayType, ExpressionId, FieldId, FunctionBody, HirTree, HirType,
-    LazyTypeId, LocalId, LocalKind, StructId, TypeId, Unary,
+    Binary, BlockId, DisplayType, ExpressionId, FieldId, FunctionBody, HirTree, HirType, HirTypeKind, LazyTypeId, LocalId, LocalKind, StructId, TypeId, Unary
 };
 use soul_utils::{
     ids::{FunctionId, IdAlloc},
@@ -8,7 +7,7 @@ use soul_utils::{
     vec_map::VecMapIndex,
 };
 use std::fmt::Write;
-use typed_hir::{TypedHir, display_thir::DisplayThirType};
+use typed_hir::{ThirTypeKind, TypedHir, display_thir::DisplayThirType};
 
 pub fn display_hir(hir: &HirTree) -> String {
     let mut displayer = HirDisplayer::new_hir(hir);
@@ -119,8 +118,20 @@ impl<'a> HirDisplayer<'a> {
             self.push_str(id.as_str());
             self.push_str("\" ");
         }
+
+        let owner = function.owner_type.to_lazy();
+        if !self.is_type_none(owner) {
+            self.display_type(owner);
+            self.push(' ');
+        }
         self.push_str(function.name.as_str());
         self.push('(');
+        match function.kind {
+            ast::FunctionKind::Static => (),
+            ast::FunctionKind::MutRef => self.push_str("&this, "),
+            ast::FunctionKind::ConstRef => self.push_str("@this, "),
+            ast::FunctionKind::Consume => self.push_str("this, "),
+        }
 
         let last_index = function.parameters.len().saturating_sub(1);
         for (i, arg) in function.parameters.iter().enumerate() {
@@ -424,6 +435,12 @@ impl<'a> HirDisplayer<'a> {
         let name = if id == FunctionId::error() {
             "<error>"
         } else {
+            let owner = self.hir.nodes.functions[id].owner_type.to_lazy();
+            if !self.is_type_none(owner) {
+                self.display_type(owner);
+                self.push('.');
+            }
+            
             self.hir.nodes.functions[id].name.as_str()
         };
 
@@ -469,6 +486,25 @@ impl<'a> HirDisplayer<'a> {
             HirType::error_type()
                 .write_display(&self.hir.info.types, &self.hir.info.infers, &mut self.sb)
                 .expect("no format error")
+        }
+    }
+
+    fn is_type_none(&mut self, id: LazyTypeId) -> bool {
+        match (self.typed, id) {
+            (Some(typed), LazyTypeId::Known(ty)) => {
+                
+                return typed
+                    .types_map
+                    .id_to_type(ty).map(|ty| matches!(ty.kind, ThirTypeKind::None)).unwrap_or(false)
+            }
+            (Some(_), LazyTypeId::Infer(_)) => panic!("should not have infer in thir"),
+            _ => (),
+        }
+
+        let types = &self.hir.info.types;
+        match id {
+            LazyTypeId::Known(type_id) => types.id_to_type(type_id).map(|ty| matches!(ty.kind, HirTypeKind::None)).unwrap_or(false),
+            LazyTypeId::Infer(_) => false,
         }
     }
 

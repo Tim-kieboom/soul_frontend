@@ -100,8 +100,40 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         generics: &GenericSubstitute,
     ) -> SoulResult<()> {
         let mut ir_arguments = Vec::with_capacity(arguments.len());
-        for arg in arguments {
-            let meta_data_value = self.lower_operand(arg, generics)?.value.into();
+        for (index, arg) in arguments.iter().enumerate() {
+            let operand = self.lower_operand(arg, generics)?;
+            let value = if operand.info.is_unloaded {
+                let ptr = operand.value.into_pointer_value();
+                let parameter = self
+                    .mir
+                    .tree
+                    .functions[id]
+                    .parameters
+                    .get(index)
+                    .copied()
+                    .ok_or_else(|| {
+                        soul_utils::soul_error_internal!(
+                            format!("parameter {} not found for call target {:?}", index, id),
+                            None
+                        )
+                    })?;
+                let parameter_ty = self.mir.tree.locals[parameter].ty();
+                let parameter_ir_ty = self
+                    .lower_type(parameter_ty, generics)?
+                    .ok_or_else(|| {
+                        soul_utils::soul_error_internal!(
+                            format!(
+                                "expected concrete parameter type at index {} for call target {:?}",
+                                index, id
+                            ),
+                            None
+                        )
+                    })?;
+                self.builder.build_load(parameter_ir_ty, ptr, "arg_load")?
+            } else {
+                operand.value
+            };
+            let meta_data_value = value.into();
             ir_arguments.push(meta_data_value);
         }
 

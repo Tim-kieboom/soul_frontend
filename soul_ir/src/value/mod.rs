@@ -2,7 +2,7 @@ use crate::{GenericSubstitute, IrOperand, LlvmBackend, Local, OperandInfo};
 use ast::ArrayKind;
 use hir::{ComplexLiteral, StructId, TypeId};
 use inkwell::{types::StructType, values::BasicValueEnum};
-use mir_parser::mir::{self, AggregateBody, Operand, Place, PlaceId, Rvalue, RvalueKind};
+use mir_parser::mir::{self, AggregateBody, Place, PlaceId, Rvalue, RvalueKind};
 use soul_utils::{error::SoulResult, soul_error_internal};
 use typed_hir::{FieldInfo, ThirTypeKind, display_thir::DisplayThirType};
 
@@ -168,7 +168,14 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         let struct_ir = self.get_or_create_struct(struct_id, generics)?;
         match body {
             AggregateBody::Runtime(operands) => {
-                self.lower_aggregate(struct_ir, ty, operands, generics)
+                let mut ir_operands = Vec::with_capacity(operands.len());
+                for op in operands {
+                    ir_operands.push(
+                        self.lower_operand(op, generics)?.value
+                    );
+                }
+
+                self.lower_aggregate(struct_ir, ty, &ir_operands, generics)
             }
             AggregateBody::Comptime(literals) => {
                 self.lower_const_aggregate(struct_ir, ty, literals, generics)
@@ -180,18 +187,14 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         &self,
         struct_ir: StructType<'a>,
         ty: TypeId,
-        operands: &Vec<Operand>,
+        fields: &[BasicValueEnum<'a>],
         generics: &GenericSubstitute,
     ) -> SoulResult<IrOperand<'a>> {
-        let mut fields = Vec::with_capacity(operands.len());
-        for operand in operands {
-            fields.push(self.lower_operand(operand, generics)?.value);
-        }
 
         let ptr = self.builder.build_alloca(struct_ir, "tmp_struct")?;
 
         for (i, field) in fields.into_iter().enumerate() {
-            self.builder.store_field(struct_ir, ptr, field, i)?;
+            self.builder.store_field(struct_ir, ptr, *field, i)?;
         }
 
         self.new_unloaded_operand(ptr.into(), ty, generics)

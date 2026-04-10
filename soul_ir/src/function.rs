@@ -5,7 +5,7 @@ use inkwell::{
 };
 use mir_parser::mir::FunctionBody;
 use soul_utils::{Ident, ids::FunctionId};
-use typed_hir::display_thir::DisplayThirType;
+use typed_hir::{ThirType, ThirTypeKind, display_thir::DisplayThirType};
 
 use crate::{FunctionKeyId, GenericSubstitute, LlvmBackend};
 
@@ -44,7 +44,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         }
 
         let function_type = return_type.fn_type(&args, false);
-        let name = self.mangle(&function.name, function.callee, type_args);
+        let name = self.mangle(&function.name, function.owner_type, type_args);
         let llvm_function = self.module.add_function(&name, function_type, None);
 
         self.create_block(function_id, llvm_function);
@@ -82,23 +82,24 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
     pub(crate) fn mangle(
         &mut self,
         name: &Ident,
-        callee: Option<TypeId>,
+        owner: TypeId,
         type_args: &Vec<TypeId>,
     ) -> String {
         const SEPARATOR: &str = "_";
 
         let mut sb = name.to_string();
-        if let Some(this) = callee {
+        let owner_type = match self.get_type(owner) {
+            Ok(val) => val,
+            Err(err) => {
+                self.log_error(err);
+                &ThirType{ kind: ThirTypeKind::None, generics: vec![], modifier: None }
+            }
+        };
+
+        if owner_type.kind != ThirTypeKind::None {
             sb.push_str("___t_");
-            match self.get_type(this) {
-                Ok(ty) => ty
-                    .write_display_no_spaces(&self.types.types_map, &mut sb)
-                    .expect("expect not fmt error"),
-                Err(err) => {
-                    self.log_error(err);
-                    sb.push_str("error");
-                }
-            };
+            owner_type.write_display_no_spaces(&self.types.types_map, &mut sb)
+                    .expect("expect not fmt error");
         }
         if !type_args.is_empty() {
             sb.push_str("___g");

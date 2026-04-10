@@ -160,9 +160,9 @@ impl<'a> HirContext<'a> {
     }
 
     pub(crate) fn type_from_literal(&mut self, literal: &ast::Literal) -> TypeId {
-        let ty = match literal.get_literal_type().to_internal_primitive_type() {
+        let ty = match literal.to_internal_primitive_type() {
             ast::TypeResult::Primitive(val) => HirTypeKind::Primitive(val),
-            ast::TypeResult::Str => HirTypeKind::Array {
+            ast::TypeResult::Str(_) => HirTypeKind::Array {
                 element: LazyTypeId::Known(self.add_type(CHAR)),
                 kind: ast::ArrayKind::ConstSlice,
             },

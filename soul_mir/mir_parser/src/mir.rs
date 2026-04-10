@@ -85,7 +85,7 @@ pub struct Function {
     /// Parameters are locals
     pub parameters: Vec<LocalId>,
     pub generics: Vec<GenericId>,
-    pub callee: Option<TypeId>,
+    pub owner_type: TypeId,
 
     /// Return type of the function
     pub return_type: TypeId,

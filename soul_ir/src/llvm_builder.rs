@@ -45,6 +45,13 @@ impl<'ctx> IrBuilder<'ctx> {
             .map_err(build_error)
     }
 
+    pub fn build_pointer_cast<T>(&self, from: T, to: T::BaseType, name: &str) -> SoulResult<T>
+    where
+        T: PointerMathValue<'ctx>,
+    {
+        self.inkwell.build_pointer_cast(from, to, name).map_err(build_error)
+    }
+
     pub fn build_unreachable(&self) -> SoulResult<InstructionValue<'ctx>> {
         self.inkwell.build_unreachable().map_err(build_error)
     }
@@ -472,6 +479,21 @@ impl<'ctx> IrBuilder<'ctx> {
                 field_info.field_index as u32,
                 "gep_struct",
             )
+            .map_err(build_error)
+    }
+
+    pub fn build_struct_gep_index<T>(
+        &self,
+        base_type: T,
+        base_ptr: PointerValue<'ctx>,
+        field_index: u32,
+        name: &str,
+    ) -> SoulResult<PointerValue<'ctx>>
+    where
+        T: BasicType<'ctx>,
+    {
+        self.inkwell
+            .build_struct_gep(base_type, base_ptr, field_index, name)
             .map_err(build_error)
     }
 

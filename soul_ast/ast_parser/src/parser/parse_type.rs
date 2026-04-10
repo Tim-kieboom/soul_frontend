@@ -333,7 +333,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
 
             *kind = callee;
-            self.expect_ident("this").try_err()?;
+            self.expect_ident("this").try_not_value()?;
 
             return match self.token().kind {
                 ROUND_CLOSE => TryOk(Loop::Break),

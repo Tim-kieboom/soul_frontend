@@ -44,6 +44,24 @@ impl DeclareStore {
         self.functions.get(index)
     }
 
+    pub fn find_function_by_name_and_owner_kind(
+        &self,
+        name: &str,
+        owner_kind: Option<&TypeKind>,
+    ) -> Option<FunctionId> {
+        self.functions.entries().find_map(|(id, signature)| {
+            if signature.name.as_str() != name {
+                return None;
+            }
+
+            match owner_kind {
+                Some(owner) if &signature.methode_type.kind == owner => Some(id),
+                None if matches!(signature.methode_type.kind, TypeKind::None) => Some(id),
+                _ => None,
+            }
+        })
+    }
+
     pub fn insert_functions(&mut self, index: FunctionId, function: FunctionSignature) {
         self.functions.insert(index, function);
     }

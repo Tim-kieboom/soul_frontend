@@ -19,6 +19,10 @@ pub struct Function {
     /// Function calling convention / `this` semantics.
     pub kind: FunctionKind,
 
+    /// Declared owner type of this function (for methods/static impls).
+    /// `none` means this is a free/global function.
+    pub owner_type: TypeId,
+
     /// Function parameters.
     pub parameters: Vec<Parameter>,
 

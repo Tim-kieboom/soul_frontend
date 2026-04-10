@@ -9,19 +9,55 @@ extern "C" malloc(len: uint): *none
 extern "C" __clib_printChar(ch: char)
 extern "C" __clib_printStr(text: *char)
 
+Duration Now(): Duration {
+    extern "C" __clib_Duration_now(duration: &Duration)
+
+    mut time = Duration{sec: 0, nano: 0}
+    __clib_Duration_now(&time)
+    time
+}
+
+// Duration Print(self: @Duration) {
+//     sec := self.sec
+//     nano := self.nano
+//     print_str("Duration{")
+// }
+
+sum(a: int, b: int): int {
+    1
+}
+
+int sum(a: int, b: int): int {
+    a + b
+}
+
+int add(this, b: int): int {
+    b
+}
+
+extern "C" __clib_delay_sec(sec: int)
 main() {
 
-    len := 23
-    println_int(len)
+    text := "hello world"
+    println(text)
 
-    comptimePow := 3 ** 2
-    comptimeRoot := 2 </ 4
-    generics()
-    prints()
-    comptime()
+    // now := Duration.Now()
+    // // Duration.Print(@now)
+    // print("hello world")
 
-    num := ifs()
-    println_int(num)
+    // len := 23
+    // println_int(sum(len, 1))
+    // println_int(int.sum(len, 1))
+    // // println_int(len.add(1))
+
+    // comptimePow := 3 ** 2
+    // comptimeRoot := 2 </ 4
+    // generics()
+    // prints()
+    // comptime()
+
+    // num := ifs()
+    // println_int(num)
 }
 
 ifs(): int {
@@ -102,6 +138,11 @@ generics() {
 }
 
 
+println(text: [@]char) {
+    print(text)
+    __clib_printChar('\n')
+}
+
 println_char(char: char) {
     __clib_printChar(char)
     __clib_printChar('\n')
@@ -120,6 +161,10 @@ println_uint(value: uint, base: u8 = 10, capital: bool = true) {
 println_float(value: f64, base: u8 = 10, capital: bool = true, precision: u8 = 4) {
     print_float(value, base: base, capital: capital, precision: precision)
     __clib_printChar('\n')
+}
+
+print(text: [@]char) {
+    __clib_printStr(text as *char)
 }
 
 print_char(char: char) {

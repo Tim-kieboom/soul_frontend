@@ -1,7 +1,8 @@
-use ast::{Expression, ExpressionKind};
+use ast::{Expression, ExpressionKind, FunctionKind, SoulType, TypeKind};
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
     ids::{FunctionId, IdAlloc},
+    soul_names::PrimitiveTypes,
 };
 
 use crate::NameResolver;
@@ -29,7 +30,23 @@ impl<'a> NameResolver<'a> {
                 self.resolve_expression(&mut index.index);
             }
             ExpressionKind::FunctionCall(function_call) => {
-                function_call.resolved = self.lookup_function(&function_call.name);
+                let owner = parse_owner_type(self, function_call.callee.as_ref());
+                let is_owner_qualifier = owner.is_some();
+                if is_owner_qualifier {
+                    // Type-qualified static call: `TypeName.fn(...)` or `int.fn(...)`.
+                    function_call.callee = None;
+                } else if let Some(callee) = &mut function_call.callee {
+                    self.resolve_expression(callee);
+                }
+
+                function_call.resolved = self.store.find_function_by_name_and_owner_kind(
+                    function_call.name.as_str(),
+                    owner.as_ref().map(|el| &el.kind),
+                );
+                if function_call.resolved.is_none() && owner.is_some() {
+                    // Fallback: keep older behavior if declaration uses a different owner encoding.
+                    function_call.resolved = self.lookup_function(&function_call.name);
+                }
 
                 if function_call.resolved.is_none() {
                     self.log_error(SoulError::new(
@@ -43,6 +60,33 @@ impl<'a> NameResolver<'a> {
 
                     function_call.resolved = Some(FunctionId::error());
                 };
+
+                if let Some(function_id) = function_call.resolved {
+                    if let Some(signature) = self.store.get_function(function_id) {
+                        let needs_callee = !matches!(signature.function_kind, FunctionKind::Static);
+
+                        let has_callee = function_call.callee.is_some();
+                        if has_callee && !needs_callee {
+                            self.log_error(SoulError::new(
+                                format!(
+                                    "function '{}' is static and can not be called on an instance",
+                                    function_call.name.as_str(),
+                                ),
+                                SoulErrorKind::InvalidContext,
+                                Some(span),
+                            ));
+                        } else if !has_callee && needs_callee {
+                            self.log_error(SoulError::new(
+                                format!(
+                                    "method '{}' requires a receiver (this/@this/&this)",
+                                    function_call.name.as_str(),
+                                ),
+                                SoulErrorKind::InvalidContext,
+                                Some(span),
+                            ));
+                        }
+                    }
+                }
 
                 for arg in &mut function_call.arguments {
                     self.resolve_expression(&mut arg.value);
@@ -98,5 +142,36 @@ impl<'a> NameResolver<'a> {
             | ExpressionKind::Literal(_)
             | ExpressionKind::ExternalExpression(_) => (),
         }
+    }
+}
+
+fn parse_owner_type(
+    resolver: &mut NameResolver<'_>,
+    callee: Option<&Box<Expression>>,
+) -> Option<SoulType> {
+    let Some(callee) = callee else {
+        return None;
+    };
+
+    match &callee.node {
+        ExpressionKind::Variable { ident, .. } => {
+            if let Some(primitive) = PrimitiveTypes::from_str(ident.as_str()) {
+                return Some(SoulType::new(None, TypeKind::Primitive(primitive), ident.span));
+            }
+
+            if resolver.info.scopes.lookup_type(ident).is_some() {
+                return Some(SoulType::new(
+                    None,
+                    TypeKind::Stub(ast::Stub {
+                        name: ident.as_str().to_string(),
+                        generics: vec![],
+                    }),
+                    ident.span,
+                ));
+            }
+
+            None
+        }
+        _ => None,
     }
 }

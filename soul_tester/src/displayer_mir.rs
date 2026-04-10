@@ -10,7 +10,7 @@ use soul_utils::{
     vec_map::VecMapIndex,
 };
 use std::fmt::Write;
-use typed_hir::{ThirType, TypedHir, display_thir::DisplayThirType};
+use typed_hir::{ThirType, ThirTypeKind, TypedHir, display_thir::DisplayThirType};
 
 pub fn display_mir(mir: &MirTree, hir: &HirResponse) -> String {
     let mut displayer = MirDisplayer::new(mir, hir);
@@ -92,6 +92,11 @@ impl<'a> MirDisplayer<'a> {
             self.push_str("\" ");
         }
 
+        let owner = function.owner_type;
+        if !self.is_type_none(owner) {
+            self.display_type(owner);
+            self.push(' ');
+        }
         self.push_str(function.name.as_str());
 
         self.push('(');
@@ -405,7 +410,13 @@ impl<'a> MirDisplayer<'a> {
         let name = if function == FunctionId::error() {
             "<error>"
         } else {
-            self.mir.functions[function].name.as_str()
+            let function = &self.mir.functions[function];
+            let owner = function.owner_type;
+            if !self.is_type_none(owner) {
+                self.display_type(owner);
+                self.push('.');
+            }
+            function.name.as_str()
         };
 
         self.push_str(name);
@@ -431,6 +442,10 @@ impl<'a> MirDisplayer<'a> {
         self.get_type(ty)
             .write_display(&self.types.types_map, &mut self.sb)
             .expect("no fmt error");
+    }
+
+    fn is_type_none(&mut self, ty: TypeId) -> bool {
+        matches!(self.get_type(ty).kind, ThirTypeKind::None)
     }
 
     fn display_field(&mut self, base: &PlaceId, field: FieldId) {

@@ -161,11 +161,6 @@ impl<'a> TypedHirContext<'a> {
             .collect::<Vec<_>>();
 
         for id in unbounds {
-            self.log_error(SoulError::new(
-                format!("type {:?} could not be inferd", id),
-                SoulErrorKind::UnifyTypeError,
-                None,
-            ));
             self.infer_table
                 .table
                 .insert(id, InferBinding::Bound(TypeId::error()));

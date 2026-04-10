@@ -68,6 +68,18 @@ impl<'a> HirContext<'a> {
                 TypeId::error()
             }
         };
+        let owner_type = match self.lower_type(&signature.methode_type, signature.methode_type.span)
+        {
+            hir::LazyTypeId::Known(type_id) => type_id,
+            hir::LazyTypeId::Infer(_) => {
+                self.log_error(SoulError::new(
+                    "function owner type should be known",
+                    SoulErrorKind::TypeInferenceError,
+                    Some(function.signature.span),
+                ));
+                TypeId::error()
+            }
+        };
 
         self.pop_scope();
 
@@ -76,6 +88,7 @@ impl<'a> HirContext<'a> {
             body,
             generics,
             parameters,
+            owner_type,
             return_type,
             name: signature.name.clone(),
             kind: signature.function_kind,

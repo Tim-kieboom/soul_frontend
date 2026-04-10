@@ -1,6 +1,6 @@
 use ast::{ArrayKind, Literal};
 use hir::{ComplexLiteral, StructId, TypeId};
-use inkwell::values::{AsValueRef, BasicValueEnum};
+use inkwell::{AddressSpace, module::Linkage, values::{AsValueRef, BasicValue, BasicValueEnum}};
 use mir_parser::mir::{Operand, OperandKind, PlaceId};
 use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},
@@ -230,8 +230,18 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
                 self.new_loaded_operand(value, should_be, generics)?
             }
-            ast::Literal::Str(_) => {
-                todo!("string literal not yet impl")
+            ast::Literal::Str(text) => {
+                let bytes = self.context.const_string(text.as_bytes(), false);
+                let array_ty = bytes.get_type();
+                let global = self.module.add_global(array_ty, None, "str");
+                global.set_constant(true);
+                global.set_linkage(Linkage::Private);
+                global.set_initializer(&bytes);
+
+                let ptr = self.builder.build_pointer_cast(global.as_basic_value_enum().into_pointer_value(), self.context.ptr_type(AddressSpace::default()), "str_ptr")?;
+                let len = self.default_int_type.const_int(text.len() as u64, false).into();
+                let slice_ty = self.context.struct_type(&[self.context.ptr_type(AddressSpace::default()).into(), self.default_int_type.into()], false);
+                self.lower_aggregate(slice_ty, should_be, &[ptr.into(), len], generics)?
             }
         })
     }

@@ -13,9 +13,9 @@ impl<'a> MirContext<'a> {
                 locals: vec![],
                 blocks: vec![entry_block],
             },
-            callee: None,
             generics: vec![],
             parameters: vec![],
+            owner_type: self.hir_response.typed.types_table.none_type,
             return_type: self.hir_response.typed.types_table.none_type,
         };
 
@@ -72,8 +72,8 @@ impl<'a> MirContext<'a> {
             body,
             id: function_id,
             parameters: vec![],
-            callee: None,
             generics: function.generics.clone(),
+            owner_type: function.owner_type,
             name: function.name.clone(),
             return_type: self.function_type(function_id),
         };

@@ -13,7 +13,7 @@ impl DisplayThirType for ThirType {
     fn write_display_no_spaces(&self, types: &ThirTypesMap, sb: &mut String) -> std::fmt::Result {
         if let Some(modifier) = self.modifier {
             sb.push_str(modifier.as_str());
-            sb.push(' ');
+            sb.push('_');
         }
 
         self.kind.write_display_no_spaces(types, sb)
