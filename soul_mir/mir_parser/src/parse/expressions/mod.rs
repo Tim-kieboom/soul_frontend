@@ -230,20 +230,13 @@ impl<'a> MirContext<'a> {
     pub(crate) fn lower_call(
         &mut self,
         function_id: FunctionId,
-        callee: &Option<hir::ExpressionId>,
+        _callee: &Option<hir::ExpressionId>,
         hir_generics: &Vec<TypeId>,
         hir_arguments: &Vec<hir::ExpressionId>,
         ty: hir::TypeId,
-        span: Span,
+        _span: Span,
     ) -> EndBlock<mir::Operand> {
         let is_end = &mut false;
-
-        if callee.is_some() {
-            self.log_error(soul_error_internal!(
-                "function call callee not yet impl",
-                Some(span)
-            ));
-        }
 
         let function = &self.hir_response.hir.nodes.functions[function_id];
         let parameters = &function.parameters;

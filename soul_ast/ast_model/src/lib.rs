@@ -30,6 +30,8 @@ pub struct DeclareStore {
     pub main_function: Option<FunctionId>,
     functions: VecMap<FunctionId, FunctionSignature>,
     variable_type: VecMap<NodeId, VarTypeKind>,
+    #[serde(default)]
+    variable_owner_hint: VecMap<NodeId, TypeKind>,
 }
 impl DeclareStore {
     pub const fn new() -> Self {
@@ -37,6 +39,7 @@ impl DeclareStore {
             main_function: None,
             functions: VecMap::const_default(),
             variable_type: VecMap::const_default(),
+            variable_owner_hint: VecMap::const_default(),
         }
     }
 
@@ -72,5 +75,13 @@ impl DeclareStore {
 
     pub fn insert_variable_type(&mut self, index: NodeId, ty: VarTypeKind) {
         self.variable_type.insert(index, ty);
+    }
+
+    pub fn get_variable_owner_hint(&self, index: NodeId) -> Option<&TypeKind> {
+        self.variable_owner_hint.get(index)
+    }
+
+    pub fn insert_variable_owner_hint(&mut self, index: NodeId, kind: TypeKind) {
+        self.variable_owner_hint.insert(index, kind);
     }
 }

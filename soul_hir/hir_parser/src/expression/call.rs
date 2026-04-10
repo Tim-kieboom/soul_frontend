@@ -1,3 +1,4 @@
+use ast::FunctionKind;
 use hir::{Expression, ExpressionId, LazyTypeId, TypeId};
 
 #[cfg(debug_assertions)]
@@ -40,11 +41,23 @@ impl<'a> HirContext<'a> {
             .as_ref()
             .map(|el| self.lower_expression(el));
 
+        let implicit_recv = !matches!(signature.function_kind, FunctionKind::Static);
+        let positional_offset: usize = if implicit_recv { 1 } else { 0 };
+
         let mut arguments = vec![];
-        arguments.resize(signature.parameters.len(), ExpressionId::error());
+        arguments.resize(
+            signature.parameters.len() + positional_offset,
+            ExpressionId::error(),
+        );
+
+        if let Some(receiver_id) = callee {
+            if implicit_recv {
+                arguments[0] = receiver_id;
+            }
+        }
 
         for (i, argument) in function_call.arguments.iter().enumerate() {
-            let parameter_i = match self.get_parameter_index(
+            let ast_param_idx = match self.get_parameter_index(
                 i,
                 argument,
                 &signature.parameters,
@@ -60,20 +73,37 @@ impl<'a> HirContext<'a> {
                     continue;
                 }
             };
-            arguments[parameter_i] = self.lower_expression(&argument.value);
+            let slot = ast_param_idx + positional_offset;
+            arguments[slot] = self.lower_expression(&argument.value);
         }
 
-        for (i, argument) in arguments.iter_mut().enumerate() {
+        for (slot, argument) in arguments.iter_mut().enumerate() {
             if *argument != ExpressionId::error() {
                 continue;
             }
 
-            *argument = match &signature.parameters[i].default {
+            if positional_offset > 0 && slot < positional_offset {
+                let span = function_call.name.span;
+                self.log_error(SoulError::new(
+                    "missing receiver for method call".to_string(),
+                    SoulErrorKind::InvalidContext,
+                    Some(span),
+                ));
+                let id = self.alloc_expression(span);
+                *argument = {
+                    let err = Expression::error(id);
+                    self.insert_expression(id, err)
+                };
+                continue;
+            }
+
+            let ast_i = slot - positional_offset;
+            *argument = match &signature.parameters[ast_i].default {
                 Some(val) => self.lower_expression(val),
                 None => {
                     let span = function_call.name.span;
                     self.log_error(SoulError::new(
-                        format!("argument {} not found in function declation", i + 1),
+                        format!("argument {} not found in function declation", slot + 1),
                         SoulErrorKind::InvalidContext,
                         Some(span),
                     ));

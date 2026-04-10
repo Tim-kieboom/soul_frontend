@@ -3,17 +3,17 @@ struct Duration {
     mut nano: u32
 }
 
-// extern "C" free(ptr: *none)
-extern "C" __clib_flush()
-extern "C" malloc(len: uint): *none
 extern "C" __clib_printChar(ch: char)
 extern "C" __clib_printCStr(text: *char)
-extern "C" __clib_printSoulStr(ptr: *char, len: uint)
+
+Duration Empty(): Duration {
+    Duration{sec: 0, nano: 0}
+}
 
 Duration Now(): Duration {
     extern "C" __clib_Duration_now(duration: &Duration)
 
-    mut time = Duration{sec: 0, nano: 0}
+    mut time = Duration.Empty()
     __clib_Duration_now(&time)
     time
 }
@@ -26,7 +26,6 @@ Duration Print(self: Duration) {
     print(", nano: ")
     print_uint(nano as uint)
     print("}")
-    __clib_flush()
 }
 
 sum(a: int, b: int): int {
@@ -47,11 +46,12 @@ main() {
 
     now := Duration.Now()
     Duration.Print(now)
+    endln()
 
     len := 23
     println_int(sum(len, 1))
     println_int(int.sum(len, 1))
-    // // println_int(len.add(1))
+    println_int(len.add(1))
 
     comptimePow := 3 ** 2
     comptimeRoot := 2 </ 4
@@ -62,6 +62,38 @@ main() {
     num := ifs()
     println_int(num)
 }
+
+// whiles() {
+//     while1() {
+//         while {
+//             loop := 1 + 2 + 3
+//             break
+//         }
+//     }
+
+//     while2() {
+//         mut stop = false
+//         while stop {
+//             stop = true
+//         }
+//     }
+
+//     while3() {
+//         mut stop = false
+//         while {
+//             stop = true
+//             if stop {
+//                 break
+//             } else {
+//                 continue
+//             }
+//         }
+//     }
+
+//     while1()
+//     while2()
+//     while3()
+// }
 
 ifs(): int {
 
@@ -171,6 +203,8 @@ println_float(value: f64, base: u8 = 10, capital: bool = true, precision: u8 = 4
 }
 
 print(text: [@]char) {
+    extern "C" __clib_printSoulStr(ptr: *char, len: uint)
+    
     __clib_printSoulStr(text as *char, text.len)
 }
 

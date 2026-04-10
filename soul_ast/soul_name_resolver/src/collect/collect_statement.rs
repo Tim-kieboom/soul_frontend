@@ -1,8 +1,12 @@
 use ast::{
-    Block, Function, FunctionSignature, Statement, StatementKind, TypeKind, VarTypeKind,
+    Block, Expression, ExpressionKind, Function, FunctionSignature, Literal, Statement,
+    StatementKind, TypeKind, VarTypeKind,
     scope::ScopeValueKind,
 };
-use soul_utils::error::{SoulError, SoulErrorKind};
+use soul_utils::{
+    error::{SoulError, SoulErrorKind},
+    soul_names::PrimitiveTypes,
+};
 
 use crate::NameResolver;
 
@@ -43,6 +47,14 @@ impl<'a> NameResolver<'a> {
                 };
 
                 self.store.insert_variable_type(id, variable.ty.clone());
+
+                if matches!(&variable.ty, VarTypeKind::InveredType(_)) {
+                    if let Some(init) = &variable.initialize_value {
+                        if let Some(hint) = owner_hint_from_initializer_literal(init) {
+                            self.store.insert_variable_owner_hint(id, hint);
+                        }
+                    }
+                }
 
                 match &mut variable.ty {
                     VarTypeKind::NonInveredType(soul_type) => self.collect_type(soul_type),
@@ -99,4 +111,18 @@ impl<'a> NameResolver<'a> {
 
 fn is_main(signature: &FunctionSignature) -> bool {
     signature.name.as_str() == "main" && matches!(signature.methode_type.kind, TypeKind::None)
+}
+
+fn owner_hint_from_initializer_literal(init: &Expression) -> Option<TypeKind> {
+    match &init.node {
+        ExpressionKind::Literal((_, lit)) => Some(TypeKind::Primitive(match lit {
+            // Lexer uses `Uint` for non-negative integer tokens; `x := 23` still infers as `int`.
+            Literal::Int(_) | Literal::Uint(_) => PrimitiveTypes::Int,
+            Literal::Float(_) => PrimitiveTypes::Float64,
+            Literal::Bool(_) => PrimitiveTypes::Boolean,
+            Literal::Char(_) => PrimitiveTypes::Char,
+            Literal::Str(_) => return None,
+        })),
+        _ => None,
+    }
 }

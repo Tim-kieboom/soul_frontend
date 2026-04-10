@@ -1,4 +1,4 @@
-use ast::NamedTupleElement;
+use ast::{FunctionKind, NamedTupleElement, ReferenceType, SoulType, TypeKind};
 use hir::TypeId;
 use soul_utils::{
     Ident,
@@ -31,25 +31,65 @@ impl<'a> HirContext<'a> {
             generics.push(self.insert_generic(generic.name.to_string()));
         }
 
-        let parameters = signature
-            .parameters
-            .iter()
-            .map(
-                |NamedTupleElement {
-                     name,
-                     ty,
-                     default,
-                     node_id: _,
-                 }| {
-                    let ty = self.lower_type(ty, name.span);
-                    let local = self.id_generator.alloc_local();
-                    self.insert_parameter(name, local, ty);
+        let mut parameters = vec![];
 
-                    let default = default.as_ref().map(|value| self.lower_expression(value));
-                    hir::Parameter { local, ty, default }
-                },
-            )
-            .collect();
+        if !matches!(signature.function_kind, FunctionKind::Static) {
+            let recv_ty = match signature.function_kind {
+                FunctionKind::Consume => {
+                    self.lower_type(&signature.methode_type, signature.methode_type.span)
+                }
+                FunctionKind::MutRef => {
+                    let ref_ty = SoulType::new(
+                        None,
+                        TypeKind::Reference(ReferenceType::new(
+                            signature.methode_type.clone(),
+                            true,
+                        )),
+                        signature.methode_type.span,
+                    );
+                    self.lower_type(&ref_ty, signature.methode_type.span)
+                }
+                FunctionKind::ConstRef => {
+                    let ref_ty = SoulType::new(
+                        None,
+                        TypeKind::Reference(ReferenceType::new(
+                            signature.methode_type.clone(),
+                            false,
+                        )),
+                        signature.methode_type.span,
+                    );
+                    self.lower_type(&ref_ty, signature.methode_type.span)
+                }
+                FunctionKind::Static => unreachable!(),
+            };
+            let local = self.id_generator.alloc_local();
+            let this_name = Ident::new("this".to_string(), signature.methode_type.span);
+            self.insert_parameter(&this_name, local, recv_ty);
+            parameters.push(hir::Parameter {
+                local,
+                ty: recv_ty,
+                default: None,
+            });
+        }
+
+        for NamedTupleElement {
+            name,
+            ty,
+            default,
+            node_id: _,
+        } in &signature.parameters
+        {
+            let ty = self.lower_type(ty, name.span);
+            let local = self.id_generator.alloc_local();
+            self.insert_parameter(name, local, ty);
+
+            let default = default.as_ref().map(|value| self.lower_expression(value));
+            parameters.push(hir::Parameter {
+                local,
+                ty,
+                default,
+            });
+        }
 
         let body = match function.signature.node.external {
             Some(language) => hir::FunctionBody::External(language),

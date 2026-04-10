@@ -1,4 +1,6 @@
-use ast::{Expression, ExpressionKind, FunctionKind, SoulType, TypeKind};
+use ast::{
+    DeclareStore, Expression, ExpressionKind, FunctionKind, SoulType, TypeKind, VarTypeKind,
+};
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
     ids::{FunctionId, IdAlloc},
@@ -30,21 +32,28 @@ impl<'a> NameResolver<'a> {
                 self.resolve_expression(&mut index.index);
             }
             ExpressionKind::FunctionCall(function_call) => {
-                let owner = parse_owner_type(self, function_call.callee.as_ref());
-                let is_owner_qualifier = owner.is_some();
-                if is_owner_qualifier {
-                    // Type-qualified static call: `TypeName.fn(...)` or `int.fn(...)`.
+                let type_qualifier = parse_owner_type(self, function_call.callee.as_ref());
+                let is_type_qualifier = type_qualifier.is_some();
+                if is_type_qualifier {
                     function_call.callee = None;
                 } else if let Some(callee) = &mut function_call.callee {
                     self.resolve_expression(callee);
                 }
 
+                let owner_kind = type_qualifier
+                    .as_ref()
+                    .map(|t| &t.kind)
+                    .or_else(|| {
+                        function_call.callee.as_ref().and_then(|c| {
+                            receiver_type_kind_for_instance_method(self.store, c.as_ref())
+                        })
+                    });
+
                 function_call.resolved = self.store.find_function_by_name_and_owner_kind(
                     function_call.name.as_str(),
-                    owner.as_ref().map(|el| &el.kind),
+                    owner_kind,
                 );
-                if function_call.resolved.is_none() && owner.is_some() {
-                    // Fallback: keep older behavior if declaration uses a different owner encoding.
+                if function_call.resolved.is_none() && type_qualifier.is_some() {
                     function_call.resolved = self.lookup_function(&function_call.name);
                 }
 
@@ -142,6 +151,21 @@ impl<'a> NameResolver<'a> {
             | ExpressionKind::Literal(_)
             | ExpressionKind::ExternalExpression(_) => (),
         }
+    }
+}
+
+fn receiver_type_kind_for_instance_method<'a>(
+    store: &'a DeclareStore,
+    receiver: &Expression,
+) -> Option<&'a TypeKind> {
+    match &receiver.node {
+        ExpressionKind::Variable {
+            resolved: Some(node_id), ..
+        } => match store.get_variable_type(*node_id)? {
+            VarTypeKind::NonInveredType(soul_type) => Some(&soul_type.kind),
+            VarTypeKind::InveredType(_) => store.get_variable_owner_hint(*node_id),
+        },
+        _ => None,
     }
 }
 
