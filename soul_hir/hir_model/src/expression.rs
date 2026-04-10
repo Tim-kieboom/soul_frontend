@@ -13,6 +13,7 @@ pub struct Expression {
     pub kind: ExpressionKind,
 }
 impl Expression {
+
     pub fn is_literal(&self) -> bool {
         matches!(self.kind, ExpressionKind::Literal(_))
     }
@@ -103,7 +104,7 @@ pub enum ExpressionKind {
     Call {
         function: FunctionId,
         generics: Vec<TypeId>,
-        callee: Option<ExpressionId>,
+        has_callee: bool,
         arguments: Vec<ExpressionId>,
     },
 

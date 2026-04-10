@@ -37,10 +37,19 @@ int sum(a: int, b: int): int {
 }
 
 int add(this, b: int): int {
-    b
+    this + b
 }
 
-extern "C" __clib_delay_sec(sec: int)
+int addMut(&this, b: int): int {
+    a := *this
+    a + b
+}
+
+int addRef(@this, b: int): int {
+    a := *this
+    a + b
+}
+
 main() {
     println("hello world")
 
@@ -48,10 +57,12 @@ main() {
     Duration.Print(now)
     endln()
 
-    len := 23
+    mut len := 23
     println_int(sum(len, 1))
     println_int(int.sum(len, 1))
     println_int(len.add(1))
+    println_int(len.addRef(1))
+    println_int(len.addMut(1))
 
     comptimePow := 3 ** 2
     comptimeRoot := 2 </ 4

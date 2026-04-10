@@ -1,7 +1,7 @@
 use ast::{
     Block, Expression, ExpressionKind, Function, FunctionSignature, Literal, Statement,
     StatementKind, TypeKind, VarTypeKind,
-    scope::ScopeValueKind,
+    scope::{ScopeValue, ScopeValueKind},
 };
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
@@ -99,12 +99,21 @@ impl<'a> NameResolver<'a> {
         self.collect_type(&mut signature.return_type);
 
         self.push_scope(&mut function.block.scope_id);
-        self.declare_parameters(&mut function.signature.node.parameters);
+        match signature.function_kind {
+            ast::FunctionKind::Static => (),
+            ast::FunctionKind::MutRef |
+            ast::FunctionKind::Consume |
+            ast::FunctionKind::ConstRef => {
+                let id = self.alloc_node();
+                self.insert_value("this", id, ScopeValue::Variable);
+            },
+        }
+        self.declare_parameters(&mut signature.parameters);
         self.collect_scopeless_block(&mut function.block);
         self.pop_scope();
 
         self.store
-            .insert_functions(id, function.signature.node.clone());
+            .insert_functions(id, signature.clone());
         self.current_function = prev;
     }
 }

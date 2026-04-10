@@ -1,5 +1,5 @@
 use ast::FunctionKind;
-use hir::{Expression, ExpressionId, LazyTypeId, TypeId};
+use hir::{Expression, ExpressionId, HirType, LazyTypeId, TypeId};
 
 #[cfg(debug_assertions)]
 use soul_utils::soul_error_internal;
@@ -36,13 +36,8 @@ impl<'a> HirContext<'a> {
             }
         };
 
-        let callee = function_call
-            .callee
-            .as_ref()
-            .map(|el| self.lower_expression(el));
-
-        let implicit_recv = !matches!(signature.function_kind, FunctionKind::Static);
-        let positional_offset: usize = if implicit_recv { 1 } else { 0 };
+        let has_this = !matches!(signature.function_kind, FunctionKind::Static);
+        let positional_offset: usize = if has_this { 1 } else { 0 };
 
         let mut arguments = vec![];
         arguments.resize(
@@ -50,8 +45,24 @@ impl<'a> HirContext<'a> {
             ExpressionId::error(),
         );
 
-        if let Some(receiver_id) = callee {
-            if implicit_recv {
+        if let Some(callee) = &function_call.callee {
+            let span = function_call.name.span;
+            let receiver_id = match signature.function_kind {
+                FunctionKind::Static => None,
+                FunctionKind::ConstRef |
+                FunctionKind::MutRef => {
+                    let mutable = signature.function_kind == FunctionKind::MutRef;
+                    let of_type = self.lower_type(&signature.methode_type, span);
+                    let ty = self.add_type(HirType::new(hir::HirTypeKind::Ref { of_type, mutable })).to_lazy();
+                    let place = self.lower_place(callee);
+                    let id = self.alloc_expression(span);
+                    self.insert_expression(id, Expression { id, ty, kind: hir::ExpressionKind::Ref { place, mutable } });
+                    Some(id)
+                }
+                FunctionKind::Consume => Some(self.lower_expression(callee)),
+            };
+
+            if let Some(receiver_id) = receiver_id {
                 arguments[0] = receiver_id;
             }
         }
@@ -158,10 +169,10 @@ impl<'a> HirContext<'a> {
             id,
             ty,
             kind: hir::ExpressionKind::Call {
-                callee,
                 generics,
                 arguments,
                 function: resolved,
+                has_callee: function_call.callee.is_some(),
             },
         }
     }

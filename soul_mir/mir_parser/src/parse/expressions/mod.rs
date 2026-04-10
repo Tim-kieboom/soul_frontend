@@ -4,7 +4,6 @@ use soul_utils::{
     Ident,
     ids::{FunctionId, IdAlloc},
     soul_error_internal,
-    span::Span,
 };
 use typed_hir::{Field, Struct, ThirTypeKind};
 use typed_hir_parser::UnifyPrimitiveCast;
@@ -100,11 +99,11 @@ impl<'a> MirContext<'a> {
             }
             hir::ExpressionKind::Call {
                 function,
-                callee,
                 generics,
+                has_callee:_,
                 arguments: hir_arguments,
             } => self
-                .lower_call(*function, callee, generics, hir_arguments, value_type, span)
+                .lower_call(*function, generics, hir_arguments, value_type)
                 .pass(is_end),
             hir::ExpressionKind::Block(block_id) => {
                 let main_body = self.expect_current_block();
@@ -230,11 +229,9 @@ impl<'a> MirContext<'a> {
     pub(crate) fn lower_call(
         &mut self,
         function_id: FunctionId,
-        _callee: &Option<hir::ExpressionId>,
         hir_generics: &Vec<TypeId>,
         hir_arguments: &Vec<hir::ExpressionId>,
         ty: hir::TypeId,
-        _span: Span,
     ) -> EndBlock<mir::Operand> {
         let is_end = &mut false;
 

@@ -336,15 +336,10 @@ impl<'a> HirDisplayer<'a> {
             }
             hir::ExpressionKind::Call {
                 function,
-                callee,
                 generics,
                 arguments,
+                has_callee:_,
             } => {
-                if let Some(value) = callee {
-                    self.display_expression(value);
-                    self.push('.');
-                }
-
                 self.display_call_id(*function);
                 if !generics.is_empty() {
                     self.push('<');

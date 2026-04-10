@@ -63,11 +63,11 @@ impl<'a> TypedHirContext<'a> {
                 right,
             }) => self.infer_binary(*left, operator, *right, span),
             hir::ExpressionKind::Call {
-                callee,
+                has_callee,
                 function,
                 generics,
                 arguments,
-            } => self.infer_call(*function, *callee, generics, arguments, span),
+            } => self.infer_call(*function, *has_callee, generics, arguments, span),
             hir::ExpressionKind::If {
                 condition,
                 then_block,
@@ -137,7 +137,7 @@ impl<'a> TypedHirContext<'a> {
     fn infer_call(
         &mut self,
         function_id: FunctionId,
-        callee: Option<ExpressionId>,
+        has_callee: bool,
         generics: &Vec<TypeId>,
         arguments: &Vec<ExpressionId>,
         span: Span,
@@ -171,7 +171,6 @@ impl<'a> TypedHirContext<'a> {
         let unresolved_return_type = self.functions[function_id].to_lazy();
         let return_type = self.resolve_generic(&generic_defines, unresolved_return_type);
 
-        let has_callee = callee.is_some();
         let needs_callee = !matches!(function.kind, FunctionKind::Static);
         if has_callee && !needs_callee {
             self.log_error(SoulError::new(
@@ -191,19 +190,6 @@ impl<'a> TypedHirContext<'a> {
                 SoulErrorKind::InvalidContext,
                 Some(span),
             ));
-        }
-
-        if let Some(callee) = callee {
-            let callee_ty = self.infer_expression(callee);
-            if matches!(function.kind, FunctionKind::MutRef)
-                && self.lazy_id_get_modifier(callee_ty) != Some(TypeModifier::Mut)
-            {
-                self.log_error(SoulError::new(
-                    "method expects '&this' but receiver is not mutable",
-                    SoulErrorKind::InvalidMutability,
-                    Some(self.expression_span(callee)),
-                ));
-            }
         }
 
         if function.parameters.len() != arguments.len() {

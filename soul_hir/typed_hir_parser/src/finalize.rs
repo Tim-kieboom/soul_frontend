@@ -1,6 +1,6 @@
 use hir::{FieldId, HirTypeKind, LazyTypeId, TypeId};
 use soul_utils::{
-    error::{SoulError, SoulErrorKind}, ids::IdAlloc, vec_map::{VecMap, VecMapIndex}
+    ids::IdAlloc, vec_map::{VecMap, VecMapIndex}
 };
 use typed_hir::{FieldInfo, ThirType, ThirTypeKind, ThirTypesMap, TypedHir};
 
