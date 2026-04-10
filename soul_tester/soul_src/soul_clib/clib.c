@@ -33,7 +33,13 @@ double __clib_log(double exp, double base) {
 
 // ---------------- #Printers ----------------
 
-void __clib_printStr(const str text) {
+void __clib_printSoulStr(const char* ptr, const uint len) {
+    for(int i = 0; i < len; i++) {
+        putchar(ptr[i]);
+    }
+}
+
+void __clib_printCStr(const str text) {
     printf("%s", text);
 }
 

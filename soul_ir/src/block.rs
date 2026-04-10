@@ -52,7 +52,14 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             Terminator::Return(value) => {
                 if let Some(operand) = value {
                     let return_value = self.lower_operand(operand, generics)?;
-                    self.builder.build_return(Some(&return_value.value))?
+                    let return_value = if return_value.info.is_unloaded {
+                        let ptr = return_value.value.into_pointer_value();
+                        self.builder
+                            .build_load(return_value.info.ir_type, ptr, "ret_value")?
+                    } else {
+                        return_value.value
+                    };
+                    self.builder.build_return(Some(&return_value))?
                 } else {
                     self.builder.build_return(None)?
                 };
@@ -99,27 +106,22 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         type_args: &Vec<TypeId>,
         generics: &GenericSubstitute,
     ) -> SoulResult<()> {
+        let called_function = &self.mir.tree.functions[id];
+        let called_generics = GenericSubstitute::new(&called_function.generics, type_args);
         let mut ir_arguments = Vec::with_capacity(arguments.len());
         for (index, arg) in arguments.iter().enumerate() {
             let operand = self.lower_operand(arg, generics)?;
             let value = if operand.info.is_unloaded {
                 let ptr = operand.value.into_pointer_value();
-                let parameter = self
-                    .mir
-                    .tree
-                    .functions[id]
-                    .parameters
-                    .get(index)
-                    .copied()
-                    .ok_or_else(|| {
-                        soul_utils::soul_error_internal!(
-                            format!("parameter {} not found for call target {:?}", index, id),
-                            None
-                        )
-                    })?;
+                let parameter = called_function.parameters.get(index).copied().ok_or_else(|| {
+                    soul_utils::soul_error_internal!(
+                        format!("parameter {} not found for call target {:?}", index, id),
+                        None
+                    )
+                })?;
                 let parameter_ty = self.mir.tree.locals[parameter].ty();
                 let parameter_ir_ty = self
-                    .lower_type(parameter_ty, generics)?
+                    .lower_type(parameter_ty, &called_generics)?
                     .ok_or_else(|| {
                         soul_utils::soul_error_internal!(
                             format!(
@@ -148,7 +150,15 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             None => return Ok(()),
         };
 
-        let return_value = call.try_as_basic_value().unwrap_basic();
+        let return_value = call.try_as_basic_value().basic().ok_or_else(|| {
+            soul_utils::soul_error_internal!(
+                format!(
+                    "call to {:?} returned no value but return_place was provided",
+                    id
+                ),
+                None
+            )
+        })?;
         match &place.kind {
             PlaceKind::Temp(temp_id) => {
                 let value = self.new_loaded_operand(return_value, place.ty, generics)?;

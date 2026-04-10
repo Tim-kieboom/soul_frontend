@@ -40,4 +40,9 @@ typedef struct {
     u32 nano;
 } Duration;
 
+typedef struct {
+    char* ptr;
+    uint len;
+} SoulStr;
+
 #endif

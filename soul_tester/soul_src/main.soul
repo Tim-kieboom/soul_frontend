@@ -7,7 +7,8 @@ struct Duration {
 extern "C" __clib_flush()
 extern "C" malloc(len: uint): *none
 extern "C" __clib_printChar(ch: char)
-extern "C" __clib_printStr(text: *char)
+extern "C" __clib_printCStr(text: *char)
+extern "C" __clib_printSoulStr(ptr: *char, len: uint)
 
 Duration Now(): Duration {
     extern "C" __clib_Duration_now(duration: &Duration)
@@ -17,11 +18,16 @@ Duration Now(): Duration {
     time
 }
 
-// Duration Print(self: @Duration) {
-//     sec := self.sec
-//     nano := self.nano
-//     print_str("Duration{")
-// }
+Duration Print(self: Duration) {
+    sec := self.sec
+    nano := self.nano
+    print("Duration{sec: ")
+    print_uint(sec as uint)
+    print(", nano: ")
+    print_uint(nano as uint)
+    print("}")
+    __clib_flush()
+}
 
 sum(a: int, b: int): int {
     1
@@ -37,27 +43,24 @@ int add(this, b: int): int {
 
 extern "C" __clib_delay_sec(sec: int)
 main() {
+    println("hello world")
 
-    text := "hello world"
-    println(text)
+    now := Duration.Now()
+    Duration.Print(now)
 
-    // now := Duration.Now()
-    // // Duration.Print(@now)
-    // print("hello world")
-
-    // len := 23
-    // println_int(sum(len, 1))
-    // println_int(int.sum(len, 1))
+    len := 23
+    println_int(sum(len, 1))
+    println_int(int.sum(len, 1))
     // // println_int(len.add(1))
 
-    // comptimePow := 3 ** 2
-    // comptimeRoot := 2 </ 4
-    // generics()
-    // prints()
-    // comptime()
+    comptimePow := 3 ** 2
+    comptimeRoot := 2 </ 4
+    generics()
+    prints()
+    comptime()
 
-    // num := ifs()
-    // println_int(num)
+    num := ifs()
+    println_int(num)
 }
 
 ifs(): int {
@@ -140,31 +143,35 @@ generics() {
 
 println(text: [@]char) {
     print(text)
+    endln()
+}
+
+endln() {
     __clib_printChar('\n')
 }
 
 println_char(char: char) {
     __clib_printChar(char)
-    __clib_printChar('\n')
+    endln()
 }
 
 println_int(value: int, base: u8 = 10, capital: bool = true) {
     print_int(value, base: base, capital: capital)
-    __clib_printChar('\n')
+    endln()
 }
 
 println_uint(value: uint, base: u8 = 10, capital: bool = true) {
     print_uint(value, base: base, capital: capital)
-    __clib_printChar('\n')
+    endln()
 }
 
 println_float(value: f64, base: u8 = 10, capital: bool = true, precision: u8 = 4) {
     print_float(value, base: base, capital: capital, precision: precision)
-    __clib_printChar('\n')
+    endln()
 }
 
 print(text: [@]char) {
-    __clib_printStr(text as *char)
+    __clib_printSoulStr(text as *char, text.len)
 }
 
 print_char(char: char) {
@@ -181,7 +188,7 @@ print_int(value: int, base: u8 = 10, capital: bool = true) {
     
     const fmtBuffer: [50]char
     cstr := __clib_fmtInt(value as c_int, base, fmtBuffer as *char, capital)
-    __clib_printStr(cstr)
+    __clib_printCStr(cstr)
 }
 
 print_uint(value: uint, base: u8 = 10, capital: bool = true) {
@@ -195,7 +202,7 @@ print_uint(value: uint, base: u8 = 10, capital: bool = true) {
     
     const fmtBuffer: [50]char
     cstr := __clib_fmtUint(value as c_uint, base, fmtBuffer as *char, capital)
-    __clib_printStr(cstr)
+    __clib_printCStr(cstr)
 }
 
 print_float(value: f64, base: u8 = 10, capital: bool = true, precision: u8 = 4) {
@@ -210,5 +217,5 @@ print_float(value: f64, base: u8 = 10, capital: bool = true, precision: u8 = 4) 
 
     const fmtBuffer: [50]char
     cstr := __clib_fmtFloat(value, base, fmtBuffer as *char, precision, capital)
-    __clib_printStr(cstr)
+    __clib_printCStr(cstr)
 }

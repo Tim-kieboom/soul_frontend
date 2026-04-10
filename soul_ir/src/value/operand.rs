@@ -1,6 +1,6 @@
 use ast::{ArrayKind, Literal};
 use hir::{ComplexLiteral, StructId, TypeId};
-use inkwell::{AddressSpace, module::Linkage, values::{AsValueRef, BasicValue, BasicValueEnum}};
+use inkwell::{AddressSpace, module::Linkage, types::StructType, values::{AsValueRef, BasicValue, BasicValueEnum, StructValue}};
 use mir_parser::mir::{Operand, OperandKind, PlaceId};
 use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},
@@ -231,17 +231,11 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 self.new_loaded_operand(value, should_be, generics)?
             }
             ast::Literal::Str(text) => {
-                let bytes = self.context.const_string(text.as_bytes(), false);
-                let array_ty = bytes.get_type();
-                let global = self.module.add_global(array_ty, None, "str");
-                global.set_constant(true);
-                global.set_linkage(Linkage::Private);
-                global.set_initializer(&bytes);
-
-                let ptr = self.builder.build_pointer_cast(global.as_basic_value_enum().into_pointer_value(), self.context.ptr_type(AddressSpace::default()), "str_ptr")?;
-                let len = self.default_int_type.const_int(text.len() as u64, false).into();
-                let slice_ty = self.context.struct_type(&[self.context.ptr_type(AddressSpace::default()).into(), self.default_int_type.into()], false);
-                self.lower_aggregate(slice_ty, should_be, &[ptr.into(), len], generics)?
+                let (slice_type, value) = self.const_string_slice(text.as_bytes());
+                IrOperand { 
+                    value: value.into(), 
+                    info: crate::OperandInfo::new_loaded(should_be, slice_type.into()) 
+                }
             }
         })
     }
@@ -315,6 +309,26 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             }
             ThirTypeKind::Struct(struct_id) => self.sizeof_struct(struct_id, generics)?,
         })
+    }
+
+    fn const_string_slice(&self, text: &[u8]) -> (StructType<'a>, StructValue<'a>) {
+        let bytes = self.context.const_string(text, false);
+        let array_ty = bytes.get_type();
+        
+        let global = self.module.add_global(array_ty, None, "str");
+        global.set_constant(true);
+        global.set_linkage(Linkage::Private);
+        global.set_initializer(&bytes);
+        
+        let ptr = global.as_basic_value_enum().into_pointer_value();
+        let len = self.default_int_type.const_int(text.len() as u64, false);
+        
+        let slice_ty = self.context.struct_type(&[
+            self.context.ptr_type(AddressSpace::default()).into(),
+            self.default_int_type.into()
+        ], false);
+        
+        (slice_ty, slice_ty.const_named_struct(&[ptr.into(), len.into()]))
     }
 
     fn sizeof_struct(

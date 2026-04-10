@@ -15,6 +15,13 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         generics: &GenericSubstitute,
     ) -> SoulResult<IrOperand<'a>> {
         let source_operand = self.lower_operand(value, generics)?;
+        let source_value = if source_operand.info.is_unloaded {
+            let ptr = source_operand.value.into_pointer_value();
+            self.builder
+                .build_load(source_operand.info.ir_type, ptr, "cast_source")?
+        } else {
+            source_operand.value
+        };
         let cast_type = match self.lower_type(cast_to, generics)? {
             Some(val) => val,
             None => self.context.i8_type().into(),
@@ -29,12 +36,12 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             }
             (ThirTypeKind::Pointer(_), ThirTypeKind::Pointer(_)) => {
                 //llvm doesn't care ptr's are ptr's
-                Ok(source_operand)
+                self.new_loaded_operand(source_value, cast_to, generics)
             }
             (ThirTypeKind::Primitive(_), ThirTypeKind::Pointer(_)) => {
                 // int → ptr
                 let (source, cast) = (
-                    source_operand.value.into_int_value(),
+                    source_value.into_int_value(),
                     cast_type.into_pointer_type(),
                 );
                 let res = self.builder.build_int_to_ptr(source, cast)?;
@@ -44,7 +51,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             (ThirTypeKind::Pointer(_), ThirTypeKind::Primitive(_)) => {
                 // ptr → int
                 let (source, cast) = (
-                    source_operand.value.into_pointer_value(),
+                    source_value.into_pointer_value(),
                     cast_type.into_int_type(),
                 );
                 let res = self.builder.build_ptr_to_int(source, cast)?;
@@ -56,7 +63,10 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     mir_source_type,
                     mir_cast_type,
                     cast_to,
-                    source_operand,
+                    IrOperand {
+                        value: source_value,
+                        info: source_operand.info,
+                    },
                     cast_type,
                 )?;
                 self.cast_primitives(info, generics)
