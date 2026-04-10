@@ -94,6 +94,7 @@ soul_frontend/
 ### `soul_tester` (`soul_tester`)
 - Executable/test harness crate (`main.rs`).
 - Runs the full frontend/backend pipeline, logs faults, and writes artifacts (token/AST/HIR/MIR/LLVM outputs).
+- There can also be a `log.txt` in there which is the log's of the last compilation
 
 ## Pipeline Ownership by Crate
 

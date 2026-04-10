@@ -65,10 +65,10 @@ impl<'a> MirContext<'a> {
 
         let temp = &mut None;
 
+        let then = self.new_block();
         let after_if = self.new_block();
         self.tree.blocks[after_if].returnable = returnable;
 
-        let then = self.new_block();
         let condition = self.lower_operand(hir_condition).pass(is_end);
         self.lower_arm(then_block, then, after_if, ty, temp, is_end);
 
@@ -106,31 +106,35 @@ impl<'a> MirContext<'a> {
         join: mir::BlockId,
         ty: hir::TypeId,
         temp: &mut Option<mir::TempId>,
-        is_end: &mut bool,
+        _is_end: &mut bool,
     ) {
         self.current.block = Some(arm);
-        let value = self.lower_block(hir_block, arm).pass(is_end);
+        let arm_end = &mut false;
+        let value = self.lower_block(hir_block, arm).pass(arm_end);
         let end_block = self.expect_current_block();
 
-        if let Some(value) = value.filter(|value| !matches!(value.kind, mir::OperandKind::None)) {
-            let temp_id = match temp {
-                Some(id) => *id,
-                None => {
-                    let id = self.new_temp(ty);
-                    *temp = Some(id);
-                    id
-                }
-            };
+        if !*arm_end {
+            if let Some(value) = value.filter(|value| !matches!(value.kind, mir::OperandKind::None))
+            {
+                let temp_id = match temp {
+                    Some(id) => *id,
+                    None => {
+                        let id = self.new_temp(ty);
+                        *temp = Some(id);
+                        id
+                    }
+                };
 
-            let place = self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp_id), ty));
+                let place = self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp_id), ty));
 
-            self.push_statement_from(
-                mir::Statement::new(mir::StatementKind::Assign {
-                    place,
-                    value: mir::Rvalue::new(mir::RvalueKind::Operand(value)),
-                }),
-                end_block,
-            );
+                self.push_statement_from(
+                    mir::Statement::new(mir::StatementKind::Assign {
+                        place,
+                        value: mir::Rvalue::new(mir::RvalueKind::Operand(value)),
+                    }),
+                    end_block,
+                );
+            }
         }
 
         if matches!(

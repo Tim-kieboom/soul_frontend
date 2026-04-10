@@ -72,7 +72,20 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     self.get_block(*arm),
                 )?;
             }
-            Terminator::Unreachable => panic!("should not have unreachable"),
+            Terminator::Unreachable => {
+                #[cfg(debug_assertions)]
+                {
+                    panic!("should not have unreachable");
+                }
+                #[cfg(not(debug_assertions))]
+                {
+                    self.log_error(SoulError::new(
+                        "should not have unreachable",
+                        SoulErrorKind::LlvmError,
+                        None,
+                    ));
+                }
+            }
         };
 
         Ok(())

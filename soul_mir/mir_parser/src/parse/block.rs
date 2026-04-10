@@ -24,6 +24,7 @@ impl<'a> MirContext<'a> {
 
         let mut terminator = None;
         let mut block_operand = None;
+        let mut block_operand_id = None;
         let is_end = &mut false;
 
         for statement in &block.statements {
@@ -36,6 +37,10 @@ impl<'a> MirContext<'a> {
                 Some(val) => block_operand = Some(val),
                 None => (),
             }
+            match response.expression_value_id {
+                Some(val) => block_operand_id = Some(val),
+                None => (),
+            }
 
             if *is_end {
                 break;
@@ -44,13 +49,17 @@ impl<'a> MirContext<'a> {
 
         this_block = self.expect_current_block();
         if !self.tree.blocks[this_block].returnable {
-            let terminator = match terminator {
+            let value = match terminator {
                 Some(mir::Terminator::Return(operand)) => {
-                    operand.filter(|value| !matches!(value.kind, OperandKind::None))
+                    let return_value = operand.filter(|value| !matches!(value.kind, OperandKind::None));
+                    self.insert_terminator(this_block, mir::Terminator::Return(return_value.clone()));
+                    return_value
                 }
-                Some(mir::Terminator::Goto(_)) | None => {
+                Some(mir::Terminator::Goto(target)) => {
+                    self.insert_terminator(this_block, mir::Terminator::Goto(target));
                     block_operand.filter(|value| !matches!(value.kind, OperandKind::None))
                 }
+                None => block_operand.filter(|value| !matches!(value.kind, OperandKind::None)),
                 _ => {
                     self.log_error(soul_error_internal!(
                         "should not have this terminator kind in block",
@@ -61,22 +70,20 @@ impl<'a> MirContext<'a> {
             };
 
             self.end_scope(live_i, parent_scope);
-            return EndBlock::new(terminator, is_end);
+            return EndBlock::new(value, is_end);
         }
 
         match (terminator, block.terminator) {
             (Some(terminator), _) => self.insert_terminator(this_block, terminator),
             (_, Some(expression)) => {
-                let value = match block_operand {
-                    Some(val) => val,
-                    None => {
-                        self.log_error(soul_error_internal!(
-                            "block_operand should be Some(_)",
-                            None
-                        ));
-                        self.lower_operand(expression.get_expression_id())
-                            .pass(is_end)
+                let expression_id = expression.get_expression_id();
+                let value = if block_operand_id == Some(expression_id) {
+                    match block_operand {
+                        Some(val) => val,
+                        None => self.lower_operand(expression_id).pass(is_end),
                     }
+                } else {
+                    self.lower_operand(expression_id).pass(is_end)
                 };
 
                 let return_value = if matches!(value.kind, OperandKind::None) {

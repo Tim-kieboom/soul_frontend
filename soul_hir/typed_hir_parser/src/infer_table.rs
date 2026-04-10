@@ -36,7 +36,7 @@ impl InferTable {
     pub(crate) fn alloc(&mut self, infer: InferTypeId, span: Span) {
         if self.table.get(infer).is_some() {
             #[cfg(debug_assertions)]
-            panic!("already has {:?} is InferTable", infer);
+            panic!("already has {:?} in InferTable", infer);
             #[cfg(not(debug_assertions))]
             return;
         }

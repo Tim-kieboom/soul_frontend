@@ -1,7 +1,6 @@
 use hir::{FieldId, HirTypeKind, LazyTypeId, TypeId};
 use soul_utils::{
-    ids::IdAlloc,
-    vec_map::{VecMap, VecMapIndex},
+    error::{SoulError, SoulErrorKind}, ids::IdAlloc, vec_map::{VecMap, VecMapIndex}
 };
 use typed_hir::{FieldInfo, ThirType, ThirTypeKind, ThirTypesMap, TypedHir};
 
@@ -162,6 +161,11 @@ impl<'a> TypedHirContext<'a> {
             .collect::<Vec<_>>();
 
         for id in unbounds {
+            self.log_error(SoulError::new(
+                format!("type {:?} could not be inferd", id),
+                SoulErrorKind::UnifyTypeError,
+                None,
+            ));
             self.infer_table
                 .table
                 .insert(id, InferBinding::Bound(TypeId::error()));

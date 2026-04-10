@@ -12,6 +12,7 @@ pub(crate) struct StatementResponse {
 
     /// operand is Some() when statement is expressionStatement
     pub(crate) expression_operand: Option<mir::Operand>,
+    pub(crate) expression_value_id: Option<hir::ExpressionId>,
 }
 
 impl<'a> MirContext<'a> {
@@ -23,6 +24,7 @@ impl<'a> MirContext<'a> {
         let is_end = &mut false;
 
         let mut last_operand = None;
+        let mut last_expression_id = None;
 
         let span = self.statement_span(statement_id);
         let terminator = match &statement.kind {
@@ -46,6 +48,7 @@ impl<'a> MirContext<'a> {
                 }
 
                 last_operand = Some(operand);
+                last_expression_id = Some(*value);
                 None
             }
             hir::StatementKind::Return(value) => {
@@ -108,6 +111,7 @@ impl<'a> MirContext<'a> {
         let response = StatementResponse {
             terminator,
             expression_operand: last_operand,
+            expression_value_id: last_expression_id,
         };
         EndBlock::new(response, is_end)
     }
