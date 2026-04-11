@@ -71,7 +71,7 @@ main() {
 
 ```bash
 # Clone the repository
-git clone https://github.com/anomalyco/soul_frontend.git
+git clone https://github.com/Tim-kieboom/soul_frontend.git
 cd soul_frontend
 
 # Build all crates

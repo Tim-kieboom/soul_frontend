@@ -86,9 +86,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 }
                 #[cfg(not(debug_assertions))]
                 {
-                    self.log_error(SoulError::new(
+                    self.log_error(soul_utils::error::SoulError::new(
                         "should not have unreachable",
-                        SoulErrorKind::LlvmError,
+                        soul_utils::error::SoulErrorKind::LlvmError,
                         None,
                     ));
                 }
