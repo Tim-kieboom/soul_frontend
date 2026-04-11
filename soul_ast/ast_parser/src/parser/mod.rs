@@ -1,4 +1,4 @@
-use ast::{AbstractSyntaxTree, Block};
+use ast::{AbstractSyntaxTree, Block, SoulType};
 #[cfg(debug_assertions)]
 use soul_tokenizer::Token;
 use soul_tokenizer::{TokenKind, TokenStream};
@@ -31,6 +31,7 @@ pub(crate) struct Parser<'a, 'f> {
     debug: DebugViewer,
 
     tokens: TokenStream<'a>,
+    current_this: Option<SoulType>,
     faults: &'f mut Vec<SementicFault>,
 }
 impl<'a, 'f> Parser<'a, 'f> {
@@ -53,6 +54,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             debug,
             tokens,
             faults,
+            current_this: None,
         }
     }
 

@@ -21,20 +21,31 @@ use crate::parser::{
 type FuncResult<T> = TryResult<T, (Ident, Box<SoulError>)>;
 impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_any_function(&mut self) -> SoulResult<Statement> {
-        fn default_methode_type(span: Span) -> SoulType {
-            SoulType::none(span).with_modifier(Some(TypeModifier::Mut))
-        }
 
-        let ident = self.try_bump_consume_ident()?;
+        let mut ident = self.try_bump_consume_ident()?;
+        let modifier = match TypeModifier::from_str(ident.as_str()) {
+            Some(modifer) => {
+                ident = self.try_bump_consume_ident()?;
+                modifer
+            }
+            None => TypeModifier::Mut,
+        };
 
         let span = self.token().span;
-        match self.try_parse_function_declaration(span, default_methode_type(span), ident) {
+        match self.try_parse_function_declaration(span, self.default_methode_type(modifier, span), ident) {
             Ok(val) => Ok(Statement::from_function(val)),
             Err(TryError::IsErr(err)) => Err(err),
             Err(TryError::IsNotValue((ident, _err))) => self
                 .try_parse_function_call(span, None, &ident)
                 .merge_to_result()
                 .map(|el| Statement::from_function_call(el, self.current_is(&SEMI_COLON))),
+        }
+    }
+
+    pub(crate) fn default_methode_type(&self, modifier: TypeModifier, span: Span) -> SoulType {
+        match &self.current_this {
+            Some(val) => val.clone().with_modifier(Some(modifier)),
+            None => SoulType::none(span).with_modifier(Some(modifier)),
         }
     }
 
@@ -257,9 +268,9 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let signature = FunctionSignature {
             name,
+            id: None,
             generics,
             external,
-            id: None,
             parameters,
             return_type,
             methode_type,

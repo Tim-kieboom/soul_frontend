@@ -1,3 +1,4 @@
+use ast::UseBlock;
 use hir::{Assign, StatementId};
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
@@ -10,9 +11,24 @@ mod function;
 
 impl<'a> HirContext<'a> {
     pub fn lower_global(&mut self, global: &ast::Statement) {
-        let id = self.alloc_statement(&global.meta_data, global.span);
 
         let kind = match &global.node {
+            ast::StatementKind::UseBlock(UseBlock{ use_type:_, generics, impls, methodes }) => {
+                if !generics.is_empty() {
+                    todo!()
+                }
+                
+                for methode in methodes {
+                    let kind = hir::GlobalKind::Function(self.lower_function(methode));
+                    let id = self.alloc_statement(&global.meta_data, global.span);
+                    self.insert_global(hir::Global::new(kind, id));
+                }
+
+                if !impls.is_empty() {
+                    todo!()
+                }
+                return
+            }
             ast::StatementKind::Import(import) => {
                 self.resolve_import(import);
                 return;
@@ -42,13 +58,30 @@ impl<'a> HirContext<'a> {
             }
         };
 
+        let id = self.alloc_statement(&global.meta_data, global.span);
         self.insert_global(hir::Global::new(kind, id));
     }
 
     pub fn lower_statement(&mut self, global: &ast::Statement) -> Option<hir::Statement> {
-        let id = self.alloc_statement(&global.meta_data, global.span);
 
         let kind = match &global.node {
+            ast::StatementKind::UseBlock(UseBlock{ use_type:_, generics, impls, methodes }) => {
+                
+                if !generics.is_empty() {
+                    todo!()
+                }
+                
+                for methode in methodes {
+                    let kind = hir::GlobalKind::Function(self.lower_function(methode));
+                    let id = self.alloc_statement(&global.meta_data, global.span);
+                    self.insert_global(hir::Global::new(kind, id));
+                }
+
+                if !impls.is_empty() {
+                    todo!()
+                }
+                return None
+            }
             ast::StatementKind::Import(import) => {
                 self.resolve_import(import);
                 return None;
@@ -62,6 +95,8 @@ impl<'a> HirContext<'a> {
             }
             ast::StatementKind::Function(function)
             | ast::StatementKind::ExternalFunction(function) => {
+                let id = self.alloc_statement(&global.meta_data, global.span);
+
                 let hir_function = self.lower_function(function);
                 let kind = hir::GlobalKind::Function(hir_function);
                 self.insert_global(hir::Global::new(kind, id));
@@ -89,6 +124,7 @@ impl<'a> HirContext<'a> {
             }
         };
 
+        let id = self.alloc_statement(&global.meta_data, global.span);
         Some(hir::Statement::new(kind, id))
     }
 

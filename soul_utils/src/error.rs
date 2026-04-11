@@ -7,6 +7,7 @@ use std::backtrace::Backtrace;
 // A result type alias for operations that can fail with a `SoulError`.
 pub type SoulResult<T> = std::result::Result<T, SoulError>;
 
+/// Converts an absolute file path to be relative to the project root.
 pub fn relative_to_project(file_path: &str) -> String {
     inner_relative_to_project(file_path).unwrap_or(file_path.to_string())
 }

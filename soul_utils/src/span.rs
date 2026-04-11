@@ -42,9 +42,11 @@ pub struct Attribute {
 pub struct Spanned<T> {
     /// The actual AST node.
     pub node: T,
+    /// The source code location.
     pub span: Span,
 }
 
+/// Metadata associated with an AST item.
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub struct ItemMetaData {
     /// Additional attributes associated with this node.
@@ -52,16 +54,19 @@ pub struct ItemMetaData {
 }
 
 impl ItemMetaData {
+    /// Creates a default `ItemMetaData` with no attributes.
     pub const fn default_const() -> Self {
         Self::new(vec![])
     }
 
+    /// Creates a new `ItemMetaData` with the given attributes.
     pub const fn new(attributes: Vec<Attribute>) -> Self {
         Self { attributes }
     }
 }
 
 impl Span {
+    /// Creates a default (zero-valued) span.
     pub const fn default_const() -> Self {
         Self {
             start_line: 0,
@@ -83,16 +88,19 @@ impl Span {
         }
     }
 
+    /// Checks whether the span is on a single line.
     pub fn is_single_line(&self) -> bool {
         self.end_line == self.start_line
     }
 
+    /// Returns a string representation of the span (e.g., "1:1" or "1:1-2:10").
     pub fn display(&self) -> String {
         let mut sb = String::new();
         self.inner_display(&mut sb);
         sb
     }
 
+    /// Writes a string representation of the span to the given buffer.
     pub fn inner_display(&self, sb: &mut String) {
         use std::fmt::Write;
 
@@ -108,6 +116,7 @@ impl Span {
         .expect("write should not give error")
     }
 
+    /// Combines this span with another, creating a new span that encompasses both.
     pub fn combine(self, other: Self) -> Self {
         let start_line = self.start_line.min(other.start_line);
         let start_offset = self.combine_start_offset(&other);
@@ -154,6 +163,7 @@ impl<T: Hash> Hash for Spanned<T> {
     }
 }
 impl<T> Spanned<T> {
+    /// Creates a new `Spanned` wrapper around a node with its source location.
     pub fn new(inner: T, span: Span) -> Self {
         Self { node: inner, span }
     }

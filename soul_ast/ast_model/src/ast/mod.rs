@@ -5,7 +5,6 @@ pub mod literal;
 pub mod operators;
 pub mod soul_type;
 pub mod statement;
-pub mod syntax_display;
 
 pub use block::*;
 pub use expression::*;

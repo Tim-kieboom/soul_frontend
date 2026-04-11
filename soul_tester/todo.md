@@ -1,0 +1,20 @@
+- [ ] Add Trait statement type to AST (StatementKind::Trait)
+- [ ] Add TraitId to hir_model/src/ids.rs
+- [ ] Add trait definition to HIR model (Trait, TraitItem, etc.)
+- [ ] Add AST -> HIR lowering for traits
+- [ ] Add trait bound parsing to generics (e.g., T: Index)
+- [ ] Implement Index trait (Index<T>, IndexMut<T>)
+- [ ] Add where clause support for trait bounds
+- [ ] Add Enum statement type to AST (StatementKind::Enum)
+- [ ] Add EnumId to hir_model/src/ids.rs
+- [ ] Add enum definition to HIR model
+- [ ] Add AST -> HIR lowering for enums
+- [ ] Add enum pattern matching (match expressions)
+- [ ] Add Union statement type to AST
+- [ ] Add UnionId to hir_model/src/ids.rs
+- [ ] Add union definition to HIR model
+- [ ] Add AST -> HIR lowering for unions
+- [ ] Improve union-find path compression in infer_table.rs
+- [ ] Add associated types in traits
+- [ ] Add default trait implementations
+- [ ] Add trait objects (dyn Trait)

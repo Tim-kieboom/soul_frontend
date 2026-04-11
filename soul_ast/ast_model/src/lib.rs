@@ -6,7 +6,6 @@ use soul_utils::{
 mod ast;
 pub mod meta_data;
 pub mod scope;
-pub mod syntax_display;
 pub use ast::*;
 
 use crate::{meta_data::AstMetadata, scope::NodeId};
@@ -30,7 +29,6 @@ pub struct DeclareStore {
     pub main_function: Option<FunctionId>,
     functions: VecMap<FunctionId, FunctionSignature>,
     variable_type: VecMap<NodeId, VarTypeKind>,
-    #[serde(default)]
     variable_owner_hint: VecMap<NodeId, TypeKind>,
 }
 impl DeclareStore {

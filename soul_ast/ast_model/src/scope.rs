@@ -1,15 +1,10 @@
 use std::collections::HashMap;
 
-use soul_utils::{Ident, ids::FunctionId, impl_soul_ids, span::Span};
+use soul_utils::{Ident, ids::FunctionId, impl_soul_ids, span::Span, vec_map::VecMapIndex};
 
 use crate::ast::Variable;
 
-impl_soul_ids!(NodeId);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct ScopeId {
-    index: usize,
-}
+impl_soul_ids!(NodeId, ScopeId);
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ScopeBuilder {
@@ -19,8 +14,8 @@ pub struct ScopeBuilder {
 }
 impl ScopeBuilder {
     pub fn new() -> Self {
-        let root = ScopeId { index: 0 };
-        let next = ScopeId { index: 1 };
+        let root = ScopeId::new_index(0);
+        let next = ScopeId::new_index(1);
         Self {
             scopes: vec![Scope::new_global(root)],
             current: root,
@@ -30,13 +25,13 @@ impl ScopeBuilder {
 
     pub fn push_scope(&mut self, parent: ScopeId) {
         self.current = self.next;
-        self.next.index += 1;
+        self.next.0 += 1;
         self.scopes
-            .insert(self.current.index, Scope::new_child(self.current, parent));
+            .insert(self.current.0, Scope::new_child(self.current, parent));
     }
 
     pub fn pop_scope(&mut self) {
-        self.current = self.scopes[self.current.index]
+        self.current = self.scopes[self.current.0]
             .parent
             .unwrap_or(self.current);
     }
@@ -46,7 +41,7 @@ impl ScopeBuilder {
     }
 
     pub fn get_scope(&self, scope_id: ScopeId) -> Option<&Scope> {
-        self.scopes.get(scope_id.index)
+        self.scopes.get(scope_id.0)
     }
 
     pub fn current_scope_id(&self) -> ScopeId {
@@ -54,7 +49,7 @@ impl ScopeBuilder {
     }
 
     pub fn current_scope_mut(&mut self) -> Option<&mut Scope> {
-        self.scopes.get_mut(self.current.index)
+        self.scopes.get_mut(self.current.0)
     }
 
     pub fn lookup_type(&self, ident: &Ident) -> Option<ScopeTypeEntry> {
@@ -82,7 +77,7 @@ impl ScopeBuilder {
     }
 
     pub fn flat_lookup_value(&self, ident: &Ident, kind: ScopeValue) -> Option<NodeId> {
-        let scope = self.scopes.get(self.current.index)?;
+        let scope = self.scopes.get(self.current.0)?;
         let ids = scope.entries.get(ident.as_str())?.values.as_ref()?;
 
         ids.get(kind)
@@ -126,7 +121,7 @@ impl<'a> Iterator for ScopeIterator<'a> {
     type Item = &'a Scope;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let index = self.current?.index;
+        let index = self.current?.0;
         let scope = self.scopes.get(index)?;
         self.current = scope.parent.map(|scope_id| scope_id);
         Some(scope)

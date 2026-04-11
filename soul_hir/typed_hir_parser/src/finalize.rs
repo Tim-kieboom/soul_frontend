@@ -1,10 +1,11 @@
 use hir::{FieldId, HirTypeKind, LazyTypeId, TypeId};
 use soul_utils::{
-    ids::IdAlloc, vec_map::{VecMap, VecMapIndex}
+    ids::IdAlloc,
+    vec_map::{VecMap, VecMapIndex},
 };
 use typed_hir::{FieldInfo, ThirType, ThirTypeKind, ThirTypesMap, TypedHir};
 
-use crate::{TypedHirContext, infer_table::InferBinding};
+use crate::{infer_table::InferBinding, TypedHirContext};
 
 impl<'a> TypedHirContext<'a> {
     pub(crate) fn finalize(mut self) -> TypedHir {

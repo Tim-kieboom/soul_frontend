@@ -6,29 +6,74 @@ struct Duration {
 extern "C" __clib_printChar(ch: char)
 extern "C" __clib_printCStr(text: *char)
 
-Duration Empty(): Duration {
-    Duration{sec: 0, nano: 0}
+// trait Index<T> {
+//     Index(@this, index: uint): @T
+// }
+// trait IndexMut<T> {
+//     IndexMut(&this, index: uint): &T
+// }
+
+// unsafe *T offset<T>(@this, index: uint): *T {
+//     ptrUint := this as uint
+//     u8Index := index * T.sizeof
+//     offset := ptrUint + u8Index
+//     offset as *T
+// }
+
+// use<T> [@]T {
+
+//     index(@this, index: uint): *T {
+//         if index > this.len {
+//             print("index: ")
+//             print_uint(index)
+//             println(" out of bounds")
+//             exit()
+//         } 
+
+//         mut ptr = @this as *T
+//         unsafe{ ptr.offset(index) }
+//     }
+
+//     impl Index<T> {
+//         Index(@this, index: T): @T {
+//             ptr := this.index(index)
+//             @*ptr
+//         }
+//     }
+
+//     impl IndexMut<T> {
+//         IndexMut(&this, index: T): @T {
+//             ptr := this.index(index)
+//             &*ptr
+//         }
+//     }
+// }
+
+use Duration {
+    Empty(): Duration {
+        Duration{sec: 0, nano: 0}
+    }
+
+    Now(): Duration {
+        extern "C" __clib_Duration_now(duration: &Duration)
+
+        mut time = Duration.Empty()
+        __clib_Duration_now(&time)
+        time
+    }
+
+    Print(@this) {
+        sec := this.sec
+        nano := this.nano
+        print("Duration{sec: ")
+        print_uint(sec as uint)
+        print(", nano: ")
+        print_uint(nano as uint)
+        print("}")
+    }
 }
 
-Duration Now(): Duration {
-    extern "C" __clib_Duration_now(duration: &Duration)
-
-    mut time = Duration.Empty()
-    __clib_Duration_now(&time)
-    time
-}
-
-Duration Print(self: Duration) {
-    sec := self.sec
-    nano := self.nano
-    print("Duration{sec: ")
-    print_uint(sec as uint)
-    print(", nano: ")
-    print_uint(nano as uint)
-    print("}")
-}
-
-sum(a: int, b: int): int {
+const sum(a: int, b: int): int {
     1
 }
 
@@ -54,7 +99,7 @@ main() {
     println("hello world")
 
     now := Duration.Now()
-    Duration.Print(now)
+    now.Print()
     endln()
 
     mut len := 23
@@ -72,6 +117,7 @@ main() {
 
     num := ifs()
     println_int(num)
+    // whiles()
 }
 
 // whiles() {

@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use crate::{
-    TypedHirContext,
     type_helpers::{TypeHelpers, UnifyPrimitiveCastLazy},
+    TypedHirContext,
 };
 use ast::{ArrayKind, BinaryOperator, BinaryOperatorKind, FunctionKind, UnaryOperator};
 use hir::{
@@ -10,13 +10,13 @@ use hir::{
     TypeId, Unary,
 };
 use soul_utils::{
-    Ident,
     error::{SoulError, SoulErrorKind, SoulResult},
     ids::{FunctionId, IdAlloc},
     soul_error_internal,
     soul_names::{PrimitiveTypes, TypeModifier},
     span::Span,
     vec_map::VecMap,
+    Ident,
 };
 const MUT: bool = true;
 const CONST: bool = false;
@@ -67,6 +67,7 @@ impl<'a> TypedHirContext<'a> {
                 function,
                 generics,
                 arguments,
+                ..
             } => self.infer_call(*function, *has_callee, generics, arguments, span),
             hir::ExpressionKind::If {
                 condition,

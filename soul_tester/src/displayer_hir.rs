@@ -1,5 +1,6 @@
 use hir::{
-    Binary, BlockId, DisplayType, ExpressionId, FieldId, FunctionBody, HirTree, HirType, HirTypeKind, LazyTypeId, LocalId, LocalKind, StructId, TypeId, Unary
+    Binary, BlockId, DisplayType, ExpressionId, FieldId, FunctionBody, HirTree, HirType,
+    HirTypeKind, LazyTypeId, LocalId, LocalKind, StructId, TypeId, Unary,
 };
 use soul_utils::{
     ids::{FunctionId, IdAlloc},
@@ -7,7 +8,7 @@ use soul_utils::{
     vec_map::VecMapIndex,
 };
 use std::fmt::Write;
-use typed_hir::{ThirTypeKind, TypedHir, display_thir::DisplayThirType};
+use typed_hir::{display_thir::DisplayThirType, ThirTypeKind, TypedHir};
 
 pub fn display_hir(hir: &HirTree) -> String {
     let mut displayer = HirDisplayer::new_hir(hir);
@@ -338,7 +339,7 @@ impl<'a> HirDisplayer<'a> {
                 function,
                 generics,
                 arguments,
-                has_callee:_,
+                has_callee: _,
             } => {
                 self.display_call_id(*function);
                 if !generics.is_empty() {
@@ -435,7 +436,7 @@ impl<'a> HirDisplayer<'a> {
                 self.display_type(owner);
                 self.push('.');
             }
-            
+
             self.hir.nodes.functions[id].name.as_str()
         };
 
@@ -487,10 +488,11 @@ impl<'a> HirDisplayer<'a> {
     fn is_type_none(&mut self, id: LazyTypeId) -> bool {
         match (self.typed, id) {
             (Some(typed), LazyTypeId::Known(ty)) => {
-                
                 return typed
                     .types_map
-                    .id_to_type(ty).map(|ty| matches!(ty.kind, ThirTypeKind::None)).unwrap_or(false)
+                    .id_to_type(ty)
+                    .map(|ty| matches!(ty.kind, ThirTypeKind::None))
+                    .unwrap_or(false)
             }
             (Some(_), LazyTypeId::Infer(_)) => panic!("should not have infer in thir"),
             _ => (),
@@ -498,7 +500,10 @@ impl<'a> HirDisplayer<'a> {
 
         let types = &self.hir.info.types;
         match id {
-            LazyTypeId::Known(type_id) => types.id_to_type(type_id).map(|ty| matches!(ty.kind, HirTypeKind::None)).unwrap_or(false),
+            LazyTypeId::Known(type_id) => types
+                .id_to_type(type_id)
+                .map(|ty| matches!(ty.kind, HirTypeKind::None))
+                .unwrap_or(false),
             LazyTypeId::Infer(_) => false,
         }
     }

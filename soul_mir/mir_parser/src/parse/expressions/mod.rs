@@ -1,16 +1,15 @@
 use hir::{Binary, ExpressionId, StructId, TypeId, Unary};
 use hir_literal_interpreter::ToComplex;
 use soul_utils::{
-    Ident,
     ids::{FunctionId, IdAlloc},
-    soul_error_internal,
+    soul_error_internal, Ident,
 };
 use typed_hir::{Field, Struct, ThirTypeKind};
 use typed_hir_parser::UnifyPrimitiveCast;
 
 use crate::{
-    EndBlock, MirContext,
     mir::{self, Operand},
+    EndBlock, MirContext,
 };
 
 mod conditionals;
@@ -100,7 +99,7 @@ impl<'a> MirContext<'a> {
             hir::ExpressionKind::Call {
                 function,
                 generics,
-                has_callee:_,
+                has_callee: _,
                 arguments: hir_arguments,
             } => self
                 .lower_call(*function, generics, hir_arguments, value_type)

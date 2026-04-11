@@ -197,6 +197,14 @@ impl ReturnKind {
             _ => None,
         }
     }
+
+    pub fn as_keyword(&self) -> KeyWord {
+        match self {
+            ReturnKind::Break => KeyWord::Break,
+            ReturnKind::Return => KeyWord::Return,
+            ReturnKind::Continue => KeyWord::Continue,
+        }
+    }
 }
 
 /// helper enum in parser

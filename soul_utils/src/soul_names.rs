@@ -37,14 +37,23 @@ define_str_enum!(
     }
 );
 
+/// Represents the primitive size categories for type inference.
 pub enum PrimitiveSize {
+    /// Character-sized (platform-specific).
     CharSize,
+    /// Integer-sized (platform-specific).
     IntSize,
+    /// C integer-sized (platform-specific).
     CIntSize,
+    /// 8-bit.
     Bit8,
+    /// 16-bit.
     Bit16,
+    /// 32-bit.
     Bit32,
+    /// 64-bit.
     Bit64,
+    /// 128-bit.
     Bit128,
 }
 
@@ -116,6 +125,7 @@ define_str_enum!(
     }
 );
 impl PrimitiveTypes {
+    /// Checks if this is a numeric type (integer or float).
     pub const fn is_numeric(&self) -> bool {
         match self {
             PrimitiveTypes::UntypedInt
@@ -143,6 +153,7 @@ impl PrimitiveTypes {
         }
     }
 
+    /// Checks if this is any integer type (signed or unsigned).
     pub const fn is_any_interger(&self) -> bool {
         match self {
             PrimitiveTypes::UntypedInt
@@ -166,6 +177,7 @@ impl PrimitiveTypes {
         }
     }
 
+    /// Checks if this is a floating-point type.
     pub const fn is_float(&self) -> bool {
         match self {
             PrimitiveTypes::UntypedFloat
@@ -177,6 +189,7 @@ impl PrimitiveTypes {
         }
     }
 
+    /// Checks if this is an unsigned integer type.
     pub const fn is_unsigned_interger(&self) -> bool {
         match self {
             PrimitiveTypes::UntypedUint
@@ -192,6 +205,7 @@ impl PrimitiveTypes {
         }
     }
 
+    /// Checks if this is a signed integer type.
     pub const fn is_signed_interger(&self) -> bool {
         match self {
             PrimitiveTypes::UntypedInt
@@ -207,6 +221,7 @@ impl PrimitiveTypes {
         }
     }
 
+    /// Checks if this is a character type.
     pub const fn is_character(&self) -> bool {
         match self {
             PrimitiveTypes::Char
@@ -219,6 +234,7 @@ impl PrimitiveTypes {
         }
     }
 
+    /// Checks if this is an untyped numeric type (untypedInt, untypedUint, untypedFloat).
     pub const fn is_untyped_numeric(&self) -> bool {
         match self {
             PrimitiveTypes::UntypedInt
@@ -228,10 +244,12 @@ impl PrimitiveTypes {
         }
     }
 
+    /// Checks if this type can represent negative values.
     pub const fn can_be_negative(&self) -> bool {
         self.is_signed_interger() || self.is_float()
     }
 
+    /// Converts this type to its primitive size category.
     pub const fn to_primitive_size(&self) -> PrimitiveSize {
         match self.precedence().as_usize() {
             1 => PrimitiveSize::IntSize,
@@ -246,6 +264,7 @@ impl PrimitiveTypes {
         }
     }
 
+    /// Converts this type to its bit width using the given platform sizes.
     pub const fn to_size_bit_u8(&self, c_int_size: u8, int_size: u8, char_size: u8) -> u8 {
         match self.to_primitive_size() {
             PrimitiveSize::CIntSize => c_int_size,

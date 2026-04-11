@@ -7,7 +7,6 @@ use std::{
 use anyhow::Result;
 use ast::{
     AstResponse,
-    syntax_display::{DisplayKind, SyntaxDisplay},
 };
 use fern::Dispatch;
 use inkwell::context::Context;
@@ -29,6 +28,7 @@ use crate::{
     displayer_tokenizer::display_tokens,
 };
 
+mod displayer_ast;
 mod convert_soul_error;
 mod displayer_hir;
 mod displayer_mir;
@@ -147,11 +147,11 @@ fn display_tokenizer(paths: &Paths, source_file: &str) -> Result<()> {
 
 fn display_ast(paths: &Paths, ast: &AstResponse) -> Result<()> {
     paths.write_to_output(
-        &ast.tree.root.display(DisplayKind::Parser),
+        &displayer_ast::display_ast(ast),
         "ast/tree.soulc",
     )?;
     paths.write_to_output(
-        &ast.tree.root.display(DisplayKind::NameResolver),
+        &displayer_ast::display_ast_name_resolved(ast),
         "ast/NameResolved.soulc",
     )
 }

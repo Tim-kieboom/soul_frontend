@@ -1,4 +1,4 @@
-use ast::{Block, Function, Statement, StatementKind, scope::NodeId};
+use ast::{Block, Function, Statement, StatementKind, UseBlock, scope::NodeId};
 use soul_utils::{
     Ident,
     error::{SoulError, SoulErrorKind},
@@ -18,6 +18,15 @@ impl<'a> NameResolver<'a> {
 
     fn resolve_statement(&mut self, statment: &mut Statement) {
         match &mut statment.node {
+            StatementKind::UseBlock(UseBlock{ use_type:_, generics:_, impls, methodes }) => {
+                for methode in methodes {
+                    self.resolves_function(methode);
+                }
+                
+                if !impls.is_empty() {
+                    todo!()
+                }
+            }
             StatementKind::Struct(_) => (),
             StatementKind::Variable(variable) => {
                 if let Some(value) = &mut variable.initialize_value {

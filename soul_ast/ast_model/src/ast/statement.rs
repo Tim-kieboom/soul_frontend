@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use enum_variant_name_const::EnumVariantNameConst;
 use soul_utils::ids::FunctionId;
 use soul_utils::soul_names::TypeModifier;
@@ -36,11 +38,27 @@ pub enum StatementKind {
     /// An assignment to an existing variable.
     Assignment(Assignment),
 
+    UseBlock(UseBlock),
+
     /// A function declaration (with body block).
     Function(Function),
     ExternalFunction(Function),
 
     Struct(Struct),
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct UseBlock {
+    pub use_type: SoulType,
+    pub generics: Vec<Generic>,
+    pub impls: Vec<ImplBlock>,
+    pub methodes: Vec<Function>,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ImplBlock {
+    pub impl_trait: SoulType,
+    pub methodes: Vec<Function>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

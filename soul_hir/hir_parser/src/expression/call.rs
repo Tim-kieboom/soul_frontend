@@ -49,14 +49,22 @@ impl<'a> HirContext<'a> {
             let span = function_call.name.span;
             let receiver_id = match signature.function_kind {
                 FunctionKind::Static => None,
-                FunctionKind::ConstRef |
-                FunctionKind::MutRef => {
+                FunctionKind::ConstRef | FunctionKind::MutRef => {
                     let mutable = signature.function_kind == FunctionKind::MutRef;
                     let of_type = self.lower_type(&signature.methode_type, span);
-                    let ty = self.add_type(HirType::new(hir::HirTypeKind::Ref { of_type, mutable })).to_lazy();
+                    let ty = self
+                        .add_type(HirType::new(hir::HirTypeKind::Ref { of_type, mutable }))
+                        .to_lazy();
                     let place = self.lower_place(callee);
                     let id = self.alloc_expression(span);
-                    self.insert_expression(id, Expression { id, ty, kind: hir::ExpressionKind::Ref { place, mutable } });
+                    self.insert_expression(
+                        id,
+                        Expression {
+                            id,
+                            ty,
+                            kind: hir::ExpressionKind::Ref { place, mutable },
+                        },
+                    );
                     Some(id)
                 }
                 FunctionKind::Consume => Some(self.lower_expression(callee)),

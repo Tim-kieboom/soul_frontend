@@ -6,7 +6,7 @@ use soul_utils::{
     vec_map::VecMap,
 };
 
-use crate::{TypedHirContext, type_helpers::TypeHelpers};
+use crate::{type_helpers::TypeHelpers, TypedHirContext};
 
 impl<'a> TypedHirContext<'a> {
     pub(crate) fn infer_place(&mut self, place_id: PlaceId) -> LazyTypeId {

@@ -61,9 +61,10 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             KeyWord::Struct => self.parse_struct().try_err()?,
 
+            KeyWord::Use => self.parse_use().try_err()?,
+
             KeyWord::New
             | KeyWord::For
-            | KeyWord::Use
             | KeyWord::Dyn
             | KeyWord::Fall
             | KeyWord::Enum

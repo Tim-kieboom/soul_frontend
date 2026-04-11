@@ -1,4 +1,6 @@
-use ast::{Block, Statement, StatementKind};
+use std::mem::take;
+
+use ast::{Block, Generic, ImplBlock, SoulType, Statement, StatementKind, UseBlock};
 use soul_tokenizer::TokenKind;
 use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},
@@ -6,7 +8,7 @@ use soul_utils::{
     span::Span,
     symbool_kind::SymbolKind,
     try_result::{
-        ResultTryErr, ResultTryNotValue, TryErr, TryError, TryNotValue, TryOk, TryResult,
+        ResultMapNotValue, ResultTryErr, ResultTryNotValue, ToResult, TryErr, TryError, TryNotValue, TryOk, TryResult
     },
 };
 
@@ -179,6 +181,97 @@ impl<'a, 'f> Parser<'a, 'f> {
         };
 
         self.parse_assign(start_span)
+    }
+
+    fn parse_use(&mut self) -> SoulResult<Statement> {
+        let start_span = self.token().span;
+        self.expect_ident(KeyWord::Use.as_str())?;
+        let generics = self.parse_generic_declare()?
+            .unwrap_or(vec![]);
+        
+        let use_type = self.try_parse_type().merge_to_result()?;
+        
+        let prev = take(&mut self.current_this);
+        self.current_this = Some(use_type.clone());
+        let block = self.parse_use_block(use_type, generics)?; 
+        self.current_this = prev;
+
+        Ok(Statement::new(StatementKind::UseBlock(block), self.span_combine(start_span)))
+    }
+
+    fn parse_use_block(&mut self, use_type: SoulType, generics: Vec<Generic>) -> SoulResult<UseBlock> {
+        let mut impls = vec![];
+        let mut methodes = vec![];
+        if self.current_is_ident(KeyWord::Impl.as_str()) {
+            let impl_block = self.parse_impl_block()?;
+            impls.push(impl_block);
+            return Ok(UseBlock { use_type, impls, generics, methodes })
+        }
+
+        self.skip_end_lines();
+        self.expect(&CURLY_OPEN)?;
+        loop {
+            self.skip_end_lines();
+            if self.current_is(&CURLY_CLOSE) {
+                break
+            }
+
+            if self.current_is_ident(KeyWord::Impl.as_str()) {
+                let impl_block = self.parse_impl_block()?;
+                impls.push(impl_block);
+                continue;
+            }
+
+            let mut name = self.try_bump_consume_ident()?;
+            let modifier = match TypeModifier::from_str(name.as_str()) {
+                Some(modifer) => {
+                    name = self.try_bump_consume_ident()?;
+                    modifer
+                }
+                None => TypeModifier::Mut,
+            };
+            
+            let methode = self.try_parse_function_declaration(name.span, self.default_methode_type(modifier, name.span), name)
+                .map_try_not_value(|(_, err)| *err)
+                .merge_to_result()?;
+            
+            methodes.push(methode.node);
+        }
+        self.expect(&CURLY_CLOSE)?;
+        Ok(UseBlock{ use_type, impls, generics, methodes })
+    }
+
+    fn parse_impl_block(&mut self) -> SoulResult<ImplBlock> {
+        self.expect_ident(KeyWord::Impl.as_str())?;
+        let impl_trait = self.try_parse_type()
+            .merge_to_result()?;
+
+        let mut methodes = vec![];
+        self.skip_end_lines();
+        self.expect(&CURLY_OPEN)?;
+        loop {
+            self.skip_end_lines();
+            if self.current_is(&CURLY_CLOSE) {
+                break
+            }
+
+            let mut name = self.try_bump_consume_ident()?;
+            let modifier = match TypeModifier::from_str(name.as_str()) {
+                Some(modifer) => {
+                    name = self.try_bump_consume_ident()?;
+                    modifer
+                }
+                None => TypeModifier::Mut,
+            };
+            
+            let methode = self.try_parse_function_declaration(name.span, self.default_methode_type(modifier, name.span), name)
+                .map_try_not_value(|(_, err)| *err)
+                .merge_to_result()?;
+            
+            methodes.push(methode.node);
+        }
+        self.expect(&CURLY_CLOSE)?;
+        Ok(ImplBlock{ impl_trait, methodes })
     }
 
     fn try_parse_methode(&mut self, start_span: Span) -> TryResult<Statement, ()> {
