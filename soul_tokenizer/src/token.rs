@@ -32,10 +32,12 @@ pub enum TokenKind {
     StringLiteral(String),
 }
 impl TokenKind {
+    /// Checks if this token marks the end of a source line.
     pub fn is_end_line(&self) -> bool {
         matches!(self, TokenKind::EndLine)
     }
 
+    /// Checks if this token marks the end of the input file.
     pub fn is_end_file(&self) -> bool {
         matches!(self, TokenKind::EndFile)
     }
@@ -63,10 +65,12 @@ impl TokenKind {
         sb
     }
 
+    /// Writes a display string to the given buffer.
     pub fn write_display(&self, sb: &mut String) {
         self.inner_display(sb).expect("write should not fail");
     }
 
+    #[doc(hidden)]
     pub fn inner_display(&self, sb: &mut String) -> Result<usize> {
         let old = sb.len();
         match self {
@@ -82,6 +86,7 @@ impl TokenKind {
         Ok(sb.len().saturating_sub(old))
     }
 
+    /// Returns the display length of this token kind.
     pub fn display_len(&self) -> usize {
         match self {
             TokenKind::EndFile => Self::END_FILE_STR.len(),
@@ -107,6 +112,7 @@ impl TokenKind {
 }
 
 impl Token {
+    /// Creates a new token with the given kind and source span.
     pub const fn new(kind: TokenKind, span: Span) -> Self {
         Self { kind, span }
     }
@@ -118,17 +124,19 @@ impl Token {
 }
 
 impl Number {
-    /// Number display formatting with type annotation.
+    /// Returns a display string with type annotation (e.g., "42: untypedInt").
     pub fn display(&self) -> String {
         let mut sb = String::new();
         self.inner_display(&mut sb).expect("write should not fail");
         sb
     }
 
+    /// Writes a display string to the given buffer.
     pub fn write_display(&self, sb: &mut String) {
         self.inner_display(sb).expect("write should not fail");
     }
 
+    #[doc(hidden)]
     fn inner_display(&self, sb: &mut String) -> Result<usize> {
         const INT_STR: &str = PrimitiveTypes::UntypedInt.as_str();
         const UINT_STR: &str = PrimitiveTypes::UntypedUint.as_str();

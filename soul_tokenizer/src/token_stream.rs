@@ -22,6 +22,7 @@ pub struct TokenStream<'a> {
 pub struct TokenStreamPosition<'a>(TokenStream<'a>);
 
 impl<'a> TokenStream<'a> {
+    /// Creates a new token stream from the given source code.
     pub fn new(source: &'a str) -> Self {
         Self {
             lexer: Lexer::new(source),
@@ -29,16 +30,17 @@ impl<'a> TokenStream<'a> {
         }
     }
 
-    /// initializes tokenstream plz call this before using tokenstream
+    /// Initializes the token stream. Call this before using the token stream.
     pub fn initialize(&mut self) -> SoulResult<()> {
         self.advance()
     }
 
-    /// Captures the current stream position for later restoration
+    /// Captures the current stream position for later restoration.
     pub fn current_position(&self) -> TokenStreamPosition<'a> {
         TokenStreamPosition(self.clone())
     }
 
+    /// Returns the current token index in the stream.
     pub fn current_token_index(&self) -> usize {
         self.lexer.current_token_index()
     }
@@ -59,17 +61,17 @@ impl<'a> TokenStream<'a> {
         lexer.next_token()
     }
 
-    /// Advances the stream to the next token, updating current token.
+    /// Advances the stream to the next token, updating the current token.
     pub fn advance(&mut self) -> SoulResult<()> {
         self.current = self.lexer.next_token()?;
         Ok(())
     }
 
-    /// Consumes and returns the current token, then advances.
+    /// Consumes and returns the current token, then advances the stream.
     ///
     /// # Returns
-    /// - `(Token, None)` no lexer error returns token
-    /// - `(Token, Some(SoulError))` returns lexer error and token
+    /// - `(Token, None)` - no lexer error, returns the token
+    /// - `(Token, Some(SoulError))` - lexer error, returns the token
     pub fn consume_advance(&mut self) -> (Token, Option<SoulError>) {
         use std::mem::swap;
 

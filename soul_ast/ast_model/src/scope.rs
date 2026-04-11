@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use soul_utils::{Ident, ids::FunctionId, impl_soul_ids, span::Span, vec_map::VecMapIndex};
+use soul_utils::{ids::FunctionId, impl_soul_ids, span::Span, vec_map::VecMapIndex, Ident};
 
 use crate::ast::Variable;
 
@@ -31,9 +31,7 @@ impl ScopeBuilder {
     }
 
     pub fn pop_scope(&mut self) {
-        self.current = self.scopes[self.current.0]
-            .parent
-            .unwrap_or(self.current);
+        self.current = self.scopes[self.current.0].parent.unwrap_or(self.current);
     }
 
     pub fn go_to(&mut self, scope_id: ScopeId) {
@@ -64,7 +62,9 @@ impl ScopeBuilder {
     pub fn lookup_value(&self, ident: &Ident, kind: ScopeValue) -> Option<NodeId> {
         for scope in self.scope_iter() {
             let ids = match scope.entries.get(ident.as_str()) {
-                Some(ScopeEntry { values: Some(val), .. }) => val,
+                Some(ScopeEntry {
+                    values: Some(val), ..
+                }) => val,
                 _ => continue,
             };
 
@@ -133,7 +133,7 @@ pub struct ScopeEntry {
     function: Option<FunctionId>,
     values: Option<ScopeValueEntry>,
     types: Option<ScopeTypeEntry>,
-} 
+}
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Scope {
     pub id: ScopeId,
@@ -175,7 +175,7 @@ impl Scope {
         if self.get_mut_entry(name)?.values.is_none() {
             self.get_mut_entry(name)?.values = Some(ScopeValueEntry::default());
         }
-        
+
         let values = &mut self.get_mut_entry(name)?.values.as_mut().unwrap();
         values.insert(kind, id)
     }
@@ -184,7 +184,7 @@ impl Scope {
         if !self.entries.contains_key(name) {
             self.entries.insert(name.to_string(), ScopeEntry::default());
         }
-        
+
         self.entries.get_mut(name)
     }
 }

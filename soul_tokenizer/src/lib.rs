@@ -9,6 +9,7 @@ mod token_stream;
 #[cfg(test)]
 mod tests;
 
+/// Converts source code into a token stream for parsing.
 pub fn to_token_stream<'a>(source: &'a str) -> TokenStream<'a> {
     TokenStream::new(source)
 }
