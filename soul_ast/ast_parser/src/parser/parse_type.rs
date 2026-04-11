@@ -105,13 +105,13 @@ impl<'a, 'f> Parser<'a, 'f> {
     fn get_type_wrapper(&mut self) -> TryResult<Vec<ParseWrappers>, SoulError> {
         let mut wrappers = vec![];
         loop {
-            let possible_wrap = match &self.token().kind {
-                &CONST_REF => Some(ParseWrappers::ConstRef),
-                &MUT_REF => Some(ParseWrappers::MutRef),
-                &POINTER => Some(ParseWrappers::Pointer),
-                &OPTIONAL => Some(ParseWrappers::Option),
-                &SQUARE_OPEN => Some(ParseWrappers::Array(self.get_array_type_wrapper()?)),
-                &ARRAY => {
+            let possible_wrap = match self.token().kind {
+                CONST_REF => Some(ParseWrappers::ConstRef),
+                MUT_REF => Some(ParseWrappers::MutRef),
+                POINTER => Some(ParseWrappers::Pointer),
+                OPTIONAL => Some(ParseWrappers::Option),
+                SQUARE_OPEN => Some(ParseWrappers::Array(self.get_array_type_wrapper()?)),
+                ARRAY => {
                     return TryNotValue(SoulError::new(
                         "empty array kind (so `[]`) is not allowed use `[<number>]` or `[*]` or `[@] or `[&]`",
                         SoulErrorKind::InvalidTokenKind,

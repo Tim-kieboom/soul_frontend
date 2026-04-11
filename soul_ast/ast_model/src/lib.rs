@@ -101,3 +101,8 @@ impl DeclareStore {
         self.variable_owner_hint.insert(index, kind);
     }
 }
+impl Default for DeclareStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}

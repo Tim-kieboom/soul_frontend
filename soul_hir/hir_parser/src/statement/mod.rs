@@ -11,13 +11,17 @@ mod function;
 
 impl<'a> HirContext<'a> {
     pub fn lower_global(&mut self, global: &ast::Statement) {
-
         let kind = match &global.node {
-            ast::StatementKind::UseBlock(UseBlock{ use_type:_, generics, impls, methodes }) => {
+            ast::StatementKind::UseBlock(UseBlock {
+                use_type: _,
+                generics,
+                impls,
+                methodes,
+            }) => {
                 if !generics.is_empty() {
                     todo!()
                 }
-                
+
                 for methode in methodes {
                     let kind = hir::GlobalKind::Function(self.lower_function(methode));
                     let id = self.alloc_statement(&global.meta_data, global.span);
@@ -27,7 +31,7 @@ impl<'a> HirContext<'a> {
                 if !impls.is_empty() {
                     todo!()
                 }
-                return
+                return;
             }
             ast::StatementKind::Import(import) => {
                 self.resolve_import(import);
@@ -63,14 +67,17 @@ impl<'a> HirContext<'a> {
     }
 
     pub fn lower_statement(&mut self, global: &ast::Statement) -> Option<hir::Statement> {
-
         let kind = match &global.node {
-            ast::StatementKind::UseBlock(UseBlock{ use_type:_, generics, impls, methodes }) => {
-                
+            ast::StatementKind::UseBlock(UseBlock {
+                use_type: _,
+                generics,
+                impls,
+                methodes,
+            }) => {
                 if !generics.is_empty() {
                     todo!()
                 }
-                
+
                 for methode in methodes {
                     let kind = hir::GlobalKind::Function(self.lower_function(methode));
                     let id = self.alloc_statement(&global.meta_data, global.span);
@@ -80,7 +87,7 @@ impl<'a> HirContext<'a> {
                 if !impls.is_empty() {
                     todo!()
                 }
-                return None
+                return None;
             }
             ast::StatementKind::Import(import) => {
                 self.resolve_import(import);
@@ -138,10 +145,10 @@ impl<'a> HirContext<'a> {
             }
         };
 
-        let value = match &variable.initialize_value {
-            Some(val) => Some(self.lower_expression(val)),
-            None => None,
-        };
+        let value = variable
+            .initialize_value
+            .as_ref()
+            .map(|val| self.lower_expression(val));
 
         let local = self.id_generator.alloc_local();
         self.insert_variable(&variable.name, local, ty, value);
@@ -204,22 +211,21 @@ impl<'a> HirContext<'a> {
         &mut self,
         return_like: &ast::ReturnLike,
     ) -> hir::StatementKind {
-        let value = match &return_like.value {
-            Some(val) => Some(self.lower_expression(val)),
-            None => None,
-        };
+        let value = return_like
+            .value
+            .as_ref()
+            .map(|val| self.lower_expression(val));
 
         if matches!(
             return_like.kind,
             ast::ReturnKind::Break | ast::ReturnKind::Continue
-        ) {
-            if let Some(value) = &return_like.value {
-                self.log_error(SoulError::new(
-                    format!("{} can not contain expression", KeyWord::Continue.as_str()),
-                    SoulErrorKind::InvalidContext,
-                    Some(value.span),
-                ));
-            }
+        ) && let Some(value) = &return_like.value
+        {
+            self.log_error(SoulError::new(
+                format!("{} can not contain expression", KeyWord::Continue.as_str()),
+                SoulErrorKind::InvalidContext,
+                Some(value.span),
+            ));
         }
 
         match return_like.kind {

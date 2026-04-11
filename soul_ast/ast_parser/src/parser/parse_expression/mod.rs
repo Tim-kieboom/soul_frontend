@@ -261,7 +261,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 .map(Expression::from_struct_contructor),
             _ => {
                 let span = ident.span;
-                
+
                 Ok(Expression::new(
                     ExpressionKind::Variable {
                         ident,
@@ -300,14 +300,11 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
         };
 
-        match op.to_unary() {
-            Some(unary) => {
-                return Ok(UnaryKinds::UnaryOperator(UnaryOperator::new(
-                    unary,
-                    self.span_combine(start_span),
-                )));
-            }
-            None => (),
+        if let Some(unary) = op.to_unary() {
+            return Ok(UnaryKinds::UnaryOperator(UnaryOperator::new(
+                unary,
+                self.span_combine(start_span),
+            )));
         }
 
         match op {

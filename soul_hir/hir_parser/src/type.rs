@@ -1,5 +1,5 @@
 use ast::Stub;
-use hir::{GenericId, HirType, HirTypeKind, InferTypesMap, LazyTypeId, StructId, TypeId, TypesMap};
+use hir::{GenericId, HirType, HirTypeKind, LazyTypeId, StructId, TypeId, TypesMap};
 use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},
     soul_names::{PrimitiveTypes, TypeModifier},
@@ -11,14 +11,7 @@ const CHAR: HirType = HirType::new(hir::HirTypeKind::Primitive(PrimitiveTypes::C
 
 impl<'a> HirContext<'a> {
     pub(crate) fn lower_type(&mut self, ty: &ast::SoulType, span: Span) -> hir::LazyTypeId {
-        match Self::convert_type(
-            ty,
-            &self.scopes,
-            &vec![],
-            &mut self.tree.info.types,
-            &mut self.tree.info.infers,
-            span,
-        ) {
+        match Self::convert_type(ty, &self.scopes, &vec![], &mut self.tree.info.types, span) {
             Ok(val) => val,
             Err(err) => {
                 self.log_error(err);
@@ -37,7 +30,6 @@ impl<'a> HirContext<'a> {
         scopes: &Vec<Scope>,
         call_generics: &Vec<(String, TypeId)>,
         types: &mut TypesMap,
-        infers: &mut InferTypesMap,
         span: Span,
     ) -> SoulResult<hir::LazyTypeId> {
         let mut generics = vec![];
@@ -50,8 +42,7 @@ impl<'a> HirContext<'a> {
                 generics: stub_generics,
             }) => {
                 for generic in stub_generics {
-                    let ty =
-                        Self::convert_type(generic, scopes, call_generics, types, infers, span)?;
+                    let ty = Self::convert_type(generic, scopes, call_generics, types, span)?;
 
                     match ty {
                         LazyTypeId::Known(type_id) => generics.push(type_id),
@@ -76,7 +67,6 @@ impl<'a> HirContext<'a> {
                 scopes,
                 call_generics,
                 types,
-                infers,
                 span,
             )?),
             ast::TypeKind::Optional(inner) => HirTypeKind::Optional(Self::convert_type(
@@ -84,29 +74,14 @@ impl<'a> HirContext<'a> {
                 scopes,
                 call_generics,
                 types,
-                infers,
                 span,
             )?),
             ast::TypeKind::Array(array) => HirTypeKind::Array {
-                element: Self::convert_type(
-                    &array.of_type,
-                    scopes,
-                    call_generics,
-                    types,
-                    infers,
-                    span,
-                )?,
+                element: Self::convert_type(&array.of_type, scopes, call_generics, types, span)?,
                 kind: array.kind,
             },
             ast::TypeKind::Reference(reference) => HirTypeKind::Ref {
-                of_type: Self::convert_type(
-                    &reference.inner,
-                    scopes,
-                    call_generics,
-                    types,
-                    infers,
-                    span,
-                )?,
+                of_type: Self::convert_type(&reference.inner, scopes, call_generics, types, span)?,
                 mutable: reference.mutable,
             },
             ast::TypeKind::Primitive(prim) => HirTypeKind::Primitive(*prim),
@@ -178,9 +153,9 @@ enum GenericKind {
 }
 
 fn resolve_stub(
-    scopes: &Vec<Scope>,
+    scopes: &[Scope],
     types: &TypesMap,
-    call_generics: &Vec<(String, TypeId)>,
+    call_generics: &[(String, TypeId)],
     name: &str,
 ) -> Option<HirTypeKind> {
     if let Some(ty) = find_created_type(scopes, name) {
@@ -194,7 +169,7 @@ fn resolve_stub(
     })
 }
 
-fn find_created_type(scopes: &Vec<Scope>, name: &str) -> Option<HirTypeKind> {
+fn find_created_type(scopes: &[Scope], name: &str) -> Option<HirTypeKind> {
     for store in scopes.iter().rev() {
         if let Some(ty) = store.created_type.get(name).copied() {
             return Some(ty.to_hir_kind());
@@ -205,8 +180,8 @@ fn find_created_type(scopes: &Vec<Scope>, name: &str) -> Option<HirTypeKind> {
 }
 
 fn find_generic(
-    scopes: &Vec<Scope>,
-    call_generics: &Vec<(String, TypeId)>,
+    scopes: &[Scope],
+    call_generics: &[(String, TypeId)],
     name: &str,
 ) -> Option<GenericKind> {
     for (generic_name, ref_type) in call_generics {

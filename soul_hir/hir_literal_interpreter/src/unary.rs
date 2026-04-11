@@ -11,7 +11,7 @@ pub(crate) fn interpret_unary(operator: &UnaryOperator, operand: &Literal) -> Op
             if let Some(a) = try_as_f64(operand) {
                 Literal::Float(-a)
             } else if let Some(a) = try_as_i128(operand) {
-                Literal::Int((-a) as i128)
+                Literal::Int(-a)
             } else {
                 return None;
             }

@@ -16,7 +16,7 @@ pub fn literal_resolve(hir: &HirTree, types: &TypedHir) -> VecMap<ExpressionId, 
 
     interpreter.collect_literals();
     interpreter.resolve_literals();
-    interpreter.to_literals()
+    interpreter.consume_to_literals()
 }
 
 struct LiteralInterpreter<'a> {
@@ -123,7 +123,7 @@ impl<'a> LiteralInterpreter<'a> {
                 None => continue,
             };
 
-            let complex = literal.to_complex();
+            let complex = literal.consume_to_complex();
             let field_type = r#struct.fields[i].ty;
             if self.get_type(field_type).is_mutable() || complex.is_mutable() {
                 all_fields_const = false;
@@ -162,8 +162,7 @@ impl<'a> LiteralInterpreter<'a> {
             return Some(LiteralRef::BasicRef(literal));
         }
 
-        self.resolve_expression(value_id)
-            .map(|literal| LiteralRef::Owner(literal))
+        self.resolve_expression(value_id).map(LiteralRef::Owner)
     }
 
     fn get_type(&self, ty: TypeId) -> &ThirType {
@@ -182,7 +181,7 @@ impl<'a> LiteralInterpreter<'a> {
             .unwrap_or(TypeId::error())
     }
 
-    fn to_literals(self) -> VecMap<ExpressionId, ComplexLiteral> {
+    fn consume_to_literals(self) -> VecMap<ExpressionId, ComplexLiteral> {
         self.literals
     }
 
@@ -213,7 +212,7 @@ enum LiteralRef<'a> {
     BasicRef(&'a Literal),
 }
 impl<'a> LiteralRef<'a> {
-    fn to_complex(self) -> ComplexLiteral {
+    fn consume_to_complex(self) -> ComplexLiteral {
         match self {
             LiteralRef::Owner(complex_literal) => complex_literal,
             LiteralRef::BasicRef(literal) => literal.clone().to_complex(),

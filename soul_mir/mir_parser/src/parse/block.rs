@@ -51,8 +51,12 @@ impl<'a> MirContext<'a> {
         if !self.tree.blocks[this_block].returnable {
             let value = match terminator {
                 Some(mir::Terminator::Return(operand)) => {
-                    let return_value = operand.filter(|value| !matches!(value.kind, OperandKind::None));
-                    self.insert_terminator(this_block, mir::Terminator::Return(return_value.clone()));
+                    let return_value =
+                        operand.filter(|value| !matches!(value.kind, OperandKind::None));
+                    self.insert_terminator(
+                        this_block,
+                        mir::Terminator::Return(return_value.clone()),
+                    );
                     return_value
                 }
                 Some(mir::Terminator::Goto(target)) => {

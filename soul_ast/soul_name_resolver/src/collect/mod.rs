@@ -72,7 +72,7 @@ impl<'a> NameResolver<'a> {
         let old_entry = self
             .current_scope_mut()
             .insert_types(name.as_str(), scope_type);
-        
+
         if old_entry.is_some() {
             self.log_error(SoulError::new(
                 format!("type of name {} already exists in scope", name.as_str()),
@@ -115,14 +115,8 @@ impl<'a> NameResolver<'a> {
         self.current_scope_mut().insert_function(name, id);
     }
 
-    fn insert_value(
-        &mut self,
-        name: &str,
-        id: NodeId,
-        kind: ScopeValue,
-    ) -> Option<NodeId> {
-        self.current_scope_mut()
-            .insert_value(name, kind, id)
+    fn insert_value(&mut self, name: &str, id: NodeId, kind: ScopeValue) -> Option<NodeId> {
+        self.current_scope_mut().insert_value(name, kind, id)
     }
 
     fn current_scope_mut(&mut self) -> &mut Scope {

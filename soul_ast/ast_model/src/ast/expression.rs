@@ -1,15 +1,15 @@
 use soul_utils::{
+    Ident,
     ids::FunctionId,
     soul_import_path::SoulImportPath,
     soul_names::KeyWord,
     span::{Span, Spanned},
-    Ident,
 };
 
 use crate::{
+    ArrayContructor, StructConstructor,
     ast::{Array, Binary, BinaryOperator, Block, Literal, SoulType, Unary, UnaryOperator},
     scope::NodeId,
-    ArrayContructor, StructConstructor,
 };
 
 /// An expression in the Soul language, wrapped with source location information.
@@ -38,7 +38,7 @@ pub enum ExpressionKind {
 
     /// Indexing into a collection, e.g., `arr[i]`.
     Index(Index),
-    ///
+    /// access field `object.field`
     FieldAccess(FieldAccess),
     /// A function call, e.g., `foo(x, y)`.
     FunctionCall(FunctionCall),

@@ -49,7 +49,9 @@ impl<'ctx> IrBuilder<'ctx> {
     where
         T: PointerMathValue<'ctx>,
     {
-        self.inkwell.build_pointer_cast(from, to, name).map_err(build_error)
+        self.inkwell
+            .build_pointer_cast(from, to, name)
+            .map_err(build_error)
     }
 
     pub fn build_unreachable(&self) -> SoulResult<InstructionValue<'ctx>> {

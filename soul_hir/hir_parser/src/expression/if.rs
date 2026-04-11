@@ -49,7 +49,7 @@ impl<'a> HirContext<'a> {
             }
             ast::ElseKind::ElseIf(if_expr) => {
                 *is_else = false;
-                self.lower_else_if(&*if_expr, is_else, span)
+                self.lower_else_if(if_expr, is_else, span)
             }
         }
     }

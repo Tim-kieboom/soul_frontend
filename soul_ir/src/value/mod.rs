@@ -170,9 +170,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             AggregateBody::Runtime(operands) => {
                 let mut ir_operands = Vec::with_capacity(operands.len());
                 for op in operands {
-                    ir_operands.push(
-                        self.lower_operand(op, generics)?.value
-                    );
+                    ir_operands.push(self.lower_operand(op, generics)?.value);
                 }
 
                 self.lower_aggregate(struct_ir, ty, &ir_operands, generics)
@@ -190,7 +188,6 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         fields: &[BasicValueEnum<'a>],
         generics: &GenericSubstitute,
     ) -> SoulResult<IrOperand<'a>> {
-
         let ptr = self.builder.build_alloca(struct_ir, "tmp_struct")?;
 
         for (i, field) in fields.into_iter().enumerate() {

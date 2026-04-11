@@ -5,9 +5,7 @@ use std::{
 };
 
 use anyhow::Result;
-use ast::{
-    AstResponse,
-};
+use ast::AstResponse;
 use fern::Dispatch;
 use inkwell::context::Context;
 use log::{error, info};
@@ -28,8 +26,8 @@ use crate::{
     displayer_tokenizer::display_tokens,
 };
 
-mod displayer_ast;
 mod convert_soul_error;
+mod displayer_ast;
 mod displayer_hir;
 mod displayer_mir;
 mod displayer_tokenizer;
@@ -80,7 +78,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn run_fontend<'a>(paths: &'a Paths) -> Result<Ouput> {
+fn run_fontend(paths: &Paths) -> Result<Ouput> {
     let mut faults = vec![];
 
     let source_file = to_source_file(&paths.source_file)?;
@@ -146,10 +144,7 @@ fn display_tokenizer(paths: &Paths, source_file: &str) -> Result<()> {
 }
 
 fn display_ast(paths: &Paths, ast: &AstResponse) -> Result<()> {
-    paths.write_to_output(
-        &displayer_ast::display_ast(ast),
-        "ast/tree.soulc",
-    )?;
+    paths.write_to_output(&displayer_ast::display_ast(ast), "ast/tree.soulc")?;
     paths.write_to_output(
         &displayer_ast::display_ast_name_resolved(ast),
         "ast/NameResolved.soulc",
@@ -177,7 +172,7 @@ fn clear_hir_type_map(hir: &mut HirResponse) {
 
 fn display_mir(paths: &Paths, mir: &MirResponse, hir: &HirResponse) -> Result<()> {
     paths.write_to_output(
-        &displayer_mir::display_mir(&mir.tree, &hir),
+        &displayer_mir::display_mir(&mir.tree, hir),
         "mir/tree.soulc",
     )
 }

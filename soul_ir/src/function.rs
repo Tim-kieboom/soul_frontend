@@ -92,14 +92,19 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             Ok(val) => val,
             Err(err) => {
                 self.log_error(err);
-                &ThirType{ kind: ThirTypeKind::None, generics: vec![], modifier: None }
+                &ThirType {
+                    kind: ThirTypeKind::None,
+                    generics: vec![],
+                    modifier: None,
+                }
             }
         };
 
         if owner_type.kind != ThirTypeKind::None {
             sb.push_str("___t_");
-            owner_type.write_display_no_spaces(&self.types.types_map, &mut sb)
-                    .expect("expect not fmt error");
+            owner_type
+                .write_display_no_spaces(&self.types.types_map, &mut sb)
+                .expect("expect not fmt error");
         }
         if !type_args.is_empty() {
             sb.push_str("___g");

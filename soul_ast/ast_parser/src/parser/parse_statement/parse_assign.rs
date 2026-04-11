@@ -1,7 +1,8 @@
 use std::{iter, sync::LazyLock};
 
 use ast::{
-    Assignment, Binary, BinaryOperator, BinaryOperatorKind, Expression, ExpressionKind, Statement, StatementKind
+    Assignment, Binary, BinaryOperator, BinaryOperatorKind, Expression, ExpressionKind, Statement,
+    StatementKind,
 };
 use soul_tokenizer::TokenKind;
 use soul_utils::{

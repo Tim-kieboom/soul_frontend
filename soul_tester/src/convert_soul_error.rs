@@ -145,7 +145,7 @@ fn get_source_snippet(out: &mut String, span: &Span, mut lines: Lines, begin_spa
     };
 
     let mut all_remaining_lines = Vec::new();
-    while let Some(line) = lines.next() {
+    for line in lines {
         all_remaining_lines.push(line);
     }
 

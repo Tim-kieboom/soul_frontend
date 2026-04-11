@@ -43,7 +43,7 @@ pub fn display_mir(mir: &MirTree, hir: &HirResponse) -> String {
         displayer.push('\n');
     }
 
-    displayer.to_string()
+    displayer.consume_to_string()
 }
 
 struct MirDisplayer<'a> {
@@ -70,7 +70,7 @@ impl<'a> MirDisplayer<'a> {
         self.sb.push_str(str);
     }
 
-    fn to_string(self) -> String {
+    fn consume_to_string(self) -> String {
         self.sb
     }
 
@@ -161,12 +161,9 @@ impl<'a> MirDisplayer<'a> {
             .write_display(&self.types.types_map, &mut self.sb)
             .expect("no fmt error");
 
-        match local {
-            Local::Comptime { value, .. } => {
-                self.push_str(" = ");
-                self.display_literal(value);
-            }
-            _ => (),
+        if let Local::Comptime { value, .. } = local {
+            self.push_str(" = ");
+            self.display_literal(value);
         }
     }
 
@@ -452,8 +449,7 @@ impl<'a> MirDisplayer<'a> {
         self.display_place(base);
         self.push('.');
         self.push_str(
-            &self
-                .hir
+            self.hir
                 .nodes
                 .fields
                 .get(field)

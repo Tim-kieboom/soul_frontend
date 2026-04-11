@@ -31,7 +31,7 @@ pub fn lower_hir(response: &AstResponse, faults: &mut Vec<SementicFault>) -> Hir
         context.lower_global(global);
     }
 
-    context.to_hir()
+    context.consume_to_hir()
 }
 
 #[derive(Debug)]
@@ -184,7 +184,7 @@ impl<'a> HirContext<'a> {
         self.faults.push(SementicFault::error(err));
     }
 
-    fn to_hir(self) -> HirTree {
+    fn consume_to_hir(self) -> HirTree {
         self.tree
     }
 }

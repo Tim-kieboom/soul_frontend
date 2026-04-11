@@ -1,7 +1,15 @@
-use std::{fmt::{Arguments, Debug, Write}};
+use std::fmt::{Arguments, Debug, Write};
 
-use ast::{Assignment, AstResponse, Block, ElseKind, Expression, Function, FunctionSignature, Generic, IfArm, Import, SoulType, Statement, StatementKind, Struct, TypeKind, UseBlock, Variable, scope::{NodeId, ScopeId}};
-use soul_utils::{ids::FunctionId, soul_names::{KeyWord, Operator, TypeModifier}, vec_map::VecMapIndex};
+use ast::{
+    Assignment, AstResponse, Block, ElseKind, Expression, Function, FunctionSignature, Generic,
+    IfArm, Import, SoulType, Statement, StatementKind, Struct, TypeKind, UseBlock, Variable,
+    scope::{NodeId, ScopeId},
+};
+use soul_utils::{
+    ids::FunctionId,
+    soul_names::{KeyWord, Operator, TypeModifier},
+    vec_map::VecMapIndex,
+};
 
 pub fn display_ast(ast: &AstResponse) -> String {
     let mut displayer = AstDisplayer::new_ast();
@@ -10,7 +18,7 @@ pub fn display_ast(ast: &AstResponse) -> String {
         displayer.display_statement(statement);
         displayer.push('\n');
     }
-    displayer.to_string()
+    displayer.consume_to_string()
 }
 
 pub fn display_ast_name_resolved(ast: &AstResponse) -> String {
@@ -20,7 +28,7 @@ pub fn display_ast_name_resolved(ast: &AstResponse) -> String {
         displayer.display_statement(statement);
         displayer.push('\n');
     }
-    displayer.to_string()
+    displayer.consume_to_string()
 }
 
 const MUT: bool = true;
@@ -32,23 +40,22 @@ struct AstDisplayer {
     is_name_resolved: bool,
 }
 impl AstDisplayer {
-    
     fn new_ast() -> Self {
-        Self { 
-            sb: String::new(), 
+        Self {
+            sb: String::new(),
             is_name_resolved: false,
-            depth: String::with_capacity(10), 
+            depth: String::with_capacity(10),
         }
     }
-    
+
     fn new_name_resolved() -> Self {
-        Self { 
-            sb: String::new(), 
+        Self {
+            sb: String::new(),
             is_name_resolved: true,
-            depth: String::with_capacity(10), 
+            depth: String::with_capacity(10),
         }
     }
-    
+
     fn push(&mut self, ch: char) {
         self.sb.push(ch);
     }
@@ -64,18 +71,17 @@ impl AstDisplayer {
     fn display_depth(&mut self) {
         self.sb.push_str(&self.depth);
     }
-    
+
     fn push_scope(&mut self) {
         self.depth.push('\t');
     }
-    
+
     fn pop_scope(&mut self) {
         let res = self.depth.pop();
         debug_assert!(res.is_some());
     }
 
     fn display_block(&mut self, block: &Block) {
-
         self.try_display_node_id(block.node_id);
         if block.modifier != TypeModifier::Mut {
             self.push(' ');
@@ -94,19 +100,23 @@ impl AstDisplayer {
         self.display_depth();
         self.push_str("}\n");
     }
-    
+
     fn display_statement(&mut self, statement: &Statement) {
-        self.display_tag(&statement.display_variant(), statement.node.get_id());
-        
+        self.display_tag(statement.display_variant(), statement.node.get_id());
+
         match &statement.node {
             ast::StatementKind::Struct(obj) => self.display_struct(obj),
             ast::StatementKind::Import(import) => self.display_import(import),
             ast::StatementKind::Variable(variable) => self.display_variable(variable),
             ast::StatementKind::UseBlock(use_block) => self.display_use_block(use_block),
             ast::StatementKind::Assignment(assignment) => self.display_assignment(assignment),
-            ast::StatementKind::Function(function) |
-            ast::StatementKind::ExternalFunction(function) => self.display_function(function),
-            ast::StatementKind::Expression { expression, ends_semicolon, .. } => {
+            ast::StatementKind::Function(function)
+            | ast::StatementKind::ExternalFunction(function) => self.display_function(function),
+            ast::StatementKind::Expression {
+                expression,
+                ends_semicolon,
+                ..
+            } => {
                 self.display_expression(expression);
                 if *ends_semicolon {
                     self.push(';');
@@ -153,19 +163,21 @@ impl AstDisplayer {
         if function.signature.node.external.is_some() {
             self.push('\n');
             return;
-        }      
+        }
         self.display_block(&function.block);
     }
 
     fn display_function_signature(&mut self, signature: &FunctionSignature) {
-        
         if let Some(language) = &signature.external {
             let keyword = KeyWord::Extern.as_str();
             self.push_fmt(format_args!("{keyword} \"{}\" ", language.as_str()));
         }
-        
+
         let methode_type = &signature.methode_type;
-        if methode_type.modifier.is_some_and(|modifier| modifier != TypeModifier::Mut) {
+        if methode_type
+            .modifier
+            .is_some_and(|modifier| modifier != TypeModifier::Mut)
+        {
             self.push_str(methode_type.modifier.unwrap().as_str());
             self.push(' ');
         }
@@ -215,7 +227,6 @@ impl AstDisplayer {
     }
 
     fn display_if_arm(&mut self, if_arm: &Option<IfArm>) {
-
         let mut current = if_arm.as_ref();
         while let Some(arm) = current {
             self.display_depth();
@@ -259,10 +270,9 @@ impl AstDisplayer {
         }
     }
 
-
     fn display_import(&mut self, import: &Import) {
         const SEPERATOR: &str = "::";
-        
+
         self.push_str(KeyWord::Import.as_str());
         for path in &import.paths {
             match &path.kind {
@@ -305,7 +315,6 @@ impl AstDisplayer {
     }
 
     fn display_expression(&mut self, expression: &Expression) {
-
         match &expression.node {
             ast::ExpressionKind::If(r#if) => {
                 self.try_display_node_id(r#if.id);
@@ -357,7 +366,6 @@ impl AstDisplayer {
                     self.display_expression(condition);
                 }
                 self.push_str("{\n");
-
             }
             ast::ExpressionKind::Binary(binary) => {
                 self.push('(');
@@ -399,11 +407,10 @@ impl AstDisplayer {
                 self.push_str(field_access.field.as_str());
             }
             ast::ExpressionKind::FunctionCall(function_call) => {
-                
                 if let Some(callee) = &function_call.callee {
                     self.display_expression(callee);
                     self.push('.');
-                } 
+                }
                 self.push_str(function_call.name.as_str());
                 self.display_generic_define(&function_call.generics);
                 self.push('(');
@@ -420,10 +427,12 @@ impl AstDisplayer {
                 }
                 self.push(')');
             }
-            ast::ExpressionKind::Variable { ident, resolved, .. } => {
+            ast::ExpressionKind::Variable {
+                ident, resolved, ..
+            } => {
                 self.try_display_node_id(*resolved);
                 self.push_str(ident.as_str());
-            },
+            }
             ast::ExpressionKind::ArrayContructor(ctor) => {
                 if let Some(collection) = &ctor.collection_type {
                     self.display_type(collection);
@@ -441,10 +450,14 @@ impl AstDisplayer {
                 self.display_expression(&ctor.element);
                 self.push(']');
             }
-            ast::ExpressionKind::Ref { expression, is_mutable, .. } => {
+            ast::ExpressionKind::Ref {
+                expression,
+                is_mutable,
+                ..
+            } => {
                 let str = match *is_mutable {
                     MUT => Operator::ConstRef.as_str(),
-                    CONST => Operator::BitAnd.as_str(), 
+                    CONST => Operator::BitAnd.as_str(),
                 };
                 self.push_str(str);
                 self.display_expression(expression);
@@ -475,7 +488,6 @@ impl AstDisplayer {
     }
 
     fn display_type(&mut self, ty: &SoulType) {
-
         if let Some(modifier) = ty.modifier {
             self.push_str(modifier.as_str());
             self.push(' ');
@@ -485,7 +497,6 @@ impl AstDisplayer {
     }
 
     fn display_typekind(&mut self, kind: &TypeKind) {
-        
         match kind {
             ast::TypeKind::None => self.push_str("none"),
             ast::TypeKind::Type => self.push_str("type"),
@@ -499,15 +510,15 @@ impl AstDisplayer {
                     ast::ArrayKind::StackArray(len) => self.push_fmt(format_args!("[{len}]")),
                 }
                 self.display_type(&array_type.of_type);
-            },
+            }
             ast::TypeKind::Pointer(soul_type) => {
                 self.push('*');
                 self.display_type(soul_type);
-            },
+            }
             ast::TypeKind::Optional(soul_type) => {
                 self.push('?');
                 self.display_type(soul_type);
-            },
+            }
             ast::TypeKind::Reference(reference_type) => {
                 match reference_type.mutable {
                     MUT => self.push('&'),
@@ -527,7 +538,7 @@ impl AstDisplayer {
             self.push_fmt(format_args!("/*{str}*/"));
             self.push('\n');
             self.display_depth();
-            return
+            return;
         }
 
         match node_id {
@@ -540,7 +551,7 @@ impl AstDisplayer {
 
     fn try_display_node_id(&mut self, node_id: Option<NodeId>) {
         if !self.is_name_resolved {
-            return
+            return;
         }
 
         if let Some(id) = node_id {
@@ -548,7 +559,7 @@ impl AstDisplayer {
         }
     }
 
-    fn display_generic_declare(&mut self, generics: &Vec<Generic>) {
+    fn display_generic_declare(&mut self, generics: &[Generic]) {
         if !generics.is_empty() {
             self.push('<');
             let last_index = generics.len().saturating_sub(1);
@@ -562,7 +573,7 @@ impl AstDisplayer {
         }
     }
 
-    fn display_generic_define(&mut self, generics: &Vec<SoulType>) {
+    fn display_generic_define(&mut self, generics: &[SoulType]) {
         if !generics.is_empty() {
             self.push('<');
             let last_index = generics.len().saturating_sub(1);
@@ -578,7 +589,7 @@ impl AstDisplayer {
 
     fn try_display_scope_id(&mut self, scope_id: Option<ScopeId>) {
         if !self.is_name_resolved {
-            return
+            return;
         }
 
         if let Some(id) = scope_id {
@@ -586,7 +597,7 @@ impl AstDisplayer {
         }
     }
 
-    fn to_string(self) -> String {
+    fn consume_to_string(self) -> String {
         self.sb
     }
 }
@@ -600,14 +611,15 @@ impl StatementKindHelper for StatementKind {
             StatementKind::Struct(obj) => obj.id.to_statement_kind(),
             StatementKind::Import(import) => import.id.to_statement_kind(),
             StatementKind::Variable(variable) => variable.node_id.to_statement_kind(),
-            StatementKind::Expression{ id, expression, .. } => match &expression.node {
+            StatementKind::Expression { id, expression, .. } => match &expression.node {
                 ast::ExpressionKind::FunctionCall(call) => call.resolved.to_statement_kind(),
                 _ => (*id).to_statement_kind(),
             },
             StatementKind::Assignment(assignment) => assignment.node_id.to_statement_kind(),
-            
-            StatementKind::ExternalFunction(func) |
-            StatementKind::Function(func) => func.signature.node.id.to_statement_kind(),
+
+            StatementKind::ExternalFunction(func) | StatementKind::Function(func) => {
+                func.signature.node.id.to_statement_kind()
+            }
             StatementKind::UseBlock(_) => None,
         }
     }
@@ -615,13 +627,13 @@ impl StatementKindHelper for StatementKind {
 /// mainly just for displayer
 pub enum StatementIdKind {
     NodeId(NodeId),
-    FunctionId(FunctionId)
+    FunctionId(FunctionId),
 }
 impl VecMapIndex for StatementIdKind {
     fn new_index(_value: usize) -> Self {
         panic!("stub impl")
     }
-    
+
     fn index(&self) -> usize {
         panic!("stub impl")
     }
@@ -639,12 +651,12 @@ trait ToStatementKind {
 }
 impl ToStatementKind for Option<NodeId> {
     fn to_statement_kind(self) -> Option<StatementIdKind> {
-        self.map(|id| StatementIdKind::NodeId(id))
+        self.map(StatementIdKind::NodeId)
     }
 }
 impl ToStatementKind for Option<FunctionId> {
     fn to_statement_kind(self) -> Option<StatementIdKind> {
-        self.map(|id| StatementIdKind::FunctionId(id))
+        self.map(StatementIdKind::FunctionId)
     }
 }
 

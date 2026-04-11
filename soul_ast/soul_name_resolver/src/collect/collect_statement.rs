@@ -1,7 +1,7 @@
 use ast::{
-    scope::{ScopeBuilder, ScopeValue, ScopeValueKind},
     Block, DeclareStore, Expression, ExpressionKind, Function, FunctionSignature, Literal,
     Statement, StatementKind, TypeKind, UseBlock, VarTypeKind,
+    scope::{ScopeBuilder, ScopeValue, ScopeValueKind},
 };
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
@@ -64,14 +64,12 @@ impl<'a> NameResolver<'a> {
 
                 self.store.insert_variable_type(id, variable.ty.clone());
 
-                if matches!(&variable.ty, VarTypeKind::InveredType(_)) {
-                    if let Some(init) = &variable.initialize_value {
-                        if let Some(hint) =
-                            owner_hint_from_initializer_literal(init, &self.info.scopes, self.store)
-                        {
-                            self.store.insert_variable_owner_hint(id, hint);
-                        }
-                    }
+                if matches!(&variable.ty, VarTypeKind::InveredType(_))
+                    && let Some(init) = &variable.initialize_value
+                    && let Some(hint) =
+                        owner_hint_from_initializer_literal(init, &self.info.scopes, self.store)
+                {
+                    self.store.insert_variable_owner_hint(id, hint);
                 }
 
                 match &mut variable.ty {
@@ -158,15 +156,14 @@ fn owner_hint_from_initializer_literal(
                 .as_ref()
                 .and_then(|callee| parse_callee_type(callee, scopes));
 
-            if let Some(owner_kind) = owner_kind {
-                let function_name = function_call.name.as_str();
-                if let Some(function_id) =
+            let function_name = function_call.name.as_str();
+
+            if let Some(owner_kind) = owner_kind
+                && let Some(function_id) =
                     store.find_function_by_name_and_owner_kind(function_name, Some(&owner_kind))
-                {
-                    if let Some(signature) = store.get_function(function_id) {
-                        return Some(signature.return_type.kind.clone());
-                    }
-                }
+                && let Some(signature) = store.get_function(function_id)
+            {
+                return Some(signature.return_type.kind.clone());
             }
             None
         }

@@ -1,15 +1,16 @@
 use hir::{Binary, ExpressionId, StructId, TypeId, Unary};
 use hir_literal_interpreter::ToComplex;
 use soul_utils::{
+    Ident,
     ids::{FunctionId, IdAlloc},
-    soul_error_internal, Ident,
+    soul_error_internal,
 };
 use typed_hir::{Field, Struct, ThirTypeKind};
 use typed_hir_parser::UnifyPrimitiveCast;
 
 use crate::{
-    mir::{self, Operand},
     EndBlock, MirContext,
+    mir::{self, Operand},
 };
 
 mod conditionals;

@@ -8,7 +8,7 @@ use soul_utils::{
     vec_map::VecMapIndex,
 };
 use std::fmt::Write;
-use typed_hir::{display_thir::DisplayThirType, ThirTypeKind, TypedHir};
+use typed_hir::{ThirTypeKind, TypedHir, display_thir::DisplayThirType};
 
 pub fn display_hir(hir: &HirTree) -> String {
     let mut displayer = HirDisplayer::new_hir(hir);
@@ -17,7 +17,7 @@ pub fn display_hir(hir: &HirTree) -> String {
         displayer.display_global(global);
     }
 
-    displayer.to_string()
+    displayer.consume_to_string()
 }
 
 pub fn display_thir(hir: &HirTree, typed: &TypedHir) -> String {
@@ -27,7 +27,7 @@ pub fn display_thir(hir: &HirTree, typed: &TypedHir) -> String {
         displayer.display_global(global);
     }
 
-    displayer.to_string()
+    displayer.consume_to_string()
 }
 
 pub fn display_created_types(hir: &HirTree, typed: &TypedHir) -> String {
@@ -55,7 +55,7 @@ pub fn display_created_types(hir: &HirTree, typed: &TypedHir) -> String {
             typed
                 .types_map
                 .id_to_type(field.ty)
-                .expect(&format!("{:?} not found", field.ty))
+                .unwrap_or_else(|| panic!("{:?} not found", field.ty))
                 .write_display(&typed.types_map, &mut sb)
                 .expect("no fmt error");
             sb.push('\n');
@@ -399,25 +399,22 @@ impl<'a> HirDisplayer<'a> {
                 self.display_place(base);
                 self.push('.');
                 self.push_str(field.as_str());
-                match self.typed {
-                    Some(typed) => {
-                        let field = typed
-                            .types_table
-                            .place_fields
-                            .get(*place)
-                            .copied()
-                            .unwrap_or(FieldId::error());
-                        let ty = typed
-                            .types_table
-                            .fields
-                            .get(field)
-                            .map(|f| f.field_type)
-                            .unwrap_or(TypeId::error());
-                        self.push_str("<as: ");
-                        self.display_type(ty.to_lazy());
-                        self.push('>');
-                    }
-                    None => (),
+                if let Some(typed) = self.typed {
+                    let field = typed
+                        .types_table
+                        .place_fields
+                        .get(*place)
+                        .copied()
+                        .unwrap_or(FieldId::error());
+                    let ty = typed
+                        .types_table
+                        .fields
+                        .get(field)
+                        .map(|f| f.field_type)
+                        .unwrap_or(TypeId::error());
+                    self.push_str("<as: ");
+                    self.display_type(ty.to_lazy());
+                    self.push('>');
                 }
             }
         }
@@ -478,7 +475,7 @@ impl<'a> HirDisplayer<'a> {
     }
 
     fn display_type(&mut self, id: LazyTypeId) {
-        if let None = self.inner_type(id) {
+        if self.inner_type(id).is_none() {
             HirType::error_type()
                 .write_display(&self.hir.info.types, &self.hir.info.infers, &mut self.sb)
                 .expect("no format error")
@@ -492,7 +489,7 @@ impl<'a> HirDisplayer<'a> {
                     .types_map
                     .id_to_type(ty)
                     .map(|ty| matches!(ty.kind, ThirTypeKind::None))
-                    .unwrap_or(false)
+                    .unwrap_or(false);
             }
             (Some(_), LazyTypeId::Infer(_)) => panic!("should not have infer in thir"),
             _ => (),
@@ -538,7 +535,7 @@ impl<'a> HirDisplayer<'a> {
         Some(())
     }
 
-    fn to_string(self) -> String {
+    fn consume_to_string(self) -> String {
         self.sb
     }
 

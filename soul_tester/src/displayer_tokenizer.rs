@@ -14,12 +14,7 @@ pub fn display_tokens<'a>(
     }
 
     let mut sb = "[\n".to_string();
-    let max = token_stream
-        .clone()
-        .into_iter()
-        .map(get_token_len)
-        .max()
-        .unwrap_or(0);
+    let max = token_stream.clone().map(get_token_len).max().unwrap_or(0);
 
     let len = max + 4;
     for result in token_stream {
@@ -30,7 +25,7 @@ pub fn display_tokens<'a>(
         sb.push('\t');
         let kind_len = token.kind.inner_display(&mut sb)?;
         for _ in 0..len.saturating_sub(kind_len) {
-            sb.push_str(" ");
+            sb.push(' ');
         }
         sb.push_str(">> Span(");
         token.span.inner_display(&mut sb);

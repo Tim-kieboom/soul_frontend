@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use soul_utils::{ids::FunctionId, impl_soul_ids, span::Span, vec_map::VecMapIndex, Ident};
+use soul_utils::{Ident, ids::FunctionId, impl_soul_ids, span::Span, vec_map::VecMapIndex};
 
 use crate::ast::Variable;
 
@@ -85,9 +85,8 @@ impl ScopeBuilder {
 
     pub fn lookup_function(&self, ident: &Ident) -> Option<FunctionId> {
         for scope in self.scope_iter() {
-            match scope.entries.get(ident.as_str()) {
-                Some(ScopeEntry { function, .. }) => return *function,
-                _ => (),
+            if let Some(ScopeEntry { function, .. }) = scope.entries.get(ident.as_str()) {
+                return *function;
             };
         }
 
@@ -123,7 +122,7 @@ impl<'a> Iterator for ScopeIterator<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let index = self.current?.0;
         let scope = self.scopes.get(index)?;
-        self.current = scope.parent.map(|scope_id| scope_id);
+        self.current = scope.parent;
         Some(scope)
     }
 }

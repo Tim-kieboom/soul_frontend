@@ -192,7 +192,7 @@ impl<'a> TypedHirContext<'a> {
                 Some(val) => val.to_lazy(),
                 None => LazyTypeId::error(),
             },
-            _ => return ty.to_lazy(),
+            _ => ty.to_lazy(),
         }
     }
 

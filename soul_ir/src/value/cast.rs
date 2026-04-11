@@ -30,9 +30,18 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         let mir_source_type = self.get_type(value.ty)?;
         let mir_cast_type = self.get_type(cast_to)?;
         match (mir_source_type.kind, mir_cast_type.kind) {
-            (ThirTypeKind::Array { kind: ArrayKind::StackArray(_), .. }, ThirTypeKind::Pointer(_)) => {
+            (
+                ThirTypeKind::Array {
+                    kind: ArrayKind::StackArray(_),
+                    ..
+                },
+                ThirTypeKind::Pointer(_),
+            ) => {
                 let value = source_operand.get_or_convert_pointer(&self.builder)?.into();
-                Ok(IrOperand { value, info: crate::OperandInfo::new_loaded(cast_to, cast_type) })
+                Ok(IrOperand {
+                    value,
+                    info: crate::OperandInfo::new_loaded(cast_to, cast_type),
+                })
             }
             (ThirTypeKind::Pointer(_), ThirTypeKind::Pointer(_)) => {
                 //llvm doesn't care ptr's are ptr's
@@ -40,20 +49,14 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             }
             (ThirTypeKind::Primitive(_), ThirTypeKind::Pointer(_)) => {
                 // int → ptr
-                let (source, cast) = (
-                    source_value.into_int_value(),
-                    cast_type.into_pointer_type(),
-                );
+                let (source, cast) = (source_value.into_int_value(), cast_type.into_pointer_type());
                 let res = self.builder.build_int_to_ptr(source, cast)?;
 
                 self.new_loaded_operand(res.into(), cast_to, generics)
             }
             (ThirTypeKind::Pointer(_), ThirTypeKind::Primitive(_)) => {
                 // ptr → int
-                let (source, cast) = (
-                    source_value.into_pointer_value(),
-                    cast_type.into_int_type(),
-                );
+                let (source, cast) = (source_value.into_pointer_value(), cast_type.into_int_type());
                 let res = self.builder.build_ptr_to_int(source, cast)?;
 
                 self.new_loaded_operand(res.into(), cast_to, generics)

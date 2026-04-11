@@ -84,11 +84,7 @@ impl<'a> HirContext<'a> {
             self.insert_parameter(name, local, ty);
 
             let default = default.as_ref().map(|value| self.lower_expression(value));
-            parameters.push(hir::Parameter {
-                local,
-                ty,
-                default,
-            });
+            parameters.push(hir::Parameter { local, ty, default });
         }
 
         let body = match function.signature.node.external {

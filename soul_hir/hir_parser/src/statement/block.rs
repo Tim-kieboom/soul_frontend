@@ -55,11 +55,9 @@ impl<'a> HirContext<'a> {
             };
 
             terminate_expression = match &hir_statement.kind {
-                hir::StatementKind::Return(Some(value)) => Some(CurrentTerminator::new_return(
-                    value.clone(),
-                    false,
-                    statement.span,
-                )),
+                hir::StatementKind::Return(Some(value)) => {
+                    Some(CurrentTerminator::new_return(*value, false, statement.span))
+                }
                 hir::StatementKind::Expression {
                     value,
                     ends_semicolon,
@@ -69,14 +67,13 @@ impl<'a> HirContext<'a> {
                         ends_semicolon,
                         span,
                     }) = terminate_expression
+                        && ends_semicolon
                     {
-                        if ends_semicolon {
-                            self.log_error(SoulError::new(
+                        self.log_error(SoulError::new(
                                 format!("'{}' at the end of a line can only be used for expressions at the end of a block", SymbolKind::SemiColon.as_str()), 
                                 SoulErrorKind::InvalidEscapeSequence,
                                 Some(span),
                             ));
-                        }
                     }
 
                     Some(CurrentTerminator::new_expression(
@@ -98,14 +95,13 @@ impl<'a> HirContext<'a> {
                     ends_semicolon,
                     span,
                 }) = terminate_expression
+                    && ends_semicolon
                 {
-                    if ends_semicolon {
-                        self.log_error(SoulError::new(
+                    self.log_error(SoulError::new(
                             format!("'{}' at the end of a line can only be used for expressions at the end of a block", SymbolKind::SemiColon.as_str()), 
                             SoulErrorKind::InvalidEscapeSequence,
                             Some(span),
                         ));
-                    }
                 }
 
                 terminate_expression = Some(CurrentTerminator::new_expression(

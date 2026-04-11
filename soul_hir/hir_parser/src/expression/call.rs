@@ -163,7 +163,6 @@ impl<'a> HirContext<'a> {
             &self.scopes,
             &call_generics,
             &mut self.tree.info.types,
-            &mut self.tree.info.infers,
             signature.return_type.span,
         ) {
             Ok(val) => val,
@@ -229,6 +228,5 @@ fn find_default_parameter<'a>(
     parameters
         .iter()
         .enumerate()
-        .filter(|(_, parameter)| parameter.name.as_str() == name)
-        .next()
+        .find(|(_, parameter)| parameter.name.as_str() == name)
 }

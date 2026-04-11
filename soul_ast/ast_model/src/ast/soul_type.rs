@@ -1,10 +1,10 @@
 use soul_utils::{
+    Ident,
     soul_names::{PrimitiveTypes, TypeModifier},
     span::Span,
-    Ident,
 };
 
-use crate::{scope::NodeId, Expression};
+use crate::{Expression, scope::NodeId};
 
 /// Represents a type in the Soul language.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -68,7 +68,7 @@ pub enum ArrayKind {
     ConstSlice,
 }
 impl ArrayKind {
-    pub fn to_string(&self) -> String {
+    pub fn display(&self) -> String {
         let mut sb = String::new();
         self.write_to_string(&mut sb)
             .expect("expect no format errors");

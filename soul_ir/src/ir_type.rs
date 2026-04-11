@@ -74,7 +74,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 #[cfg(debug_assertions)]
                 panic!("error type should not be in ir");
                 #[cfg(not(debug_assertions))]
-                return Err(soul_error_internal!("error type should not be in ir", None))
+                return Err(soul_error_internal!("error type should not be in ir", None));
             }
         }))
     }
@@ -146,8 +146,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 self.context.i32_type().into()
             }
 
-            PrimitiveTypes::CInt 
-            | PrimitiveTypes::CUint => self.default_c_int_type.into(),
+            PrimitiveTypes::CInt | PrimitiveTypes::CUint => self.default_c_int_type.into(),
 
             PrimitiveTypes::Int
             | PrimitiveTypes::Uint

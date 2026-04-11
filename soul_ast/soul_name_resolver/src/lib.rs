@@ -5,14 +5,14 @@ use ast::{
 };
 use soul_utils::{
     Ident,
-    error::{SoulError},
+    error::SoulError,
     ids::{FunctionId, IdGenerator},
     sementic_level::SementicFault,
 };
 
+mod check_name;
 mod collect;
 mod resolve;
-mod check_name;
 
 pub fn name_resolve(request: &mut AstResponse, faults: &mut Vec<SementicFault>) {
     let mut resolver = NameResolver::new(

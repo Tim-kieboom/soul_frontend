@@ -64,7 +64,7 @@ impl InferType {
         self.modifier == Some(TypeModifier::Mut)
     }
     pub fn is_modifier_none(&self) -> bool {
-        self.modifier == None
+        self.modifier.is_none()
     }
 }
 impl HirType {
@@ -101,7 +101,7 @@ impl HirType {
     }
 
     pub fn is_modifier_none(&self) -> bool {
-        self.modifier == None
+        self.modifier.is_none()
     }
 
     pub const fn is_untyped_interger_type(&self) -> bool {

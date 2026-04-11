@@ -163,8 +163,8 @@ impl ArrayKindCompatible for HirTypeKind {
         let default_format = |a: &ArrayKind, b: &ArrayKind| {
             format!(
                 "arraykind '{}' is not compatible with arraykind '{}'",
-                a.to_string(),
-                b.to_string(),
+                a.display(),
+                b.display(),
             )
         };
 
@@ -450,12 +450,12 @@ fn try_get_type(types: &ThirTypesMap, ty: TypeId) -> Option<&ThirType> {
 }
 
 const fn modifier_compatible(this: TypeModifier, should_be: TypeModifier) -> bool {
-    match (this, should_be) {
+    !matches!(
+        (this, should_be),
         (TypeModifier::Mut, TypeModifier::Const)
-        | (TypeModifier::Mut, TypeModifier::Literal)
-        | (TypeModifier::Const, TypeModifier::Literal) => false,
-        _ => true,
-    }
+            | (TypeModifier::Mut, TypeModifier::Literal)
+            | (TypeModifier::Const, TypeModifier::Literal)
+    )
 }
 
 fn primitive_compatible(is: &PrimitiveTypes, should_be: &PrimitiveTypes) -> bool {

@@ -32,7 +32,7 @@ impl<'a> NameResolver<'a> {
                 self.resolve_expression(&mut index.index);
             }
             ExpressionKind::FunctionCall(function_call) => {
-                let type_qualifier = parse_owner_type(self, function_call.callee.as_ref());
+                let type_qualifier = parse_owner_type(self, function_call.callee.as_deref());
                 let is_type_qualifier = type_qualifier.is_some();
                 if is_type_qualifier {
                     function_call.callee = None;
@@ -40,19 +40,15 @@ impl<'a> NameResolver<'a> {
                     self.resolve_expression(callee);
                 }
 
-                let owner_kind = type_qualifier
-                    .as_ref()
-                    .map(|t| &t.kind)
-                    .or_else(|| {
-                        function_call.callee.as_ref().and_then(|c| {
-                            receiver_type_kind_for_instance_method(self.store, c.as_ref())
-                        })
-                    });
+                let owner_kind = type_qualifier.as_ref().map(|t| &t.kind).or_else(|| {
+                    function_call.callee.as_ref().and_then(|c| {
+                        receiver_type_kind_for_instance_method(self.store, c.as_ref())
+                    })
+                });
 
-                function_call.resolved = self.store.find_function_by_name_and_owner_kind(
-                    function_call.name.as_str(),
-                    owner_kind,
-                );
+                function_call.resolved = self
+                    .store
+                    .find_function_by_name_and_owner_kind(function_call.name.as_str(), owner_kind);
                 if function_call.resolved.is_none() && type_qualifier.is_some() {
                     function_call.resolved = self.lookup_function(&function_call.name);
                 }
@@ -70,30 +66,30 @@ impl<'a> NameResolver<'a> {
                     function_call.resolved = Some(FunctionId::error());
                 };
 
-                if let Some(function_id) = function_call.resolved {
-                    if let Some(signature) = self.store.get_function(function_id) {
-                        let needs_callee = !matches!(signature.function_kind, FunctionKind::Static);
+                if let Some(function_id) = function_call.resolved
+                    && let Some(signature) = self.store.get_function(function_id)
+                {
+                    let needs_callee = !matches!(signature.function_kind, FunctionKind::Static);
 
-                        let has_callee = function_call.callee.is_some();
-                        if has_callee && !needs_callee {
-                            self.log_error(SoulError::new(
-                                format!(
-                                    "function '{}' is static and can not be called on an instance",
-                                    function_call.name.as_str(),
-                                ),
-                                SoulErrorKind::InvalidContext,
-                                Some(span),
-                            ));
-                        } else if !has_callee && needs_callee {
-                            self.log_error(SoulError::new(
-                                format!(
-                                    "method '{}' requires a receiver (this/@this/&this)",
-                                    function_call.name.as_str(),
-                                ),
-                                SoulErrorKind::InvalidContext,
-                                Some(span),
-                            ));
-                        }
+                    let has_callee = function_call.callee.is_some();
+                    if has_callee && !needs_callee {
+                        self.log_error(SoulError::new(
+                            format!(
+                                "function '{}' is static and can not be called on an instance",
+                                function_call.name.as_str(),
+                            ),
+                            SoulErrorKind::InvalidContext,
+                            Some(span),
+                        ));
+                    } else if !has_callee && needs_callee {
+                        self.log_error(SoulError::new(
+                            format!(
+                                "method '{}' requires a receiver (this/@this/&this)",
+                                function_call.name.as_str(),
+                            ),
+                            SoulErrorKind::InvalidContext,
+                            Some(span),
+                        ));
                     }
                 }
 
@@ -160,7 +156,8 @@ fn receiver_type_kind_for_instance_method<'a>(
 ) -> Option<&'a TypeKind> {
     match &receiver.node {
         ExpressionKind::Variable {
-            resolved: Some(node_id), ..
+            resolved: Some(node_id),
+            ..
         } => match store.get_variable_type(*node_id)? {
             VarTypeKind::NonInveredType(soul_type) => Some(&soul_type.kind),
             VarTypeKind::InveredType(_) => store.get_variable_owner_hint(*node_id),
@@ -171,16 +168,17 @@ fn receiver_type_kind_for_instance_method<'a>(
 
 fn parse_owner_type(
     resolver: &mut NameResolver<'_>,
-    callee: Option<&Box<Expression>>,
+    callee: Option<&Expression>,
 ) -> Option<SoulType> {
-    let Some(callee) = callee else {
-        return None;
-    };
-
+    let callee = callee?;
     match &callee.node {
         ExpressionKind::Variable { ident, .. } => {
             if let Some(primitive) = PrimitiveTypes::from_str(ident.as_str()) {
-                return Some(SoulType::new(None, TypeKind::Primitive(primitive), ident.span));
+                return Some(SoulType::new(
+                    None,
+                    TypeKind::Primitive(primitive),
+                    ident.span,
+                ));
             }
 
             if resolver.info.scopes.lookup_type(ident).is_some() {

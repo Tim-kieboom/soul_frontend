@@ -1,4 +1,4 @@
-use crate::{mir, MirContext};
+use crate::{MirContext, mir};
 
 impl<'a> MirContext<'a> {
     pub(super) fn lower_while(

@@ -154,14 +154,13 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         options: &'a CompilerOptions,
         faults: &'f mut Vec<SementicFault>,
     ) -> Self {
-
         fn to_int_type<'a>(context: &'a Context, size: u8) -> IntType<'a> {
             match size {
                 8 => context.i8_type(),
                 16 => context.i16_type(),
                 32 => context.i32_type(),
                 64 => context.i64_type(),
-                _ => unreachable!()
+                _ => unreachable!(),
             }
         }
 

@@ -7,10 +7,12 @@ impl<'a> NameResolver<'a> {
             ExpressionKind::Sizeof(ty) => self.collect_type(ty),
             ExpressionKind::ArrayContructor(ctor) => {
                 ctor.id = Some(self.alloc_node());
-                ctor.collection_type
-                    .as_mut()
-                    .map(|ty| self.collect_type(ty));
-                ctor.element_type.as_mut().map(|ty| self.collect_type(ty));
+                if let Some(ty) = ctor.collection_type.as_mut() {
+                    self.collect_type(ty)
+                }
+                if let Some(ty) = ctor.element_type.as_mut() {
+                    self.collect_type(ty)
+                }
                 self.collect_expression(&mut ctor.amount);
                 self.collect_expression(&mut ctor.element);
             }
@@ -91,11 +93,14 @@ impl<'a> NameResolver<'a> {
             }
             ExpressionKind::Array(array) => {
                 array.id = Some(self.alloc_node());
-                array
-                    .collection_type
-                    .as_mut()
-                    .map(|ty| self.collect_type(ty));
-                array.element_type.as_mut().map(|ty| self.collect_type(ty));
+                if let Some(ty) = array.collection_type.as_mut() {
+                    self.collect_type(ty)
+                }
+
+                if let Some(ty) = array.element_type.as_mut() {
+                    self.collect_type(ty)
+                }
+
                 for value in &mut array.values {
                     self.collect_expression(value);
                 }

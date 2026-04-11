@@ -113,12 +113,17 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             let operand = self.lower_operand(arg, generics)?;
             let value = if operand.info.is_unloaded {
                 let ptr = operand.value.into_pointer_value();
-                let parameter = called_function.parameters.get(index).copied().ok_or_else(|| {
-                    soul_utils::soul_error_internal!(
-                        format!("parameter {} not found for call target {:?}", index, id),
-                        None
-                    )
-                })?;
+                let parameter =
+                    called_function
+                        .parameters
+                        .get(index)
+                        .copied()
+                        .ok_or_else(|| {
+                            soul_utils::soul_error_internal!(
+                                format!("parameter {} not found for call target {:?}", index, id),
+                                None
+                            )
+                        })?;
                 let parameter_ty = self.mir.tree.locals[parameter].ty();
                 let parameter_ir_ty = self
                     .lower_type(parameter_ty, &called_generics)?

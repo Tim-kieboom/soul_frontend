@@ -303,7 +303,7 @@ impl<'a> HirContext<'a> {
         self.insert_place(hir::Place::new(place_id, field, span))
     }
 
-    fn lower_deref(&mut self, id: ExpressionId, inner: &Box<ast::Expression>) -> hir::Expression {
+    fn lower_deref(&mut self, id: ExpressionId, inner: &ast::Expression) -> hir::Expression {
         hir::Expression {
             id,
             ty: self.new_infer_type(vec![], None, inner.span),
@@ -311,7 +311,7 @@ impl<'a> HirContext<'a> {
         }
     }
 
-    fn lower_cast(&mut self, id: ExpressionId, cast: &Box<AsTypeCast>) -> hir::Expression {
+    fn lower_cast(&mut self, id: ExpressionId, cast: &AsTypeCast) -> hir::Expression {
         let value = self.lower_expression(&cast.left);
         let cast_to = self.lower_type(&cast.type_cast, cast.left.span);
         hir::Expression {

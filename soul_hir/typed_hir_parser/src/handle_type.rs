@@ -5,7 +5,7 @@ use soul_utils::{
     span::Span,
 };
 
-use crate::{infer_table::UnifyResult, TypedHirContext};
+use crate::{TypedHirContext, infer_table::UnifyResult};
 
 impl<'a> TypedHirContext<'a> {
     pub(crate) fn unify(

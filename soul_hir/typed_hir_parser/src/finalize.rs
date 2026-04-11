@@ -5,7 +5,7 @@ use soul_utils::{
 };
 use typed_hir::{FieldInfo, ThirType, ThirTypeKind, ThirTypesMap, TypedHir};
 
-use crate::{infer_table::InferBinding, TypedHirContext};
+use crate::{TypedHirContext, infer_table::InferBinding};
 
 impl<'a> TypedHirContext<'a> {
     pub(crate) fn finalize(mut self) -> TypedHir {
