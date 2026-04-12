@@ -12,8 +12,8 @@ use soul_utils::{
 };
 
 use crate::parser::{
-    Parser,
     parse_utils::{SEMI_COLON, STAMENT_END_TOKENS},
+    Parser,
 };
 
 static ASSIGNMENT_TOKENS: LazyLock<Vec<TokenKind>> = LazyLock::new(|| {

@@ -5,4 +5,6 @@ edition = "2024"
 
 [dependencies]
 ast = { version = "0.1.0", path = "../../soul_ast/ast_model" }
+ast_parser = { version = "0.1.0", path = "../../soul_ast/ast_parser" }
 soul_utils = { version = "0.1.0", path = "../../soul_utils" }
+soul_tokenizer = { version = "0.1.0", path = "../../soul_tokenizer" }

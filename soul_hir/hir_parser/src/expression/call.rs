@@ -5,7 +5,7 @@ use hir::{Expression, ExpressionId, HirType, LazyTypeId, TypeId};
 use soul_utils::soul_error_internal;
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
-    ids::IdAlloc,
+    ids::{FunctionId, IdAlloc},
     span::Span,
 };
 
@@ -23,6 +23,10 @@ impl<'a> HirContext<'a> {
                 return hir::Expression::error(id);
             }
         };
+
+        if resolved == FunctionId::error() {
+            return hir::Expression::error(id);
+        }
 
         let signature = match self.ast_store.get_function(resolved) {
             Some(signature) => signature,

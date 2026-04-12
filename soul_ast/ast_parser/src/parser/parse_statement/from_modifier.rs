@@ -1,15 +1,15 @@
 use crate::parser::{
-    Parser,
     parse_utils::{ARROW_LEFT, COLON, CURLY_OPEN, ROUND_OPEN, SEMI_COLON, STAMENT_END_TOKENS},
+    Parser,
 };
 use ast::{SoulType, Statement, VarTypeKind, Variable};
 use soul_tokenizer::TokenKind;
 use soul_utils::{
-    Ident,
     error::{SoulError, SoulErrorKind, SoulResult},
     soul_names::{AssignType, KeyWord, TypeModifier},
     span::Span,
     try_result::{ResultMapNotValue, ResultTryErr, ToResult, TryErr, TryError, TryOk, TryResult},
+    Ident,
 };
 
 const ILIGAL_NAMES: &[&[&str]] = &[KeyWord::VALUES, TypeModifier::VALUES];

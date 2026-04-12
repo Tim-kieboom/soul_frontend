@@ -1,0 +1,61 @@
+import "./clib"
+
+// Test() {
+//     text := "hello world"
+//     text + 1;
+// }
+
+Println(text: [@]char) {
+    Print(text)
+    Endln()
+}
+
+Endln() {
+    Print_char('\n')
+}
+
+Println_char(char: char) {
+    Print_char(char)
+    Endln()
+}
+
+Println_int(value: int, base: u8 = 10, capital: bool = true) {
+    Print_int(value, base: base, capital: capital)
+    Endln()
+}
+
+Println_uint(value: uint, base: u8 = 10, capital: bool = true) {
+    Print_uint(value, base: base, capital: capital)
+    Endln()
+}
+
+Println_float(value: f64, base: u8 = 10, capital: bool = true, precision: u8 = 4) {
+    Print_float(value, base: base, capital: capital, precision: precision)
+    Endln()
+}
+
+Print(text: [@]char) {
+    clib.Stdout_str(text)
+}
+
+Print_char(char: char) {
+    clib.Stdout_char(char)
+}
+
+Print_int(value: int, base: u8 = 10, capital: bool = true) {
+    const fmtBuffer: [50]char
+    cstr := clib.FmtInt(value, base, fmtBuffer, capital)
+    clib.Stdout_Cstr(cstr)
+}
+
+Print_uint(value: uint, base: u8 = 10, capital: bool = true) {
+    const fmtBuffer: [50]char
+    cstr := clib.FmtUint(value, base, fmtBuffer, capital)
+    clib.Stdout_Cstr(cstr)
+}
+
+Print_float(value: f64, base: u8 = 10, precision: u8 = 4, capital: bool = true) {
+    const fmtBuffer: [50]char
+    cstr := clib.FmtFloat(value, base, fmtBuffer, precision, capital)
+    clib.Stdout_Cstr(cstr)
+}

@@ -32,25 +32,59 @@ impl<'a> NameResolver<'a> {
                 self.resolve_expression(&mut index.index);
             }
             ExpressionKind::FunctionCall(function_call) => {
-                let type_qualifier = parse_owner_type(self, function_call.callee.as_deref());
-                let is_type_qualifier = type_qualifier.is_some();
-                if is_type_qualifier {
-                    function_call.callee = None;
-                } else if let Some(callee) = &mut function_call.callee {
-                    self.resolve_expression(callee);
-                }
-
-                let owner_kind = type_qualifier.as_ref().map(|t| &t.kind).or_else(|| {
-                    function_call.callee.as_ref().and_then(|c| {
-                        receiver_type_kind_for_instance_method(self.store, c.as_ref())
-                    })
+                let callee_ident = function_call.callee.as_ref().and_then(|c| {
+                    if let ExpressionKind::Variable { ident, .. } = &c.node {
+                        Some(ident.as_str().to_string())
+                    } else {
+                        None
+                    }
                 });
 
-                function_call.resolved = self
-                    .store
-                    .find_function_by_name_and_owner_kind(function_call.name.as_str(), owner_kind);
-                if function_call.resolved.is_none() && type_qualifier.is_some() {
-                    function_call.resolved = self.lookup_function(&function_call.name);
+                let is_module_callee = callee_ident.as_ref().and_then(|name| {
+                    self.lookup_module(name)
+                }).is_some();
+
+                if is_module_callee {
+                    let module_name = callee_ident.clone().unwrap_or_default();
+                    function_call.resolved = self.lookup_module_function(&module_name, function_call.name.as_str());
+                    if function_call.resolved.is_some() {
+                        function_call.callee = None;
+                    }
+                } else {
+                    // First check if this could be a qualified module call even without explicit callee
+                    // This handles cases where we're inside a module function and calling other module functions
+                    if function_call.resolved.is_none() {
+                        if let Some(_) = self.lookup_module("fmt") {
+                            if let Some(func_id) = self.lookup_module_function("fmt", function_call.name.as_str()) {
+                                function_call.resolved = Some(func_id);
+                            }
+                        }
+                    }
+                    
+                    // If still not resolved, try the store lookup
+                    if function_call.resolved.is_none() {
+                        let type_qualifier = parse_owner_type(self, function_call.callee.as_deref());
+                        let is_type_qualifier = type_qualifier.is_some();
+                        
+                        if is_type_qualifier {
+                            function_call.callee = None;
+                        } else if let Some(callee) = &mut function_call.callee {
+                            self.resolve_expression(callee);
+                        }
+
+                        let owner_kind = type_qualifier.as_ref().map(|t| &t.kind).or_else(|| {
+                            function_call.callee.as_ref().and_then(|c| {
+                                receiver_type_kind_for_instance_method(self.store, c.as_ref())
+                            })
+                        });
+
+                        function_call.resolved = self
+                            .store
+                            .find_function_by_name_and_owner_kind(function_call.name.as_str(), owner_kind);
+                        if function_call.resolved.is_none() && type_qualifier.is_some() {
+                            function_call.resolved = self.lookup_function(&function_call.name);
+                        }
+                    }
                 }
 
                 if function_call.resolved.is_none() {
@@ -182,6 +216,17 @@ fn parse_owner_type(
             }
 
             if resolver.info.scopes.lookup_type(ident).is_some() {
+                return Some(SoulType::new(
+                    None,
+                    TypeKind::Stub(ast::Stub {
+                        name: ident.as_str().to_string(),
+                        generics: vec![],
+                    }),
+                    ident.span,
+                ));
+            }
+
+            if resolver.info.scopes.lookup_module(ident.as_str()).is_some() {
                 return Some(SoulType::new(
                     None,
                     TypeKind::Stub(ast::Stub {

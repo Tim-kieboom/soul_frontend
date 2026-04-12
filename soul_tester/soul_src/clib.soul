@@ -1,0 +1,35 @@
+extern "C" __clib_printChar(ch: char)
+extern "C" __clib_printCStr(ptr: *char)
+extern "C" __clib_printSoulStr(ptr: *char, len: uint)
+extern "C" __clib_fmtInt(value: c_int, base: u8, buffer: *char, capital: bool): *char
+extern "C" __clib_fmtUint(value: c_uint, base: u8, buffer: *char, capital: bool): *char
+extern "C" __clib_fmtFloat(value: f64, base: u8, buffer: *char, precision: u8, capital: bool): *char
+
+// struct Obj {field: int}
+// Test(obj: Obj): Obj {
+//     obj
+// }
+
+Stdout_char(ch: char) {
+    __clib_printChar(ch)
+}
+
+Stdout_Cstr(str: *char) {
+    __clib_printCStr(str)
+}
+
+Stdout_str(str: [@]char) {
+    __clib_printSoulStr(str as *char, str.len)
+}
+
+FmtUint(num: uint, base: u8, buffer: [50]char, capital: bool): *char {
+    __clib_fmtUint(num as c_uint, base, buffer as *char, capital)
+}
+
+FmtInt(num: int, base: u8, buffer: [50]char, capital: bool): *char {
+    __clib_fmtInt(num as c_int, base, buffer as *char, capital)
+}
+
+FmtFloat(num: f64, base: u8, buffer: [50]char, precision: u8, capital: bool): *char {
+    __clib_fmtFloat(num, base, buffer as *char, precision, capital)
+}

@@ -252,7 +252,3 @@ Soul is in active development. The core compiler pipeline is functional, includi
 - ⚙️ Traits and trait bounds
 - ⚙️ Enum definitions
 - ⚙️ Union pattern matching
-
-## Contributing
-
-Contributions are welcome! Please read our contributing guidelines before submitting PRs.

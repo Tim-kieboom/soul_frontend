@@ -23,7 +23,7 @@ impl MessageConfig {
 
 pub trait ToAnyhow {
     fn to_anyhow(&self, file_path: &str, source_file: &str, config: MessageConfig)
-    -> anyhow::Error;
+        -> anyhow::Error;
 }
 
 pub trait ToMessage {
@@ -147,6 +147,10 @@ fn get_source_snippet(out: &mut String, span: &Span, mut lines: Lines, begin_spa
     let mut all_remaining_lines = Vec::new();
     for line in lines {
         all_remaining_lines.push(line);
+    }
+
+    if all_remaining_lines.is_empty() {
+        return;
     }
 
     let start_idx = 0;

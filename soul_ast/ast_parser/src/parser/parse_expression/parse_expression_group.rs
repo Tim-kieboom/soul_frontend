@@ -1,17 +1,17 @@
 use ast::{AnyArray, Array, ArrayContructor, Expression, SoulType, StructConstructor};
 use soul_tokenizer::TokenKind;
 use soul_utils::{
-    Ident,
     error::{SoulError, SoulErrorKind, SoulResult},
     soul_names::KeyWord,
     span::{Span, Spanned},
     symbool_kind::SymbolKind,
     try_result::TryError,
+    Ident,
 };
 
 use crate::parser::{
-    Parser,
     parse_utils::{COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, LAMBDA_ARROW, SQUARE_CLOSE, SQUARE_OPEN},
+    Parser,
 };
 
 impl<'a, 'f> Parser<'a, 'f> {

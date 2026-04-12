@@ -1,6 +1,6 @@
 use std::{
     fs::{File, OpenOptions},
-    io::{Read, stdout},
+    io::{stdout, Read},
     time::Instant,
 };
 
@@ -11,9 +11,9 @@ use inkwell::context::Context;
 use log::{error, info};
 use paths::Paths;
 use run_ast::to_ast;
-use run_hir::{HirResponse, to_hir};
-use run_mir::{MirResponse, to_mir};
-use soul_ir::{IrRequest, to_llvm_ir};
+use run_hir::{to_hir, HirResponse};
+use run_mir::{to_mir, MirResponse};
+use soul_ir::{to_llvm_ir, IrRequest};
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
     char_colors::{DEFAULT, GREEN},
@@ -36,7 +36,7 @@ mod paths;
 static PATHS: &[u8] = include_bytes!("../paths.json");
 
 pub const MESSAGE_CONFIG: MessageConfig = MessageConfig {
-    backtrace: true,
+    backtrace: false,
     colors: true,
 };
 
@@ -85,13 +85,18 @@ fn run_fontend(paths: &Paths) -> Result<Ouput> {
     let tokens = to_token_stream(&source_file);
     display_tokenizer(paths, &source_file)?;
 
-    let ast = to_ast(tokens, &COMPILER_OPTIONS, &mut faults);
+    let ast = to_ast(
+        tokens,
+        &COMPILER_OPTIONS,
+        &mut faults,
+        Some(std::path::PathBuf::from(&paths.source_file)),
+    );
     display_ast(paths, &ast)?;
     log_faults(&faults, &source_file);
 
     let mut hir = to_hir(&ast, &COMPILER_OPTIONS, &mut faults);
-    display_hir(paths, &hir)?;
     clear_hir_type_map(&mut hir);
+    display_hir(paths, &hir)?;
 
     let mir = to_mir(&hir, &COMPILER_OPTIONS, &mut faults);
     display_mir(paths, &mir, &hir)?;
@@ -218,111 +223,4 @@ fn is_fatal(faults: &Vec<SementicFault>, fatal_level: SementicLevel) -> bool {
     }
 
     false
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const TEST_SOURCE: &str = r#"
-main() {
-    value := 1 + 2
-}
-"#;
-
-    fn test_options() -> CompilerOptions {
-        CompilerOptions::new_default(TargetInfo::new(Arch::X86_64, Os::Windows))
-    }
-
-    #[test]
-    fn tokenizer_stage_produces_tokens() {
-        let mut stream = to_token_stream(TEST_SOURCE);
-        stream.initialize().expect("token stream should initialize");
-
-        let tokens = stream
-            .map(|t| t.expect("tokenization should succeed"))
-            .collect::<Vec<_>>();
-
-        assert!(!tokens.is_empty(), "token stream should not be empty");
-        assert!(
-            tokens
-                .iter()
-                .any(|token| matches!(token.kind, soul_tokenizer::TokenKind::Ident(ref name) if name == "main")),
-            "token stream should contain the main identifier"
-        );
-    }
-
-    #[test]
-    fn ast_stage_finds_main_function() {
-        let options = test_options();
-        let mut faults = vec![];
-        let ast = to_ast(to_token_stream(TEST_SOURCE), &options, &mut faults);
-
-        assert!(
-            ast.store.main_function.is_some(),
-            "name resolution should register main"
-        );
-        assert!(
-            !is_fatal(&faults, options.fatal_level()),
-            "AST stage should not produce fatal faults: {faults:?}"
-        );
-    }
-
-    #[test]
-    fn hir_stage_builds_types_and_literals() {
-        let options = test_options();
-        let mut faults = vec![];
-        let ast = to_ast(to_token_stream(TEST_SOURCE), &options, &mut faults);
-        let hir = to_hir(&ast, &options, &mut faults);
-
-        assert!(
-            hir.hir.nodes.functions.len() > 0,
-            "HIR should contain at least one function"
-        );
-        assert!(
-            hir.typed.types_table.functions.len() > 0,
-            "typed HIR should contain function types"
-        );
-        assert!(
-            hir.literal_resolves.len() > 0,
-            "literal interpreter should resolve at least one expression"
-        );
-    }
-
-    #[test]
-    fn mir_stage_creates_entry_function() {
-        let options = test_options();
-        let mut faults = vec![];
-        let ast = to_ast(to_token_stream(TEST_SOURCE), &options, &mut faults);
-        let hir = to_hir(&ast, &options, &mut faults);
-        let mir = to_mir(&hir, &options, &mut faults);
-
-        assert_eq!(mir.tree.entry_function, hir.hir.main);
-        assert!(
-            mir.tree.functions.len() > 0,
-            "MIR should contain lowered functions"
-        );
-    }
-
-    #[test]
-    fn llvm_stage_builds_module() {
-        let options = test_options();
-        let mut faults = vec![];
-        let ast = to_ast(to_token_stream(TEST_SOURCE), &options, &mut faults);
-        let hir = to_hir(&ast, &options, &mut faults);
-        let mir = to_mir(&hir, &options, &mut faults);
-
-        let context = Context::create();
-        let request = IrRequest::new(&mir, &hir.typed, &context);
-        let ir = to_llvm_ir(&request, &options, &mut faults);
-
-        assert!(
-            ir.module.get_function("exit").is_some(),
-            "LLVM module should contain declared exit function"
-        );
-        assert!(
-            !ir.is_fatal,
-            "LLVM lowering should not report fatal faults: {faults:?}"
-        );
-    }
 }

@@ -1,11 +1,10 @@
+use std::fs::read_to_string;
+
 use ast::{
-    Block, DeclareStore, Expression, ExpressionKind, Function, FunctionSignature, Literal,
-    Statement, StatementKind, TypeKind, UseBlock, VarTypeKind,
-    scope::{ScopeBuilder, ScopeValue, ScopeValueKind},
+    Block, DeclareStore, Expression, ExpressionKind, Function, FunctionSignature, ImportPath, Literal, Statement, StatementKind, TypeKind, UseBlock, VarTypeKind, scope::{ScopeBuilder, ScopeValue, ScopeValueKind}
 };
 use soul_utils::{
-    error::{SoulError, SoulErrorKind},
-    soul_names::PrimitiveTypes,
+    error::{SoulError, SoulErrorKind}, soul_error_internal, soul_names::PrimitiveTypes, span::{Span, Spanned}
 };
 
 use crate::NameResolver;
@@ -42,7 +41,11 @@ impl<'a> NameResolver<'a> {
                     todo!()
                 }
             }
-            StatementKind::Import(_) => todo!("impl import trait collection"),
+            StatementKind::Import(import) => {
+                for path in &import.paths {
+                    self.collect_import_path(path, statement.span)
+                }
+            }
             StatementKind::Struct(obj) => {
                 self.declare_struct(obj);
             }
@@ -101,7 +104,7 @@ impl<'a> NameResolver<'a> {
         }
     }
 
-    fn collect_function(&mut self, function: &mut Function) {
+    pub(crate) fn collect_function(&mut self, function: &mut Function) {
         let id = self.declare_function(&mut function.signature);
         let prev = self.current_function;
         self.current_function = Some(id);
@@ -130,6 +133,105 @@ impl<'a> NameResolver<'a> {
 
         self.store.insert_functions(id, signature.clone());
         self.current_function = prev;
+    }
+
+    fn collect_import_path(&mut self, path: &ImportPath, span: Span) {
+        let module_name = path.module.as_str().to_string();
+        let alias = match &path.kind {
+            ast::ImportKind::All | ast::ImportKind::This | ast::ImportKind::Items(_) => None,
+            ast::ImportKind::Alias(ident) => Some(ident.clone()),
+        };
+
+        let import_name = alias.as_ref().map(|a| a.as_str()).unwrap_or(&module_name);
+        self.declare_module(import_name, &module_name, path.kind.clone());
+
+        let module_file_path = match self.find_module_file(&module_name) {
+            Some(val) => val,
+            None => {
+                self.log_error(SoulError::new(
+                    format!("import '{}': module not found. Make sure the file exists and the path is correct (e.g., './{}' or '{}')", 
+                        module_name, module_name, module_name),
+                    SoulErrorKind::NotFoundInScope,
+                    Some(span),
+                ));
+                return;
+            }
+        };
+
+        let module_source = match read_to_string(&module_file_path) {
+            Ok(val) => val,
+            Err(err) => {
+                self.log_error(soul_error_internal!(
+                    format!("import '{}': could not read module file '{}': {}", 
+                        module_name, module_file_path.display(), err),
+                    Some(span)
+                ));
+                return;
+            }
+        };
+
+        if let Some(module_ast) = self.parse_module(&module_source) {
+            let items_count = module_ast.statements.iter()
+                .filter(|s| matches!(s.node, StatementKind::Function(_) | 
+                                        StatementKind::ExternalFunction(_) | 
+                                        StatementKind::Struct(_)))
+                .count();
+            
+            if items_count == 0 {
+                self.log_error(SoulError::new(
+                    format!("import '{}': module has no public items to import (functions, extern functions, or structs)", 
+                        module_name),
+                    SoulErrorKind::NotFoundInScope,
+                    Some(span),
+                ));
+                return;
+            }
+
+            for stmt in module_ast.statements {
+                match stmt.node {
+                    StatementKind::Import(import) => {
+                        self.collect_import_path(&import.paths[0], stmt.span);
+                    }
+                    StatementKind::Function(func) => {
+                        self.add_imported_function(func, import_name.to_string());
+                    }
+                    StatementKind::ExternalFunction(extern_func) => {
+                        self.add_imported_function(
+                            Function {
+                                signature: Spanned::new(
+                                    ast::FunctionSignature {
+                                        id: None,
+                                        name: extern_func.signature.node.name.clone(),
+                                        methode_type: extern_func.signature.node.methode_type.clone(),
+                                        parameters: extern_func.signature.node.parameters.clone(),
+                                        return_type: extern_func.signature.node.return_type.clone(),
+                                        function_kind: extern_func.signature.node.function_kind,
+                                        generics: extern_func.signature.node.generics.clone(),
+                                        external: Some(ast::ExternLanguage::C),
+                                    },
+                                    Span::default(),
+                                ),
+                                block: ast::Block {
+                                    modifier: soul_utils::soul_names::TypeModifier::Mut,
+                                    statements: vec![],
+                                    scope_id: None,
+                                    node_id: None,
+                                    span: Span::default(),
+                                },
+                            },
+                            import_name.to_string(),
+                        );
+                    }
+                    _ => {}
+                }
+            }
+        } else {
+            self.log_error(SoulError::new(
+                format!("import '{}': failed to parse module", module_name),
+                SoulErrorKind::NotFoundInScope,
+                Some(span),
+            ));
+        }
     }
 }
 

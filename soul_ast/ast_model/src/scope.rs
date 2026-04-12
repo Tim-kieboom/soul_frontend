@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use soul_utils::{Ident, ids::FunctionId, impl_soul_ids, span::Span, vec_map::VecMapIndex};
+use soul_utils::{ids::FunctionId, impl_soul_ids, span::Span, vec_map::VecMapIndex, Ident};
 
-use crate::ast::Variable;
+use crate::{ast::Variable, ImportKind};
 
 impl_soul_ids!(NodeId, ScopeId);
 
@@ -93,6 +93,16 @@ impl ScopeBuilder {
         None
     }
 
+    pub fn lookup_module(&self, name: &str) -> Option<ScopeModuleEntry> {
+        for scope in self.scope_iter() {
+            if let Some(ScopeEntry { module, .. }) = scope.entries.get(name) {
+                return module.clone();
+            };
+        }
+
+        None
+    }
+
     fn scope_iter<'a>(&'a self) -> ScopeIterator<'a> {
         ScopeIterator::new(&self.scopes, self.current)
     }
@@ -132,6 +142,13 @@ pub struct ScopeEntry {
     function: Option<FunctionId>,
     values: Option<ScopeValueEntry>,
     types: Option<ScopeTypeEntry>,
+    module: Option<ScopeModuleEntry>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ScopeModuleEntry {
+    pub module_name: String,
+    pub import_kind: ImportKind,
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Scope {
@@ -177,6 +194,22 @@ impl Scope {
 
         let values = &mut self.get_mut_entry(name)?.values.as_mut().unwrap();
         values.insert(kind, id)
+    }
+
+    pub fn insert_module(
+        &mut self,
+        name: &str,
+        entry: ScopeModuleEntry,
+    ) -> Option<ScopeModuleEntry> {
+        self.get_mut_entry(name)?.module.replace(entry)
+    }
+
+    pub fn get_module(&self, name: &str) -> Option<&ScopeModuleEntry> {
+        self.entries.get(name).and_then(|e| e.module.as_ref())
+    }
+
+    pub fn get_module_entry(&self, name: &str) -> Option<&ScopeModuleEntry> {
+        self.get_module(name)
     }
 
     fn get_mut_entry(&mut self, name: &str) -> Option<&mut ScopeEntry> {

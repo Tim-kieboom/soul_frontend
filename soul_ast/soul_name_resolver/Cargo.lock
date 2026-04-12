@@ -3,12 +3,28 @@
 version = 4
 
 [[package]]
+name = "anyhow"
+version = "1.0.102"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
+
+[[package]]
 name = "ast"
 version = "0.1.0"
 dependencies = [
  "enum_variant_name_const",
  "itertools",
  "serde",
+ "soul_utils",
+]
+
+[[package]]
+name = "ast_parser"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ast",
+ "soul_tokenizer",
  "soul_utils",
 ]
 
@@ -116,6 +132,16 @@ name = "soul_name_resolver"
 version = "0.1.0"
 dependencies = [
  "ast",
+ "ast_parser",
+ "soul_tokenizer",
+ "soul_utils",
+]
+
+[[package]]
+name = "soul_tokenizer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
  "soul_utils",
 ]
 

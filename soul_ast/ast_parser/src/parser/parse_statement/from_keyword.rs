@@ -8,8 +8,8 @@ use soul_utils::{
 };
 
 use crate::parser::{
-    Parser,
     parse_utils::{SEMI_COLON, STAMENT_END_TOKENS},
+    Parser,
 };
 
 impl<'a, 'f> Parser<'a, 'f> {

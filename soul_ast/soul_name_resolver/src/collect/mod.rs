@@ -4,9 +4,12 @@ use ast::{
         NodeId, Scope, ScopeId, ScopeTypeEntry, ScopeTypeEntryKind, ScopeValue, ScopeValueKind,
     },
 };
+use ast_parser::parse;
+use soul_tokenizer::to_token_stream;
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
     ids::FunctionId,
+    sementic_level::SementicLevel,
     span::Spanned,
 };
 
@@ -113,6 +116,42 @@ impl<'a> NameResolver<'a> {
 
     fn insert_function(&mut self, name: &str, id: FunctionId) {
         self.current_scope_mut().insert_function(name, id);
+    }
+
+    fn declare_module(&mut self, name: &str, module_name: &str, import_kind: ast::ImportKind) {
+        let entry = ast::scope::ScopeModuleEntry {
+            module_name: module_name.to_string(),
+            import_kind,
+        };
+        self.current_scope_mut().insert_module(name, entry);
+    }
+
+    fn find_module_file(&self, module_name: &str) -> Option<std::path::PathBuf> {
+        let current_file = self.source_file.as_ref()?;
+        let current_dir = current_file.parent()?;
+        
+        let module_path = current_dir.join(format!("{}.soul", module_name));
+        if module_path.exists() {
+            return Some(module_path);
+        }
+        
+        let relative_path = current_dir.join(module_name);
+        if relative_path.exists() {
+            return Some(relative_path);
+        }
+        
+        None
+    }
+
+    fn parse_module(&mut self, source: &str) -> Option<ast::Block> {
+        let tokens = to_token_stream(source);
+        let response = parse(tokens, self.faults, None);
+        
+        if self.faults.iter().any(|f| f.get_level() == SementicLevel::Error) {
+            return None;
+        }
+        
+        Some(response.tree.root)
     }
 
     fn insert_value(&mut self, name: &str, id: NodeId, kind: ScopeValue) -> Option<NodeId> {

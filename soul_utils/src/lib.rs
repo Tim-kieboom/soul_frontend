@@ -29,4 +29,12 @@ impl Ident {
     pub fn to_string(&self) -> String {
         self.node.clone()
     }
+
+    pub fn new_owned(name: String) -> Self {
+        crate::span::Spanned::new(name, crate::span::Span::default_const())
+    }
+
+    pub fn new_dummy(name: &str) -> Self {
+        Self::new_owned(name.to_string())
+    }
 }

@@ -1,11 +1,11 @@
 use soul_tokenizer::{Token, TokenKind, TokenStreamPosition};
 use soul_utils::{
-    Ident,
     error::{SoulError, SoulErrorKind, SoulResult},
     sementic_level::SementicFault,
     soul_names::KeyWord,
     span::Span,
     symbool_kind::SymbolKind,
+    Ident,
 };
 
 use crate::parser::Parser;
@@ -77,7 +77,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     /// Records parse error.
     pub(super) fn log_error(&mut self, err: SoulError) {
-        self.faults.push(SementicFault::error(err));
+        self.faults.push(SementicFault::error(err, ));
     }
 
     /// Saves current token stream position for backtracking.

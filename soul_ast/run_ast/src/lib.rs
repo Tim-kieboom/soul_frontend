@@ -8,8 +8,9 @@ pub fn to_ast<'a>(
     token_stream: TokenStream<'a>,
     _options: &CompilerOptions,
     faults: &mut Vec<SementicFault>,
+    source_file: Option<std::path::PathBuf>,
 ) -> AstResponse {
-    let mut response = parse(token_stream, faults);
+    let mut response = parse(token_stream, faults, source_file);
     name_resolve(&mut response, faults);
     response
 }

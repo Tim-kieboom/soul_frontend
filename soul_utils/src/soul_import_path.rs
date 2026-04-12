@@ -10,11 +10,16 @@ use crate::symbool_kind::SymbolKind;
     Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
 )]
 pub struct SoulImportPath(String);
-const PATH_SYMBOOL: &str = SymbolKind::DoubleColon.as_str();
+const PATH_SYMBOOL: &str = SymbolKind::Slash.as_str();
 
 impl SoulImportPath {
     pub fn new() -> Self {
         Self(String::new())
+    }
+
+    pub fn from_string(s: String) -> Self {
+        let cleaned = s.trim_matches('"').trim_start_matches("./").to_string();
+        Self(cleaned)
     }
 
     pub fn push(&mut self, value: &str) {

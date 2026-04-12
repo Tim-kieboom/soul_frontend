@@ -4,7 +4,6 @@ use ast::{
 };
 use soul_tokenizer::{Number, Token, TokenKind};
 use soul_utils::{
-    Ident,
     error::{SoulError, SoulErrorKind, SoulResult},
     precedence::Precedence,
     soul_error_internal,
@@ -12,14 +11,15 @@ use soul_utils::{
     span::{Span, Spanned},
     symbool_kind::SymbolKind,
     try_result::{ToResult, TryError},
+    Ident,
 };
 
 use crate::parser::{
-    Parser,
     parse_utils::{
         ARRAY, ARROW_LEFT, COLON, CURLY_OPEN, DECREMENT, INCREMENT, ROUND_OPEN, SQUARE_CLOSE,
         SQUARE_OPEN,
     },
+    Parser,
 };
 
 mod parse_condition;

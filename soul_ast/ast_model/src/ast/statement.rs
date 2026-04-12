@@ -4,11 +4,11 @@ use enum_variant_name_const::EnumVariantNameConst;
 use soul_utils::ids::FunctionId;
 use soul_utils::soul_names::TypeModifier;
 use soul_utils::span::{ItemMetaData, Span};
-use soul_utils::{Ident, soul_import_path::SoulImportPath, span::Spanned};
+use soul_utils::{soul_import_path::SoulImportPath, span::Spanned, Ident};
 
-use crate::Generic;
 use crate::ast::{Block, Expression, ExpressionKind, FunctionCall, NamedTupleType, SoulType};
 use crate::scope::NodeId;
+use crate::Generic;
 /// A statement in the Soul language, wrapped with source location information.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Statement {
@@ -107,6 +107,7 @@ pub enum ImportKind {
     All,
     This,
     Items(Vec<Ident>),
+    Alias(Ident),
 }
 
 /// A function definition with a signature and body block.

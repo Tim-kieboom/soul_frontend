@@ -37,7 +37,11 @@ pub(crate) struct Parser<'a, 'f> {
 impl<'a, 'f> Parser<'a, 'f> {
     #[cfg(not(debug_assertions))]
     fn new(tokens: TokenStream<'a>, faults: &'f mut Vec<SementicFault>) -> Self {
-        Self { tokens, faults, current_this: None }
+        Self {
+            tokens,
+            faults,
+            current_this: None,
+        }
     }
 
     #[cfg(debug_assertions)]

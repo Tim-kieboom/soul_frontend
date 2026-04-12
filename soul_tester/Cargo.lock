@@ -361,6 +361,8 @@ name = "soul_name_resolver"
 version = "0.1.0"
 dependencies = [
  "ast",
+ "ast_parser",
+ "soul_tokenizer",
  "soul_utils",
 ]
 

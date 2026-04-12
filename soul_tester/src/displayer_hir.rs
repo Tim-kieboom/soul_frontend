@@ -8,7 +8,7 @@ use soul_utils::{
     vec_map::VecMapIndex,
 };
 use std::fmt::Write;
-use typed_hir::{ThirTypeKind, TypedHir, display_thir::DisplayThirType};
+use typed_hir::{display_thir::DisplayThirType, ThirTypeKind, TypedHir};
 
 pub fn display_hir(hir: &HirTree) -> String {
     let mut displayer = HirDisplayer::new_hir(hir);
@@ -428,13 +428,21 @@ impl<'a> HirDisplayer<'a> {
         let name = if id == FunctionId::error() {
             "<error>"
         } else {
-            let owner = self.hir.nodes.functions[id].owner_type.to_lazy();
+            let owner = match self.hir.nodes.functions.get(id) {
+                Some(val) => val.owner_type.to_lazy(),
+                None => LazyTypeId::error(),
+            };
             if !self.is_type_none(owner) {
                 self.display_type(owner);
                 self.push('.');
             }
 
-            self.hir.nodes.functions[id].name.as_str()
+            self.hir
+                .nodes
+                .functions
+                .get(id)
+                .map(|f| f.name.as_str())
+                .unwrap_or("<error>")
         };
 
         self.push_str(name);

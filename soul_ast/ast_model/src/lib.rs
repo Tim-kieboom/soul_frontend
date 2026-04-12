@@ -27,6 +27,8 @@ pub struct AstResponse {
     pub tree: AbstractSyntaxTree,
     /// ID generator for functions.
     pub function_generators: IdGenerator<FunctionId>,
+    /// The source file path (for module loading).
+    pub source_file: Option<std::path::PathBuf>,
 }
 
 /// A store of all declarations in a module.
