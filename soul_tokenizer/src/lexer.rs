@@ -2,6 +2,7 @@ use std::{iter::Peekable, str::Chars};
 
 use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},
+    span::ModuleId,
     span::Span,
     symbool_kind::SymbolKind,
 };
@@ -17,21 +18,23 @@ use crate::{
 /// and symbols. Maintains line/offset position for accurate span reporting.
 #[derive(Debug, Clone)]
 pub struct Lexer<'a> {
-    input: Peekable<Chars<'a>>,
-    current_char: Option<char>,
+    module: ModuleId,
     line: usize,
     offset: usize,
     token_index: usize,
+    current_char: Option<char>,
+    input: Peekable<Chars<'a>>,
 }
 
 impl<'a> Lexer<'a> {
-    pub(crate) fn new(source: &'a str) -> Self {
+    pub(crate) fn new(source: &'a str, module: ModuleId) -> Self {
         let mut lexer = Lexer {
-            input: source.chars().peekable(),
-            current_char: None,
+            module,
             line: 1,
             offset: 0,
             token_index: 0,
+            current_char: None,
+            input: source.chars().peekable(),
         };
         lexer.next_char();
         lexer
@@ -100,7 +103,7 @@ impl<'a> Lexer<'a> {
 
         let kind = self.get_token_kind(char, start_line, start_offset)?;
         let span = if kind == TokenKind::EndLine {
-            Span::new_line(start_line, start_offset + 1)
+            Span::new_line(self.module, start_line, start_offset + 1)
         } else {
             self.new_span(start_line, start_offset)
         };
@@ -391,6 +394,7 @@ impl<'a> Lexer<'a> {
 
     fn new_span(&self, start_line: usize, start_offset: usize) -> Span {
         Span {
+            module: self.module,
             start_line,
             start_offset,
             end_line: self.line,

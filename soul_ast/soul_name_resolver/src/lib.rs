@@ -1,22 +1,25 @@
 use ast::{
-    AstResponse, Block, DeclareStore, Function, SoulType, Statement, meta_data::AstMetadata, scope::{NodeId, ScopeModuleEntry, ScopeValue}
+    AstResponse, Block, DeclareStore, Function, SoulType, Statement,
+    meta_data::AstMetadata,
+    scope::{NodeId, ScopeModuleEntry, ScopeValue},
 };
 use soul_utils::{
     Ident,
     error::SoulError,
     ids::{FunctionId, IdGenerator},
-    sementic_level::SementicFault,
-    span::{Span, Spanned},
+    sementic_level::{CompilerContext, SementicFault},
+    span::{ModuleId, Span, Spanned},
 };
 
 mod check_name;
 mod collect;
 mod resolve;
 
-pub fn name_resolve(request: &mut AstResponse, faults: &mut Vec<SementicFault>) {
+pub fn name_resolve(request: &mut AstResponse, module: ModuleId, context: &mut CompilerContext) {
     let mut resolver = NameResolver::new(
+        module,
         &mut request.meta_data,
-        faults,
+        context,
         &mut request.store,
         &mut request.function_generators,
         request.source_file.clone(),
@@ -26,24 +29,26 @@ pub fn name_resolve(request: &mut AstResponse, faults: &mut Vec<SementicFault>) 
 
     resolver.collect_declarations(root);
     resolver.resolve_import_functions(root);
-    
+
     resolver.resolve_names(root);
 }
 
 struct NameResolver<'a> {
+    module: ModuleId,
     node_generator: IdGenerator<NodeId>,
     function_generator: &'a mut IdGenerator<FunctionId>,
     info: &'a mut AstMetadata,
     store: &'a mut DeclareStore,
-    faults: &'a mut Vec<SementicFault>,
+    context: &'a mut CompilerContext,
     current_function: Option<FunctionId>,
     source_file: Option<std::path::PathBuf>,
     imported_functions: Vec<(Function, String)>,
 }
 impl<'a> NameResolver<'a> {
     fn new(
+        module: ModuleId,
         info: &'a mut AstMetadata,
-        faults: &'a mut Vec<SementicFault>,
+        context: &'a mut CompilerContext,
         store: &'a mut DeclareStore,
         function_generator: &'a mut IdGenerator<FunctionId>,
         source_file: Option<std::path::PathBuf>,
@@ -51,7 +56,8 @@ impl<'a> NameResolver<'a> {
         Self {
             info,
             store,
-            faults,
+            module,
+            context,
             function_generator,
             current_function: None,
             node_generator: IdGenerator::new(),
@@ -61,7 +67,7 @@ impl<'a> NameResolver<'a> {
     }
 
     fn log_error(&mut self, error: SoulError) {
-        self.faults.push(SementicFault::error(error));
+        self.context.faults.push(SementicFault::error(error));
     }
 
     fn check_variable(&mut self, name: &Ident) -> Option<NodeId> {
@@ -72,9 +78,16 @@ impl<'a> NameResolver<'a> {
         self.info.scopes.lookup_module(name)
     }
 
-    fn lookup_module_function(&self, module_name: &str, function_name: &str) -> Option<FunctionId> {
+    fn lookup_module_function(
+        &self,
+        module_name: &str,
+        module_id: ModuleId,
+        function_name: &str,
+    ) -> Option<FunctionId> {
         let entry_key = format!("{}::{}", module_name, function_name);
-        self.info.scopes.lookup_function(&Ident::new_dummy(&entry_key))
+        self.info
+            .scopes
+            .lookup_function(&Ident::new_dummy(&entry_key, module_id))
     }
 
     fn flat_check_variable(&mut self, name: &Ident) -> Option<NodeId> {
@@ -97,32 +110,34 @@ impl<'a> NameResolver<'a> {
             let signature = &mut function.signature.node;
             let func_name = signature.name.as_str().to_string();
             let import_name = name.clone();
-            
+
             if !imported_modules.contains(&import_name) {
                 imported_modules.push(import_name.clone());
             }
-            
-            
+
             if signature.external.is_some() {
-                signature.methode_type = SoulType::none(Span::default());
-                signature.name = Ident::new_dummy(&func_name);
+                signature.methode_type = SoulType::none(Span::default(self.module));
+                signature.name = Ident::new_dummy(&func_name, self.module);
             } else {
                 let qualified_name = format!("{}::{}", import_name, func_name);
-                signature.name = Ident::new_dummy(&qualified_name);
+                signature.name = Ident::new_dummy(&qualified_name, self.module);
             }
-            
+
             self.collect_function(&mut function);
-            
-            let stmt = Statement::from_function(Spanned::new(function, Span::default()));
+
+            let stmt = Statement::from_function(Spanned::new(function, Span::default(self.module)));
             root.statements.push(stmt);
         }
 
         if let Some(scope) = self.info.scopes.current_scope_mut() {
             for module_name in imported_modules {
-                scope.insert_module(&module_name, ScopeModuleEntry {
-                    module_name: module_name.clone(),
-                    import_kind: ast::ImportKind::All,
-                });
+                scope.insert_module(
+                    &module_name,
+                    ScopeModuleEntry {
+                        module_name: module_name.clone(),
+                        import_kind: ast::ImportKind::All,
+                    },
+                );
             }
         }
     }

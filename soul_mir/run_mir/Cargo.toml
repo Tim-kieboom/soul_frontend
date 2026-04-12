@@ -6,4 +6,5 @@ edition = "2024"
 [dependencies]
 mir_parser = { version = "0.1.0", path = "../mir_parser" }
 run_hir = { version = "0.1.0", path = "../../soul_hir/run_hir" }
+ast = { version = "0.1.0", path = "../../soul_ast/ast_model" }
 soul_utils = { version = "0.1.0", path = "../../soul_utils" }

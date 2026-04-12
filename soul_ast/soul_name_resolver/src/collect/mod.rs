@@ -10,7 +10,7 @@ use soul_utils::{
     error::{SoulError, SoulErrorKind},
     ids::FunctionId,
     sementic_level::SementicLevel,
-    span::Spanned,
+    span::{ModuleId, Spanned},
 };
 
 use crate::NameResolver;
@@ -129,28 +129,33 @@ impl<'a> NameResolver<'a> {
     fn find_module_file(&self, module_name: &str) -> Option<std::path::PathBuf> {
         let current_file = self.source_file.as_ref()?;
         let current_dir = current_file.parent()?;
-        
+
         let module_path = current_dir.join(format!("{}.soul", module_name));
         if module_path.exists() {
             return Some(module_path);
         }
-        
+
         let relative_path = current_dir.join(module_name);
         if relative_path.exists() {
             return Some(relative_path);
         }
-        
+
         None
     }
 
-    fn parse_module(&mut self, source: &str) -> Option<ast::Block> {
-        let tokens = to_token_stream(source);
-        let response = parse(tokens, self.faults, None);
-        
-        if self.faults.iter().any(|f| f.get_level() == SementicLevel::Error) {
+    fn parse_module(&mut self, source: &str, module: ModuleId) -> Option<ast::Block> {
+        let tokens = to_token_stream(source, module);
+        let response = parse(tokens, self.context, None);
+
+        if self
+            .context
+            .faults
+            .iter()
+            .any(|f| f.get_level() == SementicLevel::Error)
+        {
             return None;
         }
-        
+
         Some(response.tree.root)
     }
 

@@ -1,14 +1,13 @@
 use soul_utils::{
-    bimap::BiMap,
-    ids::{FunctionId, IdAlloc, IdGenerator},
+    ids::{FunctionId, IdAlloc},
     soul_import_path::SoulImportPath,
-    span::{ItemMetaData, Span},
+    span::{ItemMetaData, ModuleId, Span},
     vec_map::VecMap,
 };
 
 use crate::{
-    Block, BlockId, Expression, ExpressionId, FieldId, Function, LocalId, LocalInfo, ModuleId,
-    Place, PlaceId, StatementId, hir_type::Field,
+    Block, BlockId, Expression, ExpressionId, FieldId, Function, LocalId, LocalInfo, Place,
+    PlaceId, StatementId, hir_type::Field,
 };
 
 mod type_map;
@@ -52,7 +51,7 @@ impl Default for SpanMap {
             locals: Default::default(),
             functions: Default::default(),
             statements: Default::default(),
-            expressions: VecMap::from_slice(&[(ExpressionId::error(), Span::default_const())]),
+            expressions: VecMap::from_slice(&[(ExpressionId::error(), Span::error())]),
         }
     }
 }
@@ -102,22 +101,18 @@ pub struct InfoMaps {
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct ImportMap {
-    map: BiMap<ModuleId, SoulImportPath>,
+    map: VecMap<ModuleId, SoulImportPath>,
 }
 impl ImportMap {
     pub fn new() -> Self {
-        Self { map: BiMap::new() }
+        Self { map: VecMap::new() }
     }
 
-    pub fn insert(&mut self, alloc: &mut IdGenerator<ModuleId>, path: SoulImportPath) -> ModuleId {
-        self.map.insert(alloc, path)
+    pub fn insert(&mut self, id: ModuleId, path: SoulImportPath) -> Option<SoulImportPath> {
+        self.map.insert(id, path)
     }
 
-    pub fn get_module(&self, id: ModuleId) -> Option<&SoulImportPath> {
-        self.map.get_value(id)
-    }
-
-    pub fn get_id(&self, value: &SoulImportPath) -> Option<ModuleId> {
-        self.map.get_key(value)
+    pub fn get(&self, id: ModuleId) -> Option<&SoulImportPath> {
+        self.map.get(id)
     }
 }

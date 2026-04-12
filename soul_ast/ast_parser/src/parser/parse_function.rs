@@ -4,18 +4,18 @@ use ast::{
 };
 use soul_tokenizer::TokenKind;
 use soul_utils::{
+    Ident,
     error::{SoulError, SoulErrorKind, SoulResult},
     soul_names::{KeyWord, TypeModifier},
     span::{Span, Spanned},
     try_result::{ResultTryErr, ToResult, TryErr, TryError, TryNotValue, TryOk, TryResult},
-    Ident,
 };
 
 use crate::parser::{
+    Parser,
     parse_utils::{
         ARROW_LEFT, ARROW_RIGHT, COLON, COMMA, CURLY_OPEN, ROUND_CLOSE, ROUND_OPEN, SEMI_COLON,
     },
-    Parser,
 };
 
 type FuncResult<T> = TryResult<T, (Ident, Box<SoulError>)>;

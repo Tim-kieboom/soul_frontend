@@ -16,7 +16,7 @@ use soul_utils::{
     Ident,
     ids::{FunctionId, IdAlloc},
     soul_names::INIT_GLOBALS_FUNCTION_NAME,
-    span::Span,
+    span::{ModuleId, Span},
 };
 pub use statement::*;
 
@@ -48,7 +48,7 @@ impl HirTree {
             body: FunctionBody::Internal(BlockId::error()),
             name: Ident::new(
                 INIT_GLOBALS_FUNCTION_NAME.to_string(),
-                Span::default_const(),
+                Span::default(root_id),
             ),
         };
 

@@ -40,13 +40,17 @@ impl<'a> NameResolver<'a> {
                     }
                 });
 
-                let is_module_callee = callee_ident.as_ref().and_then(|name| {
-                    self.lookup_module(name)
-                }).is_some();
+                let module_entry = callee_ident
+                    .as_ref()
+                    .and_then(|name| self.lookup_module(name));
 
-                if is_module_callee {
+                if module_entry.is_some() {
                     let module_name = callee_ident.clone().unwrap_or_default();
-                    function_call.resolved = self.lookup_module_function(&module_name, function_call.name.as_str());
+                    function_call.resolved = self.lookup_module_function(
+                        &module_name,
+                        self.module,
+                        function_call.name.as_str(),
+                    );
                     if function_call.resolved.is_some() {
                         function_call.callee = None;
                     }
@@ -55,17 +59,22 @@ impl<'a> NameResolver<'a> {
                     // This handles cases where we're inside a module function and calling other module functions
                     if function_call.resolved.is_none() {
                         if let Some(_) = self.lookup_module("fmt") {
-                            if let Some(func_id) = self.lookup_module_function("fmt", function_call.name.as_str()) {
+                            if let Some(func_id) = self.lookup_module_function(
+                                "fmt",
+                                self.module,
+                                function_call.name.as_str(),
+                            ) {
                                 function_call.resolved = Some(func_id);
                             }
                         }
                     }
-                    
+
                     // If still not resolved, try the store lookup
                     if function_call.resolved.is_none() {
-                        let type_qualifier = parse_owner_type(self, function_call.callee.as_deref());
+                        let type_qualifier =
+                            parse_owner_type(self, function_call.callee.as_deref());
                         let is_type_qualifier = type_qualifier.is_some();
-                        
+
                         if is_type_qualifier {
                             function_call.callee = None;
                         } else if let Some(callee) = &mut function_call.callee {
@@ -78,9 +87,10 @@ impl<'a> NameResolver<'a> {
                             })
                         });
 
-                        function_call.resolved = self
-                            .store
-                            .find_function_by_name_and_owner_kind(function_call.name.as_str(), owner_kind);
+                        function_call.resolved = self.store.find_function_by_name_and_owner_kind(
+                            function_call.name.as_str(),
+                            owner_kind,
+                        );
                         if function_call.resolved.is_none() && type_qualifier.is_some() {
                             function_call.resolved = self.lookup_function(&function_call.name);
                         }

@@ -1,6 +1,8 @@
 use std::{
     fs::{File, OpenOptions},
-    io::{stdout, Read},
+    io::{Read, stdout},
+    path::{Path, PathBuf},
+    str::FromStr,
     time::Instant,
 };
 
@@ -11,14 +13,12 @@ use inkwell::context::Context;
 use log::{error, info};
 use paths::Paths;
 use run_ast::to_ast;
-use run_hir::{to_hir, HirResponse};
-use run_mir::{to_mir, MirResponse};
-use soul_ir::{to_llvm_ir, IrRequest};
+use run_hir::{HirResponse, to_hir};
+use run_mir::{MirResponse, to_mir};
+use soul_ir::{IrRequest, to_llvm_ir};
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
-    char_colors::{DEFAULT, GREEN},
-    compile_options::{Arch, CompilerOptions, Os, TargetInfo},
-    sementic_level::{SementicFault, SementicLevel},
+    char_colors::{DEFAULT, GREEN}, compile_options::{Arch, CompilerOptions, Os, TargetInfo}, ids::IdAlloc, sementic_level::{CompilerContext, SementicFault, SementicLevel}, span::ModuleId
 };
 
 use crate::{
@@ -48,8 +48,7 @@ pub const COMPILER_OPTIONS: CompilerOptions =
 struct Ouput {
     mir_response: MirResponse,
     hir_response: HirResponse,
-    source_file: String,
-    faults: Vec<SementicFault>,
+    context: CompilerContext,
 }
 
 fn main() -> Result<()> {
@@ -57,9 +56,9 @@ fn main() -> Result<()> {
     init_logger(&paths.log_file)?;
 
     let mut timer = Instant::now();
-    let output = run_fontend(&paths)?;
-    log_faults(&output.faults, &output.source_file);
-    if is_fatal(&output.faults, COMPILER_OPTIONS.fatal_level()) {
+    let mut output = run_fontend(&paths)?;
+    log_faults(&output.context);
+    if is_fatal(&output.context.faults, COMPILER_OPTIONS.fatal_level()) {
         return Ok(());
     }
 
@@ -69,7 +68,7 @@ fn main() -> Result<()> {
     );
 
     timer = Instant::now();
-    if run_llvm(&output) {
+    if run_llvm(&mut output) {
         info!(
             "{GREEN}llvm success: {}ms{DEFAULT}",
             timer.elapsed().as_millis()
@@ -79,46 +78,43 @@ fn main() -> Result<()> {
 }
 
 fn run_fontend(paths: &Paths) -> Result<Ouput> {
-    let mut faults = vec![];
+    let root = paths.to_entry_file_path();
+    let source_folder = PathBuf::from_str(&paths.source_folder).expect("error is infallible");
+    let mut context = CompilerContext::new(source_folder, root.clone());
+    let root_module = context.module_store.get_root_id();
 
-    let source_file = to_source_file(&paths.source_file)?;
-    let tokens = to_token_stream(&source_file);
-    display_tokenizer(paths, &source_file)?;
+    let source_file = to_source_file(&root)?;
+    let tokens = to_token_stream(&source_file, root_module);
+    display_tokenizer(paths, root_module, &source_file)?;
 
-    let ast = to_ast(
-        tokens,
-        &COMPILER_OPTIONS,
-        &mut faults,
-        Some(std::path::PathBuf::from(&paths.source_file)),
-    );
+    let ast = to_ast(tokens, &COMPILER_OPTIONS, &mut context, Some(root));
     display_ast(paths, &ast)?;
-    log_faults(&faults, &source_file);
+    log_faults(&context);
 
-    let mut hir = to_hir(&ast, &COMPILER_OPTIONS, &mut faults);
+    let mut hir = to_hir(&ast, &COMPILER_OPTIONS, &mut context);
     clear_hir_type_map(&mut hir);
     display_hir(paths, &hir)?;
 
-    let mir = to_mir(&hir, &COMPILER_OPTIONS, &mut faults);
+    let mir = to_mir(&hir, &COMPILER_OPTIONS, &mut context);
     display_mir(paths, &mir, &hir)?;
 
     Ok(Ouput {
         mir_response: mir,
         hir_response: hir,
-        faults,
-        source_file,
+        context,
     })
 }
 
-fn run_llvm(output: &Ouput) -> bool {
+fn run_llvm(output: &mut Ouput) -> bool {
     let request = IrRequest {
         mir: &output.mir_response,
         types: &output.hir_response.typed,
         context: &Context::create(),
     };
 
-    let mut faults = vec![];
-    let ir = to_llvm_ir(&request, &COMPILER_OPTIONS, &mut faults);
-    log_faults(&faults, &output.source_file);
+    output.context.faults.clear();
+    let ir = to_llvm_ir(&request, &COMPILER_OPTIONS, &mut output.context.faults);
+    log_faults(&output.context);
 
     #[cfg(not(debug_assertions))]
     if ir.is_fatal {
@@ -142,8 +138,8 @@ fn run_llvm(output: &Ouput) -> bool {
     true
 }
 
-fn display_tokenizer(paths: &Paths, source_file: &str) -> Result<()> {
-    let token_stream = to_token_stream(source_file);
+fn display_tokenizer(paths: &Paths, module: ModuleId, source_file: &str) -> Result<()> {
+    let token_stream = to_token_stream(source_file, module);
     let tokens = display_tokens(paths, source_file, token_stream)?;
     paths.write_to_output(&tokens, "tokenizer/tokens.soulc")
 }
@@ -182,7 +178,7 @@ fn display_mir(paths: &Paths, mir: &MirResponse, hir: &HirResponse) -> Result<()
     )
 }
 
-fn to_source_file(source_path: &str) -> Result<String> {
+fn to_source_file(source_path: &Path) -> Result<String> {
     let mut file = File::open(source_path)?;
     let mut source_file = String::new();
     file.read_to_string(&mut source_file)?;
@@ -190,12 +186,27 @@ fn to_source_file(source_path: &str) -> Result<String> {
     Ok(source_file)
 }
 
-fn log_faults(faults: &Vec<SementicFault>, source_file: &str) {
-    for fault in faults {
-        error!(
-            "{}",
-            fault.to_message("main.soul", source_file, MESSAGE_CONFIG)
-        );
+fn log_faults(constext: &CompilerContext) {
+    let modules = &constext.module_store;
+    let mut source_file = String::new();
+    let mut module = ModuleId::error();
+
+    for fault in &constext.faults {
+        let module_id = match fault.get_soul_error().span {
+            Some(val) => val.module,
+            None => modules.get_root_id(),
+        };
+
+        let path = match modules.get_path(module_id) {
+            Some(val) => val,
+            None => &PathBuf::new(),
+        };
+
+        if module_id != module {
+            source_file = to_source_file(path).unwrap_or(String::new());
+        }
+
+        error!("{}", fault.to_message(path, &source_file, MESSAGE_CONFIG));
     }
 }
 

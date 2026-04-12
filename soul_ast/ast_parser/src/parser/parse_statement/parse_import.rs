@@ -41,22 +41,19 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     fn parse_import_path(&mut self) -> SoulResult<SoulImportPath> {
-        match &self.token().kind {
-            TokenKind::StringLiteral(path) => {
-                let path = path.clone();
-                self.bump();
-                Ok(SoulImportPath::from_string(path))
+        let path = match &self.token().kind {
+            TokenKind::StringLiteral(path) => SoulImportPath::from_str(path),
+            TokenKind::Ident(ident) => SoulImportPath::from_str(ident),
+            _ => {
+                return Err(SoulError::new(
+                    "expected import path".to_string(),
+                    SoulErrorKind::InvalidTokenKind,
+                    Some(self.token().span),
+                ));
             }
-            TokenKind::Ident(ident) => {
-                let import_name = ident.clone();
-                self.bump();
-                Ok(SoulImportPath::from_string(import_name))
-            }
-            _ => Err(SoulError::new(
-                "expected import path".to_string(),
-                SoulErrorKind::InvalidTokenKind,
-                Some(self.token().span),
-            )),
-        }
+        };
+
+        self.bump();
+        Ok(path)
     }
 }

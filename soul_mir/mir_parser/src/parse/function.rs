@@ -7,7 +7,10 @@ impl<'a> MirContext<'a> {
         let entry_block = self.new_function_block();
         let init_globals = mir::Function {
             id: self.tree.init_global_function,
-            name: Ident::new("_init_globals".to_string(), Span::default_const()),
+            name: Ident::new(
+                "_init_globals".to_string(),
+                Span::default(self.context.module_store.get_root_id()),
+            ),
             body: mir::FunctionBody::Internal {
                 entry_block,
                 locals: vec![],

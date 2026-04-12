@@ -1,6 +1,6 @@
 use soul_utils::{
     error::{SoulError, SoulResult},
-    span::Span,
+    span::{ModuleId, Span},
 };
 
 use crate::{
@@ -23,10 +23,10 @@ pub struct TokenStreamPosition<'a>(TokenStream<'a>);
 
 impl<'a> TokenStream<'a> {
     /// Creates a new token stream from the given source code.
-    pub fn new(source: &'a str) -> Self {
+    pub fn new(source: &'a str, module: ModuleId) -> Self {
         Self {
-            lexer: Lexer::new(source),
-            current: Token::new(TokenKind::EndLine, Span::default()),
+            lexer: Lexer::new(source, module),
+            current: Token::new(TokenKind::EndLine, Span::default(module)),
         }
     }
 
@@ -75,7 +75,7 @@ impl<'a> TokenStream<'a> {
     pub fn consume_advance(&mut self) -> (Token, Option<SoulError>) {
         use std::mem::swap;
 
-        let mut consume_token = Token::new(TokenKind::EndLine, Span::default());
+        let mut consume_token = Token::new(TokenKind::EndLine, Span::error());
         swap(&mut self.current, &mut consume_token);
 
         if let Err(err) = self.advance() {

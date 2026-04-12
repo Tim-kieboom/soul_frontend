@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::str::Lines;
 
 use soul_utils::char_colors::Colors;
@@ -22,18 +23,22 @@ impl MessageConfig {
 }
 
 pub trait ToAnyhow {
-    fn to_anyhow(&self, file_path: &str, source_file: &str, config: MessageConfig)
-        -> anyhow::Error;
+    fn to_anyhow(
+        &self,
+        file_path: &Path,
+        source_file: &str,
+        config: MessageConfig,
+    ) -> anyhow::Error;
 }
 
 pub trait ToMessage {
-    fn to_message(&self, file_path: &str, source_file: &str, config: MessageConfig) -> String;
+    fn to_message(&self, file_path: &Path, source_file: &str, config: MessageConfig) -> String;
 }
 
 impl ToAnyhow for SementicFault {
     fn to_anyhow(
         &self,
-        file_path: &str,
+        file_path: &Path,
         source_file: &str,
         config: MessageConfig,
     ) -> anyhow::Error {
@@ -42,7 +47,7 @@ impl ToAnyhow for SementicFault {
 }
 
 impl ToMessage for SementicFault {
-    fn to_message(&self, file_path: &str, source_file: &str, config: MessageConfig) -> String {
+    fn to_message(&self, file_path: &Path, source_file: &str, config: MessageConfig) -> String {
         to_message(
             self.get_soul_error(),
             self.get_level(),
@@ -56,7 +61,7 @@ impl ToMessage for SementicFault {
 fn to_message(
     err: &SoulError,
     level: SementicLevel,
-    file_path: &str,
+    file_path: &Path,
     source_file: &str,
     config: MessageConfig,
 ) -> String {
@@ -84,7 +89,7 @@ fn to_message(
     sb.push_str(&err.message);
     sb.push_str(&format!("\n{begin_space}├── "));
     color(Colors::BLUE, &mut sb, &config);
-    sb.push_str(file_path);
+    sb.push_str(file_path.to_str().unwrap_or("<error>"));
 
     if let Some(span) = err.span {
         display_span(&mut sb, span);

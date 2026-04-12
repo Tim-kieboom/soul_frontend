@@ -4,7 +4,7 @@ use run_hir::HirResponse;
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
     ids::{FunctionId, IdAlloc},
-    sementic_level::SementicFault,
+    sementic_level::{CompilerContext, SementicFault},
     soul_error_internal,
     span::Span,
     vec_map::VecMap,
@@ -19,8 +19,8 @@ mod parse;
 mod utils;
 use crate::{id_generators::IdGenerators, mir::MirTree};
 
-pub fn mir_lower(hir_reponse: &HirResponse, faults: &mut Vec<SementicFault>) -> MirTree {
-    let mut context = MirContext::new(hir_reponse, faults);
+pub fn mir_lower(hir_reponse: &HirResponse, context: &mut CompilerContext) -> MirTree {
+    let mut context = MirContext::new(hir_reponse, context);
     let is_end = &mut false;
 
     for global in &hir_reponse.hir.root.globals {
@@ -47,7 +47,7 @@ struct MirContext<'a> {
     temp_remap: VecMap<hir::LocalId, mir::TempId>,
 
     hir_response: &'a HirResponse,
-    faults: &'a mut Vec<SementicFault>,
+    context: &'a mut CompilerContext,
 }
 
 struct CurrentContext {
@@ -71,12 +71,12 @@ impl CurrentContext {
 }
 
 impl<'a> MirContext<'a> {
-    fn new(hir_reponse: &'a HirResponse, faults: &'a mut Vec<SementicFault>) -> Self {
+    fn new(hir_reponse: &'a HirResponse, context: &'a mut CompilerContext) -> Self {
         let init_global_function = hir_reponse.hir.init_globals;
         let main = hir_reponse.hir.main;
 
         if main == FunctionId::error() {
-            faults.push(SementicFault::error(SoulError::new(
+            context.faults.push(SementicFault::error(SoulError::new(
                 "'main' function not found",
                 SoulErrorKind::InvalidContext,
                 None,
@@ -109,7 +109,7 @@ impl<'a> MirContext<'a> {
         let mut this = Self {
             main,
             tree,
-            faults,
+            context,
             hir_response: hir_reponse,
             error_type: ThirType {
                 kind: typed_hir::ThirTypeKind::Error,
@@ -151,7 +151,7 @@ impl<'a> MirContext<'a> {
     }
 
     fn log_error(&mut self, err: SoulError) {
-        self.faults.push(SementicFault::error(err));
+        self.context.faults.push(SementicFault::error(err));
     }
 
     fn new_function_block(&mut self) -> mir::BlockId {

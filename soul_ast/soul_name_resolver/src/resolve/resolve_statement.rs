@@ -1,8 +1,8 @@
-use ast::{scope::NodeId, Block, Function, Statement, StatementKind, UseBlock};
+use ast::{Block, Function, Statement, StatementKind, UseBlock, scope::NodeId};
 use soul_utils::{
+    Ident,
     error::{SoulError, SoulErrorKind},
     span::Span,
-    Ident,
 };
 
 use crate::NameResolver;

@@ -4,7 +4,7 @@ use std::{
     ops::{Index, IndexMut},
 };
 
-use serde::{ser::SerializeMap, Serialize, Serializer};
+use serde::{Serialize, Serializer, ser::SerializeMap};
 
 use crate::ids::IdAlloc;
 

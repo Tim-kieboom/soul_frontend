@@ -14,11 +14,11 @@ use soul_utils::{
 };
 
 use crate::parser::{
+    Parser,
     parse_utils::{
         ARROW_LEFT, COLON, COLON_ASSIGN, CURLY_CLOSE, CURLY_OPEN, ROUND_OPEN, SEMI_COLON,
         STAMENT_END_TOKENS, STAR,
     },
-    Parser,
 };
 
 mod from_keyword;

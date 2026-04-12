@@ -9,7 +9,7 @@ use soul_utils::{
     Ident,
     error::{SoulError, SoulErrorKind},
     ids::{FunctionId, IdAlloc},
-    sementic_level::SementicFault,
+    sementic_level::{CompilerContext, SementicFault},
     soul_error_internal,
     span::{ItemMetaData, Span},
     vec_map::VecMapIndex,
@@ -23,8 +23,8 @@ mod place;
 mod statement;
 mod r#type;
 
-pub fn lower_hir(response: &AstResponse, faults: &mut Vec<SementicFault>) -> HirTree {
-    let mut context = HirContext::new(response, faults);
+pub fn lower_hir(response: &AstResponse, context: &mut CompilerContext) -> HirTree {
+    let mut context = HirContext::new(response, context);
 
     context.lower_internal_structs();
     for global in &response.tree.root.statements {
@@ -43,18 +43,18 @@ struct HirContext<'a> {
     pub current_body: CurrentBody,
     pub ast_store: &'a DeclareStore,
 
-    pub faults: &'a mut Vec<SementicFault>,
+    pub context: &'a mut CompilerContext,
 }
 impl<'a> HirContext<'a> {
-    fn new(response: &'a AstResponse, faults: &'a mut Vec<SementicFault>) -> Self {
+    fn new(response: &'a AstResponse, context: &'a mut CompilerContext) -> Self {
         let mut id_generator = IdAllocalor::new(response.function_generators.clone());
         let init_global_function = id_generator.alloc_function();
-        let root_id = id_generator.alloc_module();
+        let root_id = context.module_store.get_root_id();
 
         let main = match response.store.main_function {
             Some(val) => val,
             None => {
-                faults.push(SementicFault::error(SoulError::new(
+                context.faults.push(SementicFault::error(SoulError::new(
                     "main function not found",
                     SoulErrorKind::InvalidContext,
                     None,
@@ -64,7 +64,7 @@ impl<'a> HirContext<'a> {
         };
 
         Self {
-            faults,
+            context,
             id_generator,
             ast_store: &response.store,
             scopes: vec![Scope::default()],
@@ -76,7 +76,10 @@ impl<'a> HirContext<'a> {
     fn lower_internal_structs(&mut self) {
         let struct_id = self.tree.info.types.alloc_struct();
         let generic_id = self.tree.info.types.insert_generic("T".to_string());
-        let name = Ident::new("___Array".to_string(), Span::default_const());
+        let name = Ident::new(
+            "___Array".to_string(),
+            Span::default(self.context.module_store.get_root_id()),
+        );
 
         let generic_type = self.add_type(HirType::generic_type(generic_id)).to_lazy();
         let ptr_type = self.add_type(HirType::pointer_type(generic_type)).to_lazy();
@@ -181,7 +184,7 @@ impl<'a> HirContext<'a> {
     }
 
     fn log_error(&mut self, err: SoulError) {
-        self.faults.push(SementicFault::error(err));
+        self.context.faults.push(SementicFault::error(err));
     }
 
     fn consume_to_hir(self) -> HirTree {

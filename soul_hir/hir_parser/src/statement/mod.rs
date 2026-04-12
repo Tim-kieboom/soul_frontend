@@ -2,7 +2,10 @@ use ast::UseBlock;
 use hir::{Assign, StatementId};
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
+    ids::IdAlloc,
+    soul_error_internal,
     soul_names::KeyWord,
+    span::ModuleId,
 };
 
 use crate::HirContext;
@@ -187,11 +190,26 @@ impl<'a> HirContext<'a> {
 
     fn resolve_import(&mut self, import: &ast::Import) {
         for path in &import.paths {
-            let module_id = self
+            let full_path = path.module.to_full_path(&self.context.source_folder);
+            let module_id = match self.context.module_store.get_id(&full_path) {
+                Some(id) => id,
+                None => {
+                    for (_, path) in self.context.module_store.entries() {
+                        eprintln!("{}", path.to_string_lossy().to_string());
+                    }
+                    self.log_error(soul_error_internal!(
+                        format!("module '{:?}' not found", full_path.as_path()),
+                        None
+                    ));
+                    ModuleId::error()
+                }
+            };
+
+            let _ = self
                 .tree
                 .info
                 .imports
-                .insert(&mut self.id_generator.module, path.module.clone());
+                .insert(module_id, path.module.clone());
 
             let imports = match self.current_body {
                 crate::CurrentBody::Global => &mut self.tree.root.imports,

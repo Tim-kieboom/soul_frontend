@@ -1,4 +1,12 @@
-use crate::{define_str_enum, error::SoulError};
+use std::path::PathBuf;
+
+use crate::{
+    bimap::BiMap,
+    define_str_enum,
+    error::SoulError,
+    ids::{IdAlloc, IdGenerator},
+    span::ModuleId,
+};
 
 define_str_enum!(
     /// Severity level for diagnostics and faults.
@@ -13,6 +21,60 @@ define_str_enum!(
         Debug => "debug", 3,
     }
 );
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CompilerContext {
+    pub source_folder: PathBuf,
+    pub faults: Vec<SementicFault>,
+    pub module_store: ModuleStore,
+}
+impl CompilerContext {
+    pub fn new(source_folder: PathBuf, root_path: PathBuf) -> Self {
+        Self {
+            source_folder,
+            faults: vec![],
+            module_store: ModuleStore::new(root_path),
+        }
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ModuleStore {
+    root: ModuleId,
+    map: BiMap<ModuleId, PathBuf>,
+    alloc: IdGenerator<ModuleId>,
+}
+impl ModuleStore {
+    pub fn new(root_path: PathBuf) -> Self {
+        let mut this = Self {
+            root: ModuleId::error(),
+            map: BiMap::new(),
+            alloc: IdGenerator::new(),
+        };
+        this.root = this.new_module(root_path);
+        this
+    }
+
+    pub fn new_module(&mut self, path: PathBuf) -> ModuleId {
+        self.map.insert(&mut self.alloc, path)
+    }
+
+    pub fn get_root_id(&self) -> ModuleId {
+        self.root
+    }
+
+    pub fn entries(&self) -> impl Iterator<Item = (ModuleId, &PathBuf)> {
+        self.map.entries()
+    }
+
+    pub fn get_id(&self, path: &PathBuf) -> Option<ModuleId> {
+        self.map.get_key(path)
+    }
+
+    pub fn get_path(&self, id: ModuleId) -> Option<&PathBuf> {
+        self.map.get_value(id)
+    }
+}
 
 /// A fault (error/warning/note) that occurred during compilation.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

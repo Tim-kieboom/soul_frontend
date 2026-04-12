@@ -4,21 +4,21 @@ use ast::{
 };
 use soul_tokenizer::{Number, TokenKind};
 use soul_utils::{
+    Ident,
     error::{SoulError, SoulErrorKind},
     soul_error_internal,
     soul_names::{KeyWord, PrimitiveTypes, TypeModifier},
     try_result::{
         ResultTryErr, ResultTryNotValue, TryErr, TryError, TryNotValue, TryOk, TryResult,
     },
-    Ident,
 };
 
 use crate::parser::{
+    Parser,
     parse_utils::{
         ARRAY, ARROW_LEFT, ASSIGN, COLON, COMMA, CONST_REF, CURLY_OPEN, MUT_REF, OPTIONAL, POINTER,
         ROUND_CLOSE, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN,
     },
-    Parser,
 };
 
 impl<'a, 'f> Parser<'a, 'f> {

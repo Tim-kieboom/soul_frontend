@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use soul_utils::{
     ids::{FunctionId, IdGenerator},
     vec_map::VecMap,
@@ -28,7 +30,7 @@ pub struct AstResponse {
     /// ID generator for functions.
     pub function_generators: IdGenerator<FunctionId>,
     /// The source file path (for module loading).
-    pub source_file: Option<std::path::PathBuf>,
+    pub source_file: Option<PathBuf>,
 }
 
 /// A store of all declarations in a module.

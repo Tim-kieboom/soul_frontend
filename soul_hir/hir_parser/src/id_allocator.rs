@@ -1,4 +1,4 @@
-use hir::{BlockId, ExpressionId, FieldId, LocalId, ModuleId, PlaceId, StatementId};
+use hir::{BlockId, ExpressionId, FieldId, LocalId, PlaceId, StatementId};
 use soul_utils::ids::{FunctionId, IdGenerator};
 
 #[derive(Debug, Clone, Default)]
@@ -7,7 +7,6 @@ pub(crate) struct IdAllocalor {
     pub(crate) block: IdGenerator<BlockId>,
     pub(crate) local: IdGenerator<LocalId>,
     pub(crate) field: IdGenerator<FieldId>,
-    pub(crate) module: IdGenerator<ModuleId>,
     pub(crate) function: IdGenerator<FunctionId>,
     pub(crate) statement: IdGenerator<StatementId>,
     pub(crate) expression: IdGenerator<ExpressionId>,
@@ -38,10 +37,6 @@ impl IdAllocalor {
 
     pub fn alloc_statement(&mut self) -> StatementId {
         self.statement.alloc()
-    }
-
-    pub fn alloc_module(&mut self) -> ModuleId {
-        self.module.alloc()
     }
 
     pub fn alloc_function(&mut self) -> FunctionId {

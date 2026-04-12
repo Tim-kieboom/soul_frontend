@@ -8,7 +8,7 @@ use soul_utils::{
     vec_map::VecMapIndex,
 };
 use std::fmt::Write;
-use typed_hir::{display_thir::DisplayThirType, ThirTypeKind, TypedHir};
+use typed_hir::{ThirTypeKind, TypedHir, display_thir::DisplayThirType};
 
 pub fn display_hir(hir: &HirTree) -> String {
     let mut displayer = HirDisplayer::new_hir(hir);

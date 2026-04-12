@@ -7,7 +7,7 @@ use soul_utils::{
     compile_options::CompilerOptions,
     error::SoulError,
     ids::{FunctionId, IdAlloc},
-    sementic_level::SementicFault,
+    sementic_level::{CompilerContext, SementicFault},
     soul_error_internal,
     soul_names::{PrimitiveTypes, TypeModifier},
     span::Span,
@@ -30,9 +30,9 @@ pub use type_helpers::UnifyPrimitiveCast;
 pub fn lower_typed_hir<'a>(
     hir: &'a HirTree,
     options: &'a CompilerOptions,
-    faults: &'a mut Vec<SementicFault>,
+    context: &'a mut CompilerContext,
 ) -> TypedHir {
-    let mut context = TypedHirContext::new(hir, options, faults);
+    let mut context = TypedHirContext::new(hir, options, context);
 
     for (struct_id, object) in hir.info.types.structs_entries() {
         for (i, field) in object.fields.iter().enumerate() {
@@ -77,17 +77,17 @@ struct TypedHirContext<'a> {
     expressions: VecMap<ExpressionId, LazyTypeId>,
     generic_defines: VecMap<GenericId, VecSet<TypeId>>,
 
-    faults: &'a mut Vec<SementicFault>,
+    context: &'a mut CompilerContext,
 }
 impl<'a> TypedHirContext<'a> {
     fn new(
         hir: &'a HirTree,
         options: &'a CompilerOptions,
-        faults: &'a mut Vec<SementicFault>,
+        context: &'a mut CompilerContext,
     ) -> Self {
         let mut this = Self {
             hir,
-            faults,
+            context,
             options,
             current_function: None,
             types: hir.info.types.clone(),
@@ -155,10 +155,7 @@ impl<'a> TypedHirContext<'a> {
                 }
 
                 let mut infer = self.id_to_infer(infer_id).clone();
-                let span = self
-                    .infers
-                    .get_span(infer_id)
-                    .unwrap_or(Span::default_const());
+                let span = self.infers.get_span(infer_id).unwrap_or(Span::error());
                 infer.modifier = modifier;
                 hir::LazyTypeId::Infer(self.infers.insert(infer, span))
             }
@@ -278,6 +275,6 @@ impl<'a> TypedHirContext<'a> {
     }
 
     fn log_error(&mut self, err: SoulError) {
-        self.faults.push(SementicFault::error(err));
+        self.context.faults.push(SementicFault::error(err));
     }
 }

@@ -23,7 +23,9 @@ macro_rules! impl_soul_ids {
         $(
             $( #[$meta] )*
             #[derive(
-                Debug, Clone, Copy, Hash, PartialEq, Eq,
+                Debug, Clone, Copy, Hash,
+                PartialEq, Eq,
+                PartialOrd, Ord,
                 serde::Serialize, serde::Deserialize
             )]
             pub struct $ty(usize);

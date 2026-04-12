@@ -2,7 +2,7 @@ use ast::{AbstractSyntaxTree, Block, SoulType};
 #[cfg(debug_assertions)]
 use soul_tokenizer::Token;
 use soul_tokenizer::{TokenKind, TokenStream};
-use soul_utils::{sementic_level::SementicFault, soul_names::TypeModifier};
+use soul_utils::{sementic_level::CompilerContext, soul_names::TypeModifier};
 
 use crate::parser::parse_utils::SEMI_COLON;
 
@@ -32,41 +32,38 @@ pub(crate) struct Parser<'a, 'f> {
 
     tokens: TokenStream<'a>,
     current_this: Option<SoulType>,
-    faults: &'f mut Vec<SementicFault>,
+    context: &'f mut CompilerContext,
 }
 impl<'a, 'f> Parser<'a, 'f> {
     #[cfg(not(debug_assertions))]
-    fn new(tokens: TokenStream<'a>, faults: &'f mut Vec<SementicFault>) -> Self {
+    fn new(tokens: TokenStream<'a>, context: &'f mut CompilerContext) -> Self {
         Self {
             tokens,
-            faults,
+            context,
             current_this: None,
         }
     }
 
     #[cfg(debug_assertions)]
-    fn new(tokens: TokenStream<'a>, faults: &'f mut Vec<SementicFault>) -> Self {
+    fn new(tokens: TokenStream<'a>, context: &'f mut CompilerContext) -> Self {
         use soul_tokenizer::TokenKind;
         use soul_utils::span::Span;
 
         let debug = DebugViewer {
-            current: Token::new(TokenKind::EndLine, Span::default_const()),
+            current: Token::new(TokenKind::EndLine, Span::error()),
             current_index: 0,
         };
 
         Self {
             debug,
             tokens,
-            faults,
+            context,
             current_this: None,
         }
     }
 
-    pub fn parse(
-        tokens: TokenStream<'a>,
-        faults: &'f mut Vec<SementicFault>,
-    ) -> AbstractSyntaxTree {
-        let mut this = Self::new(tokens, faults);
+    pub fn parse(tokens: TokenStream<'a>, context: &'f mut CompilerContext) -> AbstractSyntaxTree {
+        let mut this = Self::new(tokens, context);
         if let Err(err) = this.tokens.initialize() {
             this.log_error(err);
             return AbstractSyntaxTree {

@@ -6,8 +6,8 @@ use soul_utils::{
 };
 
 use crate::parser::{
-    parse_utils::{CURLY_OPEN, STAMENT_END_TOKENS},
     Parser,
+    parse_utils::{CURLY_OPEN, STAMENT_END_TOKENS},
 };
 
 const IF_STR: &str = KeyWord::If.as_str();

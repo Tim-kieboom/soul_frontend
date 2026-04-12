@@ -1,24 +1,17 @@
-use crate::Ident;
+use crate::{Ident, ids::IdAlloc, impl_soul_ids};
 use std::hash::Hash;
+
+impl_soul_ids!(ModuleId);
 
 /// Represents a source code location span.
 ///
 /// Tracks the start and end positions of code in the source file, along with
 /// any macro expansion context.
 #[derive(
-    Debug,
-    Clone,
-    Default,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
 pub struct Span {
+    pub module: ModuleId,
     /// The starting line number (1-indexed).
     pub start_line: usize,
     /// The starting column/offset within the line (1-indexed).
@@ -27,6 +20,17 @@ pub struct Span {
     pub end_line: usize,
     /// The ending column/offset within the line (1-indexed).
     pub end_offset: usize,
+}
+impl Span {
+    pub const fn default(module: ModuleId) -> Self {
+        Self {
+            module,
+            end_line: 0,
+            end_offset: 0,
+            start_line: 0,
+            start_offset: 0,
+        }
+    }
 }
 
 /// An attribute identifier
@@ -67,8 +71,9 @@ impl ItemMetaData {
 
 impl Span {
     /// Creates a default (zero-valued) span.
-    pub const fn default_const() -> Self {
+    pub fn error() -> Self {
         Self {
+            module: ModuleId::error(),
             start_line: 0,
             start_offset: 0,
             end_line: 0,
@@ -79,8 +84,9 @@ impl Span {
     /// Creates a span that represents a single point on a line.
     ///
     /// Both start and end positions are set to the same line and offset.
-    pub fn new_line(line: usize, offset: usize) -> Self {
+    pub fn new_line(module: ModuleId, line: usize, offset: usize) -> Self {
         Self {
+            module,
             start_line: line,
             start_offset: offset,
             end_line: line,
@@ -118,6 +124,8 @@ impl Span {
 
     /// Combines this span with another, creating a new span that encompasses both.
     pub fn combine(self, other: Self) -> Self {
+        debug_assert_eq!(self.module, other.module);
+
         let start_line = self.start_line.min(other.start_line);
         let start_offset = self.combine_start_offset(&other);
 
@@ -125,6 +133,7 @@ impl Span {
         let end_offset = self.combine_end_offset(&other);
 
         Self {
+            module: self.module,
             start_line,
             start_offset,
             end_line,

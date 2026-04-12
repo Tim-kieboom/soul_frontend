@@ -1,10 +1,15 @@
-use std::fs::read_to_string;
+use std::{fs::read_to_string, path::PathBuf};
 
 use ast::{
-    Block, DeclareStore, Expression, ExpressionKind, Function, FunctionSignature, ImportPath, Literal, Statement, StatementKind, TypeKind, UseBlock, VarTypeKind, scope::{ScopeBuilder, ScopeValue, ScopeValueKind}
+    Block, DeclareStore, Expression, ExpressionKind, Function, FunctionSignature, ImportPath,
+    Literal, Statement, StatementKind, TypeKind, UseBlock, VarTypeKind, Variable,
+    scope::{ScopeBuilder, ScopeValue, ScopeValueKind},
 };
 use soul_utils::{
-    error::{SoulError, SoulErrorKind}, soul_error_internal, soul_names::PrimitiveTypes, span::{Span, Spanned}
+    error::{SoulError, SoulErrorKind},
+    soul_error_internal,
+    soul_names::PrimitiveTypes,
+    span::Span,
 };
 
 use crate::NameResolver;
@@ -67,11 +72,7 @@ impl<'a> NameResolver<'a> {
 
                 self.store.insert_variable_type(id, variable.ty.clone());
 
-                if matches!(&variable.ty, VarTypeKind::InveredType(_))
-                    && let Some(init) = &variable.initialize_value
-                    && let Some(hint) =
-                        owner_hint_from_initializer_literal(init, &self.info.scopes, self.store)
-                {
+                if let Some(hint) = self.try_get_owner_hint(variable) {
                     self.store.insert_variable_owner_hint(id, hint);
                 }
 
@@ -118,15 +119,12 @@ impl<'a> NameResolver<'a> {
         self.collect_type(&mut signature.return_type);
 
         self.push_scope(&mut function.block.scope_id);
-        match signature.function_kind {
-            ast::FunctionKind::Static => (),
-            ast::FunctionKind::MutRef
-            | ast::FunctionKind::Consume
-            | ast::FunctionKind::ConstRef => {
-                let id = self.alloc_node();
-                self.insert_value("this", id, ScopeValue::Variable);
-            }
+
+        if signature.function_kind != ast::FunctionKind::Static {
+            let id = self.alloc_node();
+            self.insert_value("this", id, ScopeValue::Variable);
         }
+
         self.declare_parameters(&mut signature.parameters);
         self.collect_scopeless_block(&mut function.block);
         self.pop_scope();
@@ -136,14 +134,17 @@ impl<'a> NameResolver<'a> {
     }
 
     fn collect_import_path(&mut self, path: &ImportPath, span: Span) {
-        let module_name = path.module.as_str().to_string();
-        let alias = match &path.kind {
-            ast::ImportKind::All | ast::ImportKind::This | ast::ImportKind::Items(_) => None,
-            ast::ImportKind::Alias(ident) => Some(ident.clone()),
+        let module_name = match path.module.get_module_name() {
+            Some(val) => val,
+            None => {
+                self.log_error(soul_error_internal!("could not get module name", None));
+                return;
+            }
         };
-
-        let import_name = alias.as_ref().map(|a| a.as_str()).unwrap_or(&module_name);
-        self.declare_module(import_name, &module_name, path.kind.clone());
+        let alias = match &path.kind {
+            ast::ImportKind::Alias(ident) => Some(ident.as_str()),
+            _ => None,
+        };
 
         let module_file_path = match self.find_module_file(&module_name) {
             Some(val) => val,
@@ -158,79 +159,102 @@ impl<'a> NameResolver<'a> {
             }
         };
 
-        let module_source = match read_to_string(&module_file_path) {
-            Ok(val) => val,
-            Err(err) => {
-                self.log_error(soul_error_internal!(
-                    format!("import '{}': could not read module file '{}': {}", 
-                        module_name, module_file_path.display(), err),
-                    Some(span)
-                ));
-                return;
-            }
+        let import_name = alias.unwrap_or(module_name);
+        self.declare_module(import_name, &module_name, path.kind.clone());
+
+        self.import_module(module_file_path, import_name, module_name, span);
+    }
+
+    fn try_get_owner_hint(&self, variable: &Variable) -> Option<TypeKind> {
+        if !matches!(&variable.ty, VarTypeKind::InveredType(_)) {
+            return None;
+        }
+
+        let init = variable.initialize_value.as_ref()?;
+        owner_hint_from_expression(init, &self.info.scopes, self.store)
+    }
+
+    fn import_module(
+        &mut self,
+        module_file_path: PathBuf,
+        import_name: &str,
+        module_name: &str,
+        span: Span,
+    ) {
+        let Some(module_source) = self.read_module(&module_file_path, module_name, span) else {
+            return;
         };
 
-        if let Some(module_ast) = self.parse_module(&module_source) {
-            let items_count = module_ast.statements.iter()
-                .filter(|s| matches!(s.node, StatementKind::Function(_) | 
-                                        StatementKind::ExternalFunction(_) | 
-                                        StatementKind::Struct(_)))
-                .count();
-            
-            if items_count == 0 {
-                self.log_error(SoulError::new(
-                    format!("import '{}': module has no public items to import (functions, extern functions, or structs)", 
-                        module_name),
-                    SoulErrorKind::NotFoundInScope,
-                    Some(span),
-                ));
-                return;
-            }
-
-            for stmt in module_ast.statements {
-                match stmt.node {
-                    StatementKind::Import(import) => {
-                        self.collect_import_path(&import.paths[0], stmt.span);
-                    }
-                    StatementKind::Function(func) => {
-                        self.add_imported_function(func, import_name.to_string());
-                    }
-                    StatementKind::ExternalFunction(extern_func) => {
-                        self.add_imported_function(
-                            Function {
-                                signature: Spanned::new(
-                                    ast::FunctionSignature {
-                                        id: None,
-                                        name: extern_func.signature.node.name.clone(),
-                                        methode_type: extern_func.signature.node.methode_type.clone(),
-                                        parameters: extern_func.signature.node.parameters.clone(),
-                                        return_type: extern_func.signature.node.return_type.clone(),
-                                        function_kind: extern_func.signature.node.function_kind,
-                                        generics: extern_func.signature.node.generics.clone(),
-                                        external: Some(ast::ExternLanguage::C),
-                                    },
-                                    Span::default(),
-                                ),
-                                block: ast::Block {
-                                    modifier: soul_utils::soul_names::TypeModifier::Mut,
-                                    statements: vec![],
-                                    scope_id: None,
-                                    node_id: None,
-                                    span: Span::default(),
-                                },
-                            },
-                            import_name.to_string(),
-                        );
-                    }
-                    _ => {}
-                }
-            }
-        } else {
+        let module_id = self.context.module_store.new_module(module_file_path);
+        let Some(module_ast) = self.parse_module(&module_source, module_id) else {
             self.log_error(SoulError::new(
                 format!("import '{}': failed to parse module", module_name),
                 SoulErrorKind::NotFoundInScope,
                 Some(span),
             ));
+            return;
+        };
+
+        let items_count = module_ast
+            .statements
+            .iter()
+            .filter(|s| {
+                matches!(
+                    s.node,
+                    StatementKind::Function(_)
+                        | StatementKind::ExternalFunction(_)
+                        | StatementKind::Struct(_)
+                )
+            })
+            .count();
+
+        if items_count == 0 {
+            self.log_error(SoulError::new(
+                format!(
+                    "import '{}': module has no public items to import (functions, extern functions, or structs)", 
+                    module_name,
+                ),
+                SoulErrorKind::NotFoundInScope,
+                Some(span),
+            ));
+            return;
+        }
+
+        for stmt in module_ast.statements {
+            match stmt.node {
+                StatementKind::Import(import) => {
+                    self.collect_import_path(&import.paths[0], stmt.span);
+                }
+                StatementKind::Function(func) => {
+                    self.add_imported_function(func, import_name.to_string());
+                }
+                StatementKind::ExternalFunction(extern_func) => {
+                    let mut function = extern_func.clone();
+                    function.signature.node.id = None;
+                    function.signature.node.external = Some(ast::ExternLanguage::C);
+
+                    self.add_imported_function(function, import_name.to_string());
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn read_module(&mut self, path: &PathBuf, module_name: &str, span: Span) -> Option<String> {
+        match read_to_string(path) {
+            Ok(val) => Some(val),
+            Err(err) => {
+                self.log_error(soul_error_internal!(
+                    format!(
+                        "import '{}': could not read module file '{}': {}",
+                        module_name,
+                        path.display(),
+                        err,
+                    ),
+                    Some(span)
+                ));
+                None
+            }
         }
     }
 }
@@ -239,7 +263,7 @@ fn is_main(signature: &FunctionSignature) -> bool {
     signature.name.as_str() == "main" && matches!(signature.methode_type.kind, TypeKind::None)
 }
 
-fn owner_hint_from_initializer_literal(
+fn owner_hint_from_expression(
     init: &Expression,
     scopes: &ScopeBuilder,
     store: &DeclareStore,

@@ -1,9 +1,9 @@
 use std::fmt::{Arguments, Debug, Write};
 
 use ast::{
-    scope::{NodeId, ScopeId},
     Assignment, AstResponse, Block, ElseKind, Expression, Function, FunctionSignature, Generic,
     IfArm, Import, SoulType, Statement, StatementKind, Struct, TypeKind, UseBlock, Variable,
+    scope::{NodeId, ScopeId},
 };
 use soul_utils::{
     ids::FunctionId,
@@ -483,7 +483,13 @@ impl AstDisplayer {
                 self.push('}');
             }
             ast::ExpressionKind::ExternalExpression(external_expression) => {
-                self.push_str(external_expression.path.as_str());
+                self.push_str(
+                    external_expression
+                        .path
+                        .as_path()
+                        .to_str()
+                        .unwrap_or("<error>"),
+                );
                 self.push('.');
                 self.display_expression(&external_expression.expr);
             }

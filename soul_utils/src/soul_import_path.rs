@@ -1,6 +1,6 @@
-use std::str::Split;
-
-use crate::symbool_kind::SymbolKind;
+use std::{
+    path::{Path, PathBuf},
+};
 
 /// A path to a Soul page/module.
 ///
@@ -9,35 +9,50 @@ use crate::symbool_kind::SymbolKind;
 #[derive(
     Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
 )]
-pub struct SoulImportPath(String);
-const PATH_SYMBOOL: &str = SymbolKind::Slash.as_str();
+pub struct SoulImportPath(PathBuf);
 
 impl SoulImportPath {
     pub fn new() -> Self {
-        Self(String::new())
+        Self(PathBuf::new())
     }
 
-    pub fn from_string(s: String) -> Self {
-        let cleaned = s.trim_matches('"').trim_start_matches("./").to_string();
-        Self(cleaned)
+    pub fn from_str(s: &str) -> Self {
+        let cleaned = if s.starts_with("./") { &s[2..] } else { s };
+
+        Self(PathBuf::from(cleaned.to_string()))
+    }
+
+    pub fn get_module_name(&self) -> Option<&str> {
+        self.0.file_name()?
+            .to_str()?
+            .split('.')
+            .next()
     }
 
     pub fn push(&mut self, value: &str) {
-        if !self.as_str().is_empty() {
-            self.0.push_str(PATH_SYMBOOL);
-        }
-        self.0.push_str(value);
+        self.0.push(value);
     }
 
-    pub fn iter(&mut self) -> Split<'_, &str> {
-        self.0.split(PATH_SYMBOOL)
+    pub fn iter(&mut self) -> std::path::Iter<'_> {
+        self.0.iter()
     }
 
-    pub fn as_str(&self) -> &str {
+    pub fn as_path(&self) -> &Path {
         &self.0
     }
 
+    pub fn as_pathbuf(&self) -> &PathBuf {
+        &self.0
+    }
+
+    pub fn to_full_path(&self, dir_path: &PathBuf) -> PathBuf {
+        let mut this = dir_path.clone();
+        this.push(&self.0);
+        this.set_extension("soul");
+        this
+    }
+
     pub fn to_string(self) -> String {
-        self.0
+        self.0.to_string_lossy().to_string()
     }
 }

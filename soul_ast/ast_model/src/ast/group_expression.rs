@@ -1,9 +1,9 @@
 use soul_utils::Ident;
 
 use crate::{
+    BoxExpression,
     ast::{Expression, SoulType},
     scope::NodeId,
-    BoxExpression,
 };
 
 /// An array literal, e.g., `[1, 2, 3]`.

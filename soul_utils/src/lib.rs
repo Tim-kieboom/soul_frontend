@@ -1,3 +1,5 @@
+use crate::span::{ModuleId, Span};
+
 pub mod bimap;
 pub mod char_colors;
 pub mod compile_options;
@@ -30,11 +32,11 @@ impl Ident {
         self.node.clone()
     }
 
-    pub fn new_owned(name: String) -> Self {
-        crate::span::Spanned::new(name, crate::span::Span::default_const())
+    pub fn new_owned(name: String, module: ModuleId) -> Self {
+        crate::span::Spanned::new(name, Span::default(module))
     }
 
-    pub fn new_dummy(name: &str) -> Self {
-        Self::new_owned(name.to_string())
+    pub fn new_dummy(name: &str, module: ModuleId) -> Self {
+        Self::new_owned(name.to_string(), module)
     }
 }

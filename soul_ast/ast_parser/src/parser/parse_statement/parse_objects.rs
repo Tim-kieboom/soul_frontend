@@ -6,8 +6,8 @@ use soul_utils::{
 };
 
 use crate::parser::{
-    parse_utils::{COLON, CURLY_CLOSE, CURLY_OPEN, STAMENT_END_TOKENS},
     Parser,
+    parse_utils::{COLON, CURLY_CLOSE, CURLY_OPEN, STAMENT_END_TOKENS},
 };
 
 impl<'f, 'a> Parser<'f, 'a> {

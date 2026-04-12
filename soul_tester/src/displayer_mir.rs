@@ -10,7 +10,7 @@ use soul_utils::{
     vec_map::VecMapIndex,
 };
 use std::fmt::Write;
-use typed_hir::{display_thir::DisplayThirType, ThirType, ThirTypeKind, TypedHir};
+use typed_hir::{ThirType, ThirTypeKind, TypedHir, display_thir::DisplayThirType};
 
 pub fn display_mir(mir: &MirTree, hir: &HirResponse) -> String {
     let mut displayer = MirDisplayer::new(mir, hir);

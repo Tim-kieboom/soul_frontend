@@ -1,8 +1,19 @@
 import "./clib"
 
-// Test() {
-//     text := "hello world"
-//     text + 1;
+// trait IoWrite {
+//     Push(ch: char)
+//     PushStr(text: [@]char)
+// }
+
+// struct Stdout{}
+// use Stdout impl IoWrite {
+//     Push(ch: char) {
+//         clib.Stdout_char(ch)
+//     }
+
+//     PushStr(text: [@]char) {
+//         clib.Stdout_str(text)
+//     }
 // }
 
 Println(text: [@]char) {
@@ -10,12 +21,16 @@ Println(text: [@]char) {
     Endln()
 }
 
+Print(text: [@]char) {
+    clib.Stdout_str(text)
+}
+
 Endln() {
     Print_char('\n')
 }
 
-Println_char(char: char) {
-    Print_char(char)
+Println_char(letter: char) {
+    Print_char(letter)
     Endln()
 }
 
@@ -32,10 +47,6 @@ Println_uint(value: uint, base: u8 = 10, capital: bool = true) {
 Println_float(value: f64, base: u8 = 10, capital: bool = true, precision: u8 = 4) {
     Print_float(value, base: base, capital: capital, precision: precision)
     Endln()
-}
-
-Print(text: [@]char) {
-    clib.Stdout_str(text)
 }
 
 Print_char(char: char) {

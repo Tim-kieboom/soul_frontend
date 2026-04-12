@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use soul_utils::{ids::FunctionId, impl_soul_ids, span::Span, vec_map::VecMapIndex, Ident};
+use soul_utils::{Ident, ids::FunctionId, impl_soul_ids, span::Span, vec_map::VecMapIndex};
 
-use crate::{ast::Variable, ImportKind};
+use crate::{ImportKind, ast::Variable};
 
 impl_soul_ids!(NodeId, ScopeId);
 

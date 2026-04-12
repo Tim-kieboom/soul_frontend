@@ -1,5 +1,6 @@
 {
+    "entryFileName": "main.soul",
     "output": "F:\\Code\\Github\\soul_frontend\\soul_tester\\output",
     "logFile": "F:\\Code\\Github\\soul_frontend\\soul_tester\\log.txt",
-    "sourceFile": "F:\\Code\\Github\\soul_frontend\\soul_tester\\soul_src\\main.soul" 
+    "sourceFolder": "F:\\Code\\Github\\soul_frontend\\soul_tester\\soul_src" 
 }
