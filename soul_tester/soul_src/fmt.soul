@@ -1,21 +1,5 @@
 import "./clib"
 
-// trait IoWrite {
-//     Push(ch: char)
-//     PushStr(text: [@]char)
-// }
-
-// struct Stdout{}
-// use Stdout impl IoWrite {
-//     Push(ch: char) {
-//         clib.Stdout_char(ch)
-//     }
-
-//     PushStr(text: [@]char) {
-//         clib.Stdout_str(text)
-//     }
-// }
-
 Println(text: [@]char) {
     Print(text)
     Endln()
@@ -55,18 +39,18 @@ Print_char(char: char) {
 
 Print_int(value: int, base: u8 = 10, capital: bool = true) {
     const fmtBuffer: [50]char
-    cstr := clib.FmtInt(value, base, fmtBuffer, capital)
+    cstr := clib.FmtInt(value, base, @fmtBuffer, capital)
     clib.Stdout_Cstr(cstr)
 }
 
 Print_uint(value: uint, base: u8 = 10, capital: bool = true) {
     const fmtBuffer: [50]char
-    cstr := clib.FmtUint(value, base, fmtBuffer, capital)
+    cstr := clib.FmtUint(value, base, @fmtBuffer, capital)
     clib.Stdout_Cstr(cstr)
 }
 
 Print_float(value: f64, base: u8 = 10, precision: u8 = 4, capital: bool = true) {
     const fmtBuffer: [50]char
-    cstr := clib.FmtFloat(value, base, fmtBuffer, precision, capital)
+    cstr := clib.FmtFloat(value, base, @fmtBuffer, precision, capital)
     clib.Stdout_Cstr(cstr)
 }

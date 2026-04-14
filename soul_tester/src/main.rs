@@ -36,7 +36,7 @@ mod paths;
 static PATHS: &[u8] = include_bytes!("../paths.json");
 
 pub const MESSAGE_CONFIG: MessageConfig = MessageConfig {
-    backtrace: false,
+    backtrace: true,
     colors: true,
 };
 
@@ -204,6 +204,7 @@ fn log_faults(constext: &CompilerContext) {
 
         if module_id != module {
             source_file = to_source_file(path).unwrap_or(String::new());
+            module = module_id;
         }
 
         error!("{}", fault.to_message(path, &source_file, MESSAGE_CONFIG));

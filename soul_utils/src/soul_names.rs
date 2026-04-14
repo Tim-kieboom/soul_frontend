@@ -360,6 +360,14 @@ define_str_enum!(
         Extern => "extern", 0,
     }
 );
+impl KeyWord {
+    pub fn is_operator_keyword(&self) -> bool {
+        match self {
+            KeyWord::As => true,
+            _ => false,
+        }
+    }
+}
 
 define_symbols!(
     /// Binary and unary operators available in the Soul language.

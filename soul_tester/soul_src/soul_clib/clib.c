@@ -47,10 +47,6 @@ void __clib_printChar(char ch) {
     putchar(ch);
 }
 
-void __clib_flush() {
-    fflush(stdout);
-}
-
 // ---------------- #Formatters ----------------
 
 str __clib_fmtUint(uint num, u8 base, char buf[50], bool capital) {

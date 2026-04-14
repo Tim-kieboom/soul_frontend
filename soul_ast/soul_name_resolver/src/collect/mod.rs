@@ -9,7 +9,6 @@ use soul_tokenizer::to_token_stream;
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
     ids::FunctionId,
-    sementic_level::SementicLevel,
     span::{ModuleId, Spanned},
 };
 
@@ -143,20 +142,10 @@ impl<'a> NameResolver<'a> {
         None
     }
 
-    fn parse_module(&mut self, source: &str, module: ModuleId) -> Option<ast::Block> {
+    fn parse_module(&mut self, source: &str, module: ModuleId) -> ast::Block {
         let tokens = to_token_stream(source, module);
         let response = parse(tokens, self.context, None);
-
-        if self
-            .context
-            .faults
-            .iter()
-            .any(|f| f.get_level() == SementicLevel::Error)
-        {
-            return None;
-        }
-
-        Some(response.tree.root)
+        response.tree.root
     }
 
     fn insert_value(&mut self, name: &str, id: NodeId, kind: ScopeValue) -> Option<NodeId> {

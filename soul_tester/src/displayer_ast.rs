@@ -1,9 +1,9 @@
 use std::fmt::{Arguments, Debug, Write};
 
 use ast::{
+    scope::{NodeId, ScopeId},
     Assignment, AstResponse, Block, ElseKind, Expression, Function, FunctionSignature, Generic,
     IfArm, Import, SoulType, Statement, StatementKind, Struct, TypeKind, UseBlock, Variable,
-    scope::{NodeId, ScopeId},
 };
 use soul_utils::{
     ids::FunctionId,
@@ -289,6 +289,7 @@ impl AstDisplayer {
                     }
                     self.push(']');
                 }
+                ast::ImportKind::Glob => self.push('*'),
                 ast::ImportKind::Alias(alias) => {
                     self.push_fmt(format_args!("{SEPERATOR}as {}", alias.as_str()));
                 }

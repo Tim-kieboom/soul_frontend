@@ -239,6 +239,7 @@ dependencies = [
 name = "run_mir"
 version = "0.1.0"
 dependencies = [
+ "ast",
  "mir_parser",
  "run_hir",
  "soul_utils",

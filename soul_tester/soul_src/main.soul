@@ -1,4 +1,6 @@
-import "./fmt"
+import (
+    crate.fmt
+)
 
 main() {
     fmt.Println("hello world")

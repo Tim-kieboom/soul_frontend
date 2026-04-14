@@ -26,7 +26,7 @@ impl<'ctx> IrBuilder<'ctx> {
             inkwell: context.create_builder(),
         }
     }
-
+    
     pub fn build_unconditional_branch(&self, block: BasicBlock<'ctx>) -> SoulResult<()> {
         self.inkwell
             .build_unconditional_branch(block)

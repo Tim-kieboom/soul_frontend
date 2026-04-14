@@ -4,7 +4,7 @@ use inkwell::{
     AddressSpace,
     module::Linkage,
     types::StructType,
-    values::{AsValueRef, BasicValue, BasicValueEnum, StructValue},
+    values::{AsValueRef, BasicValue, BasicValueEnum, PointerValue, StructValue},
 };
 use mir_parser::mir::{Operand, OperandKind, PlaceId};
 use soul_utils::{
@@ -14,7 +14,7 @@ use soul_utils::{
 };
 use typed_hir::{Field, ThirTypeKind, display_thir::DisplayThirType};
 
-use crate::{GenericSubstitute, IrOperand, LlvmBackend};
+use crate::{GenericSubstitute, IrOperand, LlvmBackend, OperandInfo};
 
 impl<'f, 'a> LlvmBackend<'f, 'a> {
     pub(crate) fn lower_operand(
@@ -99,10 +99,11 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 todo!()
             }
             ThirTypeKind::Array {
-                kind: ArrayKind::StackArray(_),
+                kind: ArrayKind::StackArray(len),
                 ..
             } => {
-                todo!()
+                let ptr = inner.value.into_pointer_value();
+                self.fixed_array_to_slice(ty, ptr, len)?
             }
             _ => {
                 let value = unsafe { BasicValueEnum::new(inner.value.as_value_ref()) };
@@ -325,9 +326,42 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         global.set_constant(true);
         global.set_linkage(Linkage::Private);
         global.set_initializer(&bytes);
-
         let ptr = global.as_basic_value_enum().into_pointer_value();
-        let len = self.default_int_type.const_int(text.len() as u64, false);
+
+        self.fixed_array_to_const_slice(ptr, text.len() as u64)
+    }
+
+    fn fixed_array_to_slice(
+        &self,
+        slice_type_id: TypeId,
+        ptr: PointerValue<'a>,
+        len: u64,
+    ) -> SoulResult<IrOperand<'a>> {
+
+        let slice_type = self.context.struct_type(
+            &[
+                self.context.ptr_type(AddressSpace::default()).into(),
+                self.default_int_type.into(),
+            ],
+            false,
+        );
+
+        let slice_ptr = self.builder.build_alloca(slice_type, "slice")?;
+        let len_val = self.default_int_type.const_int(len, false);
+
+        let ptr: BasicValueEnum<'a> = ptr.into();
+        let len_val: BasicValueEnum<'a> = len_val.into();
+        self.builder.store_field(slice_type, slice_ptr, ptr, 0)?;
+        self.builder.store_field(slice_type, slice_ptr, len_val, 1)?;
+
+        Ok(IrOperand {
+            value: slice_ptr.into(),
+            info: OperandInfo::new_loaded(slice_type_id, slice_type.into()),
+        })
+    }
+
+    fn fixed_array_to_const_slice(&self, ptr: PointerValue<'a>, len: u64) -> (StructType<'a>, StructValue<'a>) {
+        let len = self.default_int_type.const_int(len, false);
 
         let slice_ty = self.context.struct_type(
             &[
