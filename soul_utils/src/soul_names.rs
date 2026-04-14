@@ -358,6 +358,7 @@ define_str_enum!(
         Typeof => "typeof", 0,
         Import => "import", 0,
         Extern => "extern", 0,
+        Crate => "crate", 0,
     }
 );
 impl KeyWord {

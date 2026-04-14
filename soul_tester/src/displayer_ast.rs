@@ -271,15 +271,17 @@ impl AstDisplayer {
     }
 
     fn display_import(&mut self, import: &Import) {
-        const SEPERATOR: &str = "::";
+        const SEPERATOR: &str = ".";
 
         self.push_str(KeyWord::Import.as_str());
         for path in &import.paths {
+            self.push(' ');
+            self.push_fmt(format_args!("{:?}", path.module.as_path()));
             match &path.kind {
                 ast::ImportKind::All => self.push('*'),
                 ast::ImportKind::This => self.push_fmt(format_args!("{SEPERATOR}this")),
                 ast::ImportKind::Items(items) => {
-                    self.push('[');
+                    self.push_str(".{");
                     let last_index = items.len().saturating_sub(1);
                     for (i, item) in items.iter().enumerate() {
                         self.push_str(item.as_str());
@@ -287,11 +289,11 @@ impl AstDisplayer {
                             self.push_str(", ");
                         }
                     }
-                    self.push(']');
+                    self.push('}');
                 }
                 ast::ImportKind::Glob => self.push('*'),
                 ast::ImportKind::Alias(alias) => {
-                    self.push_fmt(format_args!("{SEPERATOR}as {}", alias.as_str()));
+                    self.push_fmt(format_args!(" as {}", alias.as_str()));
                 }
             }
         }

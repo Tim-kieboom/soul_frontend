@@ -1,12 +1,12 @@
 (A) add import
-    (A) change import parser - parse dot-style paths (std.Fmt)
-        - soul_ast/ast_parser/src/parser/parse_statement/parse_import.rs
-        - Remove StringLiteral/TokenKind::Ident path handling
-        - Add dot-separated path parsing (std.Fmt.{A, B})
-        - Parse module path as Identifier chain (std.Fmt)
+    (A) change import parser - parse dot-style paths (std.Fmt) {cm}
+        - Remove StringLiteral/TokenKind::Ident path handling {cm}
+        - Add dot-separated path parsing (std.Fmt.{A, B}) {cm}
+        - Parse module path as Identifier chain (std.Fmt) {cm}
     (B) change ImportPath/ImportKind in ast_model/statement.rs
         - Replace SoulImportPath with simpler ModulePath (Vec<Ident>)
         - Remove ImportKind variants that won't be used (Alias, Glob?)
+    (D) impl multi import `import (crate.fmt\n std.io)`
 
 (B) add module node to AST
     (A) add StatementKind::Module(Module) in ast_model/statement.rs

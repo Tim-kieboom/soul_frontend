@@ -10,6 +10,7 @@ use soul_utils::{
 
 use crate::parser::Parser;
 
+pub const AS_STR: &str = KeyWord::As.as_str(); 
 pub const STAR: TokenKind = TokenKind::Symbol(SymbolKind::Star);
 pub const MUT_REF: TokenKind = TokenKind::Symbol(SymbolKind::And);
 pub const COMMA: TokenKind = TokenKind::Symbol(SymbolKind::Comma);

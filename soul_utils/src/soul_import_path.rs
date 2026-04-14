@@ -16,10 +16,12 @@ impl SoulImportPath {
         Self(PathBuf::new())
     }
 
-    pub fn from_str(s: &str) -> Self {
-        let cleaned = if s.starts_with("./") { &s[2..] } else { s };
+    pub fn push(&mut self, value: &str) {
+        self.0.push(value);
+    }
 
-        Self(PathBuf::from(cleaned.to_string()))
+    pub fn pop(&mut self) -> bool {
+        self.0.pop()
     }
 
     pub fn get_module_name(&self) -> Option<&str> {
@@ -27,10 +29,6 @@ impl SoulImportPath {
             .to_str()?
             .split('.')
             .next()
-    }
-
-    pub fn push(&mut self, value: &str) {
-        self.0.push(value);
     }
 
     pub fn iter(&mut self) -> std::path::Iter<'_> {
@@ -54,5 +52,10 @@ impl SoulImportPath {
 
     pub fn to_string(self) -> String {
         self.0.to_string_lossy().to_string()
+    }
+}
+impl From<PathBuf> for SoulImportPath {
+    fn from(value: PathBuf) -> Self {
+        Self(value)
     }
 }

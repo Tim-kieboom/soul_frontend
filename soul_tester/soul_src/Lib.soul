@@ -1,0 +1,9 @@
+import .subLib.*
+
+A(): int {
+    1
+}
+
+B(): int {
+    2
+}

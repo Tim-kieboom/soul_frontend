@@ -1,6 +1,5 @@
-import (
-    crate.fmt
-)
+import crate.fmt
+import crate.Lib.{this, A, B}
 
 main() {
     fmt.Println("hello world")

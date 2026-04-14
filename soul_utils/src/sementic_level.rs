@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{PathBuf};
 
 use crate::{
     bimap::BiMap,
@@ -27,14 +27,31 @@ pub struct CompilerContext {
     pub source_folder: PathBuf,
     pub faults: Vec<SementicFault>,
     pub module_store: ModuleStore,
+    path_stack: Vec<PathBuf>,
 }
 impl CompilerContext {
     pub fn new(source_folder: PathBuf, root_path: PathBuf) -> Self {
         Self {
             source_folder,
+            path_stack: vec![],
             faults: vec![],
             module_store: ModuleStore::new(root_path),
         }
+    }
+
+    pub fn current_path(&self) -> &PathBuf {
+        match self.path_stack.last() {
+            Some(path) => path,
+            None => &self.source_folder,
+        }
+    }
+
+    pub fn pop_current_path(&mut self, path: PathBuf) {
+        self.path_stack.push(path);
+    }
+
+    pub fn push_current_path(&mut self, path: PathBuf) {
+        self.path_stack.push(path);
     }
 }
 
