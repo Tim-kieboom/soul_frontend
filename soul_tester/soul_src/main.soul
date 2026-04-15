@@ -3,7 +3,10 @@ import (
     crate.Lib.{this, A, B as b}
 )
 
+function() {}
+
 main() {
+    function()
     mut num = A()
     num = b()
     num = Lib.A()

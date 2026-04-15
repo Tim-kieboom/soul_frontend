@@ -36,7 +36,7 @@ mod paths;
 static PATHS: &[u8] = include_bytes!("../paths.json");
 
 pub const MESSAGE_CONFIG: MessageConfig = MessageConfig {
-    backtrace: false,
+    backtrace: true,
     colors: true,
 };
 
@@ -90,7 +90,6 @@ fn run_fontend(paths: &Paths) -> Result<Ouput> {
     let mut ast_context = AstContext::new();
     to_ast(tokens, &COMPILER_OPTIONS, &mut context, &mut ast_context);
     display_ast(paths, &context, &ast_context)?;
-    log_faults(&context);
 
     let mut hir = to_hir(&COMPILER_OPTIONS, &mut context, &ast_context);
     clear_hir_type_map(&mut hir);

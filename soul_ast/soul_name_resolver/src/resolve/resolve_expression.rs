@@ -61,19 +61,6 @@ impl<'a> NameResolver<'a> {
                         function_call.callee = None;
                     }
                 } else {
-                    // First check if this could be a qualified module call even without explicit callee
-                    // This handles cases where we're inside a module function and calling other module functions
-                    if function_call.resolved.is_none() {
-                        if let Some(_) = self.lookup_module("fmt") {
-                            if let Some(func_id) = self.lookup_module_function(
-                                "fmt",
-                                self.root,
-                                function_call.name.as_str(),
-                            ) {
-                                function_call.resolved = Some(func_id);
-                            }
-                        }
-                    }
 
                     // If still not resolved, try the store lookup
                     if function_call.resolved.is_none() {
@@ -159,8 +146,6 @@ impl<'a> NameResolver<'a> {
                     && let Some((signature, _module)) = self.store.get_function(function_id)
                 {
                     let func_name = signature.name.as_str().to_string();
-                    let first_char = func_name.chars().next();
-                    let is_private = first_char.map(|c| c.is_lowercase()).unwrap_or(false);
                     let needs_callee = !matches!(signature.function_kind, FunctionKind::Static);
 
                     let has_callee = function_call.callee.is_some();
@@ -177,17 +162,6 @@ impl<'a> NameResolver<'a> {
                         self.log_error(SoulError::new(
                             format!(
                                 "method '{}' requires a receiver (this/@this/&this)",
-                                func_name,
-                            ),
-                            SoulErrorKind::InvalidContext,
-                            Some(span),
-                        ));
-                    }
-
-                    if is_private {
-                        self.log_error(SoulError::new(
-                            format!(
-                                "function '{}' is private",
                                 func_name,
                             ),
                             SoulErrorKind::InvalidContext,

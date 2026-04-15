@@ -6,7 +6,7 @@ use soul_utils::{
     error::SoulError,
     ids::{FunctionId, IdGenerator},
     sementic_level::{CompilerContext, SementicFault},
-    span::ModuleId, vec_map::VecMapIndex,
+    span::ModuleId,
 };
 
 mod check_name;
