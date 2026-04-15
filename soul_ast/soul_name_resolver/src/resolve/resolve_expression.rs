@@ -158,6 +158,9 @@ impl<'a> NameResolver<'a> {
                 if let Some(function_id) = function_call.resolved
                     && let Some((signature, _module)) = self.store.get_function(function_id)
                 {
+                    let func_name = signature.name.as_str().to_string();
+                    let first_char = func_name.chars().next();
+                    let is_private = first_char.map(|c| c.is_lowercase()).unwrap_or(false);
                     let needs_callee = !matches!(signature.function_kind, FunctionKind::Static);
 
                     let has_callee = function_call.callee.is_some();
@@ -165,7 +168,7 @@ impl<'a> NameResolver<'a> {
                         self.log_error(SoulError::new(
                             format!(
                                 "function '{}' is static and can not be called on an instance",
-                                function_call.name.as_str(),
+                                func_name,
                             ),
                             SoulErrorKind::InvalidContext,
                             Some(span),
@@ -174,7 +177,18 @@ impl<'a> NameResolver<'a> {
                         self.log_error(SoulError::new(
                             format!(
                                 "method '{}' requires a receiver (this/@this/&this)",
-                                function_call.name.as_str(),
+                                func_name,
+                            ),
+                            SoulErrorKind::InvalidContext,
+                            Some(span),
+                        ));
+                    }
+
+                    if is_private {
+                        self.log_error(SoulError::new(
+                            format!(
+                                "function '{}' is private",
+                                func_name,
                             ),
                             SoulErrorKind::InvalidContext,
                             Some(span),

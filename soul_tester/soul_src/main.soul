@@ -8,7 +8,7 @@ main() {
     num = b()
     num = Lib.A()
     num = Lib.B()
-    // Lib.priv()
+    Lib.priv()
     // subLib.Pub()
     // Lib.subLib.Pub()
     // fmt.Println("hello world")
