@@ -320,7 +320,10 @@ impl<'a> AstDisplayer<'a> {
                     self.push_str(".{");
                     let last_index = items.len().saturating_sub(1);
                     for (i, item) in items.iter().enumerate() {
-                        self.push_str(item.as_str());
+                        match item {
+                            ast::ImportItem::Normal(name) => self.push_str(name.as_str()),
+                            ast::ImportItem::Alias { name, alias } => self.push_fmt(format_args!("{} as {}", name.as_str(), alias.as_str())),
+                        }
                         if i != last_index {
                             self.push_str(", ");
                         }

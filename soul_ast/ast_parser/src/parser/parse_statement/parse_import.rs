@@ -1,4 +1,4 @@
-use ast::StatementKind;
+use ast::{ImportItem, StatementKind};
 use ast::{Import, ImportKind, ImportPath, Statement};
 use soul_tokenizer::TokenKind;
 use soul_utils::symbool_kind::SymbolKind;
@@ -6,7 +6,6 @@ use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},
     soul_import_path::SoulImportPath,
     soul_names::KeyWord,
-    Ident,
 };
 
 use crate::parser::parse_utils::{AS_STR, COMMA, CURLY_OPEN, ROUND_CLOSE, ROUND_OPEN, STAR};
@@ -80,22 +79,19 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok(ImportPath { module: path, kind })
     }
 
-    fn parse_import_items(&mut self) -> SoulResult<Vec<Ident>> {
+    fn parse_import_items(&mut self) -> SoulResult<Vec<ImportItem>> {
         let mut items = vec![];
         loop {
-            match &self.token().kind {
-                TokenKind::Ident(_) => {
-                    let ident = self.try_bump_consume_ident()?;
-                    items.push(ident);
-                }
-                _ => {
-                    return Err(SoulError::new(
-                        "expected identifier in import list".to_string(),
-                        SoulErrorKind::InvalidTokenKind,
-                        Some(self.token().span),
-                    ));
-                }
-            }
+            let name = self.try_bump_consume_ident()?;
+            let item = if self.current_is_ident(KeyWord::As.as_str()) {
+                self.bump();
+                let alias = self.try_bump_consume_ident()?;
+                ImportItem::Alias { name, alias }  
+            } else {
+                ImportItem::Normal(name)
+            };
+            items.push(item);
+
 
             match self.token().kind {
                 COMMA => {

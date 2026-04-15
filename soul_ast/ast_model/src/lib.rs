@@ -85,11 +85,11 @@ pub struct DeclareStore {
     /// The main function (entry point), if defined.
     pub main_function: Option<FunctionId>,
     /// All function declarations, indexed by their ID.
-    functions: VecMap<FunctionId, FunctionSignature>,
+    functions: VecMap<FunctionId, (FunctionSignature, ModuleId)>,
     /// Variable type information, indexed by node ID.
-    variable_type: VecMap<NodeId, VarTypeKind>,
+    variable_type: VecMap<NodeId, (VarTypeKind, ModuleId)>,
     /// Variable owner hints (for method resolution), indexed by node ID.
-    variable_owner_hint: VecMap<NodeId, TypeKind>,
+    variable_owner_hint: VecMap<NodeId, (TypeKind, ModuleId)>,
 }
 impl DeclareStore {
     /// Creates a new empty declaration store.
@@ -103,7 +103,7 @@ impl DeclareStore {
     }
 
     /// Retrieves a function by its ID.
-    pub fn get_function(&self, index: FunctionId) -> Option<&FunctionSignature> {
+    pub fn get_function(&self, index: FunctionId) -> Option<&(FunctionSignature, ModuleId)> {
         self.functions.get(index)
     }
 
@@ -114,41 +114,41 @@ impl DeclareStore {
         owner_kind: Option<&TypeKind>,
     ) -> Option<FunctionId> {
         self.functions.entries().find_map(|(id, signature)| {
-            if signature.name.as_str() != name {
+            if signature.0.name.as_str() != name {
                 return None;
             }
 
             match owner_kind {
-                Some(owner) if &signature.methode_type.kind == owner => Some(id),
-                None if matches!(signature.methode_type.kind, TypeKind::None) => Some(id),
+                Some(owner) if &signature.0.methode_type.kind == owner => Some(id),
+                None if matches!(signature.0.methode_type.kind, TypeKind::None) => Some(id),
                 _ => None,
             }
         })
     }
 
     /// Inserts a function into the store.
-    pub fn insert_functions(&mut self, index: FunctionId, function: FunctionSignature) {
-        self.functions.insert(index, function);
+    pub fn insert_functions(&mut self, index: FunctionId, function: FunctionSignature, module: ModuleId) {
+        self.functions.insert(index, (function, module));
     }
 
     /// Gets the type of a variable by its node ID.
-    pub fn get_variable_type(&self, index: NodeId) -> Option<&VarTypeKind> {
+    pub fn get_variable_type(&self, index: NodeId) -> Option<&(VarTypeKind, ModuleId)> {
         self.variable_type.get(index)
     }
 
     /// Sets the type of a variable.
-    pub fn insert_variable_type(&mut self, index: NodeId, ty: VarTypeKind) {
-        self.variable_type.insert(index, ty);
+    pub fn insert_variable_type(&mut self, index: NodeId, ty: VarTypeKind, module: ModuleId) {
+        self.variable_type.insert(index, (ty, module));
     }
 
     /// Gets the owner hint for a variable.
-    pub fn get_variable_owner_hint(&self, index: NodeId) -> Option<&TypeKind> {
+    pub fn get_variable_owner_hint(&self, index: NodeId) -> Option<&(TypeKind, ModuleId)> {
         self.variable_owner_hint.get(index)
     }
 
     /// Sets the owner hint for a variable.
-    pub fn insert_variable_owner_hint(&mut self, index: NodeId, kind: TypeKind) {
-        self.variable_owner_hint.insert(index, kind);
+    pub fn insert_variable_owner_hint(&mut self, index: NodeId, kind: TypeKind, module: ModuleId) {
+        self.variable_owner_hint.insert(index, (kind, module));
     }
 }
 impl Default for DeclareStore {

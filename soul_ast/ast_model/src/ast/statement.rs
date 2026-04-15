@@ -106,9 +106,15 @@ impl Default for ImportPath {
 pub enum ImportKind {
     All,
     This,
-    Items(Vec<Ident>),
+    Items(Vec<ImportItem>),
     Glob,
     Alias(Ident),
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum ImportItem {
+    Normal(Ident),
+    Alias{name: Ident, alias: Ident},
 }
 
 /// A function definition with a signature and body block.
