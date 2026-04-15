@@ -4,7 +4,7 @@
             - Remove StringLiteral/TokenKind::Ident path handling {cm}
             - Add dot-separated path parsing (std.Fmt.{A, B}) {cm}
             - Parse module path as Identifier chain (std.Fmt) {cm}
-        (D) impl multi import `import (crate.fmt\n std.io)`
+        (D) impl multi import `import (crate.fmt\n std.io)` {cm}
         (D) impl as of item import `import crate.fmt.{Println as newPrint}`
 
     (B) add module node to AST

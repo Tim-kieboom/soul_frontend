@@ -9,14 +9,51 @@ use soul_utils::{
     Ident,
 };
 
-use crate::parser::parse_utils::{AS_STR, COMMA, CURLY_OPEN, STAR};
+use crate::parser::parse_utils::{AS_STR, COMMA, CURLY_OPEN, ROUND_CLOSE, ROUND_OPEN, STAR};
 use crate::parser::{parse_utils::CURLY_CLOSE, Parser};
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub(super) fn parse_import(&mut self) -> SoulResult<Statement> {
         let start_span = self.token().span;
 
-        self.bump();
+        let mut paths = vec![];
+        self.expect_ident(KeyWord::Import.as_str())?;
+        if self.current_is(&ROUND_OPEN) {
+            self.bump();
+            self.skip_end_lines();
+            loop {
+                if self.current_is(&ROUND_CLOSE) {
+                    break
+                }
+                paths.push(
+                    self.inner_parse_import()?
+                );
+                
+                self.skip_end_lines();
+            }
+
+            self.expect(&ROUND_CLOSE)?;
+        } else {
+            paths.push(
+                self.inner_parse_import()?
+            );
+        }
+
+        let import = Import {
+            id: None,
+            paths,
+        };
+
+        self.expect(&TokenKind::EndLine)?;
+
+        Ok(Statement::new(
+            StatementKind::Import(import),
+            start_span.combine(self.token().span),
+        ))
+    }
+
+    fn inner_parse_import(&mut self) -> SoulResult<ImportPath> {
+
         let path = self.parse_import_path()?;
         let kind = match &self.token().kind {
             &CURLY_OPEN => {
@@ -40,19 +77,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             _ => ImportKind::This,
         };
 
-        let import_path = ImportPath { module: path, kind };
-
-        let import = Import {
-            id: None,
-            paths: vec![import_path],
-        };
-
-        self.expect(&TokenKind::EndLine)?;
-
-        Ok(Statement::new(
-            StatementKind::Import(import),
-            start_span.combine(self.token().span),
-        ))
+        Ok(ImportPath { module: path, kind })
     }
 
     fn parse_import_items(&mut self) -> SoulResult<Vec<Ident>> {

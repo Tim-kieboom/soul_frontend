@@ -291,9 +291,25 @@ impl<'a> AstDisplayer<'a> {
     fn display_import(&mut self, import: &Import) {
         const SEPERATOR: &str = ".";
 
+        let len = import.paths.len();
+        if len == 0 {
+            return
+        }
+
         self.push_str(KeyWord::Import.as_str());
+
+        if len > 1 {
+            self.push_str(" (\n");
+            self.push_scope();
+        }
+
         for path in &import.paths {
-            self.push(' ');
+            if len > 1 {
+                self.display_depth();
+            } else {
+                self.push(' ');
+            }
+
             if let Err(_) = path.module.write_display(&self.context.source_folder, &mut self.sb) {
                 self.push_str("<error>");
             }
@@ -316,6 +332,16 @@ impl<'a> AstDisplayer<'a> {
                     self.push_fmt(format_args!(" as {}", alias.as_str()));
                 }
             }
+
+            if len > 1 {
+                self.push('\n');
+            }
+        }
+
+        if len > 1 {
+            self.pop_scope();
+            self.display_depth();
+            self.push_str(")\n");
         }
     }
 

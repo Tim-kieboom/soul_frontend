@@ -1,6 +1,8 @@
 // import crate.fmt
-import crate.subLib
-import crate.Lib.{this, A, B}
+import ( 
+    crate.subLib
+    crate.Lib.{this, A, B}
+)
 
 main() {
     num := A()
