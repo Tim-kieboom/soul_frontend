@@ -1,5 +1,7 @@
 import .subLib.*
 
+priv() {}
+
 A(): int {
     1
 }

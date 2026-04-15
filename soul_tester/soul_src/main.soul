@@ -6,7 +6,9 @@ import (
 main() {
     mut num = A()
     num = b()
-    // num = Lib.A()
+    num = Lib.A()
+    num = Lib.B()
+    // Lib.priv()
     // subLib.Pub()
     // Lib.subLib.Pub()
     // fmt.Println("hello world")

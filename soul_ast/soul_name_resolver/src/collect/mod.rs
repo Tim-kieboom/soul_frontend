@@ -137,9 +137,10 @@ impl<'a> NameResolver<'a> {
         self.current_scope_mut().insert_function(name, id);
     }
 
-    fn declare_module(&mut self, name: &str, module_name: &str, import_kind: ast::ImportKind, imported_items: Vec<ast::ImportItem>) {
+    fn declare_module(&mut self, name: &str, module_name: &str, module_id: ModuleId, import_kind: ast::ImportKind, imported_items: Vec<ast::ImportItem>) {
         let entry = ast::scope::ScopeModuleEntry {
             module_name: module_name.to_string(),
+            module_id,
             import_kind,
             imported_items,
         };

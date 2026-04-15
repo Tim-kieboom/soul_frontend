@@ -157,9 +157,10 @@ impl<'a> NameResolver<'a> {
         };
 
         let import_name = alias.unwrap_or(module_name);
-        self.declare_module(import_name, &module_name, path.kind.clone(), imported_items.clone());
 
         let module_id = self.import_module(module_file_path, module_name, span);
+
+        self.declare_module(import_name, &module_name, module_id, path.kind.clone(), imported_items.clone());
 
         for item in imported_items {
             match item {

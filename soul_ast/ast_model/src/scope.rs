@@ -1,6 +1,12 @@
 use std::collections::HashMap;
 
-use soul_utils::{ids::FunctionId, impl_soul_ids, span::Span, vec_map::VecMapIndex, Ident};
+use soul_utils::{
+    ids::FunctionId,
+    impl_soul_ids,
+    span::{ModuleId, Span},
+    vec_map::VecMapIndex,
+    Ident,
+};
 
 use crate::{ast::Variable, ImportItem, ImportKind};
 
@@ -160,6 +166,7 @@ pub struct ScopeEntry {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ScopeModuleEntry {
     pub module_name: String,
+    pub module_id: ModuleId,
     pub import_kind: ImportKind,
     pub imported_items: Vec<ImportItem>,
 }

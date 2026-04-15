@@ -69,19 +69,16 @@ impl<'a> NameResolver<'a> {
     fn lookup_module_function(
         &self,
         module_name: &str,
-        module_id: ModuleId,
+        _module_id: ModuleId,
         function_name: &str,
     ) -> Option<FunctionId> {
+        let module_entry = self.info.scopes.lookup_module(module_name)?;
+        let module_id = module_entry.module_id;
+        
         if let Some(resolved_name) = self.resolve_alias(module_name, function_name) {
-            let entry_key = format!("{}::{}", module_id.index(), resolved_name);
-            self.info
-                .scopes
-                .lookup_function(&entry_key)
+            self.info.scopes.lookup_function(&resolved_name)
         } else {
-            let entry_key = format!("{}::{}", module_id.index(), function_name);
-            self.info
-                .scopes
-                .lookup_function(&entry_key)
+            self.store.find_function_in_module(function_name, module_id)
         }
     }
 
@@ -122,13 +119,13 @@ impl<'a> NameResolver<'a> {
             ast::ImportKind::Glob | ast::ImportKind::Alias(_) => {
                 return true;
             }
-            ast::ImportKind::This | ast::ImportKind::Items{..} => {}
-        }
-
-        if module_entry.imported_items.is_empty() {
-            match &module_entry.import_kind {
-                ast::ImportKind::This => return false,
-                _ => return true,
+            ast::ImportKind::This => {
+                return false;
+            }
+            ast::ImportKind::Items { this, this_alias: _, items: _ } => {
+                if *this {
+                    return true;
+                }
             }
         }
 
