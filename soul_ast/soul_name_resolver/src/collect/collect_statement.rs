@@ -177,12 +177,15 @@ impl<'a> NameResolver<'a> {
             return;
         };
 
+        let dir = module_file_path.parent().unwrap_or(&module_file_path);
+        self.context.push_current_path(dir.to_path_buf());
         let module_id = self.context.module_store.get_or_insert(module_file_path);
         if self.modules.get(module_id).is_some() {
             return
         }
 
         self.parse_module(&module_source, module_id, module_name.to_string());
+        self.context.pop_current_path();
     }
 
     fn read_module(&mut self, path: &PathBuf, module_name: &str, span: Span) -> Option<String> {

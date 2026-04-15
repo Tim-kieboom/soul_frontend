@@ -46,8 +46,8 @@ impl CompilerContext {
         }
     }
 
-    pub fn pop_current_path(&mut self, path: PathBuf) {
-        self.path_stack.push(path);
+    pub fn pop_current_path(&mut self) {
+        self.path_stack.pop();
     }
 
     pub fn push_current_path(&mut self, path: PathBuf) {
