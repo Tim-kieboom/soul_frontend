@@ -1,8 +1,5 @@
-use std::path::PathBuf;
-
 use soul_utils::{
-    ids::{FunctionId, IdGenerator},
-    vec_map::VecMap,
+    ids::{FunctionId, IdGenerator}, span::{ModuleId}, vec_map::VecMap
 };
 
 mod ast;
@@ -12,25 +9,74 @@ pub use ast::*;
 
 use crate::{meta_data::AstMetadata, scope::NodeId};
 
-/// The root of an Abstract Syntax Tree representing a parsed Soul program.
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct AbstractSyntaxTree {
-    /// The root block containing all top-level statements.
-    pub root: ast::Block,
-}
-
-/// The result of parsing a Soul source file into an AST.
-pub struct AstResponse {
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct AstContext {
     /// The declaration store containing all functions and variables.
     pub store: DeclareStore,
     /// Metadata associated with the AST nodes.
     pub meta_data: AstMetadata,
-    /// The abstract syntax tree.
-    pub tree: AbstractSyntaxTree,
+    /// all the modules of the project
+    pub modules: AstModuleStore,
     /// ID generator for functions.
     pub function_generators: IdGenerator<FunctionId>,
-    /// The source file path (for module loading).
-    pub source_file: Option<PathBuf>,
+}
+impl AstContext {
+    pub fn new() -> Self {
+        Self { store: DeclareStore::new(), meta_data: AstMetadata::new(), modules: AstModuleStore::new(), function_generators: IdGenerator::new() }
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Module {
+    pub id: ModuleId,
+    pub name: String,
+    pub global: Block,
+    pub modules: Vec<ModuleId>,
+    pub visibility: Visibility,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum Visibility {
+    Public,
+    Private,
+}
+
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct AstModuleStore {
+    map: VecMap<ModuleId, Module>
+}
+impl AstModuleStore {
+    pub const fn new() -> Self {
+        Self { map: VecMap::const_default() }
+    }
+
+    pub fn insert(&mut self, id: ModuleId, module: Module) -> Option<Module> {
+        self.map.insert(id, module)
+    }
+
+    pub fn keys(&self) -> impl Iterator<Item = ModuleId> {
+        self.map.keys()
+    }
+
+    pub fn values(&self) -> impl Iterator<Item = &Module> {
+        self.map.values()
+    }
+
+    pub fn get(&self, id: ModuleId) -> Option<&Module> {
+        self.map.get(id)
+    }
+
+    pub fn get_mut(&mut self, id: ModuleId) -> Option<&mut Module> {
+        self.map.get_mut(id)
+    }
+}
+impl std::ops::Index<ModuleId> for AstModuleStore {
+    type Output = Module;
+
+    fn index(&self, index: ModuleId) -> &Self::Output {
+        &self.map[index]
+    }
 }
 
 /// A store of all declarations in a module.

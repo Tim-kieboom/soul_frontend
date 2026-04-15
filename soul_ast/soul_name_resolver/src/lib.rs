@@ -1,68 +1,56 @@
 use ast::{
-    AstResponse, Block, DeclareStore, Function, SoulType, Statement,
-    meta_data::AstMetadata,
-    scope::{NodeId, ScopeModuleEntry, ScopeValue},
+    AstContext, AstModuleStore, DeclareStore, meta_data::AstMetadata, scope::{NodeId, ScopeValue}
 };
 use soul_utils::{
     Ident,
     error::SoulError,
     ids::{FunctionId, IdGenerator},
     sementic_level::{CompilerContext, SementicFault},
-    span::{ModuleId, Span, Spanned},
+    span::{ModuleId},
 };
 
 mod check_name;
 mod collect;
 mod resolve;
 
-pub fn name_resolve(request: &mut AstResponse, module: ModuleId, context: &mut CompilerContext) {
+pub fn name_resolve(module_id: ModuleId, context: &mut CompilerContext, ast_context: &mut AstContext) {
     let mut resolver = NameResolver::new(
-        module,
-        &mut request.meta_data,
+        module_id,
         context,
-        &mut request.store,
-        &mut request.function_generators,
-        request.source_file.clone(),
+        ast_context,
     );
 
-    let root = &mut request.tree.root;
-
-    resolver.collect_declarations(root);
-    resolver.resolve_import_functions(root);
-
-    resolver.resolve_names(root);
+    resolver.collect_module(module_id);
+    resolver.resolve_modules(module_id);
 }
 
 struct NameResolver<'a> {
-    module: ModuleId,
-    node_generator: IdGenerator<NodeId>,
-    function_generator: &'a mut IdGenerator<FunctionId>,
+    root: ModuleId,
+    current_module: ModuleId,
     info: &'a mut AstMetadata,
     store: &'a mut DeclareStore,
+    modules: &'a mut AstModuleStore,
     context: &'a mut CompilerContext,
+    node_generator: IdGenerator<NodeId>,
     current_function: Option<FunctionId>,
-    source_file: Option<std::path::PathBuf>,
-    imported_functions: Vec<(Function, String)>,
+    function_generator: &'a mut IdGenerator<FunctionId>,
 }
 impl<'a> NameResolver<'a> {
     fn new(
         module: ModuleId,
-        info: &'a mut AstMetadata,
         context: &'a mut CompilerContext,
-        store: &'a mut DeclareStore,
-        function_generator: &'a mut IdGenerator<FunctionId>,
-        source_file: Option<std::path::PathBuf>,
+        ast_context: &'a mut AstContext,
     ) -> Self {
         Self {
-            info,
-            store,
-            module,
+            root: module,
+            current_module: module,
             context,
-            function_generator,
             current_function: None,
             node_generator: IdGenerator::new(),
-            source_file,
-            imported_functions: Vec::new(),
+            store: &mut ast_context.store,
+            info: &mut ast_context.meta_data,
+            modules: &mut ast_context.modules,
+            function_generator: &mut ast_context.function_generators,
         }
     }
 
@@ -94,51 +82,4 @@ impl<'a> NameResolver<'a> {
         self.info.scopes.lookup_value(name, ScopeValue::Variable)
     }
 
-    pub fn add_imported_function(&mut self, func: Function, import_name: String) {
-        self.imported_functions.push((func, import_name));
-    }
-
-    pub fn take_imported_functions(&mut self) -> Vec<(Function, String)> {
-        std::mem::take(&mut self.imported_functions)
-    }
-
-    fn resolve_import_functions(&mut self, root: &mut Block) {
-        let mut imported_modules = Vec::new();
-
-        let import_funcs = self.take_imported_functions();
-        for (mut function, name) in import_funcs {
-            let signature = &mut function.signature.node;
-            let func_name = signature.name.as_str().to_string();
-            let import_name = name.clone();
-
-            if !imported_modules.contains(&import_name) {
-                imported_modules.push(import_name.clone());
-            }
-
-            if signature.external.is_some() {
-                signature.methode_type = SoulType::none(Span::default(self.module));
-                signature.name = Ident::new_dummy(&func_name, self.module);
-            } else {
-                let qualified_name = format!("{}::{}", import_name, func_name);
-                signature.name = Ident::new_dummy(&qualified_name, self.module);
-            }
-
-            self.collect_function(&mut function);
-
-            let stmt = Statement::from_function(Spanned::new(function, Span::default(self.module)));
-            root.statements.push(stmt);
-        }
-
-        if let Some(scope) = self.info.scopes.current_scope_mut() {
-            for module_name in imported_modules {
-                scope.insert_module(
-                    &module_name,
-                    ScopeModuleEntry {
-                        module_name: module_name.clone(),
-                        import_kind: ast::ImportKind::All,
-                    },
-                );
-            }
-        }
-    }
 }

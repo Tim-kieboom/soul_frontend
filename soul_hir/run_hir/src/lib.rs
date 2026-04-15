@@ -1,4 +1,4 @@
-use ast::AstResponse;
+use ast::AstContext;
 use hir::{ComplexLiteral, ExpressionId, HirTree};
 use hir_literal_interpreter::literal_resolve;
 use hir_parser::lower_hir;
@@ -19,11 +19,11 @@ pub struct HirResponse {
 }
 
 pub fn to_hir(
-    ast: &AstResponse,
     options: &CompilerOptions,
     context: &mut CompilerContext,
+    ast_context: &AstContext,
 ) -> HirResponse {
-    let hir = lower_hir(ast, context);
+    let hir = lower_hir(context, ast_context);
     let typed = lower_typed_hir(&hir, options, context);
 
     let literal_resolves = literal_resolve(&hir, &typed);

@@ -7,7 +7,7 @@ use std::{
 };
 
 use anyhow::Result;
-use ast::AstResponse;
+use ast::AstContext;
 use fern::Dispatch;
 use inkwell::context::Context;
 use log::{error, info};
@@ -87,11 +87,12 @@ fn run_fontend(paths: &Paths) -> Result<Ouput> {
     let tokens = to_token_stream(&source_file, root_module);
     display_tokenizer(paths, root_module, &source_file)?;
 
-    let ast = to_ast(tokens, &COMPILER_OPTIONS, &mut context, Some(root));
-    display_ast(paths, &ast)?;
+    let mut ast_context = AstContext::new();
+    to_ast(tokens, &COMPILER_OPTIONS, &mut context, &mut ast_context);
+    display_ast(paths, &context, &ast_context)?;
     log_faults(&context);
 
-    let mut hir = to_hir(&ast, &COMPILER_OPTIONS, &mut context);
+    let mut hir = to_hir(&COMPILER_OPTIONS, &mut context, &ast_context);
     clear_hir_type_map(&mut hir);
     display_hir(paths, &hir)?;
 
@@ -144,10 +145,11 @@ fn display_tokenizer(paths: &Paths, module: ModuleId, source_file: &str) -> Resu
     paths.write_to_output(&tokens, "tokenizer/tokens.soulc")
 }
 
-fn display_ast(paths: &Paths, ast: &AstResponse) -> Result<()> {
-    paths.write_to_output(&displayer_ast::display_ast(ast), "ast/tree.soulc")?;
+fn display_ast(paths: &Paths, context: &CompilerContext, ast_context: &AstContext) -> Result<()> {
+    let root = context.module_store.get_root_id();
+    paths.write_to_output(&displayer_ast::display_ast(root, context, ast_context), "ast/tree.soulc")?;
     paths.write_to_output(
-        &displayer_ast::display_ast_name_resolved(ast),
+        &displayer_ast::display_ast_name_resolved(root, context, ast_context),
         "ast/NameResolved.soulc",
     )
 }

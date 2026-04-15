@@ -28,7 +28,7 @@ impl<'a> HirContext<'a> {
             return hir::Expression::error(id);
         }
 
-        let signature = match self.ast_store.get_function(resolved) {
+        let signature = match self.ast_context.store.get_function(resolved) {
             Some(signature) => signature,
             None => {
                 #[cfg(debug_assertions)]

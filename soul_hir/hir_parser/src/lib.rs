@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ast::{AstResponse, DeclareStore};
+use ast::{AstContext};
 use hir::{
     BlockId, CreatedTypes, ExpressionId, Field, GenericId, HirTree, HirType, LazyTypeId, LocalId,
     StatementId, Struct,
@@ -11,7 +11,7 @@ use soul_utils::{
     ids::{FunctionId, IdAlloc},
     sementic_level::{CompilerContext, SementicFault},
     soul_error_internal,
-    span::{ItemMetaData, Span},
+    span::{ItemMetaData, ModuleId, Span},
     vec_map::VecMapIndex,
 };
 
@@ -23,14 +23,12 @@ mod place;
 mod statement;
 mod r#type;
 
-pub fn lower_hir(response: &AstResponse, context: &mut CompilerContext) -> HirTree {
-    let mut context = HirContext::new(response, context);
+pub fn lower_hir(compiler_context: &mut CompilerContext, ast_context: &AstContext) -> HirTree {
+    let root = compiler_context.module_store.get_root_id();
+    let mut context = HirContext::new(compiler_context, ast_context);
 
     context.lower_internal_structs();
-    for global in &response.tree.root.statements {
-        context.lower_global(global);
-    }
-
+    context.lower_module(root);
     context.consume_to_hir()
 }
 
@@ -41,17 +39,17 @@ struct HirContext<'a> {
     pub scopes: Vec<Scope>,
     pub id_generator: IdAllocalor,
     pub current_body: CurrentBody,
-    pub ast_store: &'a DeclareStore,
+    pub ast_context: &'a AstContext,
 
     pub context: &'a mut CompilerContext,
 }
 impl<'a> HirContext<'a> {
-    fn new(response: &'a AstResponse, context: &'a mut CompilerContext) -> Self {
-        let mut id_generator = IdAllocalor::new(response.function_generators.clone());
+    fn new(context: &'a mut CompilerContext, ast_context: &'a AstContext) -> Self {
+        let mut id_generator = IdAllocalor::new(ast_context.function_generators.clone());
         let init_global_function = id_generator.alloc_function();
         let root_id = context.module_store.get_root_id();
 
-        let main = match response.store.main_function {
+        let main = match ast_context.store.main_function {
             Some(val) => val,
             None => {
                 context.faults.push(SementicFault::error(SoulError::new(
@@ -65,11 +63,26 @@ impl<'a> HirContext<'a> {
 
         Self {
             context,
+            ast_context,
             id_generator,
-            ast_store: &response.store,
             scopes: vec![Scope::default()],
             current_body: CurrentBody::Global,
             tree: HirTree::new(root_id, main, init_global_function),
+        }
+    }
+
+    fn lower_module(&mut self, module_id: ModuleId) {
+        let root = &self.ast_context.modules[module_id];
+        for global in &root.global.statements {
+            self.lower_global(global);
+        }
+
+        for module_id in root.modules.iter().copied() {
+
+            let module = &self.ast_context.modules[module_id];
+            for global in &module.global.statements {
+                self.lower_global(global);
+            }
         }
     }
 

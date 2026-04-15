@@ -1,15 +1,12 @@
 use ast::{
-    Block, FunctionSignature, NamedTupleElement, NamedTupleType, Struct, VarTypeKind,
-    scope::{
+    Block, FunctionSignature, NamedTupleElement, NamedTupleType, Struct, VarTypeKind, scope::{
         NodeId, Scope, ScopeId, ScopeTypeEntry, ScopeTypeEntryKind, ScopeValue, ScopeValueKind,
-    },
+    }
 };
 use ast_parser::parse;
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
-    error::{SoulError, SoulErrorKind},
-    ids::FunctionId,
-    span::{ModuleId, Spanned},
+    error::{SoulError, SoulErrorKind}, ids::FunctionId, soul_error_internal, span::{ModuleId, Span, Spanned}
 };
 
 use crate::NameResolver;
@@ -18,9 +15,27 @@ mod collect_statement;
 mod collect_type;
 
 impl<'a> NameResolver<'a> {
-    pub(crate) fn collect_declarations(&mut self, block: &mut Block) {
-        block.scope_id = Some(self.info.scopes.current_scope_id());
-        self.collect_scopeless_block(block);
+    pub(crate) fn collect_module(&mut self, module_id: ModuleId) {
+        use std::mem::swap;
+        
+        let mut global = Block::dummy();
+        match self.modules.get_mut(module_id) {
+            Some(module) => swap(&mut module.global, &mut global),
+            None => {
+                self.log_error(soul_error_internal!(format!("{:?} not found", module_id), None));
+                return
+            }
+        }
+        
+        let prev = self.current_module;
+        self.current_module = module_id;
+        self.collect_block(&mut global);
+        self.current_module = prev;
+        
+        swap(
+            &mut global,
+            &mut self.modules.get_mut(module_id).expect("just checked").global,
+        );
     }
 
     fn push_scope(&mut self, set_scope_id: &mut Option<ScopeId>) {
@@ -125,27 +140,38 @@ impl<'a> NameResolver<'a> {
         self.current_scope_mut().insert_module(name, entry);
     }
 
-    fn find_module_file(&self, module_name: &str) -> Option<std::path::PathBuf> {
-        let current_file = self.source_file.as_ref()?;
-        let current_dir = current_file.parent()?;
+    fn find_module_file(&mut self, module_name: &str, span: Span) -> Option<std::path::PathBuf> {
+        let current_dir = self.context.current_path();
 
-        let module_path = current_dir.join(format!("{}.soul", module_name));
-        if module_path.exists() {
-            return Some(module_path);
+        let mut module_path = current_dir.join(module_name);
+        if module_path.is_dir() {
+
+            module_path.push("mod.soul");
+            if !module_path.is_file() {
+                self.log_error(SoulError::new(format!("no 'mod.soul' found in folder '{:?}'", module_path), SoulErrorKind::FieldNotFound, Some(span)));
+                return None
+            }
+
+            return Some(module_path)
+        }
+        
+        module_path.add_extension("soul");
+        if !module_path.is_file() {
+            self.log_error(SoulError::new(format!("file '{:?}' not found", module_path), SoulErrorKind::FieldNotFound, Some(span)));
         }
 
-        let relative_path = current_dir.join(module_name);
-        if relative_path.exists() {
-            return Some(relative_path);
-        }
-
-        None
+        Some(module_path)
     }
 
-    fn parse_module(&mut self, source: &str, module: ModuleId) -> ast::Block {
-        let tokens = to_token_stream(source, module);
-        let response = parse(tokens, self.context, None);
-        response.tree.root
+    fn parse_module(&mut self, source: &str, module_id: ModuleId, name: String) {
+        let tokens = to_token_stream(source, module_id);
+        let module = parse(tokens, module_id, name, self.context);
+        if let Some(module) = self.modules.get_mut(self.current_module) {
+            module.modules.push(module_id);
+        }
+        self.modules.insert(module_id, module);
+
+        self.collect_module(module_id);
     }
 
     fn insert_value(&mut self, name: &str, id: NodeId, kind: ScopeValue) -> Option<NodeId> {

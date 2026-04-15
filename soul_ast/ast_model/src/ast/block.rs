@@ -19,3 +19,8 @@ pub struct Block {
     pub node_id: Option<NodeId>,
     pub span: Span,
 }
+impl Block {
+    pub fn dummy() -> Self {
+        Self{ modifier: TypeModifier::Mut, statements: vec![], scope_id: None, node_id: None, span: Span::error() }
+    }
+}

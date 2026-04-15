@@ -68,11 +68,19 @@ impl ModuleStore {
             map: BiMap::new(),
             alloc: IdGenerator::new(),
         };
-        this.root = this.new_module(root_path);
+        this.root = this.insert(root_path);
         this
     }
 
-    pub fn new_module(&mut self, path: PathBuf) -> ModuleId {
+    pub fn get_or_insert(&mut self, path: PathBuf) -> ModuleId {
+        if let Some(id) = self.get_id(&path) {
+            return id;
+        }
+
+        self.insert(path.clone())
+    }
+
+    pub fn insert(&mut self, path: PathBuf) -> ModuleId {
         self.map.insert(&mut self.alloc, path)
     }
 

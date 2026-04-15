@@ -1,6 +1,4 @@
-use std::{
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf, StripPrefixError};
 
 /// A path to a Soul page/module.
 ///
@@ -43,11 +41,32 @@ impl SoulImportPath {
         &self.0
     }
 
+    pub fn to_pathbuf(&self) -> PathBuf {
+        self.0.clone()
+    }
+
     pub fn to_full_path(&self, dir_path: &PathBuf) -> PathBuf {
         let mut this = dir_path.clone();
         this.push(&self.0);
-        this.set_extension("soul");
         this
+    }
+
+    pub fn write_display(&self, root_dir: &Path, sb: &mut String) -> Result<(), StripPrefixError> {
+        const SEPERATOR: &str = ".";
+
+        let relative = self.as_path().strip_prefix(root_dir)?;
+        sb.push_str("crate");
+        for pat in relative {
+            sb.push_str(SEPERATOR);
+            let text = match pat.to_str() {
+                Some(str) => str,
+                None => &pat.to_string_lossy(), 
+            };
+
+            sb.push_str(text);
+        }
+
+        Ok(())
     }
 
     pub fn to_string(self) -> String {

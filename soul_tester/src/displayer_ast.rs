@@ -1,55 +1,53 @@
 use std::fmt::{Arguments, Debug, Write};
 
 use ast::{
-    scope::{NodeId, ScopeId},
-    Assignment, AstResponse, Block, ElseKind, Expression, Function, FunctionSignature, Generic,
-    IfArm, Import, SoulType, Statement, StatementKind, Struct, TypeKind, UseBlock, Variable,
+    Assignment, AstContext, Block, ElseKind, Expression, Function, FunctionSignature, Generic, IfArm, Import, SoulType, Statement, StatementKind, Struct, TypeKind, UseBlock, Variable, scope::{NodeId, ScopeId}
 };
 use soul_utils::{
-    ids::FunctionId,
-    soul_names::{KeyWord, Operator, TypeModifier},
-    vec_map::VecMapIndex,
+    ids::FunctionId, sementic_level::CompilerContext, soul_names::{KeyWord, Operator, TypeModifier}, span::ModuleId, vec_map::VecMapIndex
 };
 
-pub fn display_ast(ast: &AstResponse) -> String {
-    let mut displayer = AstDisplayer::new_ast();
-
-    for statement in &ast.tree.root.statements {
-        displayer.display_statement(statement);
-        displayer.push('\n');
+pub fn display_ast(root: ModuleId, context: &CompilerContext, ast_context: &AstContext) -> String {
+    let mut displayer = AstDisplayer::new_ast(context, ast_context);
+    displayer.display_module(root);   
+    for (_id, path) in context.module_store.entries() {
+        displayer.push_fmt(format_args!("\nmod {:?}", path));
     }
+
     displayer.consume_to_string()
 }
 
-pub fn display_ast_name_resolved(ast: &AstResponse) -> String {
-    let mut displayer = AstDisplayer::new_name_resolved();
-
-    for statement in &ast.tree.root.statements {
-        displayer.display_statement(statement);
-        displayer.push('\n');
-    }
+pub fn display_ast_name_resolved(root: ModuleId, context: &CompilerContext, ast_context: &AstContext) -> String {
+    let mut displayer = AstDisplayer::new_name_resolved(context, ast_context);
+    displayer.display_module(root);    
     displayer.consume_to_string()
 }
 
 const MUT: bool = true;
 const CONST: bool = false;
 
-struct AstDisplayer {
+struct AstDisplayer<'a> {
     sb: String,
     depth: String,
     is_name_resolved: bool,
+    ast_context: &'a AstContext,
+    context: &'a CompilerContext,
 }
-impl AstDisplayer {
-    fn new_ast() -> Self {
+impl<'a> AstDisplayer<'a> {
+    fn new_ast(context: &'a CompilerContext, ast_context: &'a AstContext) -> Self {
         Self {
+            context,
+            ast_context,
             sb: String::new(),
             is_name_resolved: false,
             depth: String::with_capacity(10),
         }
     }
 
-    fn new_name_resolved() -> Self {
+    fn new_name_resolved(context: &'a CompilerContext, ast_context: &'a AstContext) -> Self {
         Self {
+            context,
+            ast_context,
             sb: String::new(),
             is_name_resolved: true,
             depth: String::with_capacity(10),
@@ -79,6 +77,26 @@ impl AstDisplayer {
     fn pop_scope(&mut self) {
         let res = self.depth.pop();
         debug_assert!(res.is_some());
+    }
+
+    fn display_module(&mut self, module_id: ModuleId) {
+        let module = &self.ast_context.modules[module_id];
+        
+        self.display_depth();
+        self.push_fmt(format_args!("mod {} {{\n", module.name));
+        self.push_scope();
+        for statement in &module.global.statements {
+            self.display_statement(statement);
+            self.push('\n');
+        }
+
+        for module in &module.modules {
+            self.display_module(*module);
+        }
+
+        self.pop_scope();
+        self.display_depth();
+        self.push_str("}\n");
     }
 
     fn display_block(&mut self, block: &Block) {
@@ -276,7 +294,9 @@ impl AstDisplayer {
         self.push_str(KeyWord::Import.as_str());
         for path in &import.paths {
             self.push(' ');
-            self.push_fmt(format_args!("{:?}", path.module.as_path()));
+            if let Err(_) = path.module.write_display(&self.context.source_folder, &mut self.sb) {
+                self.push_str("<error>");
+            }
             match &path.kind {
                 ast::ImportKind::All => self.push('*'),
                 ast::ImportKind::This => self.push_fmt(format_args!("{SEPERATOR}this")),

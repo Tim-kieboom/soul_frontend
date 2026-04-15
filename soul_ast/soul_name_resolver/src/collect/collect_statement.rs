@@ -1,4 +1,4 @@
-use std::{fs::read_to_string, path::PathBuf};
+use std::{path::PathBuf};
 
 use ast::{
     Block, DeclareStore, Expression, ExpressionKind, Function, FunctionSignature, ImportPath,
@@ -10,7 +10,6 @@ use soul_utils::{
     soul_error_internal,
     soul_names::PrimitiveTypes,
     span::Span,
-    Ident,
 };
 
 use crate::NameResolver;
@@ -143,33 +142,19 @@ impl<'a> NameResolver<'a> {
             }
         };
 
-        let import_items = match &path.kind {
-            ast::ImportKind::Items(items) => Some(items.clone()),
-            _ => None,
-        };
-
         let alias = match &path.kind {
             ast::ImportKind::Alias(ident) => Some(ident.as_str()),
             _ => None,
         };
 
-        let module_file_path = match self.find_module_file(&module_name) {
-            Some(val) => val,
-            None => {
-                self.log_error(SoulError::new(
-                    format!("import '{}': module not found. Make sure the file exists and the path is correct (e.g., './{}' or '{}')", 
-                        module_name, module_name, module_name),
-                    SoulErrorKind::NotFoundInScope,
-                    Some(span),
-                ));
-                return;
-            }
+        let Some(module_file_path) = self.find_module_file(&module_name, span) else {
+            return
         };
 
         let import_name = alias.unwrap_or(module_name);
         self.declare_module(import_name, &module_name, path.kind.clone());
 
-        self.import_module(module_file_path, import_name, module_name, span, import_items);
+        self.import_module(module_file_path, module_name, span);
     }
 
     fn try_get_owner_hint(&self, variable: &Variable) -> Option<TypeKind> {
@@ -184,69 +169,24 @@ impl<'a> NameResolver<'a> {
     fn import_module(
         &mut self,
         module_file_path: PathBuf,
-        import_name: &str,
         module_name: &str,
         span: Span,
-        import_items: Option<Vec<Ident>>,
     ) {
+
         let Some(module_source) = self.read_module(&module_file_path, module_name, span) else {
             return;
         };
 
-        let module_id = self.context.module_store.new_module(module_file_path);
-        let module_ast = self.parse_module(&module_source, module_id);
-
-        let items_count = module_ast
-            .statements
-            .iter()
-            .filter(|s| {
-                matches!(
-                    s.node,
-                    StatementKind::Function(_)
-                        | StatementKind::ExternalFunction(_)
-                        | StatementKind::Struct(_)
-                )
-            })
-            .count();
-
-        if items_count == 0 {
-            self.log_error(SoulError::new(
-                format!(
-                    "import '{}': module has no public items to import (functions, extern functions, or structs)", 
-                    module_name,
-                ),
-                SoulErrorKind::NotFoundInScope,
-                Some(span),
-            ));
-            return;
+        let module_id = self.context.module_store.get_or_insert(module_file_path);
+        if self.modules.get(module_id).is_some() {
+            return
         }
 
-        for stmt in module_ast.statements {
-            match stmt.node {
-                StatementKind::Import(import) => {
-                    self.collect_import_path(&import.paths[0], stmt.span);
-                }
-                StatementKind::Function(func) => {
-                    if should_import_function(&func.signature.node.name, &import_items) {
-                        self.add_imported_function(func, import_name.to_string());
-                    }
-                }
-                StatementKind::ExternalFunction(extern_func) => {
-                    if should_import_function(&extern_func.signature.node.name, &import_items) {
-                        let mut function = extern_func.clone();
-                        function.signature.node.id = None;
-                        function.signature.node.external = Some(ast::ExternLanguage::C);
-
-                        self.add_imported_function(function, import_name.to_string());
-                    }
-                }
-                _ => {}
-            }
-        }
+        self.parse_module(&module_source, module_id, module_name.to_string());
     }
 
     fn read_module(&mut self, path: &PathBuf, module_name: &str, span: Span) -> Option<String> {
-        match read_to_string(path) {
+        match std::fs::read_to_string(path) {
             Ok(val) => Some(val),
             Err(err) => {
                 self.log_error(soul_error_internal!(
@@ -317,12 +257,5 @@ fn parse_callee_type(callee: &Expression, scopes: &ScopeBuilder) -> Option<TypeK
             None
         }
         _ => None,
-    }
-}
-
-fn should_import_function(name: &Ident, import_items: &Option<Vec<Ident>>) -> bool {
-    match import_items {
-        Some(items) => items.iter().any(|item: &Ident| item.as_str() == name.as_str()),
-        None => true,
     }
 }

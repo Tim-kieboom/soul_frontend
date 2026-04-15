@@ -1,11 +1,7 @@
 use ast::UseBlock;
 use hir::{Assign, StatementId};
 use soul_utils::{
-    error::{SoulError, SoulErrorKind},
-    ids::IdAlloc,
-    soul_error_internal,
-    soul_names::KeyWord,
-    span::ModuleId,
+    error::{SoulError, SoulErrorKind}, ids::IdAlloc, print_breakpoint, soul_error_internal, soul_import_path::SoulImportPath, soul_names::KeyWord, span::ModuleId
 };
 
 use crate::HirContext;
@@ -190,15 +186,16 @@ impl<'a> HirContext<'a> {
 
     fn resolve_import(&mut self, import: &ast::Import) {
         for path in &import.paths {
-            let full_path = path.module.to_full_path(&self.context.source_folder);
-            let module_id = match self.context.module_store.get_id(&full_path) {
+            let module_id = match self.get_module_id(&path.module) {
                 Some(id) => id,
                 None => {
+                    print_breakpoint!();
                     for (_, path) in self.context.module_store.entries() {
                         eprintln!("{}", path.to_string_lossy().to_string());
                     }
+
                     self.log_error(soul_error_internal!(
-                        format!("module '{:?}' not found", full_path.as_path()),
+                        format!("module '{}' not found", path.module.get_module_name().unwrap_or("<error>")),
                         None
                     ));
                     ModuleId::error()
@@ -223,6 +220,17 @@ impl<'a> HirContext<'a> {
                 kind: path.kind.clone(),
             });
         }
+    }
+
+    fn get_module_id(&self, path: &SoulImportPath) -> Option<ModuleId> {
+        let mut path = path.to_pathbuf();
+        if path.is_dir() {
+            path.push("mod.soul");
+        } else {
+            path.add_extension("soul");
+        }
+
+        self.context.module_store.get_id(&path)
     }
 
     pub(crate) fn lower_return_like(

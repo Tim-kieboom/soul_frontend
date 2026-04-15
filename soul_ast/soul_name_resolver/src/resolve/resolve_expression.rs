@@ -48,7 +48,7 @@ impl<'a> NameResolver<'a> {
                     let module_name = callee_ident.clone().unwrap_or_default();
                     function_call.resolved = self.lookup_module_function(
                         &module_name,
-                        self.module,
+                        self.root,
                         function_call.name.as_str(),
                     );
                     if function_call.resolved.is_some() {
@@ -61,7 +61,7 @@ impl<'a> NameResolver<'a> {
                         if let Some(_) = self.lookup_module("fmt") {
                             if let Some(func_id) = self.lookup_module_function(
                                 "fmt",
-                                self.module,
+                                self.root,
                                 function_call.name.as_str(),
                             ) {
                                 function_call.resolved = Some(func_id);

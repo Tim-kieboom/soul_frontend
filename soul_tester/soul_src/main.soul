@@ -1,6 +1,11 @@
-import crate.fmt
+// import crate.fmt
+import crate.subLib
 import crate.Lib.{this, A, B}
 
 main() {
-    fmt.Println("hello world")
+    num := A()
+    // Lib.A()
+    // subLib.Pub()
+    // Lib.subLib.Pub()
+    // fmt.Println("hello world")
 }

@@ -1,8 +1,8 @@
-use ast::{AbstractSyntaxTree, Block, SoulType};
+use ast::{Block, Module, SoulType, Visibility};
 #[cfg(debug_assertions)]
 use soul_tokenizer::Token;
 use soul_tokenizer::{TokenKind, TokenStream};
-use soul_utils::{sementic_level::CompilerContext, soul_names::TypeModifier};
+use soul_utils::{sementic_level::CompilerContext, soul_names::TypeModifier, span::ModuleId};
 
 use crate::parser::parse_utils::SEMI_COLON;
 
@@ -62,17 +62,33 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
     }
 
-    pub fn parse(tokens: TokenStream<'a>, context: &'f mut CompilerContext) -> AbstractSyntaxTree {
+    pub fn parse(
+        tokens: TokenStream<'a>, 
+        id: ModuleId,
+        name: String,
+        context: &'f mut CompilerContext,
+    ) -> Module {
+        let is_capital = name.chars().next().map_or(false, char::is_uppercase);
+        let visibility = if is_capital {
+            Visibility::Public
+        } else {
+            Visibility::Private
+        };
+        
         let mut this = Self::new(tokens, context);
         if let Err(err) = this.tokens.initialize() {
             this.log_error(err);
-            return AbstractSyntaxTree {
-                root: Block {
-                    modifier: TypeModifier::Mut,
-                    statements: vec![],
-                    scope_id: None,
+            return Module {
+                id,
+                name,
+                visibility,
+                modules: vec![],
+                global: Block {
                     node_id: None,
+                    scope_id: None,
+                    statements: vec![],
                     span: this.token().span,
+                    modifier: TypeModifier::Mut,
                 },
             };
         }
@@ -84,13 +100,17 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         let statements = this.parse_global_statments();
-        AbstractSyntaxTree {
-            root: Block {
+        Module {
+            id,
+            name,
+            visibility,
+            modules: vec![],
+            global: Block {
                 statements,
-                scope_id: None,
-                modifier: TypeModifier::Mut,
                 node_id: None,
+                scope_id: None,
                 span: this.token().span,
+                modifier: TypeModifier::Mut,
             },
         }
     }
