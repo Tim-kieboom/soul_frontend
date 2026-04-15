@@ -1,5 +1,5 @@
 use ast::{Block, scope::ScopeId};
-use soul_utils::{Ident, ids::FunctionId, soul_error_internal, span::ModuleId};
+use soul_utils::{ids::FunctionId, soul_error_internal, span::ModuleId};
 
 use crate::NameResolver;
 mod resolve_expression;
@@ -32,7 +32,7 @@ impl<'a> NameResolver<'a> {
         }
     }
 
-    fn lookup_function(&mut self, name: &Ident) -> Option<FunctionId> {
+    pub(super) fn lookup_function(&mut self, name: &str) -> Option<FunctionId> {
         self.info.scopes.lookup_function(name)
     }
 }

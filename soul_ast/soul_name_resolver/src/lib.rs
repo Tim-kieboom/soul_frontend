@@ -6,7 +6,7 @@ use soul_utils::{
     error::SoulError,
     ids::{FunctionId, IdGenerator},
     sementic_level::{CompilerContext, SementicFault},
-    span::{ModuleId},
+    span::ModuleId, vec_map::VecMapIndex,
 };
 
 mod check_name;
@@ -72,10 +72,82 @@ impl<'a> NameResolver<'a> {
         module_id: ModuleId,
         function_name: &str,
     ) -> Option<FunctionId> {
-        let entry_key = format!("{}::{}", module_name, function_name);
-        self.info
-            .scopes
-            .lookup_function(&Ident::new_dummy(&entry_key, module_id))
+        if let Some(resolved_name) = self.resolve_alias(module_name, function_name) {
+            let entry_key = format!("{}::{}", module_id.index(), resolved_name);
+            self.info
+                .scopes
+                .lookup_function(&entry_key)
+        } else {
+            let entry_key = format!("{}::{}", module_id.index(), function_name);
+            self.info
+                .scopes
+                .lookup_function(&entry_key)
+        }
+    }
+
+    fn resolve_alias(&self, module_name: &str, function_name: &str) -> Option<String> {
+        let module_entry = match self.info.scopes.lookup_module(module_name) {
+            Some(entry) => entry,
+            None => return None,
+        };
+
+        for item in &module_entry.imported_items {
+            match item {
+                ast::ImportItem::Alias { name, alias } => {
+                    if alias.as_str() == function_name {
+                        return Some(name.to_string());
+                    }
+                }
+                ast::ImportItem::Normal(ident) => {
+                    if ident.as_str() == function_name {
+                        return Some(ident.to_string());
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    fn is_item_imported(
+        &self,
+        module_name: &str,
+        function_name: &str,
+    ) -> bool {
+        let module_entry = match self.info.scopes.lookup_module(module_name) {
+            Some(entry) => entry,
+            None => return true,
+        };
+
+        match &module_entry.import_kind {
+            ast::ImportKind::Glob | ast::ImportKind::Alias(_) => {
+                return true;
+            }
+            ast::ImportKind::This | ast::ImportKind::Items{..} => {}
+        }
+
+        if module_entry.imported_items.is_empty() {
+            match &module_entry.import_kind {
+                ast::ImportKind::This => return false,
+                _ => return true,
+            }
+        }
+
+        for item in &module_entry.imported_items {
+            match item {
+                ast::ImportItem::Normal(ident) => {
+                    if ident.as_str() == function_name {
+                        return true;
+                    }
+                }
+                ast::ImportItem::Alias { name: _, alias } => {
+                    if alias.as_str() == function_name {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        false
     }
 
     fn flat_check_variable(&mut self, name: &Ident) -> Option<NodeId> {

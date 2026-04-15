@@ -6,7 +6,8 @@ use ast::{
 use ast_parser::parse;
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
-    error::{SoulError, SoulErrorKind}, ids::FunctionId, soul_error_internal, span::{ModuleId, Span, Spanned}
+    error::{SoulError, SoulErrorKind}, ids::{FunctionId}, soul_error_internal,
+    span::{ModuleId, Span, Spanned}
 };
 
 use crate::NameResolver;
@@ -68,7 +69,7 @@ impl<'a> NameResolver<'a> {
             *node_id = Some(id);
 
             self.store
-                .insert_variable_type(id, VarTypeKind::NonInveredType(ty.clone()));
+                .insert_variable_type(id, VarTypeKind::NonInveredType(ty.clone()), self.current_module);
 
             self.insert_value(name.as_str(), id, ScopeValue::Variable);
         }
@@ -132,10 +133,15 @@ impl<'a> NameResolver<'a> {
         self.current_scope_mut().insert_function(name, id);
     }
 
-    fn declare_module(&mut self, name: &str, module_name: &str, import_kind: ast::ImportKind) {
+    fn insert_function_alias(&mut self, name: &str, id: FunctionId) {
+        self.current_scope_mut().insert_function(name, id);
+    }
+
+    fn declare_module(&mut self, name: &str, module_name: &str, import_kind: ast::ImportKind, imported_items: Vec<ast::ImportItem>) {
         let entry = ast::scope::ScopeModuleEntry {
             module_name: module_name.to_string(),
             import_kind,
+            imported_items,
         };
         self.current_scope_mut().insert_module(name, entry);
     }

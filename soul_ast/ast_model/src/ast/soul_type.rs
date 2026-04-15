@@ -1,10 +1,10 @@
 use soul_utils::{
-    Ident,
     soul_names::{PrimitiveTypes, TypeModifier},
     span::Span,
+    Ident,
 };
 
-use crate::{Expression, scope::NodeId};
+use crate::{scope::NodeId, Expression};
 
 /// Represents a type in the Soul language.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

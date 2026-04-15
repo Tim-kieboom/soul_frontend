@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use soul_utils::{Ident, ids::FunctionId, impl_soul_ids, span::Span, vec_map::VecMapIndex};
+use soul_utils::{ids::FunctionId, impl_soul_ids, span::Span, vec_map::VecMapIndex, Ident};
 
-use crate::{ImportKind, ast::Variable};
+use crate::{ast::Variable, ImportItem, ImportKind};
 
 impl_soul_ids!(NodeId, ScopeId);
 
@@ -83,9 +83,9 @@ impl ScopeBuilder {
         ids.get(kind)
     }
 
-    pub fn lookup_function(&self, ident: &Ident) -> Option<FunctionId> {
+    pub fn lookup_function(&self, name: &str) -> Option<FunctionId> {
         for scope in self.scope_iter() {
-            if let Some(ScopeEntry { function, .. }) = scope.entries.get(ident.as_str()) {
+            if let Some(ScopeEntry { function, .. }) = scope.entries.get(name) {
                 return *function;
             };
         }
@@ -101,6 +101,18 @@ impl ScopeBuilder {
         }
 
         None
+    }
+
+    pub fn modules(&self) -> impl Iterator<Item = (String, ScopeModuleEntry)> {
+        let mut result = Vec::new();
+        for scope in self.scope_iter() {
+            for (name, entry) in &scope.entries {
+                if let Some(module) = &entry.module {
+                    result.push((name.clone(), module.clone()));
+                }
+            }
+        }
+        result.into_iter()
     }
 
     fn scope_iter<'a>(&'a self) -> ScopeIterator<'a> {
@@ -149,6 +161,7 @@ pub struct ScopeEntry {
 pub struct ScopeModuleEntry {
     pub module_name: String,
     pub import_kind: ImportKind,
+    pub imported_items: Vec<ImportItem>,
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Scope {

@@ -1,15 +1,15 @@
 use std::{path::PathBuf};
 
 use ast::{
-    Block, DeclareStore, Expression, ExpressionKind, Function, FunctionSignature, ImportPath,
-    Literal, Statement, StatementKind, TypeKind, UseBlock, VarTypeKind, Variable,
+    Block, DeclareStore, Expression, ExpressionKind, Function, FunctionSignature,
+    ImportPath, Literal, Statement, StatementKind, TypeKind, UseBlock, VarTypeKind, Variable,
     scope::{ScopeBuilder, ScopeValue, ScopeValueKind},
 };
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
     soul_error_internal,
     soul_names::PrimitiveTypes,
-    span::Span,
+    span::{ModuleId, Span},
 };
 
 use crate::NameResolver;
@@ -70,10 +70,10 @@ impl<'a> NameResolver<'a> {
                     self.declare_value(ScopeValueKind::Variable(variable))
                 };
 
-                self.store.insert_variable_type(id, variable.ty.clone());
+                self.store.insert_variable_type(id, variable.ty.clone(), self.current_module);
 
                 if let Some(hint) = self.try_get_owner_hint(variable) {
-                    self.store.insert_variable_owner_hint(id, hint);
+                    self.store.insert_variable_owner_hint(id, hint, self.current_module);
                 }
 
                 match &mut variable.ty {
@@ -129,7 +129,7 @@ impl<'a> NameResolver<'a> {
         self.collect_scopeless_block(&mut function.block);
         self.pop_scope();
 
-        self.store.insert_functions(id, signature.clone());
+        self.store.insert_functions(id, signature.clone(), self.current_module);
         self.current_function = prev;
     }
 
@@ -147,14 +147,36 @@ impl<'a> NameResolver<'a> {
             _ => None,
         };
 
+        let imported_items = match &path.kind {
+            ast::ImportKind::Items{ this, this_alias, items } => items.clone(),
+            _ => vec![],
+        };
+
         let Some(module_file_path) = self.find_module_file(&module_name, span) else {
             return
         };
 
         let import_name = alias.unwrap_or(module_name);
-        self.declare_module(import_name, &module_name, path.kind.clone());
+        self.declare_module(import_name, &module_name, path.kind.clone(), imported_items.clone());
 
-        self.import_module(module_file_path, module_name, span);
+        let module_id = self.import_module(module_file_path, module_name, span);
+
+        for item in imported_items {
+            match item {
+                ast::ImportItem::Alias { name, alias: alias_name } => {
+                    let Some(func_id) = self.store.find_function_in_module(name.as_str(), module_id) else {
+                        continue;
+                    };
+                    self.insert_function_alias(alias_name.as_str(), func_id);
+                }
+                ast::ImportItem::Normal(ident) => {
+                    let Some(func_id) = self.store.find_function_in_module(ident.as_str(), module_id) else {
+                        continue;
+                    };
+                    self.insert_function_alias(ident.as_str(), func_id);
+                }
+            }
+        }
     }
 
     fn try_get_owner_hint(&self, variable: &Variable) -> Option<TypeKind> {
@@ -171,21 +193,23 @@ impl<'a> NameResolver<'a> {
         module_file_path: PathBuf,
         module_name: &str,
         span: Span,
-    ) {
+    ) -> ModuleId {
 
         let Some(module_source) = self.read_module(&module_file_path, module_name, span) else {
-            return;
+            return self.root;
         };
 
         let dir = module_file_path.parent().unwrap_or(&module_file_path);
         self.context.push_current_path(dir.to_path_buf());
         let module_id = self.context.module_store.get_or_insert(module_file_path);
         if self.modules.get(module_id).is_some() {
-            return
+            self.context.pop_current_path();
+            return module_id
         }
 
         self.parse_module(&module_source, module_id, module_name.to_string());
         self.context.pop_current_path();
+        module_id
     }
 
     fn read_module(&mut self, path: &PathBuf, module_name: &str, span: Span) -> Option<String> {
@@ -235,7 +259,7 @@ fn owner_hint_from_expression(
             if let Some(owner_kind) = owner_kind
                 && let Some(function_id) =
                     store.find_function_by_name_and_owner_kind(function_name, Some(&owner_kind))
-                && let Some(signature) = store.get_function(function_id)
+                && let Some((signature, _module)) = store.get_function(function_id)
             {
                 return Some(signature.return_type.kind.clone());
             }

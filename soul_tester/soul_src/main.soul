@@ -1,13 +1,12 @@
-// import crate.fmt
 import ( 
     crate.subLib
-    crate.Lib.{this, B as b}
+    crate.Lib.{this, A, B as b}
 )
 
 main() {
-    num := A()
-    num2 := b()
-    // Lib.A()
+    mut num = A()
+    num = b()
+    // num = Lib.A()
     // subLib.Pub()
     // Lib.subLib.Pub()
     // fmt.Println("hello world")

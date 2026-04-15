@@ -314,10 +314,16 @@ impl<'a> AstDisplayer<'a> {
                 self.push_str("<error>");
             }
             match &path.kind {
-                ast::ImportKind::All => self.push('*'),
                 ast::ImportKind::This => self.push_fmt(format_args!("{SEPERATOR}this")),
-                ast::ImportKind::Items(items) => {
+                ast::ImportKind::Items{ this, this_alias, items } => {
                     self.push_str(".{");
+                    if *this {
+                        let name = this_alias.as_ref().map(|t| t.as_str()).unwrap_or("this");
+                        self.push_str(name);
+                        if !items.is_empty() {
+                            self.push_str(", ");
+                        } 
+                    }
                     let last_index = items.len().saturating_sub(1);
                     for (i, item) in items.iter().enumerate() {
                         match item {

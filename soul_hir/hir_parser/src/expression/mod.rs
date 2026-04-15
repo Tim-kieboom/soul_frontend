@@ -254,7 +254,7 @@ impl<'a> HirContext<'a> {
             }
         };
 
-        let var_type_kind = self.ast_context.store.get_variable_type(node_id);
+        let var_type_kind = self.ast_context.store.get_variable_type(node_id).map(|(var, _)| var);
 
         let ty = match var_type_kind {
             None => self.new_infer_type(vec![], None, ident.span),

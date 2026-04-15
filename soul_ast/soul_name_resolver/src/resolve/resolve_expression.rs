@@ -46,11 +46,17 @@ impl<'a> NameResolver<'a> {
 
                 if module_entry.is_some() {
                     let module_name = callee_ident.clone().unwrap_or_default();
-                    function_call.resolved = self.lookup_module_function(
+                    let is_allowed = self.is_item_imported(
                         &module_name,
-                        self.root,
                         function_call.name.as_str(),
                     );
+                    if is_allowed {
+                        function_call.resolved = self.lookup_module_function(
+                            &module_name,
+                            self.root,
+                            function_call.name.as_str(),
+                        );
+                    }
                     if function_call.resolved.is_some() {
                         function_call.callee = None;
                     }
@@ -71,28 +77,67 @@ impl<'a> NameResolver<'a> {
 
                     // If still not resolved, try the store lookup
                     if function_call.resolved.is_none() {
-                        let type_qualifier =
-                            parse_owner_type(self, function_call.callee.as_deref());
-                        let is_type_qualifier = type_qualifier.is_some();
-
-                        if is_type_qualifier {
-                            function_call.callee = None;
-                        } else if let Some(callee) = &mut function_call.callee {
-                            self.resolve_expression(callee);
+                        let func_name = function_call.name.as_str();
+                        
+                        let mut has_module_with_this = false;
+                        let mut can_use_store = false;
+                        
+                        for (_name, entry) in self.info.scopes.modules() {
+                            if let ast::ImportKind::Items { this, .. } = &entry.import_kind {
+                                if *this {
+                                    has_module_with_this = true;
+                                }
+                            }
+                            
+                            if matches!(entry.import_kind, ast::ImportKind::This) {
+                                has_module_with_this = true;
+                            }
+                            
+                            for item in &entry.imported_items {
+                                match item {
+                                    ast::ImportItem::Normal(ident) => {
+                                        if ident.as_str() == func_name {
+                                            can_use_store = true;
+                                        }
+                                    }
+                                    ast::ImportItem::Alias { name: _, alias } => {
+                                        if alias.as_str() == func_name {
+                                            can_use_store = true;
+                                        }
+                                    }
+                                }
+                            }
                         }
+                        
+                        if has_module_with_this && !can_use_store {
+                            function_call.resolved = self.lookup_function(function_call.name.as_str());
+                        } else {
+                            let type_qualifier =
+                                parse_owner_type(self, function_call.callee.as_deref());
+                            let is_type_qualifier = type_qualifier.is_some();
 
-                        let owner_kind = type_qualifier.as_ref().map(|t| &t.kind).or_else(|| {
-                            function_call.callee.as_ref().and_then(|c| {
-                                receiver_type_kind_for_instance_method(self.store, c.as_ref())
-                            })
-                        });
+                            if is_type_qualifier {
+                                function_call.callee = None;
+                            } else if let Some(callee) = &mut function_call.callee {
+                                self.resolve_expression(callee);
+                            }
 
-                        function_call.resolved = self.store.find_function_by_name_and_owner_kind(
-                            function_call.name.as_str(),
-                            owner_kind,
-                        );
-                        if function_call.resolved.is_none() && type_qualifier.is_some() {
-                            function_call.resolved = self.lookup_function(&function_call.name);
+                            let owner_kind = type_qualifier.as_ref().map(|t| &t.kind).or_else(|| {
+                                function_call.callee.as_ref().and_then(|c| {
+                                    receiver_type_kind_for_instance_method(self.store, c.as_ref())
+                                })
+                            });
+
+                            function_call.resolved = self.store.find_function_by_name_and_owner_kind(
+                                function_call.name.as_str(),
+                                owner_kind,
+                            );
+                            if function_call.resolved.is_none() {
+                                function_call.resolved = self.lookup_function(function_call.name.as_str());
+                            }
+                            if function_call.resolved.is_none() && type_qualifier.is_some() {
+                                function_call.resolved = self.lookup_function(function_call.name.as_str());
+                            }
                         }
                     }
                 }
@@ -111,7 +156,7 @@ impl<'a> NameResolver<'a> {
                 };
 
                 if let Some(function_id) = function_call.resolved
-                    && let Some(signature) = self.store.get_function(function_id)
+                    && let Some((signature, _module)) = self.store.get_function(function_id)
                 {
                     let needs_callee = !matches!(signature.function_kind, FunctionKind::Static);
 
@@ -202,10 +247,12 @@ fn receiver_type_kind_for_instance_method<'a>(
         ExpressionKind::Variable {
             resolved: Some(node_id),
             ..
-        } => match store.get_variable_type(*node_id)? {
-            VarTypeKind::NonInveredType(soul_type) => Some(&soul_type.kind),
-            VarTypeKind::InveredType(_) => store.get_variable_owner_hint(*node_id),
-        },
+        } => {
+            match &store.get_variable_type(*node_id)?.0 {
+                VarTypeKind::NonInveredType(soul_type) => Some(&soul_type.kind),
+                VarTypeKind::InveredType(_) => store.get_variable_owner_hint(*node_id).map(|(ty, _mod)| ty),
+            }
+        }
         _ => None,
     }
 }

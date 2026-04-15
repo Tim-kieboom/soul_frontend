@@ -1,5 +1,7 @@
 use soul_utils::{
-    ids::{FunctionId, IdGenerator}, span::{ModuleId}, vec_map::VecMap
+    ids::{FunctionId, IdGenerator},
+    span::ModuleId,
+    vec_map::VecMap,
 };
 
 mod ast;
@@ -22,7 +24,12 @@ pub struct AstContext {
 }
 impl AstContext {
     pub fn new() -> Self {
-        Self { store: DeclareStore::new(), meta_data: AstMetadata::new(), modules: AstModuleStore::new(), function_generators: IdGenerator::new() }
+        Self {
+            store: DeclareStore::new(),
+            meta_data: AstMetadata::new(),
+            modules: AstModuleStore::new(),
+            function_generators: IdGenerator::new(),
+        }
     }
 }
 
@@ -41,14 +48,15 @@ pub enum Visibility {
     Private,
 }
 
-
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AstModuleStore {
-    map: VecMap<ModuleId, Module>
+    map: VecMap<ModuleId, Module>,
 }
 impl AstModuleStore {
     pub const fn new() -> Self {
-        Self { map: VecMap::const_default() }
+        Self {
+            map: VecMap::const_default(),
+        }
     }
 
     pub fn insert(&mut self, id: ModuleId, module: Module) -> Option<Module> {
@@ -127,8 +135,29 @@ impl DeclareStore {
     }
 
     /// Inserts a function into the store.
-    pub fn insert_functions(&mut self, index: FunctionId, function: FunctionSignature, module: ModuleId) {
+    pub fn insert_functions(
+        &mut self,
+        index: FunctionId,
+        function: FunctionSignature,
+        module: ModuleId,
+    ) {
         self.functions.insert(index, (function, module));
+    }
+
+    pub fn find_function_in_module(&self, name: &str, module: ModuleId) -> Option<FunctionId> {
+        self.functions.entries().find_map(|(id, (sig, mod_id))| {
+            if sig.name.as_str() == name && *mod_id == module {
+                Some(id)
+            } else {
+                None
+            }
+        })
+    }
+
+    pub fn all_functions(
+        &self,
+    ) -> impl Iterator<Item = (FunctionId, &(FunctionSignature, ModuleId))> {
+        self.functions.entries()
     }
 
     /// Gets the type of a variable by its node ID.

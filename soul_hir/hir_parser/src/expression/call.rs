@@ -29,7 +29,7 @@ impl<'a> HirContext<'a> {
         }
 
         let signature = match self.ast_context.store.get_function(resolved) {
-            Some(signature) => signature,
+            Some((signature, _)) => signature,
             None => {
                 #[cfg(debug_assertions)]
                 self.log_error(soul_error_internal!(
