@@ -1,9 +1,7 @@
 use std::{path::PathBuf};
 
 use ast::{
-    Block, DeclareStore, Expression, ExpressionKind, Function, FunctionSignature,
-    ImportPath, Literal, Statement, StatementKind, TypeKind, UseBlock, VarTypeKind, Variable,
-    scope::{ScopeBuilder, ScopeValue, ScopeValueKind},
+    Block, DeclareStore, Expression, ExpressionKind, Function, FunctionSignature, ImportItem, ImportPath, Literal, Statement, StatementKind, TypeKind, UseBlock, VarTypeKind, Variable, scope::{ScopeBuilder, ScopeValue, ScopeValueKind}
 };
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
@@ -168,8 +166,8 @@ impl<'a> NameResolver<'a> {
         };
 
         let imported_items = match &path.kind {
-            ast::ImportKind::Items{ items, .. } => items.clone(),
-            _ => vec![],
+            ast::ImportKind::Items{ items, .. } => items,
+            _ => &vec![],
         };
 
         let Some(module_file_path) = self.find_module_file(&module_name, span) else {
@@ -182,33 +180,53 @@ impl<'a> NameResolver<'a> {
 
         self.declare_module(import_name, &module_name, module_id, path.kind.clone(), imported_items.clone());
 
+        self.collect_items(module_id, module_name, &imported_items, span)
+    }
+
+    fn collect_items(&mut self,  module_id: ModuleId, module_name: &str, imported_items: &Vec<ImportItem>, span: Span) {
         for item in imported_items {
-            match item {
-                ast::ImportItem::Alias { name, alias: alias_name } => {
-                    if !self.modules[module_id].header.contains_key(name.as_str()) {
-                        self.log_error(SoulError::new(
-                            format!("module '{}' does not export '{}'", module_name, name.as_str()),
-                            SoulErrorKind::NotFoundInScope,
-                            Some(span),
-                        ));
-                        continue;
-                    }
-                    if let Some(func_id) = self.store.find_function_in_module(name.as_str(), module_id) {
-                        self.insert_function_alias(alias_name.as_str(), func_id);
-                    }
+            let (name, alias_name) = match &item {
+                ast::ImportItem::Alias { name, alias } => (name.as_str(), alias),
+                ast::ImportItem::Normal(name) => (name.as_str(), name),
+            };
+            
+            let Some(entry) = self.modules[module_id].header.get(name).copied() else {
+                    
+                self.log_error(SoulError::new(
+                    format!("module '{}' does not export '{}'", module_name, name),
+                    SoulErrorKind::NotFoundInScope,
+                    Some(span),
+                ));
+                continue;
+            };
+
+            if let Some(id) = entry.variable {
+                if !self.insert_variable_alias(alias_name, id) {
+                    self.log_error(SoulError::new(
+                        format!("variable {} already exists", alias_name.as_str()), 
+                        SoulErrorKind::AlreadyFoundInScope, 
+                        Some(alias_name.span),
+                    ));
                 }
-                ast::ImportItem::Normal(ident) => {
-                    if !self.modules[module_id].header.contains_key(ident.as_str()) {
-                        self.log_error(SoulError::new(
-                            format!("module '{}' does not export '{}'", module_name, ident.as_str()),
-                            SoulErrorKind::NotFoundInScope,
-                            Some(span),
-                        ));
-                        continue;
-                    }
-                    if let Some(func_id) = self.store.find_function_in_module(ident.as_str(), module_id) {
-                        self.insert_function_alias(ident.as_str(), func_id);
-                    }
+            }
+
+            if let Some(id) = entry.function {
+                if !self.insert_function_alias(alias_name, id) {
+                    self.log_error(SoulError::new(
+                        format!("function {} already exists", alias_name.as_str()), 
+                        SoulErrorKind::AlreadyFoundInScope, 
+                        Some(alias_name.span),
+                    ));
+                }
+            }
+
+            if let Some(id) = entry.struct_type {
+                if !self.insert_struct_alias(alias_name, span, id) {
+                    self.log_error(SoulError::new(
+                        format!("struct {} already exists", alias_name.as_str()), 
+                        SoulErrorKind::AlreadyFoundInScope, 
+                        Some(alias_name.span),
+                    ));
                 }
             }
         }

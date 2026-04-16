@@ -82,11 +82,21 @@ impl ScopeBuilder {
         None
     }
 
+    pub fn flat_lookup_type(&self, ident: &Ident) -> Option<ScopeTypeEntry> {
+        let scope = self.scopes.get(self.current.0)?;
+        scope.entries.get(ident.as_str())?.types
+    }
+
     pub fn flat_lookup_value(&self, ident: &Ident, kind: ScopeValue) -> Option<NodeId> {
         let scope = self.scopes.get(self.current.0)?;
         let ids = scope.entries.get(ident.as_str())?.values.as_ref()?;
 
         ids.get(kind)
+    }
+
+    pub fn flat_lookup_function(&self, name: &str) -> Option<FunctionId> {
+        let scope = self.scopes.get(self.current.0)?;
+        scope.entries.get(name)?.function
     }
 
     pub fn lookup_function(&self, name: &str) -> Option<FunctionId> {

@@ -114,8 +114,8 @@ impl<'a> AstDisplayer<'a> {
             if entry.function.is_some() {
                 self.push_str("Function:");
             }
-            if entry.new_type.is_some() {
-                self.push_str("Type:");
+            if entry.struct_type.is_some() {
+                self.push_str("Struct:");
             }
             if entry.variable.is_some() {
                 self.push_str("Variable:");

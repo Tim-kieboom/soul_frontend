@@ -1,9 +1,10 @@
 import ( 
-    crate.subLib
+    crate.subLib.{this}
     crate.Lib.{this, Variable, A, B as b}
 )
 
 function() {}
+// A() {}
 
 main() {
     function()

@@ -6,8 +6,7 @@ use ast::{
 use ast_parser::parse;
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
-    error::{SoulError, SoulErrorKind}, ids::{FunctionId}, soul_error_internal,
-    span::{ModuleId, Span, Spanned}
+    Ident, error::{SoulError, SoulErrorKind}, ids::FunctionId, soul_error_internal, span::{ModuleId, Span, Spanned}
 };
 
 use crate::NameResolver;
@@ -134,8 +133,37 @@ impl<'a> NameResolver<'a> {
         self.current_scope_mut().insert_function(name, id);
     }
 
-    fn insert_function_alias(&mut self, name: &str, id: FunctionId) {
-        self.current_scope_mut().insert_function(name, id);
+    fn insert_function_alias(&mut self, name: &Ident, id: FunctionId) -> bool {
+        if self.info.scopes.flat_lookup_function(name.as_str()).is_some() {
+            return false
+        }
+
+        self.current_scope_mut().insert_function(name.as_str(), id);
+        true
+    }
+
+    fn insert_variable_alias(&mut self, name: &Ident, id: NodeId) -> bool {
+        if self.info.scopes.flat_lookup_value(name, ScopeValue::Variable).is_some() {
+            return false
+        }
+
+        self.current_scope_mut().insert_value(name.as_str(), ScopeValue::Variable, id);
+        true
+    }
+
+    fn insert_struct_alias(&mut self, name: &Ident, span: Span, id: NodeId) -> bool {
+        if self.info.scopes.flat_lookup_type(name).is_some() {
+            return false
+        }
+        
+        self.current_scope_mut().insert_types(name.as_str(), ScopeTypeEntry{ 
+            span, 
+            node_id: id, 
+            trait_parent: None,
+            kind: ScopeTypeEntryKind::Struct, 
+        });
+
+        true
     }
 
     fn declare_module(&mut self, name: &str, module_name: &str, module_id: ModuleId, import_kind: ast::ImportKind, imported_items: Vec<ast::ImportItem>) {

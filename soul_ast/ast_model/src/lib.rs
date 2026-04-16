@@ -45,10 +45,10 @@ pub struct Module {
     pub header: HashMap<String, HeaderEntry>,
 }
 
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, Default, serde::Serialize, serde::Deserialize)]
 pub struct HeaderEntry {
     pub variable: Option<NodeId>,
-    pub new_type: Option<NodeId>,
+    pub struct_type: Option<NodeId>,
     pub function: Option<FunctionId>,
 }
 

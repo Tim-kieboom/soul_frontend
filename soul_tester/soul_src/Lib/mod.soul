@@ -1,4 +1,4 @@
-import .subLib.*
+import .subLib.{this}
 
 const Variable = 1
 
