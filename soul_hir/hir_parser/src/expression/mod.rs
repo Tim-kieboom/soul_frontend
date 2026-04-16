@@ -1,12 +1,12 @@
+use ast::{scope::NodeId, AsTypeCast, VarTypeKind};
 use ast::{ArrayContructor, Literal};
-use ast::{AsTypeCast, VarTypeKind, scope::NodeId};
 use hir::{ExpressionId, HirType, HirTypeKind, LocalId, Place, PlaceKind, Terminator};
 use soul_utils::soul_error_internal;
 use soul_utils::{
-    Ident,
     error::{SoulError, SoulErrorKind},
     ids::IdAlloc,
     span::Span,
+    Ident,
 };
 
 use crate::HirContext;
@@ -254,7 +254,11 @@ impl<'a> HirContext<'a> {
             }
         };
 
-        let var_type_kind = self.ast_context.store.get_variable_type(node_id).map(|(var, _)| var);
+        let var_type_kind = self
+            .ast_context
+            .store
+            .get_variable_type(node_id)
+            .map(|(var, _)| var);
 
         let ty = match var_type_kind {
             None => self.new_infer_type(vec![], None, ident.span),
@@ -265,7 +269,7 @@ impl<'a> HirContext<'a> {
             }
         };
 
-        let local = match self.find_local(ident) {
+        let local = match self.find_local_by_node_id(node_id) {
             Some(val) => val,
             None => {
                 #[cfg(debug_assertions)]

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ast::{AstContext};
+use ast::{AstContext, scope::NodeId};
 use hir::{
     BlockId, CreatedTypes, ExpressionId, Field, GenericId, HirTree, HirType, LazyTypeId, LocalId,
     StatementId, Struct,
@@ -12,7 +12,7 @@ use soul_utils::{
     sementic_level::{CompilerContext, SementicFault},
     soul_error_internal,
     span::{ItemMetaData, ModuleId, Span},
-    vec_map::VecMapIndex,
+    vec_map::{VecMap, VecMapIndex},
 };
 
 use crate::id_allocator::IdAllocalor;
@@ -42,6 +42,7 @@ struct HirContext<'a> {
     pub ast_context: &'a AstContext,
 
     pub context: &'a mut CompilerContext,
+    pub node_id_to_local: VecMap<NodeId, LocalId>,
 }
 impl<'a> HirContext<'a> {
     fn new(context: &'a mut CompilerContext, ast_context: &'a AstContext) -> Self {
@@ -66,6 +67,7 @@ impl<'a> HirContext<'a> {
             ast_context,
             id_generator,
             scopes: vec![Scope::default()],
+            node_id_to_local: VecMap::new(),
             current_body: CurrentBody::Global,
             tree: HirTree::new(root_id, main, init_global_function),
         }
@@ -73,15 +75,34 @@ impl<'a> HirContext<'a> {
 
     fn lower_module(&mut self, module_id: ModuleId) {
         let root = &self.ast_context.modules[module_id];
+        
         for global in &root.global.statements {
-            self.lower_global(global);
+            if matches!(global.node, ast::StatementKind::Variable(_)) {
+                self.lower_global(global);
+            }
         }
 
         for module_id in root.modules.iter().copied() {
-
             let module = &self.ast_context.modules[module_id];
             for global in &module.global.statements {
+                if matches!(global.node, ast::StatementKind::Variable(_)) {
+                    self.lower_global(global);
+                }
+            }
+        }
+
+        for global in &root.global.statements {
+            if !matches!(global.node, ast::StatementKind::Variable(_)) {
                 self.lower_global(global);
+            }
+        }
+
+        for module_id in root.modules.iter().copied() {
+            let module = &self.ast_context.modules[module_id];
+            for global in &module.global.statements {
+                if !matches!(global.node, ast::StatementKind::Variable(_)) {
+                    self.lower_global(global);
+                }
             }
         }
     }

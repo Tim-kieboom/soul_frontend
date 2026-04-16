@@ -151,6 +151,11 @@ impl<'a> HirContext<'a> {
 
         let local = self.id_generator.alloc_local();
         self.insert_variable(&variable.name, local, ty, value);
+        
+        if let Some(node_id) = variable.node_id {
+            self.node_id_to_local.insert(node_id, local);
+        }
+        
         hir::Variable { local }
     }
 

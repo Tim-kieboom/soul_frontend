@@ -1,9 +1,9 @@
+use ast::scope::NodeId;
 use hir::{LocalId, Place, PlaceId, PlaceKind};
 use soul_utils::{
-    Ident,
     error::{SoulError, SoulErrorKind},
     ids::IdAlloc,
-    soul_error_internal,
+    soul_error_internal, Ident,
 };
 
 use crate::HirContext;
@@ -26,9 +26,9 @@ impl<'a> HirContext<'a> {
             ast::ExpressionKind::Variable {
                 id: _,
                 ident,
-                resolved: _,
+                resolved,
             } => {
-                let local = match self.find_local(ident) {
+                let local = match resolved.and_then(|node_id| self.find_local_by_node_id(node_id)) {
                     Some(val) => val,
                     None => {
                         self.log_error(SoulError::new(
@@ -62,6 +62,10 @@ impl<'a> HirContext<'a> {
         }
 
         None
+    }
+
+    pub(crate) fn find_local_by_node_id(&self, node_id: NodeId) -> Option<LocalId> {
+        self.node_id_to_local.get(node_id).copied()
     }
 
     pub fn insert_place(&mut self, place: Place) -> PlaceId {
