@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use ast::{Block, Module, SoulType, Visibility};
 #[cfg(debug_assertions)]
 use soul_tokenizer::Token;
@@ -83,6 +85,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 name,
                 visibility,
                 modules: vec![],
+                header: HashMap::default(),
                 global: Block {
                     node_id: None,
                     scope_id: None,
@@ -105,6 +108,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             name,
             visibility,
             modules: vec![],
+            header: HashMap::default(),
             global: Block {
                 statements,
                 node_id: None,

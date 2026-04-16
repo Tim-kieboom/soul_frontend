@@ -148,7 +148,7 @@ impl<'a> NameResolver<'a> {
         };
 
         let imported_items = match &path.kind {
-            ast::ImportKind::Items{ this, this_alias, items } => items.clone(),
+            ast::ImportKind::Items{ items, .. } => items.clone(),
             _ => vec![],
         };
 
@@ -259,7 +259,7 @@ fn owner_hint_from_expression(
 
             if let Some(owner_kind) = owner_kind
                 && let Some(function_id) =
-                    store.find_function_by_name_and_owner_kind(function_name, Some(&owner_kind))
+                    store.find_function(function_name, Some(&owner_kind))
                 && let Some((signature, _module)) = store.get_function(function_id)
             {
                 return Some(signature.return_type.kind.clone());

@@ -4,6 +4,7 @@ use soul_utils::{ids::FunctionId, soul_error_internal, span::ModuleId};
 use crate::NameResolver;
 mod resolve_expression;
 mod resolve_statement;
+mod resolve_function_call;
 
 impl<'a> NameResolver<'a> {
     pub(super) fn resolve_modules(&mut self, module_id: ModuleId) {

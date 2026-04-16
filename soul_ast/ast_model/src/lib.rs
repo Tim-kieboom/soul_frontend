@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use soul_utils::{
     ids::{FunctionId, IdGenerator},
     span::ModuleId,
@@ -40,6 +42,14 @@ pub struct Module {
     pub global: Block,
     pub modules: Vec<ModuleId>,
     pub visibility: Visibility,
+    pub header: HashMap<String, HeaderEntry>,
+}
+
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct HeaderEntry {
+    function: Option<(FunctionId, NodeId)>,
+    variable: Option<NodeId>,
+    new_type: Option<TypeKind>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -116,7 +126,7 @@ impl DeclareStore {
     }
 
     /// Finds a function by name and optional owner type (for method resolution).
-    pub fn find_function_by_name_and_owner_kind(
+    pub fn find_function(
         &self,
         name: &str,
         owner_kind: Option<&TypeKind>,
