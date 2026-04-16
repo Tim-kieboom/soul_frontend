@@ -28,10 +28,11 @@ impl<'a> NameResolver<'a> {
             }
         }
         
-        let prev = self.current_module;
-        self.current_module = module_id;
+        let prev = self.current.module;
+        self.current.module = module_id;
+        self.current.in_global = true;
         self.collect_block(&mut global);
-        self.current_module = prev;
+        self.current.module = prev;
         
         swap(
             &mut global,
@@ -69,7 +70,7 @@ impl<'a> NameResolver<'a> {
             *node_id = Some(id);
 
             self.store
-                .insert_variable_type(id, VarTypeKind::NonInveredType(ty.clone()), self.current_module);
+                .insert_variable_type(id, VarTypeKind::NonInveredType(ty.clone()), self.current.module);
 
             self.insert_value(name.as_str(), id, ScopeValue::Variable);
         }
@@ -173,7 +174,7 @@ impl<'a> NameResolver<'a> {
     fn parse_module(&mut self, source: &str, module_id: ModuleId, name: String) {
         let tokens = to_token_stream(source, module_id);
         let module = parse(tokens, module_id, name, self.context);
-        if let Some(module) = self.modules.get_mut(self.current_module) {
+        if let Some(module) = self.modules.get_mut(self.current.module) {
             module.modules.push(module_id);
         }
         self.modules.insert(module_id, module);

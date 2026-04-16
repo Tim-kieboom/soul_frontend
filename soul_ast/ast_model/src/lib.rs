@@ -47,9 +47,9 @@ pub struct Module {
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct HeaderEntry {
-    function: Option<(FunctionId, NodeId)>,
-    variable: Option<NodeId>,
-    new_type: Option<TypeKind>,
+    pub variable: Option<NodeId>,
+    pub new_type: Option<NodeId>,
+    pub function: Option<FunctionId>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -94,6 +94,11 @@ impl std::ops::Index<ModuleId> for AstModuleStore {
 
     fn index(&self, index: ModuleId) -> &Self::Output {
         &self.map[index]
+    }
+}
+impl std::ops::IndexMut<ModuleId> for AstModuleStore {
+    fn index_mut(&mut self, index: ModuleId) -> &mut Self::Output {
+        &mut self.map[index]
     }
 }
 

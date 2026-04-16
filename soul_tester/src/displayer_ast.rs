@@ -19,7 +19,8 @@ pub fn display_ast(root: ModuleId, context: &CompilerContext, ast_context: &AstC
 
 pub fn display_ast_name_resolved(root: ModuleId, context: &CompilerContext, ast_context: &AstContext) -> String {
     let mut displayer = AstDisplayer::new_name_resolved(context, ast_context);
-    displayer.display_module(root);    
+    displayer.display_module(root);
+    displayer.display_module_header(root);
     displayer.consume_to_string()
 }
 
@@ -92,6 +93,41 @@ impl<'a> AstDisplayer<'a> {
 
         for module in &module.modules {
             self.display_module(*module);
+        }
+
+        self.pop_scope();
+        self.display_depth();
+        self.push_str("}\n");
+    }
+
+    fn display_module_header(&mut self, module_id: ModuleId) {
+        let module = &self.ast_context.modules[module_id];
+        
+        self.display_depth();
+        self.push_fmt(format_args!("mod {} {{\n", module.name));
+        self.push_scope();
+        for (name, entry) in &module.header {
+            
+            
+            self.display_depth();
+            self.push_str("/*");
+            if entry.function.is_some() {
+                self.push_str("Function:");
+            }
+            if entry.new_type.is_some() {
+                self.push_str("Type:");
+            }
+            if entry.variable.is_some() {
+                self.push_str("Variable:");
+            }
+            self.push_str("*/\n");
+            self.display_depth();
+            self.push_str(name.as_str());
+            self.push('\n');
+        }
+
+        for module in &module.modules {
+            self.display_module_header(*module);
         }
 
         self.pop_scope();

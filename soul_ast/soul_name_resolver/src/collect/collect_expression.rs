@@ -55,7 +55,11 @@ impl<'a> NameResolver<'a> {
             }
             ExpressionKind::Block(block) => {
                 block.node_id = Some(self.alloc_node());
+
+                let prev = self.current.in_global;
+                self.current.in_global = false;
                 self.collect_block(block);
+                self.current.in_global = prev;
             }
             ExpressionKind::Binary(binary) => {
                 binary.id = Some(self.alloc_node());

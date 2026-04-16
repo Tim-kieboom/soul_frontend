@@ -36,6 +36,8 @@ impl<'a> NameResolver<'a> {
                 generics: _,
                 methodes,
             }) => {
+                let prev = self.current.in_global;
+                self.current.in_global = false;
                 self.collect_type(use_type);
                 for methode in methodes {
                     self.check_function_name(&methode.signature.node.name);
@@ -45,6 +47,7 @@ impl<'a> NameResolver<'a> {
                 if !impls.is_empty() {
                     todo!()
                 }
+                self.current.in_global = prev;
             }
             StatementKind::Import(import) => {
                 for path in &import.paths {
@@ -53,8 +56,13 @@ impl<'a> NameResolver<'a> {
             }
             StatementKind::Struct(obj) => {
                 self.declare_struct(obj);
+
+                if self.current.in_global {
+                    self.header_insert_struct(obj);
+                }
             }
             StatementKind::Variable(variable) => {
+                
                 self.check_variable_name(&variable.name);
                 let id = if let Some(id) = self.flat_check_variable(&variable.name) {
                     self.log_error(SoulError::new(
@@ -70,10 +78,10 @@ impl<'a> NameResolver<'a> {
                     self.declare_value(ScopeValueKind::Variable(variable))
                 };
 
-                self.store.insert_variable_type(id, variable.ty.clone(), self.current_module);
+                self.store.insert_variable_type(id, variable.ty.clone(), self.current.module);
 
                 if let Some(hint) = self.try_get_owner_hint(variable) {
-                    self.store.insert_variable_owner_hint(id, hint, self.current_module);
+                    self.store.insert_variable_owner_hint(id, hint, self.current.module);
                 }
 
                 match &mut variable.ty {
@@ -84,10 +92,22 @@ impl<'a> NameResolver<'a> {
                 if let Some(value) = &mut variable.initialize_value {
                     self.collect_expression(value);
                 }
+
+                if self.current.in_global {
+                    self.header_insert_variable(variable);
+                }
             }
             StatementKind::ExternalFunction(function) | StatementKind::Function(function) => {
                 self.check_function_name(&function.signature.node.name);
+
+                let prev = self.current.in_global;
+                self.current.in_global = false;
                 self.collect_function(function);
+                self.current.in_global = prev;
+
+                if self.current.in_global {
+                    self.header_insert_function(function);
+                }
             }
             StatementKind::Expression {
                 id,
@@ -107,8 +127,8 @@ impl<'a> NameResolver<'a> {
 
     pub(crate) fn collect_function(&mut self, function: &mut Function) {
         let id = self.declare_function(&mut function.signature);
-        let prev = self.current_function;
-        self.current_function = Some(id);
+        let prev = self.current.function;
+        self.current.function = Some(id);
 
         if is_main(&function.signature.node) {
             self.store.main_function = Some(id);
@@ -129,8 +149,8 @@ impl<'a> NameResolver<'a> {
         self.collect_scopeless_block(&mut function.block);
         self.pop_scope();
 
-        self.store.insert_functions(id, signature.clone(), self.current_module);
-        self.current_function = prev;
+        self.store.insert_functions(id, signature.clone(), self.current.module);
+        self.current.function = prev;
     }
 
     fn collect_import_path(&mut self, path: &ImportPath, span: Span) {

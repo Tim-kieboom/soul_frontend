@@ -56,12 +56,12 @@ impl<'a> NameResolver<'a> {
     }
 
     fn resolves_function(&mut self, function: &mut Function) {
-        let prev = self.current_function;
-        self.current_function = function.signature.node.id;
+        let prev = self.current.function;
+        self.current.function = function.signature.node.id;
 
         self.try_go_to(function.block.scope_id);
         self.resolve_block(&mut function.block);
-        self.current_function = prev;
+        self.current.function = prev;
     }
 
     pub(super) fn resolve_variable(

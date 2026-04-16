@@ -1,5 +1,5 @@
 use ast::{
-    AstContext, AstModuleStore, DeclareStore, meta_data::AstMetadata, scope::{NodeId, ScopeValue}
+    AstContext, AstModuleStore, DeclareStore, Function, Struct, Variable, meta_data::AstMetadata, scope::{NodeId, ScopeValue}
 };
 use soul_utils::{
     Ident,
@@ -24,15 +24,20 @@ pub fn name_resolve(module_id: ModuleId, context: &mut CompilerContext, ast_cont
     resolver.resolve_modules(module_id);
 }
 
+struct Current {
+    in_global: bool,
+    module: ModuleId,
+    function: Option<FunctionId>,
+}
+
 struct NameResolver<'a> {
     root: ModuleId,
-    current_module: ModuleId,
+    current: Current,
     info: &'a mut AstMetadata,
     store: &'a mut DeclareStore,
     modules: &'a mut AstModuleStore,
     context: &'a mut CompilerContext,
     node_generator: IdGenerator<NodeId>,
-    current_function: Option<FunctionId>,
     function_generator: &'a mut IdGenerator<FunctionId>,
 }
 impl<'a> NameResolver<'a> {
@@ -43,15 +48,55 @@ impl<'a> NameResolver<'a> {
     ) -> Self {
         Self {
             root: module,
-            current_module: module,
             context,
-            current_function: None,
+            current: Current {
+                in_global: true,
+                module,
+                function: None,
+            },
             node_generator: IdGenerator::new(),
             store: &mut ast_context.store,
             info: &mut ast_context.meta_data,
             modules: &mut ast_context.modules,
             function_generator: &mut ast_context.function_generators,
         }
+    }
+
+    fn header_insert_function(&mut self, function: &Function) -> Option<FunctionId> {
+        
+        let signature = &function.signature.node;
+        let header = &mut self.modules[self.current.module].header;
+
+        let entry = match header.get_mut(signature.name.as_str()) {
+            Some(val) => val,
+            None => header.entry(signature.name.to_string()).or_default(),
+        };
+
+        entry.function.replace(signature.id?)
+    }
+
+    fn header_insert_variable(&mut self, variable: &Variable) -> Option<NodeId> {
+        
+        let header = &mut self.modules[self.current.module].header;
+
+        let entry = match header.get_mut(variable.name.as_str()) {
+            Some(val) => val,
+            None => header.entry(variable.name.to_string()).or_default(),
+        };
+
+        entry.variable.replace(variable.node_id?)
+    }
+
+    fn header_insert_struct(&mut self, obj: &Struct) -> Option<NodeId> {
+        
+        let header = &mut self.modules[self.current.module].header;
+
+        let entry = match header.get_mut(obj.name.as_str()) {
+            Some(val) => val,
+            None => header.entry(obj.name.to_string()).or_default(),
+        };
+
+        entry.variable.replace(obj.id?)
     }
 
     fn log_error(&mut self, error: SoulError) {

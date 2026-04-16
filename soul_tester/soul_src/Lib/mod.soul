@@ -1,5 +1,7 @@
 import .subLib.*
 
+const Variable = 1
+
 priv() {}
 
 A(): int {
