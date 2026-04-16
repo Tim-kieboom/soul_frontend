@@ -136,7 +136,7 @@ impl<'a> NameResolver<'a> {
             return
         }
             
-        let type_qualifier =self.parse_owner_type(function_call.callee.as_deref());
+        let type_qualifier = self.parse_owner_type(function_call.callee.as_deref());
         let is_type_qualifier = type_qualifier.is_some();
 
         if is_type_qualifier {

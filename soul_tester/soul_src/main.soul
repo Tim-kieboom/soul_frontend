@@ -1,6 +1,6 @@
 import ( 
     crate.subLib
-    crate.Lib.{this, A, B as b}
+    crate.Lib.{this, Variable, A, B as b}
 )
 
 function() {}
@@ -11,6 +11,7 @@ main() {
     num = b()
     num = Lib.A()
     num = Lib.B()
+    num = Variable
     Lib.priv()
     // subLib.Pub()
     // Lib.subLib.Pub()

@@ -185,16 +185,30 @@ impl<'a> NameResolver<'a> {
         for item in imported_items {
             match item {
                 ast::ImportItem::Alias { name, alias: alias_name } => {
-                    let Some(func_id) = self.store.find_function_in_module(name.as_str(), module_id) else {
+                    if !self.modules[module_id].header.contains_key(name.as_str()) {
+                        self.log_error(SoulError::new(
+                            format!("module '{}' does not export '{}'", module_name, name.as_str()),
+                            SoulErrorKind::NotFoundInScope,
+                            Some(span),
+                        ));
                         continue;
-                    };
-                    self.insert_function_alias(alias_name.as_str(), func_id);
+                    }
+                    if let Some(func_id) = self.store.find_function_in_module(name.as_str(), module_id) {
+                        self.insert_function_alias(alias_name.as_str(), func_id);
+                    }
                 }
                 ast::ImportItem::Normal(ident) => {
-                    let Some(func_id) = self.store.find_function_in_module(ident.as_str(), module_id) else {
+                    if !self.modules[module_id].header.contains_key(ident.as_str()) {
+                        self.log_error(SoulError::new(
+                            format!("module '{}' does not export '{}'", module_name, ident.as_str()),
+                            SoulErrorKind::NotFoundInScope,
+                            Some(span),
+                        ));
                         continue;
-                    };
-                    self.insert_function_alias(ident.as_str(), func_id);
+                    }
+                    if let Some(func_id) = self.store.find_function_in_module(ident.as_str(), module_id) {
+                        self.insert_function_alias(ident.as_str(), func_id);
+                    }
                 }
             }
         }
