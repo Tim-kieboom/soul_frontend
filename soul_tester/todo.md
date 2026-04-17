@@ -5,7 +5,7 @@
             - Add dot-separated path parsing (std.Fmt.{A, B}) {cm}
             - Parse module path as Identifier chain (std.Fmt) {cm}
         (D) impl multi import `import (crate.fmt\n std.io)` {cm}
-        (D) impl as of item import `import crate.fmt.{Println as newPrint}`
+        (D) impl as of item import `import crate.fmt.{Println as newPrint}` {cm}
 
     (B) add module node to AST
         (A) add StatementKind::Module(Module) in ast_model/statement.rs {cm} 

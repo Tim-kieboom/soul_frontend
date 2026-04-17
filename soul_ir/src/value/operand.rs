@@ -337,7 +337,6 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         ptr: PointerValue<'a>,
         len: u64,
     ) -> SoulResult<IrOperand<'a>> {
-
         let slice_type = self.context.struct_type(
             &[
                 self.context.ptr_type(AddressSpace::default()).into(),
@@ -352,7 +351,8 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         let ptr: BasicValueEnum<'a> = ptr.into();
         let len_val: BasicValueEnum<'a> = len_val.into();
         self.builder.store_field(slice_type, slice_ptr, ptr, 0)?;
-        self.builder.store_field(slice_type, slice_ptr, len_val, 1)?;
+        self.builder
+            .store_field(slice_type, slice_ptr, len_val, 1)?;
 
         Ok(IrOperand {
             value: slice_ptr.into(),
@@ -360,7 +360,11 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         })
     }
 
-    fn fixed_array_to_const_slice(&self, ptr: PointerValue<'a>, len: u64) -> (StructType<'a>, StructValue<'a>) {
+    fn fixed_array_to_const_slice(
+        &self,
+        ptr: PointerValue<'a>,
+        len: u64,
+    ) -> (StructType<'a>, StructValue<'a>) {
         let len = self.default_int_type.const_int(len, false);
 
         let slice_ty = self.context.struct_type(

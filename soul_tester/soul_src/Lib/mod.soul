@@ -1,6 +1,10 @@
-import .subLib.{this}
+import .subLib
 
 const Variable = 1
+
+struct Struct {
+    field: int
+}  
 
 priv() {}
 

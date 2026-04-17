@@ -1,24 +1,27 @@
 use ast::{
-    AstContext, AstModuleStore, DeclareStore, Function, Struct, Variable, meta_data::AstMetadata, scope::{NodeId, ScopeValue}
+    AstContext, AstModuleStore, DeclareStore, EntryKind, Function, Struct, Variable,
+    meta_data::AstMetadata,
+    scope::{NodeId, ScopeValue},
 };
 use soul_utils::{
     Ident,
-    error::SoulError,
+    error::{SoulError, SoulErrorKind},
     ids::{FunctionId, IdGenerator},
     sementic_level::{CompilerContext, SementicFault},
-    span::ModuleId,
+    soul_error_internal,
+    span::{ModuleId, Span},
 };
 
 mod check_name;
 mod collect;
 mod resolve;
 
-pub fn name_resolve(module_id: ModuleId, context: &mut CompilerContext, ast_context: &mut AstContext) {
-    let mut resolver = NameResolver::new(
-        module_id,
-        context,
-        ast_context,
-    );
+pub fn name_resolve(
+    module_id: ModuleId,
+    context: &mut CompilerContext,
+    ast_context: &mut AstContext,
+) {
+    let mut resolver = NameResolver::new(module_id, context, ast_context);
 
     resolver.collect_module(module_id);
     resolver.resolve_modules(module_id);
@@ -62,45 +65,81 @@ impl<'a> NameResolver<'a> {
         }
     }
 
-    fn header_insert_function(&mut self, function: &Function) -> Option<FunctionId> {
+    fn header_insert_function(&mut self, function: &Function) -> Option<EntryKind<FunctionId>> {
         
         let signature = &function.signature.node;
+        let is_public = self.is_name_public(signature.name.as_str());
         let header = &mut self.modules[self.current.module].header;
-
         let entry = match header.get_mut(signature.name.as_str()) {
             Some(val) => val,
             None => header.entry(signature.name.to_string()).or_default(),
         };
 
-        entry.function.replace(signature.id?)
+        entry.function.replace(EntryKind {
+            value: signature.id?,
+            is_public,
+        })
     }
 
-    fn header_insert_variable(&mut self, variable: &Variable) -> Option<NodeId> {
-        
-        let header = &mut self.modules[self.current.module].header;
+    fn header_insert_variable(&mut self, variable: &Variable) -> Option<EntryKind<NodeId>> {
 
+        let is_public = self.is_name_public(variable.name.as_str());
+        let header = &mut self.modules[self.current.module].header;
         let entry = match header.get_mut(variable.name.as_str()) {
             Some(val) => val,
             None => header.entry(variable.name.to_string()).or_default(),
         };
 
-        entry.variable.replace(variable.node_id?)
+        entry.variable.replace(EntryKind {
+            value: variable.node_id?,
+            is_public,
+        })
     }
 
-    fn header_insert_struct(&mut self, obj: &Struct) -> Option<NodeId> {
-        
-        let header = &mut self.modules[self.current.module].header;
+    fn header_insert_struct(&mut self, obj: Struct) -> Option<EntryKind<Struct>> {
 
+        let is_public = self.is_name_public(obj.name.as_str());
+        let header = &mut self.modules[self.current.module].header;
         let entry = match header.get_mut(obj.name.as_str()) {
             Some(val) => val,
             None => header.entry(obj.name.to_string()).or_default(),
         };
 
-        entry.variable.replace(obj.id?)
+        entry.struct_type.replace(EntryKind {
+            value: obj,
+            is_public,
+        })
+    }
+
+    fn resolve_struct(
+        context: &mut CompilerContext,
+        store: &mut DeclareStore,
+        current: &Current,
+        obj: &Struct,
+    ) {
+        let id = match obj.id {
+            Some(val) => val,
+            None => {
+                Self::static_log_error(
+                    context,
+                    soul_error_internal!(
+                        format!("Struct: '{}' node_id is None", obj.name.as_str()),
+                        None
+                    ),
+                );
+                return;
+            }
+        };
+
+        store.try_insert_struct(id, obj, current.module);
     }
 
     fn log_error(&mut self, error: SoulError) {
         self.context.faults.push(SementicFault::error(error));
+    }
+
+    fn static_log_error(context: &mut CompilerContext, error: SoulError) {
+        context.faults.push(SementicFault::error(error));
     }
 
     fn check_variable(&mut self, name: &Ident) -> Option<NodeId> {
@@ -112,19 +151,31 @@ impl<'a> NameResolver<'a> {
     }
 
     fn lookup_module_function(
-        &self,
+        &mut self,
         module_name: &str,
-        _module_id: ModuleId,
         function_name: &str,
+        span: Span,
     ) -> Option<FunctionId> {
         let module_entry = self.info.scopes.lookup_module(module_name)?;
         let module_id = module_entry.module_id;
-        
+
         if let Some(resolved_name) = self.resolve_alias(module_name, function_name) {
-            self.info.scopes.lookup_function(&resolved_name)
-        } else {
-            self.store.find_function_in_module(function_name, module_id)
+            return self.info.scopes.lookup_function(&resolved_name);
         }
+
+        debug_assert!(self.modules.contains(module_id));
+
+        let header = &self.modules.get(module_id)?.header;
+        let entry = header.get(function_name)?.function?;
+        if !entry.is_public {
+            self.log_error(SoulError::new(
+                format!("'{function_name}' is private"),
+                SoulErrorKind::InvalidModuleAccess,
+                Some(span),
+            ));
+        }
+
+        Some(entry.value)
     }
 
     fn resolve_alias(&self, module_name: &str, function_name: &str) -> Option<String> {
@@ -150,50 +201,15 @@ impl<'a> NameResolver<'a> {
         None
     }
 
-    fn is_item_imported(
-        &self,
-        module_name: &str,
-        function_name: &str,
-    ) -> bool {
-        let module_entry = match self.info.scopes.lookup_module(module_name) {
-            Some(entry) => entry,
-            None => return true,
-        };
-
-        match &module_entry.import_kind {
-            ast::ImportKind::Glob | ast::ImportKind::Alias(_) => {
-                return true;
-            }
-            ast::ImportKind::This => {
-                return false;
-            }
-            ast::ImportKind::Items { this, this_alias: _, items: _ } => {
-                if *this {
-                    return true;
-                }
-            }
-        }
-
-        for item in &module_entry.imported_items {
-            match item {
-                ast::ImportItem::Normal(ident) => {
-                    if ident.as_str() == function_name {
-                        return true;
-                    }
-                }
-                ast::ImportItem::Alias { name: _, alias } => {
-                    if alias.as_str() == function_name {
-                        return true;
-                    }
-                }
-            }
-        }
-
-        false
-    }
-
     fn flat_check_variable(&mut self, name: &Ident) -> Option<NodeId> {
         self.info.scopes.lookup_value(name, ScopeValue::Variable)
     }
 
+    fn is_name_public(&self, name: &str) -> bool {
+        name
+            .chars()
+            .next()
+            .map(|ch| ch.is_uppercase())
+            .unwrap_or(false)
+    }
 }

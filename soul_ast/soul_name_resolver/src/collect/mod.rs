@@ -1,12 +1,18 @@
 use ast::{
-    Block, FunctionSignature, NamedTupleElement, NamedTupleType, Struct, VarTypeKind, scope::{
-        NodeId, Scope, ScopeId, ScopeTypeEntry, ScopeTypeEntryKind, ScopeValue, ScopeValueKind,
-    }
+    Block, FunctionSignature, NamedTupleElement, NamedTupleType, Struct, VarTypeKind,
+    scope::{
+        NodeId, Scope, ScopeBuilder, ScopeId, ScopeTypeEntry, ScopeTypeEntryKind, ScopeValue,
+        ScopeValueKind,
+    },
 };
 use ast_parser::parse;
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
-    Ident, error::{SoulError, SoulErrorKind}, ids::FunctionId, soul_error_internal, span::{ModuleId, Span, Spanned}
+    Ident,
+    error::{SoulError, SoulErrorKind},
+    ids::FunctionId,
+    soul_error_internal,
+    span::{ModuleId, Span, Spanned},
 };
 
 use crate::NameResolver;
@@ -17,25 +23,32 @@ mod collect_type;
 impl<'a> NameResolver<'a> {
     pub(crate) fn collect_module(&mut self, module_id: ModuleId) {
         use std::mem::swap;
-        
+
         let mut global = Block::dummy();
         match self.modules.get_mut(module_id) {
             Some(module) => swap(&mut module.global, &mut global),
             None => {
-                self.log_error(soul_error_internal!(format!("{:?} not found", module_id), None));
-                return
+                self.log_error(soul_error_internal!(
+                    format!("{:?} not found", module_id),
+                    None
+                ));
+                return;
             }
         }
-        
+
         let prev = self.current.module;
         self.current.module = module_id;
         self.current.in_global = true;
         self.collect_block(&mut global);
         self.current.module = prev;
-        
+
         swap(
             &mut global,
-            &mut self.modules.get_mut(module_id).expect("just checked").global,
+            &mut self
+                .modules
+                .get_mut(module_id)
+                .expect("just checked")
+                .global,
         );
     }
 
@@ -68,8 +81,11 @@ impl<'a> NameResolver<'a> {
             let id = self.alloc_node();
             *node_id = Some(id);
 
-            self.store
-                .insert_variable_type(id, VarTypeKind::NonInveredType(ty.clone()), self.current.module);
+            self.store.insert_variable_type(
+                id,
+                VarTypeKind::NonInveredType(ty.clone()),
+                self.current.module,
+            );
 
             self.insert_value(name.as_str(), id, ScopeValue::Variable);
         }
@@ -134,8 +150,13 @@ impl<'a> NameResolver<'a> {
     }
 
     fn insert_function_alias(&mut self, name: &Ident, id: FunctionId) -> bool {
-        if self.info.scopes.flat_lookup_function(name.as_str()).is_some() {
-            return false
+        if self
+            .info
+            .scopes
+            .flat_lookup_function(name.as_str())
+            .is_some()
+        {
+            return false;
         }
 
         self.current_scope_mut().insert_function(name.as_str(), id);
@@ -143,30 +164,51 @@ impl<'a> NameResolver<'a> {
     }
 
     fn insert_variable_alias(&mut self, name: &Ident, id: NodeId) -> bool {
-        if self.info.scopes.flat_lookup_value(name, ScopeValue::Variable).is_some() {
-            return false
+        if self
+            .info
+            .scopes
+            .flat_lookup_value(name, ScopeValue::Variable)
+            .is_some()
+        {
+            return false;
         }
 
-        self.current_scope_mut().insert_value(name.as_str(), ScopeValue::Variable, id);
+        self.current_scope_mut()
+            .insert_value(name.as_str(), ScopeValue::Variable, id);
         true
     }
 
-    fn insert_struct_alias(&mut self, name: &Ident, span: Span, id: NodeId) -> bool {
-        if self.info.scopes.flat_lookup_type(name).is_some() {
-            return false
+    fn insert_struct_alias(
+        scopes: &mut ScopeBuilder,
+        name: &Ident,
+        span: Span,
+        id: NodeId,
+    ) -> bool {
+        if scopes.flat_lookup_type(name).is_some() {
+            return false;
         }
-        
-        self.current_scope_mut().insert_types(name.as_str(), ScopeTypeEntry{ 
-            span, 
-            node_id: id, 
-            trait_parent: None,
-            kind: ScopeTypeEntryKind::Struct, 
-        });
+
+        Self::static_current_scope_mut(scopes).insert_types(
+            name.as_str(),
+            ScopeTypeEntry {
+                span,
+                node_id: id,
+                trait_parent: None,
+                kind: ScopeTypeEntryKind::Struct,
+            },
+        );
 
         true
     }
 
-    fn declare_module(&mut self, name: &str, module_name: &str, module_id: ModuleId, import_kind: ast::ImportKind, imported_items: Vec<ast::ImportItem>) {
+    fn declare_module(
+        &mut self,
+        name: &str,
+        module_name: &str,
+        module_id: ModuleId,
+        import_kind: ast::ImportKind,
+        imported_items: Vec<ast::ImportItem>,
+    ) {
         let entry = ast::scope::ScopeModuleEntry {
             module_name: module_name.to_string(),
             module_id,
@@ -181,19 +223,26 @@ impl<'a> NameResolver<'a> {
 
         let mut module_path = current_dir.join(module_name);
         if module_path.is_dir() {
-
             module_path.push("mod.soul");
             if !module_path.is_file() {
-                self.log_error(SoulError::new(format!("no 'mod.soul' found in folder '{:?}'", module_path), SoulErrorKind::FieldNotFound, Some(span)));
-                return None
+                self.log_error(SoulError::new(
+                    format!("no 'mod.soul' found in folder '{:?}'", module_path),
+                    SoulErrorKind::FieldNotFound,
+                    Some(span),
+                ));
+                return None;
             }
 
-            return Some(module_path)
+            return Some(module_path);
         }
-        
+
         module_path.add_extension("soul");
         if !module_path.is_file() {
-            self.log_error(SoulError::new(format!("file '{:?}' not found", module_path), SoulErrorKind::FieldNotFound, Some(span)));
+            self.log_error(SoulError::new(
+                format!("file '{:?}' not found", module_path),
+                SoulErrorKind::FieldNotFound,
+                Some(span),
+            ));
         }
 
         Some(module_path)
@@ -208,6 +257,7 @@ impl<'a> NameResolver<'a> {
         self.modules.insert(module_id, module);
 
         self.collect_module(module_id);
+        self.resolve_modules(module_id);
     }
 
     fn insert_value(&mut self, name: &str, id: NodeId, kind: ScopeValue) -> Option<NodeId> {
@@ -219,5 +269,9 @@ impl<'a> NameResolver<'a> {
             .scopes
             .current_scope_mut()
             .expect("resolver has no scope")
+    }
+
+    fn static_current_scope_mut<'b>(scopes: &'b mut ScopeBuilder) -> &'b mut Scope {
+        scopes.current_scope_mut().expect("resolver has no scope")
     }
 }

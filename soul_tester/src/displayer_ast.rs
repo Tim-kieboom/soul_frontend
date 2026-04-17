@@ -1,15 +1,21 @@
 use std::fmt::{Arguments, Debug, Write};
 
 use ast::{
-    Assignment, AstContext, Block, ElseKind, Expression, Function, FunctionSignature, Generic, IfArm, Import, SoulType, Statement, StatementKind, Struct, TypeKind, UseBlock, Variable, scope::{NodeId, ScopeId}
+    Assignment, AstContext, Block, ElseKind, Expression, Function, FunctionSignature, Generic,
+    IfArm, Import, SoulType, Statement, StatementKind, Struct, TypeKind, UseBlock, Variable,
+    scope::{NodeId, ScopeId},
 };
 use soul_utils::{
-    ids::FunctionId, sementic_level::CompilerContext, soul_names::{KeyWord, Operator, TypeModifier}, span::ModuleId, vec_map::VecMapIndex
+    ids::FunctionId,
+    sementic_level::CompilerContext,
+    soul_names::{KeyWord, Operator, TypeModifier},
+    span::ModuleId,
+    vec_map::VecMapIndex,
 };
 
 pub fn display_ast(root: ModuleId, context: &CompilerContext, ast_context: &AstContext) -> String {
     let mut displayer = AstDisplayer::new_ast(context, ast_context);
-    displayer.display_module(root);   
+    displayer.display_module(root);
     for (_id, path) in context.module_store.entries() {
         displayer.push_fmt(format_args!("\nmod {:?}", path));
     }
@@ -17,7 +23,11 @@ pub fn display_ast(root: ModuleId, context: &CompilerContext, ast_context: &AstC
     displayer.consume_to_string()
 }
 
-pub fn display_ast_name_resolved(root: ModuleId, context: &CompilerContext, ast_context: &AstContext) -> String {
+pub fn display_ast_name_resolved(
+    root: ModuleId,
+    context: &CompilerContext,
+    ast_context: &AstContext,
+) -> String {
     let mut displayer = AstDisplayer::new_name_resolved(context, ast_context);
     displayer.display_module(root);
     displayer.display_module_header(root);
@@ -82,7 +92,7 @@ impl<'a> AstDisplayer<'a> {
 
     fn display_module(&mut self, module_id: ModuleId) {
         let module = &self.ast_context.modules[module_id];
-        
+
         self.display_depth();
         self.push_fmt(format_args!("mod {} {{\n", module.name));
         self.push_scope();
@@ -102,13 +112,11 @@ impl<'a> AstDisplayer<'a> {
 
     fn display_module_header(&mut self, module_id: ModuleId) {
         let module = &self.ast_context.modules[module_id];
-        
+
         self.display_depth();
         self.push_fmt(format_args!("mod {} {{\n", module.name));
         self.push_scope();
         for (name, entry) in &module.header {
-            
-            
             self.display_depth();
             self.push_str("/*");
             if entry.function.is_some() {
@@ -329,7 +337,7 @@ impl<'a> AstDisplayer<'a> {
 
         let len = import.paths.len();
         if len == 0 {
-            return
+            return;
         }
 
         self.push_str(KeyWord::Import.as_str());
@@ -346,25 +354,36 @@ impl<'a> AstDisplayer<'a> {
                 self.push(' ');
             }
 
-            if let Err(_) = path.module.write_display(&self.context.source_folder, &mut self.sb) {
+            if let Err(_) = path
+                .module
+                .write_display(&self.context.source_folder, &mut self.sb)
+            {
                 self.push_str("<error>");
             }
             match &path.kind {
                 ast::ImportKind::This => self.push_fmt(format_args!("{SEPERATOR}this")),
-                ast::ImportKind::Items{ this, this_alias, items } => {
+                ast::ImportKind::Items {
+                    this,
+                    this_alias,
+                    items,
+                } => {
                     self.push_str(".{");
                     if *this {
                         let name = this_alias.as_ref().map(|t| t.as_str()).unwrap_or("this");
                         self.push_str(name);
                         if !items.is_empty() {
                             self.push_str(", ");
-                        } 
+                        }
                     }
                     let last_index = items.len().saturating_sub(1);
                     for (i, item) in items.iter().enumerate() {
                         match item {
                             ast::ImportItem::Normal(name) => self.push_str(name.as_str()),
-                            ast::ImportItem::Alias { name, alias } => self.push_fmt(format_args!("{} as {}", name.as_str(), alias.as_str())),
+                            ast::ImportItem::Alias { name, alias } => self.push_fmt(format_args!(
+                                "{} as {}",
+                                name.as_str(),
+                                alias.as_str()
+                            )),
                         }
                         if i != last_index {
                             self.push_str(", ");

@@ -1,2 +1,4 @@
+const Constant = 2
+
 priv() {}
 Pub() {}

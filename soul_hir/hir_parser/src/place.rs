@@ -1,9 +1,10 @@
 use ast::scope::NodeId;
 use hir::{LocalId, Place, PlaceId, PlaceKind};
 use soul_utils::{
+    Ident,
     error::{SoulError, SoulErrorKind},
     ids::IdAlloc,
-    soul_error_internal, Ident,
+    soul_error_internal,
 };
 
 use crate::HirContext;

@@ -1,6 +1,4 @@
-use ast::{
-    Expression, ExpressionKind,
-};
+use ast::{Expression, ExpressionKind};
 
 use crate::NameResolver;
 

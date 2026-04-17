@@ -32,7 +32,9 @@ impl<'a> NameResolver<'a> {
                     todo!()
                 }
             }
-            StatementKind::Struct(_) => (),
+            StatementKind::Struct(obj) => {
+                Self::resolve_struct(self.context, self.store, &self.current, obj);
+            }
             StatementKind::Variable(variable) => {
                 if let Some(value) = &mut variable.initialize_value {
                     self.resolve_expression(value);

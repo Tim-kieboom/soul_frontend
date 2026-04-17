@@ -1,5 +1,6 @@
 use ast::{
-    Array, AsTypeCast, BinaryOperator, BinaryOperatorKind, Expression, ExpressionKind, Literal, SoulType, UnaryOperator, UnaryOperatorKind
+    Array, AsTypeCast, BinaryOperator, BinaryOperatorKind, Expression, ExpressionKind, Literal,
+    SoulType, UnaryOperator, UnaryOperatorKind,
 };
 use soul_tokenizer::{Number, Token, TokenKind};
 use soul_utils::{
@@ -64,8 +65,15 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             match self.consume_expression_operator(start_span)? {
                 ExpressionOperator::Cast(type_cast) => {
-                    let cast = AsTypeCast{ id: None, left, type_cast };
-                    left = Expression::new(ExpressionKind::As(Box::new(cast)), self.span_combine(start_span))
+                    let cast = AsTypeCast {
+                        id: None,
+                        left,
+                        type_cast,
+                    };
+                    left = Expression::new(
+                        ExpressionKind::As(Box::new(cast)),
+                        self.span_combine(start_span),
+                    )
                 }
                 ExpressionOperator::Binary(operator) => {
                     let next_min_precedence = precedence.next();
@@ -74,8 +82,28 @@ impl<'a, 'f> Parser<'a, 'f> {
                         Expression::new_binary(left, operator, right, self.span_combine(start_span))
                 }
                 ExpressionOperator::Access(AccessType::AccessThis) => {
+                    let generics = if self.current_is(&ARROW_LEFT) {
+                        self.parse_generic_define().merge_to_result()?
+                    } else {
+                        vec![]
+                    };
+
                     let ident = self.try_bump_consume_ident()?;
-                    left = match self.try_parse_function_call(start_span, Some(&left), &ident) {
+
+                    if self.current_is(&CURLY_OPEN) {
+                        left = self
+                            .parse_struct_contructor(ident, generics, start_span)
+                            .map(Expression::from_struct_contructor)?;
+
+                        continue;
+                    }
+
+                    left = match self.try_parse_function_call_generic(
+                        start_span,
+                        Some(&left),
+                        generics,
+                        &ident,
+                    ) {
                         Ok(call) => Expression::from_function_call(call),
                         Err(TryError::IsNotValue(_)) => self.parse_field_access(left, ident)?,
                         Err(TryError::IsErr(err)) => return Err(err),
@@ -356,19 +384,15 @@ impl<'a, 'f> Parser<'a, 'f> {
             ))
         }
 
-
         match &self.token().kind {
-            TokenKind::Ident(ident) => {
-
-                match KeyWord::from_str(ident.as_str()) {
-                    Some(KeyWord::As) => {
-                        self.bump();
-                        let type_cast = self.try_parse_type().merge_to_result()?;
-                        return Ok(ExpressionOperator::Cast(type_cast))
-                    }
-                    _ => get_invalid_error(self.token()),
+            TokenKind::Ident(ident) => match KeyWord::from_str(ident.as_str()) {
+                Some(KeyWord::As) => {
+                    self.bump();
+                    let type_cast = self.try_parse_type().merge_to_result()?;
+                    return Ok(ExpressionOperator::Cast(type_cast));
                 }
-            }
+                _ => get_invalid_error(self.token()),
+            },
             TokenKind::Symbol(sym) => {
                 if let Some(access) = AccessType::from_symbool(*sym) {
                     self.bump();

@@ -1,8 +1,8 @@
 use ast::{Import, ImportKind, ImportPath, Statement};
 use ast::{ImportItem, StatementKind};
 use soul_tokenizer::TokenKind;
-use soul_utils::symbool_kind::SymbolKind;
 use soul_utils::Ident;
+use soul_utils::symbool_kind::SymbolKind;
 use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},
     soul_import_path::SoulImportPath,
@@ -10,7 +10,7 @@ use soul_utils::{
 };
 
 use crate::parser::parse_utils::{AS_STR, COMMA, CURLY_OPEN, ROUND_CLOSE, ROUND_OPEN, STAR};
-use crate::parser::{parse_utils::CURLY_CLOSE, Parser};
+use crate::parser::{Parser, parse_utils::CURLY_CLOSE};
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub(super) fn parse_import(&mut self) -> SoulResult<Statement> {

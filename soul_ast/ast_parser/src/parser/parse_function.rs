@@ -148,8 +148,20 @@ impl<'a, 'f> Parser<'a, 'f> {
             vec![]
         };
 
-        if self.current_is(&CURLY_OPEN) {
-            // could be struct constructor
+        self.try_parse_function_call_generic(start_span, callee, generics, name)
+    }
+
+    pub(crate) fn try_parse_function_call_generic(
+        &mut self,
+        start_span: Span,
+        callee: Option<&Expression>,
+        generics: Vec<SoulType>,
+        name: &Ident,
+    ) -> TryResult<Spanned<FunctionCall>, SoulError> {
+        let start_position = self.current_position();
+
+        if !self.current_is(&ROUND_OPEN) {
+            self.go_to(start_position);
             return TryNotValue(self.get_expect_error(&CURLY_OPEN));
         }
 

@@ -1,11 +1,17 @@
-use ast::{Expression, ExpressionKind, FunctionCall, FunctionKind, SoulType, TypeKind, VarTypeKind};
-use soul_utils::{error::{SoulError, SoulErrorKind}, ids::{FunctionId, IdAlloc}, soul_names::PrimitiveTypes, span::Span};
+use ast::{
+    Expression, ExpressionKind, FunctionCall, FunctionKind, SoulType, TypeKind, VarTypeKind,
+};
+use soul_utils::{
+    error::{SoulError, SoulErrorKind},
+    ids::{FunctionId, IdAlloc},
+    soul_names::PrimitiveTypes,
+    span::Span,
+};
 
 use crate::NameResolver;
 
 impl<'a> NameResolver<'a> {
     pub(super) fn resolve_function_call(&mut self, function_call: &mut FunctionCall, span: Span) {
-
         self.get_resolve(function_call);
         self.check_if_valid(function_call, span);
 
@@ -29,11 +35,11 @@ impl<'a> NameResolver<'a> {
         };
 
         let Some(function_id) = function_call.resolved else {
-            return
+            return;
         };
 
         let Some((signature, _)) = self.store.get_function(function_id) else {
-            return
+            return;
         };
 
         let func_name = signature.name.as_str().to_string();
@@ -66,34 +72,26 @@ impl<'a> NameResolver<'a> {
             Some(ExpressionKind::Variable { ident, .. }) => Some(ident.to_string()),
             _ => None,
         };
-        
+
         let module_entry = callee_ident
             .as_ref()
             .and_then(|name| self.lookup_module(name));
 
         if module_entry.is_some() {
-
             let module_name = callee_ident.clone().unwrap_or_default();
-            let is_allowed = self.is_item_imported(
+
+            function_call.resolved = self.lookup_module_function(
                 &module_name,
                 function_call.name.as_str(),
+                function_call.name.span,
             );
-
-            if is_allowed {
-                function_call.resolved = self.lookup_module_function(
-                    &module_name,
-                    self.root,
-                    function_call.name.as_str(),
-                );
-            }
 
             if function_call.resolved.is_some() {
                 function_call.callee = None;
             }
 
-            return
+            return;
         }
-
 
         if function_call.resolved.is_some() {
             return;
@@ -103,18 +101,18 @@ impl<'a> NameResolver<'a> {
         let func_name = function_call.name.as_str();
         let mut has_module_with_this = false;
         let mut can_use_store = false;
-        
+
         for (_name, entry) in self.info.scopes.modules() {
             if let ast::ImportKind::Items { this, .. } = &entry.import_kind {
                 if *this {
                     has_module_with_this = true;
                 }
             }
-            
+
             if matches!(entry.import_kind, ast::ImportKind::This) {
                 has_module_with_this = true;
             }
-            
+
             for item in &entry.imported_items {
                 match item {
                     ast::ImportItem::Normal(ident) => {
@@ -130,12 +128,12 @@ impl<'a> NameResolver<'a> {
                 }
             }
         }
-        
+
         if has_module_with_this && !can_use_store {
             function_call.resolved = self.lookup_function(function_call.name.as_str());
-            return
+            return;
         }
-            
+
         let type_qualifier = self.parse_owner_type(function_call.callee.as_deref());
         let is_type_qualifier = type_qualifier.is_some();
 
@@ -147,17 +145,20 @@ impl<'a> NameResolver<'a> {
 
         let owner_kind = self.get_owner_kind(&type_qualifier, function_call);
 
-        function_call.resolved = self.store.find_function(
-            function_call.name.as_str(),
-            owner_kind,
-        );
+        function_call.resolved = self
+            .store
+            .find_function(function_call.name.as_str(), owner_kind);
 
         if function_call.resolved.is_none() {
             function_call.resolved = self.lookup_function(function_call.name.as_str());
         }
     }
 
-    fn get_owner_kind(&'a self, type_qualifier: &'a Option<SoulType>, function_call: &mut FunctionCall) -> Option<&'a TypeKind> {
+    fn get_owner_kind(
+        &'a self,
+        type_qualifier: &'a Option<SoulType>,
+        function_call: &mut FunctionCall,
+    ) -> Option<&'a TypeKind> {
         if let Some(ty) = &type_qualifier {
             return Some(&ty.kind);
         };
@@ -171,20 +172,18 @@ impl<'a> NameResolver<'a> {
             ExpressionKind::Variable {
                 resolved: Some(node_id),
                 ..
-            } => {
-                match &self.store.get_variable_type(*node_id)?.0 {
-                    VarTypeKind::NonInveredType(soul_type) => Some(&soul_type.kind),
-                    VarTypeKind::InveredType(_) => self.store.get_variable_owner_hint(*node_id).map(|(ty, _mod)| ty),
-                }
-            }
+            } => match &self.store.get_variable_type(*node_id)?.0 {
+                VarTypeKind::NonInveredType(soul_type) => Some(&soul_type.kind),
+                VarTypeKind::InveredType(_) => self
+                    .store
+                    .get_variable_owner_hint(*node_id)
+                    .map(|(ty, _mod)| ty),
+            },
             _ => None,
         }
     }
 
-    fn parse_owner_type(
-        &mut self,
-        callee: Option<&Expression>,
-    ) -> Option<SoulType> {
+    fn parse_owner_type(&mut self, callee: Option<&Expression>) -> Option<SoulType> {
         let callee = callee?;
         let ident = match &callee.node {
             ExpressionKind::Variable { ident, .. } => ident,
@@ -222,5 +221,5 @@ impl<'a> NameResolver<'a> {
         }
 
         None
-}
+    }
 }

@@ -45,12 +45,19 @@ pub struct Module {
     pub header: HashMap<String, HeaderEntry>,
 }
 
-#[derive(Debug, Clone, Copy, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct HeaderEntry {
-    pub variable: Option<NodeId>,
-    pub struct_type: Option<NodeId>,
-    pub function: Option<FunctionId>,
+    pub variable: Option<EntryKind<NodeId>>,
+    pub struct_type: Option<EntryKind<Struct>>,
+    pub function: Option<EntryKind<FunctionId>>,
 }
+
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct EntryKind<T> {
+    pub value: T,
+    pub is_public: bool,
+}
+impl<T: Copy> Copy for EntryKind<T> {}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum Visibility {
@@ -85,6 +92,10 @@ impl AstModuleStore {
         self.map.get(id)
     }
 
+    pub fn contains(&self, id: ModuleId) -> bool {
+        self.get(id).is_some()
+    }
+
     pub fn get_mut(&mut self, id: ModuleId) -> Option<&mut Module> {
         self.map.get_mut(id)
     }
@@ -107,6 +118,8 @@ impl std::ops::IndexMut<ModuleId> for AstModuleStore {
 pub struct DeclareStore {
     /// The main function (entry point), if defined.
     pub main_function: Option<FunctionId>,
+    /// All structs declarations, indexed by their ID.
+    structs: VecMap<NodeId, (Struct, ModuleId)>,
     /// All function declarations, indexed by their ID.
     functions: VecMap<FunctionId, (FunctionSignature, ModuleId)>,
     /// Variable type information, indexed by node ID.
@@ -119,10 +132,15 @@ impl DeclareStore {
     pub const fn new() -> Self {
         Self {
             main_function: None,
+            structs: VecMap::const_default(),
             functions: VecMap::const_default(),
             variable_type: VecMap::const_default(),
             variable_owner_hint: VecMap::const_default(),
         }
+    }
+
+    pub fn iter_structs(&self) -> impl Iterator<Item = &(Struct, ModuleId)> {
+        self.structs.values()
     }
 
     /// Retrieves a function by its ID.
@@ -131,19 +149,15 @@ impl DeclareStore {
     }
 
     /// Finds a function by name and optional owner type (for method resolution).
-    pub fn find_function(
-        &self,
-        name: &str,
-        owner_kind: Option<&TypeKind>,
-    ) -> Option<FunctionId> {
-        self.functions.entries().find_map(|(id, signature)| {
-            if signature.0.name.as_str() != name {
+    pub fn find_function(&self, name: &str, owner_kind: Option<&TypeKind>) -> Option<FunctionId> {
+        self.functions.entries().find_map(|(id, (signature, _))| {
+            if signature.name.as_str() != name {
                 return None;
             }
 
             match owner_kind {
-                Some(owner) if &signature.0.methode_type.kind == owner => Some(id),
-                None if matches!(signature.0.methode_type.kind, TypeKind::None) => Some(id),
+                Some(owner) if &signature.methode_type.kind == owner => Some(id),
+                None if matches!(signature.methode_type.kind, TypeKind::None) => Some(id),
                 _ => None,
             }
         })
@@ -173,6 +187,20 @@ impl DeclareStore {
         &self,
     ) -> impl Iterator<Item = (FunctionId, &(FunctionSignature, ModuleId))> {
         self.functions.entries()
+    }
+
+    /// try Inserts a struct into the store.
+    pub fn try_insert_struct(&mut self, index: NodeId, obj: &Struct, module: ModuleId) {
+        if self.structs.contains(index) {
+            return;
+        }
+
+        self.structs.insert(index, (obj.clone(), module));
+    }
+
+    /// Gets the type of a struct by its node ID.
+    pub fn get_struct(&self, index: NodeId) -> Option<&(Struct, ModuleId)> {
+        self.structs.get(index)
     }
 
     /// Gets the type of a variable by its node ID.

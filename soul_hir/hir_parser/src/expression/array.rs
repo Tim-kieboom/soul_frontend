@@ -1,11 +1,11 @@
 use hir::{Assign, ExpressionId, HirType, LazyTypeId, Place, PlaceId, PlaceKind};
 use soul_utils::{
+    Ident,
     soul_names::TypeModifier,
     span::{ItemMetaData, Span},
-    Ident,
 };
 
-use crate::{create_local_name, HirContext};
+use crate::{HirContext, create_local_name};
 
 impl<'a> HirContext<'a> {
     pub(super) fn lower_array(

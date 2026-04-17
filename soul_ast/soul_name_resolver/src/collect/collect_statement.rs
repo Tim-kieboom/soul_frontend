@@ -1,7 +1,10 @@
-use std::{path::PathBuf};
+use std::path::PathBuf;
 
 use ast::{
-    Block, DeclareStore, Expression, ExpressionKind, Function, FunctionSignature, ImportItem, ImportPath, Literal, Statement, StatementKind, TypeKind, UseBlock, VarTypeKind, Variable, scope::{ScopeBuilder, ScopeValue, ScopeValueKind}
+    Block, DeclareStore, EntryKind, Expression, ExpressionKind, Function, FunctionSignature,
+    ImportItem, ImportPath, Literal, Statement, StatementKind, TypeKind, UseBlock, VarTypeKind,
+    Variable,
+    scope::{ScopeBuilder, ScopeValue, ScopeValueKind},
 };
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
@@ -56,11 +59,10 @@ impl<'a> NameResolver<'a> {
                 self.declare_struct(obj);
 
                 if self.current.in_global {
-                    self.header_insert_struct(obj);
+                    self.header_insert_struct(obj.clone());
                 }
             }
             StatementKind::Variable(variable) => {
-                
                 self.check_variable_name(&variable.name);
                 let id = if let Some(id) = self.flat_check_variable(&variable.name) {
                     self.log_error(SoulError::new(
@@ -76,10 +78,12 @@ impl<'a> NameResolver<'a> {
                     self.declare_value(ScopeValueKind::Variable(variable))
                 };
 
-                self.store.insert_variable_type(id, variable.ty.clone(), self.current.module);
+                self.store
+                    .insert_variable_type(id, variable.ty.clone(), self.current.module);
 
                 if let Some(hint) = self.try_get_owner_hint(variable) {
-                    self.store.insert_variable_owner_hint(id, hint, self.current.module);
+                    self.store
+                        .insert_variable_owner_hint(id, hint, self.current.module);
                 }
 
                 match &mut variable.ty {
@@ -147,7 +151,8 @@ impl<'a> NameResolver<'a> {
         self.collect_scopeless_block(&mut function.block);
         self.pop_scope();
 
-        self.store.insert_functions(id, signature.clone(), self.current.module);
+        self.store
+            .insert_functions(id, signature.clone(), self.current.module);
         self.current.function = prev;
     }
 
@@ -166,32 +171,43 @@ impl<'a> NameResolver<'a> {
         };
 
         let imported_items = match &path.kind {
-            ast::ImportKind::Items{ items, .. } => items,
+            ast::ImportKind::Items { items, .. } => items,
             _ => &vec![],
         };
 
         let Some(module_file_path) = self.find_module_file(&module_name, span) else {
-            return
+            return;
         };
 
         let import_name = alias.unwrap_or(module_name);
 
         let module_id = self.import_module(module_file_path, module_name, span);
 
-        self.declare_module(import_name, &module_name, module_id, path.kind.clone(), imported_items.clone());
+        self.declare_module(
+            import_name,
+            &module_name,
+            module_id,
+            path.kind.clone(),
+            imported_items.clone(),
+        );
 
         self.collect_items(module_id, module_name, &imported_items, span)
     }
 
-    fn collect_items(&mut self,  module_id: ModuleId, module_name: &str, imported_items: &Vec<ImportItem>, span: Span) {
+    fn collect_items(
+        &mut self,
+        module_id: ModuleId,
+        module_name: &str,
+        imported_items: &Vec<ImportItem>,
+        span: Span,
+    ) {
         for item in imported_items {
             let (name, alias_name) = match &item {
                 ast::ImportItem::Alias { name, alias } => (name.as_str(), alias),
                 ast::ImportItem::Normal(name) => (name.as_str(), name),
             };
-            
-            let Some(entry) = self.modules[module_id].header.get(name).copied() else {
-                    
+
+            let Some(entry) = self.modules[module_id].header.get(name) else {
                 self.log_error(SoulError::new(
                     format!("module '{}' does not export '{}'", module_name, name),
                     SoulErrorKind::NotFoundInScope,
@@ -200,31 +216,88 @@ impl<'a> NameResolver<'a> {
                 continue;
             };
 
-            if let Some(id) = entry.variable {
+            let entry_variable = entry.variable;
+            let entry_function = entry.function;
+            if let Some(EntryKind {
+                value: obj,
+                is_public,
+            }) = &entry.struct_type
+            {
+                if !is_public {
+                    Self::static_log_error(
+                        self.context,
+                        SoulError::new(
+                            format!("struct {} is private", alias_name.as_str()),
+                            SoulErrorKind::AlreadyFoundInScope,
+                            Some(alias_name.span),
+                        ),
+                    );
+                }
+
+                let id = match obj.id {
+                    Some(val) => val,
+                    None => {
+                        self.log_error(soul_error_internal!(
+                            format!("Struct: '{}' node_id is None", obj.name.as_str()),
+                            None
+                        ));
+                        return;
+                    }
+                };
+
+                if !Self::insert_struct_alias(&mut self.info.scopes, alias_name, span, id) {
+                    Self::static_log_error(
+                        self.context,
+                        SoulError::new(
+                            format!("struct {} already exists", alias_name.as_str()),
+                            SoulErrorKind::AlreadyFoundInScope,
+                            Some(alias_name.span),
+                        ),
+                    );
+                }
+
+                Self::resolve_struct(self.context, self.store, &self.current, obj);
+            }
+
+            if let Some(EntryKind {
+                value: id,
+                is_public,
+            }) = entry_variable
+            {
+                if !is_public {
+                    self.log_error(SoulError::new(
+                        format!("variable '{}' is private", alias_name.as_str()),
+                        SoulErrorKind::AlreadyFoundInScope,
+                        Some(alias_name.span),
+                    ));
+                }
+
                 if !self.insert_variable_alias(alias_name, id) {
                     self.log_error(SoulError::new(
-                        format!("variable {} already exists", alias_name.as_str()), 
-                        SoulErrorKind::AlreadyFoundInScope, 
+                        format!("variable '{}' already exists", alias_name.as_str()),
+                        SoulErrorKind::AlreadyFoundInScope,
                         Some(alias_name.span),
                     ));
                 }
             }
 
-            if let Some(id) = entry.function {
+            if let Some(EntryKind {
+                value: id,
+                is_public,
+            }) = entry_function
+            {
+                if !is_public {
+                    self.log_error(SoulError::new(
+                        format!("function '{}' is private", alias_name.as_str()),
+                        SoulErrorKind::AlreadyFoundInScope,
+                        Some(alias_name.span),
+                    ));
+                }
+
                 if !self.insert_function_alias(alias_name, id) {
                     self.log_error(SoulError::new(
-                        format!("function {} already exists", alias_name.as_str()), 
-                        SoulErrorKind::AlreadyFoundInScope, 
-                        Some(alias_name.span),
-                    ));
-                }
-            }
-
-            if let Some(id) = entry.struct_type {
-                if !self.insert_struct_alias(alias_name, span, id) {
-                    self.log_error(SoulError::new(
-                        format!("struct {} already exists", alias_name.as_str()), 
-                        SoulErrorKind::AlreadyFoundInScope, 
+                        format!("function '{}' already exists", alias_name.as_str()),
+                        SoulErrorKind::AlreadyFoundInScope,
                         Some(alias_name.span),
                     ));
                 }
@@ -247,7 +320,6 @@ impl<'a> NameResolver<'a> {
         module_name: &str,
         span: Span,
     ) -> ModuleId {
-
         let Some(module_source) = self.read_module(&module_file_path, module_name, span) else {
             return self.root;
         };
@@ -257,7 +329,7 @@ impl<'a> NameResolver<'a> {
         let module_id = self.context.module_store.get_or_insert(module_file_path);
         if self.modules.get(module_id).is_some() {
             self.context.pop_current_path();
-            return module_id
+            return module_id;
         }
 
         self.parse_module(&module_source, module_id, module_name.to_string());
@@ -310,8 +382,7 @@ fn owner_hint_from_expression(
             let function_name = function_call.name.as_str();
 
             if let Some(owner_kind) = owner_kind
-                && let Some(function_id) =
-                    store.find_function(function_name, Some(&owner_kind))
+                && let Some(function_id) = store.find_function(function_name, Some(&owner_kind))
                 && let Some((signature, _module)) = store.get_function(function_id)
             {
                 return Some(signature.return_type.kind.clone());

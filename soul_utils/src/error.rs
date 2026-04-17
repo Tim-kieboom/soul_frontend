@@ -96,6 +96,7 @@ pub enum SoulErrorKind {
     TypeInferenceError,
     GenericDefineError,
 
+    InvalidModuleAccess,
     InvalidMutability,
     InvalidIdent,
     InvalidNumber,

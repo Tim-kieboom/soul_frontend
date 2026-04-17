@@ -65,7 +65,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     pub fn parse(
-        tokens: TokenStream<'a>, 
+        tokens: TokenStream<'a>,
         id: ModuleId,
         name: String,
         context: &'f mut CompilerContext,
@@ -76,7 +76,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         } else {
             Visibility::Private
         };
-        
+
         let mut this = Self::new(tokens, context);
         if let Err(err) = this.tokens.initialize() {
             this.log_error(err);

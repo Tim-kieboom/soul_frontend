@@ -23,10 +23,7 @@ impl SoulImportPath {
     }
 
     pub fn get_module_name(&self) -> Option<&str> {
-        self.0.file_name()?
-            .to_str()?
-            .split('.')
-            .next()
+        self.0.file_name()?.to_str()?.split('.').next()
     }
 
     pub fn iter(&mut self) -> std::path::Iter<'_> {
@@ -60,7 +57,7 @@ impl SoulImportPath {
             sb.push_str(SEPERATOR);
             let text = match pat.to_str() {
                 Some(str) => str,
-                None => &pat.to_string_lossy(), 
+                None => &pat.to_string_lossy(),
             };
 
             sb.push_str(text);

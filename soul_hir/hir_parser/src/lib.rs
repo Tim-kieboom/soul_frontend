@@ -27,6 +27,10 @@ pub fn lower_hir(compiler_context: &mut CompilerContext, ast_context: &AstContex
     let root = compiler_context.module_store.get_root_id();
     let mut context = HirContext::new(compiler_context, ast_context);
 
+    for (obj, _module) in context.ast_context.store.iter_structs() {
+        context.lower_struct(obj);
+    }
+
     context.lower_internal_structs();
     context.lower_module(root);
     context.consume_to_hir()
@@ -75,7 +79,7 @@ impl<'a> HirContext<'a> {
 
     fn lower_module(&mut self, module_id: ModuleId) {
         let root = &self.ast_context.modules[module_id];
-        
+
         for global in &root.global.statements {
             if matches!(global.node, ast::StatementKind::Variable(_)) {
                 self.lower_global(global);

@@ -18,7 +18,11 @@ use run_mir::{MirResponse, to_mir};
 use soul_ir::{IrRequest, to_llvm_ir};
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
-    char_colors::{DEFAULT, GREEN}, compile_options::{Arch, CompilerOptions, Os, TargetInfo}, ids::IdAlloc, sementic_level::{CompilerContext, SementicFault, SementicLevel}, span::ModuleId
+    char_colors::{DEFAULT, GREEN},
+    compile_options::{Arch, CompilerOptions, Os, TargetInfo},
+    ids::IdAlloc,
+    sementic_level::{CompilerContext, SementicFault, SementicLevel},
+    span::ModuleId,
 };
 
 use crate::{
@@ -146,7 +150,10 @@ fn display_tokenizer(paths: &Paths, module: ModuleId, source_file: &str) -> Resu
 
 fn display_ast(paths: &Paths, context: &CompilerContext, ast_context: &AstContext) -> Result<()> {
     let root = context.module_store.get_root_id();
-    paths.write_to_output(&displayer_ast::display_ast(root, context, ast_context), "ast/tree.soulc")?;
+    paths.write_to_output(
+        &displayer_ast::display_ast(root, context, ast_context),
+        "ast/tree.soulc",
+    )?;
     paths.write_to_output(
         &displayer_ast::display_ast_name_resolved(root, context, ast_context),
         "ast/NameResolved.soulc",

@@ -1,12 +1,12 @@
-use ast::{scope::NodeId, AsTypeCast, VarTypeKind};
 use ast::{ArrayContructor, Literal};
+use ast::{AsTypeCast, VarTypeKind, scope::NodeId};
 use hir::{ExpressionId, HirType, HirTypeKind, LocalId, Place, PlaceKind, Terminator};
 use soul_utils::soul_error_internal;
 use soul_utils::{
+    Ident,
     error::{SoulError, SoulErrorKind},
     ids::IdAlloc,
     span::Span,
-    Ident,
 };
 
 use crate::HirContext;

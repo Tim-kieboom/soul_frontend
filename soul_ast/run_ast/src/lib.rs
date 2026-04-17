@@ -1,4 +1,4 @@
-use ast::{AstContext};
+use ast::AstContext;
 use ast_parser::parse;
 use soul_name_resolver::name_resolve;
 use soul_tokenizer::TokenStream;
@@ -16,6 +16,6 @@ pub fn to_ast<'a>(
     let name = ENTRY_MOD_NAME.to_string();
     let module = parse(token_stream, id, name, context);
     ast_context.modules.insert(id, module);
-    
+
     name_resolve(id, context, ast_context);
 }

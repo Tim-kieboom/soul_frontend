@@ -7,13 +7,16 @@ function() {}
 // A() {}
 
 main() {
-    function()
-    mut num = A()
-    num = b()
-    num = Lib.A()
-    num = Lib.B()
-    num = Variable
-    Lib.priv()
+    // function()
+    // obj := Struct{field: 1}
+    obj2 := Lib.Struct{field: 1}
+    // mut num = A()
+    // num = b()
+    // num = Lib.A()
+    // num = Lib.B()
+    // num = Variable
+    // Lib.Variable
+    // Lib.priv()
     // subLib.Pub()
     // Lib.subLib.Pub()
     // fmt.Println("hello world")

@@ -63,7 +63,12 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             KeyWord::Use => self.parse_use().try_err()?,
 
-            KeyWord::Crate => return TryErr(soul_error_internal!("'crate' outside of import unstable", Some(self.token().span))),
+            KeyWord::Crate => {
+                return TryErr(soul_error_internal!(
+                    "'crate' outside of import unstable",
+                    Some(self.token().span)
+                ));
+            }
 
             KeyWord::New
             | KeyWord::For

@@ -1,4 +1,4 @@
-use ast::{Module};
+use ast::Module;
 use soul_tokenizer::TokenStream;
 use soul_utils::{sementic_level::CompilerContext, span::ModuleId};
 

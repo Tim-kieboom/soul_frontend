@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 
 use soul_utils::{
+    Ident,
     ids::FunctionId,
     impl_soul_ids,
     span::{ModuleId, Span},
     vec_map::VecMapIndex,
-    Ident,
 };
 
-use crate::{ast::Variable, ImportItem, ImportKind};
+use crate::{ImportItem, ImportKind, ast::Variable};
 
 impl_soul_ids!(NodeId, ScopeId);
 

@@ -1,7 +1,12 @@
 use ast::UseBlock;
 use hir::{Assign, StatementId};
 use soul_utils::{
-    error::{SoulError, SoulErrorKind}, ids::IdAlloc, print_breakpoint, soul_error_internal, soul_import_path::SoulImportPath, soul_names::KeyWord, span::ModuleId
+    error::{SoulError, SoulErrorKind},
+    ids::IdAlloc,
+    print_breakpoint, soul_error_internal,
+    soul_import_path::SoulImportPath,
+    soul_names::KeyWord,
+    span::ModuleId,
 };
 
 use crate::HirContext;
@@ -36,10 +41,7 @@ impl<'a> HirContext<'a> {
                 self.resolve_import(import);
                 return;
             }
-            ast::StatementKind::Struct(object) => {
-                self.lower_struct(object);
-                return;
-            }
+            ast::StatementKind::Struct(_) => return, // gets lowered from DeclareStore
             ast::StatementKind::Variable(variable) => {
                 hir::GlobalKind::Variable(self.lower_variable(variable))
             }
@@ -151,15 +153,15 @@ impl<'a> HirContext<'a> {
 
         let local = self.id_generator.alloc_local();
         self.insert_variable(&variable.name, local, ty, value);
-        
+
         if let Some(node_id) = variable.node_id {
             self.node_id_to_local.insert(node_id, local);
         }
-        
+
         hir::Variable { local }
     }
 
-    fn lower_struct(&mut self, object: &ast::Struct) {
+    pub(crate) fn lower_struct(&mut self, object: &ast::Struct) {
         let name = object.name.clone();
 
         let mut generics = vec![];
@@ -200,7 +202,10 @@ impl<'a> HirContext<'a> {
                     }
 
                     self.log_error(soul_error_internal!(
-                        format!("module '{}' not found", path.module.get_module_name().unwrap_or("<error>")),
+                        format!(
+                            "module '{}' not found",
+                            path.module.get_module_name().unwrap_or("<error>")
+                        ),
                         None
                     ));
                     ModuleId::error()
