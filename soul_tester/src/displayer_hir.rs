@@ -13,8 +13,11 @@ use typed_hir::{ThirTypeKind, TypedHir, display_thir::DisplayThirType};
 pub fn display_hir(hir: &HirTree) -> String {
     let mut displayer = HirDisplayer::new_hir(hir);
 
-    for global in &hir.root.globals {
-        displayer.display_global(global);
+    for module in hir.nodes.modules.values() {
+        
+        for global in &module.globals {
+            displayer.display_global(global);
+        }
     }
 
     displayer.consume_to_string()
@@ -23,8 +26,11 @@ pub fn display_hir(hir: &HirTree) -> String {
 pub fn display_thir(hir: &HirTree, typed: &TypedHir) -> String {
     let mut displayer = HirDisplayer::new_thir(hir, typed);
 
-    for global in &hir.root.globals {
-        displayer.display_global(global);
+    for module in hir.nodes.modules.values() {
+        
+        for global in &module.globals {
+            displayer.display_global(global);
+        }
     }
 
     displayer.consume_to_string()

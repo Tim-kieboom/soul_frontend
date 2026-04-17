@@ -124,11 +124,13 @@ impl<'a> HirContext<'a> {
 
         self.insert_temp(&name, variable.local, ty, value);
 
-        match self.current_body {
+        match self.current.body {
             crate::CurrentBody::Global => {
                 let id = self.alloc_statement(&ItemMetaData::default_const(), span);
                 let kind = hir::GlobalKind::InternalVariable(variable);
-                self.tree.root.globals.push(hir::Global::new(kind, id));
+                let root_id = self.current.module;
+                self.tree.nodes.modules[root_id]
+                    .globals.push(hir::Global::new(kind, id));
             }
             crate::CurrentBody::Block(block_id) => {
                 let id = self.alloc_statement(&ItemMetaData::default_const(), span);
@@ -139,11 +141,13 @@ impl<'a> HirContext<'a> {
     }
 
     fn insert_desugar_assignment(&mut self, assign: hir::Assign, span: Span) {
-        match self.current_body {
+        match self.current.body {
             crate::CurrentBody::Global => {
                 let id = self.alloc_statement(&ItemMetaData::default_const(), span);
                 let kind = hir::GlobalKind::InternalAssign(assign);
-                self.tree.root.globals.push(hir::Global::new(kind, id));
+                let root_id = self.current.module;
+                self.tree.nodes.modules[root_id]
+                    .globals.push(hir::Global::new(kind, id));
             }
             crate::CurrentBody::Block(block_id) => {
                 let id = self.alloc_statement(&ItemMetaData::default_const(), span);

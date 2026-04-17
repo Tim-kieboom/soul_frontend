@@ -2,11 +2,7 @@ use ast::UseBlock;
 use hir::{Assign, StatementId};
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
-    ids::IdAlloc,
-    print_breakpoint, soul_error_internal,
-    soul_import_path::SoulImportPath,
     soul_names::KeyWord,
-    span::ModuleId,
 };
 
 use crate::HirContext;
@@ -37,8 +33,7 @@ impl<'a> HirContext<'a> {
                 }
                 return;
             }
-            ast::StatementKind::Import(import) => {
-                self.resolve_import(import);
+            ast::StatementKind::Import(_) => {
                 return;
             }
             ast::StatementKind::Struct(_) => return, // gets lowered from DeclareStore
@@ -90,8 +85,7 @@ impl<'a> HirContext<'a> {
                 }
                 return None;
             }
-            ast::StatementKind::Import(import) => {
-                self.resolve_import(import);
+            ast::StatementKind::Import(_) => {
                 return None;
             }
             ast::StatementKind::Struct(object) => {
@@ -191,58 +185,6 @@ impl<'a> HirContext<'a> {
         self.insert_struct(struct_id, hir::Struct { name, fields });
     }
 
-    fn resolve_import(&mut self, import: &ast::Import) {
-        for path in &import.paths {
-            let module_id = match self.get_module_id(&path.module) {
-                Some(id) => id,
-                None => {
-                    print_breakpoint!();
-                    for (_, path) in self.context.module_store.entries() {
-                        eprintln!("{}", path.to_string_lossy().to_string());
-                    }
-
-                    self.log_error(soul_error_internal!(
-                        format!(
-                            "module '{}' not found",
-                            path.module.get_module_name().unwrap_or("<error>")
-                        ),
-                        None
-                    ));
-                    ModuleId::error()
-                }
-            };
-
-            let _ = self
-                .tree
-                .info
-                .imports
-                .insert(module_id, path.module.clone());
-
-            let imports = match self.current_body {
-                crate::CurrentBody::Global => &mut self.tree.root.imports,
-                crate::CurrentBody::Block(block_id) => {
-                    &mut self.tree.nodes.blocks[block_id].imports
-                }
-            };
-
-            imports.push(hir::Import {
-                module: module_id,
-                kind: path.kind.clone(),
-            });
-        }
-    }
-
-    fn get_module_id(&self, path: &SoulImportPath) -> Option<ModuleId> {
-        let mut path = path.to_pathbuf();
-        if path.is_dir() {
-            path.push("mod.soul");
-        } else {
-            path.add_extension("soul");
-        }
-
-        self.context.module_store.get_id(&path)
-    }
-
     pub(crate) fn lower_return_like(
         &mut self,
         return_like: &ast::ReturnLike,
@@ -273,7 +215,9 @@ impl<'a> HirContext<'a> {
 
     fn insert_global(&mut self, global: hir::Global) -> StatementId {
         let id = global.id;
-        self.tree.root.globals.push(global);
+        let root_id = self.tree.root;
+        self.tree.nodes.modules[root_id]
+            .globals.push(global);
         id
     }
 }

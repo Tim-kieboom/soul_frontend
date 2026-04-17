@@ -37,12 +37,18 @@ pub fn lower_hir(compiler_context: &mut CompilerContext, ast_context: &AstContex
 }
 
 #[derive(Debug)]
+struct Current {
+    pub module: ModuleId,
+    pub body: CurrentBody,
+}
+
+#[derive(Debug)]
 struct HirContext<'a> {
     pub tree: HirTree,
 
+    pub current: Current,
     pub scopes: Vec<Scope>,
-    pub id_generator: IdAllocalor,
-    pub current_body: CurrentBody,
+    pub id_generator: IdAllocalor,    
     pub ast_context: &'a AstContext,
 
     pub context: &'a mut CompilerContext,
@@ -66,14 +72,18 @@ impl<'a> HirContext<'a> {
             }
         };
 
+        let root = &ast_context.modules[root_id];
         Self {
             context,
             ast_context,
             id_generator,
             scopes: vec![Scope::default()],
             node_id_to_local: VecMap::new(),
-            current_body: CurrentBody::Global,
-            tree: HirTree::new(root_id, main, init_global_function),
+            current: Current {
+                module: root_id, 
+                body: CurrentBody::Global,
+            },
+            tree: HirTree::new(root, main, init_global_function),
         }
     }
 

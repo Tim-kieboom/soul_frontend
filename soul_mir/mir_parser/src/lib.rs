@@ -23,10 +23,13 @@ pub fn mir_lower(hir_reponse: &HirResponse, context: &mut CompilerContext) -> Mi
     let mut context = MirContext::new(hir_reponse, context);
     let is_end = &mut false;
 
-    for global in &hir_reponse.hir.root.globals {
-        context.lower_global(global, is_end);
-        if *is_end {
-            break;
+    for module in hir_reponse.hir.nodes.modules.values() {
+
+        for global in &module.globals {
+            context.lower_global(global, is_end);
+            if *is_end {
+                break;
+            }
         }
     }
 

@@ -34,15 +34,14 @@ impl<'a> HirContext<'a> {
     pub(crate) fn lower_block(&mut self, body: &ast::Block) -> hir::BlockId {
         let id = self.id_generator.alloc_body();
 
-        let prev_body = self.current_body;
-        self.current_body = CurrentBody::Block(id);
+        let prev_body = self.current.body;
+        self.current.body = CurrentBody::Block(id);
         self.push_scope();
 
         let block = hir::Block {
             id,
             statements: vec![],
             terminator: None,
-            imports: vec![],
         };
         self.insert_block(id, block, body.span);
 
@@ -115,7 +114,7 @@ impl<'a> HirContext<'a> {
         }
 
         self.pop_scope();
-        self.current_body = prev_body;
+        self.current.body = prev_body;
 
         match terminate_expression {
             Some(CurrentTerminator {

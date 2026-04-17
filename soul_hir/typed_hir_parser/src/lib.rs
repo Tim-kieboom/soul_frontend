@@ -46,8 +46,11 @@ pub fn lower_typed_hir<'a>(
         context.functions.insert(function.id, function.return_type);
     }
 
-    for global in &context.hir.root.globals {
-        context.infer_global(global);
+    for module in context.hir.nodes.modules.values() {
+
+        for global in &module.globals {
+            context.infer_global(global);
+        }
     }
 
     context.finalize()
@@ -85,6 +88,7 @@ impl<'a> TypedHirContext<'a> {
         options: &'a CompilerOptions,
         context: &'a mut CompilerContext,
     ) -> Self {
+        let globals =  hir.nodes.modules.values().map(|module| module.globals.len()).sum();
         let mut this = Self {
             hir,
             context,
@@ -105,7 +109,7 @@ impl<'a> TypedHirContext<'a> {
             places: VecMap::with_capacity(hir.nodes.places.len()),
             locals: VecMap::with_capacity(hir.nodes.locals.len()),
             blocks: VecMap::with_capacity(hir.nodes.blocks.len()),
-            statements: VecMap::with_capacity(hir.root.globals.len()),
+            statements: VecMap::with_capacity(globals),
             field_names: VecMap::with_capacity(hir.nodes.fields.len()),
             functions: VecMap::with_capacity(hir.nodes.functions.len()),
             expressions: VecMap::with_capacity(hir.nodes.expressions.len()),

@@ -6,8 +6,7 @@ use soul_utils::{
 };
 
 use crate::{
-    Block, BlockId, Expression, ExpressionId, FieldId, Function, LocalId, LocalInfo, Place,
-    PlaceId, StatementId, hir_type::Field,
+    Block, BlockId, Expression, ExpressionId, FieldId, Function, LocalId, LocalInfo, Module, Place, PlaceId, StatementId, hir_type::Field
 };
 
 mod type_map;
@@ -61,6 +60,7 @@ pub struct NodeMaps {
     pub places: VecMap<PlaceId, Place>,
     pub fields: VecMap<FieldId, Field>,
     pub blocks: VecMap<BlockId, Block>,
+    pub modules: VecMap<ModuleId, Module>,
     pub locals: VecMap<LocalId, LocalInfo>,
     pub functions: VecMap<FunctionId, Function>,
     pub expressions: VecMap<ExpressionId, Expression>,
@@ -72,6 +72,7 @@ impl NodeMaps {
             fields: VecMap::const_default(),
             blocks: VecMap::const_default(),
             locals: VecMap::const_default(),
+            modules: VecMap::const_default(),
             functions: VecMap::from_slice(&[(init_globals.id, init_globals)]),
             expressions: VecMap::from_slice(&[(
                 ExpressionId::error(),

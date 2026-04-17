@@ -29,7 +29,7 @@ pub use statement::*;
 /// in `MetaDataMap` and are indexed by IR node IDs.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct HirTree {
-    pub root: Module,
+    pub root: ModuleId,
     pub info: InfoMaps,
     pub nodes: NodeMaps,
 
@@ -37,7 +37,7 @@ pub struct HirTree {
     pub init_globals: FunctionId,
 }
 impl HirTree {
-    pub fn new(root_id: ModuleId, main: FunctionId, init_globals: FunctionId) -> Self {
+    pub fn new(ast_root: &ast::Module, main: FunctionId, init_globals: FunctionId) -> Self {
         let init_global_function = Function {
             id: init_globals,
             generics: vec![],
@@ -48,22 +48,25 @@ impl HirTree {
             body: FunctionBody::Internal(BlockId::error()),
             name: Ident::new(
                 INIT_GLOBALS_FUNCTION_NAME.to_string(),
-                Span::default(root_id),
+                Span::default(ast_root.id),
             ),
         };
 
+        let mut nodes = NodeMaps::new(init_global_function);
         let root = Module {
-            id: root_id,
-            imports: vec![],
+            id: ast_root.id,
             globals: vec![],
+            modules: ast_root.modules.clone(),
         };
+        let root_id = root.id;
+        nodes.modules.insert(root_id, root);
 
         Self {
-            root,
             main,
+            nodes,
             init_globals,
+            root: root_id,
             info: InfoMaps::default(),
-            nodes: NodeMaps::new(init_global_function),
         }
     }
 }
@@ -71,14 +74,8 @@ impl HirTree {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Module {
     pub id: ModuleId,
-    pub imports: Vec<Import>,
+    pub modules: Vec<ModuleId>,
     pub globals: Vec<Global>,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct Import {
-    pub module: ModuleId,
-    pub kind: ast::ImportKind,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -137,7 +134,6 @@ pub struct Variable {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Block {
     pub id: BlockId,
-    pub imports: Vec<Import>,
     pub statements: Vec<Statement>,
     pub terminator: Option<Terminator>,
 }
@@ -145,7 +141,6 @@ impl Block {
     pub fn new(id: BlockId) -> Self {
         Self {
             id,
-            imports: vec![],
             terminator: None,
             statements: vec![],
         }
