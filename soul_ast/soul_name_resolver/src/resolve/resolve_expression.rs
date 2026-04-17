@@ -1,4 +1,4 @@
-use ast::{Expression, ExpressionKind};
+use ast::{Expression, ExpressionKind, FieldAccess};
 
 use crate::NameResolver;
 
@@ -11,7 +11,9 @@ impl<'a> NameResolver<'a> {
                 self.resolve_expression(&mut ctor.amount);
                 self.resolve_expression(&mut ctor.element);
             }
-            ExpressionKind::FieldAccess(_) => (),
+            ExpressionKind::FieldAccess(field_access) => {
+                self.resolve_field_access(field_access);
+            }
             ExpressionKind::StructConstructor(ctor) => {
                 for (_, value) in &mut ctor.values {
                     self.resolve_expression(value);
@@ -77,5 +79,46 @@ impl<'a> NameResolver<'a> {
             | ExpressionKind::Literal(_)
             | ExpressionKind::ExternalExpression(_) => (),
         }
+    }
+
+    fn resolve_field_access(&mut self, field_access: &mut FieldAccess) {
+
+        if self.resolve_module_variable(field_access) {
+            return
+        }
+
+        self.resolve_expression(&mut field_access.object);
+    }
+
+    fn resolve_module_variable(&mut self, field_access: &mut FieldAccess) -> bool {
+        let object_ident = match &field_access.object.node {
+            ExpressionKind::Variable { ident, .. } => Some(ident.to_string()),
+            _ => None,
+        };
+        
+        let Some(module_name) = object_ident else {
+            return false
+        };
+
+        if self.lookup_module(&module_name).is_none() {
+            return false
+        }
+
+        let variable = self.lookup_module_variable(
+            &module_name,
+            field_access.field.as_str(),
+            field_access.field.span,
+        );
+
+        if let Some(node_id) = variable {
+            field_access.id = Some(node_id);
+            if let ExpressionKind::Variable { resolved, .. } = &mut field_access.object.node
+            {
+                *resolved = Some(node_id);
+            }
+            return true
+        }
+
+        false
     }
 }

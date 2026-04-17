@@ -178,6 +178,34 @@ impl<'a> NameResolver<'a> {
         Some(entry.value)
     }
 
+    fn lookup_module_variable(
+        &mut self,
+        module_name: &str,
+        variable_name: &str,
+        span: Span,
+    ) -> Option<NodeId> {
+        let module_entry = self.info.scopes.lookup_module(module_name)?;
+        let module_id = module_entry.module_id;
+
+        if let Some(resolved_name) = self.resolve_alias(module_name, variable_name) {
+            return self.flat_check_variable(&Ident::new(resolved_name, span));
+        }
+
+        debug_assert!(self.modules.contains(module_id));
+
+        let header = &self.modules.get(module_id)?.header;
+        let entry = header.get(variable_name)?.variable?;
+        if !entry.is_public {
+            self.log_error(SoulError::new(
+                format!("'{variable_name}' is private"),
+                SoulErrorKind::InvalidModuleAccess,
+                Some(span),
+            ));
+        }
+
+        Some(entry.value)
+    }
+
     fn resolve_alias(&self, module_name: &str, function_name: &str) -> Option<String> {
         let module_entry = match self.info.scopes.lookup_module(module_name) {
             Some(entry) => entry,

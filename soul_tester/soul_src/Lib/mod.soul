@@ -2,6 +2,10 @@ import .subLib
 
 const Variable = 1
 
+GetStruct(): Struct {
+    Struct{field: 1}
+}
+
 struct Struct {
     field: int
 }  

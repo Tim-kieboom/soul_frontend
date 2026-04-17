@@ -7,15 +7,17 @@ function() {}
 // A() {}
 
 main() {
-    // function()
-    // obj := Struct{field: 1}
+    function()
+    obj := Struct{field: 1}
     obj2 := Lib.Struct{field: 1}
-    // mut num = A()
-    // num = b()
-    // num = Lib.A()
-    // num = Lib.B()
-    // num = Variable
-    // Lib.Variable
+    obj3 := Lib.GetStruct()
+    field := obj3.field
+    mut num = A()
+    num = b()
+    num = Lib.A()
+    num = Lib.B()
+    num = Variable
+    num = Lib.Variable
     // Lib.priv()
     // subLib.Pub()
     // Lib.subLib.Pub()
