@@ -48,7 +48,7 @@ impl<'a> HirContext<'a> {
         let mut terminate_expression = None;
 
         for statement in &body.statements {
-            let hir_statement = match self.lower_statement(statement) {
+            let hir_statement = match self.lower_statement(self.current.module, statement) {
                 Some(val) => val,
                 None => continue,
             };

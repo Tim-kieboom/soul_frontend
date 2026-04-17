@@ -40,7 +40,7 @@ mod paths;
 static PATHS: &[u8] = include_bytes!("../paths.json");
 
 pub const MESSAGE_CONFIG: MessageConfig = MessageConfig {
-    backtrace: true,
+    backtrace: false,
     colors: true,
 };
 
@@ -97,7 +97,7 @@ fn run_fontend(paths: &Paths) -> Result<Ouput> {
 
     let mut hir = to_hir(&COMPILER_OPTIONS, &mut context, &ast_context);
     clear_hir_type_map(&mut hir);
-    display_hir(paths, &hir)?;
+    display_hir(paths, &hir, &ast_context)?;
 
     let mir = to_mir(&hir, &COMPILER_OPTIONS, &mut context);
     display_mir(paths, &mir, &hir)?;
@@ -160,10 +160,10 @@ fn display_ast(paths: &Paths, context: &CompilerContext, ast_context: &AstContex
     )
 }
 
-fn display_hir(paths: &Paths, hir: &HirResponse) -> Result<()> {
-    paths.write_to_output(&displayer_hir::display_hir(&hir.hir), "hir/tree.soulc")?;
+fn display_hir(paths: &Paths, hir: &HirResponse, ast_context: &AstContext) -> Result<()> {
+    paths.write_to_output(&displayer_hir::display_hir(ast_context, &hir.hir), "hir/tree.soulc")?;
     paths.write_to_output(
-        &displayer_hir::display_thir(&hir.hir, &hir.typed),
+        &displayer_hir::display_thir(ast_context, &hir.hir, &hir.typed),
         "thir/tree.soulc",
     )?;
     paths.write_to_output(

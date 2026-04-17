@@ -1,5 +1,5 @@
 (A) add import
-    (A) Parser
+    (A) Parser {cm}
         (A) change import parser - parse dot-style paths (std.Fmt) {cm}
             - Remove StringLiteral/TokenKind::Ident path handling {cm}
             - Add dot-separated path parsing (std.Fmt.{A, B}) {cm}

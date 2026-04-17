@@ -1,38 +1,25 @@
+use ast::{AstContext};
 use hir::{
     Binary, BlockId, DisplayType, ExpressionId, FieldId, FunctionBody, HirTree, HirType,
     HirTypeKind, LazyTypeId, LocalId, LocalKind, StructId, TypeId, Unary,
 };
 use soul_utils::{
-    ids::{FunctionId, IdAlloc},
-    soul_names::KeyWord,
-    vec_map::VecMapIndex,
+    ids::{FunctionId, IdAlloc}, soul_names::KeyWord, span::ModuleId, vec_map::VecMapIndex
 };
 use std::fmt::Write;
 use typed_hir::{ThirTypeKind, TypedHir, display_thir::DisplayThirType};
 
-pub fn display_hir(hir: &HirTree) -> String {
-    let mut displayer = HirDisplayer::new_hir(hir);
+pub fn display_hir(ast_context: &AstContext, hir: &HirTree) -> String {
+    let mut displayer = HirDisplayer::new_hir(hir, ast_context);
 
-    for module in hir.nodes.modules.values() {
-        
-        for global in &module.globals {
-            displayer.display_global(global);
-        }
-    }
-
+    displayer.display_module(hir.root);
     displayer.consume_to_string()
 }
 
-pub fn display_thir(hir: &HirTree, typed: &TypedHir) -> String {
-    let mut displayer = HirDisplayer::new_thir(hir, typed);
+pub fn display_thir(ast_context: &AstContext, hir: &HirTree, typed: &TypedHir) -> String {
+    let mut displayer = HirDisplayer::new_thir(hir, typed, ast_context);
 
-    for module in hir.nodes.modules.values() {
-        
-        for global in &module.globals {
-            displayer.display_global(global);
-        }
-    }
-
+    displayer.display_module(hir.root);
     displayer.consume_to_string()
 }
 
@@ -76,29 +63,51 @@ struct HirDisplayer<'a> {
     sb: String,
     hir: &'a HirTree,
     typed: Option<&'a TypedHir>,
+    ast_context: &'a AstContext,
 
-    depth: usize,
+    depth: String,
     terminate: Option<ExpressionId>,
 }
 impl<'a> HirDisplayer<'a> {
-    fn new_hir(hir: &'a HirTree) -> Self {
+    fn new_hir(hir: &'a HirTree, ast_context: &'a AstContext) -> Self {
         Self {
             hir,
-            depth: 0,
             typed: None,
+            ast_context,
             terminate: None,
             sb: String::new(),
+            depth: String::new(),
         }
     }
 
-    fn new_thir(hir: &'a HirTree, typed: &'a TypedHir) -> Self {
+    fn new_thir(hir: &'a HirTree, typed: &'a TypedHir, ast_context: &'a AstContext) -> Self {
         Self {
             hir,
-            depth: 0,
+            ast_context,
             terminate: None,
             sb: String::new(),
             typed: Some(typed),
+            depth: String::new(),
         }
+    }
+
+    fn display_module(&mut self, module_id: ModuleId) {
+        let module = &self.hir.nodes.modules[module_id];
+        self.display_depth();
+        self.push_fmt(format_args!("mod {} {{\n", self.ast_context.modules[module_id].name));
+
+        self.push_scope();
+        for global in &module.globals {
+            self.display_global(global);
+            self.push('\n');
+        }
+        for module_id in &module.modules {
+            self.display_module(*module_id);
+        }
+        self.pop_scope();
+
+        self.display_depth();
+        self.push_str("}\n");
     }
 
     fn display_global(&mut self, global: &hir::Global) {
@@ -120,10 +129,9 @@ impl<'a> HirDisplayer<'a> {
     fn display_function(&mut self, function_id: FunctionId) {
         let function = &self.hir.nodes.functions[function_id];
         self.push('\n');
+        self.display_depth();
         if let hir::FunctionBody::External(id) = function.body {
-            self.push_str("extern \"");
-            self.push_str(id.as_str());
-            self.push_str("\" ");
+            self.push_fmt(format_args!("extern \"{}\"", id.as_str()));
         }
 
         let owner = function.owner_type.to_lazy();
@@ -159,6 +167,7 @@ impl<'a> HirDisplayer<'a> {
     }
 
     fn display_variable(&mut self, variable: &hir::Variable) {
+        self.display_depth();
         let local_info = &self.hir.nodes.locals[variable.local];
         if local_info.is_temp() {
             self.display_temp(variable.local);
@@ -180,6 +189,7 @@ impl<'a> HirDisplayer<'a> {
     }
 
     fn display_assign(&mut self, assign: &hir::Assign) {
+        self.display_depth();
         self.display_place(&assign.place);
         self.push_str(" = ");
         self.display_expression(&assign.value);
@@ -194,15 +204,15 @@ impl<'a> HirDisplayer<'a> {
         self.display_block_id(*id);
         self.push_str("{\n");
 
-        self.depth += 1;
+        self.push_scope();
         for node in &block.statements {
-            self.push_str(&"\t".repeat(self.depth));
+            self.display_depth();
             self.display_statement(node);
             self.push('\n');
         }
-        self.depth -= 1;
+        self.pop_scope();
 
-        self.push_str(&"\t".repeat(self.depth));
+        self.display_depth();
         self.push('}');
 
         self.terminate = prev;
@@ -324,7 +334,7 @@ impl<'a> HirDisplayer<'a> {
                 self.display_block(then_block);
                 if let Some(arm) = else_block {
                     self.push('\n');
-                    self.push_str(&"\t".repeat(self.depth));
+                    self.display_depth();
                     self.push_str("else ");
                     self.display_block(arm);
                 }
@@ -551,6 +561,22 @@ impl<'a> HirDisplayer<'a> {
 
     fn consume_to_string(self) -> String {
         self.sb
+    }
+
+    fn push_scope(&mut self) {
+        self.depth.push('\t');
+    }
+
+    fn pop_scope(&mut self) {
+        self.depth.pop();
+    }
+
+    fn display_depth(&mut self) {
+        self.sb.push_str(self.depth.as_str())
+    }
+
+    fn push_fmt(&mut self, arg: std::fmt::Arguments<'_>) {
+        self.sb.write_fmt(arg).expect("no fmt error");
     }
 
     fn push_str(&mut self, str: &str) {

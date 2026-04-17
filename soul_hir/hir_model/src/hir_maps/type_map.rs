@@ -7,8 +7,8 @@ use soul_utils::{
 };
 
 use crate::{
-    GenericId, InferTypeId, StructId, TypeId,
     hir_type::{HirType, InferType, Struct},
+    GenericId, InferTypeId, StructId, TypeId,
 };
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

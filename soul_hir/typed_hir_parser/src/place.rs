@@ -6,7 +6,7 @@ use soul_utils::{
     vec_map::VecMap,
 };
 
-use crate::{TypedHirContext, type_helpers::TypeHelpers};
+use crate::{type_helpers::TypeHelpers, TypedHirContext};
 
 impl<'a> TypedHirContext<'a> {
     pub(crate) fn infer_place(&mut self, place_id: PlaceId) -> LazyTypeId {
@@ -16,7 +16,16 @@ impl<'a> TypedHirContext<'a> {
                 if *id == LocalId::error() {
                     LazyTypeId::error()
                 } else {
-                    self.locals[*id]
+                    match self.locals.get(*id) {
+                        Some(ty) => *ty,
+                        None => {
+                            if let Some(local_info) = self.hir.nodes.locals.get(*id) {
+                                local_info.ty
+                            } else {
+                                LazyTypeId::error()
+                            }
+                        }
+                    }
                 }
             }
             PlaceKind::Deref(place) => {

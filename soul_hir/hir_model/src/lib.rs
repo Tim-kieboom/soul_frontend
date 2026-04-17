@@ -13,10 +13,10 @@ pub use hir_type::*;
 pub use ids::*;
 pub use place::*;
 use soul_utils::{
-    Ident,
     ids::{FunctionId, IdAlloc},
     soul_names::INIT_GLOBALS_FUNCTION_NAME,
     span::{ModuleId, Span},
+    Ident,
 };
 pub use statement::*;
 
@@ -67,6 +67,17 @@ impl HirTree {
             init_globals,
             root: root_id,
             info: InfoMaps::default(),
+        }
+    }
+
+    pub fn insert_module(&mut self, module_id: ModuleId) {
+        if !self.nodes.modules.contains(module_id) {
+            let module = Module {
+                id: module_id,
+                globals: vec![],
+                modules: vec![],
+            };
+            self.nodes.modules.insert(module_id, module);
         }
     }
 }

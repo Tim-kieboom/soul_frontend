@@ -1,6 +1,6 @@
-use crate::{BlockId, ExpressionId, LocalId, PlaceId, StructId, TypeId, hir_type::LazyTypeId};
+use crate::{hir_type::LazyTypeId, BlockId, ExpressionId, LocalId, PlaceId, StructId, TypeId};
 use ast::{BinaryOperator, Literal, UnaryOperator};
-use soul_utils::{Ident, ids::FunctionId};
+use soul_utils::{ids::FunctionId, Ident};
 
 /// A typed HIR expression.
 ///

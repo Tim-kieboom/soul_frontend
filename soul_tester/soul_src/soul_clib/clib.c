@@ -11,9 +11,11 @@
 }
 
 /// impl define marcro for all number types
-#define __IMPL_NUMBERS(impl)                \
-    impl(i8);impl(i16);impl(i32);impl(i64); \
-    impl(u8);impl(u16);impl(u32);impl(u64); \
+#define __IMPL_NUMBERS(impl)    \
+    impl(i8);impl(i16);         \
+    impl(i32);impl(i64);        \
+    impl(u8);impl(u16);         \
+    impl(u32);impl(u64);        \
     impl(f32);impl(f64);
 
 __IMPL_NUMBERS(__POW);
@@ -156,7 +158,6 @@ str __clib_fmtFloat(double num, u8 base, char buf[50], u8 percision, bool capita
 }
 
 // ---------------- #Time ----------------
-#define CLOCKS_PER_MILLI CLOCKS_PER_SEC / 1000
 
 void __clib_delay_sec(int seconds) {
     clock_t start = clock();

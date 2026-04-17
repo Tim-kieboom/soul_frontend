@@ -1,5 +1,5 @@
 use ast::{ExternLanguage, FunctionKind};
-use soul_utils::{Ident, ids::FunctionId};
+use soul_utils::{ids::FunctionId, Ident};
 
 use crate::{BlockId, ExpressionId, GenericId, LazyTypeId, LocalId, TypeId};
 

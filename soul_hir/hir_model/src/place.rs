@@ -1,6 +1,6 @@
-use soul_utils::{Ident, span::Span};
+use soul_utils::{span::Span, Ident};
 
-use crate::{ExpressionId, LocalId, PlaceId, hir_type::LazyTypeId};
+use crate::{hir_type::LazyTypeId, ExpressionId, LocalId, PlaceId};
 
 /// A memory location that can be read from or written to.
 ///

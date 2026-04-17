@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use std::path::Path;
 use std::str::Lines;
 
@@ -190,8 +191,9 @@ fn get_source_snippet(out: &mut String, span: &Span, mut lines: Lines, begin_spa
 
         if i == 0 {
             let start_col = span.start_offset.max(1);
+            let span_len = span.end_offset.max(1) - start_col;
             let spaces_before = " ".repeat(start_col.saturating_sub(1));
-            let carets = "^".repeat(line.len().saturating_sub(start_col).max(1));
+            let carets = "^".repeat(span_len);
             writeln!(out, "{begin_space}│ {spaces_before}{carets}").unwrap();
         } else if i < span_lines.len().saturating_sub(1) {
             let carets = "^".repeat(line.len());
@@ -214,15 +216,9 @@ fn get_source_snippet(out: &mut String, span: &Span, mut lines: Lines, begin_spa
 }
 
 fn display_span(sb: &mut String, span: Span) {
-    sb.push(':');
-    sb.push_str(&format!("{}", span.start_line));
-    sb.push(':');
-    sb.push_str(&format!("{}", span.start_offset));
+    sb.write_fmt(format_args!(":{}:{}", span.start_line, span.start_offset)).expect("no fmt error");
 
-    if span.start_line != span.end_line {
-        sb.push_str(" to ");
-        sb.push_str(&format!("{}", span.end_line));
-        sb.push(':');
-        sb.push_str(&format!("{}", span.end_offset));
+    if span.start_line != span.end_line || span.start_offset != span.end_offset {
+        sb.write_fmt(format_args!(" to {}:{}", span.end_line, span.end_offset)).expect("no fmt error");
     }
 }

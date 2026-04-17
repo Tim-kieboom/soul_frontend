@@ -3,6 +3,7 @@ use hir::{Assign, StatementId};
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
     soul_names::KeyWord,
+    span::ModuleId,
 };
 
 use crate::HirContext;
@@ -10,7 +11,7 @@ mod block;
 mod function;
 
 impl<'a> HirContext<'a> {
-    pub fn lower_global(&mut self, global: &ast::Statement) {
+    pub fn lower_global(&mut self, module_id: ModuleId, global: &ast::Statement) {
         let kind = match &global.node {
             ast::StatementKind::UseBlock(UseBlock {
                 use_type: _,
@@ -25,7 +26,7 @@ impl<'a> HirContext<'a> {
                 for methode in methodes {
                     let kind = hir::GlobalKind::Function(self.lower_function(methode));
                     let id = self.alloc_statement(&global.meta_data, global.span);
-                    self.insert_global(hir::Global::new(kind, id));
+                    self.insert_global(module_id, hir::Global::new(kind, id));
                 }
 
                 if !impls.is_empty() {
@@ -59,10 +60,10 @@ impl<'a> HirContext<'a> {
         };
 
         let id = self.alloc_statement(&global.meta_data, global.span);
-        self.insert_global(hir::Global::new(kind, id));
+        self.insert_global(module_id, hir::Global::new(kind, id));
     }
 
-    pub fn lower_statement(&mut self, global: &ast::Statement) -> Option<hir::Statement> {
+    pub fn lower_statement(&mut self, module_id: ModuleId, global: &ast::Statement) -> Option<hir::Statement> {
         let kind = match &global.node {
             ast::StatementKind::UseBlock(UseBlock {
                 use_type: _,
@@ -77,7 +78,7 @@ impl<'a> HirContext<'a> {
                 for methode in methodes {
                     let kind = hir::GlobalKind::Function(self.lower_function(methode));
                     let id = self.alloc_statement(&global.meta_data, global.span);
-                    self.insert_global(hir::Global::new(kind, id));
+                    self.insert_global(module_id, hir::Global::new(kind, id));
                 }
 
                 if !impls.is_empty() {
@@ -101,7 +102,7 @@ impl<'a> HirContext<'a> {
 
                 let hir_function = self.lower_function(function);
                 let kind = hir::GlobalKind::Function(hir_function);
-                self.insert_global(hir::Global::new(kind, id));
+                self.insert_global(module_id, hir::Global::new(kind, id));
                 return None;
             }
             ast::StatementKind::Assignment(assignment) => hir::StatementKind::Assign(Assign {
@@ -213,10 +214,9 @@ impl<'a> HirContext<'a> {
         }
     }
 
-    fn insert_global(&mut self, global: hir::Global) -> StatementId {
+    fn insert_global(&mut self, module_id: ModuleId, global: hir::Global) -> StatementId {
         let id = global.id;
-        let root_id = self.tree.root;
-        self.tree.nodes.modules[root_id]
+        self.tree.nodes.modules[module_id]
             .globals.push(global);
         id
     }
