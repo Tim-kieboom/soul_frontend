@@ -111,6 +111,7 @@ impl<'a> HirDisplayer<'a> {
     }
 
     fn display_global(&mut self, global: &hir::Global) {
+        self.display_depth();
         match &global.kind {
             hir::GlobalKind::Function(function) => self.display_function(*function),
             hir::GlobalKind::Variable(variable) => self.display_variable(variable),
@@ -167,7 +168,6 @@ impl<'a> HirDisplayer<'a> {
     }
 
     fn display_variable(&mut self, variable: &hir::Variable) {
-        self.display_depth();
         let local_info = &self.hir.nodes.locals[variable.local];
         if local_info.is_temp() {
             self.display_temp(variable.local);
@@ -189,7 +189,6 @@ impl<'a> HirDisplayer<'a> {
     }
 
     fn display_assign(&mut self, assign: &hir::Assign) {
-        self.display_depth();
         self.display_place(&assign.place);
         self.push_str(" = ");
         self.display_expression(&assign.value);

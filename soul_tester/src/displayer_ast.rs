@@ -101,8 +101,8 @@ impl<'a> AstDisplayer<'a> {
             self.push('\n');
         }
 
-        for module in &module.modules {
-            self.display_module(*module);
+        for module in module.modules.entries() {
+            self.display_module(module);
         }
 
         self.pop_scope();
@@ -134,8 +134,8 @@ impl<'a> AstDisplayer<'a> {
             self.push('\n');
         }
 
-        for module in &module.modules {
-            self.display_module_header(*module);
+        for module in module.modules.entries() {
+            self.display_module_header(module);
         }
 
         self.pop_scope();

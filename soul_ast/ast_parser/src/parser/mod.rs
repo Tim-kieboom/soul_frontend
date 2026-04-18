@@ -4,7 +4,7 @@ use ast::{Block, Module, SoulType, Visibility};
 #[cfg(debug_assertions)]
 use soul_tokenizer::Token;
 use soul_tokenizer::{TokenKind, TokenStream};
-use soul_utils::{sementic_level::CompilerContext, soul_names::TypeModifier, span::ModuleId};
+use soul_utils::{sementic_level::CompilerContext, soul_names::TypeModifier, span::ModuleId, vec_set::VecSet};
 
 use crate::parser::parse_utils::SEMI_COLON;
 
@@ -84,7 +84,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 id,
                 name,
                 visibility,
-                modules: vec![],
+                modules: VecSet::new(),
                 header: HashMap::default(),
                 global: Block {
                     node_id: None,
@@ -107,7 +107,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             id,
             name,
             visibility,
-            modules: vec![],
+            modules: VecSet::new(),
             header: HashMap::default(),
             global: Block {
                 statements,

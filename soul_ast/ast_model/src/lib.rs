@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use soul_utils::{
     ids::{FunctionId, IdGenerator},
     span::ModuleId,
-    vec_map::VecMap,
+    vec_map::VecMap, vec_set::VecSet,
 };
 
 mod ast;
@@ -40,7 +40,7 @@ pub struct Module {
     pub id: ModuleId,
     pub name: String,
     pub global: Block,
-    pub modules: Vec<ModuleId>,
+    pub modules: VecSet<ModuleId>,
     pub visibility: Visibility,
     pub header: HashMap<String, HeaderEntry>,
 }

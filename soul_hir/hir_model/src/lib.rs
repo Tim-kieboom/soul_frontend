@@ -56,7 +56,7 @@ impl HirTree {
         let root = Module {
             id: ast_root.id,
             globals: vec![],
-            modules: ast_root.modules.clone(),
+            modules: ast_root.modules.entries().collect(),
         };
         let root_id = root.id;
         nodes.modules.insert(root_id, root);

@@ -252,7 +252,7 @@ impl<'a> NameResolver<'a> {
         let tokens = to_token_stream(source, module_id);
         let module = parse(tokens, module_id, name, self.context);
         if let Some(module) = self.modules.get_mut(self.current.module) {
-            module.modules.push(module_id);
+            module.modules.insert(module_id);
         }
         self.modules.insert(module_id, module);
 

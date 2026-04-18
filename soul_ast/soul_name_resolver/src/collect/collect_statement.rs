@@ -356,16 +356,18 @@ impl<'a> NameResolver<'a> {
         module_name: &str,
         span: Span,
     ) -> ModuleId {
-        let Some(module_source) = self.read_module(module_file_path, module_name, span) else {
-            return ModuleId::error();
-        };
+
 
         let dir = module_file_path.parent().unwrap_or(module_file_path);
         let module_id = self.context.module_store.get_or_insert(module_file_path);       
         if self.modules.get(module_id).is_some() {
             return module_id;
         }
-        
+
+        let Some(module_source) = self.read_module(module_file_path, module_name, span) else {
+            return ModuleId::error();
+        };
+
         self.context.push_current_path(dir.to_path_buf());
         self.parse_module(&module_source, module_id, module_name.to_string());
         self.context.pop_current_path();

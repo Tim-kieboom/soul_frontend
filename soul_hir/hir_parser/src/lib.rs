@@ -92,9 +92,9 @@ impl<'a> HirContext<'a> {
 
     fn init_submodules(tree: &mut HirTree, ast_context: &AstContext, module_id: ModuleId) {
         let ast_module = &ast_context.modules[module_id];
-        for sub_module_id in &ast_module.modules {
-            tree.insert_module(*sub_module_id);
-            Self::init_submodules(tree, ast_context, *sub_module_id);
+        for sub_module_id in ast_module.modules.entries() {
+            tree.insert_module(sub_module_id);
+            Self::init_submodules(tree, ast_context, sub_module_id);
         }
     }
 
@@ -107,7 +107,7 @@ impl<'a> HirContext<'a> {
             }
         }
 
-        for sub_module_id in ast_module.modules.iter().copied() {
+        for sub_module_id in ast_module.modules.entries() {
             self.lower_module(sub_module_id);
         }
 
