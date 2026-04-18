@@ -74,14 +74,14 @@ Stdout_str(str: [@]char) {
     __clib_printSoulStr(str as *char, str.len)
 }
 
-FmtUint(num: uint, base: u8, buffer: [@]char, capital: bool): *char {
-    __clib_fmtUint(num as c_uint, base, buffer as *char, capital)
+FmtUint(n: uint, base: u8, buffer: [@]char, capital: bool): *char {
+    __clib_fmtUint(n as c_uint, base, buffer as *char, capital)
 }
 
-FmtInt(num: int, base: u8, buffer: [@]char, capital: bool): *char {
-    __clib_fmtInt(num as c_int, base, buffer as *char, capital)
+FmtInt(n: int, base: u8, buffer: [@]char, capital: bool): *char {
+    __clib_fmtInt(n as c_int, base, buffer as *char, capital)
 }
 
-FmtFloat(num: f64, base: u8, buffer: [@]char, precision: u8, capital: bool): *char {
-    __clib_fmtFloat(num, base, buffer as *char, precision, capital)
+FmtFloat(n: f64, base: u8, buffer: [@]char, precision: u8, capital: bool): *char {
+    __clib_fmtFloat(n, base, buffer as *char, precision, capital)
 }

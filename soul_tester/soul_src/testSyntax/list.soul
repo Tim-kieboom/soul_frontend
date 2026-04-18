@@ -12,15 +12,15 @@ class List<T> {
     }
 
     TryFromArray(array: [_]T): Res<This> {
-        mut self = TryNew(0).pass
+        mut self = This{..}
         self.ExtendArray(array).pass
-        self
+        Ok(self)
     }
 
     TryNew(capacity: uint): Res<This> {
         mut self = This{..}
         self.Reserve(capacity).pass
-        self
+        Ok(self)
     }
 
     Len(@this): uint {
@@ -36,6 +36,7 @@ class List<T> {
         for value in array {
             Push(value)
         }
+        Ok()
     }
 
     Push(&this, value: T) {
@@ -67,32 +68,30 @@ class List<T> {
     }
 
     Reserve(&this, toCapacity: uint): Res {
-        import std::mem::Swap
+        import Std.Mem.{Swap}
 
         old := buffer
         buffer = new:[for toCapacity => null].pass
 
-        minLen := len.min(toCapacity)
+        minLen := len.Min(toCapacity)
         for i in 0..minLen {
             Swap(&buffer[i].pass, &old[i].pass)
         }
 
-        buffer = tempPtr
         Ok()
     }
 
     Resize(&this, toCapacity: uint, default: T): Res {
-        import std::mem::Swap
+        import Std.Mem.{Swap}
 
         old := buffer
         buffer = new:[for toCapacity => default.copy].pass
-
-        minLen := len.min(toCapacity)
+ 
+        minLen := len.Min(toCapacity)
         for i in 0..minLen {
             Swap(&buffer[i].pass, &old[i].pass)
         }
 
-        buffer = tempPtr
         Ok()
     }
 
@@ -112,15 +111,27 @@ class List<T> {
         Ok(Reserve(cap))
     }
 
-    impl OpuaqeIndex<T> {
-        index(mut this, index: uint): Res<&T, OutOfBounds> {
-            use core::err::OutOfBounds;
+    impl Index<T> {
+
+        Index(@this, index: uint): Res<@T> {
             
             if index < len {
                 return Err(OutOfBounds(len, index))
             }
 
-            Ok(&buffer[index])
+            buffer.Index(index)
+        }
+    }
+
+    impl IndexMut<T> {
+
+        IndexMut(&this, index: uint): Res<&T> {
+            
+            if index < len {
+                return Err(OutOfBounds(len, index))
+            }
+
+            buffer.IndexMut(index)
         }
     }
 }

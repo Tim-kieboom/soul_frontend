@@ -6,12 +6,88 @@ struct Duration {
 extern "C" __clib_printChar(ch: char)
 extern "C" __clib_printCStr(text: *char)
 
-// trait Index<T> {
-//     Index(@this, index: uint): @T
-// }
-// trait IndexMut<T> {
-//     IndexMut(&this, index: uint): &T
-// }
+trait Formatter {
+    Push(&this, ch: char)
+    PushStr(&this, text: [@]char)
+}
+
+class StringBuilder {
+    sb: List<char>
+    This() {
+        This{sb: List()}
+    }
+
+    impl Formatter {
+        Push(&this, ch: char) {
+            sb.Push(ch)
+        }
+
+        PushStr(&this, text: [@]char) {
+            for ch in text {
+                sb.Push(ch)
+            }
+        }
+    }
+
+    AsStr(this): [@]char {
+        this.sb.AsSlice()
+    }
+}
+
+trait Display<Fmt: Formatter> {
+    Display(&this, fmt: &Fmt)
+}
+
+use<Fmt: Formatter> int impl Display<Fmt> {
+    Display(@this, fmt: &Fmt) {
+        literal NUMBERS = "0123456789"
+        literal BASE = uint(10)
+        mut buffer: [50]char
+        mut i = buffer.len
+
+        sign := *this < 0
+        number := if sign {
+            uint(-*this)
+        } else {
+            uint(*this)
+        }
+
+        while {
+            buffer[--i] = NUMBERS[number % BASE]
+            number /= BASE
+            if number <= 0 {
+                break
+            }
+        }
+
+        buffer[--i] = '-'
+        fmt.PushStr(@buffer[i..])
+    }
+}
+
+/*
+    const str NUMBERS = "0123456789ABCDEF";
+    const str NUMBERS_LOWER = "0123456789abcdef";
+
+    if (base < 2 || base > 16) {
+        return NULL;
+    }
+    
+    int sign = 0;
+    if (num < 0) {
+        sign = 1;
+        num = -num;
+    }
+
+    const str numbers = capital ? NUMBERS : NUMBERS_LOWER;
+    do {
+        *--ptr = numbers[num % base];
+        num /= base;
+    } while (num);
+
+    if (sign) *--ptr = '-';
+    return ptr;
+*/
 
 // unsafe *T offset<T>(@this, index: uint): *T {
 //     ptrUint := this as uint

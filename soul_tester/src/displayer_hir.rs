@@ -474,7 +474,7 @@ impl<'a> HirDisplayer<'a> {
 
     fn display_expression_astype(&mut self, value: ExpressionId, id: LazyTypeId) {
         let id = match self.typed {
-            Some(typed) => typed.types_table.expressions[value].to_lazy(),
+            Some(typed) => typed.types_table.expressions.get(value).map(|t| t.to_lazy()).unwrap_or(id),
             None => id,
         };
         self.display_astype(id);

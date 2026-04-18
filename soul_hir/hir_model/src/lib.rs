@@ -124,7 +124,7 @@ impl Global {
                 #[cfg(debug_assertions)]
                 panic!("span not found of {:?}", self.kind);
                 #[cfg(not(debug_assertions))]
-                Span::default_const()
+                Span::error()
             }
         }
     }

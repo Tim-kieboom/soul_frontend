@@ -128,20 +128,20 @@ impl<'a> NameResolver<'a> {
     }
 
     pub(crate) fn collect_function(&mut self, function: &mut Function) {
+        let prev_in_global = self.current.in_global;
+        let prev_function = self.current.function;
+        
         let id = self.declare_function(&mut function.signature);
-        let prev = self.current.function;
-        self.current.function = Some(id);
-
+        
         if is_main(&function.signature.node) {
             self.store.main_function = Some(id);
         }
-
+        
         let signature = &mut function.signature.node;
         self.collect_type(&mut signature.methode_type);
         self.collect_type(&mut signature.return_type);
-
         self.push_scope(&mut function.block.scope_id);
-
+        
         if signature.function_kind != ast::FunctionKind::Static {
             let id = self.alloc_node();
             self.insert_value("this", id, ScopeValue::Variable);
@@ -153,7 +153,8 @@ impl<'a> NameResolver<'a> {
 
         self.store
             .insert_functions(id, signature.clone(), self.current.module);
-        self.current.function = prev;
+        self.current.function = prev_function;
+        self.current.in_global = prev_in_global;
     }
 
     fn collect_import_path(&mut self, path: &ImportPath, span: Span) {

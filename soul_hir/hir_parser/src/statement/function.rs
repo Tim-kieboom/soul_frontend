@@ -76,11 +76,16 @@ impl<'a> HirContext<'a> {
             name,
             ty,
             default,
-            node_id: _,
+            node_id,
         } in &signature.parameters
         {
             let ty = self.lower_type(ty, name.span);
             let local = self.id_generator.alloc_local();
+
+            if let Some(node_id) = node_id {
+                self.node_id_to_local.insert(*node_id, local);
+            }
+
             self.insert_parameter(name, local, ty);
 
             let default = default.as_ref().map(|value| self.lower_expression(value));
