@@ -1,23 +1,23 @@
 import ( 
     crate.io
-    crate.Lib.SubLib
-    // crate.Lib.{this, Variable, A, B as b}
+    // crate.Lib.SubLib
+    crate.Lib.{this, Variable, A, B as b}
 )
 
 function() {}
 
 main() {
-    // mut num = A()
-    // num = b()
-    // num = Lib.A()
-    // num = Lib.B()
-    // num = Variable
-    // num = Lib.Variable
-    // num = SubLib.Constant
-    // obj1 := Lib.Struct{field: 1}
-    // obj2 := Lib.GetStruct()
-    // field := obj2.field
-    // SubLib.Pub()
+    mut num = A()
+    num = b()
+    num = Lib.A()
+    num = Lib.B()
+    num = Variable
+    num = Lib.Variable
+    num = SubLib.Constant
+    obj1 := Lib.Struct{field: 1}
+    obj2 := Lib.GetStruct()
+    field := obj2.field
+    SubLib.Pub()
     // Lib.priv()
     // subLib.Pub()
     // Lib.subLib.Pub()

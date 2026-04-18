@@ -1,4 +1,4 @@
-use std::{ffi::OsStr, path::{Path, PathBuf}};
+use std::path::{Path, PathBuf};
 
 use ast::{
     Block, DeclareStore, EntryKind, Expression, ExpressionKind, Function, FunctionSignature,
@@ -179,8 +179,9 @@ impl<'a> NameResolver<'a> {
 
         self.insure_parents_are_loaded(&module_file_path, span);
 
+        let parent_module = self.current.module;
         let import_name = alias.unwrap_or(module_name);
-        let module_id = self.import_module(&module_file_path, module_name, span);
+        let module_id = self.import_module(&module_file_path, module_name, parent_module, span);
         self.declare_module(
             import_name,
             &module_name,
@@ -197,33 +198,39 @@ impl<'a> NameResolver<'a> {
         module_file_path: &PathBuf,
         span: Span,
     ) {
-        let mut current = module_file_path.clone();
-
-        if module_file_path.file_name() == Some(OsStr::new("mod.soul")) {
-            current.pop();
+        fn get_module_name(current: &PathBuf) -> Option<String> {
+            let osstr = current.file_name()?;
+            osstr.to_str()?
+                .split('.')
+                .next()
+                .map(|name| name.to_string())
         }
 
-        loop {
-            current.pop();
-
-            if current == self.context.source_folder {
-                break
+        let mut current = self.context.source_folder.clone();
+        let relative_path = match module_file_path.strip_prefix(&current) {
+            Ok(val) => val,
+            Err(err) => {
+                self.log_error(soul_error_internal!(format!("{}", err.to_string()), None));
+                return
             }
+        };
 
-            let is_dir = current.is_dir();
-
-            let name = match current.file_name().map(|c| c.to_str()).flatten().map(|c| c.split('.').next()).flatten() {
-                Some(val) => val.to_string(),
+        let mut parent = self.current.module;
+        for component in relative_path.components() {
+            current.push(component);
+            let name = match get_module_name(&current) {
+                Some(val) => val,
                 None => {
                     self.log_error(soul_error_internal!(format!("file_name of '{:?}' not found", current), None));
                     return
                 }
             };
 
+            let is_dir = current.is_dir();
             if is_dir {
                 current.push("mod.soul");
             }
-            self.import_module(&current, &name, span);
+            parent = self.import_module(&current, &name, parent, span);
             if is_dir {
                 current.pop();
             }
@@ -354,9 +361,9 @@ impl<'a> NameResolver<'a> {
         &mut self,
         module_file_path: &PathBuf,
         module_name: &str,
+        parent: ModuleId,
         span: Span,
     ) -> ModuleId {
-
 
         let dir = module_file_path.parent().unwrap_or(module_file_path);
         let module_id = self.context.module_store.get_or_insert(module_file_path);       
@@ -369,7 +376,7 @@ impl<'a> NameResolver<'a> {
         };
 
         self.context.push_current_path(dir.to_path_buf());
-        self.parse_module(&module_source, module_id, module_name.to_string());
+        self.parse_module(&module_source, module_id, parent, module_name.to_string());
         self.context.pop_current_path();
         module_id
     }
