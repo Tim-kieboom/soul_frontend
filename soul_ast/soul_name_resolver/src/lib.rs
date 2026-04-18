@@ -34,7 +34,6 @@ struct Current {
 }
 
 struct NameResolver<'a> {
-    root: ModuleId,
     current: Current,
     info: &'a mut AstMetadata,
     store: &'a mut DeclareStore,
@@ -50,7 +49,6 @@ impl<'a> NameResolver<'a> {
         ast_context: &'a mut AstContext,
     ) -> Self {
         Self {
-            root: module,
             context,
             current: Current {
                 in_global: true,

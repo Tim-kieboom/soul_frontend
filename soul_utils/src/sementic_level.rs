@@ -72,7 +72,7 @@ impl ModuleStore {
         this
     }
 
-    pub fn get_or_insert(&mut self, path: PathBuf) -> ModuleId {
+    pub fn get_or_insert(&mut self, path: &PathBuf) -> ModuleId {
         if let Some(id) = self.get_id(&path) {
             return id;
         }

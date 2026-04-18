@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use ast::{
     Block, FunctionSignature, NamedTupleElement, NamedTupleType, Struct, VarTypeKind,
     scope::{
@@ -218,10 +220,8 @@ impl<'a> NameResolver<'a> {
         self.current_scope_mut().insert_module(name, entry);
     }
 
-    fn find_module_file(&mut self, module_name: &str, span: Span) -> Option<std::path::PathBuf> {
-        let current_dir = self.context.current_path();
+    fn find_module_file(&mut self, mut module_path: PathBuf, span: Span) -> Option<std::path::PathBuf> {
 
-        let mut module_path = current_dir.join(module_name);
         if module_path.is_dir() {
             module_path.push("mod.soul");
             if !module_path.is_file() {

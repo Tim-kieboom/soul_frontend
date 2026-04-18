@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{ffi::OsStr, path::{Path, PathBuf}};
 
 use ast::{
     Block, DeclareStore, EntryKind, Expression, ExpressionKind, Function, FunctionSignature,
@@ -7,10 +7,7 @@ use ast::{
     scope::{ScopeBuilder, ScopeValue, ScopeValueKind},
 };
 use soul_utils::{
-    error::{SoulError, SoulErrorKind},
-    soul_error_internal,
-    soul_names::PrimitiveTypes,
-    span::{ModuleId, Span},
+    error::{SoulError, SoulErrorKind}, ids::IdAlloc, soul_error_internal, soul_names::PrimitiveTypes, span::{ModuleId, Span}
 };
 
 use crate::NameResolver;
@@ -176,14 +173,14 @@ impl<'a> NameResolver<'a> {
             _ => &vec![],
         };
 
-        let Some(module_file_path) = self.find_module_file(&module_name, span) else {
+        let Some(module_file_path) = self.find_module_file(path.module.to_pathbuf(), span) else {
             return;
         };
 
+        self.insure_parents_are_loaded(&module_file_path, span);
+
         let import_name = alias.unwrap_or(module_name);
-
-        let module_id = self.import_module(module_file_path, module_name, span);
-
+        let module_id = self.import_module(&module_file_path, module_name, span);
         self.declare_module(
             import_name,
             &module_name,
@@ -193,6 +190,44 @@ impl<'a> NameResolver<'a> {
         );
 
         self.collect_items(module_id, module_name, &imported_items, span)
+    }
+
+    fn insure_parents_are_loaded(
+        &mut self,
+        module_file_path: &PathBuf,
+        span: Span,
+    ) {
+        let mut current = module_file_path.clone();
+
+        if module_file_path.file_name() == Some(OsStr::new("mod.soul")) {
+            current.pop();
+        }
+
+        loop {
+            current.pop();
+
+            if current == self.context.source_folder {
+                break
+            }
+
+            let is_dir = current.is_dir();
+
+            let name = match current.file_name().map(|c| c.to_str()).flatten().map(|c| c.split('.').next()).flatten() {
+                Some(val) => val.to_string(),
+                None => {
+                    self.log_error(soul_error_internal!(format!("file_name of '{:?}' not found", current), None));
+                    return
+                }
+            };
+
+            if is_dir {
+                current.push("mod.soul");
+            }
+            self.import_module(&current, &name, span);
+            if is_dir {
+                current.pop();
+            }
+        }
     }
 
     fn collect_items(
@@ -317,28 +352,27 @@ impl<'a> NameResolver<'a> {
 
     fn import_module(
         &mut self,
-        module_file_path: PathBuf,
+        module_file_path: &PathBuf,
         module_name: &str,
         span: Span,
     ) -> ModuleId {
-        let Some(module_source) = self.read_module(&module_file_path, module_name, span) else {
-            return self.root;
+        let Some(module_source) = self.read_module(module_file_path, module_name, span) else {
+            return ModuleId::error();
         };
 
-        let dir = module_file_path.parent().unwrap_or(&module_file_path);
-        self.context.push_current_path(dir.to_path_buf());
-        let module_id = self.context.module_store.get_or_insert(module_file_path);
+        let dir = module_file_path.parent().unwrap_or(module_file_path);
+        let module_id = self.context.module_store.get_or_insert(module_file_path);       
         if self.modules.get(module_id).is_some() {
-            self.context.pop_current_path();
             return module_id;
         }
-
+        
+        self.context.push_current_path(dir.to_path_buf());
         self.parse_module(&module_source, module_id, module_name.to_string());
         self.context.pop_current_path();
         module_id
     }
 
-    fn read_module(&mut self, path: &PathBuf, module_name: &str, span: Span) -> Option<String> {
+    fn read_module(&mut self, path: &Path, module_name: &str, span: Span) -> Option<String> {
         match std::fs::read_to_string(path) {
             Ok(val) => Some(val),
             Err(err) => {

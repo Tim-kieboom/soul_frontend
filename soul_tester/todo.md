@@ -13,9 +13,14 @@
 
     (D) HIR changes
         (A) update hir_parser to handle new import format {cm}
-        (B) update typed_hir if needed for module resolution
+        (B) update typed_hir if needed for module resolution {cm}
         (C) update mir if needed
+        (D) update llvm code
 
 (B) add trait
-(C) add union
 (C) add enum
+    (C) basic c enum
+    (D) enum with expression
+
+(C) add match
+(C) add union
