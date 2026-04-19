@@ -1,0 +1,17 @@
+extern "C" __clib_printChar(ch: char)
+extern "C" __clib_printCStr(ptr: *char)
+extern "C" __clib_printSoulStr(ptr: *char, len: uint)
+
+struct Stdout {}
+
+Stdout WriteChar(ch: char) {
+    __clib_printChar(ch)
+}
+
+Stdout WriteCstr(cstr: *char) {
+    __clib_printCStr(cstr)
+}
+
+Stdout WriteStr(str: [@]char) {
+    __clib_printSoulStr(str as *char, str.len)
+}

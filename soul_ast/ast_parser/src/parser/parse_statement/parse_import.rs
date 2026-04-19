@@ -1,7 +1,7 @@
 use ast::{Import, ImportKind, ImportPath, Statement};
 use ast::{ImportItem, StatementKind};
 use soul_tokenizer::TokenKind;
-use soul_utils::Ident;
+use soul_utils::{Ident};
 use soul_utils::symbool_kind::SymbolKind;
 use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},
@@ -119,6 +119,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     fn parse_import_path(&mut self) -> SoulResult<SoulImportPath> {
         const THIS_PORJECT: &str = KeyWord::Crate.as_str();
         const SEPARATOR: TokenKind = TokenKind::Symbol(SymbolKind::Dot);
+        const PREV_SUPER: TokenKind = TokenKind::Symbol(SymbolKind::Slash);
 
         let mut path = SoulImportPath::new();
         if self.current_is_ident(THIS_PORJECT) {
@@ -127,12 +128,23 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.bump();
             self.expect(&SEPARATOR)?;
         } else if self.current_is(&SEPARATOR) {
-            let current_path = self.context.current_path().clone();
-            path = SoulImportPath::from(current_path);
+            let mut current_path = self.context.current_path().clone();
             self.bump();
-            while self.current_is(&SEPARATOR) {
-                todo!()
+
+            while self.current_is(&PREV_SUPER) {
+                self.bump();
+                if !current_path.pop() {
+                    return Err(SoulError::new(
+                        "could not pop path",
+                        SoulErrorKind::PathNotFound,
+                        Some(self.token().span),
+                    ))
+                }
+                
+                self.expect(&SEPARATOR)?;
             }
+
+            path = SoulImportPath::from(current_path);
         }
 
         loop {

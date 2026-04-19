@@ -23,6 +23,10 @@ impl<'f, 'a> Parser<'f, 'a> {
         let mut fields = vec![];
         loop {
             self.skip_end_lines();
+
+            if self.current_is(&CURLY_CLOSE) {
+                break;
+            }
             match self.parse_field().merge_to_result() {
                 Ok(field) => fields.push(field),
                 Err(err) => {

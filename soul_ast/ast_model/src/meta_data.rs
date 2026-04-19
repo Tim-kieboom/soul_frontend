@@ -1,4 +1,4 @@
-use soul_utils::vec_map::VecMapIndex;
+use soul_utils::{span::ModuleId, vec_map::VecMapIndex};
 
 use crate::scope::{NodeId, ScopeBuilder};
 
@@ -8,17 +8,9 @@ pub struct AstMetadata {
     pub last_node_id: NodeId,
 }
 impl AstMetadata {
-    pub fn new() -> Self {
+    pub fn new(module: ModuleId) -> Self {
         Self {
-            scopes: ScopeBuilder::new(),
-            last_node_id: NodeId::new_index(0),
-        }
-    }
-}
-impl Default for AstMetadata {
-    fn default() -> Self {
-        Self {
-            scopes: ScopeBuilder::new(),
+            scopes: ScopeBuilder::new(module),
             last_node_id: NodeId::new_index(0),
         }
     }

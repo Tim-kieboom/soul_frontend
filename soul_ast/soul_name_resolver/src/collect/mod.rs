@@ -44,24 +44,32 @@ impl<'a> NameResolver<'a> {
         self.collect_block(&mut global);
         self.current.module = prev;
 
-        swap(
-            &mut global,
-            &mut self
-                .modules
-                .get_mut(module_id)
-                .expect("just checked")
-                .global,
-        );
+        match self.modules.get_mut(module_id) {
+            Some(module) => swap(&mut global, &mut module.global),
+            None => {
+                self.log_error(soul_error_internal!(
+                    format!("{:?} not found", module_id),
+                    None
+                ));
+                return;
+            }
+        }
     }
 
     fn push_scope(&mut self, set_scope_id: &mut Option<ScopeId>) {
-        let parent = self.info.scopes.current_scope_id();
-        self.info.scopes.push_scope(parent);
-        *set_scope_id = Some(self.info.scopes.current_scope_id())
+        let parent = match self.info.scopes.current_scope_id(self.current.module) {
+            Some(val) => val,
+            None => {
+                self.log_error(soul_error_internal!(format!("push_scope current_scope_id is None {:?}", self.current.module), None));
+                return
+            }
+        };
+        self.info.scopes.push_scope(parent, self.current.module).expect("no err");
+        *set_scope_id = self.info.scopes.current_scope_id(self.current.module)
     }
 
     fn pop_scope(&mut self) {
-        self.info.scopes.pop_scope();
+        self.info.scopes.pop_scope(self.current.module).expect("no err");
     }
 
     fn alloc_node(&mut self) -> NodeId {
@@ -155,7 +163,7 @@ impl<'a> NameResolver<'a> {
         if self
             .info
             .scopes
-            .flat_lookup_function(name.as_str())
+            .flat_lookup_function(name.as_str(), self.current.module)
             .is_some()
         {
             return false;
@@ -169,7 +177,7 @@ impl<'a> NameResolver<'a> {
         if self
             .info
             .scopes
-            .flat_lookup_value(name, ScopeValue::Variable)
+            .flat_lookup_value(name, ScopeValue::Variable, self.current.module)
             .is_some()
         {
             return false;
@@ -185,12 +193,13 @@ impl<'a> NameResolver<'a> {
         name: &Ident,
         span: Span,
         id: NodeId,
+        module: ModuleId,
     ) -> bool {
-        if scopes.flat_lookup_type(name).is_some() {
+        if scopes.flat_lookup_type(name, module).is_some() {
             return false;
         }
 
-        Self::static_current_scope_mut(scopes).insert_types(
+        Self::static_current_scope_mut(scopes, module).insert_types(
             name.as_str(),
             ScopeTypeEntry {
                 span,
@@ -255,6 +264,8 @@ impl<'a> NameResolver<'a> {
             module.modules.insert(module_id);
         }
         self.modules.insert(module_id, module);
+        let _res = self.info.scopes.add_module(module_id);
+        debug_assert!(_res.is_none());
 
         self.collect_module(module_id);
         self.resolve_modules(module_id);
@@ -267,11 +278,11 @@ impl<'a> NameResolver<'a> {
     fn current_scope_mut(&mut self) -> &mut Scope {
         self.info
             .scopes
-            .current_scope_mut()
+            .current_scope_mut(self.current.module)
             .expect("resolver has no scope")
     }
 
-    fn static_current_scope_mut<'b>(scopes: &'b mut ScopeBuilder) -> &'b mut Scope {
-        scopes.current_scope_mut().expect("resolver has no scope")
+    fn static_current_scope_mut<'b>(scopes: &'b mut ScopeBuilder, module: ModuleId) -> &'b mut Scope {
+        scopes.current_scope_mut(module).expect("resolver has no scope")
     }
 }

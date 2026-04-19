@@ -191,7 +191,7 @@ fn get_source_snippet(out: &mut String, span: &Span, mut lines: Lines, begin_spa
 
         if i == 0 {
             let start_col = span.start_offset.max(1);
-            let span_len = span.end_offset.max(1) - start_col;
+            let span_len = span.end_offset.max(1).saturating_sub(start_col);
             let spaces_before = " ".repeat(start_col.saturating_sub(1));
             let carets = "^".repeat(span_len);
             writeln!(out, "{begin_space}│ {spaces_before}{carets}").unwrap();

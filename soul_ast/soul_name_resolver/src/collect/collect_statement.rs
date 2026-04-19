@@ -250,7 +250,15 @@ impl<'a> NameResolver<'a> {
                 ast::ImportItem::Normal(name) => (name.as_str(), name),
             };
 
-            let Some(entry) = self.modules[module_id].header.get(name) else {
+            let Some(module) = self.modules.get(module_id) else {
+                self.log_error(soul_error_internal!(
+                    format!("module {:?} not found", module_id), 
+                    Some(span)
+                ));
+                continue;
+            };
+
+            let Some(entry) = module.header.get(name) else {
                 self.log_error(SoulError::new(
                     format!("module '{}' does not export '{}'", module_name, name),
                     SoulErrorKind::NotFoundInScope,
@@ -288,7 +296,7 @@ impl<'a> NameResolver<'a> {
                     }
                 };
 
-                if !Self::insert_struct_alias(&mut self.info.scopes, alias_name, span, id) {
+                if !Self::insert_struct_alias(&mut self.info.scopes, alias_name, span, id, self.current.module) {
                     Self::static_log_error(
                         self.context,
                         SoulError::new(
@@ -354,7 +362,7 @@ impl<'a> NameResolver<'a> {
         }
 
         let init = variable.initialize_value.as_ref()?;
-        owner_hint_from_expression(init, &self.info.scopes, self.store)
+        owner_hint_from_expression(init, &self.info.scopes, self.store, self.current.module)
     }
 
     fn import_module(
@@ -408,6 +416,7 @@ fn owner_hint_from_expression(
     init: &Expression,
     scopes: &ScopeBuilder,
     store: &DeclareStore,
+    module: ModuleId,
 ) -> Option<TypeKind> {
     match &init.node {
         ExpressionKind::Literal((_, lit)) => Some(TypeKind::Primitive(match lit {
@@ -421,7 +430,7 @@ fn owner_hint_from_expression(
             let owner_kind = function_call
                 .callee
                 .as_ref()
-                .and_then(|callee| parse_callee_type(callee, scopes));
+                .and_then(|callee| parse_callee_type(callee, scopes, module));
 
             let function_name = function_call.name.as_str();
 
@@ -437,13 +446,13 @@ fn owner_hint_from_expression(
     }
 }
 
-fn parse_callee_type(callee: &Expression, scopes: &ScopeBuilder) -> Option<TypeKind> {
+fn parse_callee_type(callee: &Expression, scopes: &ScopeBuilder, module: ModuleId) -> Option<TypeKind> {
     match &callee.node {
         ExpressionKind::Variable { ident, .. } => {
             if let Some(primitive) = PrimitiveTypes::from_str(ident.as_str()) {
                 return Some(TypeKind::Primitive(primitive));
             }
-            if scopes.lookup_type(ident).is_some() {
+            if scopes.lookup_type(ident, module).is_some() {
                 return Some(TypeKind::Stub(ast::Stub {
                     name: ident.as_str().to_string(),
                     generics: vec![],

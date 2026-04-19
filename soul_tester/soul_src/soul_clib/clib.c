@@ -192,6 +192,8 @@ Duration __clib_Duration_now() {
 
 // ---------------- #Pointers ----------------
 
-u8* __clib_offset(u8* ptr, uint index) {
+void* __clib_Nullptr() {return NULL;}
+
+u8* __clib_offset(u8* ptr, size_t index) {
     return ptr + index;
 }

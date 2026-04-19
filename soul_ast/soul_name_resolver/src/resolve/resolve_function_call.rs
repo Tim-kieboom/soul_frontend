@@ -102,7 +102,7 @@ impl<'a> NameResolver<'a> {
         let mut has_module_with_this = false;
         let mut can_use_store = false;
 
-        for (_name, entry) in self.info.scopes.modules() {
+        for (_name, entry) in self.info.scopes.modules(self.current.module).expect("shoudl be some") {
             if let ast::ImportKind::Items { this, .. } = &entry.import_kind {
                 if *this {
                     has_module_with_this = true;
@@ -198,7 +198,7 @@ impl<'a> NameResolver<'a> {
             ));
         }
 
-        if self.info.scopes.lookup_type(ident).is_some() {
+        if self.info.scopes.lookup_type(ident, self.current.module).is_some() {
             return Some(SoulType::new(
                 None,
                 TypeKind::Stub(ast::Stub {
@@ -209,7 +209,7 @@ impl<'a> NameResolver<'a> {
             ));
         }
 
-        if self.info.scopes.lookup_module(ident.as_str()).is_some() {
+        if self.info.scopes.lookup_module(ident.as_str(), self.current.module).is_some() {
             return Some(SoulType::new(
                 None,
                 TypeKind::Stub(ast::Stub {

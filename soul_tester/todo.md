@@ -24,3 +24,9 @@
 
 (C) add match
 (C) add union
+
+# Bugs
+- `[@]char methode() {}`
+- `call() as *char`
+- `return *ptr`
+- if statements with fn with return type

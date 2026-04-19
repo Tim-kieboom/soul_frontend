@@ -93,6 +93,7 @@ pub enum SoulErrorKind {
     PlaceTypeError,
     TypeNotFound,
     FieldNotFound,
+    PathNotFound,
     TypeInferenceError,
     GenericDefineError,
 

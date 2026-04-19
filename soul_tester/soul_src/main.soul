@@ -1,10 +1,12 @@
 import ( 
-    crate.io
-    // crate.Lib.SubLib
+    crate.Std.Io
+    crate.Lib.SubLib
     crate.Lib.{this, Variable, A, B as b}
 )
 
 function() {}
+
+const Num = 1
 
 main() {
     mut num = A()
@@ -17,10 +19,10 @@ main() {
     obj1 := Lib.Struct{field: 1}
     obj2 := Lib.GetStruct()
     field := obj2.field
-    SubLib.Pub()
+    // SubLib.Pub()
     // Lib.priv()
     // subLib.Pub()
     // Lib.subLib.Pub()
 
-    io.Println("hello world")
+    Io.Println("hello world")
 }

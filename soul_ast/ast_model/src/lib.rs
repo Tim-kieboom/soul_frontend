@@ -25,10 +25,10 @@ pub struct AstContext {
     pub function_generators: IdGenerator<FunctionId>,
 }
 impl AstContext {
-    pub fn new() -> Self {
+    pub fn new(module: ModuleId) -> Self {
         Self {
             store: DeclareStore::new(),
-            meta_data: AstMetadata::new(),
+            meta_data: AstMetadata::new(module),
             modules: AstModuleStore::new(),
             function_generators: IdGenerator::new(),
         }

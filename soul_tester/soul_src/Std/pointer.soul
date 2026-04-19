@@ -1,0 +1,44 @@
+extern "C" __clib_Nullptr(): *none
+extern "C" __clib_offset(ptr: *u8, index: int): *u8
+
+struct Cstr {ptr: *char}
+Cstr Null(): Cstr {
+    ptr := __clib_Nullptr() as *char
+    Cstr{ptr}
+}
+
+trait Offset {
+    Offset(this, index: int): This
+}
+
+use<T> *T impl Offset {
+    Offset(this, index: int): *T {
+        size := T.sizeof as int
+        offset := index * size
+        __clib_offset(text as *u8, offset) as *T
+    }
+}
+
+trait Index<Out> {
+    Index(@this, index: uint): @Out
+}
+
+use<T> [@]T impl Index<T> {
+    Index(@this, index: uint): @T {
+        size := T.sizeof as uint
+        offset := index * size
+        __clib_offset(text as *u8, offset as int) as @T
+    }
+}
+
+trait IndexMut<Out> {
+    IndexMut(&this, index: uint): &Out
+}
+
+use<T> [&]T impl IndexMut<T> {
+    IndexMut(&this, index: uint): &T {
+        size := T.sizeof as uint
+        offset := index * size
+        __clib_offset(text as *u8, offset as int) as &T
+    }
+}

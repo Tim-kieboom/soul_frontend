@@ -141,11 +141,11 @@ impl<'a> NameResolver<'a> {
     }
 
     fn check_variable(&mut self, name: &Ident) -> Option<NodeId> {
-        self.info.scopes.lookup_value(name, ScopeValue::Variable)
+        self.info.scopes.lookup_value(name, ScopeValue::Variable, self.current.module)
     }
 
     fn lookup_module(&mut self, name: &str) -> Option<ast::scope::ScopeModuleEntry> {
-        self.info.scopes.lookup_module(name)
+        self.info.scopes.lookup_module(name, self.current.module)
     }
 
     fn lookup_module_function(
@@ -154,11 +154,11 @@ impl<'a> NameResolver<'a> {
         function_name: &str,
         span: Span,
     ) -> Option<FunctionId> {
-        let module_entry = self.info.scopes.lookup_module(module_name)?;
+        let module_entry = self.info.scopes.lookup_module(module_name, self.current.module)?;
         let module_id = module_entry.module_id;
 
         if let Some(resolved_name) = self.resolve_alias(module_name, function_name) {
-            return self.info.scopes.lookup_function(&resolved_name);
+            return self.info.scopes.lookup_function(&resolved_name, self.current.module);
         }
 
         debug_assert!(self.modules.contains(module_id));
@@ -182,7 +182,7 @@ impl<'a> NameResolver<'a> {
         variable_name: &str,
         span: Span,
     ) -> Option<NodeId> {
-        let module_entry = self.info.scopes.lookup_module(module_name)?;
+        let module_entry = self.info.scopes.lookup_module(module_name, self.current.module)?;
         let module_id = module_entry.module_id;
 
         if let Some(resolved_name) = self.resolve_alias(module_name, variable_name) {
@@ -205,7 +205,7 @@ impl<'a> NameResolver<'a> {
     }
 
     fn resolve_alias(&self, module_name: &str, function_name: &str) -> Option<String> {
-        let module_entry = match self.info.scopes.lookup_module(module_name) {
+        let module_entry = match self.info.scopes.lookup_module(module_name, self.current.module) {
             Some(entry) => entry,
             None => return None,
         };
@@ -228,7 +228,7 @@ impl<'a> NameResolver<'a> {
     }
 
     fn flat_check_variable(&mut self, name: &Ident) -> Option<NodeId> {
-        self.info.scopes.lookup_value(name, ScopeValue::Variable)
+        self.info.scopes.lookup_value(name, ScopeValue::Variable, self.current.module)
     }
 
     fn is_name_public(&self, name: &str) -> bool {

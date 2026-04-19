@@ -1,0 +1,59 @@
+import (
+    .stdout.{Stdout}
+    ./.Fmt.{FmtUint, FmtInt, FmtFloat}
+)
+
+Println(text: [@]char) {
+    Print(text)
+    Endln()
+}
+
+Print(text: [@]char) {
+    Stdout.WriteStr(text)
+}
+
+Endln() {
+    Print_char('\n')
+}
+
+Println_char(letter: char) {
+    Print_char(letter)
+    Endln()
+}
+
+Println_int(value: int, base: u8 = 10, capital: bool = true) {
+    Print_int(value, base: base, capital: capital)
+    Endln()
+}
+
+Println_uint(value: uint, base: u8 = 10, capital: bool = true) {
+    Print_uint(value, base: base, capital: capital)
+    Endln()
+}
+
+Println_float(value: f64, base: u8 = 10, capital: bool = true, precision: u8 = 4) {
+    Print_float(value, base: base, capital: capital, precision: precision)
+    Endln()
+}
+
+Print_char(char: char) {
+    Stdout.WriteChar(char)
+}
+
+Print_int(value: int, base: u8 = 10, capital: bool = true) {
+    const fmtBuffer: [50]char
+    ptr := FmtInt(value, base, @fmtBuffer, capital)
+    Stdout.WriteCstr(ptr)
+}
+
+Print_uint(value: uint, base: u8 = 10, capital: bool = true) {
+    const fmtBuffer: [50]char
+    ptr := FmtUint(value, base, @fmtBuffer, capital)
+    Stdout.WriteCstr(ptr)
+}
+
+Print_float(value: f64, base: u8 = 10, precision: u8 = 4, capital: bool = true) {
+    const fmtBuffer: [50]char
+    ptr := FmtFloat(value, base, @fmtBuffer, precision, capital)
+    Stdout.WriteCstr(ptr)
+}

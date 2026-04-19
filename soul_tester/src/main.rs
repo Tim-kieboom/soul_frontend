@@ -91,7 +91,7 @@ fn run_fontend(paths: &Paths) -> Result<Ouput> {
     let tokens = to_token_stream(&source_file, root_module);
     display_tokenizer(paths, root_module, &source_file)?;
 
-    let mut ast_context = AstContext::new();
+    let mut ast_context = AstContext::new(root_module);
     to_ast(tokens, &COMPILER_OPTIONS, &mut context, &mut ast_context);
     display_ast(paths, &context, &ast_context)?;
 
