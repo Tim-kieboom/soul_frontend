@@ -531,9 +531,12 @@ impl<'a> HirDisplayer<'a> {
     fn inner_type(&mut self, id: LazyTypeId) -> Option<()> {
         match (self.typed, id) {
             (Some(typed), LazyTypeId::Known(ty)) => {
-                typed
+                let ty = typed
                     .types_map
-                    .id_to_type(ty)?
+                    .id_to_type(ty);
+
+                // debug_assert!(ty.is_some());                
+                ty?
                     .write_display(&typed.types_map, &mut self.sb)
                     .expect("no fmt error");
                 return Some(());
@@ -545,14 +548,22 @@ impl<'a> HirDisplayer<'a> {
         let types = &self.hir.info.types;
         let infers = &self.hir.info.infers;
         match id {
-            LazyTypeId::Known(type_id) => types
-                .id_to_type(type_id)?
-                .write_display(types, infers, &mut self.sb)
-                .expect("no fmt error"),
-            LazyTypeId::Infer(infer_type_id) => infers
-                .get_infer(infer_type_id)?
-                .write_display(types, infers, &mut self.sb)
-                .expect("no fmt error"),
+            LazyTypeId::Known(type_id) => {
+                let ty = types.id_to_type(type_id);
+                
+                // debug_assert!(ty.is_some());
+                ty?
+                    .write_display(types, infers, &mut self.sb)
+                    .expect("no fmt error");
+            }
+            LazyTypeId::Infer(infer_type_id) => {
+                let ty = infers.get_infer(infer_type_id);
+                
+                // debug_assert!(ty.is_some());
+                ty?
+                    .write_display(types, infers, &mut self.sb)
+                    .expect("no fmt error");
+            }
         }
 
         Some(())

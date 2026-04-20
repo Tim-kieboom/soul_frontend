@@ -120,14 +120,13 @@ impl<'a> HirContext<'a> {
 
     fn lower_internal_structs(&mut self) {
         let struct_id = self.tree.info.types.alloc_struct();
-        let generic_id = self.tree.info.types.insert_generic("T".to_string());
         let name = Ident::new(
             "___Array".to_string(),
             Span::default(self.context.module_store.get_root_id()),
         );
 
-        let generic_type = self.add_type(HirType::generic_type(generic_id)).to_lazy();
-        let ptr_type = self.add_type(HirType::pointer_type(generic_type)).to_lazy();
+        let none_type = self.add_type(HirType::none_type()).to_lazy();
+        let ptr_type = self.add_type(HirType::pointer_type(none_type)).to_lazy();
         let len_type = self.add_type(HirType::index_type());
         let fields = vec![
             Field {

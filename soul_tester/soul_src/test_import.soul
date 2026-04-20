@@ -1,0 +1,5 @@
+import (
+    crate.Std.Io.stdout
+)
+
+main() {}

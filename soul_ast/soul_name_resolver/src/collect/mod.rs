@@ -20,6 +20,7 @@ use soul_utils::{
 use crate::NameResolver;
 mod collect_expression;
 mod collect_statement;
+mod collect_import;
 mod collect_type;
 
 impl<'a> NameResolver<'a> {
