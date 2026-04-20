@@ -1,9 +1,5 @@
 use std::{
-    fs::{File, OpenOptions},
-    io::{Read, stdout},
-    path::{Path, PathBuf},
-    str::FromStr,
-    time::Instant,
+    fs::{File, OpenOptions}, io::{Read, stdout}, path::{Path, PathBuf}, str::FromStr, time::Instant
 };
 
 use anyhow::Result;
@@ -40,7 +36,7 @@ mod paths;
 static PATHS: &[u8] = include_bytes!("../paths.json");
 
 pub const MESSAGE_CONFIG: MessageConfig = MessageConfig {
-    backtrace: false,
+    backtrace: true,
     colors: true,
 };
 
@@ -65,7 +61,6 @@ fn main() -> Result<()> {
     if is_fatal(&output.context.faults, COMPILER_OPTIONS.fatal_level()) {
         return Ok(());
     }
-
     info!(
         "{GREEN}frontend success: {}ms{DEFAULT}",
         timer.elapsed().as_millis()

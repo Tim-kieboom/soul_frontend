@@ -1,0 +1,54 @@
+trait Write {
+    WriteChar(&this, ch: char)
+    WriteStr(&this, text: [@]char)
+    WriteFmt(&this, fmt: FmtStr<'a'>)
+}
+
+struct StringBuilder {
+    buffer: List<char> = []
+}
+use StringBuilder { 
+    
+    This() {
+        This{..}
+    }
+
+    Len(@this): uint {
+        this.buffer.Len()
+    }
+
+    Cap(@this): uint {
+        this.buffer.Cap()
+    }
+
+    IntoStr(this): [*]char {
+        this.buffer.IntoArray()
+    }
+
+    ToStr(@this): [*]char {
+        this.buffer.ToArray()
+    }
+
+    RefStr(@this): [@]char {
+        this.buffer.AsSlice()
+    }
+
+    impl Write {
+
+        WriteChar(&this, ch: char) {
+            this.buffer.Push(ch)
+        }
+
+        WriteStr(&this, text: [@]char) {
+            
+            for ch in text {
+                this.buffer.Push(ch)
+            }
+        }
+
+        WriteFmt(&this, fmt: FmtStr<'a'>) {
+            
+        }
+
+    }
+}

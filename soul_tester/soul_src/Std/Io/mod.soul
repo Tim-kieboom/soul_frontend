@@ -1,7 +1,10 @@
 import (
+    .test
     .stdout.{Stdout}
     ./.Fmt.{FmtUint, FmtInt, FmtFloat}
 )
+
+Stdout Methode() {}
 
 Println(text: [@]char) {
     Print(text)

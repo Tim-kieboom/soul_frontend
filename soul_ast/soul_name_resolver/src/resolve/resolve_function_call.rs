@@ -2,10 +2,7 @@ use ast::{
     Expression, ExpressionKind, FunctionCall, FunctionKind, SoulType, TypeKind, VarTypeKind,
 };
 use soul_utils::{
-    error::{SoulError, SoulErrorKind},
-    ids::{FunctionId, IdAlloc},
-    soul_names::PrimitiveTypes,
-    span::Span,
+    error::{SoulError, SoulErrorKind}, ids::{FunctionId, IdAlloc}, soul_error_internal, soul_names::PrimitiveTypes, span::Span
 };
 
 use crate::NameResolver;
@@ -97,12 +94,19 @@ impl<'a> NameResolver<'a> {
             return;
         }
 
-        // If still not resolved, try the store lookup
         let func_name = function_call.name.as_str();
         let mut has_module_with_this = false;
         let mut can_use_store = false;
 
-        for (_name, entry) in self.info.scopes.modules(self.current.module).expect("shoudl be some") {
+        let Some(modules_iter) = self.info.scopes.iter_modules(self.current.module) else {
+            self.log_error(soul_error_internal!(
+                format!("{:?} not found", self.current.module),
+                Some(function_call.name.span)
+            ));
+            return
+        };
+
+        for (_name, entry) in modules_iter {
             if let ast::ImportKind::Items { this, .. } = &entry.import_kind {
                 if *this {
                     has_module_with_this = true;

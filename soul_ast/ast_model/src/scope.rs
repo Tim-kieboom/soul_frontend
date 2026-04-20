@@ -117,7 +117,7 @@ impl ScopeBuilder {
             .lookup_module(name)
     }
 
-    pub fn modules(&self, module: ModuleId) -> Option<impl Iterator<Item = (String, ScopeModuleEntry)>> {
+    pub fn iter_modules(&self, module: ModuleId) -> Option<impl Iterator<Item = (String, ScopeModuleEntry)>> {
         Some(self.scopes
             .get(module)?
             .modules())
