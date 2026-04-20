@@ -117,6 +117,10 @@ impl<'a> NameResolver<'a> {
                 has_module_with_this = true;
             }
 
+            if matches!(entry.import_kind, ast::ImportKind::Module) {
+                continue;
+            }
+
             for item in &entry.imported_items {
                 match item {
                     ast::ImportItem::Normal(ident) => {

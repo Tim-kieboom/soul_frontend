@@ -68,9 +68,9 @@ impl<'a, 'f> Parser<'a, 'f> {
                     let alias = self.try_bump_consume_ident()?.into();
                     ImportKind::Alias(alias)
                 }
-                _ => ImportKind::This,
+                _ => ImportKind::Module,
             },
-            _ => ImportKind::This,
+            _ => ImportKind::Module,
         };
 
         Ok(ImportPath { module: path, kind })

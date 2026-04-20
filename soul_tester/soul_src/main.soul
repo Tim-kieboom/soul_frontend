@@ -1,5 +1,6 @@
 import ( 
     crate.Std.Io
+    crate.Std.Io.stdout.{Stdout}
     crate.Lib.SubLib
     crate.Lib.{this, Variable, A, B as b}
 )

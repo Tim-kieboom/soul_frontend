@@ -104,6 +104,7 @@ impl<'a> NameResolver<'a> {
     fn declare_struct(&mut self, obj: &mut Struct) -> NodeId {
         let id = self.alloc_node();
         obj.id = Some(id);
+        obj.defined_in = Some(self.current.module);
 
         let name = &obj.name;
         let scope_type = ScopeTypeEntry {

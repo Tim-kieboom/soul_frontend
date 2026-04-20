@@ -47,6 +47,7 @@ impl<'f, 'a> Parser<'f, 'a> {
             name,
             fields,
             generics,
+            defined_in: None,
         };
 
         Ok(Statement::new(

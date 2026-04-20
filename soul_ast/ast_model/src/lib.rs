@@ -143,6 +143,10 @@ impl DeclareStore {
         self.structs.values()
     }
 
+    pub fn find_struct_by_name(&self, name: &str) -> Option<&(Struct, ModuleId)> {
+        self.structs.values().find(|(s, _)| s.name.as_str() == name)
+    }
+
     /// Retrieves a function by its ID.
     pub fn get_function(&self, index: FunctionId) -> Option<&(FunctionSignature, ModuleId)> {
         self.functions.get(index)
@@ -150,14 +154,18 @@ impl DeclareStore {
 
     /// Finds a function by name and optional owner type (for method resolution).
     pub fn find_function(&self, name: &str, owner_kind: Option<&TypeKind>) -> Option<FunctionId> {
-        self.functions.entries().find_map(|(id, (signature, _))| {
+        self.find_function_with_module(name, owner_kind).map(|(id, _)| id)
+    }
+
+    pub fn find_function_with_module(&self, name: &str, owner_kind: Option<&TypeKind>) -> Option<(FunctionId, ModuleId)> {
+        self.functions.entries().find_map(|(id, (signature, module))| {
             if signature.name.as_str() != name {
                 return None;
             }
 
             match owner_kind {
-                Some(owner) if &signature.methode_type.kind == owner => Some(id),
-                None if matches!(signature.methode_type.kind, TypeKind::None) => Some(id),
+                Some(owner) if &signature.methode_type.kind == owner => Some((id, *module)),
+                None if matches!(signature.methode_type.kind, TypeKind::None) => Some((id, *module)),
                 _ => None,
             }
         })

@@ -395,6 +395,7 @@ impl<'a> AstDisplayer<'a> {
                 ast::ImportKind::Alias(alias) => {
                     self.push_fmt(format_args!(" as {}", alias.as_str()));
                 }
+                ast::ImportKind::Module => {}
             }
 
             if len > 1 {

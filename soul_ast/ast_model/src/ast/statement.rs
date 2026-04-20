@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use enum_variant_name_const::EnumVariantNameConst;
 use soul_utils::ids::FunctionId;
 use soul_utils::soul_names::TypeModifier;
-use soul_utils::span::{ItemMetaData, Span};
+use soul_utils::span::{ItemMetaData, Span, ModuleId};
 use soul_utils::{Ident, soul_import_path::SoulImportPath, span::Spanned};
 
 use crate::Generic;
@@ -67,6 +67,7 @@ pub struct Struct {
     pub name: Ident,
     pub generics: Vec<Generic>,
     pub fields: Vec<Field>,
+    pub defined_in: Option<ModuleId>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -107,6 +108,7 @@ pub enum ImportKind {
     This,
     Glob,
     Alias(Ident),
+    Module,
     Items {
         this: bool,
         this_alias: Option<Ident>,
