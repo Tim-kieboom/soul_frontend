@@ -535,7 +535,7 @@ impl<'a> HirDisplayer<'a> {
                     .types_map
                     .id_to_type(ty);
 
-                // debug_assert!(ty.is_some());                
+                debug_assert!(ty.is_some());                
                 ty?
                     .write_display(&typed.types_map, &mut self.sb)
                     .expect("no fmt error");
@@ -551,16 +551,16 @@ impl<'a> HirDisplayer<'a> {
             LazyTypeId::Known(type_id) => {
                 let ty = types.id_to_type(type_id);
                 
-                // debug_assert!(ty.is_some());
+                debug_assert!(ty.is_some());
                 ty?
                     .write_display(types, infers, &mut self.sb)
                     .expect("no fmt error");
             }
             LazyTypeId::Infer(infer_type_id) => {
-                let ty = infers.get_infer(infer_type_id);
+                let infer = infers.get_infer(infer_type_id);
                 
-                // debug_assert!(ty.is_some());
-                ty?
+                debug_assert!(infer.is_some());
+                infer?
                     .write_display(types, infers, &mut self.sb)
                     .expect("no fmt error");
             }

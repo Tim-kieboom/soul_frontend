@@ -1,5 +1,5 @@
-#ifndef __BETTERINTS_H__
-#define __BETTERINTS_H__
+#ifndef __CLIB_H__
+#define __CLIB_H__
 #include <time.h>
 #include <math.h>
 #include <stdio.h>

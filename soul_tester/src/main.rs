@@ -91,8 +91,8 @@ fn run_fontend(paths: &Paths) -> Result<Ouput> {
     display_ast(paths, &context, &ast_context)?;
 
     let mut hir = to_hir(&COMPILER_OPTIONS, &mut context, &ast_context);
-    clear_hir_type_map(&mut hir);
     display_hir(paths, &hir, &ast_context)?;
+    clear_hir_type_map(&mut hir);
 
     let mir = to_mir(&hir, &COMPILER_OPTIONS, &mut context);
     display_mir(paths, &mir, &hir)?;

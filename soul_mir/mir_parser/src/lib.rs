@@ -40,8 +40,6 @@ pub fn mir_lower(hir_reponse: &HirResponse, context: &mut CompilerContext) -> Mi
 struct MirContext<'a> {
     tree: MirTree,
     main: FunctionId,
-
-    /// used for fallback type in some cases
     error_type: ThirType,
     current: CurrentContext,
     id_generators: IdGenerators,
