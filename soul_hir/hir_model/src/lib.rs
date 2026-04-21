@@ -70,12 +70,12 @@ impl HirTree {
         }
     }
 
-    pub fn insert_module(&mut self, module_id: ModuleId) {
+    pub fn insert_module(&mut self, module_id: ModuleId, sub_modules: Vec<ModuleId>) {
         if !self.nodes.modules.contains(module_id) {
             let module = Module {
                 id: module_id,
                 globals: vec![],
-                modules: vec![],
+                modules: sub_modules,
             };
             self.nodes.modules.insert(module_id, module);
         }

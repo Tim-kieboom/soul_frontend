@@ -92,8 +92,11 @@ impl<'a> HirContext<'a> {
 
     fn init_submodules(tree: &mut HirTree, ast_context: &AstContext, module_id: ModuleId) {
         let ast_module = &ast_context.modules[module_id];
-        for sub_module_id in ast_module.modules.entries() {
-            tree.insert_module(sub_module_id);
+        let sub_modules: Vec<ModuleId> = ast_module.modules.entries().collect();
+        for sub_module_id in sub_modules.iter().cloned() {
+            let sub_ast_module = &ast_context.modules[sub_module_id];
+            let sub_sub_modules: Vec<ModuleId> = sub_ast_module.modules.entries().collect();
+            tree.insert_module(sub_module_id, sub_sub_modules);
             Self::init_submodules(tree, ast_context, sub_module_id);
         }
     }

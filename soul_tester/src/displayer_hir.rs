@@ -206,9 +206,7 @@ impl<'a> HirDisplayer<'a> {
         let prev = self.terminate;
         self.terminate = block.terminator.map(|t| t.get_expression_id());
 
-        self.display_block_id(*id);
-        self.push_str("{\n");
-
+        self.push_fmt(format_args!("{{ /*{}*/\n", id.index()));
         self.push_scope();
         for node in &block.statements {
             self.display_depth();
@@ -439,10 +437,6 @@ impl<'a> HirDisplayer<'a> {
                 }
             }
         }
-    }
-
-    fn display_block_id(&mut self, id: BlockId) {
-        write!(self.sb, "Block_{}", id.index()).expect("no format error")
     }
 
     fn display_call_id(&mut self, id: FunctionId) {

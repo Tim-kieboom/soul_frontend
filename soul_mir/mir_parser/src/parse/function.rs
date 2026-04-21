@@ -8,7 +8,7 @@ impl<'a> MirContext<'a> {
         let init_globals = mir::Function {
             id: self.tree.init_global_function,
             name: Ident::new(
-                "_init_globals".to_string(),
+                "___initGlobals".to_string(),
                 Span::default(self.context.module_store.get_root_id()),
             ),
             body: mir::FunctionBody::Internal {
