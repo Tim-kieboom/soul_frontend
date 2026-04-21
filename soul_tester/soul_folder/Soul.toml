@@ -1,0 +1,6 @@
+name = "Test"
+edition = "1.0"
+
+[dependencies]
+Std = { path = "Std" }
+Core = { path = "Std/Core" }
