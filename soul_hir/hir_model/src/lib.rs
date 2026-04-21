@@ -13,10 +13,10 @@ pub use hir_type::*;
 pub use ids::*;
 pub use place::*;
 use soul_utils::{
+    Ident,
     ids::{FunctionId, IdAlloc},
     soul_names::INIT_GLOBALS_FUNCTION_NAME,
     span::{ModuleId, Span},
-    Ident,
 };
 pub use statement::*;
 

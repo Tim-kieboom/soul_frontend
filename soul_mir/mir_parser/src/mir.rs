@@ -1,6 +1,6 @@
 use ast::{BinaryOperator, ExternLanguage, UnaryOperator};
 use hir::{ComplexLiteral, FieldId, GenericId, StructId, TypeId};
-use soul_utils::{Ident, ids::FunctionId, impl_soul_ids, vec_map::VecMap};
+use soul_utils::{Ident, ids::FunctionId, impl_soul_ids, span::ModuleId, vec_map::VecMap};
 
 impl_soul_ids!(GlobalId, BlockId, LocalId, StatementId, PlaceId, TempId);
 
@@ -13,8 +13,11 @@ impl_soul_ids!(GlobalId, BlockId, LocalId, StatementId, PlaceId, TempId);
 /// - Easy to lower to LLVM IR
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MirTree {
+    pub root_module: ModuleId,
     pub entry_function: FunctionId,
     pub init_global_function: FunctionId,
+
+    pub modules: VecMap<ModuleId, Module>,
 
     pub globals: VecMap<GlobalId, Global>,
 
@@ -36,6 +39,21 @@ pub struct MirTree {
 
     /// Function metadata
     pub functions: VecMap<FunctionId, Function>,
+}
+
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+pub enum ModuleNodeId {
+    BlockId(BlockId),
+    GlobalId(GlobalId),
+    FunctionId(FunctionId),
+    StatementId(StatementId),
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Module {
+    pub id: ModuleId,
+    pub nodes: Vec<ModuleNodeId>,
+    pub modules: Vec<ModuleId>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

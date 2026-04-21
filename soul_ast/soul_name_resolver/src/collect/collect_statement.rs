@@ -1,11 +1,12 @@
 use ast::{
-    Block, DeclareStore, Expression, ExpressionKind, Function, FunctionSignature,
-    Literal, Statement, StatementKind, TypeKind, UseBlock, VarTypeKind,
-    Variable,
+    Block, DeclareStore, Expression, ExpressionKind, Function, FunctionSignature, Literal,
+    Statement, StatementKind, TypeKind, UseBlock, VarTypeKind, Variable,
     scope::{ScopeBuilder, ScopeValue, ScopeValueKind},
 };
 use soul_utils::{
-    error::{SoulError, SoulErrorKind}, soul_names::PrimitiveTypes, span::{ModuleId,}
+    error::{SoulError, SoulErrorKind},
+    soul_names::PrimitiveTypes,
+    span::ModuleId,
 };
 
 use crate::NameResolver;
@@ -125,18 +126,18 @@ impl<'a> NameResolver<'a> {
     pub(crate) fn collect_function(&mut self, function: &mut Function) {
         let prev_in_global = self.current.in_global;
         let prev_function = self.current.function;
-        
+
         let id = self.declare_function(&mut function.signature);
-        
+
         if is_main(&function.signature.node) {
             self.store.main_function = Some(id);
         }
-        
+
         let signature = &mut function.signature.node;
         self.collect_type(&mut signature.methode_type);
         self.collect_type(&mut signature.return_type);
         self.push_scope(&mut function.block.scope_id);
-        
+
         if signature.function_kind != ast::FunctionKind::Static {
             let id = self.alloc_node();
             self.insert_value("this", id, ScopeValue::Variable);
@@ -200,7 +201,11 @@ fn owner_hint_from_expression(
     }
 }
 
-fn parse_callee_type(callee: &Expression, scopes: &ScopeBuilder, module: ModuleId) -> Option<TypeKind> {
+fn parse_callee_type(
+    callee: &Expression,
+    scopes: &ScopeBuilder,
+    module: ModuleId,
+) -> Option<TypeKind> {
     match &callee.node {
         ExpressionKind::Variable { ident, .. } => {
             if let Some(primitive) = PrimitiveTypes::from_str(ident.as_str()) {

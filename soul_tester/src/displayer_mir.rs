@@ -1,64 +1,39 @@
+use ast::AstModuleStore;
 use hir::{ComplexLiteral, FieldId, HirTree, StructId, TypeId};
 use mir_parser::mir::{
-    self, BlockId, FunctionBody, Local, LocalId, MirTree, Operand, Place, PlaceId, PlaceKind,
-    Rvalue, StatementId, TempId,
+    self, BlockId, FunctionBody, GlobalId, Local, LocalId, MirTree, ModuleNodeId, Operand, Place, PlaceId, PlaceKind, Rvalue, StatementId, TempId
 };
 use run_hir::HirResponse;
 use soul_utils::{
-    ids::{FunctionId, IdAlloc},
-    soul_names::{TypeModifier, TypeWrapper},
-    vec_map::VecMapIndex,
+    ids::{FunctionId, IdAlloc}, soul_names::{TypeModifier, TypeWrapper}, span::ModuleId, vec_map::VecMapIndex
 };
-use std::fmt::Write;
+use std::fmt::{Arguments, Write};
 use typed_hir::{ThirType, ThirTypeKind, TypedHir, display_thir::DisplayThirType};
 
-pub fn display_mir(mir: &MirTree, hir: &HirResponse) -> String {
-    let mut displayer = MirDisplayer::new(mir, hir);
+pub fn display_mir(mir: &MirTree, hir: &HirResponse, ast_modules: &AstModuleStore) -> String {
+    let mut displayer = MirDisplayer::new(mir, hir, ast_modules);
 
-    for global in mir.globals.values() {
-        displayer.display_global(global);
-    }
-
-    if !mir.globals.is_empty() {
-        displayer.push('\n');
-    }
-
-    if let Some(main) = mir.functions.get(mir.entry_function).map(|f| f.id) {
-        displayer.display_function(main);
-        displayer.push('\n');
-    }
-
-    if let Some(init_globals) = mir.functions.get(mir.init_global_function).map(|f| f.id) {
-        displayer.display_function(init_globals);
-        displayer.push('\n');
-    }
-
-    let keys = mir
-        .functions
-        .keys()
-        .filter(|id| *id != mir.init_global_function && *id != mir.entry_function);
-
-    for function in keys {
-        displayer.display_function(function);
-        displayer.push('\n');
-    }
-
+    displayer.display_module(mir.root_module);
     displayer.consume_to_string()
 }
 
 struct MirDisplayer<'a> {
     sb: String,
+    depth: String,
     mir: &'a MirTree,
     hir: &'a HirTree,
     types: &'a TypedHir,
+    ast_modules: &'a AstModuleStore,
 }
 impl<'a> MirDisplayer<'a> {
-    fn new(mir: &'a MirTree, hir: &'a HirResponse) -> Self {
+    fn new(mir: &'a MirTree, hir: &'a HirResponse, ast_modules: &'a AstModuleStore) -> Self {
         Self {
             mir,
+            ast_modules,
             hir: &hir.hir,
             types: &hir.typed,
             sb: String::new(),
+            depth: String::new(),
         }
     }
 
@@ -70,11 +45,67 @@ impl<'a> MirDisplayer<'a> {
         self.sb.push_str(str);
     }
 
+    fn push_scope(&mut self) {
+        self.depth.push('\t');
+    }
+
+    fn display_depth(&mut self) {
+        self.sb.push_str(&self.depth);
+    }
+
+    fn pop_scope(&mut self) {
+        self.depth.pop();
+    }
+
+    fn push_fmt(&mut self, fmt: Arguments<'_>) {
+        self.sb.write_fmt(fmt).expect("no fmt error");
+    }
+
     fn consume_to_string(self) -> String {
         self.sb
     }
 
-    fn display_global(&mut self, global: &mir::Global) {
+    fn display_module(&mut self, module_id: ModuleId) {
+        let Some(module) = self.mir.modules.get(module_id) else {
+            return
+        };
+
+        let name = self.ast_modules
+            .get(module_id)
+            .map(|m| m.name.as_str())
+            .unwrap_or("<error>");
+        
+        self.display_depth();
+        self.push_fmt(format_args!("mod {name} {{\n"));
+        self.push_scope();
+        for node in module.nodes.iter().copied() {
+            self.display_depth();
+            self.display_module_node(node);
+            self.push('\n');
+        }
+
+        for id in &module.modules {
+            self.display_module(*id);
+        }
+        self.pop_scope();
+        self.display_depth();
+        self.push_str("}\n");
+    }
+
+    fn display_module_node(&mut self, id: ModuleNodeId) {
+        match id {
+            mir::ModuleNodeId::BlockId(block_id) => self.display_block(block_id),
+            mir::ModuleNodeId::GlobalId(global_id) => self.display_global(global_id),
+            mir::ModuleNodeId::FunctionId(function_id) => self.display_function(function_id),
+            mir::ModuleNodeId::StatementId(statement_id) => self.display_statement(statement_id),
+        }
+    }
+
+    fn display_global(&mut self, global_id: GlobalId) {
+        let Some(global) = self.mir.globals.get(global_id) else {
+            return
+        };
+
         self.display_local_declare(global.local);
         if let Some(literal) = &global.literal {
             self.push_str(" = ");
@@ -127,14 +158,14 @@ impl<'a> MirDisplayer<'a> {
             } => (*entry_block, locals, blocks),
         };
 
-        self.push_str(" {");
-        write!(self.sb, "/*{}*/", function_id.index()).expect("no fmt error");
-        self.push_str("\n\t");
+        self.push_fmt(format_args!(" {{ /*{}*/\n", function_id.index()));
+        self.push_scope();
+        self.display_depth();
         self.display_goto(entry_block);
         self.push('\n');
 
         for local_id in locals {
-            self.push('\t');
+            self.display_depth();
             self.display_local_declare(*local_id);
             self.push('\n');
         }
@@ -143,7 +174,10 @@ impl<'a> MirDisplayer<'a> {
         for block in blocks {
             self.display_block(*block);
         }
-        self.push_str("\n}\n");
+        self.push('\n');
+        self.pop_scope();
+        self.display_depth();
+        self.push_str("}\n");
     }
 
     fn display_local_declare(&mut self, local_id: LocalId) {
@@ -171,15 +205,20 @@ impl<'a> MirDisplayer<'a> {
         let block = &self.mir.blocks[block_id];
 
         self.push('\n');
+        
+        self.pop_scope();
+        self.display_depth();
+        self.push_scope();
+
         self.display_block_name(block_id);
         self.push_str(": \n");
         for statement in &block.statements {
-            self.push_str("\t");
+            self.display_depth();
             self.display_statement(*statement);
             self.push('\n');
         }
 
-        self.push_str("\t");
+        self.display_depth();
         match &block.terminator {
             mir::Terminator::Exit => self.push_str("// exit"),
             mir::Terminator::Goto(block_id) => {
@@ -200,7 +239,9 @@ impl<'a> MirDisplayer<'a> {
                 self.display_operand(condition);
                 self.push_str(") ");
                 self.display_goto(*then);
-                self.push_str("\n\telse ");
+                self.push('\n');    
+                self.display_depth();
+                self.push_str("else ");
                 self.display_goto(*arm);
             }
             mir::Terminator::Unreachable => self.push_str("// unreachable"),
@@ -404,19 +445,23 @@ impl<'a> MirDisplayer<'a> {
     }
 
     fn display_function_name(&mut self, function: FunctionId) {
-        let name = if function == FunctionId::error() {
-            "<error>"
-        } else {
-            let function = &self.mir.functions[function];
-            let owner = function.owner_type;
-            if !self.is_type_none(owner) {
-                self.display_type(owner);
-                self.push('.');
-            }
-            function.name.as_str()
+        
+        if function == FunctionId::error() {
+            self.push_str("<error>");
+            return
         };
 
-        self.push_str(name);
+        let Some(function) = self.mir.functions.get(function) else {
+            self.push_str("<error>");
+            return
+        };
+
+        let owner = function.owner_type;
+        if !self.is_type_none(owner) {
+            self.display_type(owner);
+            self.push('.');
+        }
+        self.push_str(function.name.as_str())
     }
 
     fn display_local_name(&mut self, local: LocalId) {

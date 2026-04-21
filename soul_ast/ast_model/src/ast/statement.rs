@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use enum_variant_name_const::EnumVariantNameConst;
 use soul_utils::ids::FunctionId;
 use soul_utils::soul_names::TypeModifier;
-use soul_utils::span::{ItemMetaData, Span, ModuleId};
+use soul_utils::span::{ItemMetaData, ModuleId, Span};
 use soul_utils::{Ident, soul_import_path::SoulImportPath, span::Spanned};
 
 use crate::Generic;

@@ -216,9 +216,11 @@ fn get_source_snippet(out: &mut String, span: &Span, mut lines: Lines, begin_spa
 }
 
 fn display_span(sb: &mut String, span: Span) {
-    sb.write_fmt(format_args!(":{}:{}", span.start_line, span.start_offset)).expect("no fmt error");
+    sb.write_fmt(format_args!(":{}:{}", span.start_line, span.start_offset))
+        .expect("no fmt error");
 
     if span.start_line != span.end_line || span.start_offset != span.end_offset {
-        sb.write_fmt(format_args!(" to {}:{}", span.end_line, span.end_offset)).expect("no fmt error");
+        sb.write_fmt(format_args!(" to {}:{}", span.end_line, span.end_offset))
+            .expect("no fmt error");
     }
 }

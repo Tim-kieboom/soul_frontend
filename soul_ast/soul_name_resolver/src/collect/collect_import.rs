@@ -1,7 +1,12 @@
 use std::path::{Path, PathBuf};
 
 use ast::{EntryKind, ImportItem, ImportPath};
-use soul_utils::{error::{SoulError, SoulErrorKind}, ids::IdAlloc, soul_error_internal, span::{ModuleId, Span}};
+use soul_utils::{
+    error::{SoulError, SoulErrorKind},
+    ids::IdAlloc,
+    soul_error_internal,
+    span::{ModuleId, Span},
+};
 
 use crate::NameResolver;
 
@@ -32,7 +37,7 @@ impl<'a> NameResolver<'a> {
         let Some(module_file_path) = self.find_module_file(path.module.to_pathbuf(), span) else {
             return;
         };
-        
+
         self.insure_parents_are_loaded(&module_file_path, span);
 
         let module_id = self.import_module(&module_file_path, module_name, parent_module, span);
@@ -51,34 +56,33 @@ impl<'a> NameResolver<'a> {
 
     fn is_module_internal(&mut self, path: &ImportPath) -> bool {
         let Some(parent) = path.module.as_pathbuf().parent() else {
-            return false
+            return false;
         };
 
         let Some(parent_name) = parent.file_name() else {
-            return false
+            return false;
         };
 
         let current = self.context.current_path();
         if current.file_name() == Some(parent_name) {
-            return true
+            return true;
         }
 
         let Some(current_parent) = current.parent() else {
-            return false
+            return false;
         };
 
         current_parent.file_name() == Some(parent_name)
     }
 
     fn check_if_module_private(&mut self, path: &ImportPath, span: Span) {
-
         if self.is_module_internal(path) {
-           return 
-        }        
+            return;
+        }
 
         let path = path.module.as_path();
         let Some(name) = path.file_name().and_then(|f| f.to_str()) else {
-            return
+            return;
         };
 
         let is_public = self.is_name_public(name);
@@ -88,18 +92,15 @@ impl<'a> NameResolver<'a> {
                 SoulErrorKind::NotFoundInScope,
                 Some(span),
             ));
-            return
+            return;
         }
     }
 
-    fn insure_parents_are_loaded(
-        &mut self,
-        module_file_path: &PathBuf,
-        span: Span,
-    ) {
+    fn insure_parents_are_loaded(&mut self, module_file_path: &PathBuf, span: Span) {
         fn get_module_name(current: &PathBuf) -> Option<String> {
             let osstr = current.file_name()?;
-            osstr.to_str()?
+            osstr
+                .to_str()?
                 .split('.')
                 .next()
                 .map(|name| name.to_string())
@@ -110,7 +111,7 @@ impl<'a> NameResolver<'a> {
             Ok(val) => val,
             Err(err) => {
                 self.log_error(soul_error_internal!(format!("{}", err.to_string()), None));
-                return
+                return;
             }
         };
 
@@ -120,8 +121,11 @@ impl<'a> NameResolver<'a> {
             let name = match get_module_name(&current) {
                 Some(val) => val,
                 None => {
-                    self.log_error(soul_error_internal!(format!("file_name of '{:?}' not found", current), None));
-                    return
+                    self.log_error(soul_error_internal!(
+                        format!("file_name of '{:?}' not found", current),
+                        None
+                    ));
+                    return;
                 }
             };
 
@@ -151,7 +155,7 @@ impl<'a> NameResolver<'a> {
 
             let Some(module) = self.modules.get(module_id) else {
                 self.log_error(soul_error_internal!(
-                    format!("module {:?} not found", module_id), 
+                    format!("module {:?} not found", module_id),
                     Some(span)
                 ));
                 continue;
@@ -195,7 +199,13 @@ impl<'a> NameResolver<'a> {
                     }
                 };
 
-                if !Self::insert_struct_alias(&mut self.info.scopes, alias_name, span, id, self.current.module) {
+                if !Self::insert_struct_alias(
+                    &mut self.info.scopes,
+                    alias_name,
+                    span,
+                    id,
+                    self.current.module,
+                ) {
                     Self::static_log_error(
                         self.context,
                         SoulError::new(
@@ -255,8 +265,6 @@ impl<'a> NameResolver<'a> {
         }
     }
 
-
-
     fn import_module(
         &mut self,
         module_file_path: &PathBuf,
@@ -264,9 +272,8 @@ impl<'a> NameResolver<'a> {
         parent: ModuleId,
         span: Span,
     ) -> ModuleId {
-
         let dir = module_file_path.parent().unwrap_or(module_file_path);
-        let module_id = self.context.module_store.get_or_insert(module_file_path);       
+        let module_id = self.context.module_store.get_or_insert(module_file_path);
         if self.modules.get(module_id).is_some() {
             return module_id;
         }

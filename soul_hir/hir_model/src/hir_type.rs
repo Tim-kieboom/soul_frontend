@@ -1,10 +1,10 @@
 use ast::{ArrayKind, Literal};
 use soul_utils::{
+    Ident,
     ids::IdAlloc,
     soul_names::{PrimitiveTypes, TypeModifier},
     symbool_kind::SymbolKind,
     vec_map::VecMapIndex,
-    Ident,
 };
 
 use crate::{FieldId, GenericId, InferTypeId, InferTypesMap, StructId, TypeId, TypesMap};

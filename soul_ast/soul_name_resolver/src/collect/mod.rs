@@ -19,8 +19,8 @@ use soul_utils::{
 
 use crate::NameResolver;
 mod collect_expression;
-mod collect_statement;
 mod collect_import;
+mod collect_statement;
 mod collect_type;
 
 impl<'a> NameResolver<'a> {
@@ -61,16 +61,28 @@ impl<'a> NameResolver<'a> {
         let parent = match self.info.scopes.current_scope_id(self.current.module) {
             Some(val) => val,
             None => {
-                self.log_error(soul_error_internal!(format!("push_scope current_scope_id is None {:?}", self.current.module), None));
-                return
+                self.log_error(soul_error_internal!(
+                    format!(
+                        "push_scope current_scope_id is None {:?}",
+                        self.current.module
+                    ),
+                    None
+                ));
+                return;
             }
         };
-        self.info.scopes.push_scope(parent, self.current.module).expect("no err");
+        self.info
+            .scopes
+            .push_scope(parent, self.current.module)
+            .expect("no err");
         *set_scope_id = self.info.scopes.current_scope_id(self.current.module)
     }
 
     fn pop_scope(&mut self) {
-        self.info.scopes.pop_scope(self.current.module).expect("no err");
+        self.info
+            .scopes
+            .pop_scope(self.current.module)
+            .expect("no err");
     }
 
     fn alloc_node(&mut self) -> NodeId {
@@ -231,8 +243,11 @@ impl<'a> NameResolver<'a> {
         self.current_scope_mut().insert_module(name, entry);
     }
 
-    fn find_module_file(&mut self, mut module_path: PathBuf, span: Span) -> Option<std::path::PathBuf> {
-
+    fn find_module_file(
+        &mut self,
+        mut module_path: PathBuf,
+        span: Span,
+    ) -> Option<std::path::PathBuf> {
         if module_path.is_dir() {
             module_path.push("mod.soul");
             if !module_path.is_file() {
@@ -284,7 +299,12 @@ impl<'a> NameResolver<'a> {
             .expect("resolver has no scope")
     }
 
-    fn static_current_scope_mut<'b>(scopes: &'b mut ScopeBuilder, module: ModuleId) -> &'b mut Scope {
-        scopes.current_scope_mut(module).expect("resolver has no scope")
+    fn static_current_scope_mut<'b>(
+        scopes: &'b mut ScopeBuilder,
+        module: ModuleId,
+    ) -> &'b mut Scope {
+        scopes
+            .current_scope_mut(module)
+            .expect("resolver has no scope")
     }
 }

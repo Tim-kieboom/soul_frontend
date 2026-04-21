@@ -27,7 +27,7 @@ impl<'a> NameResolver<'a> {
         self.resolve_block(&mut global);
         self.current.module = prev;
 
-       swap(
+        swap(
             &mut global,
             &mut self
                 .modules
@@ -40,7 +40,10 @@ impl<'a> NameResolver<'a> {
     fn try_go_to(&mut self, scope_id: Option<ScopeId>) {
         debug_assert!(scope_id.is_some());
         if let Some(index) = scope_id {
-            self.info.scopes.go_to(index, self.current.module).expect("no err");
+            self.info
+                .scopes
+                .go_to(index, self.current.module)
+                .expect("no err");
         }
     }
 

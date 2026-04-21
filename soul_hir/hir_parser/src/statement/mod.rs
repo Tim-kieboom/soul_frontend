@@ -63,7 +63,11 @@ impl<'a> HirContext<'a> {
         self.insert_global(module_id, hir::Global::new(kind, id));
     }
 
-    pub fn lower_statement(&mut self, module_id: ModuleId, global: &ast::Statement) -> Option<hir::Statement> {
+    pub fn lower_statement(
+        &mut self,
+        module_id: ModuleId,
+        global: &ast::Statement,
+    ) -> Option<hir::Statement> {
         let kind = match &global.node {
             ast::StatementKind::UseBlock(UseBlock {
                 use_type: _,
@@ -216,8 +220,7 @@ impl<'a> HirContext<'a> {
 
     fn insert_global(&mut self, module_id: ModuleId, global: hir::Global) -> StatementId {
         let id = global.id;
-        self.tree.nodes.modules[module_id]
-            .globals.push(global);
+        self.tree.nodes.modules[module_id].globals.push(global);
         id
     }
 }

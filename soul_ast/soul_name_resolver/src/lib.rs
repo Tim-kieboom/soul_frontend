@@ -64,7 +64,6 @@ impl<'a> NameResolver<'a> {
     }
 
     fn header_insert_function(&mut self, function: &Function) -> Option<EntryKind<FunctionId>> {
-        
         let signature = &function.signature.node;
         let is_public = self.is_name_public(signature.name.as_str());
         let header = &mut self.modules[self.current.module].header;
@@ -80,7 +79,6 @@ impl<'a> NameResolver<'a> {
     }
 
     fn header_insert_variable(&mut self, variable: &Variable) -> Option<EntryKind<NodeId>> {
-
         let is_public = self.is_name_public(variable.name.as_str());
         let header = &mut self.modules[self.current.module].header;
         let entry = match header.get_mut(variable.name.as_str()) {
@@ -95,7 +93,6 @@ impl<'a> NameResolver<'a> {
     }
 
     fn header_insert_struct(&mut self, obj: Struct) -> Option<EntryKind<Struct>> {
-
         let is_public = self.is_name_public(obj.name.as_str());
         let header = &mut self.modules[self.current.module].header;
         let entry = match header.get_mut(obj.name.as_str()) {
@@ -141,7 +138,9 @@ impl<'a> NameResolver<'a> {
     }
 
     fn check_variable(&mut self, name: &Ident) -> Option<NodeId> {
-        self.info.scopes.lookup_value(name, ScopeValue::Variable, self.current.module)
+        self.info
+            .scopes
+            .lookup_value(name, ScopeValue::Variable, self.current.module)
     }
 
     fn lookup_module(&mut self, name: &str) -> Option<ast::scope::ScopeModuleEntry> {
@@ -154,11 +153,17 @@ impl<'a> NameResolver<'a> {
         function_name: &str,
         span: Span,
     ) -> Option<FunctionId> {
-        let module_entry = self.info.scopes.lookup_module(module_name, self.current.module)?;
+        let module_entry = self
+            .info
+            .scopes
+            .lookup_module(module_name, self.current.module)?;
         let module_id = module_entry.module_id;
 
         if let Some(resolved_name) = self.resolve_alias(module_name, function_name) {
-            return self.info.scopes.lookup_function(&resolved_name, self.current.module);
+            return self
+                .info
+                .scopes
+                .lookup_function(&resolved_name, self.current.module);
         }
 
         debug_assert!(self.modules.contains(module_id));
@@ -182,7 +187,10 @@ impl<'a> NameResolver<'a> {
         variable_name: &str,
         span: Span,
     ) -> Option<NodeId> {
-        let module_entry = self.info.scopes.lookup_module(module_name, self.current.module)?;
+        let module_entry = self
+            .info
+            .scopes
+            .lookup_module(module_name, self.current.module)?;
         let module_id = module_entry.module_id;
 
         if let Some(resolved_name) = self.resolve_alias(module_name, variable_name) {
@@ -205,7 +213,11 @@ impl<'a> NameResolver<'a> {
     }
 
     fn resolve_alias(&self, module_name: &str, function_name: &str) -> Option<String> {
-        let module_entry = match self.info.scopes.lookup_module(module_name, self.current.module) {
+        let module_entry = match self
+            .info
+            .scopes
+            .lookup_module(module_name, self.current.module)
+        {
             Some(entry) => entry,
             None => return None,
         };
@@ -228,12 +240,13 @@ impl<'a> NameResolver<'a> {
     }
 
     fn flat_check_variable(&mut self, name: &Ident) -> Option<NodeId> {
-        self.info.scopes.lookup_value(name, ScopeValue::Variable, self.current.module)
+        self.info
+            .scopes
+            .lookup_value(name, ScopeValue::Variable, self.current.module)
     }
 
     fn is_name_public(&self, name: &str) -> bool {
-        name
-            .chars()
+        name.chars()
             .next()
             .map(|ch| ch.is_uppercase())
             .unwrap_or(false)

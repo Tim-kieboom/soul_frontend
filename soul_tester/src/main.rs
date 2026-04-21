@@ -1,9 +1,13 @@
 use std::{
-    fs::{File, OpenOptions}, io::{Read, stdout}, path::{Path, PathBuf}, str::FromStr, time::Instant
+    fs::{File, OpenOptions},
+    io::{Read, stdout},
+    path::{Path, PathBuf},
+    str::FromStr,
+    time::Instant,
 };
 
 use anyhow::Result;
-use ast::AstContext;
+use ast::{AstContext};
 use fern::Dispatch;
 use inkwell::context::Context;
 use log::{error, info};
@@ -42,13 +46,13 @@ pub const MESSAGE_CONFIG: MessageConfig = MessageConfig {
 
 const OS: Os = Os::Windows;
 const ARCH: Arch = Arch::X86_64;
-pub const COMPILER_OPTIONS: CompilerOptions =
-    CompilerOptions::new_default(TargetInfo::new(ARCH, OS));
+const TARGET: TargetInfo = TargetInfo::new(ARCH, OS);
+pub const COMPILER_OPTIONS: CompilerOptions = CompilerOptions::new_default(TARGET);
 
 struct Ouput {
+    context: CompilerContext,
     mir_response: MirResponse,
     hir_response: HirResponse,
-    context: CompilerContext,
 }
 
 fn main() -> Result<()> {
@@ -95,7 +99,7 @@ fn run_fontend(paths: &Paths) -> Result<Ouput> {
     clear_hir_type_map(&mut hir);
 
     let mir = to_mir(&hir, &COMPILER_OPTIONS, &mut context);
-    display_mir(paths, &mir, &hir)?;
+    display_mir(paths, &mir, &hir, &ast_context)?;
 
     Ok(Ouput {
         mir_response: mir,
@@ -156,7 +160,10 @@ fn display_ast(paths: &Paths, context: &CompilerContext, ast_context: &AstContex
 }
 
 fn display_hir(paths: &Paths, hir: &HirResponse, ast_context: &AstContext) -> Result<()> {
-    paths.write_to_output(&displayer_hir::display_hir(ast_context, &hir.hir), "hir/tree.soulc")?;
+    paths.write_to_output(
+        &displayer_hir::display_hir(ast_context, &hir.hir),
+        "hir/tree.soulc",
+    )?;
     paths.write_to_output(
         &displayer_hir::display_thir(ast_context, &hir.hir, &hir.typed),
         "thir/tree.soulc",
@@ -174,9 +181,9 @@ fn clear_hir_type_map(hir: &mut HirResponse) {
     hir.hir.info.infers.clear();
 }
 
-fn display_mir(paths: &Paths, mir: &MirResponse, hir: &HirResponse) -> Result<()> {
+fn display_mir(paths: &Paths, mir: &MirResponse, hir: &HirResponse, ast_context: &AstContext) -> Result<()> {
     paths.write_to_output(
-        &displayer_mir::display_mir(&mir.tree, hir),
+        &displayer_mir::display_mir(&mir.tree, hir, &ast_context.modules),
         "mir/tree.soulc",
     )
 }

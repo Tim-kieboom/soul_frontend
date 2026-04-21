@@ -47,7 +47,6 @@ pub fn lower_typed_hir<'a>(
     }
 
     for module in context.hir.nodes.modules.values() {
-
         for global in &module.globals {
             context.infer_global(global);
         }
@@ -88,7 +87,12 @@ impl<'a> TypedHirContext<'a> {
         options: &'a CompilerOptions,
         context: &'a mut CompilerContext,
     ) -> Self {
-        let globals =  hir.nodes.modules.values().map(|module| module.globals.len()).sum();
+        let globals = hir
+            .nodes
+            .modules
+            .values()
+            .map(|module| module.globals.len())
+            .sum();
         let mut this = Self {
             hir,
             context,

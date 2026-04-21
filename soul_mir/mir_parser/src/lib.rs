@@ -6,7 +6,7 @@ use soul_utils::{
     ids::{FunctionId, IdAlloc},
     sementic_level::{CompilerContext, SementicFault},
     soul_error_internal,
-    span::Span,
+    span::{ModuleId, Span},
     vec_map::VecMap,
 };
 
@@ -21,16 +21,9 @@ use crate::{id_generators::IdGenerators, mir::MirTree};
 
 pub fn mir_lower(hir_reponse: &HirResponse, context: &mut CompilerContext) -> MirTree {
     let mut context = MirContext::new(hir_reponse, context);
-    let is_end = &mut false;
 
-    for module in hir_reponse.hir.nodes.modules.values() {
-
-        for global in &module.globals {
-            context.lower_global(global, is_end);
-            if *is_end {
-                break;
-            }
-        }
+    for module_id in hir_reponse.hir.nodes.modules.keys() {
+        context.lower_module(module_id);
     }
 
     context.lower_main_call();
@@ -99,9 +92,12 @@ impl<'a> MirContext<'a> {
             blocks,
             entry_function: main,
             init_global_function,
+            root_module: hir_reponse.hir.root,
+
             temps: VecMap::const_default(),
             places: VecMap::const_default(),
             locals: VecMap::const_default(),
+            modules: VecMap::const_default(),
             globals: VecMap::const_default(),
             functions: VecMap::const_default(),
             statements: VecMap::const_default(),
@@ -126,6 +122,32 @@ impl<'a> MirContext<'a> {
 
         this.build_init_global_function();
         this
+    }
+
+    fn lower_module(&mut self, id: ModuleId) {
+        let is_end = &mut false;
+        
+        let Some(module) = self.hir_response.hir.nodes.modules.get(id) else {
+            self.log_error(soul_error_internal!(format!("{:?} not found", id), None));
+            return
+        };
+        
+        let mut nodes = Vec::with_capacity(module.globals.len());
+        for global in &module.globals {
+            if let Some(id) = self.lower_global(global, is_end) {
+                nodes.push(id);
+            }
+
+            if *is_end {
+                break;
+            }
+        }
+
+        self.tree.modules.insert(id, mir::Module {
+            id,
+            nodes,
+            modules: module.modules.clone(),
+        });
     }
 
     fn lower_main_call(&mut self) {

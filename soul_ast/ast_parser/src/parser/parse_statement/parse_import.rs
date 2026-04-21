@@ -1,7 +1,7 @@
 use ast::{Import, ImportKind, ImportPath, Statement};
 use ast::{ImportItem, StatementKind};
 use soul_tokenizer::TokenKind;
-use soul_utils::{Ident};
+use soul_utils::Ident;
 use soul_utils::symbool_kind::SymbolKind;
 use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},
@@ -138,9 +138,9 @@ impl<'a, 'f> Parser<'a, 'f> {
                         "could not pop path",
                         SoulErrorKind::PathNotFound,
                         Some(self.token().span),
-                    ))
+                    ));
                 }
-                
+
                 self.expect(&SEPARATOR)?;
             }
 

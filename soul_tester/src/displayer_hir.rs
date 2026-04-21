@@ -1,10 +1,13 @@
-use ast::{AstContext};
+use ast::AstContext;
 use hir::{
     Binary, BlockId, DisplayType, ExpressionId, FieldId, FunctionBody, HirTree, HirType,
     HirTypeKind, LazyTypeId, LocalId, LocalKind, StructId, TypeId, Unary,
 };
 use soul_utils::{
-    ids::{FunctionId, IdAlloc}, soul_names::KeyWord, span::ModuleId, vec_map::VecMapIndex
+    ids::{FunctionId, IdAlloc},
+    soul_names::KeyWord,
+    span::ModuleId,
+    vec_map::VecMapIndex,
 };
 use std::fmt::Write;
 use typed_hir::{ThirTypeKind, TypedHir, display_thir::DisplayThirType};
@@ -94,7 +97,10 @@ impl<'a> HirDisplayer<'a> {
     fn display_module(&mut self, module_id: ModuleId) {
         let module = &self.hir.nodes.modules[module_id];
         self.display_depth();
-        self.push_fmt(format_args!("mod {} {{\n", self.ast_context.modules[module_id].name));
+        self.push_fmt(format_args!(
+            "mod {} {{\n",
+            self.ast_context.modules[module_id].name
+        ));
 
         self.push_scope();
         for global in &module.globals {
@@ -473,7 +479,12 @@ impl<'a> HirDisplayer<'a> {
 
     fn display_expression_astype(&mut self, value: ExpressionId, id: LazyTypeId) {
         let id = match self.typed {
-            Some(typed) => typed.types_table.expressions.get(value).map(|t| t.to_lazy()).unwrap_or(id),
+            Some(typed) => typed
+                .types_table
+                .expressions
+                .get(value)
+                .map(|t| t.to_lazy())
+                .unwrap_or(id),
             None => id,
         };
         self.display_astype(id);
@@ -531,13 +542,10 @@ impl<'a> HirDisplayer<'a> {
     fn inner_type(&mut self, id: LazyTypeId) -> Option<()> {
         match (self.typed, id) {
             (Some(typed), LazyTypeId::Known(ty)) => {
-                let ty = typed
-                    .types_map
-                    .id_to_type(ty);
+                let ty = typed.types_map.id_to_type(ty);
 
-                debug_assert!(ty.is_some());                
-                ty?
-                    .write_display(&typed.types_map, &mut self.sb)
+                debug_assert!(ty.is_some());
+                ty?.write_display(&typed.types_map, &mut self.sb)
                     .expect("no fmt error");
                 return Some(());
             }
@@ -550,15 +558,14 @@ impl<'a> HirDisplayer<'a> {
         match id {
             LazyTypeId::Known(type_id) => {
                 let ty = types.id_to_type(type_id);
-                
+
                 debug_assert!(ty.is_some());
-                ty?
-                    .write_display(types, infers, &mut self.sb)
+                ty?.write_display(types, infers, &mut self.sb)
                     .expect("no fmt error");
             }
             LazyTypeId::Infer(infer_type_id) => {
                 let infer = infers.get_infer(infer_type_id);
-                
+
                 debug_assert!(infer.is_some());
                 infer?
                     .write_display(types, infers, &mut self.sb)

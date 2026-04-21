@@ -5,7 +5,7 @@ use soul_utils::{
     ids::{FunctionId, IdGenerator},
     impl_soul_ids,
     span::{ModuleId, Span},
-    vec_map::{VecMap},
+    vec_map::VecMap,
 };
 
 use crate::{ImportItem, ImportKind, ast::Variable};
@@ -24,7 +24,7 @@ impl ScopeBuilder {
         Self {
             alloc,
             scopes: VecMap::from_vec(vec![(root, module)]),
-        }        
+        }
     }
 
     pub fn push_scope(&mut self, parent: ScopeId, module: ModuleId) -> Result<(), String> {
@@ -46,7 +46,8 @@ impl ScopeBuilder {
     }
 
     pub fn add_module(&mut self, module: ModuleId) -> Option<ModuleScopes> {
-        self.scopes.insert(module, ModuleScopes::new(&mut self.alloc))
+        self.scopes
+            .insert(module, ModuleScopes::new(&mut self.alloc))
     }
 
     pub fn go_to(&mut self, scope_id: ScopeId, module: ModuleId) -> Result<(), String> {
@@ -57,70 +58,60 @@ impl ScopeBuilder {
     }
 
     pub fn get_scope(&self, scope_id: ScopeId, module: ModuleId) -> Option<&Scope> {
-        self.scopes
-            .get(module)?
-            .scopes
-            .get(scope_id)
+        self.scopes.get(module)?.scopes.get(scope_id)
     }
 
     pub fn current_scope_id(&self, module: ModuleId) -> Option<ScopeId> {
-        self.scopes
-            .get(module)
-            .map(|scopes| scopes.current)
+        self.scopes.get(module).map(|scopes| scopes.current)
     }
 
     pub fn current_scope_mut(&mut self, module: ModuleId) -> Option<&mut Scope> {
-        self.scopes
-            .get_mut(module)?
-            .current_scope_mut()
+        self.scopes.get_mut(module)?.current_scope_mut()
     }
 
     pub fn lookup_type(&self, ident: &Ident, module: ModuleId) -> Option<ScopeTypeEntry> {
-        self.scopes
-            .get(module)?
-            .lookup_type(ident)
+        self.scopes.get(module)?.lookup_type(ident)
     }
 
-    pub fn lookup_value(&self, ident: &Ident, kind: ScopeValue, module: ModuleId) -> Option<NodeId> {
-        self.scopes
-            .get(module)?
-            .lookup_value(ident, kind)
+    pub fn lookup_value(
+        &self,
+        ident: &Ident,
+        kind: ScopeValue,
+        module: ModuleId,
+    ) -> Option<NodeId> {
+        self.scopes.get(module)?.lookup_value(ident, kind)
     }
 
     pub fn flat_lookup_type(&self, ident: &Ident, module: ModuleId) -> Option<ScopeTypeEntry> {
-        self.scopes
-            .get(module)?
-            .flat_lookup_type(ident)
+        self.scopes.get(module)?.flat_lookup_type(ident)
     }
 
-    pub fn flat_lookup_value(&self, ident: &Ident, kind: ScopeValue, module: ModuleId) -> Option<NodeId> {
-        self.scopes
-            .get(module)?
-            .flat_lookup_value(ident, kind)
+    pub fn flat_lookup_value(
+        &self,
+        ident: &Ident,
+        kind: ScopeValue,
+        module: ModuleId,
+    ) -> Option<NodeId> {
+        self.scopes.get(module)?.flat_lookup_value(ident, kind)
     }
 
     pub fn flat_lookup_function(&self, name: &str, module: ModuleId) -> Option<FunctionId> {
-        self.scopes
-            .get(module)?
-            .flat_lookup_function(name)
+        self.scopes.get(module)?.flat_lookup_function(name)
     }
 
     pub fn lookup_function(&self, name: &str, module: ModuleId) -> Option<FunctionId> {
-        self.scopes
-            .get(module)?
-            .lookup_function(name)       
+        self.scopes.get(module)?.lookup_function(name)
     }
 
     pub fn lookup_module(&self, name: &str, module: ModuleId) -> Option<ScopeModuleEntry> {
-        self.scopes
-            .get(module)?
-            .lookup_module(name)
+        self.scopes.get(module)?.lookup_module(name)
     }
 
-    pub fn iter_modules(&self, module: ModuleId) -> Option<impl Iterator<Item = (String, ScopeModuleEntry)>> {
-        Some(self.scopes
-            .get(module)?
-            .modules())
+    pub fn iter_modules(
+        &self,
+        module: ModuleId,
+    ) -> Option<impl Iterator<Item = (String, ScopeModuleEntry)>> {
+        Some(self.scopes.get(module)?.modules())
     }
 }
 
@@ -132,15 +123,16 @@ pub struct ModuleScopes {
 impl ModuleScopes {
     fn new(alloc: &mut IdGenerator<ScopeId>) -> Self {
         let current = alloc.alloc();
-        Self { 
+        Self {
             current,
-            scopes: VecMap::from_vec(vec![(current, Scope::new_global(current))]), 
+            scopes: VecMap::from_vec(vec![(current, Scope::new_global(current))]),
         }
     }
-    
+
     fn push_scope(&mut self, parent: ScopeId, alloc: &mut IdGenerator<ScopeId>) {
         self.current = alloc.alloc();
-        self.scopes.insert(self.current, Scope::new_child(self.current, parent));
+        self.scopes
+            .insert(self.current, Scope::new_child(self.current, parent));
     }
 
     fn pop_scope(&mut self) {
@@ -149,10 +141,10 @@ impl ModuleScopes {
             self.current = parent;
         }
     }
-    
+
     fn go_to(&mut self, scope_id: ScopeId) -> Result<(), String> {
         if !self.scopes.contains(scope_id) {
-            return Err(format!("ScopeId {:?} not found in module", scope_id))
+            return Err(format!("ScopeId {:?} not found in module", scope_id));
         }
 
         self.current = scope_id;
@@ -163,7 +155,7 @@ impl ModuleScopes {
         self.scopes.get_mut(self.current)
     }
 
-        pub fn lookup_type(&self, ident: &Ident) -> Option<ScopeTypeEntry> {
+    pub fn lookup_type(&self, ident: &Ident) -> Option<ScopeTypeEntry> {
         for scope in self.scope_iter() {
             if let Some(ScopeEntry { types, .. }) = scope.entries.get(ident.as_str()) {
                 return *types;

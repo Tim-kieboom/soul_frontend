@@ -3,7 +3,8 @@ use std::collections::HashMap;
 use soul_utils::{
     ids::{FunctionId, IdGenerator},
     span::ModuleId,
-    vec_map::VecMap, vec_set::VecSet,
+    vec_map::VecMap,
+    vec_set::VecSet,
 };
 
 mod ast;
@@ -154,21 +155,30 @@ impl DeclareStore {
 
     /// Finds a function by name and optional owner type (for method resolution).
     pub fn find_function(&self, name: &str, owner_kind: Option<&TypeKind>) -> Option<FunctionId> {
-        self.find_function_with_module(name, owner_kind).map(|(id, _)| id)
+        self.find_function_with_module(name, owner_kind)
+            .map(|(id, _)| id)
     }
 
-    pub fn find_function_with_module(&self, name: &str, owner_kind: Option<&TypeKind>) -> Option<(FunctionId, ModuleId)> {
-        self.functions.entries().find_map(|(id, (signature, module))| {
-            if signature.name.as_str() != name {
-                return None;
-            }
+    pub fn find_function_with_module(
+        &self,
+        name: &str,
+        owner_kind: Option<&TypeKind>,
+    ) -> Option<(FunctionId, ModuleId)> {
+        self.functions
+            .entries()
+            .find_map(|(id, (signature, module))| {
+                if signature.name.as_str() != name {
+                    return None;
+                }
 
-            match owner_kind {
-                Some(owner) if &signature.methode_type.kind == owner => Some((id, *module)),
-                None if matches!(signature.methode_type.kind, TypeKind::None) => Some((id, *module)),
-                _ => None,
-            }
-        })
+                match owner_kind {
+                    Some(owner) if &signature.methode_type.kind == owner => Some((id, *module)),
+                    None if matches!(signature.methode_type.kind, TypeKind::None) => {
+                        Some((id, *module))
+                    }
+                    _ => None,
+                }
+            })
     }
 
     /// Inserts a function into the store.

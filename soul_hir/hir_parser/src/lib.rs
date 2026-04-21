@@ -48,7 +48,7 @@ struct HirContext<'a> {
 
     pub current: Current,
     pub scopes: Vec<Scope>,
-    pub id_generator: IdAllocalor,    
+    pub id_generator: IdAllocalor,
     pub ast_context: &'a AstContext,
 
     pub context: &'a mut CompilerContext,
@@ -83,7 +83,7 @@ impl<'a> HirContext<'a> {
             scopes: vec![Scope::default()],
             node_id_to_local: VecMap::new(),
             current: Current {
-                module: root_id, 
+                module: root_id,
                 body: CurrentBody::Global,
             },
             tree,

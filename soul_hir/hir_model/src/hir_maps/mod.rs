@@ -6,8 +6,8 @@ use soul_utils::{
 };
 
 use crate::{
-    hir_type::Field, Block, BlockId, Expression, ExpressionId, FieldId, Function, LocalId,
-    LocalInfo, Module, Place, PlaceId, StatementId,
+    Block, BlockId, Expression, ExpressionId, FieldId, Function, LocalId, LocalInfo, Module, Place,
+    PlaceId, StatementId, hir_type::Field,
 };
 
 mod type_map;

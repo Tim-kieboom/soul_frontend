@@ -2,7 +2,11 @@ use ast::{
     Expression, ExpressionKind, FunctionCall, FunctionKind, SoulType, TypeKind, VarTypeKind,
 };
 use soul_utils::{
-    error::{SoulError, SoulErrorKind}, ids::{FunctionId, IdAlloc}, soul_error_internal, soul_names::PrimitiveTypes, span::Span
+    error::{SoulError, SoulErrorKind},
+    ids::{FunctionId, IdAlloc},
+    soul_error_internal,
+    soul_names::PrimitiveTypes,
+    span::Span,
 };
 
 use crate::NameResolver;
@@ -103,7 +107,7 @@ impl<'a> NameResolver<'a> {
                 format!("{:?} not found", self.current.module),
                 Some(function_call.name.span)
             ));
-            return
+            return;
         };
 
         for (_name, entry) in modules_iter {
@@ -206,7 +210,12 @@ impl<'a> NameResolver<'a> {
             ));
         }
 
-        if self.info.scopes.lookup_type(ident, self.current.module).is_some() {
+        if self
+            .info
+            .scopes
+            .lookup_type(ident, self.current.module)
+            .is_some()
+        {
             return Some(SoulType::new(
                 None,
                 TypeKind::Stub(ast::Stub {
@@ -217,7 +226,12 @@ impl<'a> NameResolver<'a> {
             ));
         }
 
-        if self.info.scopes.lookup_module(ident.as_str(), self.current.module).is_some() {
+        if self
+            .info
+            .scopes
+            .lookup_module(ident.as_str(), self.current.module)
+            .is_some()
+        {
             return Some(SoulType::new(
                 None,
                 TypeKind::Stub(ast::Stub {

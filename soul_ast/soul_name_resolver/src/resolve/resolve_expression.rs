@@ -82,9 +82,8 @@ impl<'a> NameResolver<'a> {
     }
 
     fn resolve_field_access(&mut self, field_access: &mut FieldAccess) {
-
         if self.resolve_module_variable(field_access) {
-            return
+            return;
         }
 
         self.resolve_expression(&mut field_access.object);
@@ -95,13 +94,13 @@ impl<'a> NameResolver<'a> {
             ExpressionKind::Variable { ident, .. } => Some(ident.to_string()),
             _ => None,
         };
-        
+
         let Some(module_name) = object_ident else {
-            return false
+            return false;
         };
 
         if self.lookup_module(&module_name).is_none() {
-            return false
+            return false;
         }
 
         let variable = self.lookup_module_variable(
@@ -112,11 +111,10 @@ impl<'a> NameResolver<'a> {
 
         if let Some(node_id) = variable {
             field_access.id = Some(node_id);
-            if let ExpressionKind::Variable { resolved, .. } = &mut field_access.object.node
-            {
+            if let ExpressionKind::Variable { resolved, .. } = &mut field_access.object.node {
                 *resolved = Some(node_id);
             }
-            return true
+            return true;
         }
 
         false

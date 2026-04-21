@@ -1,11 +1,11 @@
 use hir::{Assign, ExpressionId, HirType, LazyTypeId, Place, PlaceId, PlaceKind};
 use soul_utils::{
+    Ident,
     soul_names::TypeModifier,
     span::{ItemMetaData, Span},
-    Ident,
 };
 
-use crate::{create_local_name, HirContext};
+use crate::{HirContext, create_local_name};
 
 impl<'a> HirContext<'a> {
     pub(super) fn lower_array(
@@ -130,7 +130,8 @@ impl<'a> HirContext<'a> {
                 let kind = hir::GlobalKind::InternalVariable(variable);
                 let root_id = self.current.module;
                 self.tree.nodes.modules[root_id]
-                    .globals.push(hir::Global::new(kind, id));
+                    .globals
+                    .push(hir::Global::new(kind, id));
             }
             crate::CurrentBody::Block(block_id) => {
                 let id = self.alloc_statement(&ItemMetaData::default_const(), span);
@@ -147,7 +148,8 @@ impl<'a> HirContext<'a> {
                 let kind = hir::GlobalKind::InternalAssign(assign);
                 let root_id = self.current.module;
                 self.tree.nodes.modules[root_id]
-                    .globals.push(hir::Global::new(kind, id));
+                    .globals
+                    .push(hir::Global::new(kind, id));
             }
             crate::CurrentBody::Block(block_id) => {
                 let id = self.alloc_statement(&ItemMetaData::default_const(), span);

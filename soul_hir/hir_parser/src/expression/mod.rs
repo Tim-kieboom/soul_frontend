@@ -1,12 +1,12 @@
-use ast::{scope::NodeId, AsTypeCast, VarTypeKind};
 use ast::{ArrayContructor, Literal};
+use ast::{AsTypeCast, VarTypeKind, scope::NodeId};
 use hir::{ExpressionId, HirType, HirTypeKind, LocalId, Place, PlaceKind, Terminator};
 use soul_utils::soul_error_internal;
 use soul_utils::{
+    Ident,
     error::{SoulError, SoulErrorKind},
     ids::IdAlloc,
     span::Span,
-    Ident,
 };
 
 use crate::HirContext;
@@ -298,7 +298,6 @@ impl<'a> HirContext<'a> {
     }
 
     pub(crate) fn lower_field(&mut self, field: &ast::FieldAccess, span: Span) -> hir::PlaceId {
-        
         if let Some(node_id) = field.id {
             if let Some(local_id) = self.find_local_by_node_id(node_id) {
                 let place = hir::Place::new(

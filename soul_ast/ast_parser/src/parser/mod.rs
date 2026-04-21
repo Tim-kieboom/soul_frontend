@@ -4,7 +4,9 @@ use ast::{Block, Module, SoulType, Visibility};
 #[cfg(debug_assertions)]
 use soul_tokenizer::Token;
 use soul_tokenizer::{TokenKind, TokenStream};
-use soul_utils::{sementic_level::CompilerContext, soul_names::TypeModifier, span::ModuleId, vec_set::VecSet};
+use soul_utils::{
+    sementic_level::CompilerContext, soul_names::TypeModifier, span::ModuleId, vec_set::VecSet,
+};
 
 use crate::parser::parse_utils::SEMI_COLON;
 
