@@ -14,7 +14,7 @@ pub fn to_ast<'a>(
 ) {
     let id = context.module_store.get_root_id();
     let name = ENTRY_MOD_NAME.to_string();
-    let module = parse(token_stream, id, name, context);
+    let module = parse(token_stream, id, name, None, context);
     ast_context.modules.insert(id, module);
 
     name_resolve(id, context, ast_context);

@@ -9,7 +9,8 @@ pub fn parse<'a, 'f>(
     tokens: TokenStream<'a>,
     id: ModuleId,
     name: String,
+    parent: Option<ModuleId>,
     context: &'f mut CompilerContext,
 ) -> Module {
-    Parser::parse(tokens, id, name, context)
+    Parser::parse(tokens, id, name, parent, context)
 }

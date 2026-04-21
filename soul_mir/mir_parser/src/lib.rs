@@ -1,3 +1,4 @@
+use ast::AstModuleStore;
 use hir::{ComplexLiteral, TypeId};
 use hir_literal_interpreter::ToComplex;
 use run_hir::HirResponse;
@@ -19,8 +20,8 @@ mod parse;
 mod utils;
 use crate::{id_generators::IdGenerators, mir::MirTree};
 
-pub fn mir_lower(hir_reponse: &HirResponse, context: &mut CompilerContext) -> MirTree {
-    let mut context = MirContext::new(hir_reponse, context);
+pub fn mir_lower(hir_reponse: &HirResponse, ast_modules: &AstModuleStore, context: &mut CompilerContext) -> MirTree {
+    let mut context = MirContext::new(hir_reponse, ast_modules, context);
 
     for module_id in hir_reponse.hir.nodes.modules.keys() {
         context.lower_module(module_id);
@@ -42,9 +43,11 @@ struct MirContext<'a> {
 
     hir_response: &'a HirResponse,
     context: &'a mut CompilerContext,
+    ast_modules: &'a AstModuleStore,
 }
 
 struct CurrentContext {
+    module: ModuleId,
     scope: Vec<mir::LocalId>,
     function: FunctionId,
     block: Option<mir::BlockId>,
@@ -53,8 +56,9 @@ struct CurrentContext {
     loop_continue: Option<mir::BlockId>,
 }
 impl CurrentContext {
-    pub fn new(function: FunctionId) -> Self {
+    pub fn new(function: FunctionId, module: ModuleId) -> Self {
         Self {
+            module,
             function,
             block: None,
             scope: vec![],
@@ -65,7 +69,7 @@ impl CurrentContext {
 }
 
 impl<'a> MirContext<'a> {
-    fn new(hir_reponse: &'a HirResponse, context: &'a mut CompilerContext) -> Self {
+    fn new(hir_reponse: &'a HirResponse, ast_modules: &'a AstModuleStore, context: &'a mut CompilerContext) -> Self {
         let init_global_function = hir_reponse.hir.init_globals;
         let main = hir_reponse.hir.main;
 
@@ -113,11 +117,12 @@ impl<'a> MirContext<'a> {
                 generics: vec![],
                 modifier: None,
             },
+            ast_modules,
             id_generators: IdGenerators::new(),
             temp_remap: VecMap::const_default(),
             place_typed: VecMap::const_default(),
             local_remap: VecMap::const_default(),
-            current: CurrentContext::new(init_global_function),
+            current: CurrentContext::new(init_global_function, hir_reponse.hir.root),
         };
 
         this.build_init_global_function();
@@ -127,6 +132,9 @@ impl<'a> MirContext<'a> {
     fn lower_module(&mut self, id: ModuleId) {
         let is_end = &mut false;
         
+        let parent_module = self.current.module;
+        self.current.module = id;
+
         let Some(module) = self.hir_response.hir.nodes.modules.get(id) else {
             self.log_error(soul_error_internal!(format!("{:?} not found", id), None));
             return
@@ -143,11 +151,16 @@ impl<'a> MirContext<'a> {
             }
         }
 
+        let ast_module = &self.ast_modules[id];
         self.tree.modules.insert(id, mir::Module {
             id,
             nodes,
+            parent: ast_module.parent,
+            name: ast_module.name.clone(),
             modules: module.modules.clone(),
         });
+
+        self.current.module = parent_module;
     }
 
     fn lower_main_call(&mut self) {

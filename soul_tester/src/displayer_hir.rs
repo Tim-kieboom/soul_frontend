@@ -1,6 +1,6 @@
 use ast::AstContext;
 use hir::{
-    Binary, BlockId, DisplayType, ExpressionId, FieldId, FunctionBody, HirTree, HirType,
+    Binary, DisplayType, ExpressionId, FieldId, FunctionBody, HirTree, HirType,
     HirTypeKind, LazyTypeId, LocalId, LocalKind, StructId, TypeId, Unary,
 };
 use soul_utils::{

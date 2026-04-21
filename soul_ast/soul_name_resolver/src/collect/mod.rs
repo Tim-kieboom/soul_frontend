@@ -276,7 +276,7 @@ impl<'a> NameResolver<'a> {
 
     fn parse_module(&mut self, source: &str, module_id: ModuleId, parent: ModuleId, name: String) {
         let tokens = to_token_stream(source, module_id);
-        let module = parse(tokens, module_id, name, self.context);
+        let module = parse(tokens, module_id, name, Some(parent), self.context);
         if let Some(module) = self.modules.get_mut(parent) {
             module.modules.insert(module_id);
         }

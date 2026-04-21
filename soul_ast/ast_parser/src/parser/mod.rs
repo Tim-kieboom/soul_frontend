@@ -70,6 +70,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         tokens: TokenStream<'a>,
         id: ModuleId,
         name: String,
+        parent: Option<ModuleId>,
         context: &'f mut CompilerContext,
     ) -> Module {
         let is_capital = name.chars().next().map_or(false, char::is_uppercase);
@@ -85,6 +86,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             return Module {
                 id,
                 name,
+                parent,
                 visibility,
                 modules: VecSet::new(),
                 header: HashMap::default(),
@@ -108,6 +110,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         Module {
             id,
             name,
+            parent,
             visibility,
             modules: VecSet::new(),
             header: HashMap::default(),

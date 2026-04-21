@@ -52,8 +52,10 @@ pub enum ModuleNodeId {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Module {
     pub id: ModuleId,
-    pub nodes: Vec<ModuleNodeId>,
+    pub name: String,
     pub modules: Vec<ModuleId>,
+    pub parent: Option<ModuleId>,
+    pub nodes: Vec<ModuleNodeId>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -107,6 +109,8 @@ pub struct Function {
 
     /// Return type of the function
     pub return_type: TypeId,
+
+    pub from_module: ModuleId,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

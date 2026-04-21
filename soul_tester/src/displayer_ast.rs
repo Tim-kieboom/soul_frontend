@@ -92,9 +92,13 @@ impl<'a> AstDisplayer<'a> {
 
     fn display_module(&mut self, module_id: ModuleId) {
         let module = &self.ast_context.modules[module_id];
+        let parent_name = match module.parent {
+            Some(val) => &self.ast_context.modules[val].name,
+            None => "None",
+        };
 
         self.display_depth();
-        self.push_fmt(format_args!("mod {} {{\n", module.name));
+        self.push_fmt(format_args!("mod {} {{ /*parent: {}*/\n", module.name, parent_name));
         self.push_scope();
         for statement in &module.global.statements {
             self.display_statement(statement);

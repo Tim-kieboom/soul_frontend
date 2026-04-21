@@ -20,6 +20,7 @@ impl<'a> MirContext<'a> {
             parameters: vec![],
             owner_type: self.hir_response.typed.types_table.none_type,
             return_type: self.hir_response.typed.types_table.none_type,
+            from_module: self.hir_response.hir.root,
         };
 
         self.tree.blocks.insert(
@@ -75,6 +76,7 @@ impl<'a> MirContext<'a> {
             body,
             id: function_id,
             parameters: vec![],
+            from_module: self.current.module,
             generics: function.generics.clone(),
             owner_type: function.owner_type,
             name: function.name.clone(),

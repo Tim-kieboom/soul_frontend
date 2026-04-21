@@ -41,6 +41,7 @@ pub struct Module {
     pub id: ModuleId,
     pub name: String,
     pub global: Block,
+    pub parent: Option<ModuleId>,
     pub modules: VecSet<ModuleId>,
     pub visibility: Visibility,
     pub header: HashMap<String, HeaderEntry>,
