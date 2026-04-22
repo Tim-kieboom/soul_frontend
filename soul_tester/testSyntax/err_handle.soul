@@ -1,6 +1,8 @@
 use Ok = Res.Ok
 use Err = Res.Err
 
+trait Error: Into<str>, Debug {}
+
 union Res<V, E> 
 where
     V = none
@@ -33,7 +35,7 @@ main() {
         }
     ```
     */
-    num := resFunc()
+    num: int = resFunc()
         .Err{return}
 
     option := try{

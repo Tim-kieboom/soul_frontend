@@ -168,7 +168,7 @@ impl<'a> AstDisplayer<'a> {
     }
 
     fn display_statement(&mut self, statement: &Statement) {
-        self.display_tag(statement.display_variant(), statement.node.get_id());
+        self.display_tag_ln(statement.display_variant(), statement.node.get_id());
 
         match &statement.node {
             ast::StatementKind::Struct(obj) => self.display_struct(obj),
@@ -195,6 +195,9 @@ impl<'a> AstDisplayer<'a> {
         self.display_expression(&assignment.left);
         self.push_str(" = ");
         self.display_expression(&assignment.right);
+
+        self.push('\t');
+        self.display_mutiple_tag(&[assignment.left.node.variant_str(), assignment.right.node.variant_str()]);
     }
 
     fn display_use_block(&mut self, use_block: &UseBlock) {
@@ -205,7 +208,7 @@ impl<'a> AstDisplayer<'a> {
         self.push_str(" {\n");
         self.push_scope();
         for methode in &use_block.methodes {
-            self.display_tag("Function", methode.signature.node.id);
+            self.display_tag_ln("Function", methode.signature.node.id);
             self.display_function(methode);
             self.push('\n');
         }
@@ -214,7 +217,7 @@ impl<'a> AstDisplayer<'a> {
             self.push_str(KeyWord::Impl.as_str());
             self.display_type(&impl_block.impl_trait);
             for methode in &impl_block.methodes {
-                self.display_tag("Function", methode.signature.node.id);
+                self.display_tag_ln("Function", methode.signature.node.id);
                 self.display_function(methode);
                 self.push('\n');
             }
@@ -333,6 +336,8 @@ impl<'a> AstDisplayer<'a> {
         if let Some(value) = &variable.initialize_value {
             self.push_str(" = ");
             self.display_expression(value);
+            self.push('\t');
+            self.display_tag::<NodeId>(value.node.variant_str(), None);
         }
     }
 
@@ -422,7 +427,7 @@ impl<'a> AstDisplayer<'a> {
         self.push_str(" {\n");
         self.push_scope();
         for field in &obj.fields {
-            self.display_tag("Field", field.id);
+            self.display_tag_ln("Field", field.id);
             self.push_str(field.ty.modifier.unwrap_or(TypeModifier::Const).as_str());
             self.push(' ');
             self.push_str(field.name.as_str());
@@ -660,11 +665,8 @@ impl<'a> AstDisplayer<'a> {
     }
 
     fn display_tag<ID: VecMapIndex + Debug>(&mut self, str: &str, node_id: Option<ID>) {
-        self.display_depth();
         if !self.is_name_resolved {
             self.push_fmt(format_args!("/*{str}*/"));
-            self.push('\n');
-            self.display_depth();
             return;
         }
 
@@ -672,6 +674,15 @@ impl<'a> AstDisplayer<'a> {
             Some(id) => self.push_fmt(format_args!("/*{str}: {:?}*/", id)),
             None => self.push_fmt(format_args!("/*{str}*/")),
         }
+    }
+
+    fn display_mutiple_tag(&mut self, entrys: &[&str]) {
+        self.push_fmt(format_args!("/*{:?}*/", entrys));
+    }
+
+    fn display_tag_ln<ID: VecMapIndex + Debug>(&mut self, str: &str, node_id: Option<ID>) {
+        self.display_depth();
+        self.display_tag(str, node_id);
         self.push('\n');
         self.display_depth();
     }

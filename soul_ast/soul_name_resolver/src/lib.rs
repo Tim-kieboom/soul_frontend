@@ -6,7 +6,7 @@ use ast::{
 use soul_utils::{
     Ident,
     error::{SoulError, SoulErrorKind},
-    ids::{FunctionId, IdGenerator},
+    ids::{FunctionId, IdAlloc, IdGenerator},
     sementic_level::{CompilerContext, SementicFault},
     soul_error_internal,
     span::{ModuleId, Span},
@@ -157,6 +157,7 @@ impl<'a> NameResolver<'a> {
             .info
             .scopes
             .lookup_module(module_name, self.current.module)?;
+        
         let module_id = module_entry.module_id;
 
         if let Some(resolved_name) = self.resolve_alias(module_name, function_name) {
@@ -166,6 +167,7 @@ impl<'a> NameResolver<'a> {
                 .lookup_function(&resolved_name, self.current.module);
         }
 
+        debug_assert_ne!(module_id, ModuleId::error());
         debug_assert!(self.modules.contains(module_id));
 
         let header = &self.modules.get(module_id)?.header;

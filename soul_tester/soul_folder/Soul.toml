@@ -1,6 +1,8 @@
+[package]
 name = "Test"
-edition = "1.0"
+version = "0.1.0"
+edition = "2026"
 
 [dependencies]
-Std = { path = "Std" }
-Core = { path = "Std/Core" }
+Std = { path = "soul_std", version = "0.1.0" }
+Core = { path = "soul_core", version = "0.1.0" }

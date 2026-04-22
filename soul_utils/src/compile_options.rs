@@ -88,18 +88,18 @@ pub enum Os {
 /// Target platform information.
 #[derive(Debug, Clone)]
 pub struct TargetInfo {
-    /// Target CPU architecture.
-    pub arch: Arch,
     /// Target operating system.
     pub os: Os,
-    /// Size of C `int` type in bits.
-    pub c_int_bit_size: u8,
+    /// Target CPU architecture.
+    pub arch: Arch,
     /// Size of `int` type in bits.
     pub int_bit_size: u8,
     /// Size of pointers in bits.
     pub ptr_bit_size: u8,
     /// Size of `char` type in bits.
     pub char_bit_size: u8,
+    /// Size of C `int` type in bits.
+    pub c_int_bit_size: u8,
 }
 impl TargetInfo {
     /// Creates a new `TargetInfo` for the given architecture and OS.

@@ -1,0 +1,46 @@
+import .Write.{FmtRes}
+
+trait Display {
+    Display(@this, writer: &dyn Write) -> FmtRes
+}
+
+trait Debug {
+    Debug(@this, writer: &dyn Write) -> FmtRes
+}
+
+struct FmtStr<'a'> {
+    pieces: [@'a']PieceInfo { get set }
+}
+ 
+union PieceInfo<'a'> {
+    Str(@'a'str)
+    Debug(@'a'dyn Debug)
+    Display(@'a'dyn Display)
+}
+
+FmtStr_Write(writer: &dyn Write, fmt: FmtStr<'a'>) -> FmtRes {
+
+    for piece in fmt.pieces {
+
+        match piece {
+            PieceInfo.Str(text) => writer.WriteStr(text).pass,
+
+            PieceInfo.Debug(obj) => obj.Debug(writer).pass,
+            PieceInfo.Display(obj) => obj.Display(writer).pass,
+        }
+    }
+}
+
+example() {
+
+    name := "tim"
+    text := f"hello {name} welkom"
+    
+    fmtStr = FmtStr {
+        pieces: @[PieceInfo.Str("hello "), PieceInfo.Display(@name), PieceInfo.Str(" welkom")],
+    }
+
+    mut sb = StringBuilder()
+    FmtStr_Write(&sb, fmtStr).Err{panic}
+    text := sb.IntoStr()
+}

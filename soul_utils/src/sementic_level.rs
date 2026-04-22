@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use crate::{
     bimap::BiMap,
@@ -22,19 +22,37 @@ define_str_enum!(
     }
 );
 
+#[derive(Debug, Clone, Copy, Default, serde::Serialize, serde::Deserialize)]
+pub struct MessageConfig {
+    pub backtrace: bool,
+    pub colors: bool,
+}
+impl MessageConfig {
+    pub fn with_colors(mut self, colors: bool) -> Self {
+        self.colors = colors;
+        self
+    }
+    pub fn with_backtrace(mut self, backtrace: bool) -> Self {
+        self.backtrace = backtrace;
+        self
+    }
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CompilerContext {
     pub source_folder: PathBuf,
     pub faults: Vec<SementicFault>,
     pub module_store: ModuleStore,
+    pub message_config: MessageConfig,
     path_stack: Vec<PathBuf>,
 }
 impl CompilerContext {
-    pub fn new(source_folder: PathBuf, root_path: PathBuf) -> Self {
+    pub fn new(source_folder: PathBuf, root_path: PathBuf, message_config: MessageConfig) -> Self {
         Self {
-            source_folder,
-            path_stack: vec![],
             faults: vec![],
+            source_folder,
+            message_config,
+            path_stack: vec![],
             module_store: ModuleStore::new(root_path),
         }
     }
@@ -60,12 +78,14 @@ pub struct ModuleStore {
     root: ModuleId,
     map: BiMap<ModuleId, PathBuf>,
     alloc: IdGenerator<ModuleId>,
+    crates: HashMap<String, PathBuf>,
 }
 impl ModuleStore {
     pub fn new(root_path: PathBuf) -> Self {
         let mut this = Self {
-            root: ModuleId::error(),
             map: BiMap::new(),
+            crates: HashMap::new(),
+            root: ModuleId::error(),
             alloc: IdGenerator::new(),
         };
         this.root = this.insert(root_path);

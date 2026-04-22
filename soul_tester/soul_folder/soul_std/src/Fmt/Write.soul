@@ -1,7 +1,12 @@
+import .FmtStr.{FmtStr, FmtStr_Write}
+
+use FmtErr = str
+use FmtRes<T = none> = Res<T, FmtErr>
+
 trait Write {
-    WriteChar(&this, ch: char)
-    WriteStr(&this, text: [@]char)
-    WriteFmt(&this, fmt: FmtStr<'a'>)
+    WriteChar(&this, ch: char): FmtRes
+    WriteStr(&this, text: [@]char): FmtRes
+    WriteFmt(&this, fmt: FmtStr<'a'>): FmtRes
 }
 
 struct StringBuilder {
@@ -35,20 +40,22 @@ use StringBuilder {
 
     impl Write {
 
-        WriteChar(&this, ch: char) {
+        WriteChar(&this, ch: char): FmtRes {
             this.buffer.Push(ch)
+            Ok()
         }
 
-        WriteStr(&this, text: [@]char) {
+        WriteStr(&this, text: [@]char): FmtRes {
             
             for ch in text {
                 this.buffer.Push(ch)
             }
+
+            Ok()
         }
 
-        WriteFmt(&this, fmt: FmtStr<'a'>) {
-            
+        WriteFmt(&this, fmt: FmtStr<'a'>): FmtRes {
+            FmtStr_Write(this, fmt)
         }
-
     }
 }

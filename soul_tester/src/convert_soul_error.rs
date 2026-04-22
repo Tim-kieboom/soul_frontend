@@ -4,24 +4,8 @@ use std::str::Lines;
 
 use soul_utils::char_colors::Colors;
 use soul_utils::error::{SoulError, SoulErrorKind};
-use soul_utils::sementic_level::{SementicFault, SementicLevel};
+use soul_utils::sementic_level::{MessageConfig, SementicFault, SementicLevel};
 use soul_utils::span::Span;
-
-#[derive(Debug, Clone, Copy, Default)]
-pub struct MessageConfig {
-    pub backtrace: bool,
-    pub colors: bool,
-}
-impl MessageConfig {
-    pub fn with_colors(mut self, colors: bool) -> Self {
-        self.colors = colors;
-        self
-    }
-    pub fn with_backtrace(mut self, backtrace: bool) -> Self {
-        self.backtrace = backtrace;
-        self
-    }
-}
 
 pub trait ToAnyhow {
     fn to_anyhow(
@@ -72,9 +56,11 @@ fn to_message(
 
     let mut sb = String::new();
     if config.backtrace {
-        color(Colors::BRIGHT_RED, &mut sb, &config);
-        sb.push_str(&err.backtrace.to_string());
-        color_default(&mut sb, &config);
+        #[cfg(feature = "error_backtrace")] {
+            color(Colors::BRIGHT_RED, &mut sb, &config);
+            sb.push_str(&err.backtrace.to_string());
+            color_default(&mut sb, &config);
+        }
     }
     sb.push_str("-----");
     color(level_color(&level), &mut sb, &config);

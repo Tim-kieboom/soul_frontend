@@ -3,25 +3,29 @@ name = "soul_tester"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = ["error_backtrace", "absolute_internal_error_path"]
+error_backtrace = ["soul_utils/error_backtrace"]
+absolute_internal_error_path = ["soul_utils/absolute_internal_error_path"]
+
 [dependencies]
-anyhow = "1.0.100"
-serde_json = "1.0.148"
-serde = {version = "1.0.228", features = ["derive"]}
-soul_utils = { version = "0.1.0", path = "../soul_utils", features = ["absolute_internal_error_path", "error_backtrace"] }
-soul_name_resolver = { version = "0.1.0", path = "../soul_ast/soul_name_resolver" }
-ast_parser = { version = "0.1.0", path = "../soul_ast/ast_parser" }
-ast = { version = "0.1.0", path = "../soul_ast/ast_model" }
-soul_tokenizer = { version = "0.1.0", path = "../soul_tokenizer" }
-hir_parser = { version = "0.1.0", path = "../soul_hir/hir_parser" }
-hir = { version = "0.1.0", path = "../soul_hir/hir_model" }
 fern = "0.6"
 log = "0.4.29"
+anyhow = "1.0.100"
+serde_json = "1.0.148"
+soul_ir = { version = "0.1.0", path = "../soul_ir" }
+serde = {version = "1.0.228", features = ["derive"]}
+inkwell = { version = "0.8", features = ["llvm16-0"] }
+ast = { version = "0.1.0", path = "../soul_ast/ast_model" }
+hir = { version = "0.1.0", path = "../soul_hir/hir_model" }
 run_ast = { version = "0.1.0", path = "../soul_ast/run_ast" }
 run_hir = { version = "0.1.0", path = "../soul_hir/run_hir" }
-inkwell = { version = "0.8", features = ["llvm16-0"] }
+run_mir = { version = "0.1.0", path = "../soul_mir/run_mir" }
+soul_tokenizer = { version = "0.1.0", path = "../soul_tokenizer" }
+ast_parser = { version = "0.1.0", path = "../soul_ast/ast_parser" }
+hir_parser = { version = "0.1.0", path = "../soul_hir/hir_parser" }
+mir_parser = { version = "0.1.0", path = "../soul_mir/mir_parser" }
 typed_hir = { version = "0.1.0", path = "../soul_hir/typed_hir_model" }
 typed_hir_parser = { version = "0.1.0", path = "../soul_hir/typed_hir_parser" }
-
-soul_ir = { version = "0.1.0", path = "../soul_ir" }
-run_mir = { version = "0.1.0", path = "../soul_mir/run_mir" }
-mir_parser = { version = "0.1.0", path = "../soul_mir/mir_parser" }
+soul_name_resolver = { version = "0.1.0", path = "../soul_ast/soul_name_resolver" }
+soul_utils = { version = "0.1.0", path = "../soul_utils", default-features = false }

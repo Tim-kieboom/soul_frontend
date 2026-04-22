@@ -21,12 +21,12 @@ use soul_utils::{
     char_colors::{DEFAULT, GREEN},
     compile_options::{Arch, CompilerOptions, Os, TargetInfo},
     ids::IdAlloc,
-    sementic_level::{CompilerContext, SementicFault, SementicLevel},
+    sementic_level::{CompilerContext, MessageConfig, SementicFault, SementicLevel},
     span::ModuleId,
 };
 
 use crate::{
-    convert_soul_error::{MessageConfig, ToMessage},
+    convert_soul_error::{ToMessage},
     displayer_tokenizer::display_tokens,
 };
 
@@ -83,7 +83,7 @@ fn main() -> Result<()> {
 fn run_fontend(paths: &Paths) -> Result<Ouput> {
     let root = paths.to_entry_file_path();
     let source_folder = PathBuf::from_str(&paths.source_folder).expect("error is infallible");
-    let mut context = CompilerContext::new(source_folder, root.clone());
+    let mut context = CompilerContext::new(source_folder, root.clone(), MESSAGE_CONFIG);
     let root_module = context.module_store.get_root_id();
 
     let source_file = to_source_file(&root)?;

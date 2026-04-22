@@ -1,5 +1,5 @@
 import ( 
-    crate.Std.Io
+    // Std.Io.{Println}
     crate.Lib.SubLib
     crate.Lib.{this, Variable, A, B as b}
 )
@@ -9,6 +9,7 @@ function() {}
 const Num = 1
 
 main() {
+
     mut num = A()
     num = b()
     num = Lib.A()
@@ -24,5 +25,5 @@ main() {
     // subLib.Pub()
     // Lib.subLib.Pub()
 
-    Io.Println("hello world")
+    // Io.Println("hello world")
 }
