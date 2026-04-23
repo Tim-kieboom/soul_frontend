@@ -46,7 +46,8 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     fn inner_parse_import(&mut self) -> SoulResult<ImportPath> {
-        let path = self.parse_import_path()?;
+        
+        let (path, lib_name) = self.parse_import_path()?;
         let kind = match &self.token().kind {
             &CURLY_OPEN => {
                 self.bump();
@@ -73,7 +74,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             _ => ImportKind::Module,
         };
 
-        Ok(ImportPath { module: path, kind })
+        Ok(ImportPath { module: path, kind, lib_name })
     }
 
     fn parse_import_items(&mut self) -> SoulResult<(bool, Option<Ident>, Vec<ImportItem>)> {
@@ -116,11 +117,12 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok((this, this_alias, items))
     }
 
-    fn parse_import_path(&mut self) -> SoulResult<SoulImportPath> {
+    fn parse_import_path(&mut self) -> SoulResult<(SoulImportPath, Option<String>)> {
         const THIS_PORJECT: &str = KeyWord::Crate.as_str();
         const SEPARATOR: TokenKind = TokenKind::Symbol(SymbolKind::Dot);
         const PREV_SUPER: TokenKind = TokenKind::Symbol(SymbolKind::Slash);
 
+        let mut lib_name = None;
         let mut path = SoulImportPath::new();
         if self.current_is_ident(THIS_PORJECT) {
             let current_path = self.context.source_folder.clone();
@@ -145,11 +147,15 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
 
             path = SoulImportPath::from(current_path);
+        } else if let TokenKind::Ident(name) = &self.token().kind {
+            lib_name = Some(name.clone());
+        } else {
+            self.log_error(SoulError::new(format!("'{}' not allowed in import", self.token().kind.display()), SoulErrorKind::InvalidContext, Some(self.token().span)));
         }
 
         loop {
             if self.is_non_path_import_symbool() {
-                return Ok(path);
+                return Ok((path, lib_name));
             }
 
             let ident = self.try_bump_consume_ident()?;
@@ -163,7 +169,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         self.expect(&TokenKind::EndLine)?;
-        Ok(path)
+        Ok((path, lib_name))
     }
 
     fn is_non_path_import_symbool(&self) -> bool {

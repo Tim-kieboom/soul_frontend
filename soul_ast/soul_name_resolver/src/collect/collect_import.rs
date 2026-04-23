@@ -12,6 +12,43 @@ use crate::NameResolver;
 
 impl<'a> NameResolver<'a> {
     pub(crate) fn collect_import_path(&mut self, path: &ImportPath, span: Span) {
+
+        if let Some(name) = &path.lib_name {
+            self.collect_external_lib(path, name, span);
+        } else {
+            self.collect_internal_module(path, span);
+        }
+    }
+
+    fn collect_external_lib(&mut self, _path: &ImportPath, _lib_name: &String, _span: Span) {
+        todo!()
+        // let Some(lib_path) = self.context.libarys.get(lib_name) else {
+        //     self.log_error(SoulError::new(format!("lib '{lib_name}' not found"), SoulErrorKind::PathNotFound, Some(span)));
+        //     return 
+        // };
+        
+        // let module_name = match lib_path.module.get_module_name() {
+        //     Some(val) => val,
+        //     None => {
+        //         self.log_error(soul_error_internal!("could not get module name", None));
+        //         return;
+        //     }
+        // };
+
+        // let alias = match &lib_path.kind {
+        //     ast::ImportKind::Alias(ident) => Some(ident.as_str()),
+        //     _ => None,
+        // };
+
+        // let imported_items = match &lib_path.kind {
+        //     ast::ImportKind::Items { items, .. } => items,
+        //     _ => &vec![],
+        // };
+
+        // lib_path.module
+    }
+
+    fn collect_internal_module(&mut self, path: &ImportPath, span: Span) {
         let module_name = match path.module.get_module_name() {
             Some(val) => val,
             None => {
@@ -31,7 +68,6 @@ impl<'a> NameResolver<'a> {
         };
 
         let parent_module = self.current.module;
-
         self.check_if_module_private(path, span);
 
         let Some(module_file_path) = self.find_module_file(path.module.to_pathbuf(), span) else {

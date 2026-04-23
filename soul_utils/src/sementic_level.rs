@@ -43,6 +43,7 @@ pub struct CompilerContext {
     pub source_folder: PathBuf,
     pub faults: Vec<SementicFault>,
     pub module_store: ModuleStore,
+    pub libarys: HashMap<String, PathBuf>,
     pub message_config: MessageConfig,
     path_stack: Vec<PathBuf>,
 }
@@ -53,6 +54,7 @@ impl CompilerContext {
             source_folder,
             message_config,
             path_stack: vec![],
+            libarys: HashMap::new(),
             module_store: ModuleStore::new(root_path),
         }
     }
@@ -82,13 +84,11 @@ pub struct ModuleStore {
     root: ModuleId,
     map: BiMap<ModuleId, PathBuf>,
     alloc: IdGenerator<ModuleId>,
-    crates: HashMap<String, PathBuf>,
 }
 impl ModuleStore {
     pub fn new(root_path: PathBuf) -> Self {
         let mut this = Self {
             map: BiMap::new(),
-            crates: HashMap::new(),
             root: ModuleId::error(),
             alloc: IdGenerator::new(),
         };

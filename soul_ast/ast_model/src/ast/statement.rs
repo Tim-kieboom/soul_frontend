@@ -86,6 +86,7 @@ pub struct Import {
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ImportPath {
+    pub lib_name: Option<String>,
     pub module: SoulImportPath,
     pub kind: ImportKind,
 }
@@ -94,6 +95,7 @@ impl ImportPath {
         Self {
             module: SoulImportPath::new(),
             kind: ImportKind::This,
+            lib_name: None,
         }
     }
 }
