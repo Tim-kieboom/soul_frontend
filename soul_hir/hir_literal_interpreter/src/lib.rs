@@ -192,7 +192,7 @@ impl<'a> LiteralInterpreter<'a> {
             .fields
             .iter()
             .enumerate()
-            .find(|(_i, field)| field_name(field) == name)
+            .find(|(_i, field)| field_name(field).as_str() == name)
             .map(|(i, _)| i)
     }
 }

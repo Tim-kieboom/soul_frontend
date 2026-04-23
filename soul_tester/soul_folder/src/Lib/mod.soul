@@ -3,11 +3,12 @@ import .SubLib.{this}
 const Variable = 1
 
 GetStruct(): Struct {
-    Struct{field: 1}
+    Struct{field: 1, test: 2}
 }
 
 struct Struct {
     field: int
+    test: int
 }  
 
 priv() {}

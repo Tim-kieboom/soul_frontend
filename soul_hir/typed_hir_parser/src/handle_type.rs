@@ -210,7 +210,7 @@ impl<'a> TypedHirContext<'a> {
         let field = match object_struct
             .fields
             .iter()
-            .find(|field| field.name == field_ident)
+            .find(|field| field.name.as_str() == field_ident)
         {
             Some(val) => val,
             None => {

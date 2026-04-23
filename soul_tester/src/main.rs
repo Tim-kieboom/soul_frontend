@@ -2,12 +2,11 @@ use std::{
     fs::{File, OpenOptions},
     io::{Read, stdout},
     path::{Path, PathBuf},
-    str::FromStr,
     time::Instant,
 };
 
 use anyhow::Result;
-use ast::{AstContext};
+use ast::{AbtractSyntaxTree};
 use fern::Dispatch;
 use inkwell::context::Context;
 use log::{error, info};
@@ -65,6 +64,7 @@ fn main() -> Result<()> {
     if is_fatal(&output.context.faults, COMPILER_OPTIONS.fatal_level()) {
         return Ok(());
     }
+
     info!(
         "{GREEN}frontend success: {}ms{DEFAULT}",
         timer.elapsed().as_millis()
@@ -81,25 +81,25 @@ fn main() -> Result<()> {
 }
 
 fn run_fontend(paths: &Paths) -> Result<Ouput> {
-    let root = paths.to_entry_file_path();
-    let source_folder = PathBuf::from_str(&paths.source_folder).expect("error is infallible");
-    let mut context = CompilerContext::new(source_folder, root.clone(), MESSAGE_CONFIG);
-    let root_module = context.module_store.get_root_id();
+    let source_folder = paths.to_source_path();
+    let main_file_path = paths.to_entry_file_path();
+    
+    let mut context = CompilerContext::new(source_folder, main_file_path.clone(), MESSAGE_CONFIG);
+    let root_module = context.root_module_id();
 
-    let source_file = to_source_file(&root)?;
+    let source_file = to_source_file(&main_file_path)?;
     let tokens = to_token_stream(&source_file, root_module);
     display_tokenizer(paths, root_module, &source_file)?;
+    
+    let ast = to_ast(tokens, &COMPILER_OPTIONS, &mut context);
+    display_ast(paths, &context, &ast)?;
 
-    let mut ast_context = AstContext::new(root_module);
-    to_ast(tokens, &COMPILER_OPTIONS, &mut context, &mut ast_context);
-    display_ast(paths, &context, &ast_context)?;
-
-    let mut hir = to_hir(&COMPILER_OPTIONS, &mut context, &ast_context);
-    display_hir(paths, &hir, &ast_context)?;
+    let mut hir = to_hir(&ast, &COMPILER_OPTIONS, &mut context);
+    display_hir(paths, &hir, &ast)?;
     clear_hir_type_map(&mut hir);
 
-    let mir = to_mir(&hir, &COMPILER_OPTIONS, &ast_context.modules, &mut context);
-    display_mir(paths, &mir, &hir, &ast_context)?;
+    let mir = to_mir(&hir, &ast, &COMPILER_OPTIONS, &mut context);
+    display_mir(paths, &mir, &hir, &ast)?;
 
     Ok(Ouput {
         mir_response: mir,
@@ -147,7 +147,7 @@ fn display_tokenizer(paths: &Paths, module: ModuleId, source_file: &str) -> Resu
     paths.write_to_output(&tokens, "tokenizer/tokens.soulc")
 }
 
-fn display_ast(paths: &Paths, context: &CompilerContext, ast_context: &AstContext) -> Result<()> {
+fn display_ast(paths: &Paths, context: &CompilerContext, ast_context: &AbtractSyntaxTree) -> Result<()> {
     let root = context.module_store.get_root_id();
     paths.write_to_output(
         &displayer_ast::display_ast(root, context, ast_context),
@@ -159,7 +159,7 @@ fn display_ast(paths: &Paths, context: &CompilerContext, ast_context: &AstContex
     )
 }
 
-fn display_hir(paths: &Paths, hir: &HirResponse, ast_context: &AstContext) -> Result<()> {
+fn display_hir(paths: &Paths, hir: &HirResponse, ast_context: &AbtractSyntaxTree) -> Result<()> {
     paths.write_to_output(
         &displayer_hir::display_hir(ast_context, &hir.hir),
         "hir/tree.soulc",
@@ -181,7 +181,7 @@ fn clear_hir_type_map(hir: &mut HirResponse) {
     hir.hir.info.infers.clear();
 }
 
-fn display_mir(paths: &Paths, mir: &MirResponse, hir: &HirResponse, ast_context: &AstContext) -> Result<()> {
+fn display_mir(paths: &Paths, mir: &MirResponse, hir: &HirResponse, ast_context: &AbtractSyntaxTree) -> Result<()> {
     paths.write_to_output(
         &displayer_mir::display_mir(&mir.tree, hir, &ast_context.modules),
         "mir/tree.soulc",

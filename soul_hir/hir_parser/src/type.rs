@@ -169,7 +169,7 @@ fn resolve_stub(
     })
 }
 
-fn find_created_type(scopes: &[Scope], name: &str) -> Option<HirTypeKind> {
+pub(crate) fn find_created_type(scopes: &[Scope], name: &str) -> Option<HirTypeKind> {
     for store in scopes.iter().rev() {
         if let Some(ty) = store.created_type.get(name).copied() {
             return Some(ty.to_hir_kind());

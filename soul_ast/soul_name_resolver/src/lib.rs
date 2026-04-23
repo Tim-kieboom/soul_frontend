@@ -1,5 +1,5 @@
 use ast::{
-    AstContext, AstModuleStore, DeclareStore, EntryKind, Function, Struct, Variable,
+    AbtractSyntaxTree, AstModuleStore, DeclareStore, EntryKind, Function, Struct, Variable,
     meta_data::AstMetadata,
     scope::{NodeId, ScopeValue},
 };
@@ -19,7 +19,7 @@ mod resolve;
 pub fn name_resolve(
     module_id: ModuleId,
     context: &mut CompilerContext,
-    ast_context: &mut AstContext,
+    ast_context: &mut AbtractSyntaxTree,
 ) {
     let mut resolver = NameResolver::new(module_id, context, ast_context);
 
@@ -46,7 +46,7 @@ impl<'a> NameResolver<'a> {
     fn new(
         module: ModuleId,
         context: &'a mut CompilerContext,
-        ast_context: &'a mut AstContext,
+        ast_context: &'a mut AbtractSyntaxTree,
     ) -> Self {
         Self {
             context,

@@ -326,7 +326,7 @@ impl<'a> MirDisplayer<'a> {
                         let last_index = fields.len().saturating_sub(1);
                         for (i, field) in fields.iter().enumerate() {
                             match object {
-                                Some(obj) => self.push_str(&obj.fields[i].name),
+                                Some(obj) => self.push_str(obj.fields[i].name.as_str()),
                                 None => write!(self.sb, "_{i}").expect("no fmt error"),
                             }
 
@@ -342,7 +342,7 @@ impl<'a> MirDisplayer<'a> {
                         let last_index = literals.len().saturating_sub(1);
                         for (i, (literal, _)) in literals.iter().enumerate() {
                             match object {
-                                Some(obj) => self.push_str(&obj.fields[i].name),
+                                Some(obj) => self.push_str(obj.fields[i].name.as_str()),
                                 None => write!(self.sb, "_{i}").expect("no fmt error"),
                             }
 

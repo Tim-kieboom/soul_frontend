@@ -1,7 +1,6 @@
-use hir::{FieldId, HirTypeKind, LazyTypeId, TypeId};
+use hir::{DisplayType, FieldId, HirTypeKind, LazyTypeId, TypeId};
 use soul_utils::{
-    ids::IdAlloc,
-    vec_map::{VecMap, VecMapIndex},
+    error::{SoulError, SoulErrorKind, SoulResult}, ids::IdAlloc, soul_error_internal, span::Span, vec_map::{VecMap, VecMapIndex}
 };
 use typed_hir::{FieldInfo, ThirType, ThirTypeKind, ThirTypesMap, TypedHir};
 
@@ -87,30 +86,93 @@ impl<'a> TypedHirContext<'a> {
             out.types.force_insert(id, thir_ty);
         }
 
-        for (id, s) in self.hir.info.types.structs_entries() {
-            let mut fields = Vec::with_capacity(s.fields.len());
+        for (id, struct_) in self.hir.info.types.structs_entries() {
+            let mut fields = Vec::with_capacity(struct_.fields.len());
 
-            for field in &s.fields {
+            for field in &struct_.fields {
                 let id = field.id;
                 let ty = self.to_known(self.fields[id].field_type);
 
                 fields.push(typed_hir::Field { id, ty })
             }
 
-            let warning = "to do impl check resursive inclusion";
-
             out.structs.insert(
                 id,
                 typed_hir::Struct {
                     id,
                     fields,
-                    name: s.name.to_string(),
+                    name: struct_.name.to_string(),
                     packed: self.options.default_packed(),
                 },
             );
         }
 
+        for (id, struct_) in out.structs.entries() {
+            let struct_type = HirTypeKind::Struct(id);
+            if let Err(err) = self.check_for_recursive_inclusion(&out, &struct_type, &struct_.fields) {
+                self.log_error(err);
+            }
+        }
+
         out
+    }
+
+    fn check_for_recursive_inclusion(&mut self, thir_map: &ThirTypesMap, this: &HirTypeKind, fields: &[typed_hir::Field]) -> SoulResult<()> {
+
+        for field in fields {
+            
+            let id = field.id;
+            let field_type = field.ty;
+
+            let span = self.fields
+                .get(id)
+                .map(|f| f.span)
+                .unwrap_or(Span::error());
+            
+            let kind = &self.id_to_type(field_type).kind;
+            match kind {
+                HirTypeKind::Primitive(_) => self.check_recursive_type(this, field_type, span)?,
+                HirTypeKind::Optional(lazy_type_id) => {
+                    let kown = self.to_known(*lazy_type_id);
+                    self.check_recursive_type(this, kown, span)?
+                }
+                HirTypeKind::Struct(struct_id) => {
+                    self.check_recursive_type(this, field_type, span)?;
+
+                    let Some(struct_) = thir_map.id_to_struct(*struct_id) else {
+                        return Err(soul_error_internal!(format!("{:?} not found", struct_id), None))
+                    };
+
+                    if let Err(err) = self.check_for_recursive_inclusion(thir_map, this, &struct_.fields) {
+                        self.log_error(err);
+                    }
+                }
+                
+                HirTypeKind::Type |
+                HirTypeKind::None |
+                HirTypeKind::Error |
+                HirTypeKind::Ref { .. } |
+                HirTypeKind::Generic(_) |
+                HirTypeKind::Pointer(_) |
+                HirTypeKind::Array { .. } => continue,
+            }
+        }
+
+        Ok(())
+    }
+
+    fn check_recursive_type(&self, this: &HirTypeKind, other: TypeId, span: Span) -> SoulResult<()> {
+        let kind = &self.id_to_type(other).kind;
+        if this != kind {
+            return Ok(())
+        }
+
+        Err(SoulError::new(
+            format!("found '{}' being recurively included (type wrapping pointer `*`/`*mut` or ref `@`/`&`)", 
+            this.display(&self.types, &self.infers)), 
+            SoulErrorKind::TypeInferenceError, 
+            Some(span),
+        ))
     }
 
     fn lower_type_kind(&mut self, kind: HirTypeKind) -> ThirTypeKind {

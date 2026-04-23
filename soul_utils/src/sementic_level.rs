@@ -57,6 +57,10 @@ impl CompilerContext {
         }
     }
 
+    pub fn root_module_id(&self) -> ModuleId  {
+        self.module_store.get_root_id()
+    }
+
     pub fn current_path(&self) -> &PathBuf {
         match self.path_stack.last() {
             Some(path) => path,

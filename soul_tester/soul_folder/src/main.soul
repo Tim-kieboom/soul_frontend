@@ -17,7 +17,7 @@ main() {
     num = Variable
     num = Lib.Variable
     num = SubLib.Constant
-    obj1 := Lib.Struct{field: 1}
+    obj1 := Lib.Struct{field: 1, test: 2}
     obj2 := Lib.GetStruct()
     field := obj2.field
     // SubLib.Pub()

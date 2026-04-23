@@ -15,7 +15,7 @@ pub use ast::*;
 use crate::{meta_data::AstMetadata, scope::NodeId};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct AstContext {
+pub struct AbtractSyntaxTree {
     /// The declaration store containing all functions and variables.
     pub store: DeclareStore,
     /// Metadata associated with the AST nodes.
@@ -25,7 +25,7 @@ pub struct AstContext {
     /// ID generator for functions.
     pub function_generators: IdGenerator<FunctionId>,
 }
-impl AstContext {
+impl AbtractSyntaxTree {
     pub fn new(module: ModuleId) -> Self {
         Self {
             store: DeclareStore::new(),

@@ -11,8 +11,12 @@ pub struct Paths {
 }
 
 impl Paths {
+    pub fn to_source_path(&self) -> PathBuf {
+        PathBuf::from_str(&self.source_folder).expect("error is infallible")
+    }
+
     pub fn to_entry_file_path(&self) -> PathBuf {
-        let mut path = PathBuf::from_str(&self.source_folder).expect("error is infallible");
+        let mut path = self.to_source_path();
 
         path.push(&self.entry_file_name);
         path

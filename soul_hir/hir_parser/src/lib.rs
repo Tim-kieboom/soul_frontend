@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ast::{AstContext, scope::NodeId};
+use ast::{AbtractSyntaxTree, scope::{NodeId}};
 use hir::{
     BlockId, CreatedTypes, ExpressionId, Field, GenericId, HirTree, HirType, LazyTypeId, LocalId,
     StatementId, Struct,
@@ -23,16 +23,12 @@ mod place;
 mod statement;
 mod r#type;
 
-pub fn lower_hir(compiler_context: &mut CompilerContext, ast_context: &AstContext) -> HirTree {
+pub fn lower_hir(compiler_context: &mut CompilerContext, ast_context: &AbtractSyntaxTree) -> HirTree {
     let root = compiler_context.module_store.get_root_id();
     let mut context = HirContext::new(compiler_context, ast_context);
 
-    for (obj, _module) in context.ast_context.store.iter_structs() {
-        context.lower_struct(obj);
-    }
-
     context.lower_internal_structs();
-    context.lower_module(root);
+    context.lower_module(root);        
     context.consume_to_hir()
 }
 
@@ -49,13 +45,13 @@ struct HirContext<'a> {
     pub current: Current,
     pub scopes: Vec<Scope>,
     pub id_generator: IdAllocalor,
-    pub ast_context: &'a AstContext,
+    pub ast_context: &'a AbtractSyntaxTree,
 
     pub context: &'a mut CompilerContext,
     pub node_id_to_local: VecMap<NodeId, LocalId>,
 }
 impl<'a> HirContext<'a> {
-    fn new(context: &'a mut CompilerContext, ast_context: &'a AstContext) -> Self {
+    fn new(context: &'a mut CompilerContext, ast_context: &'a AbtractSyntaxTree) -> Self {
         let mut id_generator = IdAllocalor::new(ast_context.function_generators.clone());
         let init_global_function = id_generator.alloc_function();
         let root_id = context.module_store.get_root_id();
@@ -90,7 +86,7 @@ impl<'a> HirContext<'a> {
         }
     }
 
-    fn init_submodules(tree: &mut HirTree, ast_context: &AstContext, module_id: ModuleId) {
+    fn init_submodules(tree: &mut HirTree, ast_context: &AbtractSyntaxTree, module_id: ModuleId) {
         let ast_module = &ast_context.modules[module_id];
         let sub_modules: Vec<ModuleId> = ast_module.modules.entries().collect();
         for sub_module_id in sub_modules.iter().cloned() {
@@ -103,6 +99,14 @@ impl<'a> HirContext<'a> {
 
     fn lower_module(&mut self, module_id: ModuleId) {
         let ast_module = &self.ast_context.modules[module_id];
+
+        for statement in &ast_module.global.statements {
+
+            match &statement.node {
+                ast::StatementKind::Struct(object) => self.add_struct(object),
+                _ => (),
+            }
+        }
 
         for global in &ast_module.global.statements {
             if matches!(global.node, ast::StatementKind::Variable(_)) {
@@ -121,6 +125,44 @@ impl<'a> HirContext<'a> {
         }
     }
 
+    fn lower_struct(&mut self, object: &ast::Struct) {
+        
+        let Some(scope) = self.scopes.last() else {
+            self.log_error(soul_error_internal!(format!("self.scopes.last() not found"), Some(object.name.span)));
+            return
+        };
+
+        let Some(CreatedTypes::Struct(struct_id)) = scope.created_type.get(object.name.as_str()).copied() else {
+            self.log_error(soul_error_internal!(format!("{:?} not found", object.name.as_str()), Some(object.name.span)));
+            return
+        };
+
+
+        let mut fields = vec![];
+        for field in &object.fields {
+            
+            let ty = self.lower_type(&field.ty, field.name.span);
+            let id = self.id_generator.alloc_field();
+            
+            let hir_field = hir::Field {
+                id,
+                ty,
+                struct_id,
+                name: field.name.clone(),
+            };
+            
+            fields.push(hir_field.clone());
+            self.tree.nodes.fields.insert(id, hir_field);
+        }
+        
+        match self.tree.info.types.id_to_struct_mut(struct_id) {
+            Some(obj) => {
+                obj.fields = fields
+            }
+            None => (),
+        }
+    }
+
     fn lower_internal_structs(&mut self) {
         let struct_id = self.tree.info.types.alloc_struct();
         let name = Ident::new(
@@ -135,13 +177,13 @@ impl<'a> HirContext<'a> {
             Field {
                 struct_id,
                 id: self.id_generator.alloc_field(),
-                name: "ptr".to_string(),
+                name: Ident::new("ptr".to_string(), Span::error()),
                 ty: ptr_type,
             },
             Field {
                 struct_id,
                 id: self.id_generator.alloc_field(),
-                name: "len".to_string(),
+                name: Ident::new("len".to_string(), Span::error()),
                 ty: len_type.to_lazy(),
             },
         ];

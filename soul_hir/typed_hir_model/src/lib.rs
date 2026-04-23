@@ -6,11 +6,7 @@ use hir::{
     TypeId,
 };
 use soul_utils::{
-    bimap::BiMap,
-    ids::{FunctionId, IdAlloc},
-    soul_names::{PrimitiveTypes, TypeModifier},
-    vec_map::VecMap,
-    vec_set::VecSet,
+    bimap::BiMap, ids::{FunctionId, IdAlloc}, soul_names::{PrimitiveTypes, TypeModifier}, span::Span, vec_map::VecMap, vec_set::VecSet
 };
 
 pub mod display_thir;
@@ -128,9 +124,10 @@ pub struct TypeTable {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LazyFieldInfo {
+    pub span: Span,
     pub base_type: TypeId,
-    pub field_type: LazyTypeId,
     pub field_index: usize,
+    pub field_type: LazyTypeId,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

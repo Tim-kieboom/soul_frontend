@@ -1,7 +1,7 @@
 use std::fmt::{Arguments, Debug, Write};
 
 use ast::{
-    Assignment, AstContext, Block, ElseKind, Expression, Function, FunctionSignature, Generic,
+    Assignment, AbtractSyntaxTree, Block, ElseKind, Expression, Function, FunctionSignature, Generic,
     IfArm, Import, SoulType, Statement, StatementKind, Struct, TypeKind, UseBlock, Variable,
     scope::{NodeId, ScopeId},
 };
@@ -13,7 +13,7 @@ use soul_utils::{
     vec_map::VecMapIndex,
 };
 
-pub fn display_ast(root: ModuleId, context: &CompilerContext, ast_context: &AstContext) -> String {
+pub fn display_ast(root: ModuleId, context: &CompilerContext, ast_context: &AbtractSyntaxTree) -> String {
     let mut displayer = AstDisplayer::new_ast(context, ast_context);
     displayer.display_module(root);
     for (_id, path) in context.module_store.entries() {
@@ -26,7 +26,7 @@ pub fn display_ast(root: ModuleId, context: &CompilerContext, ast_context: &AstC
 pub fn display_ast_name_resolved(
     root: ModuleId,
     context: &CompilerContext,
-    ast_context: &AstContext,
+    ast_context: &AbtractSyntaxTree,
 ) -> String {
     let mut displayer = AstDisplayer::new_name_resolved(context, ast_context);
     displayer.display_module(root);
@@ -41,11 +41,11 @@ struct AstDisplayer<'a> {
     sb: String,
     depth: String,
     is_name_resolved: bool,
-    ast_context: &'a AstContext,
+    ast_context: &'a AbtractSyntaxTree,
     context: &'a CompilerContext,
 }
 impl<'a> AstDisplayer<'a> {
-    fn new_ast(context: &'a CompilerContext, ast_context: &'a AstContext) -> Self {
+    fn new_ast(context: &'a CompilerContext, ast_context: &'a AbtractSyntaxTree) -> Self {
         Self {
             context,
             ast_context,
@@ -55,7 +55,7 @@ impl<'a> AstDisplayer<'a> {
         }
     }
 
-    fn new_name_resolved(context: &'a CompilerContext, ast_context: &'a AstContext) -> Self {
+    fn new_name_resolved(context: &'a CompilerContext, ast_context: &'a AbtractSyntaxTree) -> Self {
         Self {
             context,
             ast_context,
@@ -92,13 +92,9 @@ impl<'a> AstDisplayer<'a> {
 
     fn display_module(&mut self, module_id: ModuleId) {
         let module = &self.ast_context.modules[module_id];
-        let parent_name = match module.parent {
-            Some(val) => &self.ast_context.modules[val].name,
-            None => "None",
-        };
 
         self.display_depth();
-        self.push_fmt(format_args!("mod {} {{ /*parent: {}*/\n", module.name, parent_name));
+        self.push_fmt(format_args!("mod {} {{\n", module.name));
         self.push_scope();
         for statement in &module.global.statements {
             self.display_statement(statement);
@@ -168,7 +164,7 @@ impl<'a> AstDisplayer<'a> {
     }
 
     fn display_statement(&mut self, statement: &Statement) {
-        self.display_tag_ln(statement.display_variant(), statement.node.get_id());
+        self.display_statement_tag(statement, statement.node.get_id());
 
         match &statement.node {
             ast::StatementKind::Struct(obj) => self.display_struct(obj),
@@ -195,9 +191,6 @@ impl<'a> AstDisplayer<'a> {
         self.display_expression(&assignment.left);
         self.push_str(" = ");
         self.display_expression(&assignment.right);
-
-        self.push('\t');
-        self.display_mutiple_tag(&[assignment.left.node.variant_str(), assignment.right.node.variant_str()]);
     }
 
     fn display_use_block(&mut self, use_block: &UseBlock) {
@@ -337,7 +330,6 @@ impl<'a> AstDisplayer<'a> {
             self.push_str(" = ");
             self.display_expression(value);
             self.push('\t');
-            self.display_tag::<NodeId>(value.node.variant_str(), None);
         }
     }
 
@@ -666,24 +658,49 @@ impl<'a> AstDisplayer<'a> {
 
     fn display_tag<ID: VecMapIndex + Debug>(&mut self, str: &str, node_id: Option<ID>) {
         if !self.is_name_resolved {
-            self.push_fmt(format_args!("/*{str}*/"));
+            self.push_str(str);
             return;
         }
 
         match node_id {
-            Some(id) => self.push_fmt(format_args!("/*{str}: {:?}*/", id)),
-            None => self.push_fmt(format_args!("/*{str}*/")),
+            Some(id) => self.push_fmt(format_args!("{str}: {:?}", id)),
+            None => self.push_str(str),
         }
     }
-
-    fn display_mutiple_tag(&mut self, entrys: &[&str]) {
-        self.push_fmt(format_args!("/*{:?}*/", entrys));
-    }
-
     fn display_tag_ln<ID: VecMapIndex + Debug>(&mut self, str: &str, node_id: Option<ID>) {
         self.display_depth();
+        self.push_str("/*");
         self.display_tag(str, node_id);
-        self.push('\n');
+        self.push_str("*/\n");
+        self.display_depth();
+    }
+
+    fn display_statement_tag<ID: VecMapIndex + Debug>(&mut self, statement: &Statement, node_id: Option<ID>) {
+        self.display_depth();
+        self.push_str("/*");
+        self.display_tag(statement.display_variant(), node_id);
+        match &statement.node {
+            StatementKind::Variable(variable) => {
+                if let Some(value) = &variable.initialize_value {
+                    self.push_str(" := ");
+                    self.push_str(value.node.variant_str());
+                }
+            }
+            StatementKind::Assignment(assignment) => {
+                self.push_str("; ");
+                self.push_str(assignment.left.node.variant_str());
+                self.push_str(" = ");
+                self.push_str(assignment.right.node.variant_str());
+            }
+            StatementKind::Struct(_) |
+            StatementKind::Import(_) |
+            StatementKind::Function(_) |
+            StatementKind::UseBlock(_) |
+            StatementKind::Expression { .. } |
+            StatementKind::ExternalFunction(_) => (),
+        }
+
+        self.push_str("*/\n");
         self.display_depth();
     }
 

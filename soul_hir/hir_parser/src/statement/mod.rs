@@ -1,12 +1,10 @@
 use ast::UseBlock;
 use hir::{Assign, StatementId};
 use soul_utils::{
-    error::{SoulError, SoulErrorKind},
-    soul_names::KeyWord,
-    span::ModuleId,
+    error::{SoulError, SoulErrorKind}, soul_names::KeyWord, span::ModuleId
 };
 
-use crate::HirContext;
+use crate::{HirContext};
 mod block;
 mod function;
 
@@ -37,7 +35,10 @@ impl<'a> HirContext<'a> {
             ast::StatementKind::Import(_) => {
                 return;
             }
-            ast::StatementKind::Struct(_) => return, // gets lowered from DeclareStore
+            ast::StatementKind::Struct(object) => {
+                self.lower_struct(object);
+                return
+            }
             ast::StatementKind::Variable(variable) => {
                 hir::GlobalKind::Variable(self.lower_variable(variable))
             }
@@ -94,7 +95,7 @@ impl<'a> HirContext<'a> {
                 return None;
             }
             ast::StatementKind::Struct(object) => {
-                self.lower_struct(object);
+                self.add_struct(object);
                 return None;
             }
             ast::StatementKind::Variable(variable) => {
@@ -160,7 +161,8 @@ impl<'a> HirContext<'a> {
         hir::Variable { local }
     }
 
-    pub(crate) fn lower_struct(&mut self, object: &ast::Struct) {
+    pub(crate) fn add_struct(&mut self, object: &ast::Struct) {
+
         let name = object.name.clone();
 
         let mut generics = vec![];
@@ -170,24 +172,7 @@ impl<'a> HirContext<'a> {
         }
 
         let struct_id = self.tree.info.types.alloc_struct();
-
-        let mut fields = vec![];
-        for field in &object.fields {
-            let ty = self.lower_type(&field.ty, field.name.span);
-            let id = self.id_generator.alloc_field();
-
-            let hir_field = hir::Field {
-                id,
-                ty,
-                struct_id,
-                name: field.name.to_string(),
-            };
-
-            fields.push(hir_field.clone());
-            self.tree.nodes.fields.insert(id, hir_field);
-        }
-
-        self.insert_struct(struct_id, hir::Struct { name, fields });
+        self.insert_struct(struct_id, hir::Struct { name, fields: vec![] });
     }
 
     pub(crate) fn lower_return_like(

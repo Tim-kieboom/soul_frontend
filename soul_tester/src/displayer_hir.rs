@@ -1,7 +1,6 @@
-use ast::AstContext;
+use ast::AbtractSyntaxTree;
 use hir::{
-    Binary, DisplayType, ExpressionId, FieldId, FunctionBody, HirTree, HirType,
-    HirTypeKind, LazyTypeId, LocalId, LocalKind, StructId, TypeId, Unary,
+    Binary, DisplayType, ExpressionId, FieldId, FunctionBody, HirTree, HirType, HirTypeKind, InferTypeId, LazyTypeId, LocalId, LocalKind, StructId, TypeId, Unary
 };
 use soul_utils::{
     ids::{FunctionId, IdAlloc},
@@ -12,14 +11,14 @@ use soul_utils::{
 use std::fmt::Write;
 use typed_hir::{ThirTypeKind, TypedHir, display_thir::DisplayThirType};
 
-pub fn display_hir(ast_context: &AstContext, hir: &HirTree) -> String {
+pub fn display_hir(ast_context: &AbtractSyntaxTree, hir: &HirTree) -> String {
     let mut displayer = HirDisplayer::new_hir(hir, ast_context);
 
     displayer.display_module(hir.root);
     displayer.consume_to_string()
 }
 
-pub fn display_thir(ast_context: &AstContext, hir: &HirTree, typed: &TypedHir) -> String {
+pub fn display_thir(ast_context: &AbtractSyntaxTree, hir: &HirTree, typed: &TypedHir) -> String {
     let mut displayer = HirDisplayer::new_thir(hir, typed, ast_context);
 
     displayer.display_module(hir.root);
@@ -66,13 +65,13 @@ struct HirDisplayer<'a> {
     sb: String,
     hir: &'a HirTree,
     typed: Option<&'a TypedHir>,
-    ast_context: &'a AstContext,
+    ast_context: &'a AbtractSyntaxTree,
 
     depth: String,
     terminate: Option<ExpressionId>,
 }
 impl<'a> HirDisplayer<'a> {
-    fn new_hir(hir: &'a HirTree, ast_context: &'a AstContext) -> Self {
+    fn new_hir(hir: &'a HirTree, ast_context: &'a AbtractSyntaxTree) -> Self {
         Self {
             hir,
             typed: None,
@@ -83,7 +82,7 @@ impl<'a> HirDisplayer<'a> {
         }
     }
 
-    fn new_thir(hir: &'a HirTree, typed: &'a TypedHir, ast_context: &'a AstContext) -> Self {
+    fn new_thir(hir: &'a HirTree, typed: &'a TypedHir, ast_context: &'a AbtractSyntaxTree) -> Self {
         Self {
             hir,
             ast_context,
@@ -551,6 +550,11 @@ impl<'a> HirDisplayer<'a> {
         let infers = &self.hir.info.infers;
         match id {
             LazyTypeId::Known(type_id) => {
+                if type_id == TypeId::error() {
+                    self.push_str("<error>");
+                    return Some(())
+                }
+
                 let ty = types.id_to_type(type_id);
 
                 debug_assert!(ty.is_some());
@@ -558,6 +562,11 @@ impl<'a> HirDisplayer<'a> {
                     .expect("no fmt error");
             }
             LazyTypeId::Infer(infer_type_id) => {
+                if infer_type_id == InferTypeId::error() {
+                    self.push_str("<infer_error>");
+                    return Some(())
+                }
+
                 let infer = infers.get_infer(infer_type_id);
 
                 debug_assert!(infer.is_some());

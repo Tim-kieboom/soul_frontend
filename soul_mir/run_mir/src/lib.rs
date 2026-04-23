@@ -1,4 +1,4 @@
-use ast::AstModuleStore;
+use ast::{AbtractSyntaxTree};
 use mir_parser::{mir::MirTree, mir_lower};
 use run_hir::HirResponse;
 use soul_utils::{compile_options::CompilerOptions, sementic_level::CompilerContext};
@@ -9,11 +9,11 @@ pub struct MirResponse {
 
 pub fn to_mir(
     hir_response: &HirResponse,
+    ast: &AbtractSyntaxTree,
     _options: &CompilerOptions,
-    ast_modules: &AstModuleStore,
     faults: &mut CompilerContext,
 ) -> MirResponse {
     MirResponse {
-        tree: mir_lower(&hir_response, ast_modules, faults),
+        tree: mir_lower(&hir_response, &ast.modules, faults),
     }
 }

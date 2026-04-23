@@ -1,4 +1,4 @@
-use ast::AstContext;
+use ast::AbtractSyntaxTree;
 use hir::{ComplexLiteral, ExpressionId, HirTree};
 use hir_literal_interpreter::literal_resolve;
 use hir_parser::lower_hir;
@@ -19,9 +19,9 @@ pub struct HirResponse {
 }
 
 pub fn to_hir(
+    ast_context: &AbtractSyntaxTree,
     options: &CompilerOptions,
     context: &mut CompilerContext,
-    ast_context: &AstContext,
 ) -> HirResponse {
     let hir = lower_hir(context, ast_context);
     let typed = lower_typed_hir(&hir, options, context);
@@ -80,7 +80,7 @@ pub fn literal_display(literal: &ComplexLiteral, hir: &HirTree, sb: &mut String)
                 };
 
                 match field {
-                    Some(val) => sb.push_str(&val.name),
+                    Some(val) => sb.push_str(val.name.as_str()),
                     None => write!(sb, "_{}", i).expect("no fmt error"),
                 }
 

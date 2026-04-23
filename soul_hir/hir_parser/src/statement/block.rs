@@ -34,6 +34,14 @@ impl<'a> HirContext<'a> {
     pub(crate) fn lower_block(&mut self, body: &ast::Block) -> hir::BlockId {
         let id = self.id_generator.alloc_body();
 
+        for statement in &body.statements {
+
+            match &statement.node {
+                ast::StatementKind::Struct(object) => self.add_struct(object),
+                _ => (),
+            }
+        }
+
         let prev_body = self.current.body;
         self.current.body = CurrentBody::Block(id);
         self.push_scope();

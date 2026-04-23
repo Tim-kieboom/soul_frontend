@@ -524,7 +524,7 @@ impl<'a> TypedHirContext<'a> {
             Ok(struct_info) => struct_info
                 .fields
                 .iter()
-                .map(|field| (field.name.clone(), field.ty))
+                .map(|field| (field.name.to_string(), field.ty))
                 .collect::<HashMap<String, LazyTypeId>>(),
             Err(err) => {
                 self.log_error(err);

@@ -73,6 +73,10 @@ impl TypesMap {
         self.structs.get(id)
     }
 
+    pub fn id_to_struct_mut(&mut self, id: StructId) -> Option<&mut Struct> {
+        self.structs.get_mut(id)
+    }
+
     pub fn structs_entries(&self) -> impl Iterator<Item = (StructId, &Struct)> {
         self.structs.entries()
     }

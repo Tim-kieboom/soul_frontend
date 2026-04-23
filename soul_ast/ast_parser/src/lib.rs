@@ -5,7 +5,7 @@ use soul_utils::{sementic_level::CompilerContext, span::ModuleId};
 use crate::parser::Parser;
 mod parser;
 
-pub fn parse<'a, 'f>(
+pub fn parse_module<'a, 'f>(
     tokens: TokenStream<'a>,
     id: ModuleId,
     name: String,

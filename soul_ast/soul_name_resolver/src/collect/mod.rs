@@ -7,7 +7,7 @@ use ast::{
         ScopeValueKind,
     },
 };
-use ast_parser::parse;
+use ast_parser::parse_module;
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
     Ident,
@@ -276,7 +276,7 @@ impl<'a> NameResolver<'a> {
 
     fn parse_module(&mut self, source: &str, module_id: ModuleId, parent: ModuleId, name: String) {
         let tokens = to_token_stream(source, module_id);
-        let module = parse(tokens, module_id, name, Some(parent), self.context);
+        let module = parse_module(tokens, module_id, name, Some(parent), self.context);
         if let Some(module) = self.modules.get_mut(parent) {
             module.modules.insert(module_id);
         }

@@ -274,6 +274,7 @@ impl<'a> TypedHirContext<'a> {
             base_type: base,
             field_index: index,
             field_type: field.ty,
+            span: field.name.span,
         };
         self.fields.insert(field.id, info);
     }

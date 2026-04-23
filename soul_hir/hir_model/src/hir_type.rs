@@ -224,8 +224,7 @@ pub struct Struct {
 pub struct Field {
     pub struct_id: StructId,
     pub id: FieldId,
-    /// The name of the field (for readability, debugging, codegen).
-    pub name: String,
+    pub name: Ident,
     pub ty: LazyTypeId,
 }
 
