@@ -49,7 +49,6 @@ const TARGET: TargetInfo = TargetInfo::new(ARCH, OS);
 pub const COMPILER_OPTIONS: CompilerOptions = CompilerOptions::new_default(TARGET);
 
 struct Ouput {
-    context: CompilerContext,
     mir_response: MirResponse,
     hir_response: HirResponse,
 }
@@ -57,11 +56,17 @@ struct Ouput {
 fn main() -> Result<()> {
     let paths: Paths = serde_json::from_slice(PATHS)?;
     init_logger(&paths.log_file)?;
+    
+    let source_folder = paths.to_source_path();
+    let main_file_path = paths.to_entry_file_path();
+    let mut context = CompilerContext::new(source_folder, main_file_path, MESSAGE_CONFIG);
 
     let mut timer = Instant::now();
-    let mut output = run_fontend(&paths)?;
-    log_faults(&output.context);
-    if is_fatal(&output.context.faults, COMPILER_OPTIONS.fatal_level()) {
+    let root_module = context.root_module_id();
+    let main_file_path = paths.to_entry_file_path();
+    let mut output = run_crate_fontend(&paths, &main_file_path, &mut context, root_module, "crate")?;
+    log_faults(&context);
+    if is_fatal(&context.faults, COMPILER_OPTIONS.fatal_level()) {
         return Ok(());
     }
 
@@ -71,7 +76,7 @@ fn main() -> Result<()> {
     );
 
     timer = Instant::now();
-    if run_llvm(&mut output) {
+    if run_llvm(&mut output, &mut context) {
         info!(
             "{GREEN}llvm success: {}ms{DEFAULT}",
             timer.elapsed().as_millis()
@@ -80,44 +85,38 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn run_fontend(paths: &Paths) -> Result<Ouput> {
-    let source_folder = paths.to_source_path();
-    let main_file_path = paths.to_entry_file_path();
+fn run_crate_fontend(paths: &Paths, entry_path: &PathBuf, context: &mut CompilerContext, root_module: ModuleId, lib_name: &str) -> Result<Ouput> {
     
-    let mut context = CompilerContext::new(source_folder, main_file_path.clone(), MESSAGE_CONFIG);
-    let root_module = context.root_module_id();
-
-    let source_file = to_source_file(&main_file_path)?;
+    let source_file = to_source_file(entry_path)?;
     let tokens = to_token_stream(&source_file, root_module);
-    display_tokenizer(paths, root_module, &source_file)?;
+    display_tokenizer(paths, root_module, &source_file, lib_name)?;
     
-    let ast = to_ast(tokens, &COMPILER_OPTIONS, &mut context);
-    display_ast(paths, &context, &ast)?;
+    let ast = to_ast(tokens, &COMPILER_OPTIONS, context);
+    display_ast(paths, &context, &ast, lib_name)?;
 
-    let mut hir = to_hir(&ast, &COMPILER_OPTIONS, &mut context);
-    display_hir(paths, &hir, &ast)?;
+    let mut hir = to_hir(&ast, &COMPILER_OPTIONS, context, root_module);
+    display_hir(paths, &hir, &ast, lib_name)?;
     clear_hir_type_map(&mut hir);
 
-    let mir = to_mir(&hir, &ast, &COMPILER_OPTIONS, &mut context);
-    display_mir(paths, &mir, &hir, &ast)?;
+    let mir = to_mir(&hir, &ast, &COMPILER_OPTIONS, context, root_module);
+    display_mir(paths, &mir, &hir, &ast, lib_name)?;
 
     Ok(Ouput {
         mir_response: mir,
         hir_response: hir,
-        context,
     })
 }
 
-fn run_llvm(output: &mut Ouput) -> bool {
+fn run_llvm(output: &mut Ouput, context: &mut CompilerContext) -> bool {
     let request = IrRequest {
         mir: &output.mir_response,
         types: &output.hir_response.typed,
         context: &Context::create(),
     };
 
-    output.context.faults.clear();
-    let ir = to_llvm_ir(&request, &COMPILER_OPTIONS, &mut output.context.faults);
-    log_faults(&output.context);
+    context.faults.clear();
+    let ir = to_llvm_ir(&request, &COMPILER_OPTIONS, &mut context.faults);
+    log_faults(&context);
 
     #[cfg(not(debug_assertions))]
     if ir.is_fatal {
@@ -141,36 +140,36 @@ fn run_llvm(output: &mut Ouput) -> bool {
     true
 }
 
-fn display_tokenizer(paths: &Paths, module: ModuleId, source_file: &str) -> Result<()> {
+fn display_tokenizer(paths: &Paths, module: ModuleId, source_file: &str, lib_name: &str) -> Result<()> {
     let token_stream = to_token_stream(source_file, module);
     let tokens = display_tokens(paths, source_file, token_stream)?;
-    paths.write_to_output(&tokens, "tokenizer/tokens.soulc")
+    paths.write_to_output(&tokens, &format!("{lib_name}/tokenizer/tokens.soulc"))
 }
 
-fn display_ast(paths: &Paths, context: &CompilerContext, ast_context: &AbtractSyntaxTree) -> Result<()> {
+fn display_ast(paths: &Paths, context: &CompilerContext, ast_context: &AbtractSyntaxTree, lib_name: &str) -> Result<()> {
     let root = context.module_store.get_root_id();
     paths.write_to_output(
         &displayer_ast::display_ast(root, context, ast_context),
-        "ast/tree.soulc",
+        &format!("{lib_name}/ast/tree.soulc"),
     )?;
     paths.write_to_output(
         &displayer_ast::display_ast_name_resolved(root, context, ast_context),
-        "ast/NameResolved.soulc",
+        &format!("{lib_name}/ast/NameResolved.soulc"),
     )
 }
 
-fn display_hir(paths: &Paths, hir: &HirResponse, ast_context: &AbtractSyntaxTree) -> Result<()> {
+fn display_hir(paths: &Paths, hir: &HirResponse, ast_context: &AbtractSyntaxTree, lib_name: &str) -> Result<()> {
     paths.write_to_output(
         &displayer_hir::display_hir(ast_context, &hir.hir),
-        "hir/tree.soulc",
+        &format!("{lib_name}/hir/tree.soulc"),
     )?;
     paths.write_to_output(
         &displayer_hir::display_thir(ast_context, &hir.hir, &hir.typed),
-        "thir/tree.soulc",
+        &format!("{lib_name}/thir/tree.soulc"),
     )?;
     paths.write_to_output(
         &displayer_hir::display_created_types(&hir.hir, &hir.typed),
-        "thir/types.soulc",
+        &format!("{lib_name}/thir/types.soulc"),
     )?;
     Ok(())
 }
@@ -181,10 +180,10 @@ fn clear_hir_type_map(hir: &mut HirResponse) {
     hir.hir.info.infers.clear();
 }
 
-fn display_mir(paths: &Paths, mir: &MirResponse, hir: &HirResponse, ast_context: &AbtractSyntaxTree) -> Result<()> {
+fn display_mir(paths: &Paths, mir: &MirResponse, hir: &HirResponse, ast_context: &AbtractSyntaxTree, lib_name: &str) -> Result<()> {
     paths.write_to_output(
         &displayer_mir::display_mir(&mir.tree, hir, &ast_context.modules),
-        "mir/tree.soulc",
+        &format!("{lib_name}/mir/tree.soulc"),
     )
 }
 

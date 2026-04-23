@@ -1,7 +1,8 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{path::PathBuf};
 
 use crate::{
     bimap::BiMap,
+    crate_store::CrateStore,
     define_str_enum,
     error::SoulError,
     ids::{IdAlloc, IdGenerator},
@@ -43,7 +44,7 @@ pub struct CompilerContext {
     pub source_folder: PathBuf,
     pub faults: Vec<SementicFault>,
     pub module_store: ModuleStore,
-    pub libarys: HashMap<String, PathBuf>,
+    pub crate_store: CrateStore,
     pub message_config: MessageConfig,
     path_stack: Vec<PathBuf>,
 }
@@ -54,8 +55,8 @@ impl CompilerContext {
             source_folder,
             message_config,
             path_stack: vec![],
-            libarys: HashMap::new(),
             module_store: ModuleStore::new(root_path),
+            crate_store: CrateStore::new(),
         }
     }
 

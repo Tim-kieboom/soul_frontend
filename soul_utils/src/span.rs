@@ -1,7 +1,7 @@
 use crate::{Ident, ids::IdAlloc, impl_soul_ids};
 use std::hash::Hash;
 
-impl_soul_ids!(ModuleId);
+impl_soul_ids!(ModuleId, CrateId);
 
 /// Represents a source code location span.
 ///

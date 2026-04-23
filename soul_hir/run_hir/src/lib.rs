@@ -6,7 +6,7 @@ use soul_utils::{
     compile_options::CompilerOptions,
     error::SoulError,
     sementic_level::{CompilerContext, SementicFault},
-    span::Span,
+    span::{ModuleId, Span},
     vec_map::VecMap,
 };
 use typed_hir::TypedHir;
@@ -22,8 +22,9 @@ pub fn to_hir(
     ast_context: &AbtractSyntaxTree,
     options: &CompilerOptions,
     context: &mut CompilerContext,
+    root: ModuleId,
 ) -> HirResponse {
-    let hir = lower_hir(context, ast_context);
+    let hir = lower_hir(context, ast_context, root);
     let typed = lower_typed_hir(&hir, options, context);
 
     let literal_resolves = literal_resolve(&hir, &typed);

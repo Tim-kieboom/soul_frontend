@@ -20,8 +20,8 @@ mod parse;
 mod utils;
 use crate::{id_generators::IdGenerators, mir::MirTree};
 
-pub fn mir_lower(hir_reponse: &HirResponse, ast_modules: &AstModuleStore, context: &mut CompilerContext) -> MirTree {
-    let mut context = MirContext::new(hir_reponse, ast_modules, context);
+pub fn mir_lower(hir_reponse: &HirResponse, ast_modules: &AstModuleStore, context: &mut CompilerContext, root: ModuleId) -> MirTree {
+    let mut context = MirContext::new(hir_reponse, ast_modules, context, root);
 
     for module_id in hir_reponse.hir.nodes.modules.keys() {
         context.lower_module(module_id);
@@ -44,6 +44,7 @@ struct MirContext<'a> {
     hir_response: &'a HirResponse,
     context: &'a mut CompilerContext,
     ast_modules: &'a AstModuleStore,
+    root: ModuleId,
 }
 
 struct CurrentContext {
@@ -69,7 +70,7 @@ impl CurrentContext {
 }
 
 impl<'a> MirContext<'a> {
-    fn new(hir_reponse: &'a HirResponse, ast_modules: &'a AstModuleStore, context: &'a mut CompilerContext) -> Self {
+    fn new(hir_reponse: &'a HirResponse, ast_modules: &'a AstModuleStore, context: &'a mut CompilerContext, root: ModuleId) -> Self {
         let init_global_function = hir_reponse.hir.init_globals;
         let main = hir_reponse.hir.main;
 
@@ -96,7 +97,7 @@ impl<'a> MirContext<'a> {
             blocks,
             entry_function: main,
             init_global_function,
-            root_module: hir_reponse.hir.root,
+            root_module: root,
 
             temps: VecMap::const_default(),
             places: VecMap::const_default(),
@@ -122,7 +123,8 @@ impl<'a> MirContext<'a> {
             temp_remap: VecMap::const_default(),
             place_typed: VecMap::const_default(),
             local_remap: VecMap::const_default(),
-            current: CurrentContext::new(init_global_function, hir_reponse.hir.root),
+            current: CurrentContext::new(init_global_function, root),
+            root,
         };
 
         this.build_init_global_function();

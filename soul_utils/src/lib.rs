@@ -1,8 +1,12 @@
-use crate::span::{ModuleId, Span};
+pub use crate::span::{ModuleId, CrateId, Span};
+pub use crate::crate_store::{Crate, CrateStore};
+pub use crate::ids::IdAlloc;
+pub use crate::soul_manifest::SoulToml;
 
 pub mod bimap;
 pub mod char_colors;
 pub mod compile_options;
+pub mod crate_store;
 pub mod define_enums;
 pub mod error;
 pub mod ids;
@@ -10,6 +14,7 @@ pub mod precedence;
 pub mod print_breakpoint;
 pub mod sementic_level;
 pub mod soul_import_path;
+pub mod soul_manifest;
 pub mod soul_names;
 pub mod span;
 pub mod symbool_kind;

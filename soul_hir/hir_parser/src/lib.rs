@@ -23,12 +23,11 @@ mod place;
 mod statement;
 mod r#type;
 
-pub fn lower_hir(compiler_context: &mut CompilerContext, ast_context: &AbtractSyntaxTree) -> HirTree {
-    let root = compiler_context.module_store.get_root_id();
-    let mut context = HirContext::new(compiler_context, ast_context);
+pub fn lower_hir(compiler_context: &mut CompilerContext, ast_context: &AbtractSyntaxTree, root: ModuleId) -> HirTree {
+    let mut context = HirContext::new(compiler_context, ast_context, root);
 
     context.lower_internal_structs();
-    context.lower_module(root);        
+    context.lower_module(root);
     context.consume_to_hir()
 }
 
@@ -49,12 +48,12 @@ struct HirContext<'a> {
 
     pub context: &'a mut CompilerContext,
     pub node_id_to_local: VecMap<NodeId, LocalId>,
+    pub root_id: ModuleId,
 }
 impl<'a> HirContext<'a> {
-    fn new(context: &'a mut CompilerContext, ast_context: &'a AbtractSyntaxTree) -> Self {
+    fn new(context: &'a mut CompilerContext, ast_context: &'a AbtractSyntaxTree, root_id: ModuleId) -> Self {
         let mut id_generator = IdAllocalor::new(ast_context.function_generators.clone());
         let init_global_function = id_generator.alloc_function();
-        let root_id = context.module_store.get_root_id();
 
         let main = match ast_context.store.main_function {
             Some(val) => val,
@@ -83,6 +82,7 @@ impl<'a> HirContext<'a> {
                 body: CurrentBody::Global,
             },
             tree,
+            root_id,
         }
     }
 
@@ -167,7 +167,7 @@ impl<'a> HirContext<'a> {
         let struct_id = self.tree.info.types.alloc_struct();
         let name = Ident::new(
             "___Array".to_string(),
-            Span::default(self.context.module_store.get_root_id()),
+            Span::default(self.root_id),
         );
 
         let none_type = self.add_type(HirType::none_type()).to_lazy();
