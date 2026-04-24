@@ -1,6 +1,10 @@
 use hir::{DisplayType, FieldId, HirTypeKind, LazyTypeId, TypeId};
 use soul_utils::{
-    error::{SoulError, SoulErrorKind, SoulResult}, ids::IdAlloc, soul_error_internal, span::Span, vec_map::{VecMap, VecMapIndex}
+    error::{SoulError, SoulErrorKind, SoulResult},
+    ids::IdAlloc,
+    soul_error_internal,
+    span::Span,
+    vec_map::{VecMap, VecMapIndex},
 };
 use typed_hir::{FieldInfo, ThirType, ThirTypeKind, ThirTypesMap, TypedHir};
 
@@ -109,7 +113,9 @@ impl<'a> TypedHirContext<'a> {
 
         for (id, struct_) in out.structs.entries() {
             let struct_type = HirTypeKind::Struct(id);
-            if let Err(err) = self.check_for_recursive_inclusion(&out, &struct_type, &struct_.fields) {
+            if let Err(err) =
+                self.check_for_recursive_inclusion(&out, &struct_type, &struct_.fields)
+            {
                 self.log_error(err);
             }
         }
@@ -117,18 +123,18 @@ impl<'a> TypedHirContext<'a> {
         out
     }
 
-    fn check_for_recursive_inclusion(&mut self, thir_map: &ThirTypesMap, this: &HirTypeKind, fields: &[typed_hir::Field]) -> SoulResult<()> {
-
+    fn check_for_recursive_inclusion(
+        &mut self,
+        thir_map: &ThirTypesMap,
+        this: &HirTypeKind,
+        fields: &[typed_hir::Field],
+    ) -> SoulResult<()> {
         for field in fields {
-            
             let id = field.id;
             let field_type = field.ty;
 
-            let span = self.fields
-                .get(id)
-                .map(|f| f.span)
-                .unwrap_or(Span::error());
-            
+            let span = self.fields.get(id).map(|f| f.span).unwrap_or(Span::error());
+
             let kind = &self.id_to_type(field_type).kind;
             match kind {
                 HirTypeKind::Primitive(_) => self.check_recursive_type(this, field_type, span)?,
@@ -140,37 +146,49 @@ impl<'a> TypedHirContext<'a> {
                     self.check_recursive_type(this, field_type, span)?;
 
                     let Some(struct_) = thir_map.id_to_struct(*struct_id) else {
-                        return Err(soul_error_internal!(format!("{:?} not found", struct_id), None))
+                        return Err(soul_error_internal!(
+                            format!("{:?} not found", struct_id),
+                            None
+                        ));
                     };
 
-                    if let Err(err) = self.check_for_recursive_inclusion(thir_map, this, &struct_.fields) {
+                    if let Err(err) =
+                        self.check_for_recursive_inclusion(thir_map, this, &struct_.fields)
+                    {
                         self.log_error(err);
                     }
                 }
-                
-                HirTypeKind::Type |
-                HirTypeKind::None |
-                HirTypeKind::Error |
-                HirTypeKind::Ref { .. } |
-                HirTypeKind::Generic(_) |
-                HirTypeKind::Pointer(_) |
-                HirTypeKind::Array { .. } => continue,
+
+                HirTypeKind::Type
+                | HirTypeKind::None
+                | HirTypeKind::Error
+                | HirTypeKind::Ref { .. }
+                | HirTypeKind::Generic(_)
+                | HirTypeKind::Pointer(_)
+                | HirTypeKind::Array { .. } => continue,
             }
         }
 
         Ok(())
     }
 
-    fn check_recursive_type(&self, this: &HirTypeKind, other: TypeId, span: Span) -> SoulResult<()> {
+    fn check_recursive_type(
+        &self,
+        this: &HirTypeKind,
+        other: TypeId,
+        span: Span,
+    ) -> SoulResult<()> {
         let kind = &self.id_to_type(other).kind;
         if this != kind {
-            return Ok(())
+            return Ok(());
         }
 
         Err(SoulError::new(
-            format!("found '{}' being recurively included (type wrapping pointer `*`/`*mut` or ref `@`/`&`)", 
-            this.display(&self.types, &self.infers)), 
-            SoulErrorKind::TypeInferenceError, 
+            format!(
+                "found '{}' being recurively included (type wrapping pointer `*`/`*mut` or ref `@`/`&`)",
+                this.display(&self.types, &self.infers)
+            ),
+            SoulErrorKind::TypeInferenceError,
             Some(span),
         ))
     }

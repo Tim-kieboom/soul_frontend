@@ -1,7 +1,7 @@
-pub use crate::span::{ModuleId, CrateId, Span};
 pub use crate::crate_store::{Crate, CrateStore};
 pub use crate::ids::IdAlloc;
 pub use crate::soul_manifest::SoulToml;
+pub use crate::span::{CrateId, ModuleId, Span};
 
 pub mod bimap;
 pub mod char_colors;

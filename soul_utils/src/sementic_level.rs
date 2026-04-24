@@ -1,8 +1,7 @@
-use std::{path::PathBuf};
+use std::path::PathBuf;
 
 use crate::{
     bimap::BiMap,
-    crate_store::CrateStore,
     define_str_enum,
     error::SoulError,
     ids::{IdAlloc, IdGenerator},
@@ -39,44 +38,21 @@ impl MessageConfig {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct CompilerContext {
-    pub source_folder: PathBuf,
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct FaultCollector {
     pub faults: Vec<SementicFault>,
-    pub module_store: ModuleStore,
-    pub crate_store: CrateStore,
     pub message_config: MessageConfig,
-    path_stack: Vec<PathBuf>,
 }
-impl CompilerContext {
-    pub fn new(source_folder: PathBuf, root_path: PathBuf, message_config: MessageConfig) -> Self {
+impl FaultCollector {
+    pub fn new(message_config: MessageConfig) -> Self {
         Self {
             faults: vec![],
-            source_folder,
             message_config,
-            path_stack: vec![],
-            module_store: ModuleStore::new(root_path),
-            crate_store: CrateStore::new(),
         }
     }
 
-    pub fn root_module_id(&self) -> ModuleId  {
-        self.module_store.get_root_id()
-    }
-
-    pub fn current_path(&self) -> &PathBuf {
-        match self.path_stack.last() {
-            Some(path) => path,
-            None => &self.source_folder,
-        }
-    }
-
-    pub fn pop_current_path(&mut self) {
-        self.path_stack.pop();
-    }
-
-    pub fn push_current_path(&mut self, path: PathBuf) {
-        self.path_stack.push(path);
+    pub fn push(&mut self, fault: SementicFault) {
+        self.faults.push(fault);
     }
 }
 
@@ -101,7 +77,6 @@ impl ModuleStore {
         if let Some(id) = self.get_id(&path) {
             return id;
         }
-
         self.insert(path.clone())
     }
 
@@ -126,7 +101,6 @@ impl ModuleStore {
     }
 }
 
-/// A fault (error/warning/note) that occurred during compilation.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SementicFault {
     /// The underlying error.
@@ -135,7 +109,6 @@ pub struct SementicFault {
     level: SementicLevel,
 }
 impl SementicFault {
-    /// Creates a new error-level fault.
     pub const fn error(err: SoulError) -> Self {
         Self {
             message: err,
@@ -143,7 +116,6 @@ impl SementicFault {
         }
     }
 
-    /// Creates a new debug-level fault.
     pub const fn debug(err: SoulError) -> Self {
         Self {
             message: err,
@@ -151,22 +123,18 @@ impl SementicFault {
         }
     }
 
-    /// Consumes the fault and returns the underlying error.
     pub fn consume_soul_error(self) -> SoulError {
         self.message
     }
 
-    /// Returns a reference to the underlying error.
     pub const fn get_soul_error(&self) -> &SoulError {
         &self.message
     }
 
-    /// Returns the severity level of this fault.
     pub const fn get_level(&self) -> SementicLevel {
         self.level
     }
 
-    /// Checks whether this fault is fatal given the minimum fatal level.
     pub const fn is_fatal(&self, fatal_level: SementicLevel) -> bool {
         fatal_level.precedence().as_usize() >= self.get_level().precedence().as_usize()
     }

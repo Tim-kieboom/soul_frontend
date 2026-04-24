@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use ast::{
     AbtractSyntaxTree, AstModuleStore, DeclareStore, EntryKind, Function, Struct, Variable,
     meta_data::AstMetadata,
@@ -5,9 +7,10 @@ use ast::{
 };
 use soul_utils::{
     Ident,
+    crate_store::CrateContext,
     error::{SoulError, SoulErrorKind},
     ids::{FunctionId, IdAlloc, IdGenerator},
-    sementic_level::{CompilerContext, SementicFault},
+    sementic_level::{ModuleStore, SementicFault},
     soul_error_internal,
     span::{ModuleId, Span},
 };
@@ -18,10 +21,13 @@ mod resolve;
 
 pub fn name_resolve(
     module_id: ModuleId,
-    context: &mut CompilerContext,
+    module_store: &mut ModuleStore,
+    context: &mut CrateContext,
     ast_context: &mut AbtractSyntaxTree,
+    source_folder: PathBuf,
 ) {
-    let mut resolver = NameResolver::new(module_id, context, ast_context);
+    let mut resolver =
+        NameResolver::new(module_id, module_store, context, ast_context, source_folder);
 
     resolver.collect_module(module_id);
     resolver.resolve_modules(module_id);
@@ -31,6 +37,26 @@ struct Current {
     in_global: bool,
     module: ModuleId,
     function: Option<FunctionId>,
+    source_folder: PathBuf,
+    path_stack: Vec<PathBuf>,
+}
+
+impl Current {
+    fn current_path(&self) -> PathBuf {
+        let mut result = self.source_folder.clone();
+        for component in &self.path_stack {
+            result.push(component);
+        }
+        result
+    }
+
+    fn push_current_path(&mut self, path: PathBuf) {
+        self.path_stack.push(path);
+    }
+
+    fn pop_current_path(&mut self) {
+        self.path_stack.pop();
+    }
 }
 
 struct NameResolver<'a> {
@@ -38,22 +64,28 @@ struct NameResolver<'a> {
     info: &'a mut AstMetadata,
     store: &'a mut DeclareStore,
     modules: &'a mut AstModuleStore,
-    context: &'a mut CompilerContext,
+    module_store: &'a mut ModuleStore,
+    context: &'a mut CrateContext,
     node_generator: IdGenerator<NodeId>,
     function_generator: &'a mut IdGenerator<FunctionId>,
 }
 impl<'a> NameResolver<'a> {
     fn new(
         module: ModuleId,
-        context: &'a mut CompilerContext,
+        module_store: &'a mut ModuleStore,
+        context: &'a mut CrateContext,
         ast_context: &'a mut AbtractSyntaxTree,
+        source_folder: PathBuf,
     ) -> Self {
         Self {
             context,
+            module_store,
             current: Current {
                 in_global: true,
                 module,
                 function: None,
+                source_folder,
+                path_stack: Vec::new(),
             },
             node_generator: IdGenerator::new(),
             store: &mut ast_context.store,
@@ -107,7 +139,7 @@ impl<'a> NameResolver<'a> {
     }
 
     fn resolve_struct(
-        context: &mut CompilerContext,
+        faults: &mut CrateContext,
         store: &mut DeclareStore,
         current: &Current,
         obj: &Struct,
@@ -116,7 +148,7 @@ impl<'a> NameResolver<'a> {
             Some(val) => val,
             None => {
                 Self::static_log_error(
-                    context,
+                    faults,
                     soul_error_internal!(
                         format!("Struct: '{}' node_id is None", obj.name.as_str()),
                         None
@@ -133,7 +165,7 @@ impl<'a> NameResolver<'a> {
         self.context.faults.push(SementicFault::error(error));
     }
 
-    fn static_log_error(context: &mut CompilerContext, error: SoulError) {
+    fn static_log_error(context: &mut CrateContext, error: SoulError) {
         context.faults.push(SementicFault::error(error));
     }
 
@@ -157,7 +189,7 @@ impl<'a> NameResolver<'a> {
             .info
             .scopes
             .lookup_module(module_name, self.current.module)?;
-        
+
         let module_id = module_entry.module_id;
 
         if let Some(resolved_name) = self.resolve_alias(module_name, function_name) {

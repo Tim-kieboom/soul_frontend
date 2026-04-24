@@ -5,8 +5,8 @@ use std::{
     time::Instant,
 };
 
-use anyhow::Result;
-use ast::{AbtractSyntaxTree};
+use anyhow::{Error, Result};
+use ast::AbtractSyntaxTree;
 use fern::Dispatch;
 use inkwell::context::Context;
 use log::{error, info};
@@ -17,17 +17,15 @@ use run_mir::{MirResponse, to_mir};
 use soul_ir::{IrRequest, to_llvm_ir};
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
+    CrateStore, ModuleId, SoulToml,
     char_colors::{DEFAULT, GREEN},
     compile_options::{Arch, CompilerOptions, Os, TargetInfo},
+    crate_store::CrateContext,
     ids::IdAlloc,
-    sementic_level::{CompilerContext, MessageConfig, SementicFault, SementicLevel},
-    span::ModuleId,
+    sementic_level::{FaultCollector, MessageConfig, ModuleStore, SementicLevel},
 };
 
-use crate::{
-    convert_soul_error::{ToMessage},
-    displayer_tokenizer::display_tokens,
-};
+use crate::{convert_soul_error::ToMessage, paths::EntryFile};
 
 mod convert_soul_error;
 mod displayer_ast;
@@ -48,7 +46,7 @@ const ARCH: Arch = Arch::X86_64;
 const TARGET: TargetInfo = TargetInfo::new(ARCH, OS);
 pub const COMPILER_OPTIONS: CompilerOptions = CompilerOptions::new_default(TARGET);
 
-struct Ouput {
+struct Output {
     mir_response: MirResponse,
     hir_response: HirResponse,
 }
@@ -56,16 +54,29 @@ struct Ouput {
 fn main() -> Result<()> {
     let paths: Paths = serde_json::from_slice(PATHS)?;
     init_logger(&paths.log_file)?;
-    
-    let source_folder = paths.to_source_path();
-    let main_file_path = paths.to_entry_file_path();
-    let mut context = CompilerContext::new(source_folder, main_file_path, MESSAGE_CONFIG);
+
+    let (manifest, crate_store) = paths.load_crates()?;
 
     let mut timer = Instant::now();
-    let root_module = context.root_module_id();
-    let main_file_path = paths.to_entry_file_path();
-    let mut output = run_crate_fontend(&paths, &main_file_path, &mut context, root_module, "crate")?;
-    log_faults(&context);
+    compile_all_libs(&paths, &crate_store, &manifest)?;
+
+    let root_lib = &manifest.package.name;
+    let source_path = Paths::to_source_path(paths.project_path())?;
+    let entry_file = Paths::to_entry_file_path(paths.project_path())?;
+
+    let mut module_store = ModuleStore::new(entry_file.path.clone());
+    let mut context = CrateContext::new(entry_file.is_lib, MESSAGE_CONFIG);
+
+    let mut output = run_crate_frontend(
+        &paths,
+        paths.project_path(),
+        source_path,
+        &entry_file,
+        &mut module_store,
+        &mut context,
+    )?;
+
+    log_faults(&context.faults, &module_store);
     if is_fatal(&context.faults, COMPILER_OPTIONS.fatal_level()) {
         return Ok(());
     }
@@ -76,7 +87,7 @@ fn main() -> Result<()> {
     );
 
     timer = Instant::now();
-    if run_llvm(&mut output, &mut context) {
+    if run_llvm(&mut output, paths.project_path(), &mut context.faults, root_lib) {
         info!(
             "{GREEN}llvm success: {}ms{DEFAULT}",
             timer.elapsed().as_millis()
@@ -85,38 +96,85 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn run_crate_fontend(paths: &Paths, entry_path: &PathBuf, context: &mut CompilerContext, root_module: ModuleId, lib_name: &str) -> Result<Ouput> {
-    
-    let source_file = to_source_file(entry_path)?;
-    let tokens = to_token_stream(&source_file, root_module);
-    display_tokenizer(paths, root_module, &source_file, lib_name)?;
-    
-    let ast = to_ast(tokens, &COMPILER_OPTIONS, context);
-    display_ast(paths, &context, &ast, lib_name)?;
+fn compile_all_libs(paths: &Paths, crate_store: &CrateStore, manifest: &SoulToml) -> Result<()> {
+    for crate_id in crate_store.keys() {
+        let crate_data = &crate_store[crate_id];
+        let lib_name = crate_data.name.as_str();
 
-    let mut hir = to_hir(&ast, &COMPILER_OPTIONS, context, root_module);
-    display_hir(paths, &hir, &ast, lib_name)?;
+        if lib_name == manifest.package.name {
+            continue;
+        }
+
+        let mut module_store = ModuleStore::new(crate_data.project_path.clone());
+
+        let source_path = Paths::to_source_path(&crate_data.project_path)?;
+        let entry_path = Paths::to_entry_file_path(&crate_data.project_path)?;
+
+        let mut context = CrateContext::new(entry_path.is_lib, MESSAGE_CONFIG);
+        let mut output = run_crate_frontend(
+            paths,
+            &crate_data.project_path,
+            source_path,
+            &entry_path,
+            &mut module_store,
+            &mut context,
+        )?;
+        log_faults(&context.faults, &module_store);
+        if is_fatal(&context.faults, COMPILER_OPTIONS.fatal_level()) {
+            continue;
+        }
+
+        run_llvm(&mut output, &crate_data.project_path, &mut context.faults, lib_name);
+    }
+
+    Ok(())
+}
+
+fn run_crate_frontend(
+    paths: &Paths,
+    manifest: &Path,
+    source: PathBuf,
+    entry: &EntryFile,
+    module_store: &mut ModuleStore,
+    context: &mut CrateContext,
+) -> Result<Output> {
+    let source_file = to_source_file(&entry.path)?;
+    let root = module_store.get_root_id();
+    let tokens = to_token_stream(&source_file, root);
+    display_tokenizer(paths, manifest, root, &source_file)?;
+
+    let ast = to_ast(tokens, &COMPILER_OPTIONS, module_store, context, source);
+    display_ast(manifest, module_store, &ast)?;
+
+    let mut hir = to_hir(&ast, &COMPILER_OPTIONS, context, root);
+    display_hir(manifest, &hir, &ast)?;
     clear_hir_type_map(&mut hir);
 
-    let mir = to_mir(&hir, &ast, &COMPILER_OPTIONS, context, root_module);
-    display_mir(paths, &mir, &hir, &ast, lib_name)?;
+    let mir = to_mir(&hir, &ast, &COMPILER_OPTIONS, context, root);
+    display_mir(manifest, &mir, &hir, &ast)?;
 
-    Ok(Ouput {
+    Ok(Output {
         mir_response: mir,
         hir_response: hir,
     })
 }
 
-fn run_llvm(output: &mut Ouput, context: &mut CompilerContext) -> bool {
+fn run_llvm(
+    output: &mut Output, 
+    manifest: &Path,
+    faults: &mut FaultCollector, 
+    lib_name: &str,
+) -> bool {
     let request = IrRequest {
         mir: &output.mir_response,
         types: &output.hir_response.typed,
         context: &Context::create(),
+        crate_name: lib_name.to_string(),
     };
 
-    context.faults.clear();
-    let ir = to_llvm_ir(&request, &COMPILER_OPTIONS, &mut context.faults);
-    log_faults(&context);
+    faults.faults.clear();
+    let ir = to_llvm_ir(&request, &COMPILER_OPTIONS, &mut faults.faults);
+    log_faults(faults, &ModuleStore::new(PathBuf::new()));
 
     #[cfg(not(debug_assertions))]
     if ir.is_fatal {
@@ -125,95 +183,135 @@ fn run_llvm(output: &mut Ouput, context: &mut CompilerContext) -> bool {
 
     #[cfg(debug_assertions)]
     if ir.is_fatal {
-        if let Err(err) = ir.module.print_to_file("output/fatal_out.ll") {
+        let llvm_code = ir
+            .module
+            .to_string();
+
+        if let Err(err) = Paths::write_to_output(&llvm_code, manifest, Path::new("fatal_out.ll")){
             error!("{err}");
-            return false;
         }
         return false;
     }
 
-    if let Err(err) = ir.module.print_to_file("output/out.ll") {
+    let llvm_code = ir
+        .module
+        .to_string();
+
+    if let Err(err) = Paths::write_to_output(&llvm_code, manifest, Path::new("out.ll")) {
         error!("{err}");
         return false;
-    };
+    }
 
     true
 }
 
-fn display_tokenizer(paths: &Paths, module: ModuleId, source_file: &str, lib_name: &str) -> Result<()> {
+fn display_tokenizer(
+    paths: &Paths,
+    manifest: &Path,
+    module: ModuleId,
+    source_file: &str,
+) -> Result<()> {
     let token_stream = to_token_stream(source_file, module);
-    let tokens = display_tokens(paths, source_file, token_stream)?;
-    paths.write_to_output(&tokens, &format!("{lib_name}/tokenizer/tokens.soulc"))
-}
-
-fn display_ast(paths: &Paths, context: &CompilerContext, ast_context: &AbtractSyntaxTree, lib_name: &str) -> Result<()> {
-    let root = context.module_store.get_root_id();
-    paths.write_to_output(
-        &displayer_ast::display_ast(root, context, ast_context),
-        &format!("{lib_name}/ast/tree.soulc"),
-    )?;
-    paths.write_to_output(
-        &displayer_ast::display_ast_name_resolved(root, context, ast_context),
-        &format!("{lib_name}/ast/NameResolved.soulc"),
+    let tokens = displayer_tokenizer::display_tokens(paths, source_file, token_stream)?;
+    Paths::write_to_output(
+        &tokens,
+        manifest,
+        Path::new("tokenizer\\tokens.soulc"),
     )
 }
 
-fn display_hir(paths: &Paths, hir: &HirResponse, ast_context: &AbtractSyntaxTree, lib_name: &str) -> Result<()> {
-    paths.write_to_output(
+fn display_ast(
+    manifest: &Path,
+    module_store: &ModuleStore,
+    ast_context: &AbtractSyntaxTree,
+) -> Result<()> {
+    let root = module_store.get_root_id();
+    Paths::write_to_output(
+        &displayer_ast::display_ast(root, module_store, ast_context),
+        manifest,
+        Path::new("ast\\tree.soulc"),
+    )?;
+    Paths::write_to_output(
+        &displayer_ast::display_ast_name_resolved(root, module_store, ast_context),
+        manifest,
+        Path::new("ast\\NameResolved.soulc"),
+    )
+}
+
+fn display_hir(
+    manifest: &Path,
+    hir: &HirResponse,
+    ast_context: &AbtractSyntaxTree,
+) -> Result<()> {
+    Paths::write_to_output(
         &displayer_hir::display_hir(ast_context, &hir.hir),
-        &format!("{lib_name}/hir/tree.soulc"),
+        manifest,
+        Path::new("hir\\tree.soulc"),
     )?;
-    paths.write_to_output(
+    Paths::write_to_output(
         &displayer_hir::display_thir(ast_context, &hir.hir, &hir.typed),
-        &format!("{lib_name}/thir/tree.soulc"),
+        manifest,
+        Path::new("thir\\tree.soulc"),
     )?;
-    paths.write_to_output(
+    Paths::write_to_output(
         &displayer_hir::display_created_types(&hir.hir, &hir.typed),
-        &format!("{lib_name}/thir/types.soulc"),
+        manifest,
+        Path::new("thir\\types.soulc"),
     )?;
     Ok(())
 }
 
-/// make sure that hir types are not used but thir types are
 fn clear_hir_type_map(hir: &mut HirResponse) {
     hir.hir.info.types.clear();
     hir.hir.info.infers.clear();
 }
 
-fn display_mir(paths: &Paths, mir: &MirResponse, hir: &HirResponse, ast_context: &AbtractSyntaxTree, lib_name: &str) -> Result<()> {
-    paths.write_to_output(
+fn display_mir(
+    manifest: &Path,
+    mir: &MirResponse,
+    hir: &HirResponse,
+    ast_context: &AbtractSyntaxTree,
+) -> Result<()> {
+    Paths::write_to_output(
         &displayer_mir::display_mir(&mir.tree, hir, &ast_context.modules),
-        &format!("{lib_name}/mir/tree.soulc"),
+        manifest,
+        Path::new("mir\\tree.soulc"),
     )
 }
 
 fn to_source_file(source_path: &Path) -> Result<String> {
-    let mut file = File::open(source_path)?;
+    let mut file = match File::open(source_path) {
+        Ok(val) => val,
+        Err(err) => {
+            return Err(Error::msg(format!(
+                "tried to open path '{source_path:?}' but got error: {err}"
+            )));
+        }
+    };
+
     let mut source_file = String::new();
     file.read_to_string(&mut source_file)?;
-
     Ok(source_file)
 }
 
-fn log_faults(constext: &CompilerContext) {
-    let modules = &constext.module_store;
+fn log_faults(faults: &FaultCollector, module_store: &ModuleStore) {
     let mut source_file = String::new();
-    let mut module = ModuleId::error();
+    let mut current_module = ModuleId::error();
 
-    for fault in &constext.faults {
+    for fault in &faults.faults {
         let module_id = match fault.get_soul_error().span {
             Some(val) => val.module,
-            None => modules.get_root_id(),
+            None => module_store.get_root_id(),
         };
 
-        let path = match modules.get_path(module_id) {
+        let path = match module_store.get_path(module_id) {
             Some(val) => val,
             None => &PathBuf::new(),
         };
 
-        if module_id != module {
-            source_file = to_source_file(path).unwrap_or(String::new());
-            module = module_id;
+        if module_id != current_module {
+            source_file = to_source_file(path).unwrap_or_default();
+            current_module = module_id;
         }
 
         error!("{}", fault.to_message(path, &source_file, MESSAGE_CONFIG));
@@ -236,12 +334,6 @@ fn init_logger(log_file: &str) -> Result<()> {
     Ok(())
 }
 
-fn is_fatal(faults: &Vec<SementicFault>, fatal_level: SementicLevel) -> bool {
-    for fault in faults {
-        if fault.is_fatal(fatal_level) {
-            return true;
-        }
-    }
-
-    false
+fn is_fatal(faults: &FaultCollector, fatal_level: SementicLevel) -> bool {
+    faults.faults.iter().any(|f| f.is_fatal(fatal_level))
 }

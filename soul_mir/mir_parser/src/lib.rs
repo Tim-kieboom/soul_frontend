@@ -3,9 +3,10 @@ use hir::{ComplexLiteral, TypeId};
 use hir_literal_interpreter::ToComplex;
 use run_hir::HirResponse;
 use soul_utils::{
-    error::{SoulError, SoulErrorKind},
+    crate_store::CrateContext,
+    error::SoulError,
     ids::{FunctionId, IdAlloc},
-    sementic_level::{CompilerContext, SementicFault},
+    sementic_level::SementicFault,
     soul_error_internal,
     span::{ModuleId, Span},
     vec_map::VecMap,
@@ -20,7 +21,12 @@ mod parse;
 mod utils;
 use crate::{id_generators::IdGenerators, mir::MirTree};
 
-pub fn mir_lower(hir_reponse: &HirResponse, ast_modules: &AstModuleStore, context: &mut CompilerContext, root: ModuleId) -> MirTree {
+pub fn mir_lower(
+    hir_reponse: &HirResponse,
+    ast_modules: &AstModuleStore,
+    context: &mut CrateContext,
+    root: ModuleId,
+) -> MirTree {
     let mut context = MirContext::new(hir_reponse, ast_modules, context, root);
 
     for module_id in hir_reponse.hir.nodes.modules.keys() {
@@ -33,7 +39,7 @@ pub fn mir_lower(hir_reponse: &HirResponse, ast_modules: &AstModuleStore, contex
 
 struct MirContext<'a> {
     tree: MirTree,
-    main: FunctionId,
+    main: Option<FunctionId>,
     error_type: ThirType,
     current: CurrentContext,
     id_generators: IdGenerators,
@@ -42,7 +48,7 @@ struct MirContext<'a> {
     temp_remap: VecMap<hir::LocalId, mir::TempId>,
 
     hir_response: &'a HirResponse,
-    context: &'a mut CompilerContext,
+    context: &'a mut CrateContext,
     ast_modules: &'a AstModuleStore,
     root: ModuleId,
 }
@@ -70,17 +76,14 @@ impl CurrentContext {
 }
 
 impl<'a> MirContext<'a> {
-    fn new(hir_reponse: &'a HirResponse, ast_modules: &'a AstModuleStore, context: &'a mut CompilerContext, root: ModuleId) -> Self {
+    fn new(
+        hir_reponse: &'a HirResponse,
+        ast_modules: &'a AstModuleStore,
+        context: &'a mut CrateContext,
+        root: ModuleId,
+    ) -> Self {
         let init_global_function = hir_reponse.hir.init_globals;
         let main = hir_reponse.hir.main;
-
-        if main == FunctionId::error() {
-            context.faults.push(SementicFault::error(SoulError::new(
-                "'main' function not found",
-                SoulErrorKind::InvalidContext,
-                None,
-            )));
-        }
 
         let mut blocks = VecMap::const_default();
         blocks.insert(
@@ -96,6 +99,7 @@ impl<'a> MirContext<'a> {
         let tree = MirTree {
             blocks,
             entry_function: main,
+            public_functions: vec![],
             init_global_function,
             root_module: root,
 
@@ -133,18 +137,18 @@ impl<'a> MirContext<'a> {
 
     fn lower_module(&mut self, id: ModuleId) {
         let is_end = &mut false;
-        
+
         let parent_module = self.current.module;
         self.current.module = id;
 
         let Some(module) = self.hir_response.hir.nodes.modules.get(id) else {
             self.log_error(soul_error_internal!(format!("{:?} not found", id), None));
-            return
+            return;
         };
-        
+
         let mut nodes = Vec::with_capacity(module.globals.len());
         for global in &module.globals {
-            if let Some(id) = self.lower_global(global, is_end) {
+            if let Some(id) = self.lower_global(global, module.is_public, is_end) {
                 nodes.push(id);
             }
 
@@ -154,19 +158,22 @@ impl<'a> MirContext<'a> {
         }
 
         let ast_module = &self.ast_modules[id];
-        self.tree.modules.insert(id, mir::Module {
+        self.tree.modules.insert(
             id,
-            nodes,
-            parent: ast_module.parent,
-            name: ast_module.name.clone(),
-            modules: module.modules.clone(),
-        });
+            mir::Module {
+                id,
+                nodes,
+                parent: ast_module.parent,
+                name: ast_module.name.clone(),
+                modules: module.modules.clone(),
+            },
+        );
 
         self.current.module = parent_module;
     }
 
     fn lower_main_call(&mut self) {
-        if self.main == FunctionId::error() {
+        if self.main.is_none() || self.main == Some(FunctionId::error()) {
             return;
         }
 

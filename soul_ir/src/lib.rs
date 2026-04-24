@@ -37,13 +37,20 @@ pub struct IrRequest<'ctx> {
     pub context: &'ctx Context,
     pub mir: &'ctx MirResponse,
     pub types: &'ctx TypedHir,
+    pub crate_name: String,
 }
 impl<'ctx> IrRequest<'ctx> {
-    pub fn new(mir: &'ctx MirResponse, types: &'ctx TypedHir, context: &'ctx Context) -> Self {
+    pub fn new(
+        mir: &'ctx MirResponse,
+        types: &'ctx TypedHir,
+        context: &'ctx Context,
+        crate_name: String,
+    ) -> Self {
         Self {
             mir,
             types,
             context,
+            crate_name,
         }
     }
 }
@@ -63,8 +70,14 @@ pub fn to_llvm_ir<'f, 'a>(
     backend.declare_exit();
     backend.allocate_globals(&GenericSubstitute::new(&[], &[]));
 
-    let entry = request.mir.tree.entry_function;
-    backend.get_or_create_function(entry, &vec![]);
+    let mir = &request.mir.tree;
+    if let Some(entry) = mir.entry_function {
+        backend.get_or_create_function(entry, &vec![]);
+    }
+
+    for function in &mir.public_functions {
+        backend.get_or_create_function(*function, &vec![]);
+    }
 
     backend.to_ir_reponse()
 }
@@ -164,7 +177,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             }
         }
 
-        let module = request.context.create_module("main");
+        let module = request.context.create_module(&request.crate_name);
         let builder = IrBuilder::new(request.context);
         let function_keys = FunctionKeyStore::new();
         let default_char_size = options.target_info().char_bit_size;

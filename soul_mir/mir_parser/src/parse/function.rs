@@ -7,10 +7,7 @@ impl<'a> MirContext<'a> {
         let entry_block = self.new_function_block();
         let init_globals = mir::Function {
             id: self.tree.init_global_function,
-            name: Ident::new(
-                "___initGlobals".to_string(),
-                Span::default(self.context.module_store.get_root_id()),
-            ),
+            name: Ident::new("___initGlobals".to_string(), Span::default(self.root)),
             body: mir::FunctionBody::Internal {
                 entry_block,
                 locals: vec![],
@@ -37,15 +34,20 @@ impl<'a> MirContext<'a> {
             .insert(self.tree.init_global_function, init_globals);
     }
 
-    pub(crate) fn lower_function(&mut self, function_id: FunctionId) {
-        self.inner_function(function_id, false);
+    pub(crate) fn lower_function(&mut self, function_id: FunctionId, is_public_module: bool) {
+        self.inner_function(function_id, false, is_public_module);
     }
 
     pub(crate) fn lower_main_function(&mut self) {
-        self.inner_function(self.main, true);
+        const IS_MAIN: bool = true;
+        const IS_PUBLIC_MODULE: bool = true;
+
+        if let Some(main) = self.main {
+            self.inner_function(main, IS_MAIN, IS_PUBLIC_MODULE);
+        }
     }
 
-    fn inner_function(&mut self, function_id: FunctionId, is_main: bool) {
+    fn inner_function(&mut self, function_id: FunctionId, is_main: bool, is_public_module: bool) {
         self.current.function = function_id;
         let function = &self.hir_response.hir.nodes.functions[function_id];
         let span = self.function_span(function_id);
@@ -92,6 +94,10 @@ impl<'a> MirContext<'a> {
             parameters.push(local_id);
         }
 
+        if is_public_module && self.context.is_lib && is_function_public(function.name.as_str()) {
+            self.tree.public_functions.push(function_id);
+        }
+
         let body = match function.body {
             hir::FunctionBody::Internal(block_id) => block_id,
             hir::FunctionBody::External(_) => return,
@@ -108,4 +114,8 @@ impl<'a> MirContext<'a> {
         }
         let _endblock = self.lower_block(body, entry_block);
     }
+}
+
+fn is_function_public(name: &str) -> bool {
+    name.chars().next().is_some_and(|ch| ch.is_uppercase())
 }

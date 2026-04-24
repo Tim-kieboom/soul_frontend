@@ -44,9 +44,14 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         }
 
         let function_type = return_type.fn_type(&args, false);
-        
+
         let name = if function.body.is_internal() {
-            &self.mangle(&function.name, function.from_module, function.owner_type, type_args)
+            &self.mangle(
+                &function.name,
+                function.from_module,
+                function.owner_type,
+                type_args,
+            )
         } else {
             function.name.as_str()
         };
@@ -94,7 +99,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         const SEPARATOR: &str = "_";
 
         let mut sb = String::new();
-        
+
         let root = self.mir.tree.root_module;
         let mut current_module = from_module;
         while current_module != root {

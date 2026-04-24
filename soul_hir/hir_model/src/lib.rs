@@ -33,11 +33,11 @@ pub struct HirTree {
     pub info: InfoMaps,
     pub nodes: NodeMaps,
 
-    pub main: FunctionId,
+    pub main: Option<FunctionId>,
     pub init_globals: FunctionId,
 }
 impl HirTree {
-    pub fn new(ast_root: &ast::Module, main: FunctionId, init_globals: FunctionId) -> Self {
+    pub fn new(ast_root: &ast::Module, main: Option<FunctionId>, init_globals: FunctionId) -> Self {
         let init_global_function = Function {
             id: init_globals,
             generics: vec![],
@@ -54,6 +54,7 @@ impl HirTree {
 
         let mut nodes = NodeMaps::new(init_global_function);
         let root = Module {
+            is_public: true,
             id: ast_root.id,
             globals: vec![],
             modules: ast_root.modules.entries().collect(),
@@ -70,9 +71,10 @@ impl HirTree {
         }
     }
 
-    pub fn insert_module(&mut self, module_id: ModuleId, sub_modules: Vec<ModuleId>) {
+    pub fn insert_module(&mut self, module_id: ModuleId, is_public: bool, sub_modules: Vec<ModuleId>) {
         if !self.nodes.modules.contains(module_id) {
             let module = Module {
+                is_public,
                 id: module_id,
                 globals: vec![],
                 modules: sub_modules,
@@ -85,8 +87,9 @@ impl HirTree {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Module {
     pub id: ModuleId,
-    pub modules: Vec<ModuleId>,
+    pub is_public: bool,
     pub globals: Vec<Global>,
+    pub modules: Vec<ModuleId>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

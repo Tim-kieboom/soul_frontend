@@ -1,11 +1,15 @@
 use ast::AstModuleStore;
 use hir::{ComplexLiteral, FieldId, HirTree, StructId, TypeId};
 use mir_parser::mir::{
-    self, BlockId, FunctionBody, GlobalId, Local, LocalId, MirTree, ModuleNodeId, Operand, Place, PlaceId, PlaceKind, Rvalue, StatementId, TempId
+    self, BlockId, FunctionBody, GlobalId, Local, LocalId, MirTree, ModuleNodeId, Operand, Place,
+    PlaceId, PlaceKind, Rvalue, StatementId, TempId,
 };
 use run_hir::HirResponse;
 use soul_utils::{
-    ids::{FunctionId, IdAlloc}, soul_names::{TypeModifier, TypeWrapper}, span::ModuleId, vec_map::VecMapIndex
+    ids::{FunctionId, IdAlloc},
+    soul_names::{TypeModifier, TypeWrapper},
+    span::ModuleId,
+    vec_map::VecMapIndex,
 };
 use std::fmt::{Arguments, Write};
 use typed_hir::{ThirType, ThirTypeKind, TypedHir, display_thir::DisplayThirType};
@@ -67,14 +71,15 @@ impl<'a> MirDisplayer<'a> {
 
     fn display_module(&mut self, module_id: ModuleId) {
         let Some(module) = self.mir.modules.get(module_id) else {
-            return
+            return;
         };
 
-        let name = self.ast_modules
+        let name = self
+            .ast_modules
             .get(module_id)
             .map(|m| m.name.as_str())
             .unwrap_or("<error>");
-        
+
         self.display_depth();
         self.push_fmt(format_args!("mod {name} {{\n"));
         self.push_scope();
@@ -103,7 +108,7 @@ impl<'a> MirDisplayer<'a> {
 
     fn display_global(&mut self, global_id: GlobalId) {
         let Some(global) = self.mir.globals.get(global_id) else {
-            return
+            return;
         };
 
         self.display_local_declare(global.local);
@@ -205,7 +210,7 @@ impl<'a> MirDisplayer<'a> {
         let block = &self.mir.blocks[block_id];
 
         self.push('\n');
-        
+
         self.pop_scope();
         self.display_depth();
         self.push_scope();
@@ -239,7 +244,7 @@ impl<'a> MirDisplayer<'a> {
                 self.display_operand(condition);
                 self.push_str(") ");
                 self.display_goto(*then);
-                self.push('\n');    
+                self.push('\n');
                 self.display_depth();
                 self.push_str("else ");
                 self.display_goto(*arm);
@@ -445,15 +450,14 @@ impl<'a> MirDisplayer<'a> {
     }
 
     fn display_function_name(&mut self, function: FunctionId) {
-        
         if function == FunctionId::error() {
             self.push_str("<error>");
-            return
+            return;
         };
 
         let Some(function) = self.mir.functions.get(function) else {
             self.push_str("<error>");
-            return
+            return;
         };
 
         let owner = function.owner_type;

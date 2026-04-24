@@ -274,9 +274,17 @@ impl<'a> NameResolver<'a> {
         Some(module_path)
     }
 
-    fn parse_module(&mut self, source: &str, module_id: ModuleId, parent: ModuleId, name: String) {
+    fn parse_module(&mut self, source: &str, path: PathBuf, module_id: ModuleId, parent: ModuleId, name: String) {
         let tokens = to_token_stream(source, module_id);
-        let module = parse_module(tokens, module_id, name, Some(parent), self.context);
+        let module = parse_module(
+            tokens,
+            module_id,
+            name,
+            Some(parent),
+            self.context,
+            path,
+        );
+
         if let Some(module) = self.modules.get_mut(parent) {
             module.modules.insert(module_id);
         }

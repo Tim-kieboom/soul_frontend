@@ -1,6 +1,7 @@
 use ast::Module;
 use soul_tokenizer::TokenStream;
-use soul_utils::{sementic_level::CompilerContext, span::ModuleId};
+use soul_utils::{crate_store::CrateContext, span::ModuleId};
+use std::path::PathBuf;
 
 use crate::parser::Parser;
 mod parser;
@@ -10,7 +11,8 @@ pub fn parse_module<'a, 'f>(
     id: ModuleId,
     name: String,
     parent: Option<ModuleId>,
-    context: &'f mut CompilerContext,
+    context: &'f mut CrateContext,
+    source_folder: PathBuf,
 ) -> Module {
-    Parser::parse(tokens, id, name, parent, context)
+    Parser::parse(tokens, id, name, parent, context, source_folder)
 }

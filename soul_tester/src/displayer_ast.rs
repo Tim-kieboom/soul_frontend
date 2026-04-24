@@ -1,22 +1,27 @@
-use std::fmt::{Arguments, Debug, Write};
+use std::fmt::{Arguments, Write};
 
 use ast::{
-    Assignment, AbtractSyntaxTree, Block, ElseKind, Expression, Function, FunctionSignature, Generic,
-    IfArm, Import, SoulType, Statement, StatementKind, Struct, TypeKind, UseBlock, Variable,
+    AbtractSyntaxTree, Assignment, Block, ElseKind, Expression, Function, FunctionSignature,
+    Generic, IfArm, Import, SoulType, Statement, StatementKind, Struct, TypeKind, UseBlock,
+    Variable,
     scope::{NodeId, ScopeId},
 };
 use soul_utils::{
     ids::FunctionId,
-    sementic_level::CompilerContext,
+    sementic_level::ModuleStore,
     soul_names::{KeyWord, Operator, TypeModifier},
     span::ModuleId,
     vec_map::VecMapIndex,
 };
 
-pub fn display_ast(root: ModuleId, context: &CompilerContext, ast_context: &AbtractSyntaxTree) -> String {
-    let mut displayer = AstDisplayer::new_ast(context, ast_context);
+pub fn display_ast(
+    root: ModuleId,
+    module_store: &ModuleStore,
+    ast_context: &AbtractSyntaxTree,
+) -> String {
+    let mut displayer = AstDisplayer::new_ast(module_store, ast_context);
     displayer.display_module(root);
-    for (_id, path) in context.module_store.entries() {
+    for (_id, path) in module_store.entries() {
         displayer.push_fmt(format_args!("\nmod {:?}", path));
     }
 
@@ -25,10 +30,10 @@ pub fn display_ast(root: ModuleId, context: &CompilerContext, ast_context: &Abtr
 
 pub fn display_ast_name_resolved(
     root: ModuleId,
-    context: &CompilerContext,
+    module_store: &ModuleStore,
     ast_context: &AbtractSyntaxTree,
 ) -> String {
-    let mut displayer = AstDisplayer::new_name_resolved(context, ast_context);
+    let mut displayer = AstDisplayer::new_name_resolved(module_store, ast_context);
     displayer.display_module(root);
     displayer.display_module_header(root);
     displayer.consume_to_string()
@@ -42,12 +47,12 @@ struct AstDisplayer<'a> {
     depth: String,
     is_name_resolved: bool,
     ast_context: &'a AbtractSyntaxTree,
-    context: &'a CompilerContext,
+    module_store: &'a ModuleStore,
 }
 impl<'a> AstDisplayer<'a> {
-    fn new_ast(context: &'a CompilerContext, ast_context: &'a AbtractSyntaxTree) -> Self {
+    fn new_ast(module_store: &'a ModuleStore, ast_context: &'a AbtractSyntaxTree) -> Self {
         Self {
-            context,
+            module_store,
             ast_context,
             sb: String::new(),
             is_name_resolved: false,
@@ -55,9 +60,12 @@ impl<'a> AstDisplayer<'a> {
         }
     }
 
-    fn new_name_resolved(context: &'a CompilerContext, ast_context: &'a AbtractSyntaxTree) -> Self {
+    fn new_name_resolved(
+        module_store: &'a ModuleStore,
+        ast_context: &'a AbtractSyntaxTree,
+    ) -> Self {
         Self {
-            context,
+            module_store,
             ast_context,
             sb: String::new(),
             is_name_resolved: true,
@@ -355,10 +363,16 @@ impl<'a> AstDisplayer<'a> {
                 self.push(' ');
             }
 
-            if let Err(_) = path
-                .module
-                .write_display(&self.context.source_folder, &mut self.sb)
-            {
+            if let Err(_) = path.module.write_display(
+                &self
+                    .module_store
+                    .get_path(self.module_store.get_root_id())
+                    .map(|p| p.parent())
+                    .flatten()
+                    .map(|p| p.to_path_buf())
+                    .unwrap_or_default(),
+                &mut self.sb,
+            ) {
                 self.push_str("<error>");
             }
             match &path.kind {
@@ -656,7 +670,7 @@ impl<'a> AstDisplayer<'a> {
         }
     }
 
-    fn display_tag<ID: VecMapIndex + Debug>(&mut self, str: &str, node_id: Option<ID>) {
+    fn display_tag<ID: VecMapIndex + std::fmt::Debug>(&mut self, str: &str, node_id: Option<ID>) {
         if !self.is_name_resolved {
             self.push_str(str);
             return;
@@ -667,7 +681,11 @@ impl<'a> AstDisplayer<'a> {
             None => self.push_str(str),
         }
     }
-    fn display_tag_ln<ID: VecMapIndex + Debug>(&mut self, str: &str, node_id: Option<ID>) {
+    fn display_tag_ln<ID: VecMapIndex + std::fmt::Debug>(
+        &mut self,
+        str: &str,
+        node_id: Option<ID>,
+    ) {
         self.display_depth();
         self.push_str("/*");
         self.display_tag(str, node_id);
@@ -675,7 +693,11 @@ impl<'a> AstDisplayer<'a> {
         self.display_depth();
     }
 
-    fn display_statement_tag<ID: VecMapIndex + Debug>(&mut self, statement: &Statement, node_id: Option<ID>) {
+    fn display_statement_tag<ID: VecMapIndex + std::fmt::Debug>(
+        &mut self,
+        statement: &Statement,
+        node_id: Option<ID>,
+    ) {
         self.display_depth();
         self.push_str("/*");
         self.display_tag(statement.display_variant(), node_id);
@@ -692,12 +714,12 @@ impl<'a> AstDisplayer<'a> {
                 self.push_str(" = ");
                 self.push_str(assignment.right.node.variant_str());
             }
-            StatementKind::Struct(_) |
-            StatementKind::Import(_) |
-            StatementKind::Function(_) |
-            StatementKind::UseBlock(_) |
-            StatementKind::Expression { .. } |
-            StatementKind::ExternalFunction(_) => (),
+            StatementKind::Struct(_)
+            | StatementKind::Import(_)
+            | StatementKind::Function(_)
+            | StatementKind::UseBlock(_)
+            | StatementKind::Expression { .. }
+            | StatementKind::ExternalFunction(_) => (),
         }
 
         self.push_str("*/\n");
@@ -793,7 +815,7 @@ impl VecMapIndex for StatementIdKind {
         panic!("stub impl")
     }
 }
-impl Debug for StatementIdKind {
+impl std::fmt::Debug for StatementIdKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::NodeId(id) => id.fmt(f),

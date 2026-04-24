@@ -14,7 +14,8 @@ impl_soul_ids!(GlobalId, BlockId, LocalId, StatementId, PlaceId, TempId);
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MirTree {
     pub root_module: ModuleId,
-    pub entry_function: FunctionId,
+    pub entry_function: Option<FunctionId>,
+    pub public_functions: Vec<FunctionId>,
     pub init_global_function: FunctionId,
 
     pub modules: VecMap<ModuleId, Module>,

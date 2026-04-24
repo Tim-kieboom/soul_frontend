@@ -5,9 +5,10 @@ use hir::{
 };
 use soul_utils::{
     compile_options::CompilerOptions,
+    crate_store::CrateContext,
     error::SoulError,
     ids::{FunctionId, IdAlloc},
-    sementic_level::{CompilerContext, SementicFault},
+    sementic_level::SementicFault,
     soul_error_internal,
     soul_names::{PrimitiveTypes, TypeModifier},
     span::Span,
@@ -30,7 +31,7 @@ pub use type_helpers::UnifyPrimitiveCast;
 pub fn lower_typed_hir<'a>(
     hir: &'a HirTree,
     options: &'a CompilerOptions,
-    context: &'a mut CompilerContext,
+    context: &'a mut CrateContext,
 ) -> TypedHir {
     let mut context = TypedHirContext::new(hir, options, context);
 
@@ -79,14 +80,10 @@ struct TypedHirContext<'a> {
     expressions: VecMap<ExpressionId, LazyTypeId>,
     generic_defines: VecMap<GenericId, VecSet<TypeId>>,
 
-    context: &'a mut CompilerContext,
+    context: &'a mut CrateContext,
 }
 impl<'a> TypedHirContext<'a> {
-    fn new(
-        hir: &'a HirTree,
-        options: &'a CompilerOptions,
-        context: &'a mut CompilerContext,
-    ) -> Self {
+    fn new(hir: &'a HirTree, options: &'a CompilerOptions, context: &'a mut CrateContext) -> Self {
         let globals = hir
             .nodes
             .modules

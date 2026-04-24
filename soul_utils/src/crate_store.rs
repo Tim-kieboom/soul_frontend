@@ -3,23 +3,38 @@ use std::path::PathBuf;
 
 use crate::{
     ids::IdGenerator,
+    sementic_level::{FaultCollector, MessageConfig},
     span::{CrateId, ModuleId},
     vec_map::VecMap,
 };
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CrateContext {
+    pub is_lib: bool,
+    pub faults: FaultCollector,
+}
+impl CrateContext {
+    pub fn new(is_lib: bool, config: MessageConfig) -> Self {
+        Self {
+            is_lib,
+            faults: FaultCollector::new(config),
+        }
+    }
+}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Crate {
     pub id: CrateId,
     pub name: String,
     pub root_module: ModuleId,
-    pub source_path: PathBuf,
+    pub project_path: PathBuf,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CrateStore {
     map: VecMap<CrateId, Crate>,
-    path_to_id: HashMap<PathBuf, CrateId>,
     alloc: IdGenerator<CrateId>,
+    path_to_id: HashMap<PathBuf, CrateId>,
 }
 impl CrateStore {
     pub fn new() -> Self {
@@ -40,7 +55,7 @@ impl CrateStore {
             id,
             name,
             root_module,
-            source_path: source_path.clone(),
+            project_path: source_path.clone(),
         };
         self.map.insert(id, crate_data);
         self.path_to_id.insert(source_path, id);

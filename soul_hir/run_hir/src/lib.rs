@@ -4,8 +4,9 @@ use hir_literal_interpreter::literal_resolve;
 use hir_parser::lower_hir;
 use soul_utils::{
     compile_options::CompilerOptions,
+    crate_store::CrateContext,
     error::SoulError,
-    sementic_level::{CompilerContext, SementicFault},
+    sementic_level::SementicFault,
     span::{ModuleId, Span},
     vec_map::VecMap,
 };
@@ -21,7 +22,7 @@ pub struct HirResponse {
 pub fn to_hir(
     ast_context: &AbtractSyntaxTree,
     options: &CompilerOptions,
-    context: &mut CompilerContext,
+    context: &mut CrateContext,
     root: ModuleId,
 ) -> HirResponse {
     let hir = lower_hir(context, ast_context, root);

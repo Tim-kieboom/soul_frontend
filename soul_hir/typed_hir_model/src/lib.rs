@@ -6,7 +6,12 @@ use hir::{
     TypeId,
 };
 use soul_utils::{
-    bimap::BiMap, ids::{FunctionId, IdAlloc}, soul_names::{PrimitiveTypes, TypeModifier}, span::Span, vec_map::VecMap, vec_set::VecSet
+    bimap::BiMap,
+    ids::{FunctionId, IdAlloc},
+    soul_names::{PrimitiveTypes, TypeModifier},
+    span::Span,
+    vec_map::VecMap,
+    vec_set::VecSet,
 };
 
 pub mod display_thir;

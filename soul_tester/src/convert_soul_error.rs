@@ -56,7 +56,8 @@ fn to_message(
 
     let mut sb = String::new();
     if config.backtrace {
-        #[cfg(feature = "error_backtrace")] {
+        #[cfg(feature = "error_backtrace")]
+        {
             color(Colors::BRIGHT_RED, &mut sb, &config);
             sb.push_str(&err.backtrace.to_string());
             color_default(&mut sb, &config);

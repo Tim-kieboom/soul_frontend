@@ -1,6 +1,7 @@
 use ast::AbtractSyntaxTree;
 use hir::{
-    Binary, DisplayType, ExpressionId, FieldId, FunctionBody, HirTree, HirType, HirTypeKind, InferTypeId, LazyTypeId, LocalId, LocalKind, StructId, TypeId, Unary
+    Binary, DisplayType, ExpressionId, FieldId, FunctionBody, HirTree, HirType, HirTypeKind,
+    InferTypeId, LazyTypeId, LocalId, LocalKind, StructId, TypeId, Unary,
 };
 use soul_utils::{
     ids::{FunctionId, IdAlloc},
@@ -552,7 +553,7 @@ impl<'a> HirDisplayer<'a> {
             LazyTypeId::Known(type_id) => {
                 if type_id == TypeId::error() {
                     self.push_str("<error>");
-                    return Some(())
+                    return Some(());
                 }
 
                 let ty = types.id_to_type(type_id);
@@ -564,7 +565,7 @@ impl<'a> HirDisplayer<'a> {
             LazyTypeId::Infer(infer_type_id) => {
                 if infer_type_id == InferTypeId::error() {
                     self.push_str("<infer_error>");
-                    return Some(())
+                    return Some(());
                 }
 
                 let infer = infers.get_infer(infer_type_id);

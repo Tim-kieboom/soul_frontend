@@ -2,7 +2,6 @@ use soul_tokenizer::{Token, TokenKind, TokenStreamPosition};
 use soul_utils::{
     Ident,
     error::{SoulError, SoulErrorKind, SoulResult},
-    sementic_level::SementicFault,
     soul_names::KeyWord,
     span::Span,
     symbool_kind::SymbolKind,
@@ -74,11 +73,6 @@ impl<'a, 'f> Parser<'a, 'f> {
             TokenKind::Ident(ident) => KeyWord::from_str(ident.as_str()) == Some(expected),
             _ => false,
         }
-    }
-
-    /// Records parse error.
-    pub(super) fn log_error(&mut self, err: SoulError) {
-        self.context.faults.push(SementicFault::error(err));
     }
 
     /// Saves current token stream position for backtracking.

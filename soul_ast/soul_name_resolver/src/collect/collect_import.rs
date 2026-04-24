@@ -12,7 +12,6 @@ use crate::NameResolver;
 
 impl<'a> NameResolver<'a> {
     pub(crate) fn collect_import_path(&mut self, path: &ImportPath, span: Span) {
-
         if let Some(name) = &path.lib_name {
             self.collect_external_lib(path, name, span);
         } else {
@@ -24,9 +23,9 @@ impl<'a> NameResolver<'a> {
         todo!()
         // let Some(lib_path) = self.context.libarys.get(lib_name) else {
         //     self.log_error(SoulError::new(format!("lib '{lib_name}' not found"), SoulErrorKind::PathNotFound, Some(span)));
-        //     return 
+        //     return
         // };
-        
+
         // let module_name = match lib_path.module.get_module_name() {
         //     Some(val) => val,
         //     None => {
@@ -99,7 +98,7 @@ impl<'a> NameResolver<'a> {
             return false;
         };
 
-        let current = self.context.current_path();
+        let current = self.current.current_path();
         if current.file_name() == Some(parent_name) {
             return true;
         }
@@ -142,7 +141,7 @@ impl<'a> NameResolver<'a> {
                 .map(|name| name.to_string())
         }
 
-        let mut current = self.context.source_folder.clone();
+        let mut current = self.current.source_folder.clone();
         let relative_path = match module_file_path.strip_prefix(&current) {
             Ok(val) => val,
             Err(err) => {
@@ -215,7 +214,7 @@ impl<'a> NameResolver<'a> {
             {
                 if !is_public {
                     Self::static_log_error(
-                        self.context,
+                        &mut self.context,
                         SoulError::new(
                             format!("struct {} is private", alias_name.as_str()),
                             SoulErrorKind::AlreadyFoundInScope,
@@ -309,7 +308,7 @@ impl<'a> NameResolver<'a> {
         span: Span,
     ) -> ModuleId {
         let dir = module_file_path.parent().unwrap_or(module_file_path);
-        let module_id = self.context.module_store.get_or_insert(module_file_path);
+        let module_id = self.module_store.get_or_insert(module_file_path);
         if self.modules.get(module_id).is_some() {
             return module_id;
         }
@@ -318,9 +317,9 @@ impl<'a> NameResolver<'a> {
             return ModuleId::error();
         };
 
-        self.context.push_current_path(dir.to_path_buf());
-        self.parse_module(&module_source, module_id, parent, module_name.to_string());
-        self.context.pop_current_path();
+        self.current.push_current_path(dir.to_path_buf());
+        self.parse_module(&module_source, module_file_path.clone(), module_id, parent, module_name.to_string());
+        self.current.pop_current_path();
         module_id
     }
 

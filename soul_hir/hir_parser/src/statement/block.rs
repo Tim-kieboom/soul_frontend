@@ -35,7 +35,6 @@ impl<'a> HirContext<'a> {
         let id = self.id_generator.alloc_body();
 
         for statement in &body.statements {
-
             match &statement.node {
                 ast::StatementKind::Struct(object) => self.add_struct(object),
                 _ => (),

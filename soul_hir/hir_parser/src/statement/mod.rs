@@ -1,10 +1,12 @@
 use ast::UseBlock;
 use hir::{Assign, StatementId};
 use soul_utils::{
-    error::{SoulError, SoulErrorKind}, soul_names::KeyWord, span::ModuleId
+    error::{SoulError, SoulErrorKind},
+    soul_names::KeyWord,
+    span::ModuleId,
 };
 
-use crate::{HirContext};
+use crate::HirContext;
 mod block;
 mod function;
 
@@ -37,7 +39,7 @@ impl<'a> HirContext<'a> {
             }
             ast::StatementKind::Struct(object) => {
                 self.lower_struct(object);
-                return
+                return;
             }
             ast::StatementKind::Variable(variable) => {
                 hir::GlobalKind::Variable(self.lower_variable(variable))
@@ -162,7 +164,6 @@ impl<'a> HirContext<'a> {
     }
 
     pub(crate) fn add_struct(&mut self, object: &ast::Struct) {
-
         let name = object.name.clone();
 
         let mut generics = vec![];
@@ -172,7 +173,13 @@ impl<'a> HirContext<'a> {
         }
 
         let struct_id = self.tree.info.types.alloc_struct();
-        self.insert_struct(struct_id, hir::Struct { name, fields: vec![] });
+        self.insert_struct(
+            struct_id,
+            hir::Struct {
+                name,
+                fields: vec![],
+            },
+        );
     }
 
     pub(crate) fn lower_return_like(

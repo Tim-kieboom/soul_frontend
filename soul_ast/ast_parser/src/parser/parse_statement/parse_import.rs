@@ -46,7 +46,6 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     fn inner_parse_import(&mut self) -> SoulResult<ImportPath> {
-        
         let (path, lib_name) = self.parse_import_path()?;
         let kind = match &self.token().kind {
             &CURLY_OPEN => {
@@ -74,7 +73,11 @@ impl<'a, 'f> Parser<'a, 'f> {
             _ => ImportKind::Module,
         };
 
-        Ok(ImportPath { module: path, kind, lib_name })
+        Ok(ImportPath {
+            module: path,
+            kind,
+            lib_name,
+        })
     }
 
     fn parse_import_items(&mut self) -> SoulResult<(bool, Option<Ident>, Vec<ImportItem>)> {
@@ -125,12 +128,12 @@ impl<'a, 'f> Parser<'a, 'f> {
         let mut lib_name = None;
         let mut path = SoulImportPath::new();
         if self.current_is_ident(THIS_PORJECT) {
-            let current_path = self.context.source_folder.clone();
+            let current_path = self.source_path.clone();
             path = SoulImportPath::from(current_path);
             self.bump();
             self.expect(&SEPARATOR)?;
         } else if self.current_is(&SEPARATOR) {
-            let mut current_path = self.context.current_path().clone();
+            let mut current_path = self.current_path().to_path_buf();
             self.bump();
 
             while self.current_is(&PREV_SUPER) {
@@ -150,7 +153,11 @@ impl<'a, 'f> Parser<'a, 'f> {
         } else if let TokenKind::Ident(name) = &self.token().kind {
             lib_name = Some(name.clone());
         } else {
-            self.log_error(SoulError::new(format!("'{}' not allowed in import", self.token().kind.display()), SoulErrorKind::InvalidContext, Some(self.token().span)));
+            self.log_error(SoulError::new(
+                format!("'{}' not allowed in import", self.token().kind.display()),
+                SoulErrorKind::InvalidContext,
+                Some(self.token().span),
+            ));
         }
 
         loop {

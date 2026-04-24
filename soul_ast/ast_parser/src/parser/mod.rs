@@ -1,11 +1,13 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::Path};
+use std::path::PathBuf;
 
 use ast::{Block, Module, SoulType, Visibility};
 #[cfg(debug_assertions)]
 use soul_tokenizer::Token;
 use soul_tokenizer::{TokenKind, TokenStream};
 use soul_utils::{
-    sementic_level::CompilerContext, soul_names::TypeModifier, span::ModuleId, vec_set::VecSet,
+    crate_store::CrateContext, error::SoulError, sementic_level::SementicFault,
+    soul_names::TypeModifier, span::ModuleId, vec_set::VecSet,
 };
 
 use crate::parser::parse_utils::SEMI_COLON;
@@ -36,20 +38,27 @@ pub(crate) struct Parser<'a, 'f> {
 
     tokens: TokenStream<'a>,
     current_this: Option<SoulType>,
-    context: &'f mut CompilerContext,
+    context: &'f mut CrateContext,
+    source_path: PathBuf,
 }
 impl<'a, 'f> Parser<'a, 'f> {
     #[cfg(not(debug_assertions))]
-    fn new(tokens: TokenStream<'a>, context: &'f mut CompilerContext) -> Self {
+    fn new(
+        tokens: TokenStream<'a>,
+        faults: &'f mut FaultCollector,
+        source_folder: PathBuf,
+    ) -> Self {
         Self {
             tokens,
-            context,
+            faults,
+            source_folder,
+            path_stack: vec![],
             current_this: None,
         }
     }
 
     #[cfg(debug_assertions)]
-    fn new(tokens: TokenStream<'a>, context: &'f mut CompilerContext) -> Self {
+    fn new(tokens: TokenStream<'a>, faults: &'f mut CrateContext, path: PathBuf) -> Self {
         use soul_tokenizer::TokenKind;
         use soul_utils::span::Span;
 
@@ -61,7 +70,8 @@ impl<'a, 'f> Parser<'a, 'f> {
         Self {
             debug,
             tokens,
-            context,
+            context: faults,
+            source_path: path,
             current_this: None,
         }
     }
@@ -71,7 +81,8 @@ impl<'a, 'f> Parser<'a, 'f> {
         id: ModuleId,
         name: String,
         parent: Option<ModuleId>,
-        context: &'f mut CompilerContext,
+        context: &'f mut CrateContext,
+        source_folder: PathBuf,
     ) -> Module {
         let is_capital = name.chars().next().map_or(false, char::is_uppercase);
         let visibility = if is_capital {
@@ -80,7 +91,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             Visibility::Private
         };
 
-        let mut this = Self::new(tokens, context);
+        let mut this = Self::new(tokens, context, source_folder);
         if let Err(err) = this.tokens.initialize() {
             this.log_error(err);
             return Module {
@@ -122,6 +133,14 @@ impl<'a, 'f> Parser<'a, 'f> {
                 modifier: TypeModifier::Mut,
             },
         }
+    }
+
+    pub fn current_path(&self) -> &Path {
+        self.source_path.parent().expect("should have parent")
+    }
+
+    pub(super) fn log_error(&mut self, err: SoulError) {
+        self.context.faults.push(SementicFault::error(err));
     }
 
     /// checked if node is end of line and ends with a semicolon
