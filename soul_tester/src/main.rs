@@ -73,6 +73,7 @@ fn main() -> Result<()> {
         source_path,
         &entry_file,
         &mut module_store,
+        &crate_store,
         &mut context,
     )?;
 
@@ -117,8 +118,10 @@ fn compile_all_libs(paths: &Paths, crate_store: &CrateStore, manifest: &SoulToml
             source_path,
             &entry_path,
             &mut module_store,
+            crate_store,
             &mut context,
         )?;
+        
         log_faults(&context.faults, &module_store);
         if is_fatal(&context.faults, COMPILER_OPTIONS.fatal_level()) {
             continue;
@@ -136,6 +139,7 @@ fn run_crate_frontend(
     source: PathBuf,
     entry: &EntryFile,
     module_store: &mut ModuleStore,
+    crate_store: &CrateStore,
     context: &mut CrateContext,
 ) -> Result<Output> {
     let source_file = to_source_file(&entry.path)?;
@@ -143,7 +147,7 @@ fn run_crate_frontend(
     let tokens = to_token_stream(&source_file, root);
     display_tokenizer(paths, manifest, root, &source_file)?;
 
-    let ast = to_ast(tokens, &COMPILER_OPTIONS, module_store, context, source);
+    let ast = to_ast(tokens, &COMPILER_OPTIONS, module_store, context, crate_store, source);
     display_ast(manifest, module_store, &ast)?;
 
     let mut hir = to_hir(&ast, &COMPILER_OPTIONS, context, root);

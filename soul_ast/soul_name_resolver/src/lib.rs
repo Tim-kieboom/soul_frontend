@@ -6,13 +6,7 @@ use ast::{
     scope::{NodeId, ScopeValue},
 };
 use soul_utils::{
-    Ident,
-    crate_store::CrateContext,
-    error::{SoulError, SoulErrorKind},
-    ids::{FunctionId, IdAlloc, IdGenerator},
-    sementic_level::{ModuleStore, SementicFault},
-    soul_error_internal,
-    span::{ModuleId, Span},
+    CrateStore, Ident, crate_store::CrateContext, error::{SoulError, SoulErrorKind}, ids::{FunctionId, IdAlloc, IdGenerator}, sementic_level::{ModuleStore, SementicFault}, soul_error_internal, span::{ModuleId, Span}
 };
 
 mod check_name;
@@ -24,10 +18,11 @@ pub fn name_resolve(
     module_store: &mut ModuleStore,
     context: &mut CrateContext,
     ast_context: &mut AbtractSyntaxTree,
+    crates: &CrateStore,
     source_folder: PathBuf,
 ) {
     let mut resolver =
-        NameResolver::new(module_id, module_store, context, ast_context, source_folder);
+        NameResolver::new(module_id, module_store, context, ast_context, crates, source_folder);
 
     resolver.collect_module(module_id);
     resolver.resolve_modules(module_id);
@@ -68,6 +63,7 @@ struct NameResolver<'a> {
     context: &'a mut CrateContext,
     node_generator: IdGenerator<NodeId>,
     function_generator: &'a mut IdGenerator<FunctionId>,
+    crates: &'a CrateStore,
 }
 impl<'a> NameResolver<'a> {
     fn new(
@@ -75,9 +71,11 @@ impl<'a> NameResolver<'a> {
         module_store: &'a mut ModuleStore,
         context: &'a mut CrateContext,
         ast_context: &'a mut AbtractSyntaxTree,
+        crates: &'a CrateStore,
         source_folder: PathBuf,
     ) -> Self {
         Self {
+            crates,
             context,
             module_store,
             current: Current {

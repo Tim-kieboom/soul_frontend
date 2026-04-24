@@ -1,5 +1,5 @@
 import ( 
-    // Std.Io.{Println}
+    Std.Io
     crate.Lib.SubLib
     crate.Lib.{this, Variable, A, B as b}
 )
@@ -25,5 +25,5 @@ main() {
     // subLib.Pub()
     // Lib.subLib.Pub()
 
-    // Io.Println("hello world")
+    Io.Println("hello world")
 }

@@ -92,6 +92,7 @@ pub enum SoulErrorKind {
     UnifyTypeError,
     PlaceTypeError,
     TypeNotFound,
+    CrateNotFound,
     FieldNotFound,
     PathNotFound,
     TypeInferenceError,

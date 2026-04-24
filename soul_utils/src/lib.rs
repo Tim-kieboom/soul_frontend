@@ -1,4 +1,4 @@
-pub use crate::crate_store::{Crate, CrateStore};
+pub use crate::crate_store::{Crate, CrateContext, CrateExports, CrateStore, TypeId};
 pub use crate::ids::IdAlloc;
 pub use crate::soul_manifest::SoulToml;
 pub use crate::span::{CrateId, ModuleId, Span};

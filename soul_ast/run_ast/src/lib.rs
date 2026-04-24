@@ -3,7 +3,7 @@ use ast_parser::parse_module;
 use soul_name_resolver::name_resolve;
 use soul_tokenizer::TokenStream;
 use soul_utils::{
-    compile_options::CompilerOptions, crate_store::CrateContext, sementic_level::ModuleStore,
+    CrateStore, compile_options::CompilerOptions, crate_store::CrateContext, sementic_level::ModuleStore
 };
 use std::path::PathBuf;
 
@@ -14,6 +14,7 @@ pub fn to_ast<'a>(
     _options: &CompilerOptions,
     module_store: &mut ModuleStore,
     context: &mut CrateContext,
+    crates: &'a CrateStore,
     source_folder: PathBuf,
 ) -> AbtractSyntaxTree {
     let root = module_store.get_root_id();
@@ -30,6 +31,6 @@ pub fn to_ast<'a>(
     );
     ast.modules.insert(root, module);
 
-    name_resolve(root, module_store, context, &mut ast, source_folder);
+    name_resolve(root, module_store, context, &mut ast, crates, source_folder);
     ast
 }
