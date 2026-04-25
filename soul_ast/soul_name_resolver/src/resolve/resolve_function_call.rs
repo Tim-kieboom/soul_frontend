@@ -1,5 +1,5 @@
 use ast::{
-    Expression, ExpressionKind, FunctionCall, FunctionKind, SoulType, TypeKind, VarTypeKind,
+    Expression, ExpressionKind, ExternalRef, FunctionCall, FunctionKind, SoulType, TypeKind, VarTypeKind, scope::ScopeModuleEntry
 };
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
@@ -78,7 +78,7 @@ impl<'a> NameResolver<'a> {
             .as_ref()
             .and_then(|name| self.lookup_module(name));
 
-        if module_entry.is_some() {
+        if let Some(entry) = &module_entry {
             let module_name = callee_ident.clone().unwrap_or_default();
 
             function_call.resolved = self.lookup_module_function(
@@ -87,7 +87,11 @@ impl<'a> NameResolver<'a> {
                 function_call.name.span,
             );
 
-            if function_call.resolved.is_some() {
+            if function_call.resolved == Some(FunctionId::error()) {
+                self.resolve_external_function(entry, &module_name, function_call)
+            }
+
+            if function_call.resolved.is_some() && function_call.resolved != Some(FunctionId::error()) {
                 function_call.callee = None;
             }
 
@@ -164,6 +168,15 @@ impl<'a> NameResolver<'a> {
         if function_call.resolved.is_none() {
             function_call.resolved = self.lookup_function(function_call.name.as_str());
         }
+    }
+
+    fn resolve_external_function(&mut self, module_entry: &ScopeModuleEntry, module_name: &str, function_call: &mut FunctionCall) {
+        let Some(crate_name) = &module_entry.crate_name else {
+            return
+        };
+
+        let full_name = format!("{}.{}", module_name, function_call.name.as_str());
+        function_call.external_ref = Some(ExternalRef{crate_name: crate_name.clone(), module_path: full_name});
     }
 
     fn get_owner_kind(

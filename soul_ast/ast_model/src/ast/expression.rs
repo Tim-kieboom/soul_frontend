@@ -107,6 +107,12 @@ pub struct FieldAccess {
     pub field: Ident,
 }
 
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ExternalRef {
+    pub crate_name: String,
+    pub module_path: String,
+}
+
 /// A function call expression.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FunctionCall {
@@ -119,6 +125,8 @@ pub struct FunctionCall {
     pub arguments: Vec<Argument>,
     pub id: Option<NodeId>,
     pub resolved: Option<FunctionId>,
+    /// For external crate calls: (crate_name, module_path)
+    pub external_ref: Option<ExternalRef>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

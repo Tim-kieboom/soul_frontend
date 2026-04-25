@@ -196,7 +196,20 @@ impl<'a> NameResolver<'a> {
         }
 
         if let Some(crate_name) = &module_entry.crate_name {
-            return self.lookup_external_module_function(module_name, function_name, crate_name, span);
+            
+            let full_name = format!("{}.{}", module_name, function_name);
+            if self.crates.resolve_function(crate_name, &full_name).is_some() {
+                // Return error FunctionId but set external_ref in caller
+                // The caller will set external_ref on the FunctionCall
+                return Some(FunctionId::error());
+            }
+
+            self.log_error(SoulError::new(
+                format!("function '{function_name}' not found in external module '{module_name}'"),
+                SoulErrorKind::NotFoundInScope,
+                Some(span),
+            ));
+            return None;
         }
 
         let module_id = module_entry.module_id;
@@ -214,23 +227,6 @@ impl<'a> NameResolver<'a> {
         }
 
         Some(entry.value)
-    }
-
-    fn lookup_external_module_function(&mut self,  module_name: &str, function_name: &str, crate_name: &String, span: Span) -> Option<FunctionId> {
-        
-        let full_name = format!("{}.{}", module_name, function_name);
-
-        if let Some(func_id) = self.crates.resolve_function(crate_name, &full_name) {
-            return Some(func_id);
-        }
-        
-        self.log_error(SoulError::new(
-            format!("function '{function_name}' not found in external module '{module_name}'"),
-            SoulErrorKind::NotFoundInScope,
-            Some(span),
-        ));
-
-        None
     }
 
     fn lookup_module_variable(
