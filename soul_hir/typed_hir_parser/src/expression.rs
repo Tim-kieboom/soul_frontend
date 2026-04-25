@@ -69,6 +69,13 @@ impl<'a> TypedHirContext<'a> {
                 arguments,
                 ..
             } => self.infer_call(*function, *has_callee, generics, arguments, span),
+            hir::ExpressionKind::ExternalCall {
+                crate_name,
+                function_name,
+                generics,
+                arguments,
+                ..
+            } => self.infer_external_call(crate_name, function_name, generics, arguments, span),
             hir::ExpressionKind::If {
                 condition,
                 then_block,
@@ -215,6 +222,19 @@ impl<'a> TypedHirContext<'a> {
         }
 
         return_type
+    }
+
+    fn infer_external_call(
+        &mut self,
+        _crate_name: &str,
+        _function_name: &str,
+        _generics: &Vec<TypeId>,
+        _arguments: &Vec<ExpressionId>,
+        _span: Span,
+    ) -> LazyTypeId {
+        // External calls - for now, assume returns unit
+        // In a real implementation, look up signature from typed HIR
+        self.none_type.to_lazy()
     }
 
     fn infer_binary(

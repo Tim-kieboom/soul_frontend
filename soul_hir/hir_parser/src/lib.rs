@@ -7,7 +7,7 @@ use hir::{
 };
 use soul_utils::{
     Ident,
-    crate_store::CrateContext,
+    crate_store::{CrateContext},
     error::{SoulError, SoulErrorKind},
     ids::FunctionId,
     sementic_level::SementicFault,

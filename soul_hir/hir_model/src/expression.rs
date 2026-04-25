@@ -107,6 +107,14 @@ pub enum ExpressionKind {
         arguments: Vec<ExpressionId>,
     },
 
+    /// An external crate function call.
+    ExternalCall {
+        crate_name: String,
+        function_name: String,
+        generics: Vec<TypeId>,
+        arguments: Vec<ExpressionId>,
+    },
+
     // --- Type operations ---
     /// An explicit type cast.
     Cast {

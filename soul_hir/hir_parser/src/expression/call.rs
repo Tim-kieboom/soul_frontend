@@ -17,6 +17,11 @@ impl<'a> HirContext<'a> {
         id: hir::ExpressionId,
         function_call: &ast::FunctionCall,
     ) -> hir::Expression {
+        
+        if let Some(external_ref) = &function_call.external_ref {
+            return self.lower_external_call(id, function_call, &external_ref.crate_name, &external_ref.module_path);
+        }
+
         let resolved = match function_call.resolved {
             Some(val) => val,
             None => {
@@ -233,4 +238,31 @@ fn find_default_parameter<'a>(
         .iter()
         .enumerate()
         .find(|(_, parameter)| parameter.name.as_str() == name)
+}
+
+impl<'a> HirContext<'a> {
+    fn lower_external_call(
+        &mut self,
+        id: hir::ExpressionId,
+        function_call: &ast::FunctionCall,
+        crate_name: &str,
+        full_name: &str,
+    ) -> hir::Expression {
+        let arguments = function_call
+            .arguments
+            .iter()
+            .map(|arg| self.lower_expression(&arg.value))
+            .collect();
+
+        hir::Expression {
+            id,
+            ty: LazyTypeId::error(),
+            kind: hir::ExpressionKind::ExternalCall {
+                crate_name: crate_name.to_string(),
+                function_name: full_name.to_string(),
+                generics: vec![],
+                arguments,
+            },
+        }
+    }
 }

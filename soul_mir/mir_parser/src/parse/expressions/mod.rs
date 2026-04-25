@@ -202,6 +202,11 @@ impl<'a> MirContext<'a> {
                 mir::OperandKind::None,
             ),
 
+            hir::ExpressionKind::ExternalCall { .. } => mir::Operand::new(
+                self.hir_response.typed.types_table.none_type,
+                mir::OperandKind::None,
+            ),
+
             hir::ExpressionKind::If {
                 condition,
                 then_block,

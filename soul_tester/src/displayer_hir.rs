@@ -397,6 +397,17 @@ impl<'a> HirDisplayer<'a> {
                 self.display_expression_astype(*id, *ty);
                 self.push_str("*/");
             }
+            hir::ExpressionKind::ExternalCall {
+                crate_name,
+                function_name,
+                ..
+            } => {
+                self.push_str("/*external ");
+                self.push_str(crate_name);
+                self.push_str(".");
+                self.push_str(function_name);
+                self.push_str("*/");
+            }
         };
     }
 

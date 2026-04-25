@@ -134,10 +134,6 @@ fn compile_all_libs(paths: &Paths, crate_store: &mut CrateStore, manifest: &Soul
         if let Some(crate_mut) = crate_store.get_mut_by_name(&lib_name) {
             crate_mut.exports = exports;
         }
-
-        // Skip LLVM compilation for dependencies - we only need MIR for exports
-        // The main crate will link with these at runtime
-        // run_llvm(&mut output, &project_path, &mut context.faults, &lib_name);
     }
 
     Ok(())

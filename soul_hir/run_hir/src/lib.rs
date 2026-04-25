@@ -4,7 +4,7 @@ use hir_literal_interpreter::literal_resolve;
 use hir_parser::lower_hir;
 use soul_utils::{
     compile_options::CompilerOptions,
-    crate_store::CrateContext,
+    crate_store::{CrateContext},
     error::SoulError,
     sementic_level::SementicFault,
     span::{ModuleId, Span},

@@ -217,6 +217,7 @@ fn is_valid_statement_expression(kind: &hir::ExpressionKind) -> bool {
         | hir::ExpressionKind::Function(_)
         | hir::ExpressionKind::If { .. }
         | hir::ExpressionKind::Call { .. }
-        | hir::ExpressionKind::While { .. } => true,
+        | hir::ExpressionKind::While { .. }
+        | hir::ExpressionKind::ExternalCall { .. } => true,
     }
 }
