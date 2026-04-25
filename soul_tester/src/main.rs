@@ -114,7 +114,7 @@ fn compile_all_libs(paths: &Paths, crate_store: &mut CrateStore, manifest: &Soul
         let entry_path = Paths::to_entry_file_path(&project_path)?;
 
         let mut context = CrateContext::new(entry_path.is_lib, MESSAGE_CONFIG);
-        let mut output = run_crate_frontend(
+        let output = run_crate_frontend(
             paths,
             &project_path,
             source_path,
@@ -135,7 +135,9 @@ fn compile_all_libs(paths: &Paths, crate_store: &mut CrateStore, manifest: &Soul
             crate_mut.exports = exports;
         }
 
-        run_llvm(&mut output, &project_path, &mut context.faults, &lib_name);
+        // Skip LLVM compilation for dependencies - we only need MIR for exports
+        // The main crate will link with these at runtime
+        // run_llvm(&mut output, &project_path, &mut context.faults, &lib_name);
     }
 
     Ok(())

@@ -34,20 +34,19 @@ impl<'a> MirContext<'a> {
             .insert(self.tree.init_global_function, init_globals);
     }
 
-    pub(crate) fn lower_function(&mut self, function_id: FunctionId, is_public_module: bool) {
-        self.inner_function(function_id, false, is_public_module);
+    pub(crate) fn lower_function(&mut self, function_id: FunctionId) {
+        self.inner_function(function_id, false);
     }
 
     pub(crate) fn lower_main_function(&mut self) {
         const IS_MAIN: bool = true;
-        const IS_PUBLIC_MODULE: bool = true;
 
         if let Some(main) = self.main {
-            self.inner_function(main, IS_MAIN, IS_PUBLIC_MODULE);
+            self.inner_function(main, IS_MAIN);
         }
     }
 
-    fn inner_function(&mut self, function_id: FunctionId, is_main: bool, is_public_module: bool) {
+    fn inner_function(&mut self, function_id: FunctionId, is_main: bool) {
         self.current.function = function_id;
         let function = &self.hir_response.hir.nodes.functions[function_id];
         let span = self.function_span(function_id);
@@ -94,7 +93,7 @@ impl<'a> MirContext<'a> {
             parameters.push(local_id);
         }
 
-        if is_public_module && self.context.is_lib && is_function_public(function.name.as_str()) {
+        if self.context.is_lib && is_function_public(function.name.as_str()) {
             self.tree.public_functions.push(function_id);
         }
 
@@ -113,6 +112,10 @@ impl<'a> MirContext<'a> {
             self.push_statement_from(statement, entry_block);
         }
         let _endblock = self.lower_block(body, entry_block);
+        
+        if self.context.is_lib && is_function_public(function.name.as_str()) {
+            self.tree.public_functions.push(function_id);
+        }
     }
 }
 

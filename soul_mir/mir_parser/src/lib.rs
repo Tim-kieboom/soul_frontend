@@ -148,7 +148,7 @@ impl<'a> MirContext<'a> {
 
         let mut nodes = Vec::with_capacity(module.globals.len());
         for global in &module.globals {
-            if let Some(id) = self.lower_global(global, module.is_public, is_end) {
+            if let Some(id) = self.lower_global(global, is_end) {
                 nodes.push(id);
             }
 

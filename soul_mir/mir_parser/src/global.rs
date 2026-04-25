@@ -11,7 +11,6 @@ impl<'a> MirContext<'a> {
     pub(crate) fn lower_global(
         &mut self,
         global: &hir::Global,
-        is_public_module: bool,
         is_end: &mut bool,
     ) -> Option<ModuleNodeId> {
         match &global.kind {
@@ -19,7 +18,7 @@ impl<'a> MirContext<'a> {
                 if self.hir_response.hir.main == Some(*function) {
                     return Some(ModuleNodeId::FunctionId(*function)); // lower main later
                 }
-                self.lower_function(*function, is_public_module);
+                self.lower_function(*function);
                 Some(ModuleNodeId::FunctionId(*function))
             }
             hir::GlobalKind::Variable(variable) | hir::GlobalKind::InternalVariable(variable) => {

@@ -220,12 +220,6 @@ impl<'a> NameResolver<'a> {
         
         let full_name = format!("{}.{}", module_name, function_name);
 
-        eprintln!("DEBUG: Looking for '{}' or '{}' in crate '{}'", full_name, crate_prefixed, crate_name);
-        
-        if let Some(c) = self.crates.name_to_crate(crate_name) {
-            eprintln!("DEBUG: Crate '{}' exports: {:?}", crate_name, c.exports.functions.keys().collect::<Vec<_>>());
-        }
-        
         if let Some(func_id) = self.crates.resolve_function(crate_name, &full_name) {
             return Some(func_id);
         }
