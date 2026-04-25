@@ -3,7 +3,7 @@ use hir::{ComplexLiteral, TypeId};
 use hir_literal_interpreter::ToComplex;
 use run_hir::HirResponse;
 use soul_utils::{
-    crate_store::CrateContext,
+    crate_store::{CrateContext, CrateExports},
     error::SoulError,
     ids::{FunctionId, IdAlloc},
     sementic_level::SementicFault,
@@ -25,9 +25,10 @@ pub fn mir_lower(
     hir_reponse: &HirResponse,
     ast_modules: &AstModuleStore,
     context: &mut CrateContext,
+    crate_exports: &CrateExports,
     root: ModuleId,
 ) -> MirTree {
-    let mut context = MirContext::new(hir_reponse, ast_modules, context, root);
+    let mut context = MirContext::new(hir_reponse, ast_modules, context, crate_exports, root);
 
     for module_id in hir_reponse.hir.nodes.modules.keys() {
         context.lower_module(module_id);
@@ -50,6 +51,7 @@ struct MirContext<'a> {
     hir_response: &'a HirResponse,
     context: &'a mut CrateContext,
     ast_modules: &'a AstModuleStore,
+    crate_exports: &'a CrateExports,
     root: ModuleId,
 }
 
@@ -80,6 +82,7 @@ impl<'a> MirContext<'a> {
         hir_reponse: &'a HirResponse,
         ast_modules: &'a AstModuleStore,
         context: &'a mut CrateContext,
+        crate_exports: &'a CrateExports,
         root: ModuleId,
     ) -> Self {
         let init_global_function = hir_reponse.hir.init_globals;
@@ -123,6 +126,7 @@ impl<'a> MirContext<'a> {
                 modifier: None,
             },
             ast_modules,
+            crate_exports,
             id_generators: IdGenerators::new(),
             temp_remap: VecMap::const_default(),
             place_typed: VecMap::const_default(),

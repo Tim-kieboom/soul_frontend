@@ -13,10 +13,11 @@ pub fn to_mir(
     ast: &AbtractSyntaxTree,
     _options: &CompilerOptions,
     context: &mut CrateContext,
+    crate_exports: &CrateExports,
     root: ModuleId,
 ) -> MirResponse {
     MirResponse {
-        tree: mir_lower(&hir_response, &ast.modules, context, root),
+        tree: mir_lower(&hir_response, &ast.modules, context, crate_exports, root),
         root,
     }
 }

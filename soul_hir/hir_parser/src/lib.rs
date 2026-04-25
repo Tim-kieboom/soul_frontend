@@ -7,7 +7,7 @@ use hir::{
 };
 use soul_utils::{
     Ident,
-    crate_store::{CrateContext},
+    crate_store::{CrateContext, CrateExports},
     error::{SoulError, SoulErrorKind},
     ids::FunctionId,
     sementic_level::SementicFault,
@@ -27,9 +27,10 @@ mod r#type;
 pub fn lower_hir(
     faults: &mut CrateContext,
     ast_context: &AbtractSyntaxTree,
+    crate_exports: &CrateExports,
     root: ModuleId,
 ) -> HirTree {
-    let mut context = HirContext::new(faults, ast_context, root);
+    let mut context = HirContext::new(faults, ast_context, crate_exports, root);
 
     context.lower_internal_structs();
     context.lower_module(root);
@@ -50,6 +51,7 @@ struct HirContext<'a> {
     pub scopes: Vec<Scope>,
     pub id_generator: IdAllocalor,
     pub ast_context: &'a AbtractSyntaxTree,
+    pub crate_exports: &'a CrateExports,
 
     pub context: &'a mut CrateContext,
     pub node_id_to_local: VecMap<NodeId, LocalId>,
@@ -59,6 +61,7 @@ impl<'a> HirContext<'a> {
     fn new(
         context: &'a mut CrateContext,
         ast_context: &'a AbtractSyntaxTree,
+        crate_exports: &'a CrateExports,
         root_id: ModuleId,
     ) -> Self {
         let mut id_generator = IdAllocalor::new(ast_context.function_generators.clone());
@@ -80,6 +83,7 @@ impl<'a> HirContext<'a> {
         Self {
             context,
             ast_context,
+            crate_exports,
             id_generator,
             scopes: vec![Scope::default()],
             node_id_to_local: VecMap::new(),

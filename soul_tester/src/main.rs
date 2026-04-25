@@ -17,7 +17,7 @@ use run_mir::{extract_exports, MirResponse, to_mir};
 use soul_ir::{IrRequest, to_llvm_ir};
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
-    CrateStore, ModuleId, SoulToml,
+    CrateExports, CrateStore, ModuleId, SoulToml,
     char_colors::{DEFAULT, GREEN},
     compile_options::{Arch, CompilerOptions, Os, TargetInfo},
     crate_store::CrateContext,
@@ -51,6 +51,19 @@ struct Output {
     hir_response: HirResponse,
 }
 
+fn collect_all_exports(crate_store: &CrateStore) -> CrateExports {
+    let mut all_exports = CrateExports::default();
+    for krate in crate_store.values() {
+        for (name, id) in &krate.exports.functions {
+            all_exports.functions.insert(name.clone(), *id);
+        }
+        for (name, id) in &krate.exports.types {
+            all_exports.types.insert(name.clone(), *id);
+        }
+    }
+    all_exports
+}
+
 fn main() -> Result<()> {
     let paths: Paths = serde_json::from_slice(PATHS)?;
     init_logger(&paths.log_file)?;
@@ -59,6 +72,9 @@ fn main() -> Result<()> {
 
     let mut timer = Instant::now();
     compile_all_libs(&paths, &mut crate_store, &manifest)?;
+
+    // Collect all exports from dependencies after compiling them
+    let all_exports = collect_all_exports(&crate_store);
 
     let root_lib = &manifest.package.name;
     let source_path = Paths::to_source_path(paths.project_path())?;
@@ -75,6 +91,7 @@ fn main() -> Result<()> {
         &mut module_store,
         &crate_store,
         &mut context,
+        &all_exports,
     )?;
 
     log_faults(&context.faults, &module_store);
@@ -122,6 +139,7 @@ fn compile_all_libs(paths: &Paths, crate_store: &mut CrateStore, manifest: &Soul
             &mut module_store,
             crate_store,
             &mut context,
+            &CrateExports::default(),
         )?;
         
         log_faults(&context.faults, &module_store);
@@ -147,6 +165,7 @@ fn run_crate_frontend(
     module_store: &mut ModuleStore,
     crate_store: &CrateStore,
     context: &mut CrateContext,
+    crate_exports: &CrateExports,
 ) -> Result<Output> {
     let source_file = to_source_file(&entry.path)?;
     let root = module_store.get_root_id();
@@ -156,11 +175,11 @@ fn run_crate_frontend(
     let ast = to_ast(tokens, &COMPILER_OPTIONS, module_store, context, crate_store, source);
     display_ast(manifest, module_store, &ast)?;
 
-    let mut hir = to_hir(&ast, &COMPILER_OPTIONS, context, root);
+    let mut hir = to_hir(&ast, &COMPILER_OPTIONS, context, crate_exports, root);
     display_hir(manifest, &hir, &ast)?;
     clear_hir_type_map(&mut hir);
 
-    let mir = to_mir(&hir, &ast, &COMPILER_OPTIONS, context, root);
+    let mir = to_mir(&hir, &ast, &COMPILER_OPTIONS, context, crate_exports, root);
     display_mir(manifest, &mir, &hir, &ast)?;
 
     Ok(Output {

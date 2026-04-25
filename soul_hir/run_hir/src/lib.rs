@@ -4,7 +4,7 @@ use hir_literal_interpreter::literal_resolve;
 use hir_parser::lower_hir;
 use soul_utils::{
     compile_options::CompilerOptions,
-    crate_store::{CrateContext},
+    crate_store::{CrateContext, CrateExports},
     error::SoulError,
     sementic_level::SementicFault,
     span::{ModuleId, Span},
@@ -23,9 +23,10 @@ pub fn to_hir(
     ast_context: &AbtractSyntaxTree,
     options: &CompilerOptions,
     context: &mut CrateContext,
+    crate_exports: &CrateExports,
     root: ModuleId,
 ) -> HirResponse {
-    let hir = lower_hir(context, ast_context, root);
+    let hir = lower_hir(context, ast_context, crate_exports, root);
     let typed = lower_typed_hir(&hir, options, context);
 
     let literal_resolves = literal_resolve(&hir, &typed);
