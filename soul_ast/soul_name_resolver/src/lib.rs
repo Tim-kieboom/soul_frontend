@@ -188,8 +188,6 @@ impl<'a> NameResolver<'a> {
             .scopes
             .lookup_module(module_name, self.current.module)?;
 
-        let module_id = module_entry.module_id;
-
         if let Some(resolved_name) = self.resolve_alias(module_name, function_name) {
             return self
                 .info
@@ -197,6 +195,11 @@ impl<'a> NameResolver<'a> {
                 .lookup_function(&resolved_name, self.current.module);
         }
 
+        if let Some(crate_name) = &module_entry.crate_name {
+            return self.lookup_external_module_function(module_name, function_name, crate_name, span);
+        }
+
+        let module_id = module_entry.module_id;
         debug_assert_ne!(module_id, ModuleId::error());
         debug_assert!(self.modules.contains(module_id));
 
@@ -211,6 +214,29 @@ impl<'a> NameResolver<'a> {
         }
 
         Some(entry.value)
+    }
+
+    fn lookup_external_module_function(&mut self,  module_name: &str, function_name: &str, crate_name: &String, span: Span) -> Option<FunctionId> {
+        
+        let full_name = format!("{}.{}", module_name, function_name);
+
+        eprintln!("DEBUG: Looking for '{}' or '{}' in crate '{}'", full_name, crate_prefixed, crate_name);
+        
+        if let Some(c) = self.crates.name_to_crate(crate_name) {
+            eprintln!("DEBUG: Crate '{}' exports: {:?}", crate_name, c.exports.functions.keys().collect::<Vec<_>>());
+        }
+        
+        if let Some(func_id) = self.crates.resolve_function(crate_name, &full_name) {
+            return Some(func_id);
+        }
+        
+        self.log_error(SoulError::new(
+            format!("function '{function_name}' not found in external module '{module_name}'"),
+            SoulErrorKind::NotFoundInScope,
+            Some(span),
+        ));
+
+        None
     }
 
     fn lookup_module_variable(

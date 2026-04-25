@@ -37,18 +37,26 @@ impl<'a> NameResolver<'a> {
             self.collect_internal_module(path, module_name, span)
         };
 
-        if module_id == ModuleId::error() {
+        // Don't return early for external crates - they use ModuleId::error() but have crate_name
+        if module_id == ModuleId::error() && path.lib_name.is_none() {
             return
         }
 
         let import_name = alias.unwrap_or(module_name);
+        let crate_name = path.lib_name.clone();
         self.declare_module(
             import_name,
             &module_name,
             module_id,
             path.kind.clone(),
             imported_items.clone(),
+            crate_name,
         );
+
+        // For external crates, we don't collect items from AST (the module_id is error)
+        if module_id == ModuleId::error() && path.lib_name.is_some() {
+            return;
+        }
 
         self.collect_items(module_id, module_name, &imported_items, span)
     }

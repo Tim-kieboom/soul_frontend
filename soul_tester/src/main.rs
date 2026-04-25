@@ -13,7 +13,7 @@ use log::{error, info};
 use paths::Paths;
 use run_ast::to_ast;
 use run_hir::{HirResponse, to_hir};
-use run_mir::{MirResponse, to_mir};
+use run_mir::{extract_exports, MirResponse, to_mir};
 use soul_ir::{IrRequest, to_llvm_ir};
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
@@ -55,10 +55,10 @@ fn main() -> Result<()> {
     let paths: Paths = serde_json::from_slice(PATHS)?;
     init_logger(&paths.log_file)?;
 
-    let (manifest, crate_store) = paths.load_crates()?;
+    let (manifest, mut crate_store) = paths.load_crates()?;
 
     let mut timer = Instant::now();
-    compile_all_libs(&paths, &crate_store, &manifest)?;
+    compile_all_libs(&paths, &mut crate_store, &manifest)?;
 
     let root_lib = &manifest.package.name;
     let source_path = Paths::to_source_path(paths.project_path())?;
@@ -97,24 +97,26 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn compile_all_libs(paths: &Paths, crate_store: &CrateStore, manifest: &SoulToml) -> Result<()> {
-    for crate_id in crate_store.keys() {
-        let crate_data = &crate_store[crate_id];
-        let lib_name = crate_data.name.as_str();
+fn compile_all_libs(paths: &Paths, crate_store: &mut CrateStore, manifest: &SoulToml) -> Result<()> {
 
+    let crate_info_list: Vec<_> = crate_store.values()
+        .map(|data| (data.name.clone(), data.project_path.clone()))
+        .collect();
+    
+    for (lib_name, project_path) in crate_info_list {
         if lib_name == manifest.package.name {
             continue;
         }
 
-        let mut module_store = ModuleStore::new(crate_data.project_path.clone());
+        let mut module_store = ModuleStore::new(project_path.clone());
 
-        let source_path = Paths::to_source_path(&crate_data.project_path)?;
-        let entry_path = Paths::to_entry_file_path(&crate_data.project_path)?;
+        let source_path = Paths::to_source_path(&project_path)?;
+        let entry_path = Paths::to_entry_file_path(&project_path)?;
 
         let mut context = CrateContext::new(entry_path.is_lib, MESSAGE_CONFIG);
         let mut output = run_crate_frontend(
             paths,
-            &crate_data.project_path,
+            &project_path,
             source_path,
             &entry_path,
             &mut module_store,
@@ -127,7 +129,13 @@ fn compile_all_libs(paths: &Paths, crate_store: &CrateStore, manifest: &SoulToml
             continue;
         }
 
-        run_llvm(&mut output, &crate_data.project_path, &mut context.faults, lib_name);
+        let exports = extract_exports(&output.mir_response);
+        
+        if let Some(crate_mut) = crate_store.get_mut_by_name(&lib_name) {
+            crate_mut.exports = exports;
+        }
+
+        run_llvm(&mut output, &project_path, &mut context.faults, &lib_name);
     }
 
     Ok(())

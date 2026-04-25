@@ -269,6 +269,8 @@ pub struct ScopeEntry {
 pub struct ScopeModuleEntry {
     pub module_name: String,
     pub module_id: ModuleId,
+    /// For external crate imports
+    pub crate_name: Option<String>,  
     pub import_kind: ImportKind,
     pub imported_items: Vec<ImportItem>,
 }

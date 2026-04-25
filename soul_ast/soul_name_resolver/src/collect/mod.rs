@@ -233,10 +233,12 @@ impl<'a> NameResolver<'a> {
         module_id: ModuleId,
         import_kind: ast::ImportKind,
         imported_items: Vec<ast::ImportItem>,
+        crate_name: Option<String>,
     ) {
         let entry = ast::scope::ScopeModuleEntry {
             module_name: module_name.to_string(),
             module_id,
+            crate_name,
             import_kind,
             imported_items,
         };

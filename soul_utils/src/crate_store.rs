@@ -88,6 +88,11 @@ impl CrateStore {
         self.map.get_mut(id)
     }
 
+    pub fn get_mut_by_name(&mut self, name: &str) -> Option<&mut Crate> {
+        let id = self.path_to_id.get(name).copied()?;
+        self.get_mut(id)
+    }
+
     pub fn name_to_id(&self, name: &String) -> Option<CrateId> {
         self.path_to_id.get(name).copied()
     }
