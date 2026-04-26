@@ -51,7 +51,7 @@ struct MirContext<'a> {
     hir_response: &'a HirResponse,
     context: &'a mut CrateContext,
     ast_modules: &'a AstModuleStore,
-    crate_exports: &'a CrateExports,
+    _crate_exports: &'a CrateExports,
     root: ModuleId,
 }
 
@@ -126,7 +126,7 @@ impl<'a> MirContext<'a> {
                 modifier: None,
             },
             ast_modules,
-            crate_exports,
+            _crate_exports: crate_exports,
             id_generators: IdGenerators::new(),
             temp_remap: VecMap::const_default(),
             place_typed: VecMap::const_default(),

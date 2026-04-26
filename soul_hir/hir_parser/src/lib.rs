@@ -51,7 +51,7 @@ struct HirContext<'a> {
     pub scopes: Vec<Scope>,
     pub id_generator: IdAllocalor,
     pub ast_context: &'a AbtractSyntaxTree,
-    pub crate_exports: &'a CrateExports,
+    pub _crate_exports: &'a CrateExports,
 
     pub context: &'a mut CrateContext,
     pub node_id_to_local: VecMap<NodeId, LocalId>,
@@ -83,7 +83,7 @@ impl<'a> HirContext<'a> {
         Self {
             context,
             ast_context,
-            crate_exports,
+            _crate_exports: crate_exports,
             id_generator,
             scopes: vec![Scope::default()],
             node_id_to_local: VecMap::new(),

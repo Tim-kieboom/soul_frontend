@@ -197,31 +197,16 @@ impl<'a> MirContext<'a> {
                 }
             }
 
-            hir::ExpressionKind::InnerRawStackArray { .. } => mir::Operand::new(
-                self.hir_response.typed.types_table.none_type,
-                mir::OperandKind::None,
-            ),
+            hir::ExpressionKind::InnerRawStackArray { .. } => self.new_none_operand(),
 
             hir::ExpressionKind::ExternalCall { 
-                crate_name,
-                function_name,
-                generics,
-                arguments: hir_arguments,
+                crate_name:_,
+                function_name:_,
+                generics:_,
+                arguments:_,
             } => {
-                // Look up the function ID from exports
-                let full_name = format!("{}.{}", crate_name, function_name);
-                let func_id = self.crate_exports.functions.get(&full_name).copied();
-                
-                match func_id {
-                    Some(fid) => self.lower_call(fid, generics, hir_arguments, value_type).pass(is_end),
-                    None => {
-                        // Couldn't find - generate a call that will fail at link time
-                        mir::Operand::new(
-                            self.hir_response.typed.types_table.none_type,
-                            mir::OperandKind::None,
-                        )
-                    }
-                }
+                self.log_error(soul_error_internal!("ExternalCall is unstable in mir stage", Some(span)));
+                self.new_none_operand()
             }
 
             hir::ExpressionKind::If {
@@ -421,5 +406,9 @@ impl<'a> MirContext<'a> {
 
         self.push_statement(statement);
         mir::Operand::new(ty, mir::OperandKind::Temp(temp))
+    }
+
+    fn new_none_operand(&self) -> Operand {
+        Operand::new(self.hir_response.typed.types_table.none_type, mir::OperandKind::None)
     }
 }
