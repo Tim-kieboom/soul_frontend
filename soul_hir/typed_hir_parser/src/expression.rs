@@ -81,7 +81,7 @@ impl<'a> TypedHirContext<'a> {
                 then_block,
                 else_block,
                 ends_with_else,
-            } => self.infer_if(*condition, *then_block, *else_block, *ends_with_else, span),
+            } => self.infer_if(expression_id, *condition, *then_block, *else_block, *ends_with_else, span),
             hir::ExpressionKind::InnerRawStackArray(_) => value.ty,
         };
 
@@ -95,6 +95,7 @@ impl<'a> TypedHirContext<'a> {
 
     fn infer_if(
         &mut self,
+        if_expression_id: ExpressionId,
         condition: ExpressionId,
         then_block: BlockId,
         else_block: Option<BlockId>,
@@ -111,35 +112,28 @@ impl<'a> TypedHirContext<'a> {
         );
 
         let then_type = self.infer_block_expression(then_block);
-        let then_span = self.block_span(then_block);
         let else_block = match else_block {
-            Some(val) => val,
-            None => {
-                _ = self.unify(
-                    ExpressionId::error(),
-                    self.none_type.to_lazy(),
-                    then_type,
-                    then_span,
-                );
-                return self.none_type.to_lazy();
+            Some(val) => {
+                let else_type = self.infer_block_expression(val);
+                let else_span = self.block_span(val);
+                _ = self.unify(if_expression_id, then_type, else_type, else_span);
+                if !ends_with_else && then_type != self.none_type.to_lazy() {
+                    self.log_error(SoulError::new(
+                        "'if' should end with an 'else' if you want to return a value",
+                        SoulErrorKind::InvalidContext,
+                        Some(if_span),
+                    ));
+                    return LazyTypeId::error();
+                }
+                Some(else_type)
             }
+            None => None,
         };
 
-        if !ends_with_else && then_type != self.none_type.to_lazy() {
-            self.log_error(SoulError::new(
-                "'if' should end with an 'else' if you want to return a value",
-                SoulErrorKind::InvalidContext,
-                Some(if_span),
-            ));
-
-            return LazyTypeId::error();
+        match else_block {
+            Some(else_type) => self.get_priority_lazy_type(then_type, else_type),
+            None => then_type,
         }
-
-        let else_type = self.infer_block_expression(else_block);
-        let else_span = self.block_span(else_block);
-
-        _ = self.unify(ExpressionId::error(), then_type, else_type, else_span);
-        self.get_priority_lazy_type(then_type, else_type)
     }
 
     fn infer_call(

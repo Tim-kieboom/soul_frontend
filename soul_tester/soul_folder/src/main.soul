@@ -1,15 +1,22 @@
 import ( 
-    // Std.Io
+    crate.Io
     crate.Lib.SubLib
     crate.Lib.{this, Variable, A, B as b}
 )
 
-function() {}
-
-const Num = 1
+elif(): int {
+    mut num = 0
+    if 1==1 {
+        num = 3
+    } else if 1==2 {
+        num = 4
+    } else {
+        num = 5
+    }
+    num
+}
 
 main() {
-
     mut num = A()
     num = b()
     num = Lib.A()
@@ -17,13 +24,7 @@ main() {
     num = Variable
     num = Lib.Variable
     num = SubLib.Constant
-    obj1 := Lib.Struct{field: 1, test: 2}
-    obj2 := Lib.GetStruct()
-    field := obj2.field
-    // SubLib.Pub()
-    // Lib.priv()
-    // subLib.Pub()
-    // Lib.subLib.Pub()
 
-    // Io.Println("hello world")
+    ret := elif()
+    Io.Println_int(ret)
 }

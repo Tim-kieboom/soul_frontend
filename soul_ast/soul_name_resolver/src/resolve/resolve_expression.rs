@@ -1,4 +1,4 @@
-use ast::{Expression, ExpressionKind, FieldAccess};
+use ast::{Expression, ExpressionKind, ElseKind, FieldAccess};
 
 use crate::NameResolver;
 
@@ -46,6 +46,21 @@ impl<'a> NameResolver<'a> {
             ExpressionKind::If(r#if) => {
                 self.resolve_expression(&mut r#if.condition);
                 self.resolve_block(&mut r#if.block);
+
+                let mut current = r#if.else_branchs.as_mut();
+                while let Some(branch) = current {
+                    match &mut branch.node {
+                        ElseKind::Else(el) => {
+                            self.resolve_block(&mut el.node);
+                            current = None;
+                        }
+                        ElseKind::ElseIf(el) => {
+                            self.resolve_expression(&mut el.node.condition);
+                            self.resolve_block(&mut el.node.block);
+                            current = el.node.else_branchs.as_mut();
+                        }
+                    }
+                }
             }
             ExpressionKind::While(r#while) => {
                 if let Some(value) = &mut r#while.condition {

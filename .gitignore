@@ -1,9 +1,9 @@
 # soul compiler outputs
 *.VSCodeCounter
-/soul_tester/output
 *.soulc
 *.soulAST
 *.soulAST.json
+*.ll
 soul_tester/path.json
 
 soul_tester/log.txt

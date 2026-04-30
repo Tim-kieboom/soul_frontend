@@ -14,10 +14,10 @@
 /* 
 to generate/run exe run commands:
 
-    clang -c .\soul_folder\clib\clib.c -o .\output\clib.o
-    clang .\output\out.ll .\output\clib.o -o .\output\out.exe
-    clang -S .\output\out.ll .\output\clib.o -o .\output\out.s
-    .\output\out.exe
+    clang -c .\soul_folder\clib\clib.c -o .\soul_folder\output\clib.o
+    clang .\soul_folder\output\out.ll .\soul_folder\output\clib.o -o .\soul_folder\output\out.exe
+    clang -S .\soul_folder\output\out.ll .\soul_folder\output\clib.o -o .\soul_folder\output\out.s
+    .\soul_folder\output\out.exe
 */
 
 typedef int8_t i8;
