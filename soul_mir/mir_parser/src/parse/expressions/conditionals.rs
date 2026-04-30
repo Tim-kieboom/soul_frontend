@@ -63,13 +63,13 @@ impl<'a> MirContext<'a> {
         let parent = self.expect_current_block();
         let returnable = self.tree.blocks[parent].returnable;
 
-        let temp = &mut None;
-
         let then = self.new_block();
         let after_if = self.new_block();
         self.tree.blocks[after_if].returnable = returnable;
 
         let condition = self.lower_operand(hir_condition).pass(is_end);
+
+        let temp = &mut None;
         self.lower_arm(then_block, then, after_if, ty, temp, is_end);
 
         let arm = match else_block {
@@ -97,6 +97,45 @@ impl<'a> MirContext<'a> {
                 None => mir::OperandKind::None,
             },
         )
+    }
+
+    pub(crate) fn lower_if_assignment(
+        &mut self,
+        hir_condition: hir::ExpressionId,
+        then_block: hir::BlockId,
+        else_block: Option<hir::BlockId>,
+        is_end: &mut bool,
+        target_place: mir::PlaceId,
+    ) {
+        let parent = self.expect_current_block();
+        let returnable = self.tree.blocks[parent].returnable;
+
+        let then = self.new_block();
+        let after_if = self.new_block();
+        self.tree.blocks[after_if].returnable = returnable;
+
+        let condition = self.lower_operand(hir_condition).pass(is_end);
+
+        self.lower_arm_with_target(then_block, then, after_if, target_place.clone());
+
+        let arm = match else_block {
+            Some(arm_block) => {
+                let arm = self.new_block();
+                self.lower_arm_with_target(arm_block, arm, after_if, target_place);
+                arm
+            }
+            None => after_if,
+        };
+
+        self.insert_terminator(
+            parent,
+            mir::Terminator::If {
+                condition,
+                then,
+                arm,
+            },
+        );
+        self.current.block = Some(after_if);
     }
 
     fn lower_arm(
@@ -130,6 +169,38 @@ impl<'a> MirContext<'a> {
                 self.push_statement_from(
                     mir::Statement::new(mir::StatementKind::Assign {
                         place,
+                        value: mir::Rvalue::new(mir::RvalueKind::Operand(value)),
+                    }),
+                    end_block,
+                );
+            }
+        }
+
+        if matches!(
+            self.tree.blocks[end_block].terminator,
+            mir::Terminator::Unreachable
+        ) {
+            self.insert_terminator(end_block, mir::Terminator::Goto(join));
+        }
+    }
+
+    fn lower_arm_with_target(
+        &mut self,
+        hir_block: hir::BlockId,
+        arm: mir::BlockId,
+        join: mir::BlockId,
+        target_place: mir::PlaceId,
+    ) {
+        self.current.block = Some(arm);
+        let arm_end = &mut false;
+        let value = self.lower_block(hir_block, arm).pass(arm_end);
+        let end_block = self.expect_current_block();
+
+        if !*arm_end {
+            if let Some(value) = value.filter(|value| !matches!(value.kind, mir::OperandKind::None)) {
+                self.push_statement_from(
+                    mir::Statement::new(mir::StatementKind::Assign {
+                        place: target_place,
                         value: mir::Rvalue::new(mir::RvalueKind::Operand(value)),
                     }),
                     end_block,

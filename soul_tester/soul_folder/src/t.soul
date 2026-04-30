@@ -6,6 +6,20 @@ struct Duration {
 extern "C" __clib_printChar(ch: char)
 extern "C" __clib_printCStr(text: *char)
 
+Assert(condition: bool, message: [@]char = "", file: [@]char = InFile(), line: uint = InLine()) {
+    if condition {
+        return
+    }
+
+    Print("|Assertion Failed at: ")
+    Print(file)
+    Print_char(':')
+    print_uint(span.line)
+    Print("| ")
+    PrintLn(message)
+    Exit()
+}
+
 trait Formatter {
     Push(&this, ch: char)
     PushStr(&this, text: [@]char)

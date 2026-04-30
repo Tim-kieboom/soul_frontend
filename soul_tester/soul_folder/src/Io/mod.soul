@@ -5,6 +5,13 @@ extern "C" __clib_fmtInt(value: c_int, base: u8, buffer: *char, capital: bool): 
 extern "C" __clib_fmtUint(value: c_uint, base: u8, buffer: *char, capital: bool): *char
 extern "C" __clib_fmtFloat(value: f64, base: u8, buffer: *char, precision: u8, capital: bool): *char
 
+PrintAssert(condition: bool, msg: [@]char) {
+
+    if condition == false {
+        Println(msg)
+    }
+}
+
 Println(text: [@]char) {
     Print(text)
     Endln()
