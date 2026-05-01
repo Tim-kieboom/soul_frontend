@@ -1,10 +1,12 @@
+use std::fmt::Write;
+
 use hir::TypeId;
 use inkwell::{
     types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FunctionType, VoidType},
     values::FunctionValue,
 };
-use mir_parser::mir::FunctionBody;
-use soul_utils::{Ident, ids::FunctionId, span::ModuleId};
+use mir_parser::mir::{self, FunctionBody};
+use soul_utils::{Ident, error::{SoulError, SoulErrorKind}, ids::FunctionId, vec_map::VecMapIndex};
 use typed_hir::{ThirType, ThirTypeKind, display_thir::DisplayThirType};
 
 use crate::{FunctionKeyId, GenericSubstitute, LlvmBackend};
@@ -48,11 +50,12 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         let name = if function.body.is_internal() {
             &self.mangle(
                 &function.name,
-                function.from_module,
                 function.owner_type,
+                function_id,
                 type_args,
             )
         } else {
+            self.check_non_mangle(function);
             function.name.as_str()
         };
         let llvm_function = self.module.add_function(name, function_type, None);
@@ -92,29 +95,14 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
     pub(crate) fn mangle(
         &mut self,
         name: &Ident,
-        from_module: ModuleId,
         owner: TypeId,
+        id: FunctionId,
         type_args: &Vec<TypeId>,
     ) -> String {
         const SEPARATOR: &str = "_";
 
         let mut sb = String::new();
-
-        let root = self.mir.tree.root_module;
-        let mut current_module = from_module;
-        while current_module != root {
-            let module = &self.mir.tree.modules[current_module];
-            sb.push_str(&module.name);
-            sb.push_str(SEPARATOR);
-            current_module = match module.parent {
-                Some(val) => val,
-                None => break,
-            }
-        }
-
-        if from_module != root {
-            sb.push_str("__");
-        }
+        sb.write_fmt(format_args!("F{}___", id.index())).expect("no fmt error");
 
         sb.push_str(name.as_str());
         let owner_type = match self.get_type(owner) {
@@ -152,6 +140,25 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         }
 
         sb
+    }
+
+    fn check_non_mangle(&mut self, function: &mir::Function) {
+
+        let id = match self.non_mangels.get(&function.name.node) {
+            Some(val) => val,
+            None => {
+                self.non_mangels.insert(function.name.to_string(), function.id);
+                return
+            }
+        };
+
+        if *id != function.id {
+            self.log_error(SoulError::new(
+                format!("function: '{}' is not mangeled and name already exists somewhere in crate", function.name.as_str(), ), 
+                SoulErrorKind::AlreadyFoundInScope, 
+                Some(function.name.span),
+            ));
+        }
     }
 }
 

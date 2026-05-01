@@ -11,13 +11,7 @@ use inkwell::{
 use mir_parser::mir::{BlockId, LocalId, TempId};
 use run_mir::MirResponse;
 use soul_utils::{
-    compile_options::CompilerOptions,
-    error::{SoulError, SoulResult},
-    ids::{FunctionId, IdGenerator},
-    impl_soul_ids,
-    sementic_level::SementicFault,
-    soul_error_internal,
-    vec_map::VecMap,
+    compile_options::CompilerOptions, error::{SoulError, SoulResult}, ids::{FunctionId, IdGenerator}, impl_soul_ids, sementic_level::SementicFault, soul_error_internal, vec_map::VecMap
 };
 
 mod block;
@@ -143,6 +137,7 @@ pub struct LlvmBackend<'f, 'a> {
     options: &'a CompilerOptions,
     exit_function: Option<FunctionValue<'a>>,
 
+    non_mangels: HashMap<String, FunctionId>,
     temps: HashMap<(FunctionKeyId, TempId), IrOperand<'a>>,
     locals: HashMap<(FunctionKeyId, LocalId), Local<'a>>,
     blocks: HashMap<(FunctionKeyId, BlockId), BasicBlock<'a>>,
@@ -199,6 +194,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             locals: HashMap::new(),
             functions: VecMap::new(),
             context: request.context,
+            non_mangels: HashMap::new(),
             structs: StructStore::new(),
             types: request.types.clone(),
             field_indexs: RefCell::new(VecMap::const_default()),

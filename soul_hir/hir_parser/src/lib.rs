@@ -39,7 +39,6 @@ pub fn lower_hir(
 
 #[derive(Debug)]
 struct Current {
-    pub function_name: Option<Ident>,
     pub module: ModuleId,
     pub body: CurrentBody,
 }
@@ -89,7 +88,6 @@ impl<'a> HirContext<'a> {
             scopes: vec![Scope::default()],
             node_id_to_local: VecMap::new(),
             current: Current {
-                function_name: None,
                 module: root_id,
                 body: CurrentBody::Global,
             },

@@ -5,7 +5,10 @@ import (
     crate.Lib.{this, Variable, A, B as b}
 )
 
+returnIf(){}
+
 main() {
+    returnIf()
     Test.RunTests()
 
     mut num = A()
