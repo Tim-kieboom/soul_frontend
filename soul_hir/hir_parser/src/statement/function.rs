@@ -10,7 +10,9 @@ use soul_utils::{
 use crate::HirContext;
 
 impl<'a> HirContext<'a> {
+
     pub(super) fn lower_function(&mut self, function: &ast::Function) -> FunctionId {
+        
         let id = match function.signature.node.id {
             Some(val) => val,
             None => {
@@ -23,7 +25,18 @@ impl<'a> HirContext<'a> {
         };
 
         let signature = &function.signature.node;
-        self.insert_function(&signature.name, id);
+        let name = match &self.current.function_name {
+            Some(parent_name) => {
+                let span = signature.name.span;
+                let string = format!("{}___fn___{}", parent_name.as_str(), signature.name.as_str());
+                Ident::new(string, span)
+            },
+            None => signature.name.clone(),
+        };
+
+        let mut prev = Some(name.clone());
+        std::mem::swap(&mut self.current.function_name, &mut prev);
+        self.insert_function(&name, id);
 
         self.push_scope();
         let mut generics = vec![];
@@ -127,14 +140,15 @@ impl<'a> HirContext<'a> {
         let hir_function = hir::Function {
             id,
             body,
+            name,
             generics,
             parameters,
             owner_type,
             return_type,
-            name: signature.name.clone(),
             kind: signature.function_kind,
         };
         self.tree.nodes.functions.insert(id, hir_function);
+        std::mem::swap(&mut prev, &mut self.current.function_name);
         id
     }
 

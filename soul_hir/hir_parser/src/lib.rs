@@ -39,6 +39,7 @@ pub fn lower_hir(
 
 #[derive(Debug)]
 struct Current {
+    pub function_name: Option<Ident>,
     pub module: ModuleId,
     pub body: CurrentBody,
 }
@@ -88,6 +89,7 @@ impl<'a> HirContext<'a> {
             scopes: vec![Scope::default()],
             node_id_to_local: VecMap::new(),
             current: Current {
+                function_name: None,
                 module: root_id,
                 body: CurrentBody::Global,
             },
@@ -112,6 +114,9 @@ impl<'a> HirContext<'a> {
     fn lower_module(&mut self, module_id: ModuleId) {
         let ast_module = &self.ast_context.modules[module_id];
 
+        let prev = self.current.module;
+        self.current.module = module_id;
+
         for statement in &ast_module.global.statements {
             match &statement.node {
                 ast::StatementKind::Struct(object) => self.add_struct(object),
@@ -134,6 +139,7 @@ impl<'a> HirContext<'a> {
                 self.lower_global(module_id, global);
             }
         }
+        self.current.module = prev;
     }
 
     fn lower_struct(&mut self, object: &ast::Struct) {

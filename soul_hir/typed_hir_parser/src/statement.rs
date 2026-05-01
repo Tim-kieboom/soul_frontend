@@ -86,7 +86,7 @@ impl<'a> TypedHirContext<'a> {
             .unwrap_or(TypeId::error())
     }
 
-    fn infer_function(&mut self, function_id: FunctionId) {
+    fn infer_function(&mut self, function_id: FunctionId) -> TypeId {
         self.current_function = Some(function_id);
         let function = &self.hir.nodes.functions[function_id];
 
@@ -101,7 +101,7 @@ impl<'a> TypedHirContext<'a> {
 
         let body = match function.body {
             hir::FunctionBody::Internal(block_id) => block_id,
-            hir::FunctionBody::External(_) => return,
+            hir::FunctionBody::External(_) => return function.return_type,
         };
 
         let span = self.hir.info.spans.blocks[body];
@@ -114,6 +114,7 @@ impl<'a> TypedHirContext<'a> {
         );
 
         self.current_function = None;
+        function.return_type
     }
 
     pub(crate) fn infer_block_expression(&mut self, body: BlockId) -> LazyTypeId {
