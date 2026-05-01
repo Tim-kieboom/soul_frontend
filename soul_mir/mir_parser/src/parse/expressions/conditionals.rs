@@ -60,6 +60,39 @@ impl<'a> MirContext<'a> {
         ty: hir::TypeId,
         is_end: &mut bool,
     ) -> mir::Operand {
+        if let Some(target_place) = self.current.target_place {
+            let parent = self.expect_current_block();
+            let returnable = self.tree.blocks[parent].returnable;
+
+            let then = self.new_block();
+            let after_if = self.new_block();
+            self.tree.blocks[after_if].returnable = returnable;
+
+            let condition = self.lower_operand(hir_condition).pass(is_end);
+
+            self.lower_arm_with_target(then_block, then, after_if, ty, target_place, is_end);
+
+            let arm = match else_block {
+                Some(arm_block) => {
+                    let arm = self.new_block();
+                    self.lower_arm_with_target(arm_block, arm, after_if, ty, target_place, is_end);
+                    arm
+                }
+                None => after_if,
+            };
+
+            self.insert_terminator(
+                parent,
+                mir::Terminator::If {
+                    condition,
+                    then,
+                    arm,
+                },
+            );
+            self.current.block = Some(after_if);
+            return mir::Operand::new(ty, mir::OperandKind::None);
+        }
+
         let parent = self.expect_current_block();
         let returnable = self.tree.blocks[parent].returnable;
 
@@ -104,6 +137,7 @@ impl<'a> MirContext<'a> {
         hir_condition: hir::ExpressionId,
         then_block: hir::BlockId,
         else_block: Option<hir::BlockId>,
+        ty: hir::TypeId,
         is_end: &mut bool,
         target_place: mir::PlaceId,
     ) {
@@ -116,12 +150,14 @@ impl<'a> MirContext<'a> {
 
         let condition = self.lower_operand(hir_condition).pass(is_end);
 
-        self.lower_arm_with_target(then_block, then, after_if, target_place.clone());
+        self.current.target_place = Some(target_place);
+
+        self.lower_arm_with_target(then_block, then, after_if, ty, target_place, is_end);
 
         let arm = match else_block {
             Some(arm_block) => {
                 let arm = self.new_block();
-                self.lower_arm_with_target(arm_block, arm, after_if, target_place);
+                self.lower_arm_with_target(arm_block, arm, after_if, ty, target_place, is_end);
                 arm
             }
             None => after_if,
@@ -136,6 +172,7 @@ impl<'a> MirContext<'a> {
             },
         );
         self.current.block = Some(after_if);
+        self.current.target_place = None;
     }
 
     fn lower_arm(
@@ -189,7 +226,9 @@ impl<'a> MirContext<'a> {
         hir_block: hir::BlockId,
         arm: mir::BlockId,
         join: mir::BlockId,
+        _ty: hir::TypeId,
         target_place: mir::PlaceId,
+        _is_end: &mut bool,
     ) {
         self.current.block = Some(arm);
         let arm_end = &mut false;

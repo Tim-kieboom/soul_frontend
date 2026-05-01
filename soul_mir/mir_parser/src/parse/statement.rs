@@ -129,10 +129,12 @@ impl<'a> MirContext<'a> {
             
             let value_expr = &self.hir_response.hir.nodes.expressions[value];
             if let ExpressionKind::If { condition, then_block, else_block, ends_with_else: _ } = &value_expr.kind {
+                let ty = self.hir_response.typed.types_table.expressions[value];
                 self.lower_if_assignment(
                     *condition,
                     *then_block,
                     *else_block,
+                    ty,
                     is_end,
                     target_place,
                 );
@@ -193,15 +195,17 @@ impl<'a> MirContext<'a> {
         }
     }
 
-    pub(crate) fn lower_assign(&mut self, assign: &hir::Assign, is_end: &mut bool) {
+     pub(crate) fn lower_assign(&mut self, assign: &hir::Assign, is_end: &mut bool) {
         let place = self.lower_place(assign.place).pass(is_end);
         
         let value_expr = &self.hir_response.hir.nodes.expressions[assign.value];
         if let ExpressionKind::If { condition, then_block, else_block, ends_with_else: _ } = &value_expr.kind {
+            let ty = self.hir_response.typed.types_table.expressions[assign.value];
             self.lower_if_assignment(
                 *condition,
                 *then_block,
                 *else_block,
+                ty,
                 is_end,
                 place,
             );

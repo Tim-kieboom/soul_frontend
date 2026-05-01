@@ -1,8 +1,8 @@
 import ( 
     crate.Io
+    crate.Test
     crate.Lib.SubLib
     crate.Lib.{this, Variable, A, B as b}
-    crate.Test
 )
 
 main() {

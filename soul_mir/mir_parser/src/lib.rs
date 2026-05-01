@@ -60,6 +60,7 @@ struct CurrentContext {
     scope: Vec<mir::LocalId>,
     function: FunctionId,
     block: Option<mir::BlockId>,
+    target_place: Option<mir::PlaceId>,
 
     loop_finish: Option<mir::BlockId>,
     loop_continue: Option<mir::BlockId>,
@@ -72,6 +73,7 @@ impl CurrentContext {
             block: None,
             scope: vec![],
             loop_finish: None,
+            target_place: None,
             loop_continue: None,
         }
     }
