@@ -5,10 +5,10 @@ import (
     crate.Lib.{this, Variable, A, B as b}
 )
 
-
 main() {
     Test.RunTests()
 
+    infer := 1
     mut num = A()
     num = b()
     num = Lib.A()

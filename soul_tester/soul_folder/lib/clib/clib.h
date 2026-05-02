@@ -14,7 +14,7 @@
 /* 
 to generate/run exe run commands:
 
-    clang -c .\soul_folder\clib\clib.c -o .\soul_folder\output\clib.o
+    clang -c .\soul_folder\lib\clib\clib.c -o .\soul_folder\output\clib.o
     clang .\soul_folder\output\out.ll .\soul_folder\output\clib.o -o .\soul_folder\output\out.exe
     clang -S .\soul_folder\output\out.ll .\soul_folder\output\clib.o -o .\soul_folder\output\out.s
     .\soul_folder\output\out.exe

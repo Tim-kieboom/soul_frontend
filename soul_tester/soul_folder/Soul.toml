@@ -4,5 +4,5 @@ version = "0.1.0"
 edition = "2026"
 
 [dependencies]
-# Std = { path = "soul_std", version = "0.1.0" }
-# Core = { path = "soul_core", version = "0.1.0" }
+# Std = { path = "lib/soul_std", version = "0.1.0" }
+# Core = { path = "lib/soul_core", version = "0.1.0" }
