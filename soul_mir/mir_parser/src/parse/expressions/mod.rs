@@ -87,6 +87,9 @@ impl<'a> MirContext<'a> {
                 let left = self.lower_operand(*left).pass(is_end);
                 let right = self.lower_operand(*right).pass(is_end);
 
+                let left = self.maybe_cast_literal_to(left, right.ty);
+                let right = self.maybe_cast_literal_to(right, left.ty);
+
                 let temp = self.new_temp(value_type);
 
                 let statement = mir::Statement::new(mir::StatementKind::Assign {
@@ -418,5 +421,49 @@ impl<'a> MirContext<'a> {
 
     fn new_none_operand(&self) -> Operand {
         Operand::new(self.hir_response.typed.types_table.none_type, mir::OperandKind::None)
+    }
+
+    /// Casts a literal operand to match another operand's type.
+    ///
+    /// WHY THIS IS NEEDED:
+    /// Integer literals in the source code (e.g., `1`, `42`) are initially typed as untyped Int (i64)
+    /// in the name resolver. However, in binary expressions:
+    ///   - `some_i32 + 1`   → literal should be i32 to match left operand
+    ///   - `value == 0`     → literal should match value's type (i64), not the result type (bool)
+    ///
+    /// The typed_hIR phase unifies operand types (so both sides have the same type), but doesn't
+    /// insert explicit casts for literals. If we don't cast here, LLVM sees mismatched types:
+    ///   - `icmp eq i64 %load, i1 false`  ← INVALID (comparing i64 to i1)
+    ///
+    /// By casting literals to match the *other operand's type* (not the result type), operands are
+    /// compatible for the binary operation, AND the result type is naturally correct.
+    fn maybe_cast_literal_to(&mut self, operand: mir::Operand, to_type: TypeId) -> mir::Operand {
+        if !operand.is_literal() {
+            return operand;
+        }
+        if operand.ty == to_type {
+            return operand;
+        }
+
+        let from_type = self.id_to_type(operand.ty).clone();
+        let to_type_info = self.id_to_type(to_type).clone();
+
+        let primitive_castable = from_type
+            .unify_primitive_cast(&self.hir_response.typed.types_map, &to_type_info)
+            .is_ok();
+        if !primitive_castable {
+            return operand;
+        }
+
+        let temp = self.new_temp(to_type);
+        let place = self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp), to_type));
+        let rvalue = mir::Rvalue::new(mir::RvalueKind::CastUse {
+            value: operand,
+            cast_to: to_type,
+        });
+        let cast = mir::Statement::new(mir::StatementKind::Assign { place, value: rvalue });
+        self.push_statement(cast);
+
+        mir::Operand::new(to_type, mir::OperandKind::Temp(temp))
     }
 }

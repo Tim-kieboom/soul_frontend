@@ -336,4 +336,8 @@ impl Operand {
     pub fn new(ty: TypeId, kind: OperandKind) -> Self {
         Self { ty, kind }
     }
+
+    pub fn is_literal(&self) -> bool {
+        matches!(self.kind, OperandKind::Comptime(_))
+    }
 }
