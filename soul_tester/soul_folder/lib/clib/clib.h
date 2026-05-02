@@ -42,6 +42,11 @@ typedef struct {
 } Duration;
 
 typedef struct {
+    void* ptr;
+    uint len;
+} SoulArray;
+
+typedef struct {
     char* ptr;
     uint len;
 } SoulStr;

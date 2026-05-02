@@ -1,5 +1,46 @@
 #include "clib.h"
 
+// ---------------- #Array ----------------      
+
+SoulArray __clib_mallocString(uint len) {
+    void* ptr = malloc(len);
+    if(ptr == NULL)
+        len = 0;
+    return (SoulArray){.ptr = ptr, .len = len};
+}
+
+// ---------------- #File ----------------      
+
+i64 __clib_fileLen(FILE* file) {
+    if (fseek(file, 0, SEEK_END) != 0) {
+        fclose(file);
+        return -1;
+    }
+    i64 len = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    return len;
+}
+
+i64 __clib_fileToStr(FILE* file, uint fileLen, /*out*/SoulStr* str) {
+    fseek(file, 0, SEEK_SET);
+    if(fileLen < 0 || str->len+1 < fileLen) 
+        return -1;
+
+    return fread(str->ptr, 1, fileLen, file);
+}
+
+bool __clib_filePrint(FILE* file) {
+    i64 len = __clib_fileLen(file);
+    if (len < 0) {
+        return false;
+    }
+
+    char* buffer = malloc(len);
+    fread(buffer, 1, len, file);
+    printf("%*s", len, buffer);
+    return true;
+}
+
 // ---------------- #Math ----------------      
 
 #define __POW(ty) ty __clib_pow_##ty(ty a, ty b) { \

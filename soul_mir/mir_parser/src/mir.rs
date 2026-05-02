@@ -337,6 +337,12 @@ impl Operand {
         Self { ty, kind }
     }
 
+    // Returns true if this operand is a compile-time literal (Literal::Comptime).
+    //
+    // IMPORTANT: This is used to determine if a value needs type casting.
+    // In the name resolver, integer literals are given type `Int` (i64). For them
+    // to be used correctly in operations/calls, they must be cast to match the expected type.
+    // This helper identifies which operands are literals that may need casting.
     pub fn is_literal(&self) -> bool {
         matches!(self.kind, OperandKind::Comptime(_))
     }

@@ -7,6 +7,15 @@ use typed_hir::{ThirType, ThirTypeKind};
 
 use crate::{GenericSubstitute, IrOperand, LlvmBackend};
 
+/// Lowers a CastUse MIR rvalue to LLVM IR.
+///
+/// Handles various casting scenarios:
+/// - Primitive widening (i8 → i32): uses sext/zext depending on sign
+/// - Primitive narrowing (i32 → i8): uses truncate
+/// - Float ↔ int conversion: uses fptosi/fptoui/sitofp/uitofp
+/// - Float widening/narrowing (f32 → f64): uses fpext/fptrunc
+/// - Pointer ↔ int conversion: uses ptrtoint/inttoptr
+/// - Stack array → pointer: extracts data pointer
 impl<'f, 'a> LlvmBackend<'f, 'a> {
     pub(super) fn lower_cast(
         &self,

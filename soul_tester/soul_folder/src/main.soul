@@ -2,15 +2,18 @@ import (
     crate.Io
     crate.Test
     crate.Lib.SubLib
-    crate.Fs.{File, Open, Close, READ_ONLY}
+    crate.Fs.{File, Open, ReadLen, Print, Close, READ_ONLY}
     crate.Lib.{this, Variable, A, B as b}
 )
 
 main() {
+    b()
     Test.RunTests()
 
     file := File.Open(c"test.txt", READ_ONLY)
-    File.Close(file)
+    len := file.ReadLen()
+    Io.Println_int(len)
+    file.Close()
 
     infer := 1
     mut num = A()
@@ -21,6 +24,5 @@ main() {
     num = Lib.Variable
     num = SubLib.Constant
 
-    const text: c_str = c"cstring"
     Io.Println("hello world")
 }

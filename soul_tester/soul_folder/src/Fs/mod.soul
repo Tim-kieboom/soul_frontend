@@ -1,6 +1,13 @@
+import (
+    ./.Io
+)
+
 extern "C" fopen_s(file: &*none, path: c_str, mode: c_str): c_int
 extern "C" fclose(file: *none)
 extern "C" __clib_nullptr(): *none
+extern "C" __clib_mallocString(len: uint): [*]char
+extern "C" __clib_fileLen(file: *none): int
+extern "C" __clib_filePrint(file: *none)
 
 struct File {
     cFilePtr: *none
@@ -14,11 +21,24 @@ File Open(path: c_str, mode: int): File {
 
     mut cFilePtr: *none = null
     code := fopen_s(&cFilePtr, path, modeToCstr(mode as u8))
+    Io.Print("tried to open file got code: ")
+    Io.Println_int(code as int)
     File{cFilePtr}
 }
 
-File Close(self: File) {
-    fclose(self.cFilePtr)
+File ReadLen(@this): int {
+    ptr := this.cFilePtr
+    __clib_fileLen(ptr)
+}
+
+File Print(@this) {
+    ptr := this.cFilePtr
+    __clib_filePrint(ptr)
+}
+
+File Close(this) {
+    ptr := this.cFilePtr
+    fclose(ptr)
 }
 
 modeToCstr(mode: u8): c_str {

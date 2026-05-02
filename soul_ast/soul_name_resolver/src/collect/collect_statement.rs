@@ -173,6 +173,19 @@ fn owner_hint_from_expression(
     store: &DeclareStore,
     module: ModuleId,
 ) -> Option<TypeKind> {
+    // Provides a "hint" for the type of an expression when inferring an owner's type.
+    //
+    // WHY LITERALS GET DEFAULT TYPES:
+    // This is where integer literals first get typed. All integer literals (42, 1, 0, etc.)
+    // are initially given type `Int` (which becomes i64). This is by design - it provides a
+    // default type so literals can participate in type inference.
+    //
+    // The actual required type is determined later in MIR when the literal is used in:
+    // - Binary expressions: cast to match the other operand's type
+    // - Function calls: cast to match the parameter type
+    //
+    // Without this default, literals would have no type and couldn't participate in
+    // type inference at all.
     match &init.node {
         ExpressionKind::Literal((_, lit)) => Some(TypeKind::Primitive(match lit {
             Literal::Int(_) | Literal::Uint(_) => PrimitiveTypes::Int,

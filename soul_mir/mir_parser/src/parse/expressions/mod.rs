@@ -244,6 +244,15 @@ impl<'a> MirContext<'a> {
         EndBlock::new(operand, is_end)
     }
 
+    // Lowers a function call, including casting literal arguments to match parameter types.
+    //
+    // WHY LITERAL CASTING IS NEEDED HERE (same as binary expressions):
+    // Integer literals in source (e.g., `print(1)`) are typed as untyped Int (i64) initially.
+    // But the function's parameter might be `i32`. LLVM requires exact type matching for
+    // function arguments - we can't pass i64 to an i32 parameter.
+    //
+    // This checks if the argument is a literal AND primitive-castable to the parameter type,
+    // then inserts a CastUse rvalue to convert the literal before the call.
     pub(crate) fn lower_call(
         &mut self,
         function_id: FunctionId,
@@ -423,20 +432,20 @@ impl<'a> MirContext<'a> {
         Operand::new(self.hir_response.typed.types_table.none_type, mir::OperandKind::None)
     }
 
-    /// Casts a literal operand to match another operand's type.
-    ///
-    /// WHY THIS IS NEEDED:
-    /// Integer literals in the source code (e.g., `1`, `42`) are initially typed as untyped Int (i64)
-    /// in the name resolver. However, in binary expressions:
-    ///   - `some_i32 + 1`   → literal should be i32 to match left operand
-    ///   - `value == 0`     → literal should match value's type (i64), not the result type (bool)
-    ///
-    /// The typed_hIR phase unifies operand types (so both sides have the same type), but doesn't
-    /// insert explicit casts for literals. If we don't cast here, LLVM sees mismatched types:
-    ///   - `icmp eq i64 %load, i1 false`  ← INVALID (comparing i64 to i1)
-    ///
-    /// By casting literals to match the *other operand's type* (not the result type), operands are
-    /// compatible for the binary operation, AND the result type is naturally correct.
+    // Casts a literal operand to match another operand's type.
+    //
+    // WHY THIS IS NEEDED:
+    // Integer literals in the source code (e.g., `1`, `42`) are initially typed as untyped Int (i64)
+    // in the name resolver. However, in binary expressions:
+    //   - `some_i32 + 1`   → literal should be i32 to match left operand
+    //   - `value == 0`     → literal should match value's type (i64), not the result type (bool)
+    //
+    // The typed_hIR phase unifies operand types (so both sides have the same type), but doesn't
+    // insert explicit casts for literals. If we don't cast here, LLVM sees mismatched types:
+    //   - `icmp eq i64 %load, i1 false`  ← INVALID (comparing i64 to i1)
+    //
+    // By casting literals to match the *other operand's type* (not the result type), operands are
+    // compatible for the binary operation, AND the result type is naturally correct.
     fn maybe_cast_literal_to(&mut self, operand: mir::Operand, to_type: TypeId) -> mir::Operand {
         if !operand.is_literal() {
             return operand;

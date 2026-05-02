@@ -105,7 +105,10 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 kind: ArrayKind::HeapArray,
                 ..
             } => {
-                todo!()
+                IrOperand {
+                    value: inner.value,
+                    info: inner.info.clone(),
+                }
             }
             ThirTypeKind::Array {
                 kind: ArrayKind::StackArray(len),
@@ -115,6 +118,21 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 self.fixed_array_to_slice(ty, ptr, len)?
             }
             _ => {
+                if inner.value.is_pointer_value() {
+                    let ptr = inner.value.into_pointer_value();
+                    let ptr_type = ptr.get_type();
+                    let new_ptr = self.builder.build_alloca(ptr_type, "ref_ptr")?;
+                    let operand_to_store = IrOperand {
+                        value: ptr.into(),
+                        info: OperandInfo::new_loaded(inner.info.type_id, ptr_type.into()),
+                    };
+                    self.builder.store_operand(new_ptr, operand_to_store)?;
+                    let info = OperandInfo::new_unloaded(ty, ptr_type.into());
+                    return Ok(IrOperand {
+                        value: new_ptr.into(),
+                        info,
+                    });
+                }
                 let value = unsafe { BasicValueEnum::new(inner.value.as_value_ref()) };
                 IrOperand {
                     value,
@@ -124,6 +142,16 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         })
     }
 
+    // Lowers a basic (non-aggregate) literal to LLVM IR.
+    //
+    // TYPE DETERMINATION:
+    // The `should_be` parameter is the expression's type from typed_hIR (after type
+    // inference/unification). This type is what determines the LLVM integer type used:
+    // - should_be = i32  → generates i32 constant
+    // - should_be = i64  → generates i64 constant
+    //
+    // This is why casting in MIR is important - if the type isn't correct here,
+    // the wrong LLVM constant type will be generated.
     fn lower_basic_literal(
         &self,
         literal: &Literal,
