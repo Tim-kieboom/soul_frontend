@@ -38,34 +38,36 @@ define_str_enum!(
 );
 
 /// Represents the primitive size categories for type inference.
+#[repr(u8)]
 pub enum PrimitiveSize {
     /// Character-sized (platform-specific).
-    CharSize,
+    CharSize = 0,
     /// Integer-sized (platform-specific).
-    IntSize,
+    IntAndPtrSize = 1,
     /// C integer-sized (platform-specific).
-    CIntSize,
+    CIntSize = 2,
     /// 8-bit.
-    Bit8,
+    Bit8 = 3,
     /// 16-bit.
-    Bit16,
+    Bit16 = 4,
     /// 32-bit.
-    Bit32,
+    Bit32 = 5,
     /// 64-bit.
-    Bit64,
+    Bit64 = 6,
     /// 128-bit.
-    Bit128,
+    Bit128 = 7,
 }
 
 define_str_enum!(
     /// Internal primitive types available in the Soul language.
     ///
     /// These are the built-in numeric, character, and boolean types.
-    /// (precedence is used for bit size with special 1=defaultIntSize and 2=defaultCharSize)
+    /// 
+    /// (!!WARNING!! precedence is used for bit size DO NOT USE FOR PRECEDENCE)
     #[derive(Hash)]
     pub enum PrimitiveTypes {
         /// default-size character type
-        Char => "char", 2,
+        Char => "char", PrimitiveSize::CharSize as usize,
         /// 8-bit character type
         Char8 => "char8", 8,
         /// 16-bit character type
@@ -75,17 +77,20 @@ define_str_enum!(
         /// 64-bit character type
         Char64 => "char64", 64,
 
+        /// a null terminated char pointer
+        CStr => "c_str", PrimitiveSize::IntAndPtrSize as usize,
+
         /// empty type (also known as `void` in c like languages)
         None => "none", 8,
         /// boolean (`true` or `false`) type
         Boolean => "bool", 8,
 
         /// c sized interger type
-        CInt => "c_int", 3,
+        CInt => "c_int", PrimitiveSize::CIntSize as usize,
         /// undecided integer type
-        UntypedInt => "untypedInt", 1,
+        UntypedInt => "untypedInt", PrimitiveSize::IntAndPtrSize as usize,
         /// system-sizes integer type
-        Int => "int", 1,
+        Int => "int", PrimitiveSize::IntAndPtrSize as usize,
         /// 8-bit integer type
         Int8 => "i8", 8,
         /// 16-bit integer type
@@ -98,11 +103,11 @@ define_str_enum!(
         Int128 => "i128", 128,
 
         /// c sized interger type
-        CUint => "c_uint", 3,
+        CUint => "c_uint", PrimitiveSize::CIntSize as usize,
         /// undecided unsigned integer type
-        UntypedUint => "untypedUint", 1,
+        UntypedUint => "untypedUint", PrimitiveSize::IntAndPtrSize as usize,
         /// system-sized unsigned integer type
-        Uint => "uint", 1,
+        Uint => "uint", PrimitiveSize::IntAndPtrSize as usize,
         /// 8-bit unsigned integer type
         Uint8 => "u8", 8,
         /// 16-bit unsigned integer type
@@ -251,10 +256,14 @@ impl PrimitiveTypes {
 
     /// Converts this type to its primitive size category.
     pub const fn to_primitive_size(&self) -> PrimitiveSize {
+        const INT_AND_PTR_SIZE: usize = PrimitiveSize::IntAndPtrSize as usize;
+        const CHAR_SIZE: usize = PrimitiveSize::CharSize as usize;
+        const CINT_SIZE: usize = PrimitiveSize::CIntSize as usize;
+
         match self.precedence().as_usize() {
-            1 => PrimitiveSize::IntSize,
-            2 => PrimitiveSize::CharSize,
-            3 => PrimitiveSize::CIntSize,
+            INT_AND_PTR_SIZE => PrimitiveSize::IntAndPtrSize,
+            CHAR_SIZE => PrimitiveSize::CharSize,
+            CINT_SIZE => PrimitiveSize::CIntSize,
             8 => PrimitiveSize::Bit8,
             16 => PrimitiveSize::Bit16,
             32 => PrimitiveSize::Bit32,
@@ -269,7 +278,7 @@ impl PrimitiveTypes {
         match self.to_primitive_size() {
             PrimitiveSize::CIntSize => c_int_size,
             PrimitiveSize::CharSize => char_size,
-            PrimitiveSize::IntSize => int_size,
+            PrimitiveSize::IntAndPtrSize => int_size,
             PrimitiveSize::Bit8 => 8,
             PrimitiveSize::Bit16 => 16,
             PrimitiveSize::Bit32 => 32,

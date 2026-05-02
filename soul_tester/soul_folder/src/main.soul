@@ -5,10 +5,8 @@ import (
     crate.Lib.{this, Variable, A, B as b}
 )
 
-returnIf(){}
 
 main() {
-    returnIf()
     Test.RunTests()
 
     mut num = A()
@@ -18,4 +16,7 @@ main() {
     num = Variable
     num = Lib.Variable
     num = SubLib.Constant
+
+    const text: c_str = c"cstring"
+    Io.Println("hello world")
 }

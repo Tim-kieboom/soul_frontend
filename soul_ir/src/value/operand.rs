@@ -143,7 +143,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 let int_type = match size {
                     PrimitiveSize::CIntSize => self.default_c_int_type,
                     PrimitiveSize::CharSize => self.default_char_type,
-                    PrimitiveSize::IntSize => self.default_int_type,
+                    PrimitiveSize::IntAndPtrSize => self.default_int_type,
                     PrimitiveSize::Bit8 => self.context.i8_type(),
                     PrimitiveSize::Bit16 => self.context.i16_type(),
                     PrimitiveSize::Bit32 => self.context.i32_type(),
@@ -178,7 +178,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 let int_type = match size {
                     PrimitiveSize::CIntSize => self.default_c_int_type,
                     PrimitiveSize::CharSize => self.default_char_type,
-                    PrimitiveSize::IntSize => self.default_int_type,
+                    PrimitiveSize::IntAndPtrSize => self.default_int_type,
                     PrimitiveSize::Bit8 => self.context.i8_type(),
                     PrimitiveSize::Bit16 => self.context.i16_type(),
                     PrimitiveSize::Bit32 => self.context.i32_type(),
@@ -236,6 +236,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
                 self.new_loaded_operand(value, should_be, generics)?
             }
+            ast::Literal::Cstr(text) |
             ast::Literal::Str(text) => {
                 let (slice_type, value) = self.const_string_slice(text.as_bytes());
                 IrOperand {
@@ -319,7 +320,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
     }
 
     fn const_string_slice(&self, text: &[u8]) -> (StructType<'a>, StructValue<'a>) {
-        let bytes = self.context.const_string(text, false);
+        let bytes = self.context.const_string(text, true);
         let array_ty = bytes.get_type();
 
         let global = self.module.add_global(array_ty, None, "str");

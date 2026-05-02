@@ -27,6 +27,56 @@ mod vec_map_tests;
 #[cfg(test)]
 mod vec_set_tests;
 
+#[derive(Clone, PartialEq)]
+pub enum StringLiteral {
+    Normal(String),
+    CStr(String),
+}
+impl std::fmt::Debug for StringLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StringLiteral::Normal(str) => f.write_fmt(format_args!("{:?}", str)),
+            StringLiteral::CStr(str) => f.write_fmt(format_args!("c{:?}", str)),
+        }
+    }
+}
+impl std::fmt::Display for StringLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StringLiteral::Normal(str) => f.write_str(str),
+            StringLiteral::CStr(str) => f.write_str(str),
+        }
+    }
+}
+impl StringLiteral {
+    pub fn display_len(&self) -> usize {
+        match self {
+            StringLiteral::CStr(str) |
+            StringLiteral::Normal(str) => str.len(),
+        }
+    }
+
+    pub fn to_tag(&self) -> Option<StringTag> {
+        match self {
+            StringLiteral::Normal(_) => None,
+            StringLiteral::CStr(_) => Some(StringTag::CStr),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum StringTag {
+    CStr, // c
+}
+impl StringTag {
+    pub fn from_char(ch: char) -> Option<Self> {
+        match ch {
+            'c' => Some(Self::CStr),
+            _ => None
+        }
+    }
+}
+
 pub type Ident = crate::span::Spanned<String>;
 impl Ident {
     pub fn as_str(&self) -> &str {

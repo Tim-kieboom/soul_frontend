@@ -1,9 +1,9 @@
 extern "C" __clib_printChar(ch: char)
-extern "C" __clib_printCStr(ptr: *char)
+extern "C" __clib_printCStr(ptr: c_str)
 extern "C" __clib_printSoulStr(ptr: *char, len: uint)
-extern "C" __clib_fmtInt(value: c_int, base: u8, buffer: *char, capital: bool): *char
-extern "C" __clib_fmtUint(value: c_uint, base: u8, buffer: *char, capital: bool): *char
-extern "C" __clib_fmtFloat(value: f64, base: u8, buffer: *char, precision: u8, capital: bool): *char
+extern "C" __clib_fmtInt(value: c_int, base: u8, buffer: *char, capital: bool): c_str
+extern "C" __clib_fmtUint(value: c_uint, base: u8, buffer: *char, capital: bool): c_str
+extern "C" __clib_fmtFloat(value: f64, base: u8, buffer: *char, precision: u8, capital: bool): c_str
 
 PrintAssert(condition: bool, msg: [@]char) {
 
@@ -51,20 +51,20 @@ Print_char(char: char) {
 
 Print_int(value: int, base: u8 = 10, capital: bool = true) {
     const fmtBuffer: [50]char
-    ptr := FmtInt(value, base, @fmtBuffer, capital)
-    Stdout.WriteCstr(ptr)
+    cstr := FmtInt(value, base, @fmtBuffer, capital)
+    Stdout.WriteCstr(cstr)
 }
 
 Print_uint(value: uint, base: u8 = 10, capital: bool = true) {
     const fmtBuffer: [50]char
-    ptr := FmtUint(value, base, @fmtBuffer, capital)
-    Stdout.WriteCstr(ptr)
+    cstr := FmtUint(value, base, @fmtBuffer, capital)
+    Stdout.WriteCstr(cstr)
 }
 
 Print_float(value: f64, base: u8 = 10, precision: u8 = 4, capital: bool = true) {
     const fmtBuffer: [50]char
-    ptr := FmtFloat(value, base, @fmtBuffer, precision, capital)
-    Stdout.WriteCstr(ptr)
+    cstr := FmtFloat(value, base, @fmtBuffer, precision, capital)
+    Stdout.WriteCstr(cstr)
 }
 
 struct Stdout {}
@@ -73,7 +73,7 @@ Stdout WriteChar(ch: char) {
     __clib_printChar(ch)
 }
 
-Stdout WriteCstr(cstr: *char) {
+Stdout WriteCstr(cstr: c_str) {
     __clib_printCStr(cstr)
 }
 
@@ -81,14 +81,14 @@ Stdout WriteStr(str: [@]char) {
     __clib_printSoulStr(str as *char, str.len)
 }
 
-FmtUint(n: uint, base: u8, buffer: [@]char, capital: bool): *char {
+FmtUint(n: uint, base: u8, buffer: [@]char, capital: bool): c_str {
     __clib_fmtUint(n as c_uint, base, buffer as *char, capital)
 }
 
-FmtInt(n: int, base: u8, buffer: [@]char, capital: bool): *char {
+FmtInt(n: int, base: u8, buffer: [@]char, capital: bool): c_str {
     __clib_fmtInt(n as c_int, base, buffer as *char, capital)
 }
 
-FmtFloat(n: f64, base: u8, buffer: [@]char, precision: u8, capital: bool): *char {
+FmtFloat(n: f64, base: u8, buffer: [@]char, precision: u8, capital: bool): c_str {
     __clib_fmtFloat(n, base, buffer as *char, precision, capital)
 }

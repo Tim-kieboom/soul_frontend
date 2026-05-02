@@ -69,11 +69,25 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
         };
 
-        let external = match string_literal.as_str() {
+        let normal_string = match string_literal {
+            soul_utils::StringLiteral::Normal(val) => val,
+            other => {
+                let tag = other.to_tag().expect("is not normal so should have tag");
+                return Err(SoulError::new(
+                    format!(
+                        "expected normal string_literal of language name but got {tag:?} string_literl",
+                    ),
+                    SoulErrorKind::InvalidIdent,
+                    Some(self.token().span),
+                ));
+            }
+        };
+
+        let external = match normal_string.as_str() {
             "C" => ExternLanguage::C,
             _ => {
                 return Err(SoulError::new(
-                    format!("language {} is not supported", string_literal),
+                    format!("language {} is not supported", normal_string),
                     SoulErrorKind::InvalidIdent,
                     Some(self.token().span),
                 ));

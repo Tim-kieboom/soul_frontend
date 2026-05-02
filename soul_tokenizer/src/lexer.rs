@@ -1,10 +1,7 @@
 use std::{iter::Peekable, str::Chars};
 
 use soul_utils::{
-    error::{SoulError, SoulErrorKind, SoulResult},
-    span::ModuleId,
-    span::Span,
-    symbool_kind::SymbolKind,
+    StringLiteral, StringTag, error::{SoulError, SoulErrorKind, SoulResult}, span::{ModuleId, Span}, symbool_kind::SymbolKind
 };
 
 use crate::{
@@ -135,12 +132,18 @@ impl<'a> Lexer<'a> {
         start_line: usize,
         start_offset: usize,
     ) -> SoulResult<TokenKind> {
+        
+        if let Some(tag) = self.try_get_string_tag(char) {
+            let string = self.get_string_literal(start_line, start_offset, Some(tag))?;
+            return Ok(TokenKind::StringLiteral(string))
+        }
+
         Ok(match char {
             '\n' | '\r' => {
                 self.next_char();
                 TokenKind::EndLine
             }
-            '"' => TokenKind::StringLiteral(self.get_string(start_line, start_offset)?),
+            '"' => TokenKind::StringLiteral(self.get_string_literal(start_line, start_offset, None)?),
             '\'' => match self.try_get_char_literal(start_line, start_offset)? {
                 Some(char) => TokenKind::CharLiteral(char),
                 None => TokenKind::Unknown('\''),
@@ -153,6 +156,17 @@ impl<'a> Lexer<'a> {
                 TokenKind::Unknown(char)
             }
         })
+    }
+
+    fn try_get_string_tag(&mut self, char: char) -> Option<StringTag> {
+        
+        match StringTag::from_char(char) {
+            Some(tag) if self.peek_char() == Some('"') => {
+                self.next_char();
+                Some(tag)
+            }
+            _ => None,
+        }
     }
 
     fn is_negative_number(&mut self, symbol: SymbolKind) -> bool {
@@ -229,6 +243,18 @@ impl<'a> Lexer<'a> {
         Ok(Some(char))
     }
 
+    fn get_string_literal(&mut self, start_line: usize, start_offset: usize, possible_tag: Option<StringTag>) -> SoulResult<StringLiteral> {
+        let string = self.get_string(start_line, start_offset)?;
+        let tag = match possible_tag {
+            Some(val) => val,
+            None => return Ok(StringLiteral::Normal(string)),
+        };
+
+        Ok(match tag {
+            StringTag::CStr => StringLiteral::CStr(string),
+        })
+    }
+
     fn get_string(&mut self, start_line: usize, start_offset: usize) -> SoulResult<String> {
         let mut cstring = String::new();
         let mut backslash = false;
@@ -258,7 +284,7 @@ impl<'a> Lexer<'a> {
         }
 
         Err(SoulError::new(
-            "cString does not have an end qoute",
+            "StringLiteral does not have an end qoute",
             SoulErrorKind::InvalidEscapeSequence,
             Some(self.new_span(start_line, start_offset)),
         ))

@@ -2,6 +2,8 @@
 
 // ---------------- #Math ----------------      
 
+// ---------------- #Math ----------------      
+
 #define __POW(ty) ty __clib_pow_##ty(ty a, ty b) { \
     return (ty)pow((f64)a, (f64)b);                \
 }

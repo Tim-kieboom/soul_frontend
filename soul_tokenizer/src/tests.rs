@@ -1,9 +1,13 @@
-use soul_utils::symbool_kind::SymbolKind;
+use soul_utils::{IdAlloc, ModuleId, symbool_kind::SymbolKind};
 
 use crate::{TokenKind, lexer::Lexer, token::Number};
 
+fn module_id() -> ModuleId {
+    ModuleId::error()
+}
+
 fn lexer_to_vec(input: &str) -> Vec<TokenKind> {
-    let mut lexer = Lexer::new(input);
+    let mut lexer = Lexer::new(input, module_id());
     let mut tokens = Vec::new();
 
     loop {
@@ -107,7 +111,7 @@ fn skip_line_comments() {
 
 #[test]
 fn span_tracking_advances_lines() {
-    let mut lexer = Lexer::new("foo\nbar");
+    let mut lexer = Lexer::new("foo\nbar", module_id());
 
     let foo = lexer.next_token().unwrap();
     let bar = lexer.next_token().unwrap();

@@ -100,6 +100,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         type_args: &Vec<TypeId>,
     ) -> String {
         const SEPARATOR: &str = "_";
+        if name.as_str() == "main" {
+            return name.to_string()
+        }
 
         let mut sb = String::new();
         sb.write_fmt(format_args!("F{}___", id.index())).expect("no fmt error");

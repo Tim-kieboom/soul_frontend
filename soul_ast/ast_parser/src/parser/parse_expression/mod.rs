@@ -4,14 +4,7 @@ use ast::{
 };
 use soul_tokenizer::{Number, Token, TokenKind};
 use soul_utils::{
-    Ident,
-    error::{SoulError, SoulErrorKind, SoulResult},
-    precedence::Precedence,
-    soul_error_internal,
-    soul_names::{AccessType, KeyWord, Operator, TypeModifier},
-    span::{Span, Spanned},
-    symbool_kind::SymbolKind,
-    try_result::{ToResult, TryError},
+    Ident, StringLiteral, error::{SoulError, SoulErrorKind, SoulResult}, precedence::Precedence, soul_error_internal, soul_names::{AccessType, KeyWord, Operator, TypeModifier}, span::{Span, Spanned}, symbool_kind::SymbolKind, try_result::{ToResult, TryError}
 };
 
 use crate::parser::{
@@ -173,7 +166,10 @@ impl<'a, 'f> Parser<'a, 'f> {
                     TokenKind::StringLiteral(val) => val,
                     _ => unreachable!(),
                 };
-                Expression::new_literal(Literal::Str(string), token.span)
+                match string {
+                    StringLiteral::CStr(string) => Expression::new_literal(Literal::Cstr(string), token.span),
+                    StringLiteral::Normal(string) => Expression::new_literal(Literal::Str(string), token.span),
+                }
             }
             TokenKind::Number(num) => {
                 let number = match num {

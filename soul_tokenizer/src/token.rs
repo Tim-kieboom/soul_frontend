@@ -1,6 +1,6 @@
 use anyhow::Result;
-use soul_utils::{soul_names::PrimitiveTypes, span::Span, symbool_kind::SymbolKind};
-use std::fmt::Write;
+use soul_utils::{StringLiteral, soul_names::PrimitiveTypes, span::Span, symbool_kind::SymbolKind};
+use std::fmt::{Debug, Write};
 
 /// A single token containing its kind and source span information.
 #[derive(Debug, Clone, PartialEq)]
@@ -29,7 +29,7 @@ pub enum TokenKind {
     /// Symbol/operator token with associated kind.
     Symbol(SymbolKind),
     /// String literal, e.g. `"hello"`.
-    StringLiteral(String),
+    StringLiteral(StringLiteral),
 }
 impl TokenKind {
     /// Checks if this token marks the end of a source line.
@@ -77,10 +77,10 @@ impl TokenKind {
             TokenKind::Number(number) => _ = number.inner_display(sb)?,
             TokenKind::EndFile => sb.push_str(Self::END_FILE_STR),
             TokenKind::EndLine => sb.push_str(Self::END_LINE_STR),
-            TokenKind::Unknown(char) => write!(sb, "Unknown('{char}')")?,
-            TokenKind::Ident(ident) => write!(sb, "\"{ident}\"")?,
-            TokenKind::CharLiteral(char) => write!(sb, "char('{char}')")?,
-            TokenKind::StringLiteral(str) => write!(sb, "str(\"{str}\")")?,
+            TokenKind::Unknown(char) => write!(sb, "Unknown({char:?})")?,
+            TokenKind::Ident(ident) => write!(sb, "{ident:?}")?,
+            TokenKind::CharLiteral(char) => write!(sb, "char({char:?})")?,
+            TokenKind::StringLiteral(str) => write!(sb, "str({str:?})")?,
             TokenKind::Symbol(symbool_kind) => write!(sb, "'{}'", symbool_kind.as_str())?,
         };
         Ok(sb.len().saturating_sub(old))
@@ -98,7 +98,7 @@ impl TokenKind {
                 .expect("no write error"),
             TokenKind::CharLiteral(_) => "char(".len() + 3 + "')".len(),
             TokenKind::Symbol(symbol_kind) => "\"".len() + symbol_kind.as_str().len() + "\"".len(),
-            TokenKind::StringLiteral(str) => "str(\"".len() + str.len() + "\")".len(),
+            TokenKind::StringLiteral(str) => "str(\"".len() + str.display_len() + "\")".len(),
         }
     }
 

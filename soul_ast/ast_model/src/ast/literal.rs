@@ -11,6 +11,7 @@ pub enum Literal {
     Bool(bool),
     Char(char),
     Str(String),
+    Cstr(String),
 }
 
 /// The type of a literal value.
@@ -22,6 +23,7 @@ pub enum LiteralType {
     Bool,
     Char,
     Str,
+    Cstr,
 }
 
 impl Literal {
@@ -34,6 +36,7 @@ impl Literal {
             Literal::Bool(_) => LiteralType::Bool,
             Literal::Char(_) => LiteralType::Char,
             Literal::Str(_) => LiteralType::Str,
+            Literal::Cstr(_) => LiteralType::Cstr,
         }
     }
 
@@ -66,6 +69,7 @@ impl Literal {
             Literal::Bool(val) => format!("{}", val),
             Literal::Char(char) => format!("{:?}", char),
             Literal::Str(str) => format!("{:?}", str),
+            Literal::Cstr(str) => format!("c{:?}", str),
         }
     }
 
@@ -77,6 +81,7 @@ impl Literal {
             Literal::Bool(_) => PrimitiveTypes::Boolean,
             Literal::Char(_) => PrimitiveTypes::Char,
             Literal::Str(text) => return TypeResult::Str(text.len() as u64),
+            Literal::Cstr(text) => return TypeResult::Cstr(text.len() as u64),
         })
     }
 }
@@ -92,6 +97,7 @@ impl Debug for Literal {
             Literal::Bool(val) => write!(f, "{val}"),
             Literal::Char(val) => write!(f, "{:?}", val),
             Literal::Str(val) => write!(f, "{:?}", val),
+            Literal::Cstr(val) => write!(f, "{:?}", val),
         }
     }
 }
@@ -106,6 +112,7 @@ impl LiteralType {
             LiteralType::Bool => 1,
             LiteralType::Char => 1,
             LiteralType::Str => 1,
+            LiteralType::Cstr => 1,
         }
     }
 
@@ -123,6 +130,7 @@ impl LiteralType {
 
         match self {
             LiteralType::Str => format!("{LITERAL} {}", "str"),
+            LiteralType::Cstr => format!("{LITERAL} {}", "c_str"),
             LiteralType::Char => format!("{LITERAL} {}", PrimitiveTypes::Char.as_str()),
             LiteralType::Bool => format!("{LITERAL} {}", PrimitiveTypes::Boolean.as_str()),
             LiteralType::Int => format!("{LITERAL} {}", PrimitiveTypes::UntypedInt.as_str()),
@@ -135,4 +143,5 @@ impl LiteralType {
 pub enum TypeResult {
     Primitive(PrimitiveTypes),
     Str(u64),
+    Cstr(u64),
 }

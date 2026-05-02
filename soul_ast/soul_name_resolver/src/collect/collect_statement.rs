@@ -179,7 +179,7 @@ fn owner_hint_from_expression(
             Literal::Float(_) => PrimitiveTypes::Float64,
             Literal::Bool(_) => PrimitiveTypes::Boolean,
             Literal::Char(_) => PrimitiveTypes::Char,
-            Literal::Str(_) => return None,
+            Literal::Str(_) | Literal::Cstr(_) => return None,
         })),
         ExpressionKind::FunctionCall(function_call) => {
             let owner_kind = function_call

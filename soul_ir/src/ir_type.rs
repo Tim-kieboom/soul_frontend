@@ -132,6 +132,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             PrimitiveTypes::None => return None,
 
             PrimitiveTypes::Char => self.default_char_type.into(),
+            PrimitiveTypes::CStr => self.context.ptr_type(AddressSpace::default()).into(),
 
             PrimitiveTypes::Int8 | PrimitiveTypes::Uint8 | PrimitiveTypes::Char8 => {
                 self.context.i8_type().into()
