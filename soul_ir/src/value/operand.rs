@@ -23,6 +23,15 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         generics: &GenericSubstitute,
     ) -> SoulResult<IrOperand<'a>> {
         Ok(match &operand.kind {
+            OperandKind::Nullptr => {
+                
+                let ptr = self.context.ptr_type(AddressSpace::default());
+                let value = ptr.const_null().into();
+                IrOperand {
+                    value,
+                    info: crate::OperandInfo::new_loaded(operand.ty, ptr.into()),
+                }
+            }
             OperandKind::Sizeof(ty) => {
                 let Sizeof { size, alignment: _ } = self.sizeof(*ty, generics)?;
                 let value = self.context.i32_type().const_int(size as u64, false).into();

@@ -75,6 +75,10 @@ impl ThirType {
             false
         }
     }
+
+    pub const fn is_ptr(&self) -> bool {
+        matches!(self.kind, ThirTypeKind::Pointer(_))
+    }
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

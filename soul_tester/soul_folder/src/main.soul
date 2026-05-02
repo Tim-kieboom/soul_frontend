@@ -2,11 +2,15 @@ import (
     crate.Io
     crate.Test
     crate.Lib.SubLib
+    crate.Fs.{File, Open, Close, READ_ONLY}
     crate.Lib.{this, Variable, A, B as b}
 )
 
 main() {
     Test.RunTests()
+
+    file := File.Open(c"test.txt", READ_ONLY)
+    File.Close(file)
 
     infer := 1
     mut num = A()

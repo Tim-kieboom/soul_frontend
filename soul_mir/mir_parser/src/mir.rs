@@ -287,6 +287,7 @@ pub enum OperandKind {
     },
 
     Sizeof(TypeId),
+    Nullptr,
     None,
 }
 

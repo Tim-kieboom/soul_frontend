@@ -395,6 +395,9 @@ impl<'a> MirDisplayer<'a> {
         const CONST: bool = false;
 
         match &operand.kind {
+            mir::OperandKind::Nullptr => {
+                self.push_str("null/*as ptr*/");
+            }
             mir::OperandKind::Sizeof(ty) => {
                 self.display_type(*ty);
                 self.push_str(".typeof");

@@ -114,6 +114,15 @@ pub enum SoulErrorKind {
     InvalidEscapeSequence,
 }
 
+impl SoulErrorKind {
+    pub fn display(&self) -> String {
+        match self {
+            Self::InternalError(path, line) => format!("InternalError({path}:{line}:{})", 0),
+            other => format!("{other:?}"),
+        }
+    }
+}
+
 /// An error that occurred during parsing or compilation.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct SoulError {

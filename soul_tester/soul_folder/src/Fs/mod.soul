@@ -1,0 +1,32 @@
+extern "C" fopen_s(file: &*none, path: c_str, mode: c_str): c_int
+extern "C" fclose(file: *none)
+extern "C" __clib_nullptr(): *none
+
+struct File {
+    cFilePtr: *none
+}
+
+const READ_ONLY = 0
+const READ_UPDATE = 1
+const WRITE_NEW_FILE = 2
+
+File Open(path: c_str, mode: int): File {
+
+    mut cFilePtr: *none = null
+    code := fopen_s(&cFilePtr, path, modeToCstr(mode as u8))
+    File{cFilePtr}
+}
+
+File Close(self: File) {
+    fclose(self.cFilePtr)
+}
+
+modeToCstr(mode: u8): c_str {
+    mut cstr = c"r"
+    if mode == 1 {
+        cstr = c"w"
+    } else if mode == 2 {
+        cstr = c"r+"
+    }
+    cstr
+}

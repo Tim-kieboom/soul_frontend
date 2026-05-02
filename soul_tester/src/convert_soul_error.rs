@@ -65,7 +65,7 @@ fn to_message(
     }
     sb.push_str("-----");
     color(level_color(&level), &mut sb, &config);
-    sb.push_str(&format!("{:?}", err.kind));
+    sb.push_str(&err.kind.display());
     color_default(&mut sb, &config);
     sb.push_str("-----\n");
 

@@ -40,10 +40,13 @@ impl<'a> MirContext<'a> {
             } => self
                 .lower_struct_constructor(values, *ty, value_type)
                 .pass(is_end),
-            hir::ExpressionKind::Literal(literal) => mir::Operand::new(
-                value_type,
-                mir::OperandKind::Comptime(literal.clone().to_complex()),
-            ),
+            hir::ExpressionKind::Literal(literal) => {
+                
+                mir::Operand::new(
+                    value_type,
+                    mir::OperandKind::Comptime(literal.clone().to_complex()),
+                )
+            },
             hir::ExpressionKind::Local(local_id) => {
                 let local_type = self.local_type(*local_id);
                 let id = match self.local_remap.get(*local_id) {
@@ -133,11 +136,16 @@ impl<'a> MirContext<'a> {
             }
 
             hir::ExpressionKind::Null => {
-                self.log_error(soul_error_internal!(
-                    "ExpressionKind::Null  not yet impl in mir",
-                    Some(span)
-                ));
-                mir::Operand::new(value_type, mir::OperandKind::None)
+                let type_id = self.expression_type(value_id);
+                if self.id_to_type(type_id).is_ptr() {
+                    mir::Operand::new(value_type, mir::OperandKind::Nullptr)
+                } else {
+                    self.log_error(soul_error_internal!(
+                        "ExpressionKind::Null  not yet impl in mir",
+                        Some(span)
+                    ));
+                    mir::Operand::new(value_type, mir::OperandKind::None)
+                }
             }
             hir::ExpressionKind::Function(_) => {
                 self.log_error(soul_error_internal!(
