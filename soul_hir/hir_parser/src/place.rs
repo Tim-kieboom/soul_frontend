@@ -31,14 +31,17 @@ impl<'a> HirContext<'a> {
             } => {
                 let local = match resolved.and_then(|node_id| self.find_local_by_node_id(node_id)) {
                     Some(val) => val,
-                    None => {
-                        self.log_error(SoulError::new(
-                            format!("'{}' not found in scope", ident.as_str()),
-                            SoulErrorKind::NotFoundInScope,
-                            Some(ident.span),
-                        ));
-                        LocalId::error()
-                    }
+                    None => match self.find_local(ident) {
+                        Some(val) => val,
+                        None => {
+                            self.log_error(SoulError::new(
+                                format!("'{}' not found in scope", ident.as_str()),
+                                SoulErrorKind::NotFoundInScope,
+                                Some(ident.span),
+                            ));
+                            LocalId::error()
+                        }
+                    },
                 };
                 Place::new(id, PlaceKind::Local(local), ident.span)
             }

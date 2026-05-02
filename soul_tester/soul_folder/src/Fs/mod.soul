@@ -2,25 +2,25 @@ import (
     ./.Io
 )
 
-extern "C" fopen_s(file: &*none, path: c_str, mode: c_str): c_int
 extern "C" fclose(file: *none)
 extern "C" __clib_nullptr(): *none
-extern "C" __clib_mallocString(len: uint): [*]char
 extern "C" __clib_fileLen(file: *none): int
-extern "C" __clib_filePrint(file: *none)
+extern "C" __clib_filePrint(file: *none): bool
+extern "C" __clib_mallocString(len: uint): [*]char
+extern "C" fopen_s(file: &*none, path: c_str, mode: c_str): c_int
 
 struct File {
     cFilePtr: *none
 }
 
-const READ_ONLY = 0
-const READ_UPDATE = 1
-const WRITE_NEW_FILE = 2
+const READ_ONLY = 0 as u8
+const READ_UPDATE = 1 as u8
+const WRITE_NEW_FILE = 2 as u8
 
-File Open(path: c_str, mode: int): File {
+File Open(path: c_str, mode: u8): File {
 
     mut cFilePtr: *none = null
-    code := fopen_s(&cFilePtr, path, modeToCstr(mode as u8))
+    code := fopen_s(&cFilePtr, path, modeToCstr(mode))
     Io.Print("tried to open file got code: ")
     Io.Println_int(code as int)
     File{cFilePtr}
@@ -31,7 +31,7 @@ File ReadLen(@this): int {
     __clib_fileLen(ptr)
 }
 
-File Print(@this) {
+File Print(@this): bool {
     ptr := this.cFilePtr
     __clib_filePrint(ptr)
 }

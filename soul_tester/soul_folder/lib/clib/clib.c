@@ -12,21 +12,10 @@ SoulArray __clib_mallocString(uint len) {
 // ---------------- #File ----------------      
 
 i64 __clib_fileLen(FILE* file) {
-    if (fseek(file, 0, SEEK_END) != 0) {
-        fclose(file);
-        return -1;
-    }
-    i64 len = ftell(file);
-    fseek(file, 0, SEEK_SET);
-    return len;
-}
-
-i64 __clib_fileToStr(FILE* file, uint fileLen, /*out*/SoulStr* str) {
-    fseek(file, 0, SEEK_SET);
-    if(fileLen < 0 || str->len+1 < fileLen) 
-        return -1;
-
-    return fread(str->ptr, 1, fileLen, file);
+    if (fseek(file, 0L, SEEK_END) != 0) return -1;
+    i64 size = ftell(file);
+    rewind(file);
+    return size;
 }
 
 bool __clib_filePrint(FILE* file) {
@@ -36,8 +25,11 @@ bool __clib_filePrint(FILE* file) {
     }
 
     char* buffer = malloc(len);
+    if(!buffer) {
+        return false;
+    }
     fread(buffer, 1, len, file);
-    printf("%*s", len, buffer);
+    printf("%*s", (int)len, buffer);
     return true;
 }
 

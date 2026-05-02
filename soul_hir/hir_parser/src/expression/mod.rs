@@ -271,15 +271,18 @@ impl<'a> HirContext<'a> {
 
         let local = match self.find_local_by_node_id(node_id) {
             Some(val) => val,
-            None => {
-                #[cfg(debug_assertions)]
-                self.log_error(soul_error_internal!(
-                    format!("local('{}') not found", ident.as_str()),
-                    Some(ident.span)
-                ));
+            None => match self.find_local(ident) {
+                Some(val) => val,
+                None => {
+                    #[cfg(debug_assertions)]
+                    self.log_error(soul_error_internal!(
+                        format!("local('{}') not found", ident.as_str()),
+                        Some(ident.span)
+                    ));
 
-                LocalId::error()
-            }
+                    LocalId::error()
+                }
+            },
         };
 
         let place_id = self.id_generator.alloc_place();
