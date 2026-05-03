@@ -6,13 +6,16 @@ import (
     crate.Lib.{this, Variable, A, B as b}
 )
 
+enum Tag {
+    One,
+    Two,
+    Three,
+}
+
 main() {
-    b()
     Test.RunTests()
 
-    file := File.Open(c"test.txt", READ_ONLY)
-    file.Print()
-    file.Close()
+    tag := Tag.One
 
     infer := 1
     mut num = A()

@@ -7,7 +7,7 @@ use soul_utils::{
     vec_map::VecMapIndex,
 };
 
-use crate::{FieldId, GenericId, InferTypeId, InferTypesMap, StructId, TypeId, TypesMap};
+use crate::{EnumId, FieldId, GenericId, InferTypeId, InferTypesMap, StructId, TypeId, TypesMap};
 
 pub type HirType = InnerType<HirTypeKind>;
 pub type InferType = InnerType<InferTypeId>;
@@ -169,7 +169,7 @@ pub enum HirTypeKind {
     Pointer(LazyTypeId),
     Optional(LazyTypeId),
     Generic(GenericId),
-    Struct(StructId),
+    CustomType(CustomTypeId),
 
     Error,
 }
@@ -187,14 +187,13 @@ impl HirTypeKind {
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum CreatedTypes {
+pub enum CustomTypeId {
     Struct(StructId),
+    Enum(EnumId),
 }
-impl CreatedTypes {
+impl CustomTypeId {
     pub fn to_hir_kind(self) -> HirTypeKind {
-        match self {
-            CreatedTypes::Struct(struct_id) => HirTypeKind::Struct(struct_id),
-        }
+        HirTypeKind::CustomType(self)
     }
 }
 
@@ -212,6 +211,12 @@ impl TypeId {
     pub fn to_lazy(self) -> LazyTypeId {
         LazyTypeId::Known(self)
     }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Enum {
+    pub name: Ident,
+    pub variants: Vec<Ident>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -301,10 +306,20 @@ impl DisplayType for HirTypeKind {
                     Ok(())
                 }
             },
-            HirTypeKind::Struct(id) => {
-                match types.id_to_struct(*id) {
-                    Some(val) => sb.push_str(val.name.as_str()),
-                    None => sb.push_str("<error>"),
+            HirTypeKind::CustomType(id) => {
+                match *id {
+                    CustomTypeId::Struct(struct_id) => {
+                        match types.id_to_struct(struct_id) {
+                            Some(val) => sb.push_str(val.name.as_str()),
+                            None => sb.push_str("<error>"),
+                        }
+                    }
+                    CustomTypeId::Enum(enum_id) => {
+                        match types.id_to_enum(enum_id) {
+                            Some(val) => sb.push_str(val.name.as_str()),
+                            None => sb.push_str("<error>"),
+                        } 
+                    }
                 }
                 Ok(())
             }
@@ -352,7 +367,10 @@ impl HirTypeKind {
             HirTypeKind::Pointer(_) => "<pointer>",
             HirTypeKind::Generic(_) => "<generic>",
             HirTypeKind::Optional(_) => "<optional>",
-            HirTypeKind::Struct(_) => "<struct>",
+            HirTypeKind::CustomType(id) => match id {
+                CustomTypeId::Enum(_) => "<enum>",
+                CustomTypeId::Struct(_) => "<struct>",
+            },
             HirTypeKind::Primitive(primitive) => primitive.as_str(),
         }
     }

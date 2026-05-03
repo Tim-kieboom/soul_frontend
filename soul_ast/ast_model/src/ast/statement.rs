@@ -45,6 +45,7 @@ pub enum StatementKind {
     ExternalFunction(Function),
 
     Struct(Struct),
+    Enum(Enum),
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -68,6 +69,13 @@ pub struct Struct {
     pub generics: Vec<Generic>,
     pub fields: Vec<Field>,
     pub defined_in: Option<ModuleId>,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Enum {
+    pub name: Ident,
+    pub id: Option<NodeId>,
+    pub variants: Vec<Ident>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

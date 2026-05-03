@@ -25,7 +25,10 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
                 return self.lower_type(ty, generics);
             }
-            ThirTypeKind::Struct(id) => self.lower_struct(id, generics).map(|s| s.into())?,
+            ThirTypeKind::CustomTypes(id) => match id {
+                hir::CustomTypeId::Struct(struct_id) => self.lower_struct(struct_id, generics).map(|s| s.into())?,
+                hir::CustomTypeId::Enum(_) => todo!(),
+            },
             ThirTypeKind::Primitive(primitive_types) => {
                 match self.lower_primitive_type(primitive_types) {
                     Some(val) => val,

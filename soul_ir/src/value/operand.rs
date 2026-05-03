@@ -352,7 +352,10 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 };
                 self.sizeof(ty, generics)?
             }
-            ThirTypeKind::Struct(struct_id) => self.sizeof_struct(struct_id, generics)?,
+            ThirTypeKind::CustomTypes(id) => match id {
+                hir::CustomTypeId::Struct(struct_id) => self.sizeof_struct(struct_id, generics)?,
+                hir::CustomTypeId::Enum(_) => todo!(),
+            },
         })
     }
 

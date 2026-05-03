@@ -58,6 +58,13 @@ impl<'a> NameResolver<'a> {
                     self.header_insert_struct(obj.clone());
                 }
             }
+            StatementKind::Enum(obj) => {
+                self.declare_enum(obj);
+
+                if self.current.in_global {
+                    self.header_insert_enum(obj.clone());
+                }
+            }
             StatementKind::Variable(variable) => {
                 self.check_variable_name(&variable.name);
                 let id = if let Some(id) = self.flat_check_variable(&variable.name) {

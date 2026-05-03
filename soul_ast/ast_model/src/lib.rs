@@ -1,10 +1,7 @@
 use std::collections::HashMap;
 
 use soul_utils::{
-    ids::{FunctionId, IdGenerator},
-    span::ModuleId,
-    vec_map::VecMap,
-    vec_set::VecSet,
+    Ident, ids::{FunctionId, IdGenerator}, span::ModuleId, vec_map::VecMap, vec_set::VecSet
 };
 
 mod ast;
@@ -50,8 +47,29 @@ pub struct Module {
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct HeaderEntry {
     pub variable: Option<EntryKind<NodeId>>,
-    pub struct_type: Option<EntryKind<Struct>>,
+    pub struct_type: Option<EntryKind<CustomType>>,
     pub function: Option<EntryKind<FunctionId>>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum CustomType {
+    Struct(Struct),
+    Enum(Enum),
+}
+impl CustomType {
+    pub fn id(&self) -> Option<NodeId> {
+        match self {
+            CustomType::Struct(obj) => obj.id,
+            CustomType::Enum(obj) => obj.id,
+        }
+    }
+
+    pub fn name(&self) -> &Ident {
+        match self {
+            CustomType::Struct(obj) => &obj.name,
+            CustomType::Enum(obj) => &obj.name,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
@@ -121,7 +139,7 @@ pub struct DeclareStore {
     /// The main function (entry point), if defined.
     pub main_function: Option<FunctionId>,
     /// All structs declarations, indexed by their ID.
-    structs: VecMap<NodeId, (Struct, ModuleId)>,
+    custom_types: VecMap<NodeId, (CustomType, ModuleId)>,
     /// All function declarations, indexed by their ID.
     functions: VecMap<FunctionId, (FunctionSignature, ModuleId)>,
     /// Variable type information, indexed by node ID.
@@ -134,19 +152,33 @@ impl DeclareStore {
     pub const fn new() -> Self {
         Self {
             main_function: None,
-            structs: VecMap::const_default(),
+            custom_types: VecMap::const_default(),
             functions: VecMap::const_default(),
             variable_type: VecMap::const_default(),
             variable_owner_hint: VecMap::const_default(),
         }
     }
 
-    pub fn iter_structs(&self) -> impl Iterator<Item = &(Struct, ModuleId)> {
-        self.structs.values()
+    pub fn iter_structs(&self) -> impl Iterator<Item = &(CustomType, ModuleId)> {
+        self.custom_types.values()
     }
 
-    pub fn find_struct_by_name(&self, name: &str) -> Option<&(Struct, ModuleId)> {
-        self.structs.values().find(|(s, _)| s.name.as_str() == name)
+    pub fn find_struct_by_name(&self, name: &str) -> Option<(&Struct, ModuleId)> {
+        self.custom_types
+            .values()
+            .filter_map(|(ty, id)| match ty {
+                CustomType::Struct(obj) => Some((obj, *id)),
+                _ => None
+            }).find(|(obj, _)| obj.name.as_str() == name)
+    }
+
+    pub fn find_enum_by_name(&self, name: &str) -> Option<(&Enum, ModuleId)> {
+        self.custom_types
+            .values()
+            .filter_map(|(ty, id)| match ty {
+                CustomType::Enum(obj) => Some((obj, *id)),
+                _ => None
+            }).find(|(obj, _)| obj.name.as_str() == name)
     }
 
     /// Retrieves a function by its ID.
@@ -210,16 +242,37 @@ impl DeclareStore {
 
     /// try Inserts a struct into the store.
     pub fn try_insert_struct(&mut self, index: NodeId, obj: &Struct, module: ModuleId) {
-        if self.structs.contains(index) {
+        if self.custom_types.contains(index) {
             return;
         }
 
-        self.structs.insert(index, (obj.clone(), module));
+        self.custom_types.insert(index, (CustomType::Struct(obj.clone()), module));
+    }
+
+    pub fn try_insert_enum(&mut self, index: NodeId, obj: &Enum, module: ModuleId) {
+        if self.custom_types.contains(index) {
+            return;
+        }
+
+        self.custom_types.insert(index, (CustomType::Enum(obj.clone()), module));
     }
 
     /// Gets the type of a struct by its node ID.
-    pub fn get_struct(&self, index: NodeId) -> Option<&(Struct, ModuleId)> {
-        self.structs.get(index)
+    pub fn get_struct(&self, index: NodeId) -> Option<(&Struct, ModuleId)> {
+        let (CustomType::Struct(obj), module_id) = self.custom_types.get(index)? else {
+            return None
+        };
+
+        Some((obj, *module_id))
+    }
+
+    /// Gets the type of a struct by its node ID.
+    pub fn get_enum(&self, index: NodeId) -> Option<(&Enum, ModuleId)> {
+        let (CustomType::Enum(obj), module_id) = self.custom_types.get(index)? else {
+            return None
+        };
+
+        Some((obj, *module_id))
     }
 
     /// Gets the type of a variable by its node ID.

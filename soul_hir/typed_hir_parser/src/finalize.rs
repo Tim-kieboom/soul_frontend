@@ -112,7 +112,7 @@ impl<'a> TypedHirContext<'a> {
         }
 
         for (id, struct_) in out.structs.entries() {
-            let struct_type = HirTypeKind::Struct(id);
+            let struct_type = HirTypeKind::CustomType(hir::CustomTypeId::Struct(id));
             if let Err(err) =
                 self.check_for_recursive_inclusion(&out, &struct_type, &struct_.fields)
             {
@@ -142,7 +142,7 @@ impl<'a> TypedHirContext<'a> {
                     let kown = self.to_known(*lazy_type_id);
                     self.check_recursive_type(this, kown, span)?
                 }
-                HirTypeKind::Struct(struct_id) => {
+                HirTypeKind::CustomType(hir::CustomTypeId::Struct(struct_id)) => {
                     self.check_recursive_type(this, field_type, span)?;
 
                     let Some(struct_) = thir_map.id_to_struct(*struct_id) else {
@@ -158,7 +158,9 @@ impl<'a> TypedHirContext<'a> {
                         self.log_error(err);
                     }
                 }
-
+                HirTypeKind::CustomType(hir::CustomTypeId::Enum(_)) => {
+                    self.check_recursive_type(this, field_type, span)?
+                }
                 HirTypeKind::Type
                 | HirTypeKind::None
                 | HirTypeKind::Error
@@ -212,7 +214,7 @@ impl<'a> TypedHirContext<'a> {
                 kind,
             },
 
-            HirTypeKind::Struct(id) => ThirTypeKind::Struct(id),
+            HirTypeKind::CustomType(id) => ThirTypeKind::CustomTypes(id),
             HirTypeKind::Generic(id) => ThirTypeKind::Generic(id),
 
             HirTypeKind::Error => ThirTypeKind::Error,

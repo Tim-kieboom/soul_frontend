@@ -70,11 +70,12 @@ impl<'a, 'f> Parser<'a, 'f> {
                 ));
             }
 
+            KeyWord::Enum => self.parse_enum().try_err()?,
+
             KeyWord::New
             | KeyWord::For
             | KeyWord::Dyn
             | KeyWord::Fall
-            | KeyWord::Enum
             | KeyWord::Copy
             | KeyWord::Impl
             | KeyWord::Trait
@@ -105,4 +106,5 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         TryOk(kind)
     }
+
 }

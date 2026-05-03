@@ -1,9 +1,7 @@
 use std::path::PathBuf;
 
 use ast::{
-    AbtractSyntaxTree, AstModuleStore, DeclareStore, EntryKind, Function, Struct, Variable,
-    meta_data::AstMetadata,
-    scope::{NodeId, ScopeValue},
+    AbtractSyntaxTree, AstModuleStore, CustomType, DeclareStore, EntryKind, Enum, Function, Struct, Variable, meta_data::AstMetadata, scope::{NodeId, ScopeValue}
 };
 use soul_utils::{
     CrateStore, Ident, crate_store::CrateContext, error::{SoulError, SoulErrorKind}, ids::{FunctionId, IdAlloc, IdGenerator}, sementic_level::{ModuleStore, SementicFault}, soul_error_internal, span::{ModuleId, Span}
@@ -122,7 +120,7 @@ impl<'a> NameResolver<'a> {
         })
     }
 
-    fn header_insert_struct(&mut self, obj: Struct) -> Option<EntryKind<Struct>> {
+    fn header_insert_enum(&mut self, obj: Enum) -> Option<EntryKind<CustomType>> {
         let is_public = self.is_name_public(obj.name.as_str());
         let header = &mut self.modules[self.current.module].header;
         let entry = match header.get_mut(obj.name.as_str()) {
@@ -131,9 +129,46 @@ impl<'a> NameResolver<'a> {
         };
 
         entry.struct_type.replace(EntryKind {
-            value: obj,
+            value: ast::CustomType::Enum(obj),
             is_public,
         })
+    }
+
+    fn header_insert_struct(&mut self, obj: Struct) -> Option<EntryKind<CustomType>> {
+        let is_public = self.is_name_public(obj.name.as_str());
+        let header = &mut self.modules[self.current.module].header;
+        let entry = match header.get_mut(obj.name.as_str()) {
+            Some(val) => val,
+            None => header.entry(obj.name.to_string()).or_default(),
+        };
+
+        entry.struct_type.replace(EntryKind {
+            value: ast::CustomType::Struct(obj),
+            is_public,
+        })
+    }
+
+    fn resolve_enum(
+        faults: &mut CrateContext,
+        store: &mut DeclareStore,
+        current: &Current,
+        obj: &Enum,
+    ) {
+        let id = match obj.id {
+            Some(val) => val,
+            None => {
+                Self::static_log_error(
+                    faults,
+                    soul_error_internal!(
+                        format!("Enum: '{}' node_id is None", obj.name.as_str()),
+                        None
+                    ),
+                );
+                return;
+            }
+        };
+
+        store.try_insert_enum(id, obj, current.module);
     }
 
     fn resolve_struct(

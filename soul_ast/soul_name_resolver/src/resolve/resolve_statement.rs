@@ -35,6 +35,9 @@ impl<'a> NameResolver<'a> {
             StatementKind::Struct(obj) => {
                 Self::resolve_struct(self.context, self.store, &self.current, obj);
             }
+            StatementKind::Enum(obj) => {
+                Self::resolve_enum(self.context, self.store, &self.current, obj);
+            }
             StatementKind::Variable(variable) => {
                 if let Some(value) = &mut variable.initialize_value {
                     self.resolve_expression(value);

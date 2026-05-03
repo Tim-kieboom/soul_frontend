@@ -1,4 +1,4 @@
-use ast::{Field, Statement, Struct};
+use ast::{Enum, Field, Statement, Struct};
 use soul_utils::{
     error::{SoulError, SoulResult},
     soul_names::{KeyWord, TypeModifier},
@@ -7,11 +7,43 @@ use soul_utils::{
 
 use crate::parser::{
     Parser,
-    parse_utils::{COLON, CURLY_CLOSE, CURLY_OPEN, STAMENT_END_TOKENS},
+    parse_utils::{COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, STAMENT_END_TOKENS},
 };
 
 impl<'f, 'a> Parser<'f, 'a> {
-    pub fn parse_struct(&mut self) -> SoulResult<Statement> {
+    pub(crate) fn parse_enum(&mut self) -> SoulResult<Statement> {
+        let start_span = self.token().span;
+        self.expect_ident(KeyWord::Enum.as_str())?;
+        let name = self.try_bump_consume_ident()?;
+        
+        let mut variant = vec![];
+        self.expect(&CURLY_OPEN)?;
+        loop {
+            self.skip_end_lines();
+            if self.current_is(&CURLY_CLOSE) {
+                break;
+            }
+            
+            variant.push(
+                self.try_bump_consume_ident()?
+            );
+
+            self.skip_end_lines();
+            if !self.current_is(&COMMA) {
+                break;
+            }
+            self.bump();
+        }
+        self.skip_end_lines();
+        self.expect(&CURLY_CLOSE)?;
+
+        Ok(Statement::new(
+            ast::StatementKind::Enum(Enum{ id: None, name, variants: variant }), 
+            self.span_combine(start_span),
+        ))
+    }
+
+    pub(crate) fn parse_struct(&mut self) -> SoulResult<Statement> {
         let start_span = self.token().span;
         self.expect_ident(KeyWord::Struct.as_str())?;
 

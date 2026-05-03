@@ -1,7 +1,6 @@
 use ast::AbtractSyntaxTree;
 use hir::{
-    Binary, DisplayType, ExpressionId, FieldId, FunctionBody, HirTree, HirType, HirTypeKind,
-    InferTypeId, LazyTypeId, LocalId, LocalKind, StructId, TypeId, Unary,
+    Binary, DisplayType, ExpressionId, FieldId, FunctionBody, HirTree, HirType, HirTypeKind, InferTypeId, LazyTypeId, LocalId, LocalKind, StructId, TypeId, Unary
 };
 use soul_utils::{
     ids::{FunctionId, IdAlloc},

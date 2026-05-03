@@ -192,8 +192,8 @@ impl InferTable {
             HirTypeKind::None
             | HirTypeKind::Type
             | HirTypeKind::Error
-            | HirTypeKind::Struct(_)
             | HirTypeKind::Generic(_)
+            | HirTypeKind::CustomType(_)
             | HirTypeKind::Primitive(_) => return Ok(hir::LazyTypeId::Known(ty)),
 
             HirTypeKind::Pointer(id) => {

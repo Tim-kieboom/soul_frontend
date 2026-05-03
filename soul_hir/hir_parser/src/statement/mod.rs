@@ -9,6 +9,7 @@ use soul_utils::{
 use crate::HirContext;
 mod block;
 mod function;
+mod custom_types;
 
 impl<'a> HirContext<'a> {
     pub fn lower_global(&mut self, module_id: ModuleId, global: &ast::Statement) {
@@ -39,6 +40,10 @@ impl<'a> HirContext<'a> {
             }
             ast::StatementKind::Struct(object) => {
                 self.lower_struct(object);
+                return;
+            }
+            ast::StatementKind::Enum(_) => {
+                // already added in lower_module
                 return;
             }
             ast::StatementKind::Variable(variable) => {
@@ -99,6 +104,9 @@ impl<'a> HirContext<'a> {
             ast::StatementKind::Struct(object) => {
                 self.add_struct(object);
                 return None;
+            }
+            ast::StatementKind::Enum(_) => {
+                todo!()
             }
             ast::StatementKind::Variable(variable) => {
                 hir::StatementKind::Variable(self.lower_variable(variable))
@@ -178,6 +186,19 @@ impl<'a> HirContext<'a> {
             hir::Struct {
                 name,
                 fields: vec![],
+            },
+        );
+    }
+
+    pub(crate) fn add_enum(&mut self, object: &ast::Enum) {
+        let name = object.name.clone();
+
+        let enum_id = self.tree.info.types.alloc_enum();
+        self.insert_enum(
+            enum_id,
+            hir::Enum {
+                name,
+                variants: object.variants.clone(),
             },
         );
     }

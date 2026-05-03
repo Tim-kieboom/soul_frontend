@@ -1,11 +1,10 @@
 use std::path::PathBuf;
 
 use ast::{
-    Block, FunctionSignature, NamedTupleElement, NamedTupleType, Struct, VarTypeKind,
-    scope::{
+    Block, Enum, FunctionSignature, NamedTupleElement, NamedTupleType, Struct, VarTypeKind, scope::{
         NodeId, Scope, ScopeBuilder, ScopeId, ScopeTypeEntry, ScopeTypeEntryKind, ScopeValue,
         ScopeValueKind,
-    },
+    }
 };
 use ast_parser::parse_module;
 use soul_tokenizer::to_token_stream;
@@ -125,6 +124,33 @@ impl<'a> NameResolver<'a> {
             trait_parent: None,
             span: name.span,
             kind: ScopeTypeEntryKind::Struct,
+        };
+
+        let old_entry = self
+            .current_scope_mut()
+            .insert_types(name.as_str(), scope_type);
+
+        if old_entry.is_some() {
+            self.log_error(SoulError::new(
+                format!("type of name {} already exists in scope", name.as_str()),
+                SoulErrorKind::AlreadyFoundInScope,
+                Some(name.span),
+            ));
+        }
+
+        id
+    }
+
+    fn declare_enum(&mut self, obj: &mut Enum) -> NodeId {
+        let id = self.alloc_node();
+        obj.id = Some(id);
+
+        let name = &obj.name;
+        let scope_type = ScopeTypeEntry {
+            node_id: id,
+            trait_parent: None,
+            span: name.span,
+            kind: ScopeTypeEntryKind::Enum,
         };
 
         let old_entry = self

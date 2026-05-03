@@ -1,10 +1,7 @@
 use std::fmt::{Arguments, Write};
 
 use ast::{
-    AbtractSyntaxTree, Assignment, Block, ElseKind, Expression, Function, FunctionSignature,
-    Generic, IfArm, Import, SoulType, Statement, StatementKind, Struct, TypeKind, UseBlock,
-    Variable,
-    scope::{NodeId, ScopeId},
+    AbtractSyntaxTree, Assignment, Block, ElseKind, Enum, Expression, Function, FunctionSignature, Generic, IfArm, Import, SoulType, Statement, StatementKind, Struct, TypeKind, UseBlock, Variable, scope::{NodeId, ScopeId}
 };
 use soul_utils::{
     ids::FunctionId,
@@ -175,6 +172,7 @@ impl<'a> AstDisplayer<'a> {
         self.display_statement_tag(statement, statement.node.get_id());
 
         match &statement.node {
+            ast::StatementKind::Enum(obj) => self.display_enum(obj),
             ast::StatementKind::Struct(obj) => self.display_struct(obj),
             ast::StatementKind::Import(import) => self.display_import(import),
             ast::StatementKind::Variable(variable) => self.display_variable(variable),
@@ -440,6 +438,22 @@ impl<'a> AstDisplayer<'a> {
             self.push_str(": ");
             self.display_typekind(&field.ty.kind);
             self.push('\n');
+        }
+        self.pop_scope();
+        self.display_depth();
+        self.push_str("}\n");
+    }
+
+    fn display_enum(&mut self, obj: &Enum) {
+        self.push_str(KeyWord::Enum.as_str());
+        self.push(' ');
+        self.push_str(obj.name.as_str());
+        self.push_str(" {\n");
+        self.push_scope();
+        for name in &obj.variants {
+            self.display_depth();
+            self.push_str(name.as_str());
+            self.push_str(",\n");
         }
         self.pop_scope();
         self.display_depth();
@@ -714,7 +728,8 @@ impl<'a> AstDisplayer<'a> {
                 self.push_str(" = ");
                 self.push_str(assignment.right.node.variant_str());
             }
-            StatementKind::Struct(_)
+            StatementKind::Enum(_)
+            | StatementKind::Struct(_)
             | StatementKind::Import(_)
             | StatementKind::Function(_)
             | StatementKind::UseBlock(_)
@@ -785,6 +800,7 @@ trait StatementKindHelper {
 impl StatementKindHelper for StatementKind {
     fn get_id(&self) -> Option<StatementIdKind> {
         match self {
+            StatementKind::Enum(obj) => obj.id.to_statement_kind(),
             StatementKind::Struct(obj) => obj.id.to_statement_kind(),
             StatementKind::Import(import) => import.id.to_statement_kind(),
             StatementKind::Variable(variable) => variable.node_id.to_statement_kind(),

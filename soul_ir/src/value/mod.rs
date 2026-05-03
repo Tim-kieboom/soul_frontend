@@ -29,7 +29,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             RvalueKind::Unary { operator, value } => self.lower_unary(value, operator, generics),
             RvalueKind::StackAlloc(ty) => self.lower_stack_alloc(*ty, generics),
             RvalueKind::Aggregate { struct_type, body } => {
-                self.lower_struct_contructor(*struct_type, ty, body, generics)
+                self.lower_struct_contructor(ty, *struct_type, body, generics)
             }
         }
     }
@@ -125,7 +125,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
     pub(crate) fn expect_type_can_field(&self, base_type: TypeId) -> SoulResult<()> {
         let hir_type = self.get_type(base_type)?;
         match &hir_type.kind {
-            ThirTypeKind::Struct(_) => Ok(()),
+            ThirTypeKind::CustomTypes(_) => Ok(()),
             _ => Err(soul_error_internal!(
                 format!(
                     "trying to access field but base type '{}' is not struct like",
@@ -160,8 +160,8 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
     fn lower_struct_contructor(
         &self,
-        struct_id: StructId,
         ty: TypeId,
+        struct_id: StructId,
         body: &AggregateBody,
         generics: &GenericSubstitute,
     ) -> SoulResult<IrOperand<'a>> {

@@ -7,8 +7,7 @@ use soul_utils::{
 };
 
 use crate::{
-    GenericId, InferTypeId, StructId, TypeId,
-    hir_type::{HirType, InferType, Struct},
+    EnumId, Enum, GenericId, InferTypeId, StructId, TypeId, hir_type::{HirType, InferType, Struct}
 };
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -16,21 +15,25 @@ pub struct TypesMap {
     pub array_struct: StructId,
     types: BiMap<TypeId, HirType>,
     structs: VecMap<StructId, Struct>,
+    enums: VecMap<EnumId, Enum>,
     generics: VecMap<GenericId, String>,
 
     type_alloc: IdGenerator<TypeId>,
+    enum_alloc: IdGenerator<EnumId>,
     struct_alloc: IdGenerator<StructId>,
     generic_alloc: IdGenerator<GenericId>,
 }
 impl Default for TypesMap {
     fn default() -> Self {
         Self {
-            array_struct: StructId::error(),
+            array_struct: IdAlloc::error(),
 
             types: Default::default(),
+            enums: Default::default(),
             structs: Default::default(),
             generics: Default::default(),
             type_alloc: Default::default(),
+            enum_alloc: Default::default(),
             struct_alloc: Default::default(),
             generic_alloc: Default::default(),
         }
@@ -69,6 +72,22 @@ impl TypesMap {
         self.structs.insert(id, obj);
     }
 
+    pub fn insert_enum(&mut self, id: EnumId, obj: Enum) {
+        self.enums.insert(id, obj);
+    }
+
+    pub fn alloc_enum(&mut self) -> EnumId {
+        self.enum_alloc.alloc()
+    }
+
+    pub fn id_to_enum(&self, id: EnumId) -> Option<&Enum> {
+        self.enums.get(id)
+    }
+
+    pub fn id_to_enum_mut(&mut self, id: EnumId) -> Option<&mut Enum> {
+        self.enums.get_mut(id)
+    }
+
     pub fn id_to_struct(&self, id: StructId) -> Option<&Struct> {
         self.structs.get(id)
     }
@@ -101,6 +120,10 @@ impl TypesMap {
 
     pub fn clone_struct_alloc(&self) -> IdGenerator<StructId> {
         self.struct_alloc.clone()
+    }
+
+    pub fn clone_enum_alloc(&self) -> IdGenerator<EnumId> {
+        self.enum_alloc.clone()
     }
 
     pub fn clone_generic_alloc(&self) -> IdGenerator<GenericId> {

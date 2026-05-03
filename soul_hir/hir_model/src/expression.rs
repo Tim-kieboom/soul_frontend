@@ -124,8 +124,8 @@ pub enum ExpressionKind {
 
     StructConstructor {
         ty: StructId,
-        values: Vec<(Ident, ExpressionId)>,
         defaults: bool,
+        values: Vec<(Ident, ExpressionId)>,
     },
 
     Sizeof(LazyTypeId),

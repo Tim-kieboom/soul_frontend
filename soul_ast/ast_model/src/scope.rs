@@ -385,6 +385,7 @@ pub struct ScopeTypeEntry {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ScopeTypeEntryKind {
+    Enum,
     Struct,
     LifeTime,
     GenericType,

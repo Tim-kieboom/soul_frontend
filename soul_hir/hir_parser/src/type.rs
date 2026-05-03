@@ -1,5 +1,5 @@
 use ast::Stub;
-use hir::{GenericId, HirType, HirTypeKind, LazyTypeId, StructId, TypeId, TypesMap};
+use hir::{EnumId, GenericId, HirType, HirTypeKind, LazyTypeId, StructId, TypeId, TypesMap};
 use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},
     soul_names::{PrimitiveTypes, TypeModifier},
@@ -112,8 +112,18 @@ impl<'a> HirContext<'a> {
         self.scopes
             .last_mut()
             .expect("should have scope")
-            .created_type
-            .insert(name, hir::CreatedTypes::Struct(id));
+            .custom_types
+            .insert(name, hir::CustomTypeId::Struct(id));
+    }
+
+    pub(crate) fn insert_enum(&mut self, id: EnumId, obj: hir::Enum) {
+        let name = obj.name.to_string();
+        self.tree.info.types.insert_enum(id, obj);
+        self.scopes
+            .last_mut()
+            .expect("should have scope")
+            .custom_types
+            .insert(name, hir::CustomTypeId::Enum(id));
     }
 
     pub(crate) fn new_infer_type(
@@ -172,7 +182,7 @@ fn resolve_stub(
 
 pub(crate) fn find_created_type(scopes: &[Scope], name: &str) -> Option<HirTypeKind> {
     for store in scopes.iter().rev() {
-        if let Some(ty) = store.created_type.get(name).copied() {
+        if let Some(ty) = store.custom_types.get(name).copied() {
             return Some(ty.to_hir_kind());
         }
     }

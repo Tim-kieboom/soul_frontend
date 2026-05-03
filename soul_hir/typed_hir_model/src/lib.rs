@@ -1,9 +1,8 @@
 use std::vec;
 
-use ast::ArrayKind;
+use ast::{ArrayKind};
 use hir::{
-    BlockId, ExpressionId, FieldId, GenericId, LazyTypeId, LocalId, PlaceId, StatementId, StructId,
-    TypeId,
+    BlockId, CustomTypeId, EnumId, ExpressionId, FieldId, GenericId, LazyTypeId, LocalId, PlaceId, StatementId, StructId, TypeId
 };
 use soul_utils::{
     bimap::BiMap,
@@ -27,6 +26,7 @@ pub struct ThirTypesMap {
     pub array_struct: StructId,
     pub types: BiMap<TypeId, ThirType>,
     pub structs: VecMap<StructId, Struct>,
+    pub enums: VecMap<EnumId, Enum>,
     pub generics: VecMap<GenericId, String>,
 }
 impl ThirTypesMap {
@@ -41,6 +41,7 @@ impl ThirTypesMap {
                     modifier: None,
                 },
             )]),
+            enums: VecMap::const_default(),
             structs: VecMap::const_default(),
             generics: VecMap::const_default(),
         }
@@ -51,6 +52,9 @@ impl ThirTypesMap {
     }
     pub fn id_to_struct(&self, id: StructId) -> Option<&Struct> {
         self.structs.get(id)
+    }
+    pub fn id_to_enum(&self, id: EnumId) -> Option<&Enum> {
+        self.enums.get(id)
     }
     pub fn id_to_generic(&self, id: GenericId) -> Option<&str> {
         self.generics.get(id).map(|s| s.as_str())
@@ -91,8 +95,7 @@ pub enum ThirTypeKind {
     Pointer(TypeId),
     Optional(TypeId),
     Generic(GenericId),
-    Struct(StructId),
-
+    CustomTypes(CustomTypeId),
     Error,
 }
 
@@ -102,6 +105,13 @@ pub struct Struct {
     pub name: String,
     pub fields: Vec<Field>,
     pub packed: bool,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Enum {
+    pub id: EnumId,
+    pub name: String,
+    pub variants: Vec<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

@@ -226,11 +226,11 @@ impl<'a> NameResolver<'a> {
                     );
                 }
 
-                let id = match obj.id {
+                let id = match obj.id() {
                     Some(val) => val,
                     None => {
                         self.log_error(soul_error_internal!(
-                            format!("Struct: '{}' node_id is None", obj.name.as_str()),
+                            format!("Struct: '{}' node_id is None", obj.name().as_str()),
                             None
                         ));
                         return;
@@ -254,7 +254,10 @@ impl<'a> NameResolver<'a> {
                     );
                 }
 
-                Self::resolve_struct(self.context, self.store, &self.current, obj);
+                match obj {
+                    ast::CustomType::Struct(struct_) => Self::resolve_struct(self.context, self.store, &self.current, struct_),
+                    ast::CustomType::Enum(_) => todo!("impl enum in collect items"),
+                }
             }
 
             if let Some(EntryKind {

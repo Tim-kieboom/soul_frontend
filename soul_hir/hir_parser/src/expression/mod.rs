@@ -1,6 +1,6 @@
 use ast::{ArrayContructor, Literal};
 use ast::{AsTypeCast, VarTypeKind, scope::NodeId};
-use hir::{ExpressionId, HirType, HirTypeKind, LocalId, Place, PlaceKind, Terminator};
+use hir::{CustomTypeId, ExpressionId, HirType, HirTypeKind, LocalId, Place, PlaceKind, Terminator};
 use soul_utils::soul_error_internal;
 use soul_utils::{
     Ident,
@@ -161,7 +161,7 @@ impl<'a> HirContext<'a> {
         };
 
         let struct_type = match &hir_type.kind {
-            HirTypeKind::Struct(val) => *val,
+            HirTypeKind::CustomType(CustomTypeId::Struct(val)) => *val,
             _ => {
                 self.log_error(SoulError::new(
                     "should be struct type",

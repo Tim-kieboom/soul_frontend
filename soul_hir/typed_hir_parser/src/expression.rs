@@ -594,7 +594,7 @@ impl<'a> TypedHirContext<'a> {
 
         let hir_type = self.id_to_type(ty);
         match &hir_type.kind {
-            HirTypeKind::Struct(id) => self
+            HirTypeKind::CustomType(hir::CustomTypeId::Struct(id)) => self
                 .types
                 .id_to_struct(*id)
                 .ok_or(soul_error_internal!(format!("{:?} not found", id), None)),
