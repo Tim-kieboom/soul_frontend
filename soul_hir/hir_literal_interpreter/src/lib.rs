@@ -76,7 +76,8 @@ impl<'a> LiteralInterpreter<'a> {
             | hir::ExpressionKind::Cast { .. }
             | hir::ExpressionKind::While { .. }
             | hir::ExpressionKind::InnerRawStackArray { .. }
-            | hir::ExpressionKind::ExternalCall { .. } => None,
+            | hir::ExpressionKind::ExternalCall { .. }
+            | hir::ExpressionKind::EnumVariant { .. } => None,
 
             hir::ExpressionKind::StructConstructor { ty, values, .. } => {
                 self.interpret_struct_contructor(*ty, values, expression_id)

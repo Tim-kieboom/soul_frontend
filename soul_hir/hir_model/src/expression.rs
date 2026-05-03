@@ -1,4 +1,4 @@
-use crate::{BlockId, ExpressionId, LocalId, PlaceId, StructId, TypeId, hir_type::LazyTypeId};
+use crate::{BlockId, EnumId, ExpressionId, LocalId, PlaceId, StructId, TypeId, hir_type::LazyTypeId};
 use ast::{BinaryOperator, Literal, UnaryOperator};
 use soul_utils::{Ident, ids::FunctionId};
 
@@ -126,6 +126,11 @@ pub enum ExpressionKind {
         ty: StructId,
         defaults: bool,
         values: Vec<(Ident, ExpressionId)>,
+    },
+
+    EnumVariant {
+        enum_id: EnumId,
+        variant_name: Ident,
     },
 
     Sizeof(LazyTypeId),

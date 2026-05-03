@@ -111,6 +111,17 @@ impl<'a> TypedHirContext<'a> {
             );
         }
 
+        for (id, enum_) in self.hir.info.types.enums_entries() {
+            out.enums.insert(
+                id,
+                typed_hir::Enum {
+                    id,
+                    name: enum_.name.to_string(),
+                    variants: enum_.variants.iter().map(|v| v.as_str().to_string()).collect(),
+                },
+            );
+        }
+
         for (id, struct_) in out.structs.entries() {
             let struct_type = HirTypeKind::CustomType(hir::CustomTypeId::Struct(id));
             if let Err(err) =

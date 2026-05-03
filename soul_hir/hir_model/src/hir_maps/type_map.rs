@@ -100,6 +100,10 @@ impl TypesMap {
         self.structs.entries()
     }
 
+    pub fn enums_entries(&self) -> impl Iterator<Item = (EnumId, &Enum)> {
+        self.enums.entries()
+    }
+
     pub fn types_keys(&self) -> impl Iterator<Item = TypeId> {
         self.types.keys()
     }

@@ -168,6 +168,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     .kind
                 {
                     ThirTypeKind::Primitive(primitive_types) => primitive_types.to_primitive_size(),
+                    ThirTypeKind::CustomTypes(hir::CustomTypeId::Enum(enum_id)) => self.get_enum_size(enum_id),
                     _ => {
                         return Err(soul_error_internal!(
                             "literal should be primitive type",

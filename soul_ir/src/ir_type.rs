@@ -1,9 +1,9 @@
 use hir::{StructId, TypeId};
 use inkwell::{
     AddressSpace,
-    types::{BasicType, BasicTypeEnum, StructType},
+    types::{BasicType, BasicTypeEnum, IntType, StructType},
 };
-use soul_utils::{error::SoulResult, soul_error_internal, soul_names::PrimitiveTypes};
+use soul_utils::{error::SoulResult, soul_error_internal, soul_names::{PrimitiveSize, PrimitiveTypes}};
 use typed_hir::ThirTypeKind;
 
 use crate::{GenericSubstitute, LlvmBackend, OperandInfo};
@@ -27,7 +27,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             }
             ThirTypeKind::CustomTypes(id) => match id {
                 hir::CustomTypeId::Struct(struct_id) => self.lower_struct(struct_id, generics).map(|s| s.into())?,
-                hir::CustomTypeId::Enum(_) => todo!(),
+                hir::CustomTypeId::Enum(enum_id) => self.lower_enum(enum_id).into(),
             },
             ThirTypeKind::Primitive(primitive_types) => {
                 match self.lower_primitive_type(primitive_types) {
@@ -128,6 +128,41 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         let ty = self.context.struct_type(fields.as_slice(), object.packed);
         self.structs.insert(id, ty);
         Ok(ty)
+    }
+
+    pub(crate) fn lower_enum(
+        &self,
+        id: hir::EnumId,
+    ) -> IntType<'a> {
+        match self.get_enum_size(id) {
+            PrimitiveSize::Bit8 => self.context.i8_type(),
+            PrimitiveSize::Bit16 => self.context.i16_type(),
+            PrimitiveSize::Bit32 => self.context.i32_type(),
+            PrimitiveSize::Bit64 => self.context.i64_type(),
+            PrimitiveSize::Bit128 => self.context.i128_type(),
+            PrimitiveSize::CIntSize => self.default_c_int_type,
+            PrimitiveSize::CharSize => self.default_char_type,
+            PrimitiveSize::IntAndPtrSize => self.default_int_type,
+        }
+    }
+
+    pub(crate) fn get_enum_size(
+        &self, 
+        id: hir::EnumId,
+    ) -> PrimitiveSize {
+        if let Some(object) = self.types.types_map.id_to_enum(id) {
+            let variant_count = object.variants.len() as u64;
+            let bit_width = variant_count.next_power_of_two().max(8);
+            let ty = match bit_width {
+                1..=8 => PrimitiveSize::Bit8,
+                9..=16 => PrimitiveSize::Bit16,
+                17..=32 => PrimitiveSize::Bit32,
+                _ => PrimitiveSize::Bit64,
+            };
+            ty
+        } else {
+            PrimitiveSize::Bit32
+        }
     }
 
     fn lower_primitive_type(&self, primitive: PrimitiveTypes) -> Option<BasicTypeEnum<'a>> {

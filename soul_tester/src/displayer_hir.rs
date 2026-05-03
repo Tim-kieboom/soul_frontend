@@ -407,6 +407,15 @@ impl<'a> HirDisplayer<'a> {
                 self.push_str(function_name);
                 self.push_str("*/");
             }
+            hir::ExpressionKind::EnumVariant {
+                enum_id,
+                variant_name,
+            } => {
+                let enum_name = self.hir.info.types.id_to_enum(*enum_id).map(|e| e.name.as_str()).unwrap_or("<error>");
+                self.push_str(enum_name);
+                self.push('.');
+                self.push_str(&variant_name.to_string());
+            }
         };
     }
 

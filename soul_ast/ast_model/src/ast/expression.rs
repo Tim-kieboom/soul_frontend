@@ -105,6 +105,7 @@ pub struct FieldAccess {
     pub id: Option<NodeId>,
     pub object: BoxExpression,
     pub field: Ident,
+    pub is_enum_variant: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -254,6 +255,7 @@ impl Expression {
                 id: None,
                 object: Box::new(object),
                 field,
+                is_enum_variant: false,
             }),
             span,
         )

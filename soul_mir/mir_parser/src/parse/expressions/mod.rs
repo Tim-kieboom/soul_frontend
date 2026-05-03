@@ -1,4 +1,5 @@
-use hir::{Binary, ExpressionId, StructId, TypeId, Unary};
+use ast::Literal;
+use hir::{Binary, ComplexLiteral, CustomTypeId, ExpressionId, StructId, TypeId, Unary};
 use hir_literal_interpreter::ToComplex;
 use soul_utils::{
     Ident,
@@ -40,6 +41,13 @@ impl<'a> MirContext<'a> {
             } => self
                 .lower_struct_constructor(values, *ty, value_type)
                 .pass(is_end),
+            hir::ExpressionKind::EnumVariant { enum_id: _, variant_name } => {
+                let index = self.lower_enum_variant_index(value_type, variant_name)
+                    .unwrap_or(0);
+
+                let value = ComplexLiteral::Basic(Literal::Int(index));
+                mir::Operand::new(value_type, mir::OperandKind::Comptime(value))
+            }
             hir::ExpressionKind::Literal(literal) => {
                 
                 mir::Operand::new(
@@ -242,6 +250,22 @@ impl<'a> MirContext<'a> {
         };
 
         EndBlock::new(operand, is_end)
+    }
+
+    fn lower_enum_variant_index(&self, value_type: TypeId, variant_name: &Ident) -> Option<i128> {
+        let hir_type = self.hir_response.typed.types_map.id_to_type(value_type)?;
+
+        match &hir_type.kind {
+            ThirTypeKind::CustomTypes(CustomTypeId::Enum(enum_id)) => {
+                let enum_ = self.hir_response.hir.info.types.id_to_enum(*enum_id)?;
+                enum_
+                    .variants
+                    .iter()
+                    .position(|v| v.as_str() == variant_name.as_str())
+                    .map(|i| i as i128)
+            }
+            _ => None,
+        }
     }
 
     // Lowers a function call, including casting literal arguments to match parameter types.

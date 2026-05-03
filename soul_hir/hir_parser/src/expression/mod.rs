@@ -1,6 +1,6 @@
-use ast::{ArrayContructor, Literal};
+use ast::{ArrayContructor, FieldAccess, Literal};
 use ast::{AsTypeCast, VarTypeKind, scope::NodeId};
-use hir::{CustomTypeId, ExpressionId, HirType, HirTypeKind, LocalId, Place, PlaceKind, Terminator};
+use hir::{CustomTypeId, EnumId, ExpressionId, HirType, HirTypeKind, LocalId, Place, PlaceKind, Terminator};
 use soul_utils::soul_error_internal;
 use soul_utils::{
     Ident,
@@ -42,14 +42,7 @@ impl<'a> HirContext<'a> {
             ast::ExpressionKind::While(ast_while) => self.lower_while(id, ast_while),
             ast::ExpressionKind::As(as_type_cast) => self.lower_cast(id, as_type_cast),
             ast::ExpressionKind::Deref { id: _, inner } => self.lower_deref(id, inner),
-            ast::ExpressionKind::FieldAccess(field_access) => {
-                let place = self.lower_field(field_access, span);
-                hir::Expression {
-                    id,
-                    ty: self.new_infer_type(vec![], None, span),
-                    kind: hir::ExpressionKind::Load(place),
-                }
-            }
+            ast::ExpressionKind::FieldAccess(field_access) => self.lower_field_access(id, field_access, span),
             ast::ExpressionKind::FunctionCall(function_call) => self.lower_call(id, function_call),
             ast::ExpressionKind::Literal((_node_id, literal)) => self.lower_literal(id, literal),
             ast::ExpressionKind::Variable {
@@ -90,6 +83,44 @@ impl<'a> HirContext<'a> {
         };
 
         self.insert_expression(id, value)
+    }
+
+    fn lower_field_access(&mut self, id: hir::ExpressionId, field_access: &FieldAccess, span: Span) -> hir::Expression {
+        if field_access.is_enum_variant {
+            let variant_name = field_access.field.clone();
+            let enum_id = self.tree.info.types.enums_entries()
+                .find(|(_, e)| e.variants.iter().any(|v| v.as_str() == variant_name.as_str()))
+                .map(|(id, _)| id)
+                .unwrap_or_else(|| {
+                    EnumId::error()
+                });
+
+            if enum_id == EnumId::error() {
+                self.log_error(SoulError::new(
+                    "Enum not found", 
+                    SoulErrorKind::NotFoundInScope, 
+                    Some(span),
+                ));
+            }
+
+            let variant = hir::Expression {
+                id,
+                ty: self.new_infer_type(vec![], None, span),
+                kind: hir::ExpressionKind::EnumVariant {
+                    enum_id,
+                    variant_name,
+                },
+            };
+
+            return variant;
+        }
+
+        let place = self.lower_field(field_access, span);
+        hir::Expression {
+            id,
+            ty: self.new_infer_type(vec![], None, span),
+            kind: hir::ExpressionKind::Load(place),
+        }
     }
 
     fn desugar_array_contructor(

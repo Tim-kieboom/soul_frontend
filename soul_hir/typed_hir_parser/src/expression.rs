@@ -46,6 +46,9 @@ impl<'a> TypedHirContext<'a> {
                 values,
                 defaults: _,
             } => self.infer_struct_constructor(value.ty, values, span),
+            hir::ExpressionKind::EnumVariant { enum_id, variant_name } => {
+                self.infer_enum_variant(*enum_id, variant_name, span)
+            }
             hir::ExpressionKind::DeRef(inner) => self.infer_deref(*inner, span),
             hir::ExpressionKind::Function(function) => self.functions[*function].to_lazy(),
             hir::ExpressionKind::Ref { place, mutable } => self.infer_ref(*place, *mutable, span),
@@ -572,6 +575,27 @@ impl<'a> TypedHirContext<'a> {
         }
 
         ty
+    }
+
+    fn infer_enum_variant(
+        &mut self,
+        enum_id: hir::EnumId,
+        variant_name: &Ident,
+        _span: Span,
+    ) -> LazyTypeId {
+        if let Some(enum_def) = self.types.id_to_enum(enum_id) {
+            if enum_def.variants.iter().any(|v| v.as_str() == variant_name.as_str()) {
+                let enum_type = HirType::new(HirTypeKind::CustomType(hir::CustomTypeId::Enum(enum_id)));
+                return self.add_type(enum_type).to_lazy();
+            }
+        }
+        
+        self.log_error(SoulError::new(
+            format!("variant '{}' not found in enum", variant_name.as_str()),
+            SoulErrorKind::NotFoundInScope,
+            Some(variant_name.span),
+        ));
+        LazyTypeId::error()
     }
 
     fn new_infer_optional(&mut self, span: Span) -> LazyTypeId {

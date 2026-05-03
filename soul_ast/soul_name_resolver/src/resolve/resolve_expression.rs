@@ -1,4 +1,5 @@
 use ast::{Expression, ExpressionKind, ElseKind, FieldAccess};
+use soul_utils::error::{SoulError, SoulErrorKind};
 
 use crate::NameResolver;
 
@@ -101,7 +102,40 @@ impl<'a> NameResolver<'a> {
             return;
         }
 
+        if self.resolve_enum_variant(field_access) {
+            return;
+        }
+
         self.resolve_expression(&mut field_access.object);
+    }
+
+    fn resolve_enum_variant(&mut self, field_access: &mut FieldAccess) -> bool {
+        let object_ident = match &field_access.object.node {
+            ExpressionKind::Variable { ident, .. } => ident,
+            _ => return false,
+        };
+
+        let Some((enum_def, _)) = self.store.find_enum_by_name(object_ident.as_str()) else {
+            return false;
+        };
+
+        if !enum_def.variants.iter().any(|v| v.as_str() == field_access.field.as_str()) {
+            self.log_error(SoulError::new(
+                format!(
+                    "variant '{}' not found in enum '{}'",
+                    field_access.field.as_str(),
+                    object_ident.as_str()
+                ),
+                SoulErrorKind::NotFoundInScope,
+                Some(field_access.field.span),
+            ));
+            return true;
+        }
+
+        field_access.id = Some(enum_def.id.unwrap());
+        field_access.is_enum_variant = true;
+
+        true
     }
 
     fn resolve_module_variable(&mut self, field_access: &mut FieldAccess) -> bool {

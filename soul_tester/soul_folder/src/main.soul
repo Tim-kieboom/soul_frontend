@@ -15,7 +15,8 @@ enum Tag {
 main() {
     Test.RunTests()
 
-    tag := Tag.One
+    mut tag := Tag.One
+    tag = Tag.Two
 
     infer := 1
     mut num = A()
