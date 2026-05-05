@@ -114,6 +114,22 @@ pub struct ExternalRef {
     pub module_path: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum Intrinsic {
+    InFile,
+    InLine,
+}
+
+impl Intrinsic {
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "InFile" => Some(Intrinsic::InFile),
+            "InLine" => Some(Intrinsic::InLine),
+            _ => None,
+        }
+    }
+}
+
 /// A function call expression.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FunctionCall {
@@ -128,6 +144,10 @@ pub struct FunctionCall {
     pub resolved: Option<FunctionId>,
     /// For external crate calls: (crate_name, module_path)
     pub external_ref: Option<ExternalRef>,
+    /// Compiler intrinsic if this is an intrinsic call
+    pub intrinsic: Option<Intrinsic>,
+    /// Computed intrinsic value (e.g., file path for InFile)
+    pub intrinsic_value: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

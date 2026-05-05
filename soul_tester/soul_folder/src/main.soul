@@ -6,6 +6,8 @@ import (
     crate.Lib.{this, Struct, Variable, A, B as b}
 )
 
+
+
 main() {
     Test.RunTests()
 
@@ -22,4 +24,8 @@ main() {
     num = SubLib.Constant
 
     Io.Println("hello world")
+
+    Io.Println(InFile())
+    Io.Println_int(InLine())
+    Lib.DefaultInFile()
 }

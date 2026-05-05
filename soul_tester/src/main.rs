@@ -187,11 +187,11 @@ fn run_crate_frontend(
         module_store,
         context,
         crate_store,
-        source,
+        source.clone(),
     );
     display_ast(manifest, module_store, &ast)?;
 
-    let mut hir = to_hir(&ast, &COMPILER_OPTIONS, context, crate_exports, root);
+    let mut hir = to_hir(&ast, &COMPILER_OPTIONS, context, crate_exports, root, source.clone());
     display_hir(manifest, &hir, &ast)?;
     clear_hir_type_map(&mut hir);
 

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 use ast::{AbtractSyntaxTree, Visibility, scope::NodeId};
 use hir::{
@@ -28,8 +29,9 @@ pub fn lower_hir(
     ast_context: &AbtractSyntaxTree,
     crate_exports: &CrateExports,
     root: ModuleId,
+    source_folder: PathBuf,
 ) -> HirTree {
-    let mut context = HirContext::new(faults, ast_context, crate_exports, root);
+    let mut context = HirContext::new(faults, ast_context, crate_exports, root, source_folder);
 
     context.lower_internal_structs();
     context.lower_module(root);
@@ -55,6 +57,7 @@ struct HirContext<'a> {
     pub context: &'a mut CrateContext,
     pub node_id_to_local: VecMap<NodeId, LocalId>,
     pub root_id: ModuleId,
+    pub source_folder: PathBuf,
 }
 impl<'a> HirContext<'a> {
     fn new(
@@ -62,6 +65,7 @@ impl<'a> HirContext<'a> {
         ast_context: &'a AbtractSyntaxTree,
         crate_exports: &'a CrateExports,
         root_id: ModuleId,
+        source_folder: PathBuf,
     ) -> Self {
         let mut id_generator = IdAllocalor::new(ast_context.function_generators.clone());
         let init_global_function = id_generator.alloc_function();
@@ -92,6 +96,7 @@ impl<'a> HirContext<'a> {
             },
             tree,
             root_id,
+            source_folder,
         }
     }
 

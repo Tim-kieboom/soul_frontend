@@ -73,7 +73,14 @@ fn main() {
 
     let all_exports = CrateExports::default();
     let timer = Instant::now();
-    let hir = to_hir(&ast, &COMPILER_OPTIONS, &mut context, &all_exports, root);
+    let hir = to_hir(
+        &ast, 
+        &COMPILER_OPTIONS, 
+        &mut context, 
+        &all_exports, 
+        root, 
+        project_path.clone(),
+    );
     let hir_time = timer.elapsed();
     logger.logln(format!("HIR:       {:?}", hir_time));
 

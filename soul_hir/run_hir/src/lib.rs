@@ -12,6 +12,7 @@ use soul_utils::{
 };
 use typed_hir::TypedHir;
 use typed_hir_parser::lower_typed_hir;
+use std::path::PathBuf;
 
 pub struct HirResponse {
     pub hir: HirTree,
@@ -25,8 +26,9 @@ pub fn to_hir(
     context: &mut CrateContext,
     crate_exports: &CrateExports,
     root: ModuleId,
+    source_folder: PathBuf,
 ) -> HirResponse {
-    let hir = lower_hir(context, ast_context, crate_exports, root);
+    let hir = lower_hir(context, ast_context, crate_exports, root, source_folder);
     let typed = lower_typed_hir(&hir, options, context);
 
     let literal_resolves = literal_resolve(&hir, &typed);

@@ -1,12 +1,13 @@
-use ast::FunctionKind;
+use ast::{FunctionKind, Intrinsic, Literal};
 use hir::{Expression, ExpressionId, HirType, LazyTypeId, TypeId};
 
 #[cfg(debug_assertions)]
 use soul_utils::soul_error_internal;
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
-    ids::{FunctionId, IdAlloc},
+    ids::FunctionId,
     span::Span,
+    IdAlloc,
 };
 
 use crate::HirContext;
@@ -17,6 +18,10 @@ impl<'a> HirContext<'a> {
         id: hir::ExpressionId,
         function_call: &ast::FunctionCall,
     ) -> hir::Expression {
+        if let Some(intrinsic) = function_call.intrinsic {
+            return self.lower_intrinsic(id, intrinsic, function_call.name.span, function_call.intrinsic_value.as_deref());
+        }
+
         if let Some(external_ref) = &function_call.external_ref {
             return self.lower_external_call(
                 id,
@@ -245,6 +250,35 @@ fn find_default_parameter<'a>(
 }
 
 impl<'a> HirContext<'a> {
+    fn lower_intrinsic(
+        &mut self,
+        id: hir::ExpressionId,
+        intrinsic: Intrinsic,
+        span: Span,
+        intrinsic_value: Option<&str>,
+    ) -> hir::Expression {
+        match intrinsic {
+            Intrinsic::InFile => {
+                let path_str = intrinsic_value.unwrap_or("unknown").to_string();
+                let ty = self.type_from_literal(&Literal::Str(path_str.clone()));
+                hir::Expression {
+                    id,
+                    ty: LazyTypeId::Known(ty),
+                    kind: hir::ExpressionKind::Literal(Literal::Str(path_str)),
+                }
+            }
+            Intrinsic::InLine => {
+                let line = intrinsic_value.and_then(|v| v.parse().ok()).unwrap_or(span.start_line as i128);
+                let ty = self.type_from_literal(&Literal::Int(line));
+                hir::Expression {
+                    id,
+                    ty: LazyTypeId::Known(ty),
+                    kind: hir::ExpressionKind::Literal(Literal::Int(line)),
+                }
+            }
+        }
+    }
+
     fn lower_external_call(
         &mut self,
         id: hir::ExpressionId,

@@ -189,6 +189,8 @@ impl<'a, 'f> Parser<'a, 'f> {
                 name: name.clone(),
                 callee: callee.map(|expr| Box::new(expr.clone())),
                 external_ref: None,
+                intrinsic: None,
+                intrinsic_value: None,
             },
             self.span_combine(start_span),
         ))
