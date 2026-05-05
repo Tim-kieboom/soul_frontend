@@ -3,6 +3,10 @@ name = "soul_tester"
 version = "0.1.0"
 edition = "2024"
 
+[[example]]
+name = "benchmark"
+path = "example/benchmark.rs"
+
 [features]
 # default = ["error_backtrace", "absolute_internal_error_path"]
 error_backtrace = ["soul_utils/error_backtrace"]
@@ -13,6 +17,7 @@ fern = "0.6"
 log = "0.4.29"
 anyhow = "1.0.100"
 serde_json = "1.0.148"
+chrono = "0.4"
 soul_ir = { version = "0.1.0", path = "../soul_ir" }
 serde = {version = "1.0.228", features = ["derive"]}
 inkwell = { version = "0.8", features = ["llvm16-0"] }

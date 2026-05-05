@@ -83,6 +83,20 @@ impl Paths {
 
         Ok((manifest, crate_store))
     }
+
+    pub fn load_crate_store(&self) -> CrateStore {
+        let project_dir = self.project_path();
+        let manifest_path = project_dir.join("Soul.toml");
+        let manifest = SoulToml::from_path(&manifest_path).unwrap();
+
+        let mut crate_store = CrateStore::new();
+        crate_store.insert(
+            manifest.package.name.clone(),
+            project_dir.to_path_buf(),
+            ModuleId::error(),
+        );
+        crate_store
+    }
 }
 
 fn check_pathbuf(path: &PathBuf) -> std::io::Result<()> {

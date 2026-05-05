@@ -32,7 +32,7 @@ mod displayer_ast;
 mod displayer_hir;
 mod displayer_mir;
 mod displayer_tokenizer;
-mod paths;
+pub mod paths;
 
 static PATHS: &[u8] = include_bytes!("../paths.json");
 

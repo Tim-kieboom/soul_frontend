@@ -43,16 +43,11 @@ pub(crate) struct Parser<'a, 'f> {
 }
 impl<'a, 'f> Parser<'a, 'f> {
     #[cfg(not(debug_assertions))]
-    fn new(
-        tokens: TokenStream<'a>,
-        faults: &'f mut FaultCollector,
-        source_folder: PathBuf,
-    ) -> Self {
+    fn new(tokens: TokenStream<'a>, faults: &'f mut CrateContext, path: PathBuf) -> Self {
         Self {
             tokens,
-            faults,
-            source_folder,
-            path_stack: vec![],
+            context: faults,
+            source_path: path,
             current_this: None,
         }
     }
