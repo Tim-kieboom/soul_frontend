@@ -75,7 +75,7 @@ fn main() {
     let timer = Instant::now();
     let hir = to_hir(&ast, &COMPILER_OPTIONS, &mut context, &all_exports, root);
     let hir_time = timer.elapsed();
-    logger.logln(format!("HIR:      {:?}", hir_time));
+    logger.logln(format!("HIR:       {:?}", hir_time));
 
     let timer = Instant::now();
     let mir = to_mir(&hir, &ast, &COMPILER_OPTIONS, &mut context, &all_exports, root);

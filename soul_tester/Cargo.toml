@@ -8,7 +8,7 @@ name = "benchmark"
 path = "example/benchmark.rs"
 
 [features]
-# default = ["error_backtrace", "absolute_internal_error_path"]
+default = ["error_backtrace", "absolute_internal_error_path"]
 error_backtrace = ["soul_utils/error_backtrace"]
 absolute_internal_error_path = ["soul_utils/absolute_internal_error_path"]
 
