@@ -17,9 +17,13 @@ impl<'a> HirContext<'a> {
         id: hir::ExpressionId,
         function_call: &ast::FunctionCall,
     ) -> hir::Expression {
-        
         if let Some(external_ref) = &function_call.external_ref {
-            return self.lower_external_call(id, function_call, &external_ref.crate_name, &external_ref.module_path);
+            return self.lower_external_call(
+                id,
+                function_call,
+                &external_ref.crate_name,
+                &external_ref.module_path,
+            );
         }
 
         let resolved = match function_call.resolved {

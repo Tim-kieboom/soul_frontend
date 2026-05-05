@@ -20,6 +20,7 @@ impl<'a> NameResolver<'a> {
 
     pub(crate) fn collect_scopeless_block(&mut self, block: &mut Block) {
         block.node_id = Some(self.alloc_node());
+        
         for statement in &mut block.statements {
             self.collect_statement(statement);
         }

@@ -71,9 +71,11 @@ impl<'a> HirContext<'a> {
         self.tree.info.types.array_struct = struct_id;
         // to insure struct is in compiler
         self.add_type(
-            HirType::new(hir::HirTypeKind::CustomType(CustomTypeId::Struct(struct_id))).apply_generics(vec![len_type]),
+            HirType::new(hir::HirTypeKind::CustomType(CustomTypeId::Struct(
+                struct_id,
+            )))
+            .apply_generics(vec![len_type]),
         );
         self.insert_struct(struct_id, Struct { name, fields });
     }
-
-} 
+}

@@ -24,7 +24,6 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
     ) -> SoulResult<IrOperand<'a>> {
         Ok(match &operand.kind {
             OperandKind::Nullptr => {
-                
                 let ptr = self.context.ptr_type(AddressSpace::default());
                 let value = ptr.const_null().into();
                 IrOperand {
@@ -104,12 +103,10 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             ThirTypeKind::Array {
                 kind: ArrayKind::HeapArray,
                 ..
-            } => {
-                IrOperand {
-                    value: inner.value,
-                    info: inner.info.clone(),
-                }
-            }
+            } => IrOperand {
+                value: inner.value,
+                info: inner.info.clone(),
+            },
             ThirTypeKind::Array {
                 kind: ArrayKind::StackArray(len),
                 ..
@@ -168,7 +165,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     .kind
                 {
                     ThirTypeKind::Primitive(primitive_types) => primitive_types.to_primitive_size(),
-                    ThirTypeKind::CustomTypes(hir::CustomTypeId::Enum(enum_id)) => self.get_enum_size(enum_id),
+                    ThirTypeKind::CustomTypes(hir::CustomTypeId::Enum(enum_id)) => {
+                        self.get_enum_size(enum_id)
+                    }
                     _ => {
                         return Err(soul_error_internal!(
                             "literal should be primitive type",
@@ -274,8 +273,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
                 self.new_loaded_operand(value, should_be, generics)?
             }
-            ast::Literal::Cstr(text) |
-            ast::Literal::Str(text) => {
+            ast::Literal::Cstr(text) | ast::Literal::Str(text) => {
                 let (slice_type, value) = self.const_string_slice(text.as_bytes());
                 IrOperand {
                     value: value.into(),

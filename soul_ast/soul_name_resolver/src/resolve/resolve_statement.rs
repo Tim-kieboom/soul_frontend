@@ -8,11 +8,24 @@ use soul_utils::{
 use crate::NameResolver;
 
 impl<'a> NameResolver<'a> {
-    pub fn resolve_block(&mut self, block: &mut Block) {
+    pub(super) fn resolve_block(&mut self, block: &mut Block) {
         self.try_go_to(block.scope_id);
 
         for statement in &mut block.statements {
             self.resolve_statement(statement);
+        }
+    }
+
+    pub(super) fn resolve_custom_type(&mut self, statement: &mut Statement) {
+
+        match &mut statement.node {
+            StatementKind::Struct(obj) => {
+                Self::resolve_struct(self.context, self.store, &self.current, obj);
+            }
+            StatementKind::Enum(obj) => {
+                Self::resolve_enum(self.context, self.store, &self.current, obj);
+            }
+            _ => ()
         }
     }
 

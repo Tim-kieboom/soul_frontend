@@ -1,6 +1,7 @@
 use ast::AbtractSyntaxTree;
 use hir::{
-    Binary, DisplayType, ExpressionId, FieldId, FunctionBody, HirTree, HirType, HirTypeKind, InferTypeId, LazyTypeId, LocalId, LocalKind, StructId, TypeId, Unary
+    Binary, DisplayType, ExpressionId, FieldId, FunctionBody, HirTree, HirType, HirTypeKind,
+    InferTypeId, LazyTypeId, LocalId, LocalKind, StructId, TypeId, Unary,
 };
 use soul_utils::{
     ids::{FunctionId, IdAlloc},
@@ -411,7 +412,13 @@ impl<'a> HirDisplayer<'a> {
                 enum_id,
                 variant_name,
             } => {
-                let enum_name = self.hir.info.types.id_to_enum(*enum_id).map(|e| e.name.as_str()).unwrap_or("<error>");
+                let enum_name = self
+                    .hir
+                    .info
+                    .types
+                    .id_to_enum(*enum_id)
+                    .map(|e| e.name.as_str())
+                    .unwrap_or("<error>");
                 self.push_str(enum_name);
                 self.push('.');
                 self.push_str(&variant_name.to_string());

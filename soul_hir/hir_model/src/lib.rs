@@ -71,7 +71,12 @@ impl HirTree {
         }
     }
 
-    pub fn insert_module(&mut self, module_id: ModuleId, is_public: bool, sub_modules: Vec<ModuleId>) {
+    pub fn insert_module(
+        &mut self,
+        module_id: ModuleId,
+        is_public: bool,
+        sub_modules: Vec<ModuleId>,
+    ) {
         if !self.nodes.modules.contains(module_id) {
             let module = Module {
                 is_public,

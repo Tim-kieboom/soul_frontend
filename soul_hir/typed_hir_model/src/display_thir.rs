@@ -58,18 +58,14 @@ impl DisplayThirType for ThirTypeKind {
             },
             ThirTypeKind::CustomTypes(id) => {
                 match *id {
-                    CustomTypeId::Struct(struct_id) => {
-                        match types.id_to_struct(struct_id) {
-                            Some(s) => sb.push_str(s.name.as_str()),
-                            None => sb.push_str("<error>"),
-                        }
-                    }
-                    CustomTypeId::Enum(enum_id) => {
-                        match types.id_to_enum(enum_id) {
-                            Some(s) => sb.push_str(s.name.as_str()),
-                            None => sb.push_str("<error>"),
-                        }
-                    }
+                    CustomTypeId::Struct(struct_id) => match types.id_to_struct(struct_id) {
+                        Some(s) => sb.push_str(s.name.as_str()),
+                        None => sb.push_str("<error>"),
+                    },
+                    CustomTypeId::Enum(enum_id) => match types.id_to_enum(enum_id) {
+                        Some(s) => sb.push_str(s.name.as_str()),
+                        None => sb.push_str("<error>"),
+                    },
                 }
                 Ok(())
             }
@@ -116,11 +112,9 @@ impl ThirTypeKind {
             ThirTypeKind::Pointer(_) => "<pointer>",
             ThirTypeKind::Generic(_) => "<generic>",
             ThirTypeKind::Optional(_) => "<optional>",
-            ThirTypeKind::CustomTypes(id) => {
-                match id {
-                    CustomTypeId::Struct(_) => "<struct>",
-                    CustomTypeId::Enum(_) => "<enum>",
-                }
+            ThirTypeKind::CustomTypes(id) => match id {
+                CustomTypeId::Struct(_) => "<struct>",
+                CustomTypeId::Enum(_) => "<enum>",
             },
             ThirTypeKind::Primitive(primitive) => primitive.as_str(),
         }

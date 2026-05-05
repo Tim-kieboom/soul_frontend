@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-default = ["error_backtrace", "absolute_internal_error_path"]
+# default = ["error_backtrace", "absolute_internal_error_path"]
 error_backtrace = ["soul_utils/error_backtrace"]
 absolute_internal_error_path = ["soul_utils/absolute_internal_error_path"]
 

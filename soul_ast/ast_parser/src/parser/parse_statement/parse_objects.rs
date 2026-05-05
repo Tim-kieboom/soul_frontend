@@ -15,7 +15,7 @@ impl<'f, 'a> Parser<'f, 'a> {
         let start_span = self.token().span;
         self.expect_ident(KeyWord::Enum.as_str())?;
         let name = self.try_bump_consume_ident()?;
-        
+
         let mut variant = vec![];
         self.expect(&CURLY_OPEN)?;
         loop {
@@ -23,10 +23,8 @@ impl<'f, 'a> Parser<'f, 'a> {
             if self.current_is(&CURLY_CLOSE) {
                 break;
             }
-            
-            variant.push(
-                self.try_bump_consume_ident()?
-            );
+
+            variant.push(self.try_bump_consume_ident()?);
 
             self.skip_end_lines();
             if !self.current_is(&COMMA) {
@@ -36,16 +34,25 @@ impl<'f, 'a> Parser<'f, 'a> {
         }
         self.skip_end_lines();
         if !self.current_is(&CURLY_CLOSE) {
-            
             return Err(SoulError::new(
-                format!("expected: '{}' or '{}' but found: '{}'", CURLY_CLOSE.display(), COMMA.display(), self.token().kind.display()), 
-                soul_utils::error::SoulErrorKind::InvalidTokenKind, 
+                format!(
+                    "expected: '{}' or '{}' but found: '{}'",
+                    CURLY_CLOSE.display(),
+                    COMMA.display(),
+                    self.token().kind.display()
+                ),
+                soul_utils::error::SoulErrorKind::InvalidTokenKind,
                 Some(self.token().span),
-            ))
+            ));
         }
 
+        self.bump();
         Ok(Statement::new(
-            ast::StatementKind::Enum(Enum{ id: None, name, variants: variant }), 
+            ast::StatementKind::Enum(Enum {
+                id: None,
+                name,
+                variants: variant,
+            }),
             self.span_combine(start_span),
         ))
     }

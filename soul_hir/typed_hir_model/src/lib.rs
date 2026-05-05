@@ -1,8 +1,9 @@
 use std::vec;
 
-use ast::{ArrayKind};
+use ast::ArrayKind;
 use hir::{
-    BlockId, CustomTypeId, EnumId, ExpressionId, FieldId, GenericId, LazyTypeId, LocalId, PlaceId, StatementId, StructId, TypeId
+    BlockId, CustomTypeId, EnumId, ExpressionId, FieldId, GenericId, LazyTypeId, LocalId, PlaceId,
+    StatementId, StructId, TypeId,
 };
 use soul_utils::{
     bimap::BiMap,

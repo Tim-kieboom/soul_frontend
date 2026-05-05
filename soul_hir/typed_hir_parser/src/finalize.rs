@@ -117,7 +117,11 @@ impl<'a> TypedHirContext<'a> {
                 typed_hir::Enum {
                     id,
                     name: enum_.name.to_string(),
-                    variants: enum_.variants.iter().map(|v| v.as_str().to_string()).collect(),
+                    variants: enum_
+                        .variants
+                        .iter()
+                        .map(|v| v.as_str().to_string())
+                        .collect(),
                 },
             );
         }

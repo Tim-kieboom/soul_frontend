@@ -1,7 +1,11 @@
 use std::collections::HashMap;
 
 use soul_utils::{
-    Ident, ids::{FunctionId, IdGenerator}, span::ModuleId, vec_map::VecMap, vec_set::VecSet
+    Ident,
+    ids::{FunctionId, IdGenerator},
+    span::ModuleId,
+    vec_map::VecMap,
+    vec_set::VecSet,
 };
 
 mod ast;
@@ -168,8 +172,9 @@ impl DeclareStore {
             .values()
             .filter_map(|(ty, id)| match ty {
                 CustomType::Struct(obj) => Some((obj, *id)),
-                _ => None
-            }).find(|(obj, _)| obj.name.as_str() == name)
+                _ => None,
+            })
+            .find(|(obj, _)| obj.name.as_str() == name)
     }
 
     pub fn find_enum_by_name(&self, name: &str) -> Option<(&Enum, ModuleId)> {
@@ -177,8 +182,9 @@ impl DeclareStore {
             .values()
             .filter_map(|(ty, id)| match ty {
                 CustomType::Enum(obj) => Some((obj, *id)),
-                _ => None
-            }).find(|(obj, _)| obj.name.as_str() == name)
+                _ => None,
+            })
+            .find(|(obj, _)| obj.name.as_str() == name)
     }
 
     /// Retrieves a function by its ID.
@@ -246,7 +252,8 @@ impl DeclareStore {
             return;
         }
 
-        self.custom_types.insert(index, (CustomType::Struct(obj.clone()), module));
+        self.custom_types
+            .insert(index, (CustomType::Struct(obj.clone()), module));
     }
 
     pub fn try_insert_enum(&mut self, index: NodeId, obj: &Enum, module: ModuleId) {
@@ -254,13 +261,14 @@ impl DeclareStore {
             return;
         }
 
-        self.custom_types.insert(index, (CustomType::Enum(obj.clone()), module));
+        self.custom_types
+            .insert(index, (CustomType::Enum(obj.clone()), module));
     }
 
     /// Gets the type of a struct by its node ID.
     pub fn get_struct(&self, index: NodeId) -> Option<(&Struct, ModuleId)> {
         let (CustomType::Struct(obj), module_id) = self.custom_types.get(index)? else {
-            return None
+            return None;
         };
 
         Some((obj, *module_id))
@@ -269,7 +277,7 @@ impl DeclareStore {
     /// Gets the type of a struct by its node ID.
     pub fn get_enum(&self, index: NodeId) -> Option<(&Enum, ModuleId)> {
         let (CustomType::Enum(obj), module_id) = self.custom_types.get(index)? else {
-            return None
+            return None;
         };
 
         Some((obj, *module_id))

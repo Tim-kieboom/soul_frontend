@@ -41,20 +41,21 @@ impl<'a> MirContext<'a> {
             } => self
                 .lower_struct_constructor(values, *ty, value_type)
                 .pass(is_end),
-            hir::ExpressionKind::EnumVariant { enum_id: _, variant_name } => {
-                let index = self.lower_enum_variant_index(value_type, variant_name)
+            hir::ExpressionKind::EnumVariant {
+                enum_id: _,
+                variant_name,
+            } => {
+                let index = self
+                    .lower_enum_variant_index(value_type, variant_name)
                     .unwrap_or(0);
 
                 let value = ComplexLiteral::Basic(Literal::Int(index));
                 mir::Operand::new(value_type, mir::OperandKind::Comptime(value))
             }
-            hir::ExpressionKind::Literal(literal) => {
-                
-                mir::Operand::new(
-                    value_type,
-                    mir::OperandKind::Comptime(literal.clone().to_complex()),
-                )
-            },
+            hir::ExpressionKind::Literal(literal) => mir::Operand::new(
+                value_type,
+                mir::OperandKind::Comptime(literal.clone().to_complex()),
+            ),
             hir::ExpressionKind::Local(local_id) => {
                 let local_type = self.local_type(*local_id);
                 let id = match self.local_remap.get(*local_id) {
@@ -218,13 +219,16 @@ impl<'a> MirContext<'a> {
 
             hir::ExpressionKind::InnerRawStackArray { .. } => self.new_none_operand(),
 
-            hir::ExpressionKind::ExternalCall { 
-                crate_name:_,
-                function_name:_,
-                generics:_,
-                arguments:_,
+            hir::ExpressionKind::ExternalCall {
+                crate_name: _,
+                function_name: _,
+                generics: _,
+                arguments: _,
             } => {
-                self.log_error(soul_error_internal!("ExternalCall is unstable in mir stage", Some(span)));
+                self.log_error(soul_error_internal!(
+                    "ExternalCall is unstable in mir stage",
+                    Some(span)
+                ));
                 self.new_none_operand()
             }
 
@@ -453,7 +457,10 @@ impl<'a> MirContext<'a> {
     }
 
     fn new_none_operand(&self) -> Operand {
-        Operand::new(self.hir_response.typed.types_table.none_type, mir::OperandKind::None)
+        Operand::new(
+            self.hir_response.typed.types_table.none_type,
+            mir::OperandKind::None,
+        )
     }
 
     // Casts a literal operand to match another operand's type.
@@ -494,7 +501,10 @@ impl<'a> MirContext<'a> {
             value: operand,
             cast_to: to_type,
         });
-        let cast = mir::Statement::new(mir::StatementKind::Assign { place, value: rvalue });
+        let cast = mir::Statement::new(mir::StatementKind::Assign {
+            place,
+            value: rvalue,
+        });
         self.push_statement(cast);
 
         mir::Operand::new(to_type, mir::OperandKind::Temp(temp))

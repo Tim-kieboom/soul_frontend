@@ -4,7 +4,14 @@ use ast::{
 };
 use soul_tokenizer::{Number, Token, TokenKind};
 use soul_utils::{
-    Ident, StringLiteral, error::{SoulError, SoulErrorKind, SoulResult}, precedence::Precedence, soul_error_internal, soul_names::{AccessType, KeyWord, Operator, TypeModifier}, span::{Span, Spanned}, symbool_kind::SymbolKind, try_result::{ToResult, TryError}
+    Ident, StringLiteral,
+    error::{SoulError, SoulErrorKind, SoulResult},
+    precedence::Precedence,
+    soul_error_internal,
+    soul_names::{AccessType, KeyWord, Operator, TypeModifier},
+    span::{Span, Spanned},
+    symbool_kind::SymbolKind,
+    try_result::{ToResult, TryError},
 };
 
 use crate::parser::{
@@ -167,8 +174,12 @@ impl<'a, 'f> Parser<'a, 'f> {
                     _ => unreachable!(),
                 };
                 match string {
-                    StringLiteral::CStr(string) => Expression::new_literal(Literal::Cstr(string), token.span),
-                    StringLiteral::Normal(string) => Expression::new_literal(Literal::Str(string), token.span),
+                    StringLiteral::CStr(string) => {
+                        Expression::new_literal(Literal::Cstr(string), token.span)
+                    }
+                    StringLiteral::Normal(string) => {
+                        Expression::new_literal(Literal::Str(string), token.span)
+                    }
                 }
             }
             TokenKind::Number(num) => {
@@ -271,7 +282,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 return Err(soul_error_internal!(
                     "collectionType array not yet impl",
                     Some(span)
-                ))
+                ));
             }
             &ROUND_OPEN | &ARROW_LEFT => {
                 match self.try_parse_function_call(start_span, None, &ident) {
@@ -282,16 +293,19 @@ impl<'a, 'f> Parser<'a, 'f> {
 
                 match self.parse_generic_define() {
                     Ok(generics) => {
-                        return self.parse_struct_contructor(ident, generics, start_span)
+                        return self
+                            .parse_struct_contructor(ident, generics, start_span)
                             .map(Expression::from_struct_contructor);
                     }
                     Err(TryError::IsNotValue(_)) => (),
                     Err(TryError::IsErr(err)) => return Err(err),
                 }
             }
-            &CURLY_OPEN => return self
-                .parse_struct_contructor(ident, vec![], start_span)
-                .map(Expression::from_struct_contructor),
+            &CURLY_OPEN => {
+                return self
+                    .parse_struct_contructor(ident, vec![], start_span)
+                    .map(Expression::from_struct_contructor);
+            }
             _ => (),
         };
 

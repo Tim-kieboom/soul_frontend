@@ -53,11 +53,7 @@ impl Paths {
         Path::new(&self.project)
     }
 
-    pub fn write_to_output(
-        output_file: &str,
-        project: &Path,
-        relative_file: &Path,
-    ) -> Result<()> {
+    pub fn write_to_output(output_file: &str, project: &Path, relative_file: &Path) -> Result<()> {
         let path = project.join("output").join(relative_file);
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;

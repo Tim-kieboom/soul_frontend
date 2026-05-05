@@ -12,15 +12,14 @@ use crate::NameResolver;
 
 impl<'a> NameResolver<'a> {
     pub(crate) fn collect_import_path(&mut self, path: &ImportPath, span: Span) {
-        
         let module_name = match path.module.get_module_name() {
             Some(val) => val,
             None => {
                 self.log_error(soul_error_internal!("could not get module name", None));
-                return
+                return;
             }
         };
-        
+
         let alias = match &path.kind {
             ast::ImportKind::Alias(ident) => Some(ident.as_str()),
             _ => None,
@@ -30,7 +29,7 @@ impl<'a> NameResolver<'a> {
             ast::ImportKind::Items { items, .. } => items,
             _ => &vec![],
         };
-        
+
         let module_id = if let Some(name) = &path.lib_name {
             self.collect_external_lib(name, span)
         } else {
@@ -39,7 +38,7 @@ impl<'a> NameResolver<'a> {
 
         // Don't return early for external crates - they use ModuleId::error() but have crate_name
         if module_id == ModuleId::error() && path.lib_name.is_none() {
-            return
+            return;
         }
 
         let import_name = alias.unwrap_or(module_name);
@@ -62,29 +61,32 @@ impl<'a> NameResolver<'a> {
     }
 
     fn collect_external_lib(&mut self, lib_name: &String, span: Span) -> ModuleId {
-        
         let crate_info = match self.crates.name_to_crate(lib_name) {
             Some(val) => val,
             None => {
                 self.log_error(SoulError::new(
-                    format!("libary '{lib_name}' not found"), 
-                    SoulErrorKind::CrateNotFound, 
+                    format!("libary '{lib_name}' not found"),
+                    SoulErrorKind::CrateNotFound,
                     Some(span),
                 ));
-                return ModuleId::error()
+                return ModuleId::error();
             }
         };
 
         crate_info.root_module
     }
 
-    fn collect_internal_module(&mut self, path: &ImportPath, module_name: &str, span: Span) -> ModuleId {
-
+    fn collect_internal_module(
+        &mut self,
+        path: &ImportPath,
+        module_name: &str,
+        span: Span,
+    ) -> ModuleId {
         let parent_module = self.current.module;
         self.check_if_module_private(path, span);
 
         let Some(module_file_path) = self.find_module_file(path.module.to_pathbuf(), span) else {
-            return ModuleId::error()
+            return ModuleId::error();
         };
 
         self.insure_parents_are_loaded(&module_file_path, span);
@@ -255,7 +257,9 @@ impl<'a> NameResolver<'a> {
                 }
 
                 match obj {
-                    ast::CustomType::Struct(struct_) => Self::resolve_struct(self.context, self.store, &self.current, struct_),
+                    ast::CustomType::Struct(struct_) => {
+                        Self::resolve_struct(self.context, self.store, &self.current, struct_)
+                    }
                     ast::CustomType::Enum(_) => todo!("impl enum in collect items"),
                 }
             }
@@ -324,7 +328,13 @@ impl<'a> NameResolver<'a> {
         };
 
         self.current.push_current_path(dir.to_path_buf());
-        self.parse_module(&module_source, module_file_path.clone(), module_id, parent, module_name.to_string());
+        self.parse_module(
+            &module_source,
+            module_file_path.clone(),
+            module_id,
+            parent,
+            module_name.to_string(),
+        );
         self.current.pop_current_path();
         module_id
     }

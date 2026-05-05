@@ -11,7 +11,13 @@ use inkwell::{
 use mir_parser::mir::{BlockId, LocalId, TempId};
 use run_mir::MirResponse;
 use soul_utils::{
-    compile_options::CompilerOptions, error::{SoulError, SoulResult}, ids::{FunctionId, IdGenerator}, impl_soul_ids, sementic_level::SementicFault, soul_error_internal, vec_map::VecMap
+    compile_options::CompilerOptions,
+    error::{SoulError, SoulResult},
+    ids::{FunctionId, IdGenerator},
+    impl_soul_ids,
+    sementic_level::SementicFault,
+    soul_error_internal,
+    vec_map::VecMap,
 };
 
 mod block;

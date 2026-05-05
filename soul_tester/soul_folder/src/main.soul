@@ -23,15 +23,3 @@ main() {
 
     Io.Println("hello world")
 }
-
-// enum Number as int {
-//     One = 1,
-//     Two = 332,
-//     Three = 3,
-// }
-
-// enums() {
-//     mut test = Test.One
-//     test = Test.Two
-//     mut tag: u32 = test.Tag() 
-// }

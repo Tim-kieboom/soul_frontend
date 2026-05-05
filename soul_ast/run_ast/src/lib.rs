@@ -3,7 +3,8 @@ use ast_parser::parse_module;
 use soul_name_resolver::name_resolve;
 use soul_tokenizer::TokenStream;
 use soul_utils::{
-    CrateStore, compile_options::CompilerOptions, crate_store::CrateContext, sementic_level::ModuleStore
+    CrateStore, compile_options::CompilerOptions, crate_store::CrateContext,
+    sementic_level::ModuleStore,
 };
 use std::path::PathBuf;
 

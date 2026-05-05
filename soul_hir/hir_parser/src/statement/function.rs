@@ -10,9 +10,7 @@ use soul_utils::{
 use crate::HirContext;
 
 impl<'a> HirContext<'a> {
-
     pub(super) fn lower_function(&mut self, function: &ast::Function) -> FunctionId {
-        
         let id = match function.signature.node.id {
             Some(val) => val,
             None => {

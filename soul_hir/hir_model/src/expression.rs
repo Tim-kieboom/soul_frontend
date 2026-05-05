@@ -1,4 +1,6 @@
-use crate::{BlockId, EnumId, ExpressionId, LocalId, PlaceId, StructId, TypeId, hir_type::LazyTypeId};
+use crate::{
+    BlockId, EnumId, ExpressionId, LocalId, PlaceId, StructId, TypeId, hir_type::LazyTypeId,
+};
 use ast::{BinaryOperator, Literal, UnaryOperator};
 use soul_utils::{Ident, ids::FunctionId};
 

@@ -1,4 +1,4 @@
-use ast::{Expression, ExpressionKind, ElseKind, FieldAccess};
+use ast::{ElseKind, Expression, ExpressionKind, FieldAccess};
 use soul_utils::error::{SoulError, SoulErrorKind};
 
 use crate::NameResolver;
@@ -119,7 +119,11 @@ impl<'a> NameResolver<'a> {
             return false;
         };
 
-        if !enum_def.variants.iter().any(|v| v.as_str() == field_access.field.as_str()) {
+        if !enum_def
+            .variants
+            .iter()
+            .any(|v| v.as_str() == field_access.field.as_str())
+        {
             self.log_error(SoulError::new(
                 format!(
                     "variant '{}' not found in enum '{}'",

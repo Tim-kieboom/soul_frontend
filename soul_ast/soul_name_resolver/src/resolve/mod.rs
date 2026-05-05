@@ -24,6 +24,9 @@ impl<'a> NameResolver<'a> {
 
         let prev = self.current.module;
         self.current.module = module_id;
+        for statement in &mut global.statements {
+            self.resolve_custom_type(statement);
+        }
         self.resolve_block(&mut global);
         self.current.module = prev;
 

@@ -236,7 +236,8 @@ impl<'a> MirContext<'a> {
         let end_block = self.expect_current_block();
 
         if !*arm_end {
-            if let Some(value) = value.filter(|value| !matches!(value.kind, mir::OperandKind::None)) {
+            if let Some(value) = value.filter(|value| !matches!(value.kind, mir::OperandKind::None))
+            {
                 self.push_statement_from(
                     mir::Statement::new(mir::StatementKind::Assign {
                         place: target_place,

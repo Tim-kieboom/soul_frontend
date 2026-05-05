@@ -13,7 +13,7 @@ use log::{error, info};
 use paths::Paths;
 use run_ast::to_ast;
 use run_hir::{HirResponse, to_hir};
-use run_mir::{extract_exports, MirResponse, to_mir};
+use run_mir::{MirResponse, extract_exports, to_mir};
 use soul_ir::{IrRequest, to_llvm_ir};
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
@@ -105,7 +105,12 @@ fn main() -> Result<()> {
     );
 
     timer = Instant::now();
-    if run_llvm(&mut output, paths.project_path(), &mut context.faults, root_lib) {
+    if run_llvm(
+        &mut output,
+        paths.project_path(),
+        &mut context.faults,
+        root_lib,
+    ) {
         info!(
             "{GREEN}llvm success: {}ms{DEFAULT}",
             timer.elapsed().as_millis()
@@ -114,12 +119,16 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn compile_all_libs(paths: &Paths, crate_store: &mut CrateStore, manifest: &SoulToml) -> Result<()> {
-
-    let crate_info_list: Vec<_> = crate_store.values()
+fn compile_all_libs(
+    paths: &Paths,
+    crate_store: &mut CrateStore,
+    manifest: &SoulToml,
+) -> Result<()> {
+    let crate_info_list: Vec<_> = crate_store
+        .values()
         .map(|data| (data.name.clone(), data.project_path.clone()))
         .collect();
-    
+
     for (lib_name, project_path) in crate_info_list {
         if lib_name == manifest.package.name {
             continue;
@@ -141,14 +150,14 @@ fn compile_all_libs(paths: &Paths, crate_store: &mut CrateStore, manifest: &Soul
             &mut context,
             &CrateExports::default(),
         )?;
-        
+
         log_faults(&context.faults, &module_store);
         if is_fatal(&context.faults, COMPILER_OPTIONS.fatal_level()) {
             continue;
         }
 
         let exports = extract_exports(&output.mir_response);
-        
+
         if let Some(crate_mut) = crate_store.get_mut_by_name(&lib_name) {
             crate_mut.exports = exports;
         }
@@ -172,7 +181,14 @@ fn run_crate_frontend(
     let tokens = to_token_stream(&source_file, root);
     display_tokenizer(paths, manifest, root, &source_file)?;
 
-    let ast = to_ast(tokens, &COMPILER_OPTIONS, module_store, context, crate_store, source);
+    let ast = to_ast(
+        tokens,
+        &COMPILER_OPTIONS,
+        module_store,
+        context,
+        crate_store,
+        source,
+    );
     display_ast(manifest, module_store, &ast)?;
 
     let mut hir = to_hir(&ast, &COMPILER_OPTIONS, context, crate_exports, root);
@@ -189,9 +205,9 @@ fn run_crate_frontend(
 }
 
 fn run_llvm(
-    output: &mut Output, 
+    output: &mut Output,
     manifest: &Path,
-    faults: &mut FaultCollector, 
+    faults: &mut FaultCollector,
     lib_name: &str,
 ) -> bool {
     let request = IrRequest {
@@ -212,19 +228,15 @@ fn run_llvm(
 
     #[cfg(debug_assertions)]
     if ir.is_fatal {
-        let llvm_code = ir
-            .module
-            .to_string();
+        let llvm_code = ir.module.to_string();
 
-        if let Err(err) = Paths::write_to_output(&llvm_code, manifest, Path::new("fatal_out.ll")){
+        if let Err(err) = Paths::write_to_output(&llvm_code, manifest, Path::new("fatal_out.ll")) {
             error!("{err}");
         }
         return false;
     }
 
-    let llvm_code = ir
-        .module
-        .to_string();
+    let llvm_code = ir.module.to_string();
 
     if let Err(err) = Paths::write_to_output(&llvm_code, manifest, Path::new("out.ll")) {
         error!("{err}");
@@ -242,11 +254,7 @@ fn display_tokenizer(
 ) -> Result<()> {
     let token_stream = to_token_stream(source_file, module);
     let tokens = displayer_tokenizer::display_tokens(paths, source_file, token_stream)?;
-    Paths::write_to_output(
-        &tokens,
-        manifest,
-        Path::new("tokenizer\\tokens.soulc"),
-    )
+    Paths::write_to_output(&tokens, manifest, Path::new("tokenizer\\tokens.soulc"))
 }
 
 fn display_ast(
@@ -267,11 +275,7 @@ fn display_ast(
     )
 }
 
-fn display_hir(
-    manifest: &Path,
-    hir: &HirResponse,
-    ast_context: &AbtractSyntaxTree,
-) -> Result<()> {
+fn display_hir(manifest: &Path, hir: &HirResponse, ast_context: &AbtractSyntaxTree) -> Result<()> {
     Paths::write_to_output(
         &displayer_hir::display_hir(ast_context, &hir.hir),
         manifest,

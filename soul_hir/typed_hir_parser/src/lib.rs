@@ -37,7 +37,9 @@ pub fn lower_typed_hir<'a>(
 
     for (struct_id, object) in hir.info.types.structs_entries() {
         for (i, field) in object.fields.iter().enumerate() {
-            let struct_type = HirType::new(HirTypeKind::CustomType(hir::CustomTypeId::Struct(struct_id)));
+            let struct_type = HirType::new(HirTypeKind::CustomType(hir::CustomTypeId::Struct(
+                struct_id,
+            )));
             let base = context.add_type(struct_type);
             context.type_field(field, base, i);
         }

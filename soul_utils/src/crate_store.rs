@@ -2,7 +2,11 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use crate::{
-    ids::{FunctionId, IdGenerator}, impl_soul_ids, sementic_level::{FaultCollector, MessageConfig}, span::{CrateId, ModuleId}, vec_map::VecMap
+    ids::{FunctionId, IdGenerator},
+    impl_soul_ids,
+    sementic_level::{FaultCollector, MessageConfig},
+    span::{CrateId, ModuleId},
+    vec_map::VecMap,
 };
 
 impl_soul_ids!(TypeId);
@@ -12,7 +16,6 @@ pub struct CrateExports {
     pub functions: HashMap<String, FunctionId>,
     pub types: HashMap<String, TypeId>,
 }
-
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CrateContext {

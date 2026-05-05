@@ -1,7 +1,10 @@
 use std::{iter::Peekable, str::Chars};
 
 use soul_utils::{
-    StringLiteral, StringTag, error::{SoulError, SoulErrorKind, SoulResult}, span::{ModuleId, Span}, symbool_kind::SymbolKind
+    StringLiteral, StringTag,
+    error::{SoulError, SoulErrorKind, SoulResult},
+    span::{ModuleId, Span},
+    symbool_kind::SymbolKind,
 };
 
 use crate::{
@@ -132,10 +135,9 @@ impl<'a> Lexer<'a> {
         start_line: usize,
         start_offset: usize,
     ) -> SoulResult<TokenKind> {
-        
         if let Some(tag) = self.try_get_string_tag(char) {
             let string = self.get_string_literal(start_line, start_offset, Some(tag))?;
-            return Ok(TokenKind::StringLiteral(string))
+            return Ok(TokenKind::StringLiteral(string));
         }
 
         Ok(match char {
@@ -143,7 +145,9 @@ impl<'a> Lexer<'a> {
                 self.next_char();
                 TokenKind::EndLine
             }
-            '"' => TokenKind::StringLiteral(self.get_string_literal(start_line, start_offset, None)?),
+            '"' => {
+                TokenKind::StringLiteral(self.get_string_literal(start_line, start_offset, None)?)
+            }
             '\'' => match self.try_get_char_literal(start_line, start_offset)? {
                 Some(char) => TokenKind::CharLiteral(char),
                 None => TokenKind::Unknown('\''),
@@ -159,7 +163,6 @@ impl<'a> Lexer<'a> {
     }
 
     fn try_get_string_tag(&mut self, char: char) -> Option<StringTag> {
-        
         match StringTag::from_char(char) {
             Some(tag) if self.peek_char() == Some('"') => {
                 self.next_char();
@@ -243,7 +246,12 @@ impl<'a> Lexer<'a> {
         Ok(Some(char))
     }
 
-    fn get_string_literal(&mut self, start_line: usize, start_offset: usize, possible_tag: Option<StringTag>) -> SoulResult<StringLiteral> {
+    fn get_string_literal(
+        &mut self,
+        start_line: usize,
+        start_offset: usize,
+        possible_tag: Option<StringTag>,
+    ) -> SoulResult<StringLiteral> {
         let string = self.get_string(start_line, start_offset)?;
         let tag = match possible_tag {
             Some(val) => val,

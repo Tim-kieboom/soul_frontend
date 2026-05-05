@@ -1,5 +1,6 @@
 use ast::{
-    Expression, ExpressionKind, ExternalRef, FunctionCall, FunctionKind, SoulType, TypeKind, VarTypeKind, scope::ScopeModuleEntry
+    Expression, ExpressionKind, ExternalRef, FunctionCall, FunctionKind, SoulType, TypeKind,
+    VarTypeKind, scope::ScopeModuleEntry,
 };
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
@@ -91,7 +92,9 @@ impl<'a> NameResolver<'a> {
                 self.resolve_external_function(entry, &module_name, function_call)
             }
 
-            if function_call.resolved.is_some() && function_call.resolved != Some(FunctionId::error()) {
+            if function_call.resolved.is_some()
+                && function_call.resolved != Some(FunctionId::error())
+            {
                 function_call.callee = None;
             }
 
@@ -170,13 +173,21 @@ impl<'a> NameResolver<'a> {
         }
     }
 
-    fn resolve_external_function(&mut self, module_entry: &ScopeModuleEntry, module_name: &str, function_call: &mut FunctionCall) {
+    fn resolve_external_function(
+        &mut self,
+        module_entry: &ScopeModuleEntry,
+        module_name: &str,
+        function_call: &mut FunctionCall,
+    ) {
         let Some(crate_name) = &module_entry.crate_name else {
-            return
+            return;
         };
 
         let full_name = format!("{}.{}", module_name, function_call.name.as_str());
-        function_call.external_ref = Some(ExternalRef{crate_name: crate_name.clone(), module_path: full_name});
+        function_call.external_ref = Some(ExternalRef {
+            crate_name: crate_name.clone(),
+            module_path: full_name,
+        });
     }
 
     fn get_owner_kind(

@@ -125,10 +125,17 @@ impl<'a> MirContext<'a> {
         }
 
         if let LocalKind::Variable(Some(value)) = local_info.kind {
-            let target_place = self.new_place(mir::Place::new(place_kind, self.local_type(variable.local)));
-            
+            let target_place =
+                self.new_place(mir::Place::new(place_kind, self.local_type(variable.local)));
+
             let value_expr = &self.hir_response.hir.nodes.expressions[value];
-            if let ExpressionKind::If { condition, then_block, else_block, ends_with_else: _ } = &value_expr.kind {
+            if let ExpressionKind::If {
+                condition,
+                then_block,
+                else_block,
+                ends_with_else: _,
+            } = &value_expr.kind
+            {
                 let ty = self.hir_response.typed.types_table.expressions[value];
                 self.lower_if_assignment(
                     *condition,
@@ -140,7 +147,7 @@ impl<'a> MirContext<'a> {
                 );
                 return;
             }
-            
+
             let operand = self.lower_operand(value).pass(is_end);
 
             let statement = mir::Statement::new(mir::StatementKind::Assign {
@@ -195,23 +202,22 @@ impl<'a> MirContext<'a> {
         }
     }
 
-     pub(crate) fn lower_assign(&mut self, assign: &hir::Assign, is_end: &mut bool) {
+    pub(crate) fn lower_assign(&mut self, assign: &hir::Assign, is_end: &mut bool) {
         let place = self.lower_place(assign.place).pass(is_end);
-        
+
         let value_expr = &self.hir_response.hir.nodes.expressions[assign.value];
-        if let ExpressionKind::If { condition, then_block, else_block, ends_with_else: _ } = &value_expr.kind {
+        if let ExpressionKind::If {
+            condition,
+            then_block,
+            else_block,
+            ends_with_else: _,
+        } = &value_expr.kind
+        {
             let ty = self.hir_response.typed.types_table.expressions[assign.value];
-            self.lower_if_assignment(
-                *condition,
-                *then_block,
-                *else_block,
-                ty,
-                is_end,
-                place,
-            );
+            self.lower_if_assignment(*condition, *then_block, *else_block, ty, is_end, place);
             return;
         }
-        
+
         let value = self.lower_operand(assign.value).pass(is_end);
         if matches!(value.kind, mir::OperandKind::None) {
             return;

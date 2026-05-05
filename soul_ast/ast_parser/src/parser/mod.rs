@@ -1,5 +1,5 @@
-use std::{collections::HashMap, path::Path};
 use std::path::PathBuf;
+use std::{collections::HashMap, path::Path};
 
 use ast::{Block, Module, SoulType, Visibility};
 #[cfg(debug_assertions)]

@@ -1,10 +1,11 @@
 use std::path::PathBuf;
 
 use ast::{
-    Block, Enum, FunctionSignature, NamedTupleElement, NamedTupleType, Struct, VarTypeKind, scope::{
+    Block, Enum, FunctionSignature, NamedTupleElement, NamedTupleType, Struct, VarTypeKind,
+    scope::{
         NodeId, Scope, ScopeBuilder, ScopeId, ScopeTypeEntry, ScopeTypeEntryKind, ScopeValue,
         ScopeValueKind,
-    }
+    },
 };
 use ast_parser::parse_module;
 use soul_tokenizer::to_token_stream;
@@ -302,16 +303,16 @@ impl<'a> NameResolver<'a> {
         Some(module_path)
     }
 
-    fn parse_module(&mut self, source: &str, path: PathBuf, module_id: ModuleId, parent: ModuleId, name: String) {
+    fn parse_module(
+        &mut self,
+        source: &str,
+        path: PathBuf,
+        module_id: ModuleId,
+        parent: ModuleId,
+        name: String,
+    ) {
         let tokens = to_token_stream(source, module_id);
-        let module = parse_module(
-            tokens,
-            module_id,
-            name,
-            Some(parent),
-            self.context,
-            path,
-        );
+        let module = parse_module(tokens, module_id, name, Some(parent), self.context, path);
 
         if let Some(module) = self.modules.get_mut(parent) {
             module.modules.insert(module_id);

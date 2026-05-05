@@ -1,7 +1,10 @@
 use std::fmt::{Arguments, Write};
 
 use ast::{
-    AbtractSyntaxTree, Assignment, Block, ElseKind, Enum, Expression, Function, FunctionSignature, Generic, IfArm, Import, SoulType, Statement, StatementKind, Struct, TypeKind, UseBlock, Variable, scope::{NodeId, ScopeId}
+    AbtractSyntaxTree, Assignment, Block, ElseKind, Enum, Expression, Function, FunctionSignature,
+    Generic, IfArm, Import, SoulType, Statement, StatementKind, Struct, TypeKind, UseBlock,
+    Variable,
+    scope::{NodeId, ScopeId},
 };
 use soul_utils::{
     ids::FunctionId,

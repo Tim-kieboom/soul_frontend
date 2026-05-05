@@ -308,18 +308,14 @@ impl DisplayType for HirTypeKind {
             },
             HirTypeKind::CustomType(id) => {
                 match *id {
-                    CustomTypeId::Struct(struct_id) => {
-                        match types.id_to_struct(struct_id) {
-                            Some(val) => sb.push_str(val.name.as_str()),
-                            None => sb.push_str("<error>"),
-                        }
-                    }
-                    CustomTypeId::Enum(enum_id) => {
-                        match types.id_to_enum(enum_id) {
-                            Some(val) => sb.push_str(val.name.as_str()),
-                            None => sb.push_str("<error>"),
-                        } 
-                    }
+                    CustomTypeId::Struct(struct_id) => match types.id_to_struct(struct_id) {
+                        Some(val) => sb.push_str(val.name.as_str()),
+                        None => sb.push_str("<error>"),
+                    },
+                    CustomTypeId::Enum(enum_id) => match types.id_to_enum(enum_id) {
+                        Some(val) => sb.push_str(val.name.as_str()),
+                        None => sb.push_str("<error>"),
+                    },
                 }
                 Ok(())
             }

@@ -106,5 +106,4 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         TryOk(kind)
     }
-
 }

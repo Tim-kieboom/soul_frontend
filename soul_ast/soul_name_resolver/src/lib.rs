@@ -1,10 +1,19 @@
 use std::path::PathBuf;
 
 use ast::{
-    AbtractSyntaxTree, AstModuleStore, CustomType, DeclareStore, EntryKind, Enum, Function, Struct, Variable, meta_data::AstMetadata, scope::{NodeId, ScopeValue}
+    AbtractSyntaxTree, AstModuleStore, CustomType, DeclareStore, EntryKind, Enum, Function, Struct,
+    Variable,
+    meta_data::AstMetadata,
+    scope::{NodeId, ScopeValue},
 };
 use soul_utils::{
-    CrateStore, Ident, crate_store::CrateContext, error::{SoulError, SoulErrorKind}, ids::{FunctionId, IdAlloc, IdGenerator}, sementic_level::{ModuleStore, SementicFault}, soul_error_internal, span::{ModuleId, Span}
+    CrateStore, Ident,
+    crate_store::CrateContext,
+    error::{SoulError, SoulErrorKind},
+    ids::{FunctionId, IdAlloc, IdGenerator},
+    sementic_level::{ModuleStore, SementicFault},
+    soul_error_internal,
+    span::{ModuleId, Span},
 };
 
 mod check_name;
@@ -19,8 +28,14 @@ pub fn name_resolve(
     crates: &CrateStore,
     source_folder: PathBuf,
 ) {
-    let mut resolver =
-        NameResolver::new(module_id, module_store, context, ast_context, crates, source_folder);
+    let mut resolver = NameResolver::new(
+        module_id,
+        module_store,
+        context,
+        ast_context,
+        crates,
+        source_folder,
+    );
 
     resolver.collect_module(module_id);
     resolver.resolve_modules(module_id);
@@ -231,9 +246,12 @@ impl<'a> NameResolver<'a> {
         }
 
         if let Some(crate_name) = &module_entry.crate_name {
-            
             let full_name = format!("{}.{}", module_name, function_name);
-            if self.crates.resolve_function(crate_name, &full_name).is_some() {
+            if self
+                .crates
+                .resolve_function(crate_name, &full_name)
+                .is_some()
+            {
                 // Return error FunctionId but set external_ref in caller
                 // The caller will set external_ref on the FunctionCall
                 return Some(FunctionId::error());

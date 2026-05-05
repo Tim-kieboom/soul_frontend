@@ -51,8 +51,7 @@ impl std::fmt::Display for StringLiteral {
 impl StringLiteral {
     pub fn display_len(&self) -> usize {
         match self {
-            StringLiteral::CStr(str) |
-            StringLiteral::Normal(str) => str.len(),
+            StringLiteral::CStr(str) | StringLiteral::Normal(str) => str.len(),
         }
     }
 
@@ -72,7 +71,7 @@ impl StringTag {
     pub fn from_char(ch: char) -> Option<Self> {
         match ch {
             'c' => Some(Self::CStr),
-            _ => None
+            _ => None,
         }
     }
 }

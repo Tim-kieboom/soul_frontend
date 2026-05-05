@@ -112,7 +112,7 @@ impl<'a> MirContext<'a> {
             self.push_statement_from(statement, entry_block);
         }
         let _endblock = self.lower_block(body, entry_block);
-        
+
         if self.context.is_lib && is_function_public(function.name.as_str()) {
             self.tree.public_functions.push(function_id);
         }

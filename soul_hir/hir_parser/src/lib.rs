@@ -2,8 +2,7 @@ use std::collections::HashMap;
 
 use ast::{AbtractSyntaxTree, Visibility, scope::NodeId};
 use hir::{
-    BlockId, CustomTypeId, ExpressionId, GenericId, HirTree, LazyTypeId, LocalId,
-    StatementId,
+    BlockId, CustomTypeId, ExpressionId, GenericId, HirTree, LazyTypeId, LocalId, StatementId,
 };
 use soul_utils::{
     Ident,
@@ -100,7 +99,6 @@ impl<'a> HirContext<'a> {
         let ast_module = &ast_context.modules[module_id];
         let sub_modules: Vec<ModuleId> = ast_module.modules.entries().collect();
         for sub_module_id in sub_modules.iter().cloned() {
-            
             let sub_ast_module = &ast_context.modules[sub_module_id];
             let sub_sub_modules: Vec<ModuleId> = sub_ast_module.modules.entries().collect();
             let is_public = matches!(ast_module.visibility, Visibility::Public);

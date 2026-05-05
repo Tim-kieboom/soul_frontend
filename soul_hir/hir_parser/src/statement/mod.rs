@@ -8,8 +8,8 @@ use soul_utils::{
 
 use crate::HirContext;
 mod block;
-mod function;
 mod custom_types;
+mod function;
 
 impl<'a> HirContext<'a> {
     pub fn lower_global(&mut self, module_id: ModuleId, global: &ast::Statement) {

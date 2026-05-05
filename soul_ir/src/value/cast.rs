@@ -60,9 +60,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                             mir_source_type, mir_cast_type
                         ),
                         None
-                    ))
+                    ));
                 }
-                
+
                 //llvm doesn't care enum's are (u8, u16, u32 or u64)
                 self.new_loaded_operand(source_value, cast_to, generics)
             }

@@ -3,7 +3,11 @@ use inkwell::{
     AddressSpace,
     types::{BasicType, BasicTypeEnum, IntType, StructType},
 };
-use soul_utils::{error::SoulResult, soul_error_internal, soul_names::{PrimitiveSize, PrimitiveTypes}};
+use soul_utils::{
+    error::SoulResult,
+    soul_error_internal,
+    soul_names::{PrimitiveSize, PrimitiveTypes},
+};
 use typed_hir::ThirTypeKind;
 
 use crate::{GenericSubstitute, LlvmBackend, OperandInfo};
@@ -26,7 +30,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 return self.lower_type(ty, generics);
             }
             ThirTypeKind::CustomTypes(id) => match id {
-                hir::CustomTypeId::Struct(struct_id) => self.lower_struct(struct_id, generics).map(|s| s.into())?,
+                hir::CustomTypeId::Struct(struct_id) => {
+                    self.lower_struct(struct_id, generics).map(|s| s.into())?
+                }
                 hir::CustomTypeId::Enum(enum_id) => self.lower_enum(enum_id).into(),
             },
             ThirTypeKind::Primitive(primitive_types) => {
@@ -130,10 +136,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         Ok(ty)
     }
 
-    pub(crate) fn lower_enum(
-        &self,
-        id: hir::EnumId,
-    ) -> IntType<'a> {
+    pub(crate) fn lower_enum(&self, id: hir::EnumId) -> IntType<'a> {
         match self.get_enum_size(id) {
             PrimitiveSize::Bit8 => self.context.i8_type(),
             PrimitiveSize::Bit16 => self.context.i16_type(),
@@ -146,10 +149,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         }
     }
 
-    pub(crate) fn get_enum_size(
-        &self, 
-        id: hir::EnumId,
-    ) -> PrimitiveSize {
+    pub(crate) fn get_enum_size(&self, id: hir::EnumId) -> PrimitiveSize {
         if let Some(object) = self.types.types_map.id_to_enum(id) {
             let variant_count = object.variants.len() as u64;
             let bit_width = variant_count.next_power_of_two().max(8);

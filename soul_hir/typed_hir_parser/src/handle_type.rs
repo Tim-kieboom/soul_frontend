@@ -1,4 +1,7 @@
-use hir::{CustomTypeId, ExpressionId, FieldId, HirType, HirTypeKind, LazyTypeId, LocalId, StructId, TypeId};
+use hir::{
+    CustomTypeId, ExpressionId, FieldId, HirType, HirTypeKind, LazyTypeId, LocalId, StructId,
+    TypeId,
+};
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
     soul_names::{PrimitiveTypes, TypeModifier},
@@ -95,9 +98,9 @@ impl<'a> TypedHirContext<'a> {
     }
 
     fn get_custom_type_field_access(
-        &mut self, 
-        id: CustomTypeId, 
-        field: &str, 
+        &mut self,
+        id: CustomTypeId,
+        field: &str,
         span: Span,
     ) -> Option<FieldId> {
         match id {
