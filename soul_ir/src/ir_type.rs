@@ -18,33 +18,34 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         ty: TypeId,
         generics: &GenericSubstitute,
     ) -> SoulResult<Option<BasicTypeEnum<'a>>> {
+        if let Some(ir_type) = self.lowered_types.borrow().get(ty).copied() {
+            return Ok(ir_type);
+        }
+        
         let hir_type = self.get_type(ty)?;
 
-        Ok(Some(match hir_type.kind {
+        let ir_type = match hir_type.kind {
             ThirTypeKind::Generic(id) => {
                 let ty = generics.resolve(id).ok_or(soul_error_internal!(
                     format!("generic {:?} substitute type not found", ty),
                     None
                 ))?;
 
-                return self.lower_type(ty, generics);
+                self.lower_type(ty, generics)?
             }
-            ThirTypeKind::CustomTypes(id) => match id {
+            ThirTypeKind::CustomTypes(id) => Some(match id {
                 hir::CustomTypeId::Struct(struct_id) => {
                     self.lower_struct(struct_id, generics).map(|s| s.into())?
                 }
                 hir::CustomTypeId::Enum(enum_id) => self.lower_enum(enum_id).into(),
-            },
+            }),
             ThirTypeKind::Primitive(primitive_types) => {
-                match self.lower_primitive_type(primitive_types) {
-                    Some(val) => val,
-                    None => return Ok(None),
-                }
+                self.lower_primitive_type(primitive_types)
             }
 
             ThirTypeKind::Ref { .. } | ThirTypeKind::Pointer(_) => {
                 let ptr_type = self.context.ptr_type(AddressSpace::default());
-                ptr_type.into()
+                Some(ptr_type.into())
             }
             ThirTypeKind::Optional(type_id) => {
                 let element_type = match self.lower_type(type_id, generics)? {
@@ -52,9 +53,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     None => self.context.i8_type().into(),
                 };
                 let is_null = self.context.bool_type().into();
-                self.context
+                Some(self.context
                     .struct_type(&[is_null, element_type], false)
-                    .into()
+                    .into())
             }
             ThirTypeKind::Array { element, kind } => {
                 let array_struct = self.types.types_map.array_struct;
@@ -65,27 +66,28 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                             Some(ty) => ty,
                             None => self.context.i8_type().into(),
                         };
-                        element_type.array_type(num as u32).into()
+                        Some(element_type.array_type(num as u32).into())
                     }
                     ast::ArrayKind::MutSlice
                     | ast::ArrayKind::HeapArray
                     | ast::ArrayKind::ConstSlice => {
-                        self.get_or_create_struct(array_struct, generics)?.into()
+                        Some(self.get_or_create_struct(array_struct, generics)?.into())
                     }
                 }
             }
-
             ThirTypeKind::None | ThirTypeKind::Type => {
-                return Ok(None);
+                None
             }
-
             ThirTypeKind::Error => {
                 #[cfg(debug_assertions)]
                 panic!("error type should not be in ir");
                 #[cfg(not(debug_assertions))]
                 return Err(soul_error_internal!("error type should not be in ir", None));
             }
-        }))
+        };
+    
+        self.lowered_types.borrow_mut().insert(ty, ir_type);
+        Ok(ir_type)
     }
 
     pub(crate) fn get_or_create_struct(

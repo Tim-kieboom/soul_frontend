@@ -147,6 +147,7 @@ pub struct LlvmBackend<'f, 'a> {
     temps: HashMap<(FunctionKeyId, TempId), IrOperand<'a>>,
     locals: HashMap<(FunctionKeyId, LocalId), Local<'a>>,
     blocks: HashMap<(FunctionKeyId, BlockId), BasicBlock<'a>>,
+    lowered_types: RefCell<VecMap<TypeId, Option<BasicTypeEnum<'a>>>>,
 
     function_keys: FunctionKeyStore,
     field_indexs: RefCell<VecMap<FieldId, usize>>,
@@ -203,7 +204,8 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             non_mangels: HashMap::new(),
             structs: StructStore::new(),
             types: request.types.clone(),
-            field_indexs: RefCell::new(VecMap::const_default()),
+            field_indexs: VecMap::const_default().into(),
+            lowered_types: VecMap::const_default().into(),
             current: Current::start(function_keys.global_key()),
 
             function_keys,
