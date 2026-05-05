@@ -1,0 +1,29 @@
+import (
+    ./.Io
+)
+
+RunTests() {
+    test_should_have_correct_tag()
+    test_should_cmp_correctly()
+}
+
+enum Basic {
+    Zero,
+    One,
+    Two,
+    Three,
+}
+
+test_should_have_correct_tag() {
+    Io.PrintAssert(Basic.Zero as u8 == 0, "|'test_should_have_correct_tag()' FAILED file: Test/enums.soul| Basic.Zero should be 0")
+    Io.PrintAssert(Basic.One as u8 == 1, "|'test_should_have_correct_tag()' FAILED file: Test/enums.soul| Basic.One should be 1")
+    Io.PrintAssert(Basic.Two as u8 == 2, "|'test_should_have_correct_tag()' FAILED file: Test/enums.soul| Basic.Two should be 2")
+    Io.PrintAssert(Basic.Three as u8 == 3, "|'test_should_have_correct_tag()' FAILED file: Test/enums.soul| Basic.Three should be 3")
+}
+
+test_should_cmp_correctly() {
+    Io.PrintAssert(Basic.One == Basic.One, "|'test_should_cmp_correctly()' FAILED file: Test/enums.soul| Basic.One should be Basic.One")
+    Io.PrintAssert(Basic.One != Basic.Two, "|'test_should_cmp_correctly()' FAILED file: Test/enums.soul| Basic.One should not be Basic.Two")
+    Io.PrintAssert(Basic.One < Basic.Two, "|'test_should_cmp_correctly()' FAILED file: Test/enums.soul| Basic.One should be smaller then Basic.Two")
+    Io.PrintAssert(Basic.Two > Basic.One, "|'test_should_cmp_correctly()' FAILED file: Test/enums.soul| Basic.Two should be bigger then Basic.One")
+}

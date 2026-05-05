@@ -1,10 +1,14 @@
-import .SubLib.{this}
+import (
+    .SubLib
+)
 
 const Variable = 1
 
 GetStruct(): Struct {
     Struct{field: 1, test: 2}
 }
+
+Struct Methode() {}
 
 struct Struct {
     field: int

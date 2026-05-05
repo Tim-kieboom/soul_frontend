@@ -1,7 +1,9 @@
 import (
     .ifs
+    .enums
 )
 
 RunTests() {
     ifs.RunTests()
+    enums.RunTests()
 }

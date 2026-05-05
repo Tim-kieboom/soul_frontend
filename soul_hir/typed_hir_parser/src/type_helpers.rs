@@ -1,5 +1,5 @@
-use ast::ArrayKind;
-use hir::{DisplayType, HirType, HirTypeKind, InferTypesMap, LazyTypeId, TypeId, TypesMap};
+use ast::{ArrayKind, CustomType};
+use hir::{CustomTypeId, DisplayType, HirType, HirTypeKind, InferTypesMap, LazyTypeId, TypeId, TypesMap};
 use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},
     soul_names::{PrimitiveTypes, TypeModifier, TypeWrapper},
@@ -226,6 +226,12 @@ impl UnifyPrimitiveCastLazy for HirTypeKind {
         }
 
         Ok(match (self, should_be) {
+            (HirTypeKind::CustomType(CustomTypeId::Enum(_)), HirTypeKind::Primitive(prim)) => {
+                if !prim.is_any_interger() {
+                    return Err(display_msg_lazy(self, should_be))
+                }
+
+            }
             (
                 HirTypeKind::Ref {
                     of_type: a_id,

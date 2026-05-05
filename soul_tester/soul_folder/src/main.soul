@@ -2,21 +2,15 @@ import (
     crate.Io
     crate.Test
     crate.Lib.SubLib
-    crate.Fs.{File, READ_ONLY}
-    crate.Lib.{this, Variable, A, B as b}
+    // crate.Fs.{File, Open, FileMode}
+    crate.Lib.{this, Struct, Variable, A, B as b}
 )
-
-enum Tag {
-    One,
-    Two,
-    Three,
-}
 
 main() {
     Test.RunTests()
 
-    mut tag := Tag.One
-    tag = Tag.Two
+    // Struct.Methode()
+    // File.Open(c"text.txt", FileMode.ReadOnly)
 
     infer := 1
     mut num = A()
@@ -29,3 +23,15 @@ main() {
 
     Io.Println("hello world")
 }
+
+// enum Number as int {
+//     One = 1,
+//     Two = 332,
+//     Three = 3,
+// }
+
+// enums() {
+//     mut test = Test.One
+//     test = Test.Two
+//     mut tag: u32 = test.Tag() 
+// }

@@ -212,6 +212,8 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     pub(crate) fn parse_generic_define(&mut self) -> TryResult<Vec<SoulType>, SoulError> {
+        let start_position = self.current_position();
+
         self.expect(&ARROW_LEFT).try_err()?;
         let mut types = vec![];
         loop {
@@ -223,7 +225,10 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            self.expect(&COMMA).try_err()?;
+            if !self.current_is(&COMMA) {
+                self.go_to(start_position);
+                return TryNotValue(self.get_expect_error(&COMMA))
+            }
         }
         TryOk(types)
     }

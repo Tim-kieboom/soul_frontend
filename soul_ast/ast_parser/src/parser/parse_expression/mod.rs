@@ -256,6 +256,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         };
 
         let ident = self.try_bump_consume_ident()?;
+        let span = ident.span;
 
         let peek = self.peek();
         match &self.token().kind {
@@ -263,13 +264,13 @@ impl<'a, 'f> Parser<'a, 'f> {
                 if ident.as_str() == KeyWord::New.as_str() {
                     return Err(soul_error_internal!(
                         "heap array alloc not yet impl",
-                        Some(ident.span)
+                        Some(span)
                     ));
                 }
 
-                Err(soul_error_internal!(
+                return Err(soul_error_internal!(
                     "collectionType array not yet impl",
-                    Some(ident.span)
+                    Some(span)
                 ))
             }
             &ROUND_OPEN | &ARROW_LEFT => {
@@ -279,26 +280,29 @@ impl<'a, 'f> Parser<'a, 'f> {
                     Err(TryError::IsNotValue(_)) => (),
                 };
 
-                let generics = self.parse_generic_define().merge_to_result()?;
-                self.parse_struct_contructor(ident, generics, start_span)
-                    .map(Expression::from_struct_contructor)
+                match self.parse_generic_define() {
+                    Ok(generics) => {
+                        return self.parse_struct_contructor(ident, generics, start_span)
+                            .map(Expression::from_struct_contructor);
+                    }
+                    Err(TryError::IsNotValue(_)) => (),
+                    Err(TryError::IsErr(err)) => return Err(err),
+                }
             }
-            &CURLY_OPEN => self
+            &CURLY_OPEN => return self
                 .parse_struct_contructor(ident, vec![], start_span)
                 .map(Expression::from_struct_contructor),
-            _ => {
-                let span = ident.span;
+            _ => (),
+        };
 
-                Ok(Expression::new(
-                    ExpressionKind::Variable {
-                        ident,
-                        resolved: None,
-                        id: None,
-                    },
-                    span,
-                ))
-            }
-        }
+        Ok(Expression::new(
+            ExpressionKind::Variable {
+                ident,
+                resolved: None,
+                id: None,
+            },
+            span,
+        ))
     }
 
     fn parse_as_typecast(&mut self, left: Expression, start_span: Span) -> SoulResult<Expression> {

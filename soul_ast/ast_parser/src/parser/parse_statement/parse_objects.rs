@@ -35,7 +35,14 @@ impl<'f, 'a> Parser<'f, 'a> {
             self.bump();
         }
         self.skip_end_lines();
-        self.expect(&CURLY_CLOSE)?;
+        if !self.current_is(&CURLY_CLOSE) {
+            
+            return Err(SoulError::new(
+                format!("expected: '{}' or '{}' but found: '{}'", CURLY_CLOSE.display(), COMMA.display(), self.token().kind.display()), 
+                soul_utils::error::SoulErrorKind::InvalidTokenKind, 
+                Some(self.token().span),
+            ))
+        }
 
         Ok(Statement::new(
             ast::StatementKind::Enum(Enum{ id: None, name, variants: variant }), 

@@ -13,14 +13,16 @@ struct File {
     cFilePtr: *none
 }
 
-const READ_ONLY = 0 as u8
-const READ_UPDATE = 1 as u8
-const WRITE_NEW_FILE = 2 as u8
+enum FileMode as c_str {
+    ReadOnly = c"r",
+    ReadUpdate = c"r+",
+    WriteNewFile  = c"w",
+}
 
-File Open(path: c_str, mode: u8): File {
+File Open(path: c_str, mode: FileMode): File {
 
     mut cFilePtr: *none = null
-    code := fopen_s(&cFilePtr, path, modeToCstr(mode))
+    code := fopen_s(&cFilePtr, path, mode.Value())
     Io.Print("tried to open file got code: ")
     Io.Println_int(code as int)
     File{cFilePtr}
@@ -39,14 +41,4 @@ File Print(@this): bool {
 File Close(this) {
     ptr := this.cFilePtr
     fclose(ptr)
-}
-
-modeToCstr(mode: u8): c_str {
-    mut cstr = c"r"
-    if mode == 1 {
-        cstr = c"w"
-    } else if mode == 2 {
-        cstr = c"r+"
-    }
-    cstr
 }

@@ -1,5 +1,5 @@
 use ast::ArrayKind;
-use hir::TypeId;
+use hir::{CustomTypeId, TypeId};
 use inkwell::{AddressSpace, types::BasicTypeEnum, values::BasicValueEnum};
 use mir_parser::mir;
 use soul_utils::{error::SoulResult, soul_error_internal, soul_names::PrimitiveTypes};
@@ -51,6 +51,20 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     value,
                     info: crate::OperandInfo::new_loaded(cast_to, cast_type),
                 })
+            }
+            (ThirTypeKind::CustomTypes(CustomTypeId::Enum(_)), ThirTypeKind::Primitive(prim)) => {
+                if !prim.is_any_interger() {
+                    return Err(soul_error_internal!(
+                        format!(
+                            "types can not be type cast\nsource: {:#?}\ncast: {:#?}",
+                            mir_source_type, mir_cast_type
+                        ),
+                        None
+                    ))
+                }
+                
+                //llvm doesn't care enum's are (u8, u16, u32 or u64)
+                self.new_loaded_operand(source_value, cast_to, generics)
             }
             (ThirTypeKind::Pointer(_), ThirTypeKind::Pointer(_)) => {
                 //llvm doesn't care ptr's are ptr's
