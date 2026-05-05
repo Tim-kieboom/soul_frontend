@@ -2,19 +2,15 @@ use std::{fs::File, io::Write, path::PathBuf, time::Instant};
 
 use chrono::Local;
 
-
-
 use run_ast::to_ast;
 use run_hir::to_hir;
 use run_mir::to_mir;
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
-    CrateExports, CrateStore,
+    CrateExports, CrateStore, IdAlloc, ModuleId, SoulToml,
     compile_options::{Arch, CompilerOptions, Os, TargetInfo},
     crate_store::CrateContext,
-    IdAlloc, ModuleId,
     sementic_level::ModuleStore,
-    SoulToml,
 };
 
 #[cfg(not(debug_assertions))]
@@ -29,9 +25,10 @@ const COMPILER_OPTIONS: CompilerOptions = CompilerOptions::new_default(TARGET);
 
 fn main() {
     let now = chrono::Local::now();
-    let mut logger = Logger{text: String::new()};
-    let paths_json: PathsJson =
-        serde_json::from_slice(include_bytes!("../paths.json")).unwrap();
+    let mut logger = Logger {
+        text: String::new(),
+    };
+    let paths_json: PathsJson = serde_json::from_slice(include_bytes!("../paths.json")).unwrap();
     let project_path = PathBuf::from(&paths_json.project);
 
     logger.logln(format!("date: {}", now.format("%Y_%m_%d %H:%M:%S")));
@@ -45,7 +42,11 @@ fn main() {
     let timer = Instant::now();
     let manifest = SoulToml::from_path(&project_path.join("Soul.toml")).unwrap();
     let mut crate_store = CrateStore::new();
-    crate_store.insert(manifest.package.name.clone(), project_path.clone(), ModuleId::error());
+    crate_store.insert(
+        manifest.package.name.clone(),
+        project_path.clone(),
+        ModuleId::error(),
+    );
     let load_time = timer.elapsed();
     logger.logln(format!("Load deps:   {:?}", load_time));
 
@@ -73,22 +74,22 @@ fn main() {
 
     let all_exports = CrateExports::default();
     let timer = Instant::now();
-    let hir = to_hir(
-        &ast, 
-        &COMPILER_OPTIONS, 
-        &mut context, 
-        &all_exports, 
-        root, 
-        project_path.clone(),
-    );
+    let hir = to_hir(&ast, &COMPILER_OPTIONS, &mut context, &all_exports, root);
     let hir_time = timer.elapsed();
     logger.logln(format!("HIR:       {:?}", hir_time));
 
     let timer = Instant::now();
-    let mir = to_mir(&hir, &ast, &COMPILER_OPTIONS, &mut context, &all_exports, root);
+    let mir = to_mir(
+        &hir,
+        &ast,
+        &COMPILER_OPTIONS,
+        &mut context,
+        &all_exports,
+        root,
+    );
     let mir_time = timer.elapsed();
     logger.logln(format!("MIR:       {:?}", mir_time));
-    
+
     #[cfg(debug_assertions)]
     let _ = mir; // to avoid unused warning (mir is used in release)
 
@@ -105,7 +106,7 @@ fn main() {
         to_llvm_ir(&request, &COMPILER_OPTIONS, &mut faults);
         timer.elapsed()
     };
-    
+
     #[cfg(debug_assertions)]
     let llvm_time = std::time::Duration::ZERO;
 
@@ -113,15 +114,21 @@ fn main() {
 
     let frontend_total = tokenizer_time + ast_time + hir_time + mir_time;
     let full_total = frontend_total + llvm_time;
-    
+
     let pct = |part: std::time::Duration, total: std::time::Duration| -> f64 {
-        if total.as_nanos() == 0 { 0.0 } 
-        else { 100.0 * part.as_secs_f64() / total.as_secs_f64() }
+        if total.as_nanos() == 0 {
+            0.0
+        } else {
+            100.0 * part.as_secs_f64() / total.as_secs_f64()
+        }
     };
-    
+
     logger.logln("");
     logger.logln("=== Frontend Percentages ===");
-    logger.logln(format!("Tokenizer: {:.1}%", pct(tokenizer_time, frontend_total)));
+    logger.logln(format!(
+        "Tokenizer: {:.1}%",
+        pct(tokenizer_time, frontend_total)
+    ));
     logger.logln(format!("AST:       {:.1}%", pct(ast_time, frontend_total)));
     logger.logln(format!("HIR:       {:.1}%", pct(hir_time, frontend_total)));
     logger.logln(format!("MIR:       {:.1}%", pct(mir_time, frontend_total)));
@@ -129,7 +136,10 @@ fn main() {
     logger.logln(format!("Frontend Total: {:?}", frontend_total));
     logger.logln("");
     logger.logln("=== Full Pipeline Percentages ===");
-    logger.logln(format!("Tokenizer: {:.1}%", pct(tokenizer_time, full_total)));
+    logger.logln(format!(
+        "Tokenizer: {:.1}%",
+        pct(tokenizer_time, full_total)
+    ));
     logger.logln(format!("AST:       {:.1}%", pct(ast_time, full_total)));
     logger.logln(format!("HIR:       {:.1}%", pct(hir_time, full_total)));
     logger.logln(format!("MIR:       {:.1}%", pct(mir_time, full_total)));
@@ -138,16 +148,12 @@ fn main() {
     logger.logln(format!("Full Total: {:?}", full_total));
 
     println!("{}", logger.as_str());
-    write_results(
-        now,
-        logger.as_str(),
-    );
+    write_results(now, logger.as_str());
 }
 struct Logger {
-    text: String
+    text: String,
 }
 impl Logger {
-
     fn logln(&mut self, text: impl Into<String>) {
         self.text.push_str(&text.into());
         self.text.push('\n');
@@ -177,21 +183,22 @@ struct PathsJson {
     project: String,
 }
 
-fn write_results(
-    now: chrono::DateTime<Local>,
-    output: &str,
-) {
+fn write_results(now: chrono::DateTime<Local>, output: &str) {
     #[cfg(not(debug_assertions))]
     let folder = "release";
-    
+
     #[cfg(debug_assertions)]
     let folder = "debug";
-    
-    let filename = format!("example/results/{}/{}.txt", folder, now.format("%Y%m%d_%H%M%S"));
-    
-    
+
+    let filename = format!(
+        "example/results/{}/{}.txt",
+        folder,
+        now.format("%Y%m%d_%H%M%S")
+    );
+
     let mut file = File::create(&filename).expect("Failed to create results file");
-    file.write_all(output.as_bytes()).expect("Failed to write results");
-    
+    file.write_all(output.as_bytes())
+        .expect("Failed to write results");
+
     println!("Results written to: {}", filename);
 }

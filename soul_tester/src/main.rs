@@ -17,7 +17,7 @@ use run_mir::{MirResponse, extract_exports, to_mir};
 use soul_ir::{IrRequest, to_llvm_ir};
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
-    CrateExports, CrateStore, ModuleId, SoulToml,
+    CrateExports, CrateId, CrateStore, ModuleId, SoulToml,
     char_colors::{DEFAULT, GREEN},
     compile_options::{Arch, CompilerOptions, Os, TargetInfo},
     crate_store::CrateContext,
@@ -25,8 +25,9 @@ use soul_utils::{
     sementic_level::{FaultCollector, MessageConfig, ModuleStore, SementicLevel},
 };
 
-use crate::{convert_soul_error::ToMessage, paths::EntryFile};
+use crate::{benchmark::Benchmarks, convert_soul_error::ToMessage, paths::EntryFile};
 
+pub mod benchmark;
 mod convert_soul_error;
 mod displayer_ast;
 mod displayer_hir;
@@ -51,7 +52,7 @@ struct Output {
     hir_response: HirResponse,
 }
 
-fn collect_all_exports(crate_store: &CrateStore) -> CrateExports {
+fn collect_all_crate_exports(crate_store: &CrateStore) -> CrateExports {
     let mut all_exports = CrateExports::default();
     for krate in crate_store.values() {
         for (name, id) in &krate.exports.functions {
@@ -69,12 +70,11 @@ fn main() -> Result<()> {
     init_logger(&paths.log_file)?;
 
     let (manifest, mut crate_store) = paths.load_crates()?;
+    let mut benchmarks = Benchmarks::default();
 
-    let mut timer = Instant::now();
-    compile_all_libs(&paths, &mut crate_store, &manifest)?;
+    compile_all_libs(&paths, &mut crate_store, &manifest, &mut benchmarks)?;
 
-    // Collect all exports from dependencies after compiling them
-    let all_exports = collect_all_exports(&crate_store);
+    let all_exports = collect_all_crate_exports(&crate_store);
 
     let root_lib = &manifest.package.name;
     let source_path = Paths::to_source_path(paths.project_path())?;
@@ -84,6 +84,7 @@ fn main() -> Result<()> {
     let mut context = CrateContext::new(entry_file.is_lib, MESSAGE_CONFIG);
 
     let mut output = run_crate_frontend(
+        crate_store.main_crate(),
         &paths,
         paths.project_path(),
         source_path,
@@ -92,6 +93,7 @@ fn main() -> Result<()> {
         &crate_store,
         &mut context,
         &all_exports,
+        &mut benchmarks,
     )?;
 
     log_faults(&context.faults, &module_store);
@@ -99,23 +101,21 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    info!(
-        "{GREEN}frontend success: {}ms{DEFAULT}",
-        timer.elapsed().as_millis()
-    );
+    info!("{GREEN}frontend success{DEFAULT}",);
 
-    timer = Instant::now();
     if run_llvm(
         &mut output,
         paths.project_path(),
         &mut context.faults,
         root_lib,
+        &mut benchmarks,
     ) {
-        info!(
-            "{GREEN}llvm success: {}ms{DEFAULT}",
-            timer.elapsed().as_millis()
-        )
+        info!("{GREEN}llvm success{DEFAULT}",)
     }
+
+    let mut total_times = String::new();
+    benchmarks.write_total(&mut total_times);
+    info!("{total_times}");
     Ok(())
 }
 
@@ -123,13 +123,14 @@ fn compile_all_libs(
     paths: &Paths,
     crate_store: &mut CrateStore,
     manifest: &SoulToml,
+    benchmarks: &mut Benchmarks,
 ) -> Result<()> {
     let crate_info_list: Vec<_> = crate_store
-        .values()
-        .map(|data| (data.name.clone(), data.project_path.clone()))
+        .entries()
+        .map(|(id, data)| (id, data.name.clone(), data.project_path.clone()))
         .collect();
 
-    for (lib_name, project_path) in crate_info_list {
+    for (crate_id, lib_name, project_path) in crate_info_list {
         if lib_name == manifest.package.name {
             continue;
         }
@@ -141,6 +142,7 @@ fn compile_all_libs(
 
         let mut context = CrateContext::new(entry_path.is_lib, MESSAGE_CONFIG);
         let output = run_crate_frontend(
+            crate_id,
             paths,
             &project_path,
             source_path,
@@ -149,6 +151,7 @@ fn compile_all_libs(
             crate_store,
             &mut context,
             &CrateExports::default(),
+            benchmarks,
         )?;
 
         log_faults(&context.faults, &module_store);
@@ -167,6 +170,7 @@ fn compile_all_libs(
 }
 
 fn run_crate_frontend(
+    crate_id: CrateId,
     paths: &Paths,
     manifest: &Path,
     source: PathBuf,
@@ -175,12 +179,20 @@ fn run_crate_frontend(
     crate_store: &CrateStore,
     context: &mut CrateContext,
     crate_exports: &CrateExports,
+    benchmarks: &mut Benchmarks,
 ) -> Result<Output> {
+    let timer = Instant::now();
     let source_file = to_source_file(&entry.path)?;
+    benchmarks.source_read(crate_id, timer.elapsed());
+
     let root = module_store.get_root_id();
+
+    let timer = Instant::now();
     let tokens = to_token_stream(&source_file, root);
     display_tokenizer(paths, manifest, root, &source_file)?;
+    benchmarks.tokenize(crate_id, timer.elapsed());
 
+    let timer = Instant::now();
     let ast = to_ast(
         tokens,
         &COMPILER_OPTIONS,
@@ -189,13 +201,18 @@ fn run_crate_frontend(
         crate_store,
         source.clone(),
     );
+    benchmarks.ast(crate_id, timer.elapsed());
     display_ast(manifest, module_store, &ast)?;
 
-    let mut hir = to_hir(&ast, &COMPILER_OPTIONS, context, crate_exports, root, source.clone());
+    let timer = Instant::now();
+    let mut hir = to_hir(&ast, &COMPILER_OPTIONS, context, crate_exports, root);
     display_hir(manifest, &hir, &ast)?;
+    benchmarks.hir(crate_id, timer.elapsed());
     clear_hir_type_map(&mut hir);
 
+    let timer = Instant::now();
     let mir = to_mir(&hir, &ast, &COMPILER_OPTIONS, context, crate_exports, root);
+    benchmarks.mir(crate_id, timer.elapsed());
     display_mir(manifest, &mir, &hir, &ast)?;
 
     Ok(Output {
@@ -209,6 +226,7 @@ fn run_llvm(
     manifest: &Path,
     faults: &mut FaultCollector,
     lib_name: &str,
+    benchmarks: &mut Benchmarks,
 ) -> bool {
     let request = IrRequest {
         mir: &output.mir_response,
@@ -218,7 +236,10 @@ fn run_llvm(
     };
 
     faults.faults.clear();
+
+    let timer = Instant::now();
     let ir = to_llvm_ir(&request, &COMPILER_OPTIONS, &mut faults.faults);
+    benchmarks.ir = timer.elapsed();
     log_faults(faults, &ModuleStore::new(PathBuf::new()));
 
     #[cfg(not(debug_assertions))]

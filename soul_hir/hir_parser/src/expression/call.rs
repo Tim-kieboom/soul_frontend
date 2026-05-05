@@ -4,10 +4,10 @@ use hir::{Expression, ExpressionId, HirType, LazyTypeId, TypeId};
 #[cfg(debug_assertions)]
 use soul_utils::soul_error_internal;
 use soul_utils::{
+    IdAlloc,
     error::{SoulError, SoulErrorKind},
     ids::FunctionId,
     span::Span,
-    IdAlloc,
 };
 
 use crate::HirContext;
@@ -19,7 +19,12 @@ impl<'a> HirContext<'a> {
         function_call: &ast::FunctionCall,
     ) -> hir::Expression {
         if let Some(intrinsic) = function_call.intrinsic {
-            return self.lower_intrinsic(id, intrinsic, function_call.name.span, function_call.intrinsic_value.as_deref());
+            return self.lower_intrinsic(
+                id,
+                intrinsic,
+                function_call.name.span,
+                function_call.intrinsic_value.as_deref(),
+            );
         }
 
         if let Some(external_ref) = &function_call.external_ref {
@@ -268,7 +273,9 @@ impl<'a> HirContext<'a> {
                 }
             }
             Intrinsic::InLine => {
-                let line = intrinsic_value.and_then(|v| v.parse().ok()).unwrap_or(span.start_line as i128);
+                let line = intrinsic_value
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(span.start_line as i128);
                 let ty = self.type_from_literal(&Literal::Int(line));
                 hir::Expression {
                     id,

@@ -3,12 +3,18 @@ name = "soul_tester"
 version = "0.1.0"
 edition = "2024"
 
+[profile.release]
+# opt-level = 'z'     # Optimize for size
+# strip = true        # Remove symbols
+# lto = true          # Enable Link Time Optimization
+debug = true       # Disable debug info
+
 [[example]]
 name = "benchmark"
 path = "example/benchmark.rs"
 
 [features]
-default = ["error_backtrace", "absolute_internal_error_path"]
+# default = ["error_backtrace", "absolute_internal_error_path"]
 error_backtrace = ["soul_utils/error_backtrace"]
 absolute_internal_error_path = ["soul_utils/absolute_internal_error_path"]
 

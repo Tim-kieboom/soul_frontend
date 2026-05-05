@@ -79,7 +79,12 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             } => {
                 let field_info = &match self.types.types_table.fields.get(*field_id) {
                     Some(val) => val,
-                    None => return Err(soul_error_internal!(format!("fieldId: {:?} not found", field_id), None)),
+                    None => {
+                        return Err(soul_error_internal!(
+                            format!("fieldId: {:?} not found", field_id),
+                            None
+                        ));
+                    }
                 };
                 self.lower_field_access(*base, field_info, generics)
             }

@@ -17,7 +17,6 @@ impl<'a> NameResolver<'a> {
     }
 
     pub(super) fn resolve_custom_type(&mut self, statement: &mut Statement) {
-
         match &mut statement.node {
             StatementKind::Struct(obj) => {
                 Self::resolve_struct(self.context, self.store, &self.current, obj);
@@ -25,7 +24,7 @@ impl<'a> NameResolver<'a> {
             StatementKind::Enum(obj) => {
                 Self::resolve_enum(self.context, self.store, &self.current, obj);
             }
-            _ => ()
+            _ => (),
         }
     }
 

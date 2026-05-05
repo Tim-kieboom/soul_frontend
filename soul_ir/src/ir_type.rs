@@ -21,7 +21,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         if let Some(ir_type) = self.lowered_types.borrow().get(ty).copied() {
             return Ok(ir_type);
         }
-        
+
         let hir_type = self.get_type(ty)?;
 
         let ir_type = match hir_type.kind {
@@ -39,9 +39,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 }
                 hir::CustomTypeId::Enum(enum_id) => self.lower_enum(enum_id).into(),
             }),
-            ThirTypeKind::Primitive(primitive_types) => {
-                self.lower_primitive_type(primitive_types)
-            }
+            ThirTypeKind::Primitive(primitive_types) => self.lower_primitive_type(primitive_types),
 
             ThirTypeKind::Ref { .. } | ThirTypeKind::Pointer(_) => {
                 let ptr_type = self.context.ptr_type(AddressSpace::default());
@@ -53,9 +51,11 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     None => self.context.i8_type().into(),
                 };
                 let is_null = self.context.bool_type().into();
-                Some(self.context
-                    .struct_type(&[is_null, element_type], false)
-                    .into())
+                Some(
+                    self.context
+                        .struct_type(&[is_null, element_type], false)
+                        .into(),
+                )
             }
             ThirTypeKind::Array { element, kind } => {
                 let array_struct = self.types.types_map.array_struct;
@@ -75,9 +75,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     }
                 }
             }
-            ThirTypeKind::None | ThirTypeKind::Type => {
-                None
-            }
+            ThirTypeKind::None | ThirTypeKind::Type => None,
             ThirTypeKind::Error => {
                 #[cfg(debug_assertions)]
                 panic!("error type should not be in ir");
@@ -85,7 +83,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 return Err(soul_error_internal!("error type should not be in ir", None));
             }
         };
-    
+
         self.lowered_types.borrow_mut().insert(ty, ir_type);
         Ok(ir_type)
     }

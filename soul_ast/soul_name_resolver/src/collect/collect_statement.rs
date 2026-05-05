@@ -20,7 +20,7 @@ impl<'a> NameResolver<'a> {
 
     pub(crate) fn collect_scopeless_block(&mut self, block: &mut Block) {
         block.node_id = Some(self.alloc_node());
-        
+
         for statement in &mut block.statements {
             self.collect_statement(statement);
         }
@@ -203,6 +203,13 @@ fn owner_hint_from_expression(
             Literal::Str(_) | Literal::Cstr(_) => return None,
         })),
         ExpressionKind::FunctionCall(function_call) => {
+            if let Some(intrinsic) = function_call.intrinsic {
+                return match intrinsic {
+                    ast::Intrinsic::InFile => Some(TypeKind::Primitive(PrimitiveTypes::CStr)),
+                    ast::Intrinsic::InLine => Some(TypeKind::Primitive(PrimitiveTypes::Int)),
+                };
+            }
+
             let owner_kind = function_call
                 .callee
                 .as_ref()

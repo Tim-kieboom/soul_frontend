@@ -70,11 +70,12 @@ impl Paths {
         let project_dir = self.project_path();
         let mut crate_store = CrateStore::new();
 
-        crate_store.insert(
+        let id = crate_store.insert(
             manifest.package.name.clone(),
             project_dir.to_path_buf(),
             ModuleId::error(),
         );
+        crate_store.set_main_crate(id);
 
         for (dep_name, dep) in &manifest.dependencies {
             let dep_src = project_dir.join(&dep.path);

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use crate::{
+    IdAlloc,
     ids::{FunctionId, IdGenerator},
     impl_soul_ids,
     sementic_level::{FaultCollector, MessageConfig},
@@ -42,6 +43,7 @@ pub struct Crate {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CrateStore {
+    main_crate: CrateId,
     map: VecMap<CrateId, Crate>,
     alloc: IdGenerator<CrateId>,
     path_to_id: HashMap<String, CrateId>,
@@ -49,10 +51,19 @@ pub struct CrateStore {
 impl CrateStore {
     pub fn new() -> Self {
         Self {
+            main_crate: CrateId::error(),
             map: VecMap::const_default(),
             path_to_id: HashMap::new(),
             alloc: IdGenerator::new(),
         }
+    }
+
+    pub fn set_main_crate(&mut self, crate_id: CrateId) {
+        self.main_crate = crate_id;
+    }
+
+    pub fn main_crate(&self) -> CrateId {
+        self.main_crate
     }
 
     pub fn insert(&mut self, name: String, source_path: PathBuf, root_module: ModuleId) -> CrateId {
@@ -103,6 +114,10 @@ impl CrateStore {
     pub fn name_to_crate(&self, name: &String) -> Option<&Crate> {
         let id = self.path_to_id.get(name).copied()?;
         self.get(id)
+    }
+
+    pub fn entries(&self) -> impl Iterator<Item = (CrateId, &Crate)> {
+        self.map.entries()
     }
 
     pub fn values(&self) -> impl Iterator<Item = &Crate> {

@@ -75,16 +75,16 @@ impl<'a> NameResolver<'a> {
 
     fn get_resolve(&mut self, function_call: &mut FunctionCall) {
         if function_call.callee.is_none() {
-
             if let Some(intrinsic) = ast::Intrinsic::from_name(function_call.name.as_str()) {
                 function_call.intrinsic = Some(intrinsic);
                 function_call.resolved = Some(FunctionId::error());
-                
+
                 if intrinsic == ast::Intrinsic::InFile {
                     let file_path = self.current.current_path();
                     function_call.intrinsic_value = Some(file_path.to_string_lossy().to_string());
                 } else if intrinsic == ast::Intrinsic::InLine {
-                    function_call.intrinsic_value = Some(function_call.name.span.start_line.to_string());
+                    function_call.intrinsic_value =
+                        Some(function_call.name.span.start_line.to_string());
                 }
                 return;
             }
