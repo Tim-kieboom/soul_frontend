@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap};
 
 use soul_utils::{
     Ident,
@@ -110,7 +110,7 @@ impl ScopeBuilder {
     pub fn iter_modules(
         &self,
         module: ModuleId,
-    ) -> Option<impl Iterator<Item = (String, ScopeModuleEntry)>> {
+    ) -> Option<impl Iterator<Item = (&String, &ScopeModuleEntry)>> {
         Some(self.scopes.get(module)?.modules())
     }
 }
@@ -218,16 +218,15 @@ impl ModuleScopes {
         None
     }
 
-    fn modules(&self) -> impl Iterator<Item = (String, ScopeModuleEntry)> {
-        let mut result = Vec::new();
-        for scope in self.scope_iter() {
-            for (name, entry) in &scope.entries {
-                if let Some(module) = &entry.module {
-                    result.push((name.clone(), module.clone()));
-                }
-            }
-        }
-        result.into_iter()
+    fn modules(&self) -> impl Iterator<Item = (&std::string::String, &ScopeModuleEntry)> {
+        self.scope_iter()
+            .map(|scope| {
+                scope.entries.iter().filter_map(|(name, entry)| match &entry.module {
+                    Some(module) => Some((name, module)),
+                    None => None,
+                })
+            })
+            .flatten()
     }
 
     fn scope_iter<'a>(&'a self) -> ScopeIterator<'a> {

@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [profile.release]
-# opt-level = 'z'     # Optimize for size
-# strip = true        # Remove symbols
-# lto = true          # Enable Link Time Optimization
-debug = true       # Disable debug info
+opt-level = 'z'     # Optimize for size
+strip = true        # Remove symbols
+lto = true          # Enable Link Time Optimization
+debug = false       # Disable debug info
 
 [[example]]
 name = "benchmark"

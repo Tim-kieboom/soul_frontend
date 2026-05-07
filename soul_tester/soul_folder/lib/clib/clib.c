@@ -6,6 +6,7 @@ SoulArray __clib_mallocString(uint len) {
     void* ptr = malloc(len);
     if(ptr == NULL)
         len = 0;
+    
     return (SoulArray){.ptr = ptr, .len = len};
 }
 
@@ -20,14 +21,13 @@ i64 __clib_fileLen(FILE* file) {
 
 bool __clib_filePrint(FILE* file) {
     i64 len = __clib_fileLen(file);
-    if (len < 0) {
+    if (len < 0)
         return false;
-    }
 
     char* buffer = malloc(len);
-    if(!buffer) {
+    if(!buffer)
         return false;
-    }
+
     fread(buffer, 1, len, file);
     printf("%*s", (int)len, buffer);
     return true;
@@ -90,9 +90,8 @@ str __clib_fmtUint(uint num, u8 base, char buf[50], bool capital) {
     str ptr = &buf[49];
     *ptr = '\0';
     
-    if (base < 2 || base > 16) {
+    if (base < 2 || base > 16)
         return NULL;
-    }
 
     const str numbers = capital ? NUMBERS : NUMBERS_LOWER;
     do {
@@ -109,9 +108,8 @@ str __clib_fmtInt(int num, u8 base, char buf[50], bool capital) {
     str ptr = &buf[49];
     *ptr = '\0';
 
-    if (base < 2 || base > 16) {
+    if (base < 2 || base > 16)
         return NULL;
-    }
     
     int sign = 0;
     if (num < 0) {
@@ -137,9 +135,8 @@ static str __inner_fmt_uint(uint64_t n, u8 base, str buf, int max_digits, bool c
         *buf++ = '0';
         return buf;
     }
-    if (base < 2 || base > 16) {
+    if (base < 2 || base > 16)
         return NULL;
-    }
 
     const str numbers = capital ? NUMBERS : NUMBERS_LOWER;
     char temp[20];
@@ -150,9 +147,7 @@ static str __inner_fmt_uint(uint64_t n, u8 base, str buf, int max_digits, bool c
         n /= base;
     }
     
-    while (i--) {
-        *buf++ = temp[i];
-    }
+    while (i--) *buf++ = temp[i];
     return buf;
 }
 
@@ -165,9 +160,8 @@ str __clib_fmtFloat(double num, u8 base, char buf[50], u8 percision, bool capita
         *buf++ = '-';
         num = -num;
     }
-    if (base < 2 || base > 16) {
+    if (base < 2 || base > 16)
         return NULL;
-    }
 
     uint whole = (uint)num;
     buf = __inner_fmt_uint(whole, base, buf, 20, capital);

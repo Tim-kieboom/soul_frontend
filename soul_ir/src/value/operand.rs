@@ -67,7 +67,13 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             OperandKind::Comptime(literal) => self.lower_literal(literal, operand.ty, generics)?,
             OperandKind::Ref { place, .. } => self.lower_ref(*place, generics)?,
             OperandKind::None => {
-                return Err(soul_error_internal!("operand should be Some(_)", None));
+                #[cfg(debug_assertions)]
+                panic!();
+
+                #[cfg(not(debug_assertions))] {
+                    let id = self.current.function_key();
+                    return Err(soul_error_internal!(format!("operand should be Some(_) {:?}", self.function_keys.id_to_key(id)), None));
+                }
             }
         })
     }

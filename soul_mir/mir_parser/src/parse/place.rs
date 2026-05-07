@@ -1,5 +1,7 @@
 use hir::{StructId, TypeId};
-use soul_utils::{ids::IdAlloc, soul_error_internal, span::Span};
+use soul_utils::{ids::IdAlloc, span::Span};
+#[cfg(debug_assertions)]
+use soul_utils::soul_error_internal;
 
 use crate::{
     EndBlock, MirContext,
@@ -9,7 +11,10 @@ use crate::{
 impl<'a> MirContext<'a> {
     pub fn lower_place(&mut self, place_id: hir::PlaceId) -> EndBlock<mir::PlaceId> {
         let is_end = &mut false;
+        
+        #[cfg(debug_assertions)]
         let span = self.place_span(place_id);
+        
         let mir_place = match &self.hir_response.hir.nodes.places[place_id].kind {
             hir::PlaceKind::Local(local_id) => {
                 let local = match self.local_remap.get(*local_id) {

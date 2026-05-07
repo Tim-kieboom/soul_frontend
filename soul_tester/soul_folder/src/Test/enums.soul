@@ -9,10 +9,10 @@ RunTests() {
 
 
 test_should_have_correct_tag() {
-    Io.PrintAssert(Basic.Zero as u8 == 0,  "|'test_should_have_correct_tag()' FAILED file: Test/enums.soul| Basic.Zero should be 0")
-    Io.PrintAssert(Basic.One as u8 == 1,   "|'test_should_have_correct_tag()' FAILED file: Test/enums.soul| Basic.One should be 1")
-    Io.PrintAssert(Basic.Two as u8 == 2,   "|'test_should_have_correct_tag()' FAILED file: Test/enums.soul| Basic.Two should be 2")
-    Io.PrintAssert(Basic.Three as u8 == 3, "|'test_should_have_correct_tag()' FAILED file: Test/enums.soul| Basic.Three should be 3")
+    Io.PrintAssert(Basic.Zero  as u32 == 0, "|'test_should_have_correct_tag()' FAILED file: Test/enums.soul| Basic.Zero should be 0")
+    Io.PrintAssert(Basic.One   as u32 == 1, "|'test_should_have_correct_tag()' FAILED file: Test/enums.soul| Basic.One should be 1")
+    Io.PrintAssert(Basic.Two   as u32 == 2, "|'test_should_have_correct_tag()' FAILED file: Test/enums.soul| Basic.Two should be 2")
+    Io.PrintAssert(Basic.Three as u32 == 3, "|'test_should_have_correct_tag()' FAILED file: Test/enums.soul| Basic.Three should be 3")
 }
 
 test_should_cmp_correctly() {

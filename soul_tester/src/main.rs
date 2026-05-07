@@ -1,8 +1,5 @@
 use std::{
-    fs::{File, OpenOptions},
-    io::{Read, stdout},
-    path::{Path, PathBuf},
-    time::Instant,
+    fs::{File, OpenOptions}, io::{Read, stdout}, path::{Path, PathBuf}, sync::{LazyLock, Mutex, MutexGuard}, time::Instant
 };
 
 use anyhow::{Error, Result};
@@ -35,7 +32,13 @@ mod displayer_mir;
 mod displayer_tokenizer;
 pub mod paths;
 
-static PATHS: &[u8] = include_bytes!("../paths.json");
+static RAW_PATHS: &[u8] = include_bytes!("../paths.json");
+static PATHS: LazyLock<Paths> = LazyLock::new(|| {
+    serde_json::from_slice(RAW_PATHS).expect("no json error")
+});
+static BENCHMARKS: Mutex<Benchmarks> = Mutex::new(
+    Benchmarks::const_default()
+);
 
 pub const MESSAGE_CONFIG: MessageConfig = MessageConfig {
     backtrace: true,
@@ -52,78 +55,63 @@ struct Output {
     hir_response: HirResponse,
 }
 
-fn collect_all_crate_exports(crate_store: &CrateStore) -> CrateExports {
-    let mut all_exports = CrateExports::default();
-    for krate in crate_store.values() {
-        for (name, id) in &krate.exports.functions {
-            all_exports.functions.insert(name.clone(), *id);
-        }
-        for (name, id) in &krate.exports.types {
-            all_exports.types.insert(name.clone(), *id);
-        }
-    }
-    all_exports
-}
-
 fn main() -> Result<()> {
-    let paths: Paths = serde_json::from_slice(PATHS)?;
-    init_logger(&paths.log_file)?;
+    init_logger(&PATHS.log_file)?;
 
-    let (manifest, mut crate_store) = paths.load_crates()?;
-    let mut benchmarks = Benchmarks::default();
+    let (manifest, mut crate_store) = PATHS.load_crates()?;
 
-    compile_all_libs(&paths, &mut crate_store, &manifest, &mut benchmarks)?;
+    compile_all_libs(&mut crate_store, &manifest)?;
 
-    let all_exports = collect_all_crate_exports(&crate_store);
-
-    let root_lib = &manifest.package.name;
-    let source_path = Paths::to_source_path(paths.project_path())?;
-    let entry_file = Paths::to_entry_file_path(paths.project_path())?;
-
-    let mut module_store = ModuleStore::new(entry_file.path.clone());
+    let root_crate = &manifest.package.name;
+    let entry_file = Paths::to_entry_file_path(PATHS.project_path())?;
     let mut context = CrateContext::new(entry_file.is_lib, MESSAGE_CONFIG);
 
-    let mut output = run_crate_frontend(
+    let mut output = compiler_root_crate(entry_file, &mut crate_store, &mut context)?;
+
+    let is_success = run_llvm(
+        &mut output,
+        PATHS.project_path(),
+        &mut context.faults,
+        root_crate,
+    )?;
+
+    if is_success {
+        info!("{GREEN}llvm success{DEFAULT}",)
+    }
+
+    log_benchmark()
+}
+
+fn compiler_root_crate(entry_file: EntryFile, crate_store: &mut CrateStore, context: &mut CrateContext) -> Result<Output> {
+
+    let source_path = Paths::to_source_path(PATHS.project_path())?;
+    let mut module_store = ModuleStore::new(entry_file.path.clone());
+    
+    let all_exports = collect_all_crate_exports(&crate_store);
+
+    let output = run_crate_frontend(
         crate_store.main_crate(),
-        &paths,
-        paths.project_path(),
+        PATHS.project_path(),
         source_path,
         &entry_file,
         &mut module_store,
         &crate_store,
-        &mut context,
+        context,
         &all_exports,
-        &mut benchmarks,
     )?;
 
     log_faults(&context.faults, &module_store);
     if is_fatal(&context.faults, COMPILER_OPTIONS.fatal_level()) {
-        return Ok(());
+        return Err(anyhow::Error::msg("compiler got fatal compile error"));
     }
 
     info!("{GREEN}frontend success{DEFAULT}",);
-
-    if run_llvm(
-        &mut output,
-        paths.project_path(),
-        &mut context.faults,
-        root_lib,
-        &mut benchmarks,
-    ) {
-        info!("{GREEN}llvm success{DEFAULT}",)
-    }
-
-    let mut total_times = String::new();
-    benchmarks.write_total(&mut total_times);
-    info!("{total_times}");
-    Ok(())
+    Ok(output)
 }
 
 fn compile_all_libs(
-    paths: &Paths,
     crate_store: &mut CrateStore,
     manifest: &SoulToml,
-    benchmarks: &mut Benchmarks,
 ) -> Result<()> {
     let crate_info_list: Vec<_> = crate_store
         .entries()
@@ -143,7 +131,6 @@ fn compile_all_libs(
         let mut context = CrateContext::new(entry_path.is_lib, MESSAGE_CONFIG);
         let output = run_crate_frontend(
             crate_id,
-            paths,
             &project_path,
             source_path,
             &entry_path,
@@ -151,7 +138,6 @@ fn compile_all_libs(
             crate_store,
             &mut context,
             &CrateExports::default(),
-            benchmarks,
         )?;
 
         log_faults(&context.faults, &module_store);
@@ -171,7 +157,6 @@ fn compile_all_libs(
 
 fn run_crate_frontend(
     crate_id: CrateId,
-    paths: &Paths,
     manifest: &Path,
     source: PathBuf,
     entry: &EntryFile,
@@ -179,18 +164,17 @@ fn run_crate_frontend(
     crate_store: &CrateStore,
     context: &mut CrateContext,
     crate_exports: &CrateExports,
-    benchmarks: &mut Benchmarks,
 ) -> Result<Output> {
     let timer = Instant::now();
     let source_file = to_source_file(&entry.path)?;
-    benchmarks.source_read(crate_id, timer.elapsed());
+    get_benchmarks()?.source_read(crate_id, timer.elapsed());
 
     let root = module_store.get_root_id();
 
     let timer = Instant::now();
     let tokens = to_token_stream(&source_file, root);
-    display_tokenizer(paths, manifest, root, &source_file)?;
-    benchmarks.tokenize(crate_id, timer.elapsed());
+    display_tokenizer(&PATHS, manifest, root, &source_file)?;
+    get_benchmarks()?.tokenize(crate_id, timer.elapsed());
 
     let timer = Instant::now();
     let ast = to_ast(
@@ -201,18 +185,18 @@ fn run_crate_frontend(
         crate_store,
         source.clone(),
     );
-    benchmarks.ast(crate_id, timer.elapsed());
+    get_benchmarks()?.ast(crate_id, timer.elapsed());
     display_ast(manifest, module_store, &ast)?;
 
     let timer = Instant::now();
     let mut hir = to_hir(&ast, &COMPILER_OPTIONS, context, crate_exports, root);
     display_hir(manifest, &hir, &ast)?;
-    benchmarks.hir(crate_id, timer.elapsed());
+    get_benchmarks()?.hir(crate_id, timer.elapsed());
     clear_hir_type_map(&mut hir);
 
     let timer = Instant::now();
     let mir = to_mir(&hir, &ast, &COMPILER_OPTIONS, context, crate_exports, root);
-    benchmarks.mir(crate_id, timer.elapsed());
+    get_benchmarks()?.mir(crate_id, timer.elapsed());
     display_mir(manifest, &mir, &hir, &ast)?;
 
     Ok(Output {
@@ -226,8 +210,7 @@ fn run_llvm(
     manifest: &Path,
     faults: &mut FaultCollector,
     lib_name: &str,
-    benchmarks: &mut Benchmarks,
-) -> bool {
+) -> Result<bool> {
     let request = IrRequest {
         mir: &output.mir_response,
         types: &output.hir_response.typed,
@@ -239,32 +222,27 @@ fn run_llvm(
 
     let timer = Instant::now();
     let ir = to_llvm_ir(&request, &COMPILER_OPTIONS, &mut faults.faults);
-    benchmarks.ir = timer.elapsed();
+    get_benchmarks()?.ir = timer.elapsed();
     log_faults(faults, &ModuleStore::new(PathBuf::new()));
 
     #[cfg(not(debug_assertions))]
     if ir.is_fatal {
-        return false;
+        return Ok(false);
     }
 
     #[cfg(debug_assertions)]
     if ir.is_fatal {
         let llvm_code = ir.module.to_string();
 
-        if let Err(err) = Paths::write_to_output(&llvm_code, manifest, Path::new("fatal_out.ll")) {
-            error!("{err}");
-        }
-        return false;
+        Paths::write_to_output(&llvm_code, manifest, Path::new("fatal_out.ll"))?;
+        return Ok(false);
     }
 
     let llvm_code = ir.module.to_string();
 
-    if let Err(err) = Paths::write_to_output(&llvm_code, manifest, Path::new("out.ll")) {
-        error!("{err}");
-        return false;
-    }
+    Paths::write_to_output(&llvm_code, manifest, Path::new("out.ll"))?;
 
-    true
+    Ok(true)
 }
 
 fn display_tokenizer(
@@ -372,6 +350,27 @@ fn log_faults(faults: &FaultCollector, module_store: &ModuleStore) {
     }
 }
 
+fn log_benchmark() -> Result<()> {
+    let mut total_times = String::new();
+    // benchmarks.write_crates(&mut total_times, &crate_store);
+    get_benchmarks()?.write_total(&mut total_times);
+    info!("{total_times}");
+    Ok(())
+}
+
+fn collect_all_crate_exports(crate_store: &CrateStore) -> CrateExports {
+    let mut all_exports = CrateExports::default();
+    for krate in crate_store.values() {
+        for (name, id) in &krate.exports.functions {
+            all_exports.functions.insert(name.clone(), *id);
+        }
+        for (name, id) in &krate.exports.types {
+            all_exports.types.insert(name.clone(), *id);
+        }
+    }
+    all_exports
+}
+
 fn init_logger(log_file: &str) -> Result<()> {
     let log_file = OpenOptions::new()
         .create(true)
@@ -379,13 +378,18 @@ fn init_logger(log_file: &str) -> Result<()> {
         .open(log_file)?;
 
     Dispatch::new()
-        .format(|out, message, _record| out.finish(format_args!("{}", message)))
+        .format(|out, message, _record| out.finish(*message))
         .level_for("soulc", log::LevelFilter::Info)
         .chain(stdout())
         .chain(log_file)
         .apply()?;
 
     Ok(())
+}
+
+fn get_benchmarks<'a>() -> Result<MutexGuard<'a, Benchmarks>> {
+    BENCHMARKS.lock()
+        .map_err(|err| anyhow::Error::msg(err.to_string()))
 }
 
 fn is_fatal(faults: &FaultCollector, fatal_level: SementicLevel) -> bool {
