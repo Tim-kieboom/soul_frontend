@@ -6,6 +6,19 @@
     "configurations": [
     
         {
+            "name": "Debug And RunOuput 'soul_tester'",
+            "type": "lldb",
+            "request": "launch",
+            "preLaunchTask": "cargo then build soul c",
+            "program": "${workspaceFolder}/soul_folder/output/out.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "env": {
+                "RUST_BACKTRACE": "1"
+            }
+        },
+        {
             "name": "Debug executable 'soul_tester'",
             "type": "lldb",
             "request": "launch",

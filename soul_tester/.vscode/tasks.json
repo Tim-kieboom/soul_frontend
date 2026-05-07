@@ -1,0 +1,33 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "cargo run soul_tester",
+            "type": "shell",
+            "command": "cargo",
+            "args": ["run", "--bin", "soul_tester"],
+            "options": {
+                "env": {
+                    "RUST_BACKTRACE": "1"
+                }
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "build soul c",
+            "type": "shell",
+            "command": "cmd",
+            "args": [
+            "/c",
+            "clang -c .\\\\soul_folder\\\\lib\\\\clib\\\\clib.c -o .\\\\soul_folder\\\\output\\\\clib.o && clang .\\\\soul_folder\\\\output\\\\out.ll .\\\\soul_folder\\\\output\\\\clib.o -o .\\\\soul_folder\\\\output\\\\out.exe && clang -S .\\\\soul_folder\\\\output\\\\out.ll .\\\\soul_folder\\\\output\\\\clib.o -o .\\\\soul_folder\\\\output\\\\out.s"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "cargo then build soul c",
+            "dependsOn": ["cargo run soul_tester", "build soul c"],
+            "dependsOrder": "sequence",
+            "problemMatcher": []
+        }
+    ]
+}
