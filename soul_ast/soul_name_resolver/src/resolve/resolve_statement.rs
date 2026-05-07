@@ -76,6 +76,19 @@ impl<'a> NameResolver<'a> {
         let prev = self.current.function;
         self.current.function = function.signature.node.id;
 
+        self.current.resolving_default = true;
+        for param in &mut function.signature.node.parameters {
+            if let Some(ref mut default) = param.default {
+                self.resolve_expression(default);
+            }
+        }
+        self.current.resolving_default = false;
+
+        if let Some(id) = function.signature.node.id {
+            self.store
+                .insert_functions(id, function.signature.node.clone(), self.current.module);
+        }
+
         self.try_go_to(function.block.scope_id);
         self.resolve_block(&mut function.block);
         self.current.function = prev;

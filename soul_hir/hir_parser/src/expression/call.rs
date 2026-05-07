@@ -1,4 +1,4 @@
-use ast::{FunctionKind, Intrinsic, Literal};
+use ast::{FunctionKind, Intrinsic, IntrinsicValue, Literal};
 use hir::{Expression, ExpressionId, HirType, LazyTypeId, TypeId};
 
 #[cfg(debug_assertions)]
@@ -23,7 +23,7 @@ impl<'a> HirContext<'a> {
                 id,
                 intrinsic,
                 function_call.name.span,
-                function_call.intrinsic_value.as_deref(),
+                &function_call.intrinsic_value,
             );
         }
 
@@ -260,22 +260,37 @@ impl<'a> HirContext<'a> {
         id: hir::ExpressionId,
         intrinsic: Intrinsic,
         span: Span,
-        intrinsic_value: Option<&str>,
+        intrinsic_value: &Option<IntrinsicValue>,
     ) -> hir::Expression {
         match intrinsic {
             Intrinsic::InFile => {
-                let path_str = intrinsic_value.unwrap_or("unknown").to_string();
-                let ty = self.type_from_literal(&Literal::Str(path_str.clone()));
+                
+                let path_str = match intrinsic_value {
+                    Some(IntrinsicValue::Literal(Literal::Str(val))) => val.clone(),
+                    _ => {
+                        self.module_to_source_path
+                            .get(&self.current.module)
+                            .map(|p| p.strip_prefix(&self.source_folder).ok())
+                            .flatten()
+                            .map(|p| p.to_string_lossy().to_string())
+                            .unwrap_or_else(|| "unknown".to_string())
+                    }
+                };
+
+                let literal = Literal::Str(path_str);
+                let ty = self.type_from_literal(&literal);
                 hir::Expression {
                     id,
                     ty: LazyTypeId::Known(ty),
-                    kind: hir::ExpressionKind::Literal(Literal::Str(path_str)),
+                    kind: hir::ExpressionKind::Literal(literal),
                 }
             }
             Intrinsic::InLine => {
-                let line = intrinsic_value
-                    .and_then(|v| v.parse().ok())
-                    .unwrap_or(span.start_line as i128);
+                let line = match intrinsic_value {
+                    Some(IntrinsicValue::Literal(Literal::Int(line))) => *line,
+                    _ => span.start_line as i128,
+                };
+
                 let ty = self.type_from_literal(&Literal::Int(line));
                 hir::Expression {
                     id,

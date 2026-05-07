@@ -144,6 +144,13 @@ impl<'a> NameResolver<'a> {
         let signature = &mut function.signature.node;
         self.collect_type(&mut signature.methode_type);
         self.collect_type(&mut signature.return_type);
+
+        for param in &mut signature.parameters {
+            if let Some(ref mut default) = param.default {
+                self.collect_expression(default);
+            }
+        }
+
         self.push_scope(&mut function.block.scope_id);
 
         if signature.function_kind != ast::FunctionKind::Static {

@@ -24,8 +24,4 @@ main() {
     num = SubLib.Constant
 
     Io.Println("hello world")
-
-    Io.Println(InFile())
-    Io.Println_int(InLine())
-    Lib.DefaultInFile()
 }

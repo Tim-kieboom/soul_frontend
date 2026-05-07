@@ -13,6 +13,7 @@ use soul_utils::{
     vec_map::{VecMap, VecMapIndex},
 };
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
 use crate::id_allocator::IdAllocalor;
 
@@ -27,8 +28,9 @@ pub fn lower_hir(
     ast_context: &AbtractSyntaxTree,
     crate_exports: &CrateExports,
     root: ModuleId,
+    source_folder: PathBuf,
 ) -> HirTree {
-    let mut context = HirContext::new(faults, ast_context, crate_exports, root);
+    let mut context = HirContext::new(faults, ast_context, crate_exports, root, source_folder);
 
     context.lower_internal_structs();
     context.lower_module(root);
@@ -54,6 +56,8 @@ struct HirContext<'a> {
     pub context: &'a mut CrateContext,
     pub node_id_to_local: VecMap<NodeId, LocalId>,
     pub root_id: ModuleId,
+    pub source_folder: PathBuf,
+    pub module_to_source_path: HashMap<ModuleId, PathBuf>,
 }
 impl<'a> HirContext<'a> {
     fn new(
@@ -61,6 +65,7 @@ impl<'a> HirContext<'a> {
         ast_context: &'a AbtractSyntaxTree,
         crate_exports: &'a CrateExports,
         root_id: ModuleId,
+        source_folder: PathBuf,
     ) -> Self {
         let mut id_generator = IdAllocalor::new(ast_context.function_generators.clone());
         let init_global_function = id_generator.alloc_function();
@@ -78,6 +83,15 @@ impl<'a> HirContext<'a> {
         let mut tree = HirTree::new(root, main, init_global_function);
         Self::init_submodules(&mut tree, ast_context, root_id);
 
+        let mut module_to_source_path = HashMap::new();
+        Self::build_module_paths(
+            ast_context,
+            &source_folder,
+            root_id,
+            &source_folder,
+            &mut module_to_source_path,
+        );
+
         Self {
             context,
             ast_context,
@@ -91,6 +105,8 @@ impl<'a> HirContext<'a> {
             },
             tree,
             root_id,
+            source_folder,
+            module_to_source_path,
         }
     }
 
@@ -103,6 +119,25 @@ impl<'a> HirContext<'a> {
             let is_public = matches!(ast_module.visibility, Visibility::Public);
             tree.insert_module(sub_module_id, is_public, sub_sub_modules);
             Self::init_submodules(tree, ast_context, sub_module_id);
+        }
+    }
+
+    fn build_module_paths(
+        ast_context: &AbtractSyntaxTree,
+        source_folder: &Path,
+        module_id: ModuleId,
+        parent_path: &Path,
+        map: &mut HashMap<ModuleId, PathBuf>,
+    ) {
+        let path = if ast_context.modules[module_id].parent.is_none() {
+            source_folder.to_path_buf()
+        } else {
+            let module_name = &ast_context.modules[module_id].name;
+            parent_path.join(module_name)
+        };
+        map.insert(module_id, path.clone());
+        for sub_id in ast_context.modules[module_id].modules.entries() {
+            Self::build_module_paths(ast_context, source_folder, sub_id, &path, map);
         }
     }
 

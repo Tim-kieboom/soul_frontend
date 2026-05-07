@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use soul_utils::{
     Ident,
     ids::FunctionId,
@@ -114,6 +116,13 @@ pub struct ExternalRef {
     pub module_path: String,
 }
 
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum IntrinsicValue {
+    Literal(Literal),
+    Path(PathBuf),
+    Other(String),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Intrinsic {
     InFile,
@@ -147,7 +156,7 @@ pub struct FunctionCall {
     /// Compiler intrinsic if this is an intrinsic call
     pub intrinsic: Option<Intrinsic>,
     /// Computed intrinsic value (e.g., file path for InFile)
-    pub intrinsic_value: Option<String>,
+    pub intrinsic_value: Option<IntrinsicValue>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

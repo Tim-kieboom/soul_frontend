@@ -44,9 +44,10 @@ pub fn name_resolve(
 struct Current {
     in_global: bool,
     module: ModuleId,
-    function: Option<FunctionId>,
     source_folder: PathBuf,
     path_stack: Vec<PathBuf>,
+    resolving_default: bool,
+    function: Option<FunctionId>,
 }
 
 impl Current {
@@ -97,6 +98,7 @@ impl<'a> NameResolver<'a> {
                 function: None,
                 source_folder,
                 path_stack: Vec::new(),
+                resolving_default: false,
             },
             node_generator: IdGenerator::new(),
             store: &mut ast_context.store,

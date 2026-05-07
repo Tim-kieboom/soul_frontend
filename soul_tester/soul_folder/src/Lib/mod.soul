@@ -8,8 +8,6 @@ GetStruct(): Struct {
     Struct{field: 1, test: 2}
 }
 
-DefaultInFile(file: [@]char = InFile()) {}
-
 Struct Methode() {}
 
 struct Struct {

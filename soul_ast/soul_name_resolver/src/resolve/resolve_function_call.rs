@@ -79,12 +79,12 @@ impl<'a> NameResolver<'a> {
                 function_call.intrinsic = Some(intrinsic);
                 function_call.resolved = Some(FunctionId::error());
 
-                if intrinsic == ast::Intrinsic::InFile {
+                if intrinsic == ast::Intrinsic::InFile && !self.current.resolving_default {
                     let file_path = self.current.current_path();
-                    function_call.intrinsic_value = Some(file_path.to_string_lossy().to_string());
-                } else if intrinsic == ast::Intrinsic::InLine {
-                    function_call.intrinsic_value =
-                        Some(function_call.name.span.start_line.to_string());
+                    function_call.intrinsic_value = Some(ast::IntrinsicValue::Path(file_path));
+                } else if intrinsic == ast::Intrinsic::InLine && !self.current.resolving_default {
+                    let line = function_call.name.span.start_line as i128;
+                    function_call.intrinsic_value = Some(ast::IntrinsicValue::Literal(ast::Literal::Int(line)));
                 }
                 return;
             }

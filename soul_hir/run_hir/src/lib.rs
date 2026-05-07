@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use ast::AbtractSyntaxTree;
 use hir::{ComplexLiteral, ExpressionId, HirTree};
 use hir_literal_interpreter::literal_resolve;
@@ -25,8 +26,9 @@ pub fn to_hir(
     context: &mut CrateContext,
     crate_exports: &CrateExports,
     root: ModuleId,
+    source_folder: PathBuf,
 ) -> HirResponse {
-    let hir = lower_hir(context, ast_context, crate_exports, root);
+    let hir = lower_hir(context, ast_context, crate_exports, root, source_folder);
     let typed = lower_typed_hir(&hir, options, context);
 
     let literal_resolves = literal_resolve(&hir, &typed);

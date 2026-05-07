@@ -189,7 +189,7 @@ fn run_crate_frontend(
     display_ast(manifest, module_store, &ast)?;
 
     let timer = Instant::now();
-    let mut hir = to_hir(&ast, &COMPILER_OPTIONS, context, crate_exports, root);
+    let mut hir = to_hir(&ast, &COMPILER_OPTIONS, context, crate_exports, root, source.clone());
     display_hir(manifest, &hir, &ast)?;
     get_benchmarks()?.hir(crate_id, timer.elapsed());
     clear_hir_type_map(&mut hir);
