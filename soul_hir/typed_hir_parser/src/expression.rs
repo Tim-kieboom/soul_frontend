@@ -52,7 +52,7 @@ impl<'a> TypedHirContext<'a> {
             } => self.infer_enum_variant(*enum_id, variant_name, span),
             hir::ExpressionKind::DeRef(inner) => self.infer_deref(*inner, span),
             hir::ExpressionKind::Function(function) => self.functions[*function].to_lazy(),
-            hir::ExpressionKind::Ref { place, mutable } => self.infer_ref(*place, *mutable, span),
+            hir::ExpressionKind::Ref { place, mutable } => self.infer_ref(*place, *mutable, value.ty, span),
             hir::ExpressionKind::Cast { value, cast_to } => self.infer_cast(*value, *cast_to),
             hir::ExpressionKind::While { condition, body } => {
                 self.infer_while(*condition, *body, span)
@@ -449,8 +449,27 @@ impl<'a> TypedHirContext<'a> {
         cast_to.to_lazy()
     }
 
-    fn infer_ref(&mut self, place: PlaceId, mutable: bool, span: Span) -> LazyTypeId {
+    fn infer_ref(&mut self, place: PlaceId, mutable: bool, declared_type: LazyTypeId, span: Span) -> LazyTypeId {
         let place_type = self.infer_place(place);
+
+        let decl_of = match self.resolve_type_lazy(declared_type, span) {
+            LazyTypeId::Known(resolved_decl) => match &self.id_to_type(resolved_decl).kind {
+                HirTypeKind::Ref { of_type, .. } => Some(*of_type),
+                _ => None,
+            },
+            _ => None,
+        };
+
+        if let Some(decl_of) = decl_of {
+            if let LazyTypeId::Known(resolved_place) = self.resolve_type_lazy(place_type, span) {
+                if let HirTypeKind::Ref { of_type: place_of, .. } = &self.id_to_type(resolved_place).kind {
+                    if *place_of == decl_of {
+                        return declared_type;
+                    }
+                }
+            }
+        }
+
         let resolved = self.resolve_type_lazy(place_type, span);
         let ty = match resolved {
             LazyTypeId::Known(val) => val,
@@ -492,7 +511,7 @@ impl<'a> TypedHirContext<'a> {
         inner_modifier: Option<TypeModifier>,
         span: Span,
     ) -> LazyTypeId {
-        if mutable && inner_modifier != Some(TypeModifier::Mut) {
+        if mutable && !matches!(inner_modifier, None | Some(TypeModifier::Mut)) {
             let type_str = match type_id {
                 LazyTypeId::Known(type_id) => self
                     .id_to_type(type_id)

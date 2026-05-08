@@ -6,7 +6,7 @@ use inkwell::{
     context::Context,
     module::Module,
     types::{BasicTypeEnum, IntType},
-    values::{BasicValueEnum, FunctionValue, PointerValue},
+    values::{BasicValueEnum, FunctionValue, GlobalValue, PointerValue},
 };
 use mir_parser::mir::{BlockId, LocalId, TempId};
 use run_mir::MirResponse;
@@ -147,13 +147,15 @@ pub struct LlvmBackend<'f, 'a> {
     temps: HashMap<(FunctionKeyId, TempId), IrOperand<'a>>,
     locals: HashMap<(FunctionKeyId, LocalId), Local<'a>>,
     blocks: HashMap<(FunctionKeyId, BlockId), BasicBlock<'a>>,
-    lowered_types: RefCell<VecMap<TypeId, Option<BasicTypeEnum<'a>>>>,
-
-    function_keys: FunctionKeyStore,
-    field_indexs: RefCell<VecMap<FieldId, usize>>,
+    
     structs: StructStore<'a>,
+    function_keys: FunctionKeyStore,
     functions: VecMap<FunctionKeyId, FunctionValue<'a>>,
-
+    
+    strings: RefCell<HashMap<String, GlobalValue<'a>>>,
+    field_indexs: RefCell<VecMap<FieldId, usize>>,
+    lowered_types: RefCell<VecMap<TypeId, Option<BasicTypeEnum<'a>>>>,
+    
     faults: &'f mut Vec<SementicFault>,
 }
 
@@ -204,6 +206,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             non_mangels: HashMap::new(),
             structs: StructStore::new(),
             types: request.types.clone(),
+            strings: HashMap::new().into(),
             field_indexs: VecMap::const_default().into(),
             lowered_types: VecMap::const_default().into(),
             current: Current::start(function_keys.global_key()),

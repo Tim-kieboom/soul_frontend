@@ -1,18 +1,28 @@
 import ( 
     crate.Io
     crate.Test
+    crate.List.{List, Index, Push, Drop}
     crate.Lib.SubLib
     // crate.Fs.{File, Open, FileMode}
     crate.Lib.{this, Struct, Variable, A, B as b}
 )
-
-
 
 main() {
     Test.RunTests()
 
     // Struct.Methode()
     // File.Open(c"text.txt", FileMode.ReadOnly)
+
+    mut el: u8 = 0
+    mut list = List.New(size: 10)
+    
+    el = list.Index(0)
+    Io.Println_int(el as int)
+
+    list.Push(20)
+    // el = list.Index(0)
+    // Io.Println_int(el as int)
+    list.Drop()
 
     infer := 1
     mut num = A()

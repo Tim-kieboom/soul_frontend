@@ -2,12 +2,28 @@
 
 // ---------------- #Array ----------------      
 
-SoulArray __clib_mallocString(uint len) {
-    void* ptr = malloc(len);
-    if(ptr == NULL)
-        len = 0;
+u8* __clib_bytesRealloc(uint len, u8* ptr) {
+    if(ptr == NULL) {
+        return malloc(len);
+    }
     
-    return (SoulArray){.ptr = ptr, .len = len};
+    u8* new = realloc(ptr, len);
+    if(ptr != NULL) 
+        free(ptr);
+
+    return new;
+}
+
+void __clib_bytesPlace(/*out*/u8* ptr, uint index, u8 byte) {
+    ptr[index] = byte;
+}
+
+u8 __clib_bytesGet(/*out*/u8* ptr, uint index) {
+    return ptr[index];
+}
+
+u8* __clib_bytesOffset(u8 const* ptr, int offset) {
+    return (u8*)&ptr[offset];
 }
 
 // ---------------- #File ----------------      

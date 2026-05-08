@@ -1,4 +1,6 @@
-import .Write.{FmtRes}
+import (
+    .Write.{FmtRes}
+)
 
 trait Display {
     Display(@this, writer: &dyn Write) -> FmtRes

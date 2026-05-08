@@ -116,23 +116,27 @@ impl<'a> TypedHirContext<'a> {
         modifier: TypeModifier,
         span: Span,
     ) -> LazyTypeId {
+        fn is_ref_type(ty: &HirType) -> bool {
+            matches!(ty.kind, HirTypeKind::Ref { .. })
+        }
+
         let resolved = self.resolve_untyped_primitive(type_id, span);
         let local_type_id = match resolved {
             Some(mut ty) => {
-                ty.modifier = Some(modifier);
+                if !is_ref_type(&ty) {
+                    ty.modifier = Some(modifier);
+                }
                 self.add_type(ty).to_lazy()
             }
-            None => self.lazy_id_insure_modifier(type_id, Some(modifier)),
+            None => {
+                let is_ref = matches!(type_id, LazyTypeId::Known(id) if is_ref_type(self.id_to_type(id)));
+                if is_ref {
+                    type_id
+                } else {
+                    self.lazy_id_insure_modifier(type_id, Some(modifier))
+                }
+            }
         };
-
-        match local_type_id {
-            LazyTypeId::Known(type_id) => {
-                debug_assert_eq!(self.id_to_type(type_id).modifier, Some(modifier))
-            }
-            LazyTypeId::Infer(infer) => {
-                debug_assert_eq!(self.id_to_infer(infer).modifier, Some(modifier))
-            }
-        }
 
         self.locals.insert(id, local_type_id);
         local_type_id
@@ -249,7 +253,10 @@ impl<'a> TypedHirContext<'a> {
         match ty {
             LazyTypeId::Known(type_id) => {
                 let ty = self.id_to_type(type_id);
-                ty.is_mutable() || ty.is_modifier_none()
+                match &ty.kind {
+                    HirTypeKind::Ref { mutable, .. } => *mutable,
+                    _ => ty.is_mutable() || ty.is_modifier_none(),
+                }
             }
             LazyTypeId::Infer(infer_type_id) => {
                 let ty = self.id_to_infer(infer_type_id);

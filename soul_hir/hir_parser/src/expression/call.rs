@@ -141,7 +141,9 @@ impl<'a> HirContext<'a> {
 
             let ast_i = slot - positional_offset;
             *argument = match &signature.parameters[ast_i].default {
-                Some(val) => self.lower_expression(val),
+                Some(val) => {
+                    self.lower_default_expression(val, function_call.name.span)
+                }
                 None => {
                     let span = function_call.name.span;
                     self.log_error(SoulError::new(
@@ -299,6 +301,29 @@ impl<'a> HirContext<'a> {
                 }
             }
         }
+    }
+
+    fn lower_default_expression(
+        &mut self,
+        expr: &ast::Expression,
+        call_site_span: Span,
+    ) -> ExpressionId {
+        if let ast::ExpressionKind::FunctionCall(fc) = &expr.node {
+            if fc.intrinsic == Some(Intrinsic::InLine) && fc.intrinsic_value.is_none() {
+                let line = call_site_span.start_line as i128;
+                let expr_id = self.alloc_expression(expr.span);
+                let ty = self.type_from_literal(&Literal::Int(line));
+                return self.insert_expression(
+                    expr_id,
+                    Expression {
+                        id: expr_id,
+                        ty: LazyTypeId::Known(ty),
+                        kind: hir::ExpressionKind::Literal(Literal::Int(line)),
+                    },
+                );
+            }
+        }
+        self.lower_expression(expr)
     }
 
     fn lower_external_call(

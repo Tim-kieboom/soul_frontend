@@ -1,3 +1,4 @@
+use ast::FunctionKind;
 use hir::{
     Assign, Block, BlockId, ExpressionId, Global, GlobalKind, LazyTypeId, Statement, StatementKind,
     Terminator, TypeId, Variable,
@@ -90,10 +91,14 @@ impl<'a> TypedHirContext<'a> {
         self.current_function = Some(function_id);
         let function = &self.hir.nodes.functions[function_id];
 
-        for parameter in &function.parameters {
-            let modifier = self
-                .lazy_id_get_modifier(parameter.ty)
-                .unwrap_or(TypeModifier::Const);
+        for (i, parameter) in function.parameters.iter().enumerate() {
+            let modifier = self.lazy_id_get_modifier(parameter.ty).unwrap_or_else(|| {
+                if i == 0 && matches!(function.kind, FunctionKind::MutRef) {
+                    TypeModifier::Mut
+                } else {
+                    TypeModifier::Const
+                }
+            });
 
             let span = self.hir.info.spans.locals[parameter.local];
             self.type_local(parameter.local, parameter.ty, modifier, span);

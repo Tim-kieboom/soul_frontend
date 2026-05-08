@@ -1,0 +1,58 @@
+extern "C" free(ptr: *none)
+extern "C" malloc(size: uint): *u8
+extern "C" realloc(size: uint, array: *u8): *u8
+
+extern "C" __clib_bytesOffset(self: *u8, index: uint): *u8
+
+struct List {
+    mut array: *u8
+    mut len: uint
+    mut cap: uint
+}
+
+List New(size: uint = 0): List {
+    array := malloc(size)
+    List{array, len: 0, cap: size}
+}
+
+List Push(&this, value: u8) {
+    
+    len := this.len
+    c := len+1 > this.cap
+    if c == true {
+        this.resize(len*2)
+    }
+
+    array := this.array
+    ptr := __clib_bytesOffset(array, len)
+    *ptr = value
+    this.len += 1
+}
+
+List Index(@this, index: uint): u8 {
+    array := this.array
+    ptr := __clib_bytesOffset(array, index)
+    num := *ptr
+    num
+}
+
+List Len(@this): uint {
+    this.len
+}
+
+List Cap(@this): uint {
+    this.cap
+}
+
+List Drop(this) {
+    ptr := this.array
+    if ptr as int != 0 {
+        free(ptr as *none)
+    }
+}
+
+List resize(&this, newSize: uint) {
+    this.cap = newSize
+    this.array = realloc(newSize, this.array)
+}
+

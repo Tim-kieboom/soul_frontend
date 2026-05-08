@@ -1,0 +1,15 @@
+extern "C" __clib_fmtInt(value: c_int, base: u8, buffer: *char, capital: bool): c_str
+extern "C" __clib_fmtUint(value: c_uint, base: u8, buffer: *char, capital: bool): c_str
+extern "C" __clib_fmtFloat(value: f64, base: u8, buffer: *char, precision: u8, capital: bool): c_str
+
+FmtUint(n: uint, base: u8, buffer: [@]char, capital: bool): c_str {
+    __clib_fmtUint(n as c_uint, base, buffer as *char, capital)
+}
+
+FmtInt(n: int, base: u8, buffer: [@]char, capital: bool): c_str {
+    __clib_fmtInt(n as c_int, base, buffer as *char, capital)
+}
+
+FmtFloat(n: f64, base: u8, buffer: [@]char, precision: u8, capital: bool): c_str {
+    __clib_fmtFloat(n, base, buffer as *char, precision, capital)
+}

@@ -1,10 +1,12 @@
+use std::{cell::RefMut, collections::HashMap};
+
 use ast::{ArrayKind, Literal};
 use hir::{ComplexLiteral, StructId, TypeId};
 use inkwell::{
     AddressSpace,
     module::Linkage,
     types::StructType,
-    values::{AsValueRef, BasicValue, BasicValueEnum, PointerValue, StructValue},
+    values::{AsValueRef, BasicValue, BasicValueEnum, GlobalValue, PointerValue, StructValue},
 };
 use mir_parser::mir::{Operand, OperandKind, PlaceId};
 use soul_utils::{
@@ -280,7 +282,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 self.new_loaded_operand(value, should_be, generics)?
             }
             ast::Literal::Cstr(text) | ast::Literal::Str(text) => {
-                let (slice_type, value) = self.const_string_slice(text.as_bytes());
+                let (slice_type, value) = self.const_string_slice(&text);
                 IrOperand {
                     value: value.into(),
                     info: crate::OperandInfo::new_loaded(should_be, slice_type.into()),
@@ -364,17 +366,29 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         })
     }
 
-    fn const_string_slice(&self, text: &[u8]) -> (StructType<'a>, StructValue<'a>) {
-        let bytes = self.context.const_string(text, true);
+    fn const_string_slice(&self, text: &String) -> (StructType<'a>, StructValue<'a>) {
+        
+        let strings = self.strings.borrow_mut();
+        let global = match strings.get(text).copied() {
+            Some(val) => val,
+            None => self.create_global_string(text, strings),
+        };
+
+        let ptr = global.as_basic_value_enum().into_pointer_value();
+        self.fixed_array_to_const_slice(ptr, text.len() as u64)
+    }
+
+    fn create_global_string(&self, text: &str, mut strings: RefMut<'_, HashMap<String, GlobalValue<'a>>>) -> GlobalValue<'a> {
+        let bytes = self.context.const_string(text.as_bytes(), true);
         let array_ty = bytes.get_type();
 
         let global = self.module.add_global(array_ty, None, "str");
         global.set_constant(true);
         global.set_linkage(Linkage::Private);
         global.set_initializer(&bytes);
-        let ptr = global.as_basic_value_enum().into_pointer_value();
 
-        self.fixed_array_to_const_slice(ptr, text.len() as u64)
+        strings.insert(text.to_string(), global);
+        global
     }
 
     fn fixed_array_to_slice(

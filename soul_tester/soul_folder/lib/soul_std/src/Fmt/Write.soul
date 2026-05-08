@@ -1,4 +1,6 @@
-import .FmtStr.{FmtStr, FmtStr_Write}
+import (
+    .FmtStr.{FmtStr, FmtStr_Write}
+)
 
 use FmtErr = str
 use FmtRes<T = none> = Res<T, FmtErr>
