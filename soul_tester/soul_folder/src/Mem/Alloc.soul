@@ -1,0 +1,30 @@
+extern "C" free(ptr: *none)
+extern "C" malloc(size: uint): *u8
+extern "C" realloc(ptr: *none, size: uint): *none
+
+RawAlloc(size: uint): *u8 {
+    malloc(size)
+}
+
+Alloc<T>(): *T {
+    literal SIZE = T.sizeof as uint
+    ptr := RawAlloc(SIZE) 
+    ptr as *T
+}
+
+AllocArray<T>(size: uint): *T {
+    literal SIZE = T.sizeof as uint
+    ptr := RawAlloc(SIZE * size) as *T
+    ptr as *T
+}
+
+ReallocArray<T>(array: *T, newSize: uint): *T {
+    literal SIZE = T.sizeof as uint
+    ptr := realloc(array as *none, SIZE * newSize) as *T
+    ptr as *T
+}
+
+Dealloc<T>(ptr: *T) {
+    free(ptr as *none)
+}
+

@@ -190,12 +190,66 @@ impl<'a> TypedHirContext<'a> {
             LazyTypeId::Infer(_) => return ty,
         };
 
-        let hir_type = self.id_to_type(ty);
+        let hir_type = self.id_to_type(ty).clone();
         match hir_type.kind {
             HirTypeKind::Generic(generic_id) => match generic_defines.get(generic_id) {
                 Some(val) => val.to_lazy(),
                 None => LazyTypeId::error(),
             },
+            HirTypeKind::Pointer(inner) => {
+                let resolved = self.resolve_generic(generic_defines, inner);
+                if resolved == inner {
+                    return ty.to_lazy();
+                }
+                self.add_type(HirType {
+                    kind: HirTypeKind::Pointer(resolved),
+                    generics: hir_type.generics,
+                    modifier: hir_type.modifier,
+                })
+                .to_lazy()
+            }
+            HirTypeKind::Optional(inner) => {
+                let resolved = self.resolve_generic(generic_defines, inner);
+                if resolved == inner {
+                    return ty.to_lazy();
+                }
+                self.add_type(HirType {
+                    kind: HirTypeKind::Optional(resolved),
+                    generics: hir_type.generics,
+                    modifier: hir_type.modifier,
+                })
+                .to_lazy()
+            }
+            HirTypeKind::Ref { of_type, mutable } => {
+                let resolved = self.resolve_generic(generic_defines, of_type);
+                if resolved == of_type {
+                    return ty.to_lazy();
+                }
+                self.add_type(HirType {
+                    kind: HirTypeKind::Ref {
+                        of_type: resolved,
+                        mutable,
+                    },
+                    generics: hir_type.generics,
+                    modifier: hir_type.modifier,
+                })
+                .to_lazy()
+            }
+            HirTypeKind::Array { element, kind } => {
+                let resolved = self.resolve_generic(generic_defines, element);
+                if resolved == element {
+                    return ty.to_lazy();
+                }
+                self.add_type(HirType {
+                    kind: HirTypeKind::Array {
+                        element: resolved,
+                        kind,
+                    },
+                    generics: hir_type.generics,
+                    modifier: hir_type.modifier,
+                })
+                .to_lazy()
+            }
             _ => ty.to_lazy(),
         }
     }

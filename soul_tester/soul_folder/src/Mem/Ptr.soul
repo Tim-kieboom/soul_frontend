@@ -1,0 +1,5 @@
+extern "C" __clib_bytesOffset(self: *u8, index: int): *u8
+
+Offset(self: *u8, index: int): *u8 {
+    __clib_bytesOffset(self as *u8, index)
+}
