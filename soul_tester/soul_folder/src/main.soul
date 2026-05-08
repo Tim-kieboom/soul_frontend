@@ -20,8 +20,8 @@ main() {
     Io.Println_int(el as int)
 
     list.Push(20)
-    // el = list.Index(0)
-    // Io.Println_int(el as int)
+    el = list.Index(0)
+    Io.Println_int(el as int)
     list.Drop()
 
     infer := 1

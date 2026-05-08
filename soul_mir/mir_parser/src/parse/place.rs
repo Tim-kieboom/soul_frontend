@@ -142,7 +142,10 @@ impl<'a> MirContext<'a> {
 
         let statement = mir::Statement::new(mir::StatementKind::Assign {
             place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(deref_temp), ty)),
-            value: Rvalue::new(mir::RvalueKind::Operand(operand)),
+            value: Rvalue::new(mir::RvalueKind::Place(mir::Place::new(
+                mir::PlaceKind::Deref(operand),
+                ty,
+            ))),
         });
         self.push_statement(statement);
 

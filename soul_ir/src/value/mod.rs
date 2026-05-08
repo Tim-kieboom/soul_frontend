@@ -88,8 +88,34 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 };
                 self.lower_field_access(*base, field_info, generics)
             }
-            mir::PlaceKind::Temp(_) | mir::PlaceKind::Deref(_) | mir::PlaceKind::Local(_) => {
-                unreachable!()
+            mir::PlaceKind::Deref(operand) => {
+                let ir_type = self
+                    .lower_type(place.ty, generics)?
+                    .unwrap_or(self.context.i8_type().into());
+
+                let ptr_op = self.lower_operand(operand, generics)?;
+                let ptr = ptr_op.value.into_pointer_value();
+                let value = self.builder.build_load(ir_type, ptr, "load")?.into();
+                self.new_loaded_operand(value, place.ty, generics)
+            }
+            mir::PlaceKind::Temp(temp_id) => self.get_temp(*temp_id),
+            mir::PlaceKind::Local(local_id) => {
+                let local = self.get_local(*local_id);
+                let ptr = match local {
+                    Local::Runtime(ptr) => ptr,
+                    Local::Comptime(op) => return Ok(op.clone()),
+                };
+                let hir_type = self.get_type(place.ty)?;
+                match &hir_type.kind {
+                    ThirTypeKind::Ref { .. } | ThirTypeKind::Pointer(_) => {
+                        let ir_type = self
+                            .lower_type(place.ty, generics)?
+                            .unwrap_or(self.context.i8_type().into());
+                        let loaded = self.builder.build_load(ir_type, ptr, "load_ref")?;
+                        self.new_loaded_operand(loaded, place.ty, generics)
+                    }
+                    _ => self.new_loaded_operand(ptr.into(), place.ty, generics),
+                }
             }
         }
     }

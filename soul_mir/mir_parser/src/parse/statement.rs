@@ -1,5 +1,6 @@
-use hir::{ComplexLiteral, ExpressionKind, LocalInfo, LocalKind};
+use hir::{ComplexLiteral, ExpressionKind, LocalInfo, LocalKind, TypeId};
 use soul_utils::soul_error_internal;
+use typed_hir_parser::UnifyPrimitiveCast;
 
 use crate::{
     EndBlock, MirContext,
@@ -149,14 +150,57 @@ impl<'a> MirContext<'a> {
             }
 
             let operand = self.lower_operand(value).pass(is_end);
+            let local_type = self.local_type(variable.local);
+
+            let rvalue = if operand.ty != local_type {
+                self.cast_variable(operand, local_type)
+            } else {
+                mir::Rvalue::new(mir::RvalueKind::Operand(operand))
+            };
 
             let statement = mir::Statement::new(mir::StatementKind::Assign {
                 place: target_place,
-                value: mir::Rvalue::new(mir::RvalueKind::Operand(operand)),
+                value: rvalue,
             });
 
             self.push_statement(statement);
         }
+    }
+
+    fn cast_variable(&mut self, operand: mir::Operand, local_type: TypeId) -> mir::Rvalue {
+        let left_type = self.id_to_type(operand.ty).clone();
+        let right_type = self.id_to_type(local_type).clone();
+        let compatible = left_type
+            .unify_primitive_cast(&self.hir_response.typed.types_map, &right_type)
+            .is_ok();
+        
+        if !compatible {
+            return mir::Rvalue::new(mir::RvalueKind::Operand(operand))
+        }
+
+        let temp = self.new_temp(local_type);
+        let cast_place =self.new_place(mir::Place::new(
+            mir::PlaceKind::Temp(temp), 
+            local_type,
+        ));
+
+        let cast_rvalue = mir::Rvalue::new(mir::RvalueKind::CastUse {
+            value: operand,
+            cast_to: local_type,
+        });
+
+        let cast_stmt = mir::Statement::new(
+            mir::StatementKind::Assign {
+                place: cast_place,
+                value: cast_rvalue,
+            }
+        );
+
+        self.push_statement(cast_stmt);
+        mir::Rvalue::new(mir::RvalueKind::Operand(mir::Operand::new(
+            local_type,
+            mir::OperandKind::Temp(temp),
+        )))
     }
 
     fn lower_variable_place(
