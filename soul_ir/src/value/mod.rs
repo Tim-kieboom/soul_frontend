@@ -230,9 +230,20 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         match &self.mir.tree.places[place].kind {
             mir::PlaceKind::Local(local_id) => {
                 let local = self.get_local(*local_id);
-                match local {
-                    Local::Runtime(ptr) => self.new_loaded_operand(ptr.into(), ty, generics),
-                    Local::Comptime(op) => Ok(op.clone()),
+                let ptr = match local {
+                    Local::Runtime(ptr) => ptr,
+                    Local::Comptime(op) => return Ok(op.clone()),
+                };
+
+                let hir_type = self.get_type(ty)?;
+                match &hir_type.kind {
+                    ThirTypeKind::Ref { .. } | ThirTypeKind::Pointer(_) => {
+                        let ir_type = self.lower_type(ty, generics)?
+                            .unwrap_or(self.context.i8_type().into());
+                        let loaded = self.builder.build_load(ir_type, ptr, "load_ref")?;
+                        self.new_loaded_operand(loaded, ty, generics)
+                    }
+                    _ => self.new_loaded_operand(ptr.into(), ty, generics),
                 }
             }
             mir::PlaceKind::Temp(temp_id) => {
@@ -240,14 +251,14 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 Ok(temp_op.clone())
             }
             mir::PlaceKind::Deref(operand) => {
-                let ty = self
-                    .lower_type(operand.ty, generics)?
+                let ir_type = self
+                    .lower_type(ty, generics)?
                     .unwrap_or(self.context.i8_type().into());
 
                 let ptr_op = self.lower_operand(operand, generics)?;
                 let ptr = ptr_op.value.into_pointer_value();
-                let value = self.builder.build_load(ty, ptr, "load")?.into();
-                self.new_loaded_operand(value, operand.ty, generics)
+                let value = self.builder.build_load(ir_type, ptr, "load")?.into();
+                self.new_loaded_operand(value, ty, generics)
             }
             mir::PlaceKind::Field {
                 struct_type: _,

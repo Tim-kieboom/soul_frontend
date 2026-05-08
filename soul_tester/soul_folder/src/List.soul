@@ -1,8 +1,8 @@
 extern "C" free(ptr: *none)
 extern "C" malloc(size: uint): *u8
-extern "C" realloc(size: uint, array: *u8): *u8
+extern "C" realloc(ptr: *none, size: uint): *u8
 
-extern "C" __clib_bytesOffset(self: *u8, index: uint): *u8
+extern "C" __clib_bytesOffset(self: *u8, index: int): *u8
 
 struct List {
     mut array: *u8
@@ -20,18 +20,22 @@ List Push(&this, value: u8) {
     len := this.len
     c := len+1 > this.cap
     if c == true {
-        this.resize(len*2)
+        if len == 0 {
+            this.resize(1)
+        } else {
+            this.resize(len*2)
+        }
     }
 
     array := this.array
-    ptr := __clib_bytesOffset(array, len)
+    ptr := __clib_bytesOffset(array, len as int)
     *ptr = value
     this.len += 1
 }
 
 List Index(@this, index: uint): u8 {
     array := this.array
-    ptr := __clib_bytesOffset(array, index)
+    ptr := __clib_bytesOffset(array, index as int)
     num := *ptr
     num
 }
@@ -53,6 +57,6 @@ List Drop(this) {
 
 List resize(&this, newSize: uint) {
     this.cap = newSize
-    this.array = realloc(newSize, this.array)
+    this.array = realloc(this.array as *none, newSize)
 }
 

@@ -22,8 +22,8 @@ u8 __clib_bytesGet(/*out*/u8* ptr, uint index) {
     return ptr[index];
 }
 
-u8* __clib_bytesOffset(u8 const* ptr, int offset) {
-    return (u8*)&ptr[offset];
+u8* __clib_bytesOffset(u8* ptr, intptr_t offset) {
+    return &ptr[offset];
 }
 
 // ---------------- #File ----------------      
