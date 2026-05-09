@@ -1,9 +1,12 @@
 use crate::{GenericSubstitute, IrOperand, LlvmBackend, Local, OperandInfo};
 use ast::ArrayKind;
 use hir::{ComplexLiteral, StructId, TypeId};
-use inkwell::{types::StructType, values::BasicValueEnum};
+use inkwell::{types::StructType, values::BasicValueEnum, AddressSpace};
 use mir_parser::mir::{self, AggregateBody, Place, PlaceId, Rvalue, RvalueKind};
-use soul_utils::{error::SoulResult, soul_error_internal};
+use soul_utils::{
+    error::{SoulError, SoulErrorKind, SoulResult},
+    soul_error_internal,
+};
 use typed_hir::{FieldInfo, ThirTypeKind, display_thir::DisplayThirType};
 
 pub(crate) mod binary_unary;
@@ -30,6 +33,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             RvalueKind::StackAlloc(ty) => self.lower_stack_alloc(*ty, generics),
             RvalueKind::Aggregate { struct_type, body } => {
                 self.lower_struct_contructor(ty, *struct_type, body, generics)
+            }
+            RvalueKind::PtrOffset { pointer, offset } => {
+                self.lower_ptr_offset(pointer, offset, generics)
             }
         }
     }
@@ -309,5 +315,64 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         let ptr = self.builder.build_alloca(ir_type, "rvalue")?.into();
 
         self.new_loaded_operand(ptr, ty, generics)
+    }
+
+    fn lower_ptr_offset(
+        &self,
+        pointer: &mir::Operand,
+        offset: &mir::Operand,
+        generics: &GenericSubstitute,
+    ) -> SoulResult<IrOperand<'a>> {
+        let pointer_op = self.lower_operand(pointer, generics)?;
+        let pointer_val = pointer_op.value.into_pointer_value();
+
+        let offset_op = self.lower_operand(offset, generics)?;
+        let offset_val = offset_op.value.into_int_value();
+
+        let pointee_ty = match self.types.types_map.id_to_type(pointer.ty) {
+            Some(thir_type) => match thir_type.kind {
+                ThirTypeKind::Pointer(inner) => inner,
+                _ => {
+                    return Err(SoulError::new(
+                        "PtrOffset requires a pointer type".to_string(),
+                        SoulErrorKind::LlvmError,
+                        None,
+                    ));
+                }
+            },
+            None => {
+                return Err(SoulError::new(
+                    "PtrOffset pointer type not found".to_string(),
+                    SoulErrorKind::LlvmError,
+                    None,
+                ));
+            }
+        };
+
+        let size_info = self.sizeof_bit(pointee_ty, generics)?;
+        let size_bits = size_info.size;
+
+        let ptr_int = self.builder.build_ptr_to_int(pointer_val, self.default_int_type)?;
+
+        let size_bits_val = self.default_int_type.const_int(size_bits as u64, false);
+        let eight = self.default_int_type.const_int(8, false);
+        let size_bytes = self.builder.build_int_unsigned_div(size_bits_val, eight)?;
+
+        let offset_ext = if offset_val.get_type() == self.default_int_type {
+            offset_val
+        } else if offset_val.get_type().get_bit_width() < self.default_int_type.get_bit_width() {
+            self.builder.build_int_s_extend(offset_val, self.default_int_type)?
+        } else {
+            self.builder.build_int_truncate(offset_val, self.default_int_type)?
+        };
+
+        let byte_offset = self.builder.build_int_mul(offset_ext, size_bytes)?;
+        let result_int = self.builder.build_int_add(ptr_int, byte_offset)?;
+        let result_ptr = self.builder.build_int_to_ptr(result_int, self.context.ptr_type(AddressSpace::default()))?;
+
+        Ok(IrOperand {
+            value: result_ptr.into(),
+            info: crate::OperandInfo::new_loaded(pointer.ty, result_ptr.get_type().into()),
+        })
     }
 }

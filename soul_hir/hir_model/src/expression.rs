@@ -135,6 +135,13 @@ pub enum ExpressionKind {
     },
 
     Sizeof(LazyTypeId),
+
+    /// Pointer offset: given a `*T` and an integer offset, returns a new `*T`
+    /// advanced by `offset * sizeof(T)` bytes.
+    PtrOffset {
+        pointer: ExpressionId,
+        offset: ExpressionId,
+    },
 }
 
 /// An array literal, e.g., `[1, 2, 3]`.

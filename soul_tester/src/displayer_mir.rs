@@ -387,6 +387,13 @@ impl<'a> MirDisplayer<'a> {
                 self.push_str(" as ");
                 self.display_type(*cast_to);
             }
+            mir::RvalueKind::PtrOffset { pointer, offset } => {
+                self.push_str("PtrOffset(");
+                self.display_operand(pointer);
+                self.push_str(", ");
+                self.display_operand(offset);
+                self.push(')');
+            }
         }
     }
 

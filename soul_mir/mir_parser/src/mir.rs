@@ -231,6 +231,12 @@ pub enum RvalueKind {
     },
 
     StackAlloc(TypeId),
+
+    /// Pointer offset: computes `ptr + offset * sizeof(pointee)` in bytes.
+    PtrOffset {
+        pointer: Operand,
+        offset: Operand,
+    },
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

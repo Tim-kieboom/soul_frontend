@@ -290,7 +290,8 @@ fn is_valid_statement_expression(kind: &hir::ExpressionKind) -> bool {
         | hir::ExpressionKind::Cast { .. }
         | hir::ExpressionKind::Unary { .. }
         | hir::ExpressionKind::Binary { .. }
-        | hir::ExpressionKind::StructConstructor { .. } => false,
+        | hir::ExpressionKind::StructConstructor { .. }
+        | hir::ExpressionKind::PtrOffset { .. } => false,
 
         hir::ExpressionKind::Block(_)
         | hir::ExpressionKind::Function(_)

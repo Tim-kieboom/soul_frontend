@@ -34,8 +34,8 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 }
             }
             OperandKind::Sizeof(ty) => {
-                let Sizeof { size, alignment: _ } = self.sizeof(*ty, generics)?;
-                let value = self.context.i32_type().const_int(size as u64, false).into();
+                let Sizeof { size, alignment: _ } = self.sizeof_bit(*ty, generics)?;
+                let value = self.context.i32_type().const_int(size as u64 / 8, false).into();
                 let u32 = self.types.types_table.u32_type;
                 let ir_u32 = self
                     .lower_type(u32, generics)?
@@ -324,7 +324,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         })
     }
 
-    pub(crate) fn sizeof(
+    pub(crate) fn sizeof_bit(
         &self,
         sizeof: TypeId,
         generics: &GenericSubstitute,
@@ -366,7 +366,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             }
             ThirTypeKind::Array { kind, element } => {
                 let size = match kind {
-                    ArrayKind::StackArray(num) => num as u32 * self.sizeof(element, generics)?.size,
+                    ArrayKind::StackArray(num) => num as u32 * self.sizeof_bit(element, generics)?.size,
                     _ => int + ptr,
                 };
                 Sizeof {
@@ -390,7 +390,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                         ));
                     }
                 };
-                self.sizeof(ty, generics)?
+                self.sizeof_bit(ty, generics)?
             }
             ThirTypeKind::CustomTypes(id) => match id {
                 hir::CustomTypeId::Struct(struct_id) => self.sizeof_struct(struct_id, generics)?,
@@ -492,7 +492,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
         let mut alignment = Alignment::Null;
         for field in &struct_type.fields {
-            let inner_alignment = self.sizeof(field.ty, generics)?.alignment;
+            let inner_alignment = self.sizeof_bit(field.ty, generics)?.alignment;
 
             if alignment < inner_alignment {
                 alignment = inner_alignment;
@@ -506,7 +506,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         let mut size = 0u32;
 
         for Field { ty, .. } in &struct_type.fields {
-            let field = self.sizeof(*ty, generics)?;
+            let field = self.sizeof_bit(*ty, generics)?;
 
             if !is_packed {
                 let padding = field.alignment.get_padding(offset);

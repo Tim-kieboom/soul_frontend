@@ -38,6 +38,9 @@ impl<'a> TypedHirContext<'a> {
                 self.add_type(HirType::primitive_type(PrimitiveTypes::Uint32))
                     .to_lazy()
             }
+            hir::ExpressionKind::PtrOffset { pointer, offset } => {
+                self.infer_ptr_offset(*pointer, *offset, span)
+            }
             hir::ExpressionKind::Error => LazyTypeId::error(),
             hir::ExpressionKind::Null => self.new_infer(span),
             hir::ExpressionKind::Load(place) => self.infer_place(*place),
@@ -561,6 +564,28 @@ impl<'a> TypedHirContext<'a> {
             HirType::new(HirTypeKind::Ref { of_type, mutable }).apply_modfier(inner_modifier);
 
         self.add_type(ref_type).to_lazy()
+    }
+
+    fn infer_ptr_offset(&mut self, pointer: ExpressionId, offset: ExpressionId, span: Span) -> LazyTypeId {
+        let _ = self.infer_expression(offset);
+
+        let pointer_ty = self.infer_expression(pointer);
+        let resolved = match self.resolve_type_strict(pointer_ty, span) {
+            Some(val) => val,
+            None => return LazyTypeId::error(),
+        };
+
+        match self.id_to_type(resolved).kind {
+            HirTypeKind::Pointer(_) => pointer_ty,
+            _ => {
+                self.log_error(SoulError::new(
+                    "PtrOffset requires a pointer as the first argument".to_string(),
+                    SoulErrorKind::TypeInferenceError,
+                    Some(span),
+                ));
+                LazyTypeId::error()
+            }
+        }
     }
 
     fn infer_deref(&mut self, inner: ExpressionId, span: Span) -> LazyTypeId {

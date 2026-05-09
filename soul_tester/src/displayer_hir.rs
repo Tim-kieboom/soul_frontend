@@ -441,6 +441,13 @@ impl<'a> HirDisplayer<'a> {
                 self.push('.');
                 self.push_str(&variant_name.to_string());
             }
+            hir::ExpressionKind::PtrOffset { pointer, offset } => {
+                self.push_str("PtrOffset(");
+                self.display_expression(pointer);
+                self.push_str(", ");
+                self.display_expression(offset);
+                self.push(')');
+            }
         };
     }
 

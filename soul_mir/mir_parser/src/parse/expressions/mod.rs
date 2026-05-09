@@ -222,6 +222,23 @@ impl<'a> MirContext<'a> {
                 }
             }
 
+            hir::ExpressionKind::PtrOffset { pointer, offset } => {
+                let pointer_operand = self.lower_operand(*pointer).pass(is_end);
+                let offset_operand = self.lower_operand(*offset).pass(is_end);
+                let temp = self.new_temp(value_type);
+
+                let statement = mir::Statement::new(mir::StatementKind::Assign {
+                    place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp), value_type)),
+                    value: mir::Rvalue::new(mir::RvalueKind::PtrOffset {
+                        pointer: pointer_operand,
+                        offset: offset_operand,
+                    }),
+                });
+
+                self.push_statement(statement);
+                mir::Operand::new(value_type, mir::OperandKind::Temp(temp))
+            }
+
             hir::ExpressionKind::ExternalCall {
                 crate_name: _,
                 function_name: _,

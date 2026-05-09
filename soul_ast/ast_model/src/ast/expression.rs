@@ -127,6 +127,7 @@ pub enum IntrinsicValue {
 pub enum Intrinsic {
     InFile,
     InLine,
+    PtrOffset,
 }
 
 impl Intrinsic {
@@ -134,6 +135,7 @@ impl Intrinsic {
         match name {
             "InFile" => Some(Intrinsic::InFile),
             "InLine" => Some(Intrinsic::InLine),
+            "PtrOffset" => Some(Intrinsic::PtrOffset),
             _ => None,
         }
     }

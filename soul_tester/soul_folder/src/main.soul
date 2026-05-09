@@ -12,8 +12,8 @@ main() {
     // Struct.Methode()
     // File.Open(c"text.txt", FileMode.ReadOnly)
 
-    array: [4]int = [1, 2, 3, 4]
-    ptr := RawOffset(array as *u8, 0) as *int
+    array := [1, 2, 3, 4]
+    ptr := PtrOffset(array as *int, 1)
     num := *ptr
     // mut index = Index<int>(@array, 0)
     Io.Println_int(num as int)

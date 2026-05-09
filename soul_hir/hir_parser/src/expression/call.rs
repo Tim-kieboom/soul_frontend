@@ -19,6 +19,9 @@ impl<'a> HirContext<'a> {
         function_call: &ast::FunctionCall,
     ) -> hir::Expression {
         if let Some(intrinsic) = function_call.intrinsic {
+            if intrinsic == Intrinsic::PtrOffset {
+                return self.lower_ptr_offset(id, &function_call.arguments, function_call.name.span);
+            }
             return self.lower_intrinsic(
                 id,
                 intrinsic,
@@ -300,6 +303,30 @@ impl<'a> HirContext<'a> {
                     kind: hir::ExpressionKind::Literal(Literal::Int(line)),
                 }
             }
+            Intrinsic::PtrOffset => unreachable!("PtrOffset should be handled in lower_call"),
+        }
+    }
+
+    fn lower_ptr_offset(
+        &mut self,
+        id: hir::ExpressionId,
+        arguments: &[ast::Argument],
+        span: Span,
+    ) -> hir::Expression {
+        let pointer = arguments
+            .get(0)
+            .map(|arg| self.lower_expression(&arg.value))
+            .unwrap_or(ExpressionId::error());
+
+        let offset = arguments
+            .get(1)
+            .map(|arg| self.lower_expression(&arg.value))
+            .unwrap_or(ExpressionId::error());
+
+        hir::Expression {
+            id,
+            ty: self.new_infer_type(vec![], None, span),
+            kind: hir::ExpressionKind::PtrOffset { pointer, offset },
         }
     }
 

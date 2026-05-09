@@ -220,6 +220,7 @@ fn owner_hint_from_expression(
                 return match intrinsic {
                     ast::Intrinsic::InFile => Some(TypeKind::Primitive(PrimitiveTypes::CStr)),
                     ast::Intrinsic::InLine => Some(TypeKind::Primitive(PrimitiveTypes::Int)),
+                    ast::Intrinsic::PtrOffset => None,
                 };
             }
 
