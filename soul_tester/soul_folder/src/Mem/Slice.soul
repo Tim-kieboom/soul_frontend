@@ -1,5 +1,5 @@
 Index<T>(self: [@]T, index: uint): T {
-    ptr := PtrOffset(self as *T, index as int)
+    ptr := intrinsic.PtrOffset(self as *T, index as int)
     value := *ptr
     value
 }

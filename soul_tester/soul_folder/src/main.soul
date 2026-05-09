@@ -12,7 +12,7 @@ main() {
     // File.Open(c"text.txt", FileMode.ReadOnly)
 
     array := [1, 2, 3, 4]
-    ptr := StackArrayIndex(array, 1)
+    ptr := intrinsic.StackArrayIndex(array, 1)
     num := *ptr
     // mut index = Index<int>(@array, 0)
     Io.Println_int(num as int)

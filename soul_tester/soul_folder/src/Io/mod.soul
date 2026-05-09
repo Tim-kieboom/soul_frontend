@@ -6,8 +6,8 @@ import (
 PrintAssert(
     condition: bool, 
     msg: [@]char = "", 
-    line: int = InLine(),
-    file: [@]char = InFile(), 
+    line: int = intrinsic.InLine(),
+    file: [@]char = intrinsic.InFile(), 
 ) {
 
     if condition == true {
