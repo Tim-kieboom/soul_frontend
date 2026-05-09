@@ -21,11 +21,16 @@ pub enum ComplexLiteral {
         values: Vec<(ComplexLiteral, TypeId)>,
         all_fields_const: bool,
     },
+    Array {
+        array_type: TypeId,
+        values: Vec<ComplexLiteral>,
+    },
 }
 impl ComplexLiteral {
     /// for example `Struct{mut field: i32}` should be alloced becouse you can change value of field
     pub fn is_mutable(&self) -> bool {
         match self {
+            ComplexLiteral::Array{..} => true,
             ComplexLiteral::Basic(_) => false,
             ComplexLiteral::Struct {
                 all_fields_const, ..

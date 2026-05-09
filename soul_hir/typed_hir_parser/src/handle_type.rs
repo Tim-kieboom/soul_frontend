@@ -142,7 +142,7 @@ impl<'a> TypedHirContext<'a> {
         local_type_id
     }
 
-    fn resolve_untyped_primitive(&mut self, base_type: LazyTypeId, span: Span) -> Option<HirType> {
+    pub(crate) fn resolve_untyped_primitive(&mut self, base_type: LazyTypeId, span: Span) -> Option<HirType> {
         let base_type = match base_type {
             LazyTypeId::Known(val) => val,
             LazyTypeId::Infer(_) => return None,

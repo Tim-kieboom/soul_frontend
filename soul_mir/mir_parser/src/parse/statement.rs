@@ -281,6 +281,7 @@ fn is_valid_statement_expression(kind: &hir::ExpressionKind) -> bool {
         hir::ExpressionKind::Null
         | hir::ExpressionKind::Error
         | hir::ExpressionKind::Load(_)
+        | hir::ExpressionKind::Array(_)
         | hir::ExpressionKind::Local(_)
         | hir::ExpressionKind::DeRef(_)
         | hir::ExpressionKind::Sizeof(_)
@@ -289,8 +290,7 @@ fn is_valid_statement_expression(kind: &hir::ExpressionKind) -> bool {
         | hir::ExpressionKind::Cast { .. }
         | hir::ExpressionKind::Unary { .. }
         | hir::ExpressionKind::Binary { .. }
-        | hir::ExpressionKind::StructConstructor { .. }
-        | hir::ExpressionKind::InnerRawStackArray { .. } => false,
+        | hir::ExpressionKind::StructConstructor { .. } => false,
 
         hir::ExpressionKind::Block(_)
         | hir::ExpressionKind::Function(_)

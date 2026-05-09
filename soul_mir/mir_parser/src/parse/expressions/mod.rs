@@ -30,6 +30,10 @@ impl<'a> MirContext<'a> {
         }
 
         let operand = match &value.kind {
+            hir::ExpressionKind::Array(_) => {
+                self.log_error(soul_error_internal!("mir Array not yet impl", Some(span)));
+                mir::Operand::new(value_type, mir::OperandKind::Comptime(ComplexLiteral::Array { array_type: value_type, values: vec![] }))
+            }
             hir::ExpressionKind::Sizeof(_) => {
                 let ty = self.sizeof_type(value_id);
                 mir::Operand::new(value_type, mir::OperandKind::Sizeof(ty))
@@ -217,8 +221,6 @@ impl<'a> MirContext<'a> {
                     mir::Operand::new(value_type, mir::OperandKind::Temp(temp))
                 }
             }
-
-            hir::ExpressionKind::InnerRawStackArray { .. } => self.new_none_operand(),
 
             hir::ExpressionKind::ExternalCall {
                 crate_name: _,

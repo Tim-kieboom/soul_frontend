@@ -21,13 +21,20 @@ impl<'a> HirContext<'a> {
                 methodes,
             }) => {
                 if !generics.is_empty() {
-                    todo!()
+                    self.push_scope();
+                    for generic in generics {
+                        self.insert_generic(generic.name.to_string());
+                    }
                 }
 
                 for methode in methodes {
                     let kind = hir::GlobalKind::Function(self.lower_function(methode));
                     let id = self.alloc_statement(&global.meta_data, global.span);
                     self.insert_global(module_id, hir::Global::new(kind, id));
+                }
+
+                if !generics.is_empty() {
+                    self.pop_scope();
                 }
 
                 if !impls.is_empty() {
@@ -84,13 +91,20 @@ impl<'a> HirContext<'a> {
                 methodes,
             }) => {
                 if !generics.is_empty() {
-                    todo!()
+                    self.push_scope();
+                    for generic in generics {
+                        self.insert_generic(generic.name.to_string());
+                    }
                 }
 
                 for methode in methodes {
                     let kind = hir::GlobalKind::Function(self.lower_function(methode));
                     let id = self.alloc_statement(&global.meta_data, global.span);
                     self.insert_global(module_id, hir::Global::new(kind, id));
+                }
+
+                if !generics.is_empty() {
+                    self.pop_scope();
                 }
 
                 if !impls.is_empty() {

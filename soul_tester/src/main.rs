@@ -48,7 +48,15 @@ pub const MESSAGE_CONFIG: MessageConfig = MessageConfig {
 const OS: Os = Os::Windows;
 const ARCH: Arch = Arch::X86_64;
 const TARGET: TargetInfo = TargetInfo::new(ARCH, OS);
-pub const COMPILER_OPTIONS: CompilerOptions = CompilerOptions::new_default(TARGET);
+
+const DEFAULT_PACKED: bool = false;
+const DEBUG_VIEW_LITERAL_RESOLVE: bool = false;
+pub const COMPILER_OPTIONS: CompilerOptions = CompilerOptions::new(
+    DEBUG_VIEW_LITERAL_RESOLVE, 
+    SementicLevel::Error, 
+    TARGET, 
+    DEFAULT_PACKED,
+);
 
 struct Output {
     mir_response: MirResponse,
@@ -76,10 +84,11 @@ fn main() -> Result<()> {
     )?;
 
     if is_success {
-        info!("{GREEN}llvm success{DEFAULT}",)
+        info!("{GREEN}llvm success{DEFAULT}");
+        log_benchmark()
+    } else {
+        Err(anyhow::Error::msg("llvm failed"))
     }
-
-    log_benchmark()
 }
 
 fn compiler_root_crate(entry_file: EntryFile, crate_store: &mut CrateStore, context: &mut CrateContext) -> Result<Output> {

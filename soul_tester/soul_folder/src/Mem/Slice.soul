@@ -1,0 +1,13 @@
+import (
+    .Ptr.{RawOffset}
+)
+
+Index<T>(self: [@]T, index: uint): T {
+    literal SIZE = int.sizeof as int
+    offset := index as int
+
+    bytes := self as *u8
+    ptr := RawOffset(bytes, SIZE * offset) as *T
+    value := *ptr
+    value
+}

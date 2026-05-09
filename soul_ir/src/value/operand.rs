@@ -1,12 +1,12 @@
 use std::{cell::RefMut, collections::HashMap};
 
 use ast::{ArrayKind, Literal};
-use hir::{ComplexLiteral, StructId, TypeId};
+use hir::{ComplexLiteral, CustomTypeId, StructId, TypeId};
 use inkwell::{
     AddressSpace,
     module::Linkage,
-    types::StructType,
-    values::{AsValueRef, BasicValue, BasicValueEnum, GlobalValue, PointerValue, StructValue},
+    types::{ArrayType, BasicType, StructType},
+    values::{ArrayValue, AsValueRef, BasicValue, BasicValueEnum, GlobalValue, PointerValue, StructValue},
 };
 use mir_parser::mir::{Operand, OperandKind, PlaceId};
 use soul_utils::{
@@ -90,12 +90,45 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             ComplexLiteral::Basic(literal) => {
                 self.lower_basic_literal(literal, should_be, generics)
             }
+            ComplexLiteral::Array {
+                array_type,
+                values,
+            } => {
+
+                let hir_array_type = self.get_type_kind(*array_type)?;
+                let element_type = match hir_array_type {
+                    ThirTypeKind::Array { element, .. } => element,
+                    _ => return Err(soul_error_internal!("arrayType can only be of ThirTypeKind::Array", None)), 
+                };
+
+                let hir_should_type = self.get_type_kind(should_be)?;
+                match hir_should_type {
+                    ThirTypeKind::Array { element, .. } if self.get_type_kind(*element)? == self.get_type_kind(*element_type)? => (),
+                    _ => {
+                        let array_str = hir_array_type.display(&self.types.types_map);
+                        let should_str = hir_should_type.display(&self.types.types_map);
+                        return Err(soul_error_internal!(format!("should type does not match array type {array_str} != {should_str}", ), None)) 
+                    }
+                } 
+
+                self.create_const_array(*array_type, *element_type, values, generics)
+            }
             ComplexLiteral::Struct {
                 struct_id,
                 struct_type,
                 values,
                 all_fields_const: _,
             } => {
+                let hir_should_type = self.get_type(should_be)?;
+                match hir_should_type.kind {
+                    ThirTypeKind::CustomTypes(CustomTypeId::Struct(id)) if id == *struct_id => (),
+                    _ => {
+                        let struct_str = self.get_type(*struct_type)?.display(&self.types.types_map);
+                        let should_str = hir_should_type.display(&self.types.types_map);
+                        return Err(soul_error_internal!(format!("should type does not match struct type {struct_str} != {should_str}", ), None)) 
+                    }
+                } 
+
                 let struct_ir = self.get_or_create_struct(*struct_id, generics)?;
                 self.lower_const_aggregate(struct_ir, *struct_type, values, generics)
             }
@@ -490,6 +523,46 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         }
 
         Ok(Sizeof { size, alignment })
+    }
+    
+    fn create_const_array(
+        &self, 
+        array_type_id: TypeId, 
+        element_type_id: TypeId,
+        values: &Vec<hir::ComplexLiteral>, 
+        generics: &GenericSubstitute,
+    ) -> SoulResult<IrOperand<'a>> {
+        
+        let array_type = self.resolve_array_type(array_type_id, generics)?;
+
+        let mut elements: Vec<BasicValueEnum<'a>> = Vec::with_capacity(values.len());
+        for value in values {
+            let operand = self.lower_literal(value, element_type_id, generics)?;
+            elements.push(operand.value);
+        }
+
+        let array_value = unsafe {
+            ArrayValue::new_const_array(&array_type, &elements)
+        };
+
+        Ok(IrOperand { 
+            value: array_value.into(), 
+            info: OperandInfo::new_loaded(array_type_id, array_type.into()),
+        })
+    }
+    
+    fn resolve_array_type(&self, type_id: TypeId, generics: &GenericSubstitute) -> SoulResult<ArrayType<'a>> {
+        
+        let ty = self.get_type(type_id)?;
+        let (element, len) = match &ty.kind {
+            ThirTypeKind::Array { element, kind: ArrayKind::StackArray(len) } => (element, len),
+            _ => return Err(soul_error_internal!("arrayType should be of ThirTypeKind::Array{kind: ArrayKind::StackArray, ..}", None)),
+        };
+
+        let ir_type = self.lower_type(*element, generics)?
+            .ok_or(soul_error_internal!("elementType of array should be Some(_)", None))?;
+
+        Ok(ir_type.array_type(*len as u32))
     }
 }
 

@@ -71,13 +71,16 @@ impl<'a> LiteralInterpreter<'a> {
             | hir::ExpressionKind::Literal(_)
             | hir::ExpressionKind::If { .. }
             | hir::ExpressionKind::Ref { .. }
-            | hir::ExpressionKind::Function(_)
             | hir::ExpressionKind::Call { .. }
             | hir::ExpressionKind::Cast { .. }
+            | hir::ExpressionKind::Function(_)
             | hir::ExpressionKind::While { .. }
-            | hir::ExpressionKind::InnerRawStackArray { .. }
-            | hir::ExpressionKind::ExternalCall { .. }
-            | hir::ExpressionKind::EnumVariant { .. } => None,
+            | hir::ExpressionKind::EnumVariant { .. }
+            | hir::ExpressionKind::ExternalCall { .. } => None,
+
+            hir::ExpressionKind::Array(array) => {
+                self.interpret_array(array, expression_id)
+            }
 
             hir::ExpressionKind::StructConstructor { ty, values, .. } => {
                 self.interpret_struct_contructor(*ty, values, expression_id)
@@ -100,6 +103,22 @@ impl<'a> LiteralInterpreter<'a> {
                 .map(|l| l.to_complex())
             }
         }
+    }
+
+    fn interpret_array(&self, array: &hir::Array, expression_id: ExpressionId) -> Option<ComplexLiteral> {
+        if let Some(_) = array.collection_type {
+            return None
+        }
+
+        let mut values = Vec::with_capacity(array.values.len());
+        for value in &array.values {
+            values.push(self.try_get_literal(*value)?.consume_to_complex());
+        }
+
+        let array_type = self.types.types_table.expressions[expression_id];
+        Some(
+            ComplexLiteral::Array { array_type, values }
+        )
     }
 
     fn interpret_struct_contructor(
@@ -226,6 +245,7 @@ impl<'a> LiteralRef<'a> {
             LiteralRef::Owner(complex) => match complex {
                 ComplexLiteral::Basic(literal) => Some(literal),
                 ComplexLiteral::Struct { .. } => None,
+                ComplexLiteral::Array { .. } => None,
             },
             LiteralRef::BasicRef(literal) => Some(literal),
         }

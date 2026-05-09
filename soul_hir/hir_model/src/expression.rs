@@ -42,6 +42,7 @@ pub enum ExpressionKind {
 
     /// A literal value (integer, float, string, etc.).
     Literal(Literal),
+    Array(Array),
 
     /// A reference to a local variable.
     Local(LocalId),
@@ -66,8 +67,6 @@ pub enum ExpressionKind {
 
     /// Dereferences a pointer or reference expression.
     DeRef(ExpressionId),
-
-    InnerRawStackArray(LazyTypeId),
 
     // --- Operators ---
     /// A unary operation.
@@ -136,6 +135,14 @@ pub enum ExpressionKind {
     },
 
     Sizeof(LazyTypeId),
+}
+
+/// An array literal, e.g., `[1, 2, 3]`.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Array {
+    pub collection_type: Option<LazyTypeId>,
+    pub element_type: Option<LazyTypeId>,
+    pub values: Vec<ExpressionId>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

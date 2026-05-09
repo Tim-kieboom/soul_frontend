@@ -93,7 +93,9 @@ pub(crate) fn interpret_binary(
                 (Literal::Char(a), Literal::Char(b)) => a == b,
                 (Literal::Str(a), Literal::Str(b)) => a == b,
                 _ => {
-                    if let (Some(a), Some(b)) = (try_as_f64(left), try_as_f64(right)) {
+                    if let (Some(a), Some(b)) = (try_as_i128(left), try_as_i128(right)) {
+                        a == b
+                    } else if let (Some(a), Some(b)) = (try_as_f64(left), try_as_f64(right)) {
                         a == b
                     } else {
                         return None;
@@ -115,7 +117,9 @@ pub(crate) fn interpret_binary(
                 (Literal::Char(a), Literal::Char(b)) => a.partial_cmp(b),
                 (Literal::Str(a), Literal::Str(b)) => a.partial_cmp(b),
                 _ => {
-                    if let (Some(a), Some(b)) = (try_as_f64(left), try_as_f64(right)) {
+                    if let (Some(a), Some(b)) = (try_as_i128(left), try_as_i128(right)) {
+                        a.partial_cmp(&b)
+                    } else if let (Some(a), Some(b)) = (try_as_f64(left), try_as_f64(right)) {
                         a.partial_cmp(&b)
                     } else {
                         None

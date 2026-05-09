@@ -419,7 +419,7 @@ impl<'a> MirDisplayer<'a> {
     }
 
     fn display_literal(&mut self, literal: &ComplexLiteral) {
-        run_hir::literal_display(literal, self.hir, &mut self.sb);
+        run_hir::literal_display(literal, self.types, self.hir, &mut self.sb);
     }
 
     fn display_place(&mut self, place_id: &PlaceId) {

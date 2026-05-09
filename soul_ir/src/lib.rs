@@ -28,7 +28,7 @@ mod local;
 mod statement;
 mod utils;
 mod value;
-use typed_hir::{ThirType, TypedHir};
+use typed_hir::{ThirType, ThirTypeKind, TypedHir};
 use utils::*;
 
 use crate::llvm_builder::IrBuilder;
@@ -152,8 +152,8 @@ pub struct LlvmBackend<'f, 'a> {
     function_keys: FunctionKeyStore,
     functions: VecMap<FunctionKeyId, FunctionValue<'a>>,
     
-    strings: RefCell<HashMap<String, GlobalValue<'a>>>,
     field_indexs: RefCell<VecMap<FieldId, usize>>,
+    strings: RefCell<HashMap<String, GlobalValue<'a>>>,
     lowered_types: RefCell<VecMap<TypeId, Option<BasicTypeEnum<'a>>>>,
     
     faults: &'f mut Vec<SementicFault>,
@@ -324,6 +324,14 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         self.types
             .types_map
             .id_to_type(ty)
+            .ok_or(soul_error_internal!(format!("{:?} not found", ty), None))
+    }
+
+    fn get_type_kind(&self, ty: TypeId) -> SoulResult<&ThirTypeKind> {
+        self.types
+            .types_map
+            .id_to_type(ty)
+            .map(|ty| &ty.kind)
             .ok_or(soul_error_internal!(format!("{:?} not found", ty), None))
     }
 

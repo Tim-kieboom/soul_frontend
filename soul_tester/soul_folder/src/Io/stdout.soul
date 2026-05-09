@@ -12,6 +12,6 @@ Stdout WriteCstr(cstr: c_str) {
     __clib_printCStr(cstr)
 }
 
-Stdout WriteStr(str: [@]char) {
-    __clib_printSoulStr(str as *char, str.len)
+Stdout WriteStr(text: [@]char) {
+    __clib_printSoulStr(text as *char, text.len)
 }

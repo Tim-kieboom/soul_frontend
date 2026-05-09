@@ -11,7 +11,7 @@ use soul_utils::{
     span::{ModuleId, Span},
     vec_map::VecMap,
 };
-use typed_hir::TypedHir;
+use typed_hir::{TypedHir, display_thir::DisplayThirType};
 use typed_hir_parser::lower_typed_hir;
 
 pub struct HirResponse {
@@ -37,7 +37,7 @@ pub fn to_hir(
             let span = hir.info.spans.expressions[id];
             context
                 .faults
-                .push(SementicFault::debug(literal_msg(literal, &hir, span)));
+                .push(SementicFault::debug(literal_msg(literal, &typed, &hir, span)));
         }
     }
 
@@ -48,9 +48,9 @@ pub fn to_hir(
     }
 }
 
-fn literal_msg(literal: &ComplexLiteral, hir: &HirTree, span: Span) -> SoulError {
+fn literal_msg(literal: &ComplexLiteral,  typed: &TypedHir, hir: &HirTree, span: Span) -> SoulError {
     let mut literal_str = String::new();
-    literal_display(literal, hir, &mut literal_str);
+    literal_display(literal, typed, hir, &mut literal_str);
 
     SoulError::new(
         format!("literal resolved to >> {literal_str}"),
@@ -59,11 +59,27 @@ fn literal_msg(literal: &ComplexLiteral, hir: &HirTree, span: Span) -> SoulError
     )
 }
 
-pub fn literal_display(literal: &ComplexLiteral, hir: &HirTree, sb: &mut String) {
+pub fn literal_display(literal: &ComplexLiteral, typed: &TypedHir, hir: &HirTree, sb: &mut String) {
     use std::fmt::Write;
 
     match literal {
         ComplexLiteral::Basic(literal) => sb.push_str(&literal.value_to_string()),
+        ComplexLiteral::Array { array_type, values } => {
+            let array_type = typed.types_map.id_to_type(*array_type);
+            match array_type {
+                Some(val) => val.write_display(&typed.types_map, sb).expect("no fmt error"),
+                None => write!(sb, "{:?}", array_type).expect("no fmt error"),
+            };
+            sb.push_str(":[");
+            let last_index = values.len().saturating_sub(1);
+            for (i, literal) in values.iter().enumerate() {
+                literal_display(literal, typed, hir, sb);
+                if i != last_index {
+                    sb.push_str(", ");
+                }
+            }
+            sb.push_str("]");
+        }
         ComplexLiteral::Struct {
             struct_id,
             values,
@@ -90,7 +106,7 @@ pub fn literal_display(literal: &ComplexLiteral, hir: &HirTree, sb: &mut String)
                 }
 
                 sb.push_str(": ");
-                literal_display(value, hir, sb);
+                literal_display(value, typed, hir, sb);
                 if i != last_index {
                     sb.push_str(", ");
                 }

@@ -14,14 +14,6 @@ u8* __clib_bytesRealloc(uint len, u8* ptr) {
     return new;
 }
 
-void __clib_bytesPlace(/*out*/u8* ptr, uint index, u8 byte) {
-    ptr[index] = byte;
-}
-
-u8 __clib_bytesGet(/*out*/u8* ptr, uint index) {
-    return ptr[index];
-}
-
 u8* __clib_bytesOffset(u8* ptr, intptr_t offset) {
     return &ptr[offset];
 }

@@ -37,7 +37,7 @@ impl<'a> NameResolver<'a> {
                 let prev = self.current.in_global;
                 self.current.in_global = false;
                 self.collect_type(use_type);
-                for methode in methodes {
+                for methode in methodes.iter_mut() {
                     self.check_function_name(&methode.signature.node.name);
                     self.collect_function(methode);
                 }
@@ -46,6 +46,12 @@ impl<'a> NameResolver<'a> {
                     todo!()
                 }
                 self.current.in_global = prev;
+
+                for methode in methodes {
+                    if self.current.in_global {
+                        self.header_insert_function(methode);
+                    }
+                }
             }
             StatementKind::Import(import) => {
                 for path in &import.paths {

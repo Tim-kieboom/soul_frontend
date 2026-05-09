@@ -260,6 +260,29 @@ impl<'a> HirDisplayer<'a> {
         let value = &self.hir.nodes.expressions[*id];
 
         match &value.kind {
+            hir::ExpressionKind::Array(array) => {
+
+                if let Some(ty) = array.collection_type {
+                    self.display_type(ty);
+                    self.push(':');
+                }
+
+                self.push('[');
+                if let Some(ty) = array.element_type {
+                    self.display_type(ty);
+                    self.push(':');
+                }
+
+                let last_index = array.values.len().saturating_sub(1);
+                for (i, value) in array.values.iter().enumerate() {
+                    self.display_expression(value);
+                    if i != last_index {
+                        self.push_str(", ");
+                    }
+                }
+
+                self.push(']');
+            }
             hir::ExpressionKind::Sizeof(ty) => {
                 self.display_type(*ty);
                 self.push_str(".sizeof");
@@ -391,11 +414,6 @@ impl<'a> HirDisplayer<'a> {
                     None => *cast_to,
                 };
                 self.display_type(cast_to);
-            }
-            hir::ExpressionKind::InnerRawStackArray(ty) => {
-                self.push_str("/*stack alloc ");
-                self.display_expression_astype(*id, *ty);
-                self.push_str("*/");
             }
             hir::ExpressionKind::ExternalCall {
                 crate_name,

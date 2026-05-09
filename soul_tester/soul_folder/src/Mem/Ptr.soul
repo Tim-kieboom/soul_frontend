@@ -1,5 +1,12 @@
 extern "C" __clib_bytesOffset(self: *u8, index: int): *u8
 
-Offset(self: *u8, index: int): *u8 {
-    __clib_bytesOffset(self as *u8, index)
+RawOffset(self: *u8, offset: int): *u8 {
+    __clib_bytesOffset(self, offset)
+}
+
+Offset<T>(self: *T, offset: int): *T {
+    literal SIZE = int.sizeof as int
+
+    ptr := __clib_bytesOffset(self as *u8, SIZE * offset) as *T
+    ptr
 }

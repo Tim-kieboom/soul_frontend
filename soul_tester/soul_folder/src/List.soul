@@ -1,6 +1,6 @@
 import (
-    .Mem.Ptr
-    .Mem.Alloc.{AllocArray, ReallocArray}
+    .Mem.Ptr.{Offset}
+    .Mem.Alloc.{AllocMultiple, ReallocMultiple}
 )
 
 struct List {
@@ -8,45 +8,46 @@ struct List {
     mut len: uint
     mut cap: uint
 }
-List New(size: uint = 0): List {
-    array := AllocArray<u8>(size)
-    List{array, len: 0, cap: size}
-}
+use List {
+    New(size: uint = 0): List {
+        array := AllocMultiple<u8>(size)
+        List{array, len: 0, cap: size}
+    }
 
-List Push(&this, value: u8) {
-    
-    len := this.len
-    c := len+1 > this.cap
-    if c == true {
-        if len == 0 {
-            this.resize(1)
-        } else {
-            this.resize(len*2)
+    Push(&this, value: u8) {
+        
+        len := this.len
+        c := len+1 > this.cap
+        if c == true {
+            if len == 0 {
+                this.resize(1)
+            } else {
+                this.resize(len*2)
+            }
+        }
+
+        array := this.array
+        ptr := Offset<u8>(array, len as int)
+        *ptr = value
+        this.len += 1
+    }
+
+    Index(@this, index: uint): u8 {
+        array := this.array
+        ptr := Offset<u8>(array, index as int)
+        num := *ptr
+        num
+    }
+
+    Drop(this) {
+        ptr := this.array
+        if ptr as int != 0 {
+            free(ptr as *none)
         }
     }
 
-    array := this.array
-    ptr := Ptr.Offset(array, len as int)
-    *ptr = value
-    this.len += 1
-}
-
-List Index(@this, index: uint): u8 {
-    array := this.array
-    ptr := Ptr.Offset(array, index as int)
-    num := *ptr
-    num
-}
-
-List Drop(this) {
-    ptr := this.array
-    if ptr as int != 0 {
-        free(ptr as *none)
+    resize(&this, newSize: uint) {
+        this.cap = newSize
+        this.array = ReallocMultiple<u8>(this.array, newSize)
     }
 }
-
-List resize(&this, newSize: uint) {
-    this.cap = newSize
-    this.array = ReallocArray<u8>(this.array, newSize)
-}
-

@@ -30,13 +30,16 @@ impl<'a> TypedHirContext<'a> {
         let value = &self.hir.nodes.expressions[expression_id];
         let span = self.expression_span(expression_id);
         let ty = match &value.kind {
+            hir::ExpressionKind::Array(array) => {
+                self.infer_array(array, span)
+            },
             hir::ExpressionKind::Sizeof(ty) => {
                 self.sizeofs.insert(expression_id, *ty);
                 self.add_type(HirType::primitive_type(PrimitiveTypes::Uint32))
                     .to_lazy()
             }
             hir::ExpressionKind::Error => LazyTypeId::error(),
-            hir::ExpressionKind::Null => self.new_infer_optional(span),
+            hir::ExpressionKind::Null => self.new_infer(span),
             hir::ExpressionKind::Load(place) => self.infer_place(*place),
             hir::ExpressionKind::Block(body) => self.infer_block_expression(*body),
             hir::ExpressionKind::Local(local) => self.locals[*local],
@@ -74,12 +77,8 @@ impl<'a> TypedHirContext<'a> {
                 ..
             } => self.infer_call(*function, *has_callee, generics, arguments, span),
             hir::ExpressionKind::ExternalCall {
-                crate_name,
-                function_name,
-                generics,
-                arguments,
                 ..
-            } => self.infer_external_call(crate_name, function_name, generics, arguments, span),
+            } => self.infer_external_call(),
             hir::ExpressionKind::If {
                 condition,
                 then_block,
@@ -93,7 +92,6 @@ impl<'a> TypedHirContext<'a> {
                 *ends_with_else,
                 span,
             ),
-            hir::ExpressionKind::InnerRawStackArray(_) => value.ty,
         };
 
         if let LazyTypeId::Infer(id) = value.ty {
@@ -102,6 +100,37 @@ impl<'a> TypedHirContext<'a> {
 
         self.type_expression(expression_id, ty);
         ty
+    }
+
+    fn infer_array(&mut self, array: &hir::Array, span: Span) -> LazyTypeId {
+        
+        if array.collection_type.is_some() {
+            self.log_error(soul_error_internal!(
+                "collectionType in LiteralArray is unstable", 
+                Some(span)
+            ));
+            return LazyTypeId::error()
+        }
+
+        let mut element = array.element_type.unwrap_or(self.new_infer(span));
+        for value in &array.values {
+            let span = self.expression_span(*value);
+            let value_type = self.infer_expression(*value);
+            self.unify(*value, element, value_type, span);
+
+            element = self.get_priority_lazy_type(element, value_type);
+        }
+
+        element = self.resolve_untyped_primitive(element, span)
+            .map(|hir_type| self.add_type(hir_type).to_lazy())
+            .unwrap_or(element);
+        
+        let hir_type = HirType::new(HirTypeKind::Array { 
+            element, 
+            kind: ArrayKind::StackArray(array.values.len() as u64) 
+        });
+
+        self.add_type(hir_type).to_lazy()
     }
 
     fn infer_if(
@@ -231,11 +260,6 @@ impl<'a> TypedHirContext<'a> {
 
     fn infer_external_call(
         &mut self,
-        _crate_name: &str,
-        _function_name: &str,
-        _generics: &Vec<TypeId>,
-        _arguments: &Vec<ExpressionId>,
-        _span: Span,
     ) -> LazyTypeId {
         // External calls - for now, assume returns unit
         // In a real implementation, look up signature from typed HIR
@@ -630,7 +654,7 @@ impl<'a> TypedHirContext<'a> {
         LazyTypeId::error()
     }
 
-    fn new_infer_optional(&mut self, span: Span) -> LazyTypeId {
+    fn new_infer(&mut self, span: Span) -> LazyTypeId {
         let new_infer = self.infers.insert_infer(vec![], None, span);
         self.infer_table.alloc(new_infer, span);
         hir::LazyTypeId::Infer(new_infer)
@@ -697,6 +721,7 @@ impl<'a> TypedHirContext<'a> {
 
         Ok(())
     }
+
 }
 
 enum BinaryTypeCheck {
