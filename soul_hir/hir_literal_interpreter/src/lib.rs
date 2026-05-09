@@ -77,7 +77,8 @@ impl<'a> LiteralInterpreter<'a> {
             | hir::ExpressionKind::While { .. }
             | hir::ExpressionKind::EnumVariant { .. }
             | hir::ExpressionKind::ExternalCall { .. }
-            | hir::ExpressionKind::PtrOffset { .. } => None,
+            | hir::ExpressionKind::PtrOffset { .. }
+            | hir::ExpressionKind::StackArrayIndex { .. } => None,
 
             hir::ExpressionKind::Array(array) => {
                 self.interpret_array(array, expression_id)

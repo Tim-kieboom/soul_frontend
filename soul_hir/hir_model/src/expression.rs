@@ -142,6 +142,13 @@ pub enum ExpressionKind {
         pointer: ExpressionId,
         offset: ExpressionId,
     },
+
+    /// Stack array element index: given a `[N]T` and an integer index, returns
+    /// a `*T` pointing to the element at the given index.
+    StackArrayIndex {
+        array: ExpressionId,
+        index: ExpressionId,
+    },
 }
 
 /// An array literal, e.g., `[1, 2, 3]`.

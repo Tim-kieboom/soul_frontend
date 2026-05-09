@@ -37,6 +37,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             RvalueKind::PtrOffset { pointer, offset } => {
                 self.lower_ptr_offset(pointer, offset, generics)
             }
+            RvalueKind::StackArrayIndex { array, index } => {
+                self.lower_stack_array_index(array, index, ty, generics)
+            }
         }
     }
 
@@ -373,6 +376,66 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         Ok(IrOperand {
             value: result_ptr.into(),
             info: crate::OperandInfo::new_loaded(pointer.ty, result_ptr.get_type().into()),
+        })
+    }
+
+    fn lower_stack_array_index(
+        &self,
+        array: &mir::Operand,
+        index: &mir::Operand,
+        result_ty: TypeId,
+        generics: &GenericSubstitute,
+    ) -> SoulResult<IrOperand<'a>> {
+        let array_op = self.lower_operand(array, generics)?;
+        let array_ptr = array_op.get_or_convert_pointer(&self.builder)?;
+
+        let index_op = self.lower_operand(index, generics)?;
+        let index_val = index_op.value.into_int_value();
+
+        let element_ty = match self.types.types_map.id_to_type(array.ty) {
+            Some(thir_type) => match &thir_type.kind {
+                ThirTypeKind::Array { element, .. } => *element,
+                _ => {
+                    return Err(SoulError::new(
+                        "StackArrayIndex requires an array type".to_string(),
+                        SoulErrorKind::LlvmError,
+                        None,
+                    ));
+                }
+            },
+            None => {
+                return Err(SoulError::new(
+                    "StackArrayIndex array type not found".to_string(),
+                    SoulErrorKind::LlvmError,
+                    None,
+                ));
+            }
+        };
+
+        let size_info = self.sizeof_bit(element_ty, generics)?;
+        let size_bits = size_info.size;
+
+        let ptr_int = self.builder.build_ptr_to_int(array_ptr, self.default_int_type)?;
+
+        let size_bits_val = self.default_int_type.const_int(size_bits as u64, false);
+        let eight = self.default_int_type.const_int(8, false);
+        let size_bytes = self.builder.build_int_unsigned_div(size_bits_val, eight)?;
+
+        let index_ext = if index_val.get_type() == self.default_int_type {
+            index_val
+        } else if index_val.get_type().get_bit_width() < self.default_int_type.get_bit_width() {
+            self.builder.build_int_s_extend(index_val, self.default_int_type)?
+        } else {
+            self.builder.build_int_truncate(index_val, self.default_int_type)?
+        };
+
+        let byte_offset = self.builder.build_int_mul(index_ext, size_bytes)?;
+        let result_int = self.builder.build_int_add(ptr_int, byte_offset)?;
+        let result_ptr = self.builder.build_int_to_ptr(result_int, self.context.ptr_type(AddressSpace::default()))?;
+
+        Ok(IrOperand {
+            value: result_ptr.into(),
+            info: crate::OperandInfo::new_loaded(result_ty, result_ptr.get_type().into()),
         })
     }
 }

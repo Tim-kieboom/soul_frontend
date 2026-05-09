@@ -128,6 +128,7 @@ pub enum Intrinsic {
     InFile,
     InLine,
     PtrOffset,
+    StackArrayIndex,
 }
 
 impl Intrinsic {
@@ -136,6 +137,7 @@ impl Intrinsic {
             "InFile" => Some(Intrinsic::InFile),
             "InLine" => Some(Intrinsic::InLine),
             "PtrOffset" => Some(Intrinsic::PtrOffset),
+            "StackArrayIndex" => Some(Intrinsic::StackArrayIndex),
             _ => None,
         }
     }

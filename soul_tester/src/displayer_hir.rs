@@ -448,6 +448,13 @@ impl<'a> HirDisplayer<'a> {
                 self.display_expression(offset);
                 self.push(')');
             }
+            hir::ExpressionKind::StackArrayIndex { array, index } => {
+                self.push_str("StackArrayIndex(");
+                self.display_expression(array);
+                self.push_str(", ");
+                self.display_expression(index);
+                self.push(')');
+            }
         };
     }
 

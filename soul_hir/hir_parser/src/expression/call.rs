@@ -22,6 +22,9 @@ impl<'a> HirContext<'a> {
             if intrinsic == Intrinsic::PtrOffset {
                 return self.lower_ptr_offset(id, &function_call.arguments, function_call.name.span);
             }
+            if intrinsic == Intrinsic::StackArrayIndex {
+                return self.lower_stack_array_index(id, &function_call.arguments, function_call.name.span);
+            }
             return self.lower_intrinsic(
                 id,
                 intrinsic,
@@ -304,6 +307,7 @@ impl<'a> HirContext<'a> {
                 }
             }
             Intrinsic::PtrOffset => unreachable!("PtrOffset should be handled in lower_call"),
+            Intrinsic::StackArrayIndex => unreachable!("StackArrayIndex should be handled in lower_call"),
         }
     }
 
@@ -327,6 +331,29 @@ impl<'a> HirContext<'a> {
             id,
             ty: self.new_infer_type(vec![], None, span),
             kind: hir::ExpressionKind::PtrOffset { pointer, offset },
+        }
+    }
+
+    fn lower_stack_array_index(
+        &mut self,
+        id: hir::ExpressionId,
+        arguments: &[ast::Argument],
+        span: Span,
+    ) -> hir::Expression {
+        let array = arguments
+            .get(0)
+            .map(|arg| self.lower_expression(&arg.value))
+            .unwrap_or(ExpressionId::error());
+
+        let index = arguments
+            .get(1)
+            .map(|arg| self.lower_expression(&arg.value))
+            .unwrap_or(ExpressionId::error());
+
+        hir::Expression {
+            id,
+            ty: self.new_infer_type(vec![], None, span),
+            kind: hir::ExpressionKind::StackArrayIndex { array, index },
         }
     }
 

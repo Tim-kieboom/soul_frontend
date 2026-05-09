@@ -14,10 +14,6 @@ u8* __clib_bytesRealloc(uint len, u8* ptr) {
     return new;
 }
 
-u8* __clib_bytesOffset(u8* ptr, intptr_t offset) {
-    return &ptr[offset];
-}
-
 // ---------------- #File ----------------      
 
 i64 __clib_fileLen(FILE* file) {

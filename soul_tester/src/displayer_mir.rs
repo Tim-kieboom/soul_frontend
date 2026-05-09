@@ -394,6 +394,13 @@ impl<'a> MirDisplayer<'a> {
                 self.display_operand(offset);
                 self.push(')');
             }
+            mir::RvalueKind::StackArrayIndex { array, index } => {
+                self.push_str("StackArrayIndex(");
+                self.display_operand(array);
+                self.push_str(", ");
+                self.display_operand(index);
+                self.push(')');
+            }
         }
     }
 

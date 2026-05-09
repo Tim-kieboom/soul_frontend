@@ -41,6 +41,9 @@ impl<'a> TypedHirContext<'a> {
             hir::ExpressionKind::PtrOffset { pointer, offset } => {
                 self.infer_ptr_offset(*pointer, *offset, span)
             }
+            hir::ExpressionKind::StackArrayIndex { array, index } => {
+                self.infer_stack_array_index(*array, *index, span)
+            }
             hir::ExpressionKind::Error => LazyTypeId::error(),
             hir::ExpressionKind::Null => self.new_infer(span),
             hir::ExpressionKind::Load(place) => self.infer_place(*place),
@@ -580,6 +583,35 @@ impl<'a> TypedHirContext<'a> {
             _ => {
                 self.log_error(SoulError::new(
                     "PtrOffset requires a pointer as the first argument".to_string(),
+                    SoulErrorKind::TypeInferenceError,
+                    Some(span),
+                ));
+                LazyTypeId::error()
+            }
+        }
+    }
+
+    fn infer_stack_array_index(&mut self, array: ExpressionId, index: ExpressionId, span: Span) -> LazyTypeId {
+        let _ = self.infer_expression(index);
+
+        let array_ty = self.infer_expression(array);
+        let resolved = match self.resolve_type_strict(array_ty, span) {
+            Some(val) => val,
+            None => return LazyTypeId::error(),
+        };
+
+        match &self.id_to_type(resolved).kind {
+            HirTypeKind::Array { element, .. } => {
+                let element_ty = match self.resolve_type_strict(*element, span) {
+                    Some(val) => val,
+                    None => return LazyTypeId::error(),
+                };
+                let ptr_type = self.add_type(HirType::new(HirTypeKind::Pointer(LazyTypeId::Known(element_ty))));
+                LazyTypeId::Known(ptr_type)
+            }
+            _ => {
+                self.log_error(SoulError::new(
+                    "StackArrayIndex requires an array as the first argument".to_string(),
                     SoulErrorKind::TypeInferenceError,
                     Some(span),
                 ));

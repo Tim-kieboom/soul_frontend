@@ -239,6 +239,23 @@ impl<'a> MirContext<'a> {
                 mir::Operand::new(value_type, mir::OperandKind::Temp(temp))
             }
 
+            hir::ExpressionKind::StackArrayIndex { array, index } => {
+                let array_operand = self.lower_operand(*array).pass(is_end);
+                let index_operand = self.lower_operand(*index).pass(is_end);
+                let temp = self.new_temp(value_type);
+
+                let statement = mir::Statement::new(mir::StatementKind::Assign {
+                    place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp), value_type)),
+                    value: mir::Rvalue::new(mir::RvalueKind::StackArrayIndex {
+                        array: array_operand,
+                        index: index_operand,
+                    }),
+                });
+
+                self.push_statement(statement);
+                mir::Operand::new(value_type, mir::OperandKind::Temp(temp))
+            }
+
             hir::ExpressionKind::ExternalCall {
                 crate_name: _,
                 function_name: _,

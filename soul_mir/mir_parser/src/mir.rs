@@ -237,6 +237,12 @@ pub enum RvalueKind {
         pointer: Operand,
         offset: Operand,
     },
+
+    /// Stack array element index: computes a `*T` pointer to `array[index]`.
+    StackArrayIndex {
+        array: Operand,
+        index: Operand,
+    },
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
