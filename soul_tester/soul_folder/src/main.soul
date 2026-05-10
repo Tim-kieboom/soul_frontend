@@ -1,21 +1,29 @@
 import ( 
     crate.Io
-    // crate.Test
-    // crate.Fs.{File, Open, FileMode}
+    crate.Test
     crate.Mem.Slice.{Index}
 )
 
+index(self: [@]int, index: uint): int {
+    ptr := intrinsic.PtrOffset(self as *int, index as int)
+    value := *ptr
+    value
+}
+
 main() {
-    // Test.RunTests()
+    Test.RunTests()
 
     // Struct.Methode()
     // File.Open(c"text.txt", FileMode.ReadOnly)
 
     array := [1, 2, 3, 4]
-    ptr := intrinsic.StackArrayIndex(array, 1)
-    num := *ptr
+    ptr := intrinsic.PtrOffset(array as *int, 1)
+    mut num = *ptr
     // mut index = Index<int>(@array, 0)
     Io.Println_int(num as int)
+
+    num = index(@array, 1)
+    Io.Println_int(num)
 
     // Io.Println("hello world")
 }

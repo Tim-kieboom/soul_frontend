@@ -188,12 +188,11 @@ impl<'a> MirContext<'a> {
             }
 
             hir::ExpressionKind::Ref { place, mutable } => {
-                let ty = self.hir_response.typed.types_table.places[*place];
 
                 let place_id = self.lower_place(*place).pass(is_end);
 
                 mir::Operand::new(
-                    ty,
+                    value_type,
                     mir::OperandKind::Ref {
                         place: place_id,
                         mutable: *mutable,

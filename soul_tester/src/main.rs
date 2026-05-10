@@ -65,7 +65,6 @@ struct Output {
 
 fn main() -> Result<()> {
     init_logger(&PATHS.log_file)?;
-
     let (manifest, mut crate_store) = PATHS.load_crates()?;
 
     compile_all_libs(&mut crate_store, &manifest)?;

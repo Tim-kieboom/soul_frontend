@@ -449,7 +449,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
         Ok(IrOperand {
             value: slice_ptr.into(),
-            info: OperandInfo::new_loaded(slice_type_id, slice_type.into()),
+            info: OperandInfo::new_unloaded(slice_type_id, slice_type.into()),
         })
     }
 
