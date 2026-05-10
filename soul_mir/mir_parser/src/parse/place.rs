@@ -12,38 +12,19 @@ impl<'a> MirContext<'a> {
     pub fn lower_place(&mut self, place_id: hir::PlaceId) -> EndBlock<mir::PlaceId> {
         let is_end = &mut false;
         
-        #[cfg(debug_assertions)]
         let span = self.place_span(place_id);
         
         let mir_place = match &self.hir_response.hir.nodes.places[place_id].kind {
             hir::PlaceKind::Local(local_id) => {
-                let local = match self.local_remap.get(*local_id) {
-                    Some(val) => *val,
-                    None => {
-                        #[cfg(debug_assertions)]
-                        self.log_error(soul_error_internal!(
-                            format!("{:?} not found in remap", local_id),
-                            Some(span)
-                        ));
-                        mir::LocalId::error()
-                    }
-                };
-
-                let ty = self.local_type(*local_id);
-                self.new_place(mir::Place::new(mir::PlaceKind::Local(local), ty))
+                let local_info = &self.hir_response.hir.nodes.locals[*local_id];
+                if local_info.is_temp() {
+                    self.lower_temp(*local_id, place_id)
+                } else {
+                    self.lower_local(*local_id, span)
+                }
             }
             hir::PlaceKind::Temp(local_id) => {
-                let ty = self.place_type(place_id);
-                let temp = match self.temp_remap.get(*local_id) {
-                    Some(val) => *val,
-                    None => {
-                        let temp = self.new_temp(ty);
-                        self.temp_remap.insert(*local_id, temp);
-                        temp
-                    }
-                };
-
-                self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp), ty))
+                self.lower_temp(*local_id, place_id)
             }
             hir::PlaceKind::Deref(inner) => {
                 let ty = self.place_type(place_id);
@@ -134,6 +115,39 @@ impl<'a> MirContext<'a> {
                 self.deref_to_operand(operand)
             }
         }
+    }
+
+    // Look up a HIR local in the MIR-local remap and wrap it in a `PlaceKind::Local`.
+    #[allow(unused_variables)]
+    fn lower_local(&mut self, local_id: hir::LocalId, span: Span) -> mir::PlaceId {
+        let local = match self.local_remap.get(local_id) {
+            Some(val) => *val,
+            None => {
+                #[cfg(debug_assertions)]
+                self.log_error(soul_error_internal!(
+                    format!("{:?} not found in remap", local_id),
+                    Some(span)
+                ));
+                mir::LocalId::error()
+            }
+        };
+
+        let ty = self.local_type(local_id);
+        self.new_place(mir::Place::new(mir::PlaceKind::Local(local), ty))
+    }
+
+    // Return a MIR temp for a HIR temp local, creating one if not yet remapped.
+    fn lower_temp(&mut self, local_id: hir::LocalId, place_id: hir::PlaceId) -> mir::PlaceId {
+        let ty = self.place_type(place_id);
+        let temp = match self.temp_remap.get(local_id) {
+            Some(val) => *val,
+            None => {
+                let temp = self.new_temp(ty);
+                self.temp_remap.insert(local_id, temp);
+                temp
+            }
+        };
+        self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp), ty))
     }
 
     fn deref_to_operand(&mut self, operand: mir::Operand) -> mir::Operand {

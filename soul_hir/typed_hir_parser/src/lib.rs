@@ -312,6 +312,7 @@ impl<'a> TypedHirContext<'a> {
         let info = &self.hir.nodes.locals[variable.local];
         match &info.kind {
             hir::LocalKind::Variable(expression_id) => *expression_id,
+            hir::LocalKind::Temp(expression_id) => Some(*expression_id),
             other => {
                 self.log_error(soul_error_internal!(
                     format!("LocalKind::{} should be unreachable in TypedHirContext::get_variable_value", other.display_variant()), 

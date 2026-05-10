@@ -36,6 +36,11 @@ impl<'a, 'f> Parser<'a, 'f> {
         end_tokens: &[TokenKind],
     ) -> SoulResult<Expression> {
         let start_span = self.token().span;
+
+        
+        let mut prefix_ops = vec![];
+        self.collect_prefix_operators(&mut prefix_ops, start_span);
+
         let mut left = self.parse_primary()?;
 
         loop {
@@ -121,7 +126,36 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
         }
 
+        left = self.apply_prefix_operators(left, prefix_ops);
         Ok(left)
+    }
+
+    /// Collect prefix operators before parse_primary so that postfix operators
+    /// (`.`, `()`, `[]`) bind tighter — which is standard language semantics.
+    /// `@*expr` → outer `@` wraps the result of inner `*`; we apply them in
+    /// reverse order below so the outermost prefix wraps the innermost.
+    fn collect_prefix_operators(&mut self, prefix_ops: &mut Vec<(Span, UnaryKinds)>, start_span: Span) {
+        while let TokenKind::Symbol(symbol) = &self.token().kind {
+            match self.expect_unary_kind(start_span, *symbol) {
+                Ok(unary_kind) => {
+                    self.bump();
+                    prefix_ops.push((self.span_combine(start_span), unary_kind));
+                }
+                Err(_) => break,
+            }
+        }
+    }
+
+    fn apply_prefix_operators(&mut self, mut left: Expression, prefix_ops: Vec<(Span, UnaryKinds)>) -> Expression {
+        for (span, unary) in prefix_ops.into_iter().rev() {
+            left = match unary {
+                UnaryKinds::UnaryOperator(unary) => Expression::new_unary(unary, left, span),
+                UnaryKinds::Ref { mutable } => Expression::new_ref(mutable, left, span),
+                UnaryKinds::Deref => Expression::new_deref(left, span),
+            };
+        }
+
+        left
     }
 
     fn parse_primary(&mut self) -> SoulResult<Expression> {
@@ -148,18 +182,6 @@ impl<'a, 'f> Parser<'a, 'f> {
                     values: vec![],
                 };
                 Expression::from_array(Spanned::new(arr, start_span))
-            }
-            TokenKind::Symbol(symbol) => {
-                let unary = self.expect_unary_kind(start_span, *symbol)?;
-                self.bump();
-
-                let rvalue = self.parse_primary()?;
-                let span = self.span_combine(start_span);
-                match unary {
-                    UnaryKinds::UnaryOperator(unary) => Expression::new_unary(unary, rvalue, span),
-                    UnaryKinds::Ref { mutable } => Expression::new_ref(mutable, rvalue, span),
-                    UnaryKinds::Deref => Expression::new_deref(rvalue, span),
-                }
             }
             TokenKind::Ident(_) => self.parse_primary_ident(start_span)?,
             TokenKind::CharLiteral(char) => {

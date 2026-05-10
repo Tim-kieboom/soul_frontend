@@ -1,4 +1,4 @@
-use hir::{ComplexLiteral, ExpressionKind, LocalInfo, LocalKind, TypeId};
+use hir::{ComplexLiteral, ExpressionId, ExpressionKind, LocalInfo, LocalKind, TypeId};
 use soul_utils::soul_error_internal;
 use typed_hir_parser::UnifyPrimitiveCast;
 
@@ -125,7 +125,15 @@ impl<'a> MirContext<'a> {
             return;
         }
 
-        if let LocalKind::Variable(Some(value)) = local_info.kind {
+        match local_info.kind {
+            LocalKind::Temp(value)
+            | LocalKind::Variable(Some(value)) => self.lower_variable_assign(value, variable, place_kind, is_end),
+            _ => (),
+        }
+    }
+
+    // Assign a value expression to a variable/temp, handling if-expressions and type casts.
+    fn lower_variable_assign(&mut self, value: ExpressionId, variable: &hir::Variable, place_kind: mir::PlaceKind, is_end: &mut bool) {
             let target_place =
                 self.new_place(mir::Place::new(place_kind, self.local_type(variable.local)));
 
@@ -164,7 +172,6 @@ impl<'a> MirContext<'a> {
             });
 
             self.push_statement(statement);
-        }
     }
 
     fn cast_variable(&mut self, operand: mir::Operand, local_type: TypeId) -> mir::Rvalue {
@@ -211,13 +218,15 @@ impl<'a> MirContext<'a> {
         const SHOULD_ASSIGN: bool = true;
 
         if local_info.is_temp() {
-            return (
-                SHOULD_ASSIGN,
-                mir::PlaceKind::Temp(match self.temp_remap.get(variable.local) {
-                    Some(val) => *val,
-                    None => self.new_temp(self.local_type(variable.local)),
-                }),
-            );
+            let temp = match self.temp_remap.get(variable.local) {
+                Some(val) => *val,
+                None => {
+                    let temp = self.new_temp(self.local_type(variable.local));
+                    self.temp_remap.insert(variable.local, temp);
+                    temp
+                }
+            };
+            return (SHOULD_ASSIGN, mir::PlaceKind::Temp(temp));
         }
 
         let local = match self.local_remap.get(variable.local) {

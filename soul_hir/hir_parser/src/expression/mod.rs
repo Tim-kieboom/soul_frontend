@@ -242,6 +242,14 @@ impl<'a> HirContext<'a> {
         is_mutable: &bool,
         span: Span,
     ) -> hir::Expression {
+
+        // `&*expr` / `@*expr`: use a PlaceKind::Deref directly instead of
+        // eagerly loading the deref into a temp and taking its address,
+        // which would lose the original pointer identity.
+        if let ast::ExpressionKind::Deref { inner, .. } = &expression.node {
+            return self.cast_pointer_to_ref(inner, id, *is_mutable, span)
+        }
+
         let inner = self.lower_expression(expression);
         let of_type = self.tree.nodes.expressions[inner].ty;
 
@@ -283,6 +291,66 @@ impl<'a> HirContext<'a> {
             kind: hir::ExpressionKind::Ref {
                 place: self.insert_place(place),
                 mutable: *is_mutable,
+            },
+        }
+    }
+
+    /// Special case: `@*expr` or `&*expr` — create a PlaceKind::Deref directly
+    /// instead of eagerly loading the deref into a temp and taking
+    /// the address of that temp (which loses the original pointer).
+    fn cast_pointer_to_ref(&mut self, deref_inner: &ast::Expression, id: ExpressionId, is_mutable: bool, span: Span) -> hir::Expression {
+        let inner_expr = self.lower_expression(deref_inner);
+        let inner_ty = self.tree.nodes.expressions[inner_expr].ty;
+
+        let inner_place_kind = match &deref_inner.node {
+            ast::ExpressionKind::Variable { ident, .. } => {
+                match self.find_local(&ident) {
+                    Some(local) => PlaceKind::Local(local),
+                    None => {
+                        self.log_error(SoulError::new(
+                            format!("'{}' not found in scope", ident.as_str()),
+                            SoulErrorKind::NotFoundInScope,
+                            Some(ident.span),
+                        ));
+                        PlaceKind::Local(LocalId::error())
+                    }
+                }
+            }
+            _ => {
+                let temp_local = self.id_generator.alloc_local();
+                let variable = hir::Variable { local: temp_local };
+                self.insert_desugar_variable(variable, inner_ty, inner_expr, span);
+                PlaceKind::Local(temp_local)
+            }
+        };
+
+        let inner_place = Place::new(
+            self.id_generator.alloc_place(),
+            inner_place_kind,
+            span,
+        );
+        let inner_place_id = self.insert_place(inner_place);
+
+        let deref_place_id = self.id_generator.alloc_place();
+        let deref_place = Place::new(
+            deref_place_id,
+            PlaceKind::Deref(inner_place_id),
+            span,
+        );
+        let deref_place_id = self.insert_place(deref_place);
+
+        let of_type = self.new_infer_type(vec![], None, span);
+        let ty = self.add_type(HirType::new(HirTypeKind::Ref {
+            of_type,
+            mutable: is_mutable,
+        }));
+
+        hir::Expression {
+            id,
+            ty: hir::LazyTypeId::Known(ty),
+            kind: hir::ExpressionKind::Ref {
+                place: deref_place_id,
+                mutable: is_mutable,
             },
         }
     }

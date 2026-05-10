@@ -1,5 +1,9 @@
-Index<T>(self: [@]T, index: uint): T {
-    ptr := intrinsic.PtrOffset(self as *T, index as int)
-    value := *ptr
-    value
+Index<T>(self: [@]T, index: uint): @T {
+    ref := @*intrinsic.PtrOffset(self as *T, index as int)
+    ref
+}
+
+IndexMut<T>(self: [&]T, index: uint): &T {
+    ref := &*intrinsic.PtrOffset(self as *T, index as int)
+    ref
 }

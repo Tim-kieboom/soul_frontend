@@ -8,7 +8,7 @@ use inkwell::{
     types::{ArrayType, BasicType, StructType},
     values::{ArrayValue, AsValueRef, BasicValue, BasicValueEnum, GlobalValue, PointerValue, StructValue},
 };
-use mir_parser::mir::{Operand, OperandKind, PlaceId};
+use mir_parser::mir::{Operand, OperandKind, PlaceId, PlaceKind};
 use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},
     soul_error_internal,
@@ -136,6 +136,14 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
     }
 
     fn lower_ref(&self, place: PlaceId, generics: &GenericSubstitute) -> SoulResult<IrOperand<'a>> {
+
+        // For Deref places, the inner operand is the pointer we want the address of.
+        // Skip the generic lower_place_to_operand path (which loads the *value*)
+        // and store the pointer directly into a new alloca.
+        if let PlaceKind::Deref(operand) = &self.mir.tree.places[place].kind {
+            return self.deref_place(operand, place, generics)  
+        }
+
         let inner = self.lower_place_to_operand(place, generics)?;
         let ty = self.mir.tree.places[place].ty;
         let hir_type = self.get_type(ty)?;
@@ -177,6 +185,26 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     info: inner.info.clone(),
                 }
             }
+        })
+    }
+
+    /// For Deref places, use the inner pointer operand directly
+    /// (the pointer IS the address of the deref'd location).
+    fn deref_place(&self, operand: &Operand, place: PlaceId, generics: &GenericSubstitute) -> SoulResult<IrOperand<'a>>  {
+        let ptr_op = self.lower_operand(operand, generics)?;
+        let ptr = ptr_op.value.into_pointer_value();
+        let ptr_type = ptr.get_type();
+        let new_ptr = self.builder.build_alloca(ptr_type, "ref_ptr")?;
+        let operand_to_store = IrOperand {
+            value: ptr.into(),
+            info: OperandInfo::new_loaded(ptr_op.info.type_id, ptr_type.into()),
+        };
+        self.builder.store_operand(new_ptr, operand_to_store)?;
+        let ty = self.mir.tree.places[place].ty;
+        let info = OperandInfo::new_unloaded(ty, ptr_type.into());
+        Ok(IrOperand {
+            value: new_ptr.into(),
+            info,
         })
     }
 

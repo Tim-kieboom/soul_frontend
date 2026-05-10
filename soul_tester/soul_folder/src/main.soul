@@ -4,26 +4,24 @@ import (
     crate.Mem.Slice.{Index}
 )
 
-index(self: [@]int, index: uint): int {
-    ptr := intrinsic.PtrOffset(self as *int, index as int)
-    value := *ptr
-    value
-}
+
 
 main() {
     Test.RunTests()
 
     // Struct.Methode()
     // File.Open(c"text.txt", FileMode.ReadOnly)
-
     array := [1, 2, 3, 4]
-    ptr := intrinsic.PtrOffset(array as *int, 1)
-    mut num = *ptr
-    // mut index = Index<int>(@array, 0)
+
+    mutRef := IndexMut<int>(&array, 1)
+    *mutRef = 20
+
+    ref := Index<int>(@array, 1)
+    mut num = *ref
     Io.Println_int(num as int)
 
-    num = index(@array, 1)
-    Io.Println_int(num)
+
+
 
     // Io.Println("hello world")
 }
