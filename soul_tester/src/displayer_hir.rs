@@ -442,14 +442,14 @@ impl<'a> HirDisplayer<'a> {
                 self.push_str(&variant_name.to_string());
             }
             hir::ExpressionKind::PtrOffset { pointer, offset } => {
-                self.push_str("PtrOffset(");
+                self.push_str("intrinsic.PtrOffset(");
                 self.display_expression(pointer);
                 self.push_str(", ");
                 self.display_expression(offset);
                 self.push(')');
             }
             hir::ExpressionKind::StackArrayIndex { array, index } => {
-                self.push_str("StackArrayIndex(");
+                self.push_str("intrinsic.StackArrayIndex(");
                 self.display_expression(array);
                 self.push_str(", ");
                 self.display_expression(index);
@@ -470,6 +470,11 @@ impl<'a> HirDisplayer<'a> {
                     }
                 }
                 self.push(']');
+            }
+            &hir::ExpressionKind::Drop { value } => {
+                self.push_str("intrinsic.Drop(");
+                self.display_expression(&value);
+                self.push(')');
             }
         };
     }

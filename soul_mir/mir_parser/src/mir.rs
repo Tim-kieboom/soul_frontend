@@ -1,6 +1,6 @@
 use ast::{BinaryOperator, ExternLanguage, UnaryOperator};
 use hir::{ComplexLiteral, FieldId, GenericId, StructId, TypeId};
-use soul_utils::{Ident, ids::FunctionId, impl_soul_ids, span::ModuleId, vec_map::VecMap};
+use soul_utils::{Ident, Span, ids::FunctionId, impl_soul_ids, span::ModuleId, vec_map::VecMap};
 
 impl_soul_ids!(GlobalId, BlockId, LocalId, StatementId, PlaceId, TempId);
 
@@ -246,6 +246,9 @@ pub enum RvalueKind {
 
     /// Heap allocation: allocates `count * Type.sizeof` bytes on the heap and returns `*ty`.
     HeapAlloc { ty: TypeId, count: u64 },
+
+    /// Drop: frees heap-allocated memory for pointer/heap-array types.
+    Drop { value: Operand, span: Span },
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

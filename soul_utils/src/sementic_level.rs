@@ -123,6 +123,13 @@ impl SementicFault {
         }
     }
 
+    pub const fn warning(err: SoulError) -> Self {
+        Self {
+            message: err,
+            level: SementicLevel::Warning,
+        }
+    }
+
     pub fn consume_soul_error(self) -> SoulError {
         self.message
     }

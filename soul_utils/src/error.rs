@@ -85,6 +85,7 @@ pub enum SoulErrorKind {
 
     LlvmError,
 
+    Unused,
     NotFoundInScope,
     AlreadyFoundInScope,
 

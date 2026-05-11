@@ -4,8 +4,7 @@ use hir::{ComplexLiteral, StructId, TypeId};
 use inkwell::{types::StructType, values::BasicValueEnum, AddressSpace};
 use mir_parser::mir::{self, AggregateBody, Place, PlaceId, Rvalue, RvalueKind};
 use soul_utils::{
-    error::{SoulError, SoulErrorKind, SoulResult},
-    soul_error_internal,
+    Span, error::{SoulError, SoulErrorKind, SoulResult}, soul_error_internal
 };
 use typed_hir::{FieldInfo, ThirTypeKind, display_thir::DisplayThirType};
 
@@ -19,53 +18,35 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         value: &Rvalue,
         ty: TypeId,
         generics: &GenericSubstitute,
-    ) -> SoulResult<IrOperand<'a>> {
-        match &value.kind {
-            RvalueKind::Place(place) => self.lower_rvalue_place(place, generics),
-            RvalueKind::CastUse { value, cast_to } => self.lower_cast(value, *cast_to, generics),
-            RvalueKind::Operand(operand) => self.lower_operand(operand, generics),
+    ) -> SoulResult<Option<IrOperand<'a>>> {
+        Ok(Some(match &value.kind {
+            RvalueKind::Place(place) => self.lower_rvalue_place(place, generics)?,
+            RvalueKind::CastUse { value, cast_to } => self.lower_cast(value, *cast_to, generics)?,
+            RvalueKind::Operand(operand) => self.lower_operand(operand, generics)?,
             RvalueKind::Binary {
                 left,
                 operator,
                 right,
-            } => self.lower_binary(left, operator, right, generics),
-            RvalueKind::Unary { operator, value } => self.lower_unary(value, operator, generics),
-            RvalueKind::StackAlloc(ty) => self.lower_stack_alloc(*ty, generics),
+            } => self.lower_binary(left, operator, right, generics)?,
+            RvalueKind::Unary { operator, value } => self.lower_unary(value, operator, generics)?,
+            RvalueKind::StackAlloc(ty) => self.lower_stack_alloc(*ty, generics)?,
             RvalueKind::Aggregate { struct_type, body } => {
-                self.lower_struct_contructor(ty, *struct_type, body, generics)
+                self.lower_struct_contructor(ty, *struct_type, body, generics)?
             }
             RvalueKind::PtrOffset { pointer, offset } => {
-                self.lower_ptr_offset(pointer, offset, generics)
+                self.lower_ptr_offset(pointer, offset, generics)?
             }
             RvalueKind::StackArrayIndex { array, index } => {
-                self.lower_stack_array_index(array, index, ty, generics)
+                self.lower_stack_array_index(array, index, ty, generics)?
             }
-            RvalueKind::HeapAlloc { ty: inner_ty, count } => {
-                let size_info = self.sizeof_bit(*inner_ty, generics)?;
-                let size_bits = size_info.size as u64;
-
-                let eight = self.default_int_type.const_int(8, false);
-                let size_bits_val = self.default_int_type.const_int(size_bits, false);
-                let size_bytes = self.builder.build_int_unsigned_div(size_bits_val, eight)?;
-
-                let total_size = if *count > 1 {
-                    let count_val = self.default_int_type.const_int(*count, false);
-                    self.builder.build_int_mul(size_bytes, count_val)?
-                } else {
-                    size_bytes
-                };
-
-                let malloc_fn = self.malloc_function.ok_or_else(|| {
-                    soul_error_internal!("malloc function not declared", None)
-                })?;
-                let call = self.builder.build_call(malloc_fn, &[total_size.into()])?;
-                let ptr = call.try_as_basic_value().basic().ok_or_else(|| {
-                    soul_error_internal!("malloc call returned no value", None)
-                })?;
-
-                self.new_loaded_operand(ptr, ty, generics)
+            RvalueKind::HeapAlloc { ty: inner_type, count } => {
+                self.lower_heap_alloc(ty, *inner_type, *count, generics)?
             }
-        }
+            RvalueKind::Drop { value, span } => {
+                self.lower_drop(value, *span, generics)?;
+                return Ok(None);
+            }
+        }))
     }
 
     pub(crate) fn new_loaded_operand(
@@ -98,6 +79,101 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             value,
             info: OperandInfo::new_unloaded(ty, ir_type),
         })
+    }
+
+    fn lower_heap_alloc(&self, ty: TypeId, inner_type: TypeId, count: u64, generics: &GenericSubstitute) -> SoulResult<IrOperand<'a>> {
+        let size_info = self.sizeof_bit(inner_type, generics)?;
+        let size_bits = size_info.size as u64;
+
+        let eight = self.default_int_type.const_int(8, false);
+        let size_bits_val = self.default_int_type.const_int(size_bits, false);
+        let size_bytes = self.builder.build_int_unsigned_div(size_bits_val, eight)?;
+
+        let total_size = if count > 1 {
+            let count_val = self.default_int_type.const_int(count, false);
+            self.builder.build_int_mul(size_bytes, count_val)?
+        } else {
+            size_bytes
+        };
+
+        let malloc_fn = self.malloc_function.ok_or_else(|| {
+            soul_error_internal!("malloc function not declared", None)
+        })?;
+        let call = self.builder.build_call(malloc_fn, &[total_size.into()])?;
+        let ptr = call.try_as_basic_value().basic().ok_or_else(|| {
+            soul_error_internal!("malloc call returned no value", None)
+        })?;
+
+        self.new_loaded_operand(ptr, ty, generics)
+    }
+
+    fn lower_drop(&self, value: &mir::Operand, span: Span, generics: &GenericSubstitute) -> SoulResult<()> {
+        let value_op = self.lower_operand(value, generics)?;
+        let hir_type = self.get_type(value.ty)?;
+
+        match &hir_type.kind {
+            ThirTypeKind::Pointer(_) => {
+                let ptr = if value_op.value.is_pointer_value() {
+                    value_op.value.into_pointer_value()
+                } else {
+                    return Err(soul_error_internal!("Drop: expected pointer value", Some(span)));
+                };
+
+                let Some(free_fn) = self.free_function else {
+                    return Err(soul_error_internal!("free function not declared", Some(span)))
+                };
+
+                self.builder.build_call(free_fn, &[ptr.into()])?;
+            }
+            ThirTypeKind::Array {
+                kind: ast::ArrayKind::HeapArray,
+                ..
+            } => {
+                let heap_struct_ir_type = value_op.info.ir_type;
+                let data_ptr = if value_op.info.is_unloaded {
+                    let ptr = value_op.value.into_pointer_value();
+
+                    let data_ptr_ptr = self.builder.build_struct_gep_index(
+                        heap_struct_ir_type.into_struct_type(),
+                        ptr,
+                        0,
+                        "drop_heap_array_ptr",
+                    )?;
+                    
+                    self.builder.build_load(
+                        self.context.ptr_type(AddressSpace::default()),
+                        data_ptr_ptr,
+                        "drop_heap_array_data",
+                    )?.into_pointer_value()
+
+                } else {
+
+                    if !value_op.value.is_struct_value() {
+                        return Err(soul_error_internal!("Drop: expected struct value for loaded heap array", Some(span)));
+                    }
+
+                    let struct_val = value_op.value.into_struct_value();
+                    let struct_ty = heap_struct_ir_type.into_struct_type();
+                    let ptr_type = self.context.ptr_type(AddressSpace::default());
+                    let ptr_alloca = self.builder.build_alloca(struct_ty, "drop_heap_array_temp")?;
+                    let _ = self.builder.inkwell().build_store(ptr_alloca, struct_val);
+                    let data_ptr_ptr = self.builder.build_struct_gep_index(
+                        struct_ty,
+                        ptr_alloca,
+                        0,
+                        "drop_heap_array_data_ptr",
+                    )?;
+                    self.builder.build_load(ptr_type, data_ptr_ptr, "drop_heap_array_data")?.into_pointer_value()
+                };
+                let free_fn = self.free_function.ok_or_else(|| {
+                    soul_error_internal!("free function not declared", Some(span))
+                })?;
+                self.builder.build_call(free_fn, &[data_ptr.into()])?;
+            }
+            _ => (),
+        }
+
+        Ok(())
     }
 
     fn lower_rvalue_place(

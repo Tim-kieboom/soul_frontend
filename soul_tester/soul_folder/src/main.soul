@@ -8,17 +8,22 @@ main() {
     ptr := new(1)
     Io.Println_int(*ptr)
 
-    mut array = new:[1, 2, 3, 4]
-    mut ref = Index<int>(@array, 1)
+    array := new:[1, 2, 3, 4]
+    ref := Index<int>(@array, 1)
     Io.Print("array.len = ")
     Io.Print_uint(array.len)
     Io.Print(", array[1] = ")
     Io.Println_int(*ref)
 
-    array = new:[for 10 => 3]
-    ref = Index<int>(@array, 1)
-    Io.Print("array.len = ")
-    Io.Print_uint(array.len)
-    Io.Print(", array[1] = ")
-    Io.Println_int(*ref)
+    array2 := new:[for 10 => 3]
+    ref2 := Index<int>(@array2, 1)
+    Io.Print("array2.len = ")
+    Io.Print_uint(array2.len)
+    Io.Print(", array2[1] = ")
+    Io.Println_int(*ref2)
+
+    intrinsic.Drop(ref)
+    intrinsic.Drop(ptr)
+    intrinsic.Drop(array)
+    intrinsic.Drop(array2)
 }

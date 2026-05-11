@@ -65,6 +65,10 @@ impl<'a> TypedHirContext<'a> {
                     span,
                 )
             },
+            hir::ExpressionKind::Drop { value } => {
+                self.infer_expression(*value);
+                self.none_type.to_lazy()
+            }
             hir::ExpressionKind::Load(place) => self.infer_place(*place),
             hir::ExpressionKind::Block(body) => self.infer_block_expression(*body),
             hir::ExpressionKind::Local(local) => self.locals[*local],

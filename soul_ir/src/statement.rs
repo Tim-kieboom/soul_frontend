@@ -54,7 +54,10 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         }
 
         let ty = self.mir.tree.places[place_id].ty;
-        let ir_value = self.lower_rvalue(value, ty, generics)?;
+        let Some(ir_value) = self.lower_rvalue(value, ty, generics)? else {
+            return Ok(()) // for valueless rvalues like intrinsic.Drop
+        };
+
         match &self.mir.tree.places[place_id].kind {
             PlaceKind::Field {
                 struct_type,

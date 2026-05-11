@@ -158,6 +158,11 @@ pub enum ExpressionKind {
         values: Vec<ExpressionId>,
         ptr_type: TypeId,
     },
+
+    /// `Drop(expr)` — frees heap-allocated memory for pointer/heap-array types.
+    Drop {
+        value: ExpressionId,
+    },
 }
 
 /// An array literal, e.g., `[1, 2, 3]`.

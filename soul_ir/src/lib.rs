@@ -70,6 +70,7 @@ pub fn to_llvm_ir<'f, 'a>(
 
     backend.declare_exit();
     backend.declare_malloc();
+    backend.declare_free();
     backend.allocate_globals(&GenericSubstitute::new(&[], &[]));
 
     let mir = &request.mir.tree;
@@ -145,6 +146,7 @@ pub struct LlvmBackend<'f, 'a> {
     options: &'a CompilerOptions,
     exit_function: Option<FunctionValue<'a>>,
     malloc_function: Option<FunctionValue<'a>>,
+    free_function: Option<FunctionValue<'a>>,
 
     non_mangels: HashMap<String, FunctionId>,
     temps: HashMap<(FunctionKeyId, TempId), IrOperand<'a>>,
@@ -202,6 +204,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             mir: request.mir,
             exit_function: None,
             malloc_function: None,
+            free_function: None,
             temps: HashMap::new(),
             blocks: HashMap::new(),
             locals: HashMap::new(),
@@ -248,6 +251,14 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         let malloc_fn = self.module.add_function("malloc", malloc_type, None);
         malloc_fn.set_linkage(inkwell::module::Linkage::External);
         self.malloc_function = Some(malloc_fn);
+    }
+
+    fn declare_free(&mut self) {
+        let ptr_type = self.context.ptr_type(AddressSpace::default());
+        let free_type = self.context.i8_type().fn_type(&[ptr_type.into()], false);
+        let free_fn = self.module.add_function("free", free_type, None);
+        free_fn.set_linkage(inkwell::module::Linkage::External);
+        self.free_function = Some(free_fn);
     }
 
     fn get_or_create_function(

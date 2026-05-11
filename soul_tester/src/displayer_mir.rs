@@ -2,7 +2,7 @@ use ast::AstModuleStore;
 use hir::{ComplexLiteral, FieldId, HirTree, StructId, TypeId};
 use mir_parser::mir::{
     self, BlockId, FunctionBody, GlobalId, Local, LocalId, MirTree, ModuleNodeId, Operand, Place,
-    PlaceId, PlaceKind, Rvalue, StatementId, TempId,
+    PlaceId, PlaceKind, Rvalue, RvalueKind, StatementId, TempId,
 };
 use run_hir::HirResponse;
 use soul_utils::{
@@ -388,14 +388,14 @@ impl<'a> MirDisplayer<'a> {
                 self.display_type(*cast_to);
             }
             mir::RvalueKind::PtrOffset { pointer, offset } => {
-                self.push_str("PtrOffset(");
+                self.push_str("intrinsic.PtrOffset(");
                 self.display_operand(pointer);
                 self.push_str(", ");
                 self.display_operand(offset);
                 self.push(')');
             }
             mir::RvalueKind::StackArrayIndex { array, index } => {
-                self.push_str("StackArrayIndex(");
+                self.push_str("intrinsic.StackArrayIndex(");
                 self.display_operand(array);
                 self.push_str(", ");
                 self.display_operand(index);
@@ -409,6 +409,11 @@ impl<'a> MirDisplayer<'a> {
                 self.push_str("(");
                 self.push_fmt(format_args!("{}", count));
                 self.push_str(")*/");
+            }
+            &RvalueKind::Drop { ref value, .. } => {
+                self.push_str("intrinsic.Drop(");
+                self.display_operand(value);
+                self.push(')');
             }
         }
     }

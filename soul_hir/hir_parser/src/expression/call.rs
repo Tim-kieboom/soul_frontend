@@ -25,6 +25,9 @@ impl<'a> HirContext<'a> {
             if intrinsic == Intrinsic::StackArrayIndex {
                 return self.lower_stack_array_index(id, &function_call.arguments, function_call.name.span);
             }
+            if intrinsic == Intrinsic::Drop {
+                return self.lower_drop(id, &function_call.arguments, function_call.name.span);
+            }
             return self.lower_intrinsic(
                 id,
                 intrinsic,
@@ -308,6 +311,7 @@ impl<'a> HirContext<'a> {
             }
             Intrinsic::PtrOffset => unreachable!("PtrOffset should be handled in lower_call"),
             Intrinsic::StackArrayIndex => unreachable!("StackArrayIndex should be handled in lower_call"),
+            Intrinsic::Drop => unreachable!("Drop should be handled in lower_call"),
         }
     }
 
@@ -354,6 +358,24 @@ impl<'a> HirContext<'a> {
             id,
             ty: self.new_infer_type(vec![], None, span),
             kind: hir::ExpressionKind::StackArrayIndex { array, index },
+        }
+    }
+
+    fn lower_drop(
+        &mut self,
+        id: hir::ExpressionId,
+        arguments: &[ast::Argument],
+        span: Span,
+    ) -> hir::Expression {
+        let value = arguments
+            .get(0)
+            .map(|arg| self.lower_expression(&arg.value))
+            .unwrap_or(ExpressionId::error());
+
+        hir::Expression {
+            id,
+            ty: self.new_infer_type(vec![], None, span),
+            kind: hir::ExpressionKind::Drop { value },
         }
     }
 

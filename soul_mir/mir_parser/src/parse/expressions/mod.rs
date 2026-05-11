@@ -287,6 +287,9 @@ impl<'a> MirContext<'a> {
             hir::ExpressionKind::NewArray { values, ptr_type } => {
                 self.lower_new_array(values, *ptr_type, value_type, span, is_end)
             }
+            hir::ExpressionKind::Drop { value } => {
+                self.lower_drop(*value, value_type, span, is_end)
+            }
             hir::ExpressionKind::Error => mir::Operand::new(
                 self.hir_response.typed.types_table.none_type,
                 mir::OperandKind::None,
@@ -421,6 +424,23 @@ impl<'a> MirContext<'a> {
         self.push_statement(result_stmt);
 
         mir::Operand::new(array_type, mir::OperandKind::Temp(result_temp))
+    }
+
+    fn lower_drop(&mut self, value_id: hir::ExpressionId, value_type: TypeId, span: Span, is_end: &mut bool) -> mir::Operand {
+        let value = self.lower_operand(value_id).pass(is_end);
+
+        let temp_id = self.new_temp(value_type);
+        let drop_stmt = mir::Statement::new(mir::StatementKind::Assign {
+            place: self.new_place(mir::Place::new(
+                mir::PlaceKind::Temp(temp_id),
+                value_type,
+            )),
+            value: mir::Rvalue::new(mir::RvalueKind::Drop { value, span }),
+        });
+        self.push_statement(drop_stmt);
+
+        let none_type = self.hir_response.typed.types_table.none_type;
+        mir::Operand::new(none_type, mir::OperandKind::None)
     }
 
     fn lower_enum_variant_index(&self, value_type: TypeId, variant_name: &Ident) -> Option<i128> {
