@@ -7,6 +7,7 @@ use inkwell::{
     module::Module,
     types::{BasicTypeEnum, IntType},
     values::{BasicValueEnum, FunctionValue, GlobalValue, PointerValue},
+    AddressSpace,
 };
 use mir_parser::mir::{BlockId, LocalId, TempId};
 use run_mir::MirResponse;
@@ -68,6 +69,7 @@ pub fn to_llvm_ir<'f, 'a>(
     let mut backend = LlvmBackend::new(request, options, faults);
 
     backend.declare_exit();
+    backend.declare_malloc();
     backend.allocate_globals(&GenericSubstitute::new(&[], &[]));
 
     let mir = &request.mir.tree;
@@ -142,6 +144,7 @@ pub struct LlvmBackend<'f, 'a> {
     builder: IrBuilder<'a>,
     options: &'a CompilerOptions,
     exit_function: Option<FunctionValue<'a>>,
+    malloc_function: Option<FunctionValue<'a>>,
 
     non_mangels: HashMap<String, FunctionId>,
     temps: HashMap<(FunctionKeyId, TempId), IrOperand<'a>>,
@@ -198,6 +201,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             options,
             mir: request.mir,
             exit_function: None,
+            malloc_function: None,
             temps: HashMap::new(),
             blocks: HashMap::new(),
             locals: HashMap::new(),
@@ -235,6 +239,15 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         exit_fn.add_attribute(inkwell::attributes::AttributeLoc::Function, noreturn_attr);
 
         self.exit_function = Some(exit_fn);
+    }
+
+    fn declare_malloc(&mut self) {
+        let i64_type = self.context.i64_type();
+        let ptr_type = self.context.ptr_type(AddressSpace::default());
+        let malloc_type = ptr_type.fn_type(&[i64_type.into()], false);
+        let malloc_fn = self.module.add_function("malloc", malloc_type, None);
+        malloc_fn.set_linkage(inkwell::module::Linkage::External);
+        self.malloc_function = Some(malloc_fn);
     }
 
     fn get_or_create_function(

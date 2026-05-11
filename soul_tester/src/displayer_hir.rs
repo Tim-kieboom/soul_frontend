@@ -455,6 +455,22 @@ impl<'a> HirDisplayer<'a> {
                 self.display_expression(index);
                 self.push(')');
             }
+            hir::ExpressionKind::New(expr) => {
+                self.push_str("new(");
+                self.display_expression(expr);
+                self.push(')');
+            }
+            hir::ExpressionKind::NewArray { values, .. } => {
+                self.push_str("new:[");
+                let last_index = values.len().saturating_sub(1);
+                for (i, val) in values.iter().enumerate() {
+                    self.display_expression(val);
+                    if i != last_index {
+                        self.push_str(", ");
+                    }
+                }
+                self.push(']');
+            }
         };
     }
 

@@ -18,8 +18,10 @@
             "type": "shell",
             "command": "cmd",
             "args": [
-            "/c",
-            "clang -c .\\\\soul_folder\\\\lib\\\\clib\\\\clib.c -o .\\\\soul_folder\\\\output\\\\clib.o && clang .\\\\soul_folder\\\\output\\\\out.ll .\\\\soul_folder\\\\output\\\\clib.o -o .\\\\soul_folder\\\\output\\\\out.exe && clang -S .\\\\soul_folder\\\\output\\\\out.ll .\\\\soul_folder\\\\output\\\\clib.o -o .\\\\soul_folder\\\\output\\\\out.s"
+                "/c",
+                "clang -c .\\\\soul_folder\\\\lib\\\\clib\\\\clib.c -o .\\\\soul_folder\\\\output\\\\clib.o",
+                "&& clang .\\\\soul_folder\\\\output\\\\out.ll .\\\\soul_folder\\\\output\\\\clib.o -o .\\\\soul_folder\\\\output\\\\out.exe",
+                "&& clang -S .\\\\soul_folder\\\\output\\\\out.ll .\\\\soul_folder\\\\output\\\\clib.o -o .\\\\soul_folder\\\\output\\\\out.s"
             ],
             "problemMatcher": []
         },

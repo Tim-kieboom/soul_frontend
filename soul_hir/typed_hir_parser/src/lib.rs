@@ -292,6 +292,10 @@ impl<'a> TypedHirContext<'a> {
         self.hir.info.spans.expressions[id]
     }
 
+    fn place_span(&self, id: PlaceId) -> Span {
+        self.hir.nodes.places[id].span
+    }
+
     fn block_span(&self, id: BlockId) -> Span {
         self.hir.info.spans.blocks[id]
     }

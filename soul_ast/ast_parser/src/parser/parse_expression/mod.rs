@@ -4,21 +4,14 @@ use ast::{
 };
 use soul_tokenizer::{Number, Token, TokenKind};
 use soul_utils::{
-    Ident, StringLiteral,
-    error::{SoulError, SoulErrorKind, SoulResult},
-    precedence::Precedence,
-    soul_error_internal,
-    soul_names::{AccessType, KeyWord, Operator, TypeModifier},
-    span::{Span, Spanned},
-    symbool_kind::SymbolKind,
-    try_result::{ToResult, TryError},
+    Ident, StringLiteral, error::{SoulError, SoulErrorKind, SoulResult}, precedence::Precedence, soul_error_internal, soul_names::{AccessType, KeyWord, Operator, TypeModifier}, span::{Span, Spanned}, symbool_kind::SymbolKind, try_result::{ToResult, TryError}
 };
 
 use crate::parser::{
     Parser,
     parse_utils::{
-        ARRAY, ARROW_LEFT, COLON, CURLY_OPEN, DECREMENT, INCREMENT, ROUND_OPEN, SQUARE_CLOSE,
-        SQUARE_OPEN,
+        ARRAY, ARROW_LEFT, COLON, CURLY_OPEN, DECREMENT, INCREMENT, ROUND_CLOSE, ROUND_OPEN,
+        SQUARE_CLOSE, SQUARE_OPEN,
     },
 };
 
@@ -251,42 +244,10 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     fn parse_primary_ident(&mut self, start_span: Span) -> SoulResult<Expression> {
-        let str = self.try_token_as_ident_str()?;
-
-        match KeyWord::from_str(str) {
-            Some(KeyWord::If) => return self.parse_if(),
-            Some(KeyWord::While) => return self.parse_while(),
-
-            Some(KeyWord::True) | Some(KeyWord::False) => {
-                let value = str == "true";
-                self.bump();
-                return Ok(Expression::new_literal(
-                    Literal::Bool(value),
-                    self.token().span,
-                ));
-            }
-
-            Some(KeyWord::Null) => {
-                self.bump();
-                return Ok(Expression::new(
-                    ExpressionKind::Null(None),
-                    self.token().span,
-                ));
-            }
-
-            Some(KeyWord::Fall)
-            | Some(KeyWord::Break)
-            | Some(KeyWord::Return)
-            | Some(KeyWord::Continue) => {
-                return Err(SoulError::new(
-                    format!("can not have {} in expression", str),
-                    SoulErrorKind::InvalidContext,
-                    Some(self.token().span),
-                ));
-            }
-
-            _ => (),
-        };
+        
+        if let Some(primary) = self.parse_primary_keyword(start_span)? {
+            return Ok(primary);
+        }
 
         let ident = self.try_bump_consume_ident()?;
         let span = ident.span;
@@ -294,13 +255,6 @@ impl<'a, 'f> Parser<'a, 'f> {
         let peek = self.peek();
         match &self.token().kind {
             &COLON if peek.kind == SQUARE_OPEN => {
-                if ident.as_str() == KeyWord::New.as_str() {
-                    return Err(soul_error_internal!(
-                        "heap array alloc not yet impl",
-                        Some(span)
-                    ));
-                }
-
                 return Err(soul_error_internal!(
                     "collectionType array not yet impl",
                     Some(span)
@@ -309,8 +263,8 @@ impl<'a, 'f> Parser<'a, 'f> {
             &ROUND_OPEN | &ARROW_LEFT => {
                 match self.try_parse_function_call(start_span, None, &ident) {
                     Ok(val) => return Ok(Expression::from_function_call(val)),
-                    Err(TryError::IsErr(err)) => return Err(err),
                     Err(TryError::IsNotValue(_)) => (),
+                    Err(TryError::IsErr(err)) => return Err(err),
                 };
 
                 match self.parse_generic_define() {
@@ -338,6 +292,88 @@ impl<'a, 'f> Parser<'a, 'f> {
                 id: None,
             },
             span,
+        ))
+    }
+
+    fn parse_primary_keyword(&mut self, start_span: Span) -> SoulResult<Option<Expression>> {
+        
+        let ident = self.try_token_as_ident_str()?;
+        let keyword = match KeyWord::from_str(ident) {
+            Some(val) => val,
+            None => return Ok(None),
+        };
+
+        let primary = match keyword {
+            KeyWord::If => self.parse_if()?,
+            KeyWord::While => self.parse_while()?,
+
+            KeyWord::True | KeyWord::False => {
+                let value = keyword == KeyWord::True;
+                self.bump();
+                Expression::new_literal(
+                    Literal::Bool(value),
+                    self.token().span,
+                )
+            }
+
+            KeyWord::Null => {
+                self.bump();
+                Expression::new(
+                    ExpressionKind::Null(None),
+                    self.token().span,
+                )
+            }
+
+            KeyWord::Fall
+            | KeyWord::Break
+            | KeyWord::Return
+            | KeyWord::Continue => {
+                return Err(SoulError::new(
+                    format!("can not have {} in expression", keyword.as_str()),
+                    SoulErrorKind::InvalidContext,
+                    Some(self.token().span),
+                ))
+            }
+
+            KeyWord::New => {
+                self.bump();
+                match &self.token().kind {
+                    &ROUND_OPEN => self.parse_new_ptr(start_span)?,
+                    &COLON => self.parse_new_array(start_span)?,
+                    _ => return Err(SoulError::new(
+                        "expected '(' or ':[' after 'new'".to_string(),
+                        SoulErrorKind::InvalidTokenKind,
+                        Some(self.token().span),
+                    ))
+                }
+            }
+
+            _ => return Ok(None),
+        };
+
+        Ok(Some(primary))
+    }
+
+    fn parse_new_ptr(&mut self, start_span: Span) -> SoulResult<Expression> {
+        self.expect(&ROUND_OPEN)?;
+        let inner = self.parse_expression(&[
+            ROUND_CLOSE,
+            TokenKind::EndLine,
+            TokenKind::EndFile,
+        ])?;
+        self.expect(&ROUND_CLOSE)?;
+        Ok(Expression::new(
+            ExpressionKind::New(Box::new(inner)),
+            self.span_combine(start_span),
+        ))
+    }
+
+    fn parse_new_array(&mut self, start_span: Span) -> SoulResult<Expression> {
+        self.expect(&COLON)?;
+        let array = self.parse_array(None)?;
+        Ok(Expression::new(
+            ExpressionKind::NewArray(array.node),
+            self.span_combine(start_span),
         ))
     }
 

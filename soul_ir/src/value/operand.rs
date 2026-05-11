@@ -152,10 +152,14 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             ThirTypeKind::Array {
                 kind: ArrayKind::HeapArray,
                 ..
-            } => IrOperand {
-                value: inner.value,
-                info: inner.info.clone(),
-            },
+            } => {
+                let ptr = inner.value.into_pointer_value();
+                let loaded = self.builder.build_load(inner.info.ir_type, ptr, "heap_slice")?;
+                IrOperand {
+                    value: loaded,
+                    info: OperandInfo::new_loaded(inner.info.type_id, inner.info.ir_type),
+                }
+            }
             ThirTypeKind::Array {
                 kind: ArrayKind::StackArray(len),
                 ..
@@ -237,9 +241,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     ThirTypeKind::CustomTypes(hir::CustomTypeId::Enum(enum_id)) => {
                         self.get_enum_size(enum_id)
                     }
-                    _ => {
+                    other => {
                         return Err(soul_error_internal!(
-                            "literal should be primitive type",
+                            format!("literal should be primitive type not {}", other.display_variant()),
                             None
                         ));
                     }

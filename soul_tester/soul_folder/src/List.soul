@@ -2,6 +2,7 @@ import (
     .Mem.Alloc.{AllocMultiple, ReallocMultiple}
 )
 
+
 struct List {
     mut array: *u8
     mut len: uint

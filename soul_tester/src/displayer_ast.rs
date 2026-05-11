@@ -639,6 +639,36 @@ impl<'a> AstDisplayer<'a> {
                 self.push('.');
                 self.display_expression(&external_expression.expr);
             }
+            ast::ExpressionKind::New(expr) => {
+                self.push_str("new(");
+                self.display_expression(expr);
+                self.push(')');
+            }
+            ast::ExpressionKind::NewArray(array) => {
+                self.push_str("new:");
+                match array {
+                    ast::AnyArray::ArrayLiteral(arr) => {
+                        self.push('[');
+                        let last_index = arr.values.len().saturating_sub(1);
+                        for (i, value) in arr.values.iter().enumerate() {
+                            self.display_expression(value);
+                            if i != last_index {
+                                self.push_str(", ");
+                            }
+                        }
+                        self.push(']');
+                    }
+                    ast::AnyArray::ArrayConstructor(ctor) => {
+                        self.push('[');
+                        self.push_str(KeyWord::For.as_str());
+                        self.push(' ');
+                        self.display_expression(&ctor.amount);
+                        self.push_str(" => ");
+                        self.display_expression(&ctor.element);
+                        self.push(']');
+                    }
+                }
+            }
         }
     }
 

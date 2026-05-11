@@ -1,5 +1,5 @@
 use crate::NameResolver;
-use ast::{ElseKind, Expression, ExpressionKind, If};
+use ast::{AnyArray, ElseKind, Expression, ExpressionKind, If};
 
 impl<'a> NameResolver<'a> {
     pub(super) fn collect_expression(&mut self, expression: &mut Expression) {
@@ -89,6 +89,32 @@ impl<'a> NameResolver<'a> {
                 *id = Some(self.alloc_node());
                 self.collect_expression(expression);
             }
+            ExpressionKind::New(expr) => {
+                self.collect_expression(expr);
+            }
+            ExpressionKind::NewArray(array) => match array {
+                AnyArray::ArrayLiteral(arr) => {
+                    if let Some(ty) = arr.collection_type.as_mut() {
+                        self.collect_type(ty)
+                    }
+                    if let Some(ty) = arr.element_type.as_mut() {
+                        self.collect_type(ty)
+                    }
+                    for value in &mut arr.values {
+                        self.collect_expression(value);
+                    }
+                }
+                AnyArray::ArrayConstructor(arr) => {
+                    if let Some(ty) = arr.collection_type.as_mut() {
+                        self.collect_type(ty)
+                    }
+                    if let Some(ty) = arr.element_type.as_mut() {
+                        self.collect_type(ty)
+                    }
+                    self.collect_expression(&mut arr.amount);
+                    self.collect_expression(&mut arr.element);
+                }
+            },
             ExpressionKind::ExternalExpression(_) => todo!("impl external expressions"),
             ExpressionKind::Default(id) => *id = Some(self.alloc_node()),
             ExpressionKind::Literal((id, _)) => *id = Some(self.alloc_node()),

@@ -243,6 +243,9 @@ pub enum RvalueKind {
         array: Operand,
         index: Operand,
     },
+
+    /// Heap allocation: allocates `count * Type.sizeof` bytes on the heap and returns `*ty`.
+    HeapAlloc { ty: TypeId, count: u64 },
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

@@ -401,6 +401,15 @@ impl<'a> MirDisplayer<'a> {
                 self.display_operand(index);
                 self.push(')');
             }
+            mir::RvalueKind::HeapAlloc { ty, count } => {
+                self.push_str("/*@alloc");
+                self.push('<');
+                self.display_type(*ty);
+                self.push('>');
+                self.push_str("(");
+                self.push_fmt(format_args!("{}", count));
+                self.push_str(")*/");
+            }
         }
     }
 

@@ -31,7 +31,13 @@ impl<'a> TypedHirContext<'a> {
         let span = self.expression_span(expression_id);
         let ty = match &value.kind {
             hir::ExpressionKind::Array(array) => {
-                self.infer_array(array, span)
+                self.infer_array(
+                    array.collection_type, 
+                    array.collection_type, 
+                    &array.values, 
+                    ArrayKind::StackArray(array.values.len() as u64), 
+                    span,
+                )
             },
             hir::ExpressionKind::Sizeof(ty) => {
                 self.sizeofs.insert(expression_id, *ty);
@@ -46,6 +52,19 @@ impl<'a> TypedHirContext<'a> {
             }
             hir::ExpressionKind::Error => LazyTypeId::error(),
             hir::ExpressionKind::Null => self.new_infer(span),
+            hir::ExpressionKind::New(value) => {
+                let inner_type = self.infer_expression(*value);
+                self.add_type(HirType::pointer_type(inner_type)).to_lazy()
+            }
+            hir::ExpressionKind::NewArray { values, .. } => {
+                self.infer_array(
+                    None, 
+                    None, 
+                    values, 
+                    ArrayKind::HeapArray,
+                    span,
+                )
+            },
             hir::ExpressionKind::Load(place) => self.infer_place(*place),
             hir::ExpressionKind::Block(body) => self.infer_block_expression(*body),
             hir::ExpressionKind::Local(local) => self.locals[*local],
@@ -108,9 +127,9 @@ impl<'a> TypedHirContext<'a> {
         ty
     }
 
-    fn infer_array(&mut self, array: &hir::Array, span: Span) -> LazyTypeId {
+    fn infer_array(&mut self, collection_type: Option<LazyTypeId>, element_type: Option<LazyTypeId>, values: &Vec<ExpressionId>, array_kind: ArrayKind, span: Span) -> LazyTypeId {
         
-        if array.collection_type.is_some() {
+        if collection_type.is_some() {
             self.log_error(soul_error_internal!(
                 "collectionType in LiteralArray is unstable", 
                 Some(span)
@@ -118,8 +137,8 @@ impl<'a> TypedHirContext<'a> {
             return LazyTypeId::error()
         }
 
-        let mut element = array.element_type.unwrap_or(self.new_infer(span));
-        for value in &array.values {
+        let mut element = element_type.unwrap_or(self.new_infer(span));
+        for value in values {
             let span = self.expression_span(*value);
             let value_type = self.infer_expression(*value);
             self.unify(*value, element, value_type, span);
@@ -133,7 +152,7 @@ impl<'a> TypedHirContext<'a> {
         
         let hir_type = HirType::new(HirTypeKind::Array { 
             element, 
-            kind: ArrayKind::StackArray(array.values.len() as u64) 
+            kind: array_kind
         });
 
         self.add_type(hir_type).to_lazy()

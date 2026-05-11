@@ -40,6 +40,31 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             RvalueKind::StackArrayIndex { array, index } => {
                 self.lower_stack_array_index(array, index, ty, generics)
             }
+            RvalueKind::HeapAlloc { ty: inner_ty, count } => {
+                let size_info = self.sizeof_bit(*inner_ty, generics)?;
+                let size_bits = size_info.size as u64;
+
+                let eight = self.default_int_type.const_int(8, false);
+                let size_bits_val = self.default_int_type.const_int(size_bits, false);
+                let size_bytes = self.builder.build_int_unsigned_div(size_bits_val, eight)?;
+
+                let total_size = if *count > 1 {
+                    let count_val = self.default_int_type.const_int(*count, false);
+                    self.builder.build_int_mul(size_bytes, count_val)?
+                } else {
+                    size_bytes
+                };
+
+                let malloc_fn = self.malloc_function.ok_or_else(|| {
+                    soul_error_internal!("malloc function not declared", None)
+                })?;
+                let call = self.builder.build_call(malloc_fn, &[total_size.into()])?;
+                let ptr = call.try_as_basic_value().basic().ok_or_else(|| {
+                    soul_error_internal!("malloc call returned no value", None)
+                })?;
+
+                self.new_loaded_operand(ptr, ty, generics)
+            }
         }
     }
 
@@ -335,9 +360,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         let pointee_ty = match self.types.types_map.id_to_type(pointer.ty) {
             Some(thir_type) => match thir_type.kind {
                 ThirTypeKind::Pointer(inner) => inner,
-                _ => {
+                other => {
                     return Err(SoulError::new(
-                        "PtrOffset requires a pointer type".to_string(),
+                        format!("PtrOffset requires a pointer type got {}", other.display_variant()),
                         SoulErrorKind::LlvmError,
                         None,
                     ));
@@ -345,7 +370,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             },
             None => {
                 return Err(SoulError::new(
-                    "PtrOffset pointer type not found".to_string(),
+                    "PtrOffset pointer type not found",
                     SoulErrorKind::LlvmError,
                     None,
                 ));

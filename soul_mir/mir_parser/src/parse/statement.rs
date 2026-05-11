@@ -309,6 +309,8 @@ fn is_valid_statement_expression(kind: &hir::ExpressionKind) -> bool {
         | hir::ExpressionKind::Call { .. }
         | hir::ExpressionKind::While { .. }
         | hir::ExpressionKind::ExternalCall { .. }
-        | hir::ExpressionKind::EnumVariant { .. } => true,
+        | hir::ExpressionKind::EnumVariant { .. }
+        | hir::ExpressionKind::New(_)
+        | hir::ExpressionKind::NewArray { .. } => true,
     }
 }

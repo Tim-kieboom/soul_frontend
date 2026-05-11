@@ -1,7 +1,7 @@
-use ast::{ArrayContructor, FieldAccess, Literal};
+use ast::{ArrayContructor, ArrayKind, FieldAccess, Literal};
 use ast::{AsTypeCast, VarTypeKind, scope::NodeId};
 use hir::{
-    CustomTypeId, EnumId, ExpressionId, HirType, HirTypeKind, LocalId, Place, PlaceKind, Terminator,
+    CustomTypeId, EnumId, ExpressionId, HirType, HirTypeKind, LocalId, Place, PlaceKind, Terminator
 };
 use soul_utils::soul_error_internal;
 use soul_utils::{
@@ -62,6 +62,8 @@ impl<'a> HirContext<'a> {
             ast::ExpressionKind::StructConstructor(struct_constructor) => {
                 self.lower_struct_contructor(id, struct_constructor, span)
             }
+            ast::ExpressionKind::New(expr) => self.lower_new(id, expr, span),
+            ast::ExpressionKind::NewArray(any_array) => self.lower_new_array(id, any_array, span),
 
             ast::ExpressionKind::ExternalExpression(_external_expression) => {
                 self.log_error(soul_error_internal!(
@@ -179,6 +181,68 @@ impl<'a> HirContext<'a> {
         };
 
         self.lower_array(id, &literal_array, span)
+    }
+
+    fn lower_new(
+        &mut self,
+        id: ExpressionId,
+        expr: &ast::Expression,
+        _span: Span,
+    ) -> hir::Expression {
+        let inner = self.lower_expression(expr);
+        let inner_ty = self.tree.nodes.expressions[inner].ty;
+        let ty = self.add_type(HirType::new(HirTypeKind::Pointer(inner_ty)));
+        hir::Expression {
+            id,
+            ty: hir::LazyTypeId::Known(ty),
+            kind: hir::ExpressionKind::New(inner),
+        }
+    }
+
+    fn lower_new_array(
+        &mut self,
+        id: ExpressionId,
+        any_array: &ast::AnyArray,
+        _span: Span,
+    ) -> hir::Expression {
+        let (values, element_ty) = match any_array {
+            ast::AnyArray::ArrayLiteral(arr) => {
+                let values: Vec<_> = arr.values.iter().map(|v| self.lower_expression(v)).collect();
+                let element_ty = values
+                    .first()
+                    .map(|v| self.tree.nodes.expressions[*v].ty)
+                    .unwrap_or(hir::LazyTypeId::error());
+                (values, element_ty)
+            }
+            ast::AnyArray::ArrayConstructor(ctor) => {
+                let amount = match &ctor.amount.node {
+                    ast::ExpressionKind::Literal((_, Literal::Uint(num))) => *num,
+                    _ => {
+                        self.log_error(SoulError::new(
+                            "expression should be a uint literal",
+                            SoulErrorKind::NeedsToBeLiteralError,
+                            Some(ctor.amount.span),
+                        ));
+                        return hir::Expression::error(id);
+                    }
+                };
+                let element = self.lower_expression(&ctor.element);
+                let element_ty = self.tree.nodes.expressions[element].ty;
+                let values = vec![element; amount as usize];
+                (values, element_ty)
+            }
+        };
+        let ty = self.add_type(HirType::new(HirTypeKind::Array {
+            element: element_ty,
+            kind: ArrayKind::HeapArray,
+        }));
+
+        let ptr_ty = self.add_type(HirType::new(HirTypeKind::Pointer(element_ty)));
+        hir::Expression {
+            id,
+            ty: hir::LazyTypeId::Known(ty),
+            kind: hir::ExpressionKind::NewArray { values, ptr_type: ptr_ty },
+        }
     }
 
     fn lower_struct_contructor(

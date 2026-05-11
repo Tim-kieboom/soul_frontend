@@ -4,24 +4,21 @@ import (
     crate.Mem.Slice.{Index}
 )
 
-
-
 main() {
-    Test.RunTests()
+    ptr := new(1)
+    Io.Println_int(*ptr)
 
-    // Struct.Methode()
-    // File.Open(c"text.txt", FileMode.ReadOnly)
-    array := [1, 2, 3, 4]
+    mut array = new:[1, 2, 3, 4]
+    mut ref = Index<int>(@array, 1)
+    Io.Print("array.len = ")
+    Io.Print_uint(array.len)
+    Io.Print(", array[1] = ")
+    Io.Println_int(*ref)
 
-    mutRef := IndexMut<int>(&array, 1)
-    *mutRef = 20
-
-    ref := Index<int>(@array, 1)
-    mut num = *ref
-    Io.Println_int(num as int)
-
-
-
-
-    // Io.Println("hello world")
+    array = new:[for 10 => 3]
+    ref = Index<int>(@array, 1)
+    Io.Print("array.len = ")
+    Io.Print_uint(array.len)
+    Io.Print(", array[1] = ")
+    Io.Println_int(*ref)
 }

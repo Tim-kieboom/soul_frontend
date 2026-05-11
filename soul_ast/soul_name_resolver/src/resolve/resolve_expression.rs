@@ -1,4 +1,4 @@
-use ast::{ElseKind, Expression, ExpressionKind, FieldAccess};
+use ast::{AnyArray, ElseKind, Expression, ExpressionKind, FieldAccess};
 use soul_utils::error::{SoulError, SoulErrorKind};
 
 use crate::NameResolver;
@@ -90,6 +90,20 @@ impl<'a> NameResolver<'a> {
                 }
             }
 
+            ExpressionKind::New(expr) => {
+                self.resolve_expression(expr);
+            }
+            ExpressionKind::NewArray(any_array) => match any_array {
+                AnyArray::ArrayLiteral(arr) => {
+                    for value in &mut arr.values {
+                        self.resolve_expression(value);
+                    }
+                }
+                AnyArray::ArrayConstructor(arr) => {
+                    self.resolve_expression(&mut arr.amount);
+                    self.resolve_expression(&mut arr.element);
+                }
+            },
             ExpressionKind::Null(_)
             | ExpressionKind::Default(_)
             | ExpressionKind::Literal(_)

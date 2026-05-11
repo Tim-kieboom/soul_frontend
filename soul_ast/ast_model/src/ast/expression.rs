@@ -84,6 +84,12 @@ pub enum ExpressionKind {
 
     /// `i32.sizeof // returns 4`
     Sizeof(SoulType),
+
+    /// `new(expr)` — heap-allocate and initialize a single value, returns `*T`.
+    New(BoxExpression),
+
+    /// `new:[1, 2, 3]` or `new:[for N => init]` — heap-allocate an array, returns `[*]T`.
+    NewArray(AnyArray),
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -250,6 +256,7 @@ impl ReturnKind {
 }
 
 /// helper enum in parser
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum AnyArray {
     ArrayLiteral(Array),
     ArrayConstructor(ArrayContructor),
@@ -421,6 +428,8 @@ impl ExpressionKind {
             ExpressionKind::As(_) => "As",
             ExpressionKind::Block(_) => "Block",
             ExpressionKind::ReturnLike(_) => "ReturnLike",
+            ExpressionKind::New(_) => "New",
+            ExpressionKind::NewArray(_) => "NewArray",
         }
     }
 }

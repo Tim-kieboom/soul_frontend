@@ -245,24 +245,29 @@ impl<'a> TypedHirContext<'a> {
         Some(field.id)
     }
 
-    pub(crate) fn is_mutable_or_modifier_none(&self, ty: LazyTypeId) -> bool {
+    pub(crate) fn get_type_modifier(&self, ty: LazyTypeId) -> Option<TypeModifier>  {
         if ty == LazyTypeId::error() {
-            return true;
+            return None;
         }
 
         match ty {
             LazyTypeId::Known(type_id) => {
                 let ty = self.id_to_type(type_id);
-                match &ty.kind {
-                    HirTypeKind::Ref { mutable, .. } => *mutable,
-                    _ => ty.is_mutable() || ty.is_modifier_none(),
-                }
+                ty.modifier
             }
             LazyTypeId::Infer(infer_type_id) => {
                 let ty = self.id_to_infer(infer_type_id);
-                ty.is_mutable() || ty.is_modifier_none()
+                ty.modifier
             }
         }
+    }
+
+    pub(crate) fn is_mutable_or_modifier_none(&self, ty: LazyTypeId) -> bool {
+        let Some(modifier) = self.get_type_modifier(ty) else {
+            return true
+        };
+
+        modifier == TypeModifier::Mut
     }
 
     fn posion_expression(&mut self, value: ExpressionId) {

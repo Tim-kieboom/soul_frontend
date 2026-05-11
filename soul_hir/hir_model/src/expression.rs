@@ -149,6 +149,15 @@ pub enum ExpressionKind {
         array: ExpressionId,
         index: ExpressionId,
     },
+
+    /// `new(expr)` — heap-allocate and initialize a single value, returns `*T`.
+    New(ExpressionId),
+
+    /// `new:[...]` — heap-allocate an array, returns `[*]T`.
+    NewArray {
+        values: Vec<ExpressionId>,
+        ptr_type: TypeId,
+    },
 }
 
 /// An array literal, e.g., `[1, 2, 3]`.
