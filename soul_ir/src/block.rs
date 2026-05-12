@@ -42,7 +42,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             Terminator::Exit => {
                 let i32 = self.context.i32_type();
                 let exit_code = i32.const_int(0, false);
-                let exit = self
+                let exit = self.internal_functions
                     .exit_function
                     .expect("should have initialize exit function");
                 self.builder.build_call(exit, &[exit_code.into()])?;
@@ -176,6 +176,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 None
             )
         })?;
+        
         match &place.kind {
             PlaceKind::Temp(temp_id) => {
                 let value = self.new_loaded_operand(return_value, place.ty, generics)?;

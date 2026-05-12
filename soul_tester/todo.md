@@ -17,9 +17,9 @@
 
 # Bugs
 - `{ Io.Println("test") }` (unexpected `}` error)
-- `[@]char methode() {}`
+- `[@]char methode() {}` (`[@]char` the `[@]` is unexpected)
 - `call() as *char`
-- `return *ptr`
+- `return *ptr` (generates incorrect llvm code)
 - `if condition {}` (`if condition == true {}` does work only if right is literal)
 - `Fn(): int {if true {return 1} else {return 2}}` 
 - `Fn() {innerFn() {}}` (if in non crate mod innerFn gets placed in crate mod)

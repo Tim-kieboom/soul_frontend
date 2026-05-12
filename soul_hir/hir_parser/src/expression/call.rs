@@ -278,7 +278,11 @@ impl<'a> HirContext<'a> {
                 
                 let path_str = match intrinsic_value {
                     Some(IntrinsicValue::Literal(Literal::Str(val))) => val.clone(),
+                    _ if self.current.module == self.root_id => {
+                        "main.soul".to_string()
+                    }
                     _ => {
+
                         self.module_to_source_path
                             .get(&self.current.module)
                             .map(|p| p.strip_prefix(&self.source_folder).ok())

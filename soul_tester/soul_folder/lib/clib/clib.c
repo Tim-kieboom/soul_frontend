@@ -14,6 +14,15 @@ u8* __clib_bytesRealloc(uint len, u8* ptr) {
     return new;
 }
 
+/// !!DO NOT REMOVE!! this is a internal used function for array compare
+bool __clib_arrayEqual(u32 elementSize, u8* leftPtr, uint leftSize, u8* rightPtr, uint rightSize) {
+    if(leftSize != rightSize) {
+        return false;
+    }
+
+    return memcmp(leftPtr, rightPtr, leftSize * elementSize) == 0;
+}
+
 // ---------------- #File ----------------      
 
 i64 __clib_fileLen(FILE* file) {

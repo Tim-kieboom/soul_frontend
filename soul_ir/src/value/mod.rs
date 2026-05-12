@@ -11,6 +11,7 @@ use typed_hir::{FieldInfo, ThirTypeKind, display_thir::DisplayThirType};
 pub(crate) mod binary_unary;
 pub(crate) mod cast;
 pub(crate) mod operand;
+pub(crate) mod sizeof;
 
 impl<'f, 'a> LlvmBackend<'f, 'a> {
     pub(crate) fn lower_rvalue(
@@ -82,12 +83,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
     }
 
     fn lower_heap_alloc(&self, ty: TypeId, inner_type: TypeId, count: u64, generics: &GenericSubstitute) -> SoulResult<IrOperand<'a>> {
-        let size_info = self.sizeof_bit(inner_type, generics)?;
-        let size_bits = size_info.size as u64;
+        let size_bytes_u64 = self.sizeof(inner_type, generics)? as u64; 
 
-        let eight = self.default_int_type.const_int(8, false);
-        let size_bits_val = self.default_int_type.const_int(size_bits, false);
-        let size_bytes = self.builder.build_int_unsigned_div(size_bits_val, eight)?;
+        let size_bytes = self.default_int_type.const_int(size_bytes_u64, false);
 
         let total_size = if count > 1 {
             let count_val = self.default_int_type.const_int(count, false);
@@ -96,7 +94,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             size_bytes
         };
 
-        let malloc_fn = self.malloc_function.ok_or_else(|| {
+        let malloc_fn = self.internal_functions.malloc_function.ok_or_else(|| {
             soul_error_internal!("malloc function not declared", None)
         })?;
         let call = self.builder.build_call(malloc_fn, &[total_size.into()])?;
@@ -119,7 +117,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     return Err(soul_error_internal!("Drop: expected pointer value", Some(span)));
                 };
 
-                let Some(free_fn) = self.free_function else {
+                let Some(free_fn) = self.internal_functions.free_function else {
                     return Err(soul_error_internal!("free function not declared", Some(span)))
                 };
 
@@ -165,7 +163,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     )?;
                     self.builder.build_load(ptr_type, data_ptr_ptr, "drop_heap_array_data")?.into_pointer_value()
                 };
-                let free_fn = self.free_function.ok_or_else(|| {
+                let free_fn = self.internal_functions.free_function.ok_or_else(|| {
                     soul_error_internal!("free function not declared", Some(span))
                 })?;
                 self.builder.build_call(free_fn, &[data_ptr.into()])?;
@@ -453,14 +451,11 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             }
         };
 
-        let size_info = self.sizeof_bit(pointee_ty, generics)?;
-        let size_bits = size_info.size;
+        let size_bytes_u64 = self.sizeof(pointee_ty, generics)? as u64;
 
         let ptr_int = self.builder.build_ptr_to_int(pointer_val, self.default_int_type)?;
 
-        let size_bits_val = self.default_int_type.const_int(size_bits as u64, false);
-        let eight = self.default_int_type.const_int(8, false);
-        let size_bytes = self.builder.build_int_unsigned_div(size_bits_val, eight)?;
+        let size_bytes = self.default_int_type.const_int(size_bytes_u64, false);
 
         let offset_ext = if offset_val.get_type() == self.default_int_type {
             offset_val
@@ -513,15 +508,11 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             }
         };
 
-        let size_info = self.sizeof_bit(element_ty, generics)?;
-        let size_bits = size_info.size;
+        let size_bytes_u64 = self.sizeof(element_ty, generics)? as u64;
 
         let ptr_int = self.builder.build_ptr_to_int(array_ptr, self.default_int_type)?;
 
-        let size_bits_val = self.default_int_type.const_int(size_bits as u64, false);
-        let eight = self.default_int_type.const_int(8, false);
-        let size_bytes = self.builder.build_int_unsigned_div(size_bits_val, eight)?;
-
+        let size_bytes = self.default_int_type.const_int(size_bytes_u64, false);
         let index_ext = if index_val.get_type() == self.default_int_type {
             index_val
         } else if index_val.get_type().get_bit_width() < self.default_int_type.get_bit_width() {

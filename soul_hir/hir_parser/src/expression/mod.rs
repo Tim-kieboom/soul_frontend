@@ -67,14 +67,14 @@ impl<'a> HirContext<'a> {
             ast::ExpressionKind::New(expr) => self.lower_new(id, expr, span),
             ast::ExpressionKind::NewArray(any_array) => self.lower_new_array(id, any_array, span),
 
-            ast::ExpressionKind::ExternalExpression(_external_expression) => {
+            ast::ExpressionKind::ExternalExpression(_) => {
                 self.log_error(soul_error_internal!(
                     "ExternalExpression expression is unstable",
                     Some(span)
                 ));
                 hir::Expression::error(id)
             }
-            ast::ExpressionKind::Default(_node_id) => {
+            ast::ExpressionKind::Default(_) => {
                 self.log_error(soul_error_internal!(
                     "Default expression is unstable",
                     Some(span)

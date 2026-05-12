@@ -24,6 +24,11 @@ PrintAssert(
     Println(msg)
 }
 
+Println_bool(value: bool) {
+    Print_bool(value)
+    Endln()
+}
+
 Println_int(value: int, base: u8 = 10, capital: bool = true) {
     Print_int(value, base: base, capital: capital)
     Endln()
@@ -37,6 +42,15 @@ Println_uint(value: uint, base: u8 = 10, capital: bool = true) {
 Println_float(value: f64, base: u8 = 10, capital: bool = true, precision: u8 = 4) {
     Print_float(value, base: base, capital: capital, precision: precision)
     Endln()
+}
+
+Print_bool(value: bool) {
+    
+    if value == true {
+        Stdout.WriteCstr(c"true")
+    } else {
+        Stdout.WriteCstr(c"false")
+    }
 }
 
 Print_int(value: int, base: u8 = 10, capital: bool = true) {

@@ -376,7 +376,6 @@ impl<'a> HirDisplayer<'a> {
                     self.push_str("else ");
                     self.display_block(arm);
                 }
-                self.display_expression_astype(*id, value.ty);
                 self.push('\n');
             }
             hir::ExpressionKind::While { condition, body } => {

@@ -6,10 +6,10 @@ import (
 
 main() {
 
-    // string := "notTim"
-    // if string == "tim" {
-    //     Io.Println("is tim!!!")
-    // }
+    string := "tim"
+    if string == "tim" {
+        Io.Println("is tim!!")
+    }
 
     x := match 5 {
         10 => "10"

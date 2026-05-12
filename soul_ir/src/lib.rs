@@ -7,7 +7,6 @@ use inkwell::{
     module::Module,
     types::{BasicTypeEnum, IntType},
     values::{BasicValueEnum, FunctionValue, GlobalValue, PointerValue},
-    AddressSpace,
 };
 use mir_parser::mir::{BlockId, LocalId, TempId};
 use run_mir::MirResponse;
@@ -29,6 +28,8 @@ mod local;
 mod statement;
 mod utils;
 mod value;
+mod internal_functions;
+
 use typed_hir::{ThirType, ThirTypeKind, TypedHir};
 use utils::*;
 
@@ -68,9 +69,7 @@ pub fn to_llvm_ir<'f, 'a>(
 ) -> IrResponse<'a> {
     let mut backend = LlvmBackend::new(request, options, faults);
 
-    backend.declare_exit();
-    backend.declare_malloc();
-    backend.declare_free();
+    backend.initialize_internal_functions();
     backend.allocate_globals(&GenericSubstitute::new(&[], &[]));
 
     let mir = &request.mir.tree;
@@ -128,6 +127,14 @@ impl<'a> OperandInfo<'a> {
 
 impl_soul_ids!(FunctionKeyId);
 
+#[derive(Debug, Clone, Default)]
+pub struct InternalFunctions<'a> {
+    exit_function: Option<FunctionValue<'a>>,
+    malloc_function: Option<FunctionValue<'a>>,
+    free_function: Option<FunctionValue<'a>>,
+    arraycmp_function: Option<FunctionValue<'a>>,
+}
+
 pub struct LlvmBackend<'f, 'a> {
     default_ptr_size: u8,
     default_int_size: u8,
@@ -144,9 +151,7 @@ pub struct LlvmBackend<'f, 'a> {
     mir: &'a MirResponse,
     builder: IrBuilder<'a>,
     options: &'a CompilerOptions,
-    exit_function: Option<FunctionValue<'a>>,
-    malloc_function: Option<FunctionValue<'a>>,
-    free_function: Option<FunctionValue<'a>>,
+    internal_functions: InternalFunctions<'a>,
 
     non_mangels: HashMap<String, FunctionId>,
     temps: HashMap<(FunctionKeyId, TempId), IrOperand<'a>>,
@@ -202,9 +207,6 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             builder,
             options,
             mir: request.mir,
-            exit_function: None,
-            malloc_function: None,
-            free_function: None,
             temps: HashMap::new(),
             blocks: HashMap::new(),
             locals: HashMap::new(),
@@ -216,6 +218,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             strings: HashMap::new().into(),
             field_indexs: VecMap::const_default().into(),
             lowered_types: VecMap::const_default().into(),
+            internal_functions: InternalFunctions::default(),
             current: Current::start(function_keys.global_key()),
 
             function_keys,
@@ -227,38 +230,6 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             default_c_int_type,
             default_ptr_size: options.target_info().ptr_bit_size,
         }
-    }
-
-    fn declare_exit(&mut self) {
-        let void_type = self.context.void_type();
-        let i32_type = self.context.i32_type();
-        let exit_type = void_type.fn_type(&[i32_type.into()], false);
-        let exit_fn = self.module.add_function("exit", exit_type, None);
-
-        exit_fn.set_linkage(inkwell::module::Linkage::External);
-
-        // Use raw enum ID 39 for noreturn (LLVM 16)
-        let noreturn_attr = self.context.create_enum_attribute(39, 0);
-        exit_fn.add_attribute(inkwell::attributes::AttributeLoc::Function, noreturn_attr);
-
-        self.exit_function = Some(exit_fn);
-    }
-
-    fn declare_malloc(&mut self) {
-        let i64_type = self.context.i64_type();
-        let ptr_type = self.context.ptr_type(AddressSpace::default());
-        let malloc_type = ptr_type.fn_type(&[i64_type.into()], false);
-        let malloc_fn = self.module.add_function("malloc", malloc_type, None);
-        malloc_fn.set_linkage(inkwell::module::Linkage::External);
-        self.malloc_function = Some(malloc_fn);
-    }
-
-    fn declare_free(&mut self) {
-        let ptr_type = self.context.ptr_type(AddressSpace::default());
-        let free_type = self.context.i8_type().fn_type(&[ptr_type.into()], false);
-        let free_fn = self.module.add_function("free", free_type, None);
-        free_fn.set_linkage(inkwell::module::Linkage::External);
-        self.free_function = Some(free_fn);
     }
 
     fn get_or_create_function(

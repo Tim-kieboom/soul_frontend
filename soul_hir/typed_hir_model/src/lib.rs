@@ -127,6 +127,7 @@ pub struct TypeTable {
     pub none_type: TypeId,
     pub never_type: TypeId,
     pub bool_type: TypeId,
+    pub index_type: TypeId,
     pub u32_type: TypeId,
 
     pub expressions: VecMap<ExpressionId, TypeId>,
@@ -157,4 +158,13 @@ pub struct FieldInfo {
     pub base_type: TypeId,
     pub field_type: TypeId,
     pub field_index: usize,
+}
+
+impl ThirTypeKind {
+    pub const fn is_array(&self) -> bool {
+        match self {
+            ThirTypeKind::Array { .. } => true,
+            _ => false,
+        }
+    } 
 }
