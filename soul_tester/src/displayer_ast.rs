@@ -516,6 +516,29 @@ impl<'a> AstDisplayer<'a> {
                 }
                 self.push_str("{\n");
             }
+            ast::ExpressionKind::Match(match_) => {
+                self.push_str("match ");
+                self.display_expression(&match_.scrutinee);
+                self.push_str(" {\n");
+                self.push_scope();
+                for arm in &match_.arms {
+                    
+                    self.display_depth();
+                    match &arm.pattern {
+                        ast::MatchPattern::Literal(literal) => {
+                            self.push_str(&literal.value_to_string());
+                            self.push_str("  => ");
+                        }
+                        ast::MatchPattern::Wildcard => self.push_str("_ => "),
+                    }
+
+                    self.display_block(&arm.body);
+                }
+                self.pop_scope();
+                self.push('\n');
+                self.display_depth();
+                self.push('}');
+            }
             ast::ExpressionKind::Binary(binary) => {
                 self.push('(');
                 self.display_expression(&binary.left);

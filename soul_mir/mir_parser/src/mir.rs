@@ -273,6 +273,13 @@ pub enum Terminator {
         arm: BlockId,
     },
 
+    /// Switch on an integer value.
+    SwitchInt {
+        discriminant: Operand,
+        targets: Vec<(i128, BlockId)>,
+        otherwise: BlockId,
+    },
+
     Exit,
 
     /// Indicates unreachable code (after errors or diverging control flow).

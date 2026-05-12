@@ -290,6 +290,9 @@ impl<'a> MirContext<'a> {
             hir::ExpressionKind::Drop { value } => {
                 self.lower_drop(*value, value_type, span, is_end)
             }
+            hir::ExpressionKind::Match { scrutinee, arms } => {
+                self.lower_match(*scrutinee, arms, value_type, is_end)
+            }
             hir::ExpressionKind::Error => mir::Operand::new(
                 self.hir_response.typed.types_table.none_type,
                 mir::OperandKind::None,

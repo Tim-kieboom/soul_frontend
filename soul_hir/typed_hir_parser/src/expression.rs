@@ -89,6 +89,9 @@ impl<'a> TypedHirContext<'a> {
             hir::ExpressionKind::While { condition, body } => {
                 self.infer_while(*condition, *body, span)
             }
+            hir::ExpressionKind::Match { scrutinee, arms } => {
+                self.infer_match(*scrutinee, arms.clone(), span)
+            }
             hir::ExpressionKind::Unary(Unary {
                 operator,
                 expression,
@@ -473,6 +476,75 @@ impl<'a> TypedHirContext<'a> {
         }
 
         self.none_type.to_lazy()
+    }
+
+    fn infer_match(
+        &mut self,
+        scrutinee: ExpressionId,
+        arms: Vec<hir::MatchArm>,
+        span: Span,
+    ) -> LazyTypeId {
+        let _ = self.infer_expression(scrutinee);
+
+        let mut arm_types = Vec::new();
+        let mut has_wildcard = false;
+        let mut first_value_type: Option<LazyTypeId> = None;
+
+        for arm in &arms {
+            let arm_type = self.infer_block_expression(arm.body);
+            arm_types.push(arm_type);
+
+            let is_divergent = self.is_arm_divergent(arm.body);
+            if !is_divergent && first_value_type.is_none() {
+                first_value_type = Some(arm_type);
+            }
+
+            match &arm.pattern {
+                hir::MatchPatternHir::Wildcard => has_wildcard = true,
+                hir::MatchPatternHir::Literal(_) => {}
+            }
+        }
+
+        if arm_types.is_empty() {
+            self.log_error(SoulError::new(
+                "match expression must have at least one arm",
+                SoulErrorKind::InvalidContext,
+                Some(span),
+            ));
+            return LazyTypeId::error();
+        }
+
+        let result_type = first_value_type.unwrap_or(self.none_type.to_lazy());
+        for (arm, arm_type) in arms.iter().zip(arm_types.iter()) {
+            if self.is_arm_divergent(arm.body) {
+                continue;
+            }
+
+            if *arm_type != result_type {
+                self.log_error(SoulError::new(
+                    "match arms must all have the same type",
+                    SoulErrorKind::UnifyTypeError,
+                    Some(span),
+                ));
+            }
+        }
+
+        if !has_wildcard {
+            self.log_error(SoulError::new(
+                "match expression should have a wildcard arm ('_')",
+                SoulErrorKind::InvalidContext,
+                Some(span),
+            ));
+        }
+
+        result_type
+    }
+
+    fn is_arm_divergent(&self, body: BlockId) -> bool {
+        let block = &self.hir.nodes.blocks[body];
+        block.statements.iter().any(|s| {
+            matches!(s.kind, hir::StatementKind::Return(_))
+        })
     }
 
     fn infer_cast(&mut self, value: ExpressionId, cast_to: LazyTypeId) -> LazyTypeId {

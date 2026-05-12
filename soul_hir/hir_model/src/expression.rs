@@ -95,6 +95,12 @@ pub enum ExpressionKind {
         body: BlockId,
     },
 
+    /// A match expression.
+    Match {
+        scrutinee: ExpressionId,
+        arms: Vec<MatchArm>,
+    },
+
     Block(BlockId),
 
     // --- Calls ---
@@ -184,4 +190,18 @@ pub struct Binary {
     pub left: ExpressionId,
     pub operator: BinaryOperator,
     pub right: ExpressionId,
+}
+
+/// A match arm in HIR.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct MatchArm {
+    pub pattern: MatchPatternHir,
+    pub body: BlockId,
+}
+
+/// A match pattern in HIR.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum MatchPatternHir {
+    Literal(Literal),
+    Wildcard,
 }

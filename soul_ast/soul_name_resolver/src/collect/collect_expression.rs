@@ -4,6 +4,19 @@ use ast::{AnyArray, ElseKind, Expression, ExpressionKind, If};
 impl<'a> NameResolver<'a> {
     pub(super) fn collect_expression(&mut self, expression: &mut Expression) {
         match &mut expression.node {
+            ExpressionKind::Match(match_expression) => {
+                match_expression.id = Some(self.alloc_node());
+                self.collect_expression(&mut match_expression.scrutinee);
+                for arm in &mut match_expression.arms {
+                    
+                    match &arm.pattern {
+                        ast::MatchPattern::Literal(_) => (),
+                        ast::MatchPattern::Wildcard => (),
+                    }
+
+                    self.collect_block(&mut arm.body);
+                }
+            }
             ExpressionKind::Sizeof(ty) => self.collect_type(ty),
             ExpressionKind::ArrayContructor(ctor) => {
                 ctor.id = Some(self.alloc_node());

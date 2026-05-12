@@ -49,6 +49,17 @@ impl<'ctx> IrBuilder<'ctx> {
             .map_err(build_error)
     }
 
+    pub fn build_switch(
+        &self,
+        value: IntValue<'ctx>,
+        default: BasicBlock<'ctx>,
+        cases: &[(IntValue<'ctx>, BasicBlock<'ctx>)],
+    ) -> SoulResult<InstructionValue<'ctx>> {
+        self.inkwell
+            .build_switch(value, default, cases)
+            .map_err(build_error)
+    }
+
     pub fn build_pointer_cast<T>(&self, from: T, to: T::BaseType, name: &str) -> SoulResult<T>
     where
         T: PointerMathValue<'ctx>,

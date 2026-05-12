@@ -306,6 +306,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let primary = match keyword {
             KeyWord::If => self.parse_if()?,
             KeyWord::While => self.parse_while()?,
+            KeyWord::Match => self.parse_match()?,
 
             KeyWord::True | KeyWord::False => {
                 let value = keyword == KeyWord::True;

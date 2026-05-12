@@ -26,7 +26,8 @@ impl<'a, 'f> Parser<'a, 'f> {
             | KeyWord::False
             | KeyWord::Sizeof
             | KeyWord::While
-            | KeyWord::New => {
+            | KeyWord::New
+            | KeyWord::Match => {
                 let value = self.parse_expression(STAMENT_END_TOKENS).try_err()?;
                 Statement::from_expression(value, self.current_is(&SEMI_COLON))
             }
@@ -81,7 +82,6 @@ impl<'a, 'f> Parser<'a, 'f> {
             | KeyWord::Trait
             | KeyWord::Class
             | KeyWord::Union
-            | KeyWord::Match
             | KeyWord::Await
             | KeyWord::Typeof
             | KeyWord::InForLoop

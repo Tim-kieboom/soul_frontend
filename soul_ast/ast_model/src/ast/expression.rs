@@ -65,6 +65,8 @@ pub enum ExpressionKind {
     If(If),
     /// A conditional loop `while true {Println("loop")}`.
     While(While),
+    /// A match expression `match x { 1 => "one", _ => "other" }`.
+    Match(Match),
     /// A dereference, e.g., `*ptr`.
     Deref {
         id: Option<NodeId>,
@@ -218,6 +220,34 @@ pub struct While {
     pub condition: Option<BoxExpression>,
     /// The loop body block.
     pub block: Block,
+}
+
+/// A `match` expression.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Match {
+    pub id: Option<NodeId>,
+    /// The expression to match on.
+    pub scrutinee: BoxExpression,
+    /// The match arms.
+    pub arms: Vec<MatchArm>,
+}
+
+/// A single arm in a match expression.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct MatchArm {
+    /// The pattern to match against.
+    pub pattern: MatchPattern,
+    /// The block to execute if this arm matches.
+    pub body: Block,
+}
+
+/// A pattern in a match arm.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum MatchPattern {
+    /// A literal value pattern.
+    Literal(Literal),
+    /// A wildcard (default) pattern.
+    Wildcard,
 }
 
 /// A `return`, `fall`, or `break`-like expression.
@@ -432,6 +462,7 @@ impl ExpressionKind {
             ExpressionKind::ReturnLike(_) => "ReturnLike",
             ExpressionKind::New(_) => "New",
             ExpressionKind::NewArray(_) => "NewArray",
+            ExpressionKind::Match(_) => "Match",
         }
     }
 }

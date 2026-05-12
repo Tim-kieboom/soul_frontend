@@ -79,19 +79,31 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     self.get_block(*arm),
                 )?;
             }
+            Terminator::SwitchInt {
+                discriminant,
+                targets,
+                otherwise,
+            } => {
+                let discr = self.lower_operand(discriminant, generics)?;
+                let discr_val = discr.value.into_int_value();
+                let otherwise_block = self.get_block(*otherwise);
+                let mut cases = Vec::new();
+                for (val, target) in targets {
+                    let case_val = self.context.i64_type().const_int(*val as u64, false);
+                    cases.push((case_val, self.get_block(*target)));
+                }
+                self.builder.build_switch(discr_val, otherwise_block, &cases)?;
+            }
             Terminator::Unreachable => {
                 #[cfg(debug_assertions)]
-                {
-                    panic!("should not have unreachable");
-                }
+                panic!("should not have unreachable");
+                
                 #[cfg(not(debug_assertions))]
-                {
-                    self.log_error(soul_utils::error::SoulError::new(
-                        "should not have unreachable",
-                        soul_utils::error::SoulErrorKind::LlvmError,
-                        None,
-                    ));
-                }
+                self.log_error(soul_utils::error::SoulError::new(
+                    "should not have unreachable",
+                    soul_utils::error::SoulErrorKind::LlvmError,
+                    None,
+                ));
             }
         };
 

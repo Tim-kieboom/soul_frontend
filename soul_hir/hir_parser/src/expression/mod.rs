@@ -16,6 +16,7 @@ use crate::HirContext;
 mod array;
 mod call;
 mod r#if;
+mod r#match;
 
 impl<'a> HirContext<'a> {
     pub(crate) fn lower_expression(&mut self, expression: &ast::Expression) -> hir::ExpressionId {
@@ -42,6 +43,7 @@ impl<'a> HirContext<'a> {
             ast::ExpressionKind::Null(_node_id) => self.lower_null(id, span),
             ast::ExpressionKind::Binary(binary) => self.lower_binary(id, binary, span),
             ast::ExpressionKind::While(ast_while) => self.lower_while(id, ast_while),
+            ast::ExpressionKind::Match(ast_match) => self.lower_match(id, ast_match, span),
             ast::ExpressionKind::As(as_type_cast) => self.lower_cast(id, as_type_cast),
             ast::ExpressionKind::Deref { id: _, inner } => self.lower_deref(id, inner),
             ast::ExpressionKind::FieldAccess(field_access) => {

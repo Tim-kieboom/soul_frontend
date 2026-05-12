@@ -249,6 +249,34 @@ impl<'a> MirDisplayer<'a> {
                 self.push_str("else ");
                 self.display_goto(*arm);
             }
+            mir::Terminator::SwitchInt {
+                discriminant,
+                targets,
+                otherwise,
+            } => {
+                self.push_str("match<int>(");
+                self.display_operand(discriminant);
+                self.push_str(") {\n");
+                self.push_scope();
+                let last_index = targets.len().saturating_sub(1);
+                for (i, (value, block)) in targets.iter().enumerate() {
+                    self.display_depth();
+                    self.push_fmt(format_args!("{value} => "));
+                    self.display_goto(*block);
+                    if i != last_index {
+                        self.push_str("\n");
+                    }
+                }
+                self.push('\n');
+                self.display_depth();
+                self.push_str("_ => ");
+                self.display_goto(*otherwise);
+                self.pop_scope();
+
+                self.push('\n');
+                self.display_depth();
+                self.push_str("}");
+            }
             mir::Terminator::Unreachable => self.push_str("// unreachable"),
         }
         self.push('\n');

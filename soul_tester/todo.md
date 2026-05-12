@@ -16,6 +16,7 @@
 (A) merge ast:Expression Array and Arracontructor using AnyArray
 
 # Bugs
+- `{ Io.Println("test") }` (unexpected `}` error)
 - `[@]char methode() {}`
 - `call() as *char`
 - `return *ptr`

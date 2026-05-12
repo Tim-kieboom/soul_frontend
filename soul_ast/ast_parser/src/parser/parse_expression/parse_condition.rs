@@ -1,18 +1,21 @@
-use ast::{ElseKind, Expression, ExpressionKind, If, IfArm, IfArmHelper, While};
+use ast::{Block, ElseKind, Expression, ExpressionKind, If, IfArm, IfArmHelper, Literal, Match, MatchArm, MatchPattern, While};
+use soul_tokenizer::{Number, TokenKind};
 use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},
     soul_names::{KeyWord, TypeModifier},
-    span::Spanned,
+    span::{Spanned},
+    symbool_kind::SymbolKind,
 };
 
 use crate::parser::{
     Parser,
-    parse_utils::{CURLY_OPEN, STAMENT_END_TOKENS},
+    parse_utils::{CURLY_CLOSE, CURLY_OPEN, STAMENT_END_TOKENS},
 };
 
 const IF_STR: &str = KeyWord::If.as_str();
 const ELSE_STR: &str = KeyWord::Else.as_str();
 const WHILE_STR: &str = KeyWord::While.as_str();
+const MATCH_STR: &str = KeyWord::Match.as_str();
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_if(&mut self) -> SoulResult<Expression> {
@@ -112,6 +115,108 @@ impl<'a, 'f> Parser<'a, 'f> {
                 Some(val) => val,
                 None => return Ok(()),
             };
+        }
+    }
+
+    pub(crate) fn parse_match(&mut self) -> SoulResult<Expression> {
+        let start_span = self.token().span;
+        self.expect_ident(MATCH_STR)?;
+
+        let scrutinee = self.parse_expression(&[CURLY_OPEN])?;
+
+        let arms = self.parse_match_arms()?;
+
+        Ok(Expression::new(
+            ExpressionKind::Match(Match {
+                id: None,
+                scrutinee: Box::new(scrutinee),
+                arms,
+            }),
+            start_span,
+        ))
+    }
+
+    fn parse_match_arms(&mut self) -> SoulResult<Vec<MatchArm>> {
+        self.expect(&CURLY_OPEN)?;
+        let mut arms = Vec::new();
+
+        loop {
+            self.skip_end_lines();
+            if self.current_is(&CURLY_CLOSE) {
+                self.bump();
+                break;
+            }
+
+            let pattern = self.parse_match_pattern()?;
+            self.skip_end_lines();
+
+            if !self.current_is(&TokenKind::Symbol(SymbolKind::LambdaArray)) {
+                return Err(SoulError::new(
+                    "expected '=>' in match arm",
+                    SoulErrorKind::InvalidTokenKind,
+                    Some(self.token().span),
+                ));
+            }
+            self.bump();
+
+            let body = if self.current_is(&CURLY_OPEN) {
+                self.parse_block(TypeModifier::Mut)?
+            } else {
+                let span = self.token().span;
+                let statement = self.parse_statement()?;
+                Block {
+                    span,
+                    node_id: None,
+                    scope_id: None,
+                    modifier: TypeModifier::Mut,
+                    statements: vec![statement],
+                }
+            };
+            arms.push(MatchArm { pattern, body });
+        }
+
+        Ok(arms)
+    }
+
+    fn parse_match_pattern(&mut self) -> SoulResult<MatchPattern> {
+        if self.current_is_ident("_") {
+            self.bump();
+            return Ok(MatchPattern::Wildcard);
+        }
+
+        let token_kind = self.token().kind.clone();
+        match &token_kind {
+            TokenKind::Number(num) => {
+                let value = match num {
+                    Number::Uint(u) => *u as i128,
+                    Number::Int(i) => *i as i128,
+                    Number::Float(_) => {
+                        return Err(SoulError::new(
+                            "expected integer literal for match pattern",
+                            SoulErrorKind::InvalidIdent,
+                            Some(self.token().span),
+                        ));
+                    }
+                };
+                self.bump();
+                Ok(MatchPattern::Literal(Literal::Int(value)))
+            }
+            TokenKind::Ident(ident) => {
+                if let Ok(i) = ident.parse::<i128>() {
+                    self.bump();
+                    return Ok(MatchPattern::Literal(Literal::Int(i)));
+                }
+                Err(SoulError::new(
+                    "expected integer literal or '_' for match pattern",
+                    SoulErrorKind::InvalidIdent,
+                    Some(self.token().span),
+                ))
+            }
+            _ => Err(SoulError::new(
+                "expected integer literal or '_' for match pattern",
+                SoulErrorKind::InvalidIdent,
+                Some(self.token().span),
+            )),
         }
     }
 }

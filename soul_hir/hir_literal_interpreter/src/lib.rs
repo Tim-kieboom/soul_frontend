@@ -81,7 +81,8 @@ impl<'a> LiteralInterpreter<'a> {
             | hir::ExpressionKind::StackArrayIndex { .. }
             | hir::ExpressionKind::New(_)
             | hir::ExpressionKind::NewArray { .. }
-            | hir::ExpressionKind::Drop { .. } => None,
+            | hir::ExpressionKind::Drop { .. }
+            | hir::ExpressionKind::Match { .. } => None,
 
             hir::ExpressionKind::Array(array) => {
                 self.interpret_array(array, expression_id)

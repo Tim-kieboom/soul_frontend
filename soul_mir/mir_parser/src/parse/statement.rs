@@ -304,14 +304,15 @@ fn is_valid_statement_expression(kind: &hir::ExpressionKind) -> bool {
         | hir::ExpressionKind::StackArrayIndex { .. } => false,
 
         hir::ExpressionKind::Block(_)
-        | hir::ExpressionKind::Function(_)
+        | hir::ExpressionKind::New(_)
         | hir::ExpressionKind::If { .. }
+        | hir::ExpressionKind::Function(_)
+        | hir::ExpressionKind::Drop { .. } 
         | hir::ExpressionKind::Call { .. }
         | hir::ExpressionKind::While { .. }
-        | hir::ExpressionKind::ExternalCall { .. }
-        | hir::ExpressionKind::EnumVariant { .. }
-        | hir::ExpressionKind::New(_)
+        | hir::ExpressionKind::Match { .. }
         | hir::ExpressionKind::NewArray { .. }
-        | hir::ExpressionKind::Drop { .. } => true,
+        | hir::ExpressionKind::EnumVariant { .. }
+        | hir::ExpressionKind::ExternalCall { .. } => true,
     }
 }

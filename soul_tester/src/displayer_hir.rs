@@ -217,6 +217,18 @@ impl<'a> HirDisplayer<'a> {
 
         self.display_depth();
         self.push('}');
+        
+        if let Some(typed) = self.typed {
+            self.push_str("<as: ");
+            let ty = typed.types_table
+                .blocks
+                .get(*id)
+                .copied()
+                .unwrap_or(TypeId::error());
+            
+            self.display_type(ty.to_lazy());
+            self.push('>');
+        };
 
         self.terminate = prev;
     }
@@ -374,6 +386,29 @@ impl<'a> HirDisplayer<'a> {
                     self.push(' ');
                 }
                 self.display_block(body);
+                self.display_expression_astype(*id, value.ty);
+                self.push('\n');
+            }
+            hir::ExpressionKind::Match { scrutinee, arms } => {
+                self.push_str("match ");
+                self.display_expression(scrutinee);
+                self.push_str(" {\n");
+                self.push_scope();
+
+                for arm in arms {
+                    self.display_depth();
+                    match &arm.pattern {
+                        hir::MatchPatternHir::Literal(literal) => self.push_fmt(format_args!("{} => ", literal.value_to_string())),
+                        hir::MatchPatternHir::Wildcard => self.push_str("_ => "),
+                    }
+
+                    self.display_block(&arm.body);
+                    self.push('\n');
+                }
+
+                self.pop_scope();
+                self.display_depth();
+                self.push('}');
                 self.display_expression_astype(*id, value.ty);
                 self.push('\n');
             }

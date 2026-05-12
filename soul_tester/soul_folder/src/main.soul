@@ -1,29 +1,23 @@
-import ( 
+import (
     crate.Io
     crate.Test
     crate.Mem.Slice.{Index}
 )
 
 main() {
-    ptr := new(1)
-    Io.Println_int(*ptr)
 
-    array := new:[1, 2, 3, 4]
-    ref := Index<int>(@array, 1)
-    Io.Print("array.len = ")
-    Io.Print_uint(array.len)
-    Io.Print(", array[1] = ")
-    Io.Println_int(*ref)
+    // string := "notTim"
+    // if string == "tim" {
+    //     Io.Println("is tim!!!")
+    // }
 
-    array2 := new:[for 10 => 3]
-    ref2 := Index<int>(@array2, 1)
-    Io.Print("array2.len = ")
-    Io.Print_uint(array2.len)
-    Io.Print(", array2[1] = ")
-    Io.Println_int(*ref2)
-
-    intrinsic.Drop(ref)
-    intrinsic.Drop(ptr)
-    intrinsic.Drop(array)
-    intrinsic.Drop(array2)
+    x := match 5 {
+        10 => "10"
+        5 => {
+            Io.Println("early return")
+            return
+        }
+        _ => "other"
+    }
+    Io.Println(x)
 }

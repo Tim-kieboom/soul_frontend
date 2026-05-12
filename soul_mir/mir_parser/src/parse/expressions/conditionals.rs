@@ -1,4 +1,6 @@
-use crate::{MirContext, mir};
+use ast::Literal;
+
+use crate::{MirContext, mir::{self, BlockId}};
 
 impl<'a> MirContext<'a> {
     pub(super) fn lower_while(
@@ -254,5 +256,142 @@ impl<'a> MirContext<'a> {
         ) {
             self.insert_terminator(end_block, mir::Terminator::Goto(join));
         }
+    }
+
+    pub(super) fn lower_match(
+        &mut self,
+        scrutinee: hir::ExpressionId,
+        arms: &[hir::MatchArm],
+        ty: hir::TypeId,
+        is_end: &mut bool,
+    ) -> mir::Operand {
+        let scrutinee_op = self.lower_operand(scrutinee).pass(is_end);
+
+        let parent_bb = self.expect_current_block();
+        let returnable = self.tree.blocks[parent_bb].returnable;
+
+        let mut targets = Vec::new();
+        let mut wildcard_arm: Option<(BlockId, hir::BlockId)> = None;
+        let mut arm_blocks = Vec::new();
+
+        let is_expr = self.current.target_place.is_none();
+
+        for arm in arms {
+            let arm_bb = self.new_block();
+            if !is_expr {
+                self.tree.blocks[arm_bb].returnable = returnable;
+            }
+            arm_blocks.push((arm_bb, arm.body));
+
+            match &arm.pattern {
+                hir::MatchPatternHir::Literal(lit) => {
+                    if let Literal::Int(val) = lit {
+                        targets.push((*val, arm_bb));
+                    }
+                }
+                hir::MatchPatternHir::Wildcard => {
+                    wildcard_arm = Some((arm_bb, arm.body));
+                }
+            }
+        }
+
+        if wildcard_arm.is_none() {
+            let else_bb = self.new_block();
+            if !is_expr {
+                self.tree.blocks[else_bb].returnable = returnable;
+            }
+            targets.push((0, else_bb));
+            wildcard_arm = Some((else_bb, arms.last().map(|a| a.body).unwrap()));
+        }
+
+        let otherwise = wildcard_arm.as_ref().unwrap().0;
+
+        let join_bb = self.new_block();
+        self.tree.blocks[join_bb].returnable = returnable;
+
+        self.insert_terminator(parent_bb, mir::Terminator::SwitchInt {
+            discriminant: scrutinee_op,
+            targets,
+            otherwise,
+        });
+
+        if let Some(target_place) = self.current.target_place {
+            for (arm_bb, hir_body) in arm_blocks {
+                self.current.block = Some(arm_bb);
+                let arm_end = &mut false;
+                let value = self.lower_block(hir_body, arm_bb).pass(arm_end);
+                let end_block = self.expect_current_block();
+
+                if !*arm_end {
+                    if let Some(value) = value.filter(|v| !matches!(v.kind, mir::OperandKind::None)) {
+                        self.push_statement_from(
+                            mir::Statement::new(mir::StatementKind::Assign {
+                                place: target_place,
+                                value: mir::Rvalue::new(mir::RvalueKind::Operand(value)),
+                            }),
+                            end_block,
+                        );
+                    }
+                }
+
+                if matches!(
+                    self.tree.blocks[end_block].terminator,
+                    mir::Terminator::Unreachable
+                ) {
+                    self.insert_terminator(end_block, mir::Terminator::Goto(join_bb));
+                }
+            }
+
+            self.current.block = Some(join_bb);
+            return mir::Operand::new(ty, mir::OperandKind::None);
+        } 
+
+        let mut temp: Option<mir::TempId> = None;
+        for (arm_bb, hir_body) in arm_blocks {
+            self.current.block = Some(arm_bb);
+            let arm_end = &mut false;
+            let value = self.lower_block(hir_body, arm_bb).pass(arm_end);
+            let end_block = self.expect_current_block();
+
+            if !*arm_end {
+                if let Some(value) = value.filter(|v| !matches!(v.kind, mir::OperandKind::None)) {
+                    let temp_id = match temp {
+                        Some(id) => id,
+                        None => {
+                            let id = self.new_temp(ty);
+                            temp = Some(id);
+                            id
+                        }
+                    };
+
+                    let place = self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp_id), ty));
+
+                    self.push_statement_from(
+                        mir::Statement::new(mir::StatementKind::Assign {
+                            place,
+                            value: mir::Rvalue::new(mir::RvalueKind::Operand(value)),
+                        }),
+                        end_block,
+                    );
+                }
+            }
+
+            if matches!(
+                self.tree.blocks[end_block].terminator,
+                mir::Terminator::Unreachable
+            ) {
+                self.insert_terminator(end_block, mir::Terminator::Goto(join_bb));
+            }
+        }
+
+        self.current.block = Some(join_bb);
+
+        mir::Operand::new(
+            ty,
+            match temp {
+                Some(temp_id) => mir::OperandKind::Temp(temp_id),
+                None => mir::OperandKind::None,
+            },
+        )
     }
 }
