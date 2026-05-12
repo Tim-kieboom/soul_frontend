@@ -153,6 +153,8 @@ impl InferTable {
                 self.unify_type_type(types, infers, *a_id, *b_id, span)
             }
 
+            (HirTypeKind::Never, _) | (_, HirTypeKind::Never) => Ok(UnifyResult::Ok),
+
             (HirTypeKind::Error, _) | (_, HirTypeKind::Error) => Ok(UnifyResult::Ok),
 
             _ => a_ty.compatible_type_kind(b_ty).map_err(|reason| {
@@ -191,6 +193,7 @@ impl InferTable {
         let resolved = match &hir_type.kind {
             HirTypeKind::None
             | HirTypeKind::Type
+            | HirTypeKind::Never
             | HirTypeKind::Error
             | HirTypeKind::Generic(_)
             | HirTypeKind::CustomType(_)

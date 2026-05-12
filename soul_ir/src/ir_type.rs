@@ -75,7 +75,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     }
                 }
             }
-            ThirTypeKind::None | ThirTypeKind::Type => None,
+            ThirTypeKind::None | ThirTypeKind::Type | ThirTypeKind::Never => None,
             ThirTypeKind::Error => {
                 #[cfg(debug_assertions)]
                 panic!("error type should not be in ir");

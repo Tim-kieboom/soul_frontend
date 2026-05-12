@@ -91,6 +91,7 @@ impl DisplayThirType for ThirTypeKind {
                 sb.push_str(OPTIONAL_STR);
                 write_display_from_id(types, *type_id, sb)
             }
+            ThirTypeKind::Never => write!(sb, "!"),
             ThirTypeKind::Error => write!(sb, "<error>"),
         }
     }
@@ -106,6 +107,7 @@ impl ThirTypeKind {
         match self {
             ThirTypeKind::Type => "type",
             ThirTypeKind::None => "none",
+            ThirTypeKind::Never => "never",
             ThirTypeKind::Error => "<error>",
             ThirTypeKind::Ref { .. } => "<ref>",
             ThirTypeKind::Array { .. } => "<array>",

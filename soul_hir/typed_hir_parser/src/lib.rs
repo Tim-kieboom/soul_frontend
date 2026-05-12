@@ -70,6 +70,7 @@ struct TypedHirContext<'a> {
 
     u32_type: TypeId,
     none_type: TypeId,
+    never_type: TypeId,
     bool_type: TypeId,
     places: VecMap<PlaceId, LazyTypeId>,
     locals: VecMap<LocalId, LazyTypeId>,
@@ -104,6 +105,7 @@ impl<'a> TypedHirContext<'a> {
             fields: VecMap::new(),
             auto_copys: VecSet::new(),
             none_type: TypeId::error(),
+            never_type: TypeId::error(),
             bool_type: TypeId::error(),
             u32_type: TypeId::error(),
             place_fields: VecMap::new(),
@@ -118,6 +120,7 @@ impl<'a> TypedHirContext<'a> {
             expressions: VecMap::with_capacity(hir.nodes.expressions.len()),
         };
         this.none_type = this.add_type(HirType::none_type());
+        this.never_type = this.add_type(HirType::never_type());
         this.bool_type = this.add_type(HirType::bool_type());
         this.u32_type = this.add_type(HirType::primitive_type(PrimitiveTypes::Uint32));
         this

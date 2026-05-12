@@ -374,7 +374,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         let ptr_align = Alignment::from_u8(ptr as u8).expect("should be value in alignment");
 
         Ok(match sizeof.kind {
-            ThirTypeKind::Error | ThirTypeKind::Type => {
+            ThirTypeKind::Error | ThirTypeKind::Type | ThirTypeKind::Never => {
                 return Err(SoulError::new(
                     format!(
                         "type '{}' does not have a size",

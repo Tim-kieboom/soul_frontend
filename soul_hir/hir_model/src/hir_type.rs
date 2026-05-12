@@ -101,6 +101,10 @@ impl HirType {
         Self::new(HirTypeKind::Error)
     }
 
+    pub const fn never_type() -> Self {
+        Self::new(HirTypeKind::Never)
+    }
+
     pub fn is_mutable(&self) -> bool {
         self.modifier == Some(TypeModifier::Mut)
     }
@@ -156,6 +160,10 @@ impl HirType {
     pub const fn is_error(&self) -> bool {
         matches!(self.kind, HirTypeKind::Error)
     }
+
+    pub const fn is_never(&self) -> bool {
+        matches!(self.kind, HirTypeKind::Never)
+    }
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -176,6 +184,7 @@ pub enum HirTypeKind {
     Generic(GenericId),
     CustomType(CustomTypeId),
 
+    Never,
     Error,
 }
 impl HirTypeKind {
@@ -188,6 +197,10 @@ impl HirTypeKind {
 
     pub const fn is_error(&self) -> bool {
         matches!(self, HirTypeKind::Error)
+    }
+
+    pub const fn is_never(&self) -> bool {
+        matches!(self, HirTypeKind::Never)
     }
 }
 
@@ -346,6 +359,7 @@ impl DisplayType for HirTypeKind {
                 sb.push_str(OPTIONAL_STR);
                 write_display_from_id(types, infers, *type_id, sb)
             }
+            HirTypeKind::Never => write!(sb, "!"),
             HirTypeKind::Error => write!(sb, "<error>"),
         }
     }
@@ -362,6 +376,7 @@ impl HirTypeKind {
         match self {
             HirTypeKind::Type => "type",
             HirTypeKind::None => "none",
+            HirTypeKind::Never => "never",
             HirTypeKind::Error => "<error>",
             HirTypeKind::Ref { .. } => "<ref>",
             HirTypeKind::Array { .. } => "<array>",

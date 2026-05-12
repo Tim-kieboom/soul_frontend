@@ -163,9 +163,27 @@ impl<'a> TypedHirContext<'a> {
 
         self.handle_block_terminator(block, &mut return_type, returnable);
 
-        let ty = return_type.unwrap_or(self.none_type.to_lazy());
+        let ty = match return_type {
+            Some(ty) => ty,
+            None => {
+                if !returnable && self.block_has_return(block) {
+                    self.never_type.to_lazy()
+                } else {
+                    self.none_type.to_lazy()
+                }
+            }
+        };
         self.type_block(body, ty);
         ty
+    }
+
+    fn block_has_return(&self, block: &Block) -> bool {
+        if matches!(block.terminator, Some(Terminator::Return(_))) {
+            return true;
+        }
+        block.statements.iter().any(|s| {
+            matches!(s.kind, hir::StatementKind::Return(_))
+        })
     }
 
     fn handle_block_terminator(
@@ -176,6 +194,7 @@ impl<'a> TypedHirContext<'a> {
     ) {
         if let Some(terminator) = block.terminator {
             if matches!(terminator, Terminator::Return(_)) && !returnable {
+                *return_type = Some(self.never_type.to_lazy());
                 return;
             }
 

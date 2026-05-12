@@ -24,6 +24,7 @@ impl<'a> TypedHirContext<'a> {
 
         let table = typed_hir::TypeTable {
             none_type: self.none_type,
+            never_type: self.never_type,
             bool_type: self.bool_type,
             u32_type: self.u32_type,
 
@@ -178,6 +179,7 @@ impl<'a> TypedHirContext<'a> {
                 }
                 HirTypeKind::Type
                 | HirTypeKind::None
+                | HirTypeKind::Never
                 | HirTypeKind::Error
                 | HirTypeKind::Ref { .. }
                 | HirTypeKind::Generic(_)
@@ -232,6 +234,7 @@ impl<'a> TypedHirContext<'a> {
             HirTypeKind::CustomType(id) => ThirTypeKind::CustomTypes(id),
             HirTypeKind::Generic(id) => ThirTypeKind::Generic(id),
 
+            HirTypeKind::Never => ThirTypeKind::Never,
             HirTypeKind::Error => ThirTypeKind::Error,
         }
     }

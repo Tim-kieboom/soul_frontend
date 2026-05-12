@@ -90,6 +90,7 @@ impl ThirType {
 pub enum ThirTypeKind {
     None,
     Type,
+    Never,
     Primitive(PrimitiveTypes),
     Array { element: TypeId, kind: ArrayKind },
     Ref { of_type: TypeId, mutable: bool },
@@ -124,6 +125,7 @@ pub struct Field {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TypeTable {
     pub none_type: TypeId,
+    pub never_type: TypeId,
     pub bool_type: TypeId,
     pub u32_type: TypeId,
 

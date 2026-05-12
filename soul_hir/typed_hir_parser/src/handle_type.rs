@@ -18,6 +18,10 @@ impl<'a> TypedHirContext<'a> {
         got: LazyTypeId,
         span: Span,
     ) -> bool {
+        if expect == self.never_type.to_lazy() || got == self.never_type.to_lazy() {
+            return true;
+        }
+
         match self
             .infer_table
             .unify_type_type(&mut self.types, &self.infers, expect, got, span)

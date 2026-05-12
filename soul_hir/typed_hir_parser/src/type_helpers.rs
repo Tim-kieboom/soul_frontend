@@ -119,6 +119,10 @@ impl TypeCompatible for HirType {
             return Ok(UnifyResult::Ok);
         }
 
+        if self.is_never() || should_be.is_never() {
+            return Ok(UnifyResult::Ok);
+        }
+
         self.kind.compatible_type_kind(&should_be.kind)?;
         Ok(result.unwrap_or(UnifyResult::Ok))
     }
@@ -142,6 +146,8 @@ impl TypeKindCompatible for HirTypeKind {
             | (HirTypeKind::None, HirTypeKind::Primitive(PrimitiveTypes::None))
             | (HirTypeKind::None, HirTypeKind::None)
             | (HirTypeKind::Type, HirTypeKind::Type)
+            | (HirTypeKind::Never, _)
+            | (_, HirTypeKind::Never)
             | (HirTypeKind::Error, _)
             | (_, HirTypeKind::Error) => Ok(()),
 
@@ -224,6 +230,10 @@ impl UnifyPrimitiveCastLazy for HirTypeKind {
         should_be: &Self,
     ) -> Result<(), MishmatchReason> {
         if self.is_error() || should_be.is_error() {
+            return Ok(());
+        }
+
+        if self.is_never() || should_be.is_never() {
             return Ok(());
         }
 
@@ -344,6 +354,18 @@ impl UnifyPrimitiveCast for ThirTypeKind {
         types: &ThirTypesMap,
         should_be: &Self,
     ) -> Result<(), MishmatchReason> {
+        if matches!(self, ThirTypeKind::Never)
+            || matches!(should_be, ThirTypeKind::Never)
+        {
+            return Ok(());
+        }
+
+        if matches!(self, ThirTypeKind::Error)
+            || matches!(should_be, ThirTypeKind::Error)
+        {
+            return Ok(());
+        }
+
         Ok(match (self, should_be) {
             (
                 ThirTypeKind::Ref {

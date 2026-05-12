@@ -486,17 +486,18 @@ impl<'a> TypedHirContext<'a> {
     ) -> LazyTypeId {
         let _ = self.infer_expression(scrutinee);
 
-        let mut arm_types = Vec::new();
+        let mut result_type: Option<LazyTypeId> = None;
         let mut has_wildcard = false;
-        let mut first_value_type: Option<LazyTypeId> = None;
 
         for arm in &arms {
             let arm_type = self.infer_block_expression(arm.body);
-            arm_types.push(arm_type);
 
-            let is_divergent = self.is_arm_divergent(arm.body);
-            if !is_divergent && first_value_type.is_none() {
-                first_value_type = Some(arm_type);
+            match result_type {
+                Some(prev) => {
+                    let _ = self.unify(ExpressionId::error(), prev, arm_type, span);
+                    result_type = Some(self.get_priority_lazy_type(prev, arm_type));
+                }
+                None => result_type = Some(arm_type),
             }
 
             match &arm.pattern {
@@ -505,29 +506,7 @@ impl<'a> TypedHirContext<'a> {
             }
         }
 
-        if arm_types.is_empty() {
-            self.log_error(SoulError::new(
-                "match expression must have at least one arm",
-                SoulErrorKind::InvalidContext,
-                Some(span),
-            ));
-            return LazyTypeId::error();
-        }
-
-        let result_type = first_value_type.unwrap_or(self.none_type.to_lazy());
-        for (arm, arm_type) in arms.iter().zip(arm_types.iter()) {
-            if self.is_arm_divergent(arm.body) {
-                continue;
-            }
-
-            if *arm_type != result_type {
-                self.log_error(SoulError::new(
-                    "match arms must all have the same type",
-                    SoulErrorKind::UnifyTypeError,
-                    Some(span),
-                ));
-            }
-        }
+        let result_type = result_type.unwrap_or(self.none_type.to_lazy());
 
         if !has_wildcard {
             self.log_error(SoulError::new(
@@ -538,13 +517,6 @@ impl<'a> TypedHirContext<'a> {
         }
 
         result_type
-    }
-
-    fn is_arm_divergent(&self, body: BlockId) -> bool {
-        let block = &self.hir.nodes.blocks[body];
-        block.statements.iter().any(|s| {
-            matches!(s.kind, hir::StatementKind::Return(_))
-        })
     }
 
     fn infer_cast(&mut self, value: ExpressionId, cast_to: LazyTypeId) -> LazyTypeId {
