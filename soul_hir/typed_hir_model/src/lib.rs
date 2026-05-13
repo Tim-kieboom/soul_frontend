@@ -129,6 +129,7 @@ pub struct TypeTable {
     pub bool_type: TypeId,
     pub index_type: TypeId,
     pub u32_type: TypeId,
+    pub c_int_type: TypeId,
 
     pub expressions: VecMap<ExpressionId, TypeId>,
     pub statements: VecMap<StatementId, TypeId>,
@@ -166,5 +167,5 @@ impl ThirTypeKind {
             ThirTypeKind::Array { .. } => true,
             _ => false,
         }
-    } 
+    }
 }

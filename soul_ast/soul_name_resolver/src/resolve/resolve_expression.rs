@@ -10,11 +10,9 @@ impl<'a> NameResolver<'a> {
             ExpressionKind::Match(match_expression) => {
                 self.resolve_expression(&mut match_expression.scrutinee);
                 for arm in &mut match_expression.arms {
-                    
                     self.resolve_block(&mut arm.body);
                     match &mut arm.pattern {
-                        ast::MatchPattern::Wildcard
-                        | ast::MatchPattern::Literal(_) => (),
+                        ast::MatchPattern::Wildcard | ast::MatchPattern::Literal(_) => (),
                     }
                 }
             }

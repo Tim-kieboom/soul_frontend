@@ -165,6 +165,11 @@ pub enum ExpressionKind {
         ptr_type: TypeId,
     },
 
+    /// `Exit(int)` — exit program with exit  code.
+    Exit {
+        exit_code: ExpressionId,
+    },
+
     /// `Drop(expr)` — frees heap-allocated memory for pointer/heap-array types.
     Drop {
         value: ExpressionId,

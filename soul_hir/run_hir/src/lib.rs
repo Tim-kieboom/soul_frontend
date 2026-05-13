@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use ast::AbtractSyntaxTree;
 use hir::{ComplexLiteral, ExpressionId, HirTree};
 use hir_literal_interpreter::literal_resolve;
@@ -11,6 +10,7 @@ use soul_utils::{
     span::{ModuleId, Span},
     vec_map::VecMap,
 };
+use std::path::PathBuf;
 use typed_hir::{TypedHir, display_thir::DisplayThirType};
 use typed_hir_parser::lower_typed_hir;
 
@@ -35,9 +35,9 @@ pub fn to_hir(
     if options.debug_view_literal_resolve() {
         for (id, literal) in literal_resolves.entries() {
             let span = hir.info.spans.expressions[id];
-            context
-                .faults
-                .push(SementicFault::debug(literal_msg(literal, &typed, &hir, span)));
+            context.faults.push(SementicFault::debug(literal_msg(
+                literal, &typed, &hir, span,
+            )));
         }
     }
 
@@ -48,7 +48,7 @@ pub fn to_hir(
     }
 }
 
-fn literal_msg(literal: &ComplexLiteral,  typed: &TypedHir, hir: &HirTree, span: Span) -> SoulError {
+fn literal_msg(literal: &ComplexLiteral, typed: &TypedHir, hir: &HirTree, span: Span) -> SoulError {
     let mut literal_str = String::new();
     literal_display(literal, typed, hir, &mut literal_str);
 
@@ -67,7 +67,9 @@ pub fn literal_display(literal: &ComplexLiteral, typed: &TypedHir, hir: &HirTree
         ComplexLiteral::Array { array_type, values } => {
             let array_type = typed.types_map.id_to_type(*array_type);
             match array_type {
-                Some(val) => val.write_display(&typed.types_map, sb).expect("no fmt error"),
+                Some(val) => val
+                    .write_display(&typed.types_map, sb)
+                    .expect("no fmt error"),
                 None => write!(sb, "{:?}", array_type).expect("no fmt error"),
             };
             sb.push_str(":[");

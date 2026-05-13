@@ -133,16 +133,18 @@ pub enum IntrinsicValue {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Intrinsic {
+    Drop,
+    Exit,
     InFile,
     InLine,
     PtrOffset,
     StackArrayIndex,
-    Drop,
 }
 
 impl Intrinsic {
     pub fn from_name(name: &str) -> Option<Self> {
         match name {
+            "Exit" => Some(Intrinsic::Exit),
             "InFile" => Some(Intrinsic::InFile),
             "InLine" => Some(Intrinsic::InLine),
             "PtrOffset" => Some(Intrinsic::PtrOffset),

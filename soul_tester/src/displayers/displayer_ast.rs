@@ -522,7 +522,6 @@ impl<'a> AstDisplayer<'a> {
                 self.push_str(" {\n");
                 self.push_scope();
                 for arm in &match_.arms {
-                    
                     self.display_depth();
                     match &arm.pattern {
                         ast::MatchPattern::Literal(literal) => {
@@ -706,6 +705,7 @@ impl<'a> AstDisplayer<'a> {
 
     fn display_typekind(&mut self, kind: &TypeKind) {
         match kind {
+            ast::TypeKind::Never => self.push('!'),
             ast::TypeKind::None => self.push_str("none"),
             ast::TypeKind::Type => self.push_str("type"),
             ast::TypeKind::Stub(stub) => self.push_str(&stub.name),

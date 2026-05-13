@@ -8,7 +8,6 @@ impl<'a> NameResolver<'a> {
                 match_expression.id = Some(self.alloc_node());
                 self.collect_expression(&mut match_expression.scrutinee);
                 for arm in &mut match_expression.arms {
-                    
                     match &arm.pattern {
                         ast::MatchPattern::Literal(_) => (),
                         ast::MatchPattern::Wildcard => (),

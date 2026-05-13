@@ -1,4 +1,4 @@
-use std::{collections::HashMap};
+use std::collections::HashMap;
 
 use soul_utils::{
     Ident,
@@ -221,10 +221,13 @@ impl ModuleScopes {
     fn modules(&self) -> impl Iterator<Item = (&std::string::String, &ScopeModuleEntry)> {
         self.scope_iter()
             .map(|scope| {
-                scope.entries.iter().filter_map(|(name, entry)| match &entry.module {
-                    Some(module) => Some((name, module)),
-                    None => None,
-                })
+                scope
+                    .entries
+                    .iter()
+                    .filter_map(|(name, entry)| match &entry.module {
+                        Some(module) => Some((name, module)),
+                        None => None,
+                    })
             })
             .flatten()
     }

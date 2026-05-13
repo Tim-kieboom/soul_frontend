@@ -20,13 +20,24 @@ impl<'a> HirContext<'a> {
     ) -> hir::Expression {
         if let Some(intrinsic) = function_call.intrinsic {
             if intrinsic == Intrinsic::PtrOffset {
-                return self.lower_ptr_offset(id, &function_call.arguments, function_call.name.span);
+                return self.lower_ptr_offset(
+                    id,
+                    &function_call.arguments,
+                    function_call.name.span,
+                );
             }
             if intrinsic == Intrinsic::StackArrayIndex {
-                return self.lower_stack_array_index(id, &function_call.arguments, function_call.name.span);
+                return self.lower_stack_array_index(
+                    id,
+                    &function_call.arguments,
+                    function_call.name.span,
+                );
             }
             if intrinsic == Intrinsic::Drop {
-                return self.lower_drop(id, &function_call.arguments, function_call.name.span);
+                return self.lower_drop(id, &function_call.arguments);
+            }
+            if intrinsic == Intrinsic::Exit {
+                return self.lower_exit(id, &function_call.arguments);
             }
             return self.lower_intrinsic(
                 id,
@@ -150,9 +161,7 @@ impl<'a> HirContext<'a> {
 
             let ast_i = slot - positional_offset;
             *argument = match &signature.parameters[ast_i].default {
-                Some(val) => {
-                    self.lower_default_expression(val, function_call.name.span)
-                }
+                Some(val) => self.lower_default_expression(val, function_call.name.span),
                 None => {
                     let span = function_call.name.span;
                     self.log_error(SoulError::new(
@@ -275,21 +284,16 @@ impl<'a> HirContext<'a> {
     ) -> hir::Expression {
         match intrinsic {
             Intrinsic::InFile => {
-                
                 let path_str = match intrinsic_value {
                     Some(IntrinsicValue::Literal(Literal::Str(val))) => val.clone(),
-                    _ if self.current.module == self.root_id => {
-                        "main.soul".to_string()
-                    }
-                    _ => {
-
-                        self.module_to_source_path
-                            .get(&self.current.module)
-                            .map(|p| p.strip_prefix(&self.source_folder).ok())
-                            .flatten()
-                            .map(|p| p.to_string_lossy().to_string())
-                            .unwrap_or_else(|| "unknown".to_string())
-                    }
+                    _ if self.current.module == self.root_id => "main.soul".to_string(),
+                    _ => self
+                        .module_to_source_path
+                        .get(&self.current.module)
+                        .map(|p| p.strip_prefix(&self.source_folder).ok())
+                        .flatten()
+                        .map(|p| p.to_string_lossy().to_string())
+                        .unwrap_or_else(|| "unknown".to_string()),
                 };
 
                 let literal = Literal::Str(path_str);
@@ -314,8 +318,11 @@ impl<'a> HirContext<'a> {
                 }
             }
             Intrinsic::PtrOffset => unreachable!("PtrOffset should be handled in lower_call"),
-            Intrinsic::StackArrayIndex => unreachable!("StackArrayIndex should be handled in lower_call"),
+            Intrinsic::StackArrayIndex => {
+                unreachable!("StackArrayIndex should be handled in lower_call")
+            }
             Intrinsic::Drop => unreachable!("Drop should be handled in lower_call"),
+            Intrinsic::Exit => unreachable!("Exit should be handled in lower_call"),
         }
     }
 
@@ -365,11 +372,27 @@ impl<'a> HirContext<'a> {
         }
     }
 
+    fn lower_exit(
+        &mut self,
+        id: hir::ExpressionId,
+        arguments: &[ast::Argument],
+    ) -> hir::Expression {
+        let exit_code = arguments
+            .get(0)
+            .map(|arg| self.lower_expression(&arg.value))
+            .unwrap_or(ExpressionId::error());
+
+        hir::Expression {
+            id,
+            ty: self.add_type(HirType::never_type()).to_lazy(),
+            kind: hir::ExpressionKind::Exit { exit_code },
+        }
+    }
+
     fn lower_drop(
         &mut self,
         id: hir::ExpressionId,
         arguments: &[ast::Argument],
-        span: Span,
     ) -> hir::Expression {
         let value = arguments
             .get(0)
@@ -378,7 +401,7 @@ impl<'a> HirContext<'a> {
 
         hir::Expression {
             id,
-            ty: self.new_infer_type(vec![], None, span),
+            ty: self.add_type(HirType::none_type()).to_lazy(),
             kind: hir::ExpressionKind::Drop { value },
         }
     }

@@ -42,7 +42,8 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             Terminator::Exit => {
                 let i32 = self.context.i32_type();
                 let exit_code = i32.const_int(0, false);
-                let exit = self.internal_functions
+                let exit = self
+                    .internal_functions
                     .exit_function
                     .expect("should have initialize exit function");
                 self.builder.build_call(exit, &[exit_code.into()])?;
@@ -92,12 +93,13 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     let case_val = self.context.i64_type().const_int(*val as u64, false);
                     cases.push((case_val, self.get_block(*target)));
                 }
-                self.builder.build_switch(discr_val, otherwise_block, &cases)?;
+                self.builder
+                    .build_switch(discr_val, otherwise_block, &cases)?;
             }
             Terminator::Unreachable => {
                 #[cfg(debug_assertions)]
                 panic!("should not have unreachable");
-                
+
                 #[cfg(not(debug_assertions))]
                 self.log_error(soul_utils::error::SoulError::new(
                     "should not have unreachable",
@@ -113,7 +115,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
     pub(crate) fn lower_call(
         &mut self,
         id: FunctionId,
-        arguments: &Vec<Operand>,
+        arguments: &[Operand],
         return_place: Option<PlaceId>,
         type_args: &Vec<TypeId>,
         generics: &GenericSubstitute,
@@ -176,7 +178,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 None
             )
         })?;
-        
+
         match &place.kind {
             PlaceKind::Temp(temp_id) => {
                 let value = self.new_loaded_operand(return_value, place.ty, generics)?;

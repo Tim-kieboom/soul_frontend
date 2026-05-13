@@ -1,8 +1,13 @@
 use ast::{ArrayKind, BinaryOperator, UnaryOperator};
 use hir::TypeId;
-use inkwell::{AddressSpace, FloatPredicate, IntPredicate, types::BasicTypeEnum, values::BasicValueEnum};
+use inkwell::{
+    AddressSpace, FloatPredicate, IntPredicate, types::BasicTypeEnum, values::BasicValueEnum,
+};
 use mir_parser::mir;
-use soul_utils::{error::{SoulError, SoulErrorKind, SoulResult}, soul_error_internal};
+use soul_utils::{
+    error::{SoulError, SoulErrorKind, SoulResult},
+    soul_error_internal,
+};
 use typed_hir::{ThirType, ThirTypeKind};
 
 use crate::{GenericSubstitute, IrOperand, LlvmBackend, OperandInfo};
@@ -49,7 +54,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             ast::BinaryOperatorKind::BitXor => self.bit_xor(ir_left, ir_right),
             ast::BinaryOperatorKind::LogAnd => self.bit_and(ir_left, ir_right),
             ast::BinaryOperatorKind::LogOr => self.bit_or(ir_left, ir_right),
-            ast::BinaryOperatorKind::NotEq => self.compare(IrCompare::NotEq, ir_left, ir_right, generics),
+            ast::BinaryOperatorKind::NotEq => {
+                self.compare(IrCompare::NotEq, ir_left, ir_right, generics)
+            }
             ast::BinaryOperatorKind::Eq => self.compare(IrCompare::Eq, ir_left, ir_right, generics),
             ast::BinaryOperatorKind::Lt => self.compare(IrCompare::Lt, ir_left, ir_right, generics),
             ast::BinaryOperatorKind::Gt => self.compare(IrCompare::Gt, ir_left, ir_right, generics),
@@ -306,11 +313,10 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         right: IrOperand<'a>,
         generics: &GenericSubstitute,
     ) -> SoulResult<IrOperand<'a>> {
-
         let left_type = self.get_type(left.info.type_id)?;
         let right_type = self.get_type(right.info.type_id)?;
         if left_type.kind.is_array() && right_type.kind.is_array() {
-            return self.array_compare(cmp, left, left_type, right, right_type, generics)
+            return self.array_compare(cmp, left, left_type, right, right_type, generics);
         }
 
         let value = match (left.value, right.value) {
@@ -346,7 +352,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
     }
 
     fn array_compare(
-        &self, 
+        &self,
         cmp: IrCompare,
         left: IrOperand<'a>,
         left_type: &ThirType,
@@ -355,16 +361,26 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         generics: &GenericSubstitute,
     ) -> SoulResult<IrOperand<'a>> {
         let (
-            ThirTypeKind::Array { element, kind: left_kind }, 
-            ThirTypeKind::Array { element: _, kind: right_kind }, 
-        ) = (left_type.kind, right_type.kind) else {
-            return Err(soul_error_internal!("left_type and right_type should be ThirTypeKind::Array", None));
+            ThirTypeKind::Array {
+                element,
+                kind: left_kind,
+            },
+            ThirTypeKind::Array {
+                element: _,
+                kind: right_kind,
+            },
+        ) = (left_type.kind, right_type.kind)
+        else {
+            return Err(soul_error_internal!(
+                "left_type and right_type should be ThirTypeKind::Array",
+                None
+            ));
         };
 
         let left_len = self.get_array_len(left, left_kind)?;
         let right_len = self.get_array_len(right, right_kind)?;
         if cmp.is_order_kind() {
-            return self.compare(cmp, left_len, right_len, generics)
+            return self.compare(cmp, left_len, right_len, generics);
         }
 
         let left_ptr = self.get_array_ptr(left, left_kind)?;
@@ -393,13 +409,15 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             return Err(soul_error_internal!(
                 "call to internal 'arraycmp' returned no value but return_place was provided",
                 None
-            ))
+            ));
         };
 
         let value = if cmp == IrCompare::Eq {
             return_value
         } else {
-            self.builder.build_not(return_value.into_int_value())?.into()
+            self.builder
+                .build_not(return_value.into_int_value())?
+                .into()
         };
 
         let bool_type_id = self.types.types_table.bool_type;
@@ -416,12 +434,12 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         let len_ir_type = self.default_int_type;
 
         match kind {
-            ArrayKind::MutSlice |
-            ArrayKind::HeapArray |
-            ArrayKind::ConstSlice => self.extract_struct_field(operand, 1, len_type, len_ir_type.into()),
-            ArrayKind::StackArray(num) => Ok(IrOperand { 
-                value: len_ir_type.const_int(num, false).into(), 
-                info: OperandInfo::new_loaded(len_type, len_ir_type.into()) 
+            ArrayKind::MutSlice | ArrayKind::HeapArray | ArrayKind::ConstSlice => {
+                self.extract_struct_field(operand, 1, len_type, len_ir_type.into())
+            }
+            ArrayKind::StackArray(num) => Ok(IrOperand {
+                value: len_ir_type.const_int(num, false).into(),
+                info: OperandInfo::new_loaded(len_type, len_ir_type.into()),
             }),
         }
     }
@@ -431,9 +449,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         let ptr_ir_type = self.context.ptr_type(AddressSpace::default());
 
         match kind {
-            ArrayKind::MutSlice |
-            ArrayKind::HeapArray |
-            ArrayKind::ConstSlice => self.extract_struct_field(operand, 0, ptr_type, ptr_ir_type.into()),
+            ArrayKind::MutSlice | ArrayKind::HeapArray | ArrayKind::ConstSlice => {
+                self.extract_struct_field(operand, 0, ptr_type, ptr_ir_type.into())
+            }
             ArrayKind::StackArray(_) => {
                 let ptr = operand.get_or_convert_pointer(&self.builder)?;
                 Ok(IrOperand {
@@ -454,16 +472,16 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         let struct_ty = operand.info.ir_type.into_struct_type();
         let tmp = self.builder.build_alloca(struct_ty, "tmp")?;
         self.builder.store_operand(tmp, operand)?;
-        let field_ptr = self.builder.build_struct_gep_index(
-            struct_ty, tmp, field_index, "field_ptr",
-        )?;
-        let field_val = self.builder.build_load(
-            field_ir_type, field_ptr, "field_val",
-        )?;
+        let field_ptr =
+            self.builder
+                .build_struct_gep_index(struct_ty, tmp, field_index, "field_ptr")?;
+        let field_val = self
+            .builder
+            .build_load(field_ir_type, field_ptr, "field_val")?;
 
-        Ok(IrOperand { 
-            value: field_val.into(), 
-            info: OperandInfo::new_loaded(field_type_id, field_ir_type) 
+        Ok(IrOperand {
+            value: field_val.into(),
+            info: OperandInfo::new_loaded(field_type_id, field_ir_type),
         })
     }
 
@@ -526,10 +544,7 @@ enum IrCompare {
 impl IrCompare {
     fn is_order_kind(&self) -> bool {
         match self {
-            IrCompare::Lt |
-            IrCompare::Gt |
-            IrCompare::Le |
-            IrCompare::Ge => true,
+            IrCompare::Lt | IrCompare::Gt | IrCompare::Le | IrCompare::Ge => true,
             _ => false,
         }
     }

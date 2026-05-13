@@ -21,6 +21,7 @@ pub struct SoulType {
 pub enum TypeKind {
     /// empty type
     None,
+    Never,
     /// Represents the type of all types
     Type,
     /// Primitive types like int, bool, float

@@ -18,7 +18,9 @@ impl<'a> TypedHirContext<'a> {
         got: LazyTypeId,
         span: Span,
     ) -> bool {
-        if expect == self.never_type.to_lazy() || got == self.never_type.to_lazy() {
+        if expect == self.common_types.never_type.to_lazy()
+            || got == self.common_types.never_type.to_lazy()
+        {
             return true;
         }
 
@@ -133,7 +135,8 @@ impl<'a> TypedHirContext<'a> {
                 self.add_type(ty).to_lazy()
             }
             None => {
-                let is_ref = matches!(type_id, LazyTypeId::Known(id) if is_ref_type(self.id_to_type(id)));
+                let is_ref =
+                    matches!(type_id, LazyTypeId::Known(id) if is_ref_type(self.id_to_type(id)));
                 if is_ref {
                     type_id
                 } else {
@@ -146,7 +149,11 @@ impl<'a> TypedHirContext<'a> {
         local_type_id
     }
 
-    pub(crate) fn resolve_untyped_primitive(&mut self, base_type: LazyTypeId, span: Span) -> Option<HirType> {
+    pub(crate) fn resolve_untyped_primitive(
+        &mut self,
+        base_type: LazyTypeId,
+        span: Span,
+    ) -> Option<HirType> {
         let base_type = match base_type {
             LazyTypeId::Known(val) => val,
             LazyTypeId::Infer(_) => return None,
@@ -249,7 +256,7 @@ impl<'a> TypedHirContext<'a> {
         Some(field.id)
     }
 
-    pub(crate) fn get_type_modifier(&self, ty: LazyTypeId) -> Option<TypeModifier>  {
+    pub(crate) fn get_type_modifier(&self, ty: LazyTypeId) -> Option<TypeModifier> {
         if ty == LazyTypeId::error() {
             return None;
         }
@@ -268,7 +275,7 @@ impl<'a> TypedHirContext<'a> {
 
     pub(crate) fn is_mutable_or_modifier_none(&self, ty: LazyTypeId) -> bool {
         let Some(modifier) = self.get_type_modifier(ty) else {
-            return true
+            return true;
         };
 
         modifier == TypeModifier::Mut

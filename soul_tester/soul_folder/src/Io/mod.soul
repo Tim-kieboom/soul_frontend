@@ -6,14 +6,16 @@ import (
 PrintAssert(
     condition: bool, 
     msg: [@]char = "", 
-    line: int = intrinsic.InLine(),
-    file: [@]char = intrinsic.InFile(), 
+    line: int = intrinsic.InLine(), 
+    file: [@]char = intrinsic.InFile(),
 ) {
 
-    if condition == true {
-        return
+    if condition == false {
+        PrintAssertMsg(msg, line, file)
     }
+}
 
+PrintAssertMsg(msg: [@]char, line: int, file: [@]char) {
     Print("|Assert FAILED at ")
     Print(file)
     Print_char(':')

@@ -341,6 +341,11 @@ impl<'a> MirDisplayer<'a> {
                 self.display_local_name(*local_id);
                 self.push(')');
             }
+            mir::StatementKind::Exit { exit_code } => {
+                self.push_str("intrinsic.Exit(");
+                self.display_operand(exit_code);
+                self.push(')');
+            }
         }
     }
 

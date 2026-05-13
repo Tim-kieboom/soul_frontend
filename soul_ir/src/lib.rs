@@ -22,13 +22,13 @@ use soul_utils::{
 
 mod block;
 mod function;
+mod internal_functions;
 mod ir_type;
 mod llvm_builder;
 mod local;
 mod statement;
 mod utils;
 mod value;
-mod internal_functions;
 
 use typed_hir::{ThirType, ThirTypeKind, TypedHir};
 use utils::*;
@@ -157,15 +157,15 @@ pub struct LlvmBackend<'f, 'a> {
     temps: HashMap<(FunctionKeyId, TempId), IrOperand<'a>>,
     locals: HashMap<(FunctionKeyId, LocalId), Local<'a>>,
     blocks: HashMap<(FunctionKeyId, BlockId), BasicBlock<'a>>,
-    
+
     structs: StructStore<'a>,
     function_keys: FunctionKeyStore,
     functions: VecMap<FunctionKeyId, FunctionValue<'a>>,
-    
+
     field_indexs: RefCell<VecMap<FieldId, usize>>,
     strings: RefCell<HashMap<String, GlobalValue<'a>>>,
     lowered_types: RefCell<VecMap<TypeId, Option<BasicTypeEnum<'a>>>>,
-    
+
     faults: &'f mut Vec<SementicFault>,
 }
 

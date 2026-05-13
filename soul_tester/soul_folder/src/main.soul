@@ -2,22 +2,22 @@ import (
     crate.Io
     crate.Test
     crate.Mem.Slice.{Index}
+    crate.Assertions.{Assert}
 )
 
 main() {
-
     string := "tim"
     if string == "tim" {
         Io.Println("is tim!!")
     }
 
-    x := match 5 {
-        10 => "10"
-        5 => {
-            Io.Println("early return")
-            return
-        }
-        _ => "other"
-    }
-    Io.Println(x)
+    // x := match 5 {
+    //     10 => "10"
+    //     5 => {
+    //         Io.Println("early return")
+    //         return
+    //     }
+    //     _ => "other"
+    // }
+    // Io.Println(x)
 }

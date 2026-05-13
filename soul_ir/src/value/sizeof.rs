@@ -1,22 +1,20 @@
 use ast::ArrayKind;
 use hir::{StructId, TypeId};
-use soul_utils::{error::{SoulError, SoulErrorKind, SoulResult}, soul_error_internal};
+use soul_utils::{
+    error::{SoulError, SoulErrorKind, SoulResult},
+    soul_error_internal,
+};
 use typed_hir::{Field, ThirTypeKind, display_thir::DisplayThirType};
 
 use crate::{LlvmBackend, utils::GenericSubstitute};
 
 impl<'f, 'a> LlvmBackend<'f, 'a> {
-    
     pub(crate) fn sizeof(&self, sizeof: TypeId, generics: &GenericSubstitute) -> SoulResult<u32> {
         self.sizeof_bit(sizeof, generics)
             .map(|sizeof| sizeof.bits / 8)
     }
 
-    fn sizeof_bit(
-        &self,
-        sizeof: TypeId,
-        generics: &GenericSubstitute,
-    ) -> SoulResult<Sizeof> {
+    fn sizeof_bit(&self, sizeof: TypeId, generics: &GenericSubstitute) -> SoulResult<Sizeof> {
         let sizeof = self.get_type(sizeof)?;
 
         if !sizeof.generics.is_empty() {
@@ -48,14 +46,21 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             ThirTypeKind::Primitive(primitive_types) => {
                 let size =
                     primitive_types.to_size_bit_u8(c_int as u8, int as u8, char as u8) as u32;
-                let alignment = Alignment::from_bits(size)
-                    .expect(&format!("should be value in alignment, size: {}, type {:?}", size, primitive_types));
-                
-                Sizeof { bits: size, alignment }
+                let alignment = Alignment::from_bits(size).expect(&format!(
+                    "should be value in alignment, size: {}, type {:?}",
+                    size, primitive_types
+                ));
+
+                Sizeof {
+                    bits: size,
+                    alignment,
+                }
             }
             ThirTypeKind::Array { kind, element } => {
                 let size = match kind {
-                    ArrayKind::StackArray(num) => num as u32 * self.sizeof_bit(element, generics)?.bits,
+                    ArrayKind::StackArray(num) => {
+                        num as u32 * self.sizeof_bit(element, generics)?.bits
+                    }
                     _ => int + ptr,
                 };
                 Sizeof {
@@ -136,9 +141,11 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             size = (size + align - 1) / align * align;
         }
 
-        Ok(Sizeof { bits: size, alignment })
+        Ok(Sizeof {
+            bits: size,
+            alignment,
+        })
     }
-    
 }
 
 pub(crate) struct Sizeof {

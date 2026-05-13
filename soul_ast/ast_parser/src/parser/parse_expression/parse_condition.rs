@@ -1,9 +1,12 @@
-use ast::{Block, ElseKind, Expression, ExpressionKind, If, IfArm, IfArmHelper, Literal, Match, MatchArm, MatchPattern, While};
+use ast::{
+    Block, ElseKind, Expression, ExpressionKind, If, IfArm, IfArmHelper, Literal, Match, MatchArm,
+    MatchPattern, While,
+};
 use soul_tokenizer::{Number, TokenKind};
 use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},
     soul_names::{KeyWord, TypeModifier},
-    span::{Spanned},
+    span::Spanned,
     symbool_kind::SymbolKind,
 };
 

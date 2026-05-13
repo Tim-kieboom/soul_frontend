@@ -1,7 +1,7 @@
 use ast::{ArrayContructor, ArrayKind, FieldAccess, Literal};
 use ast::{AsTypeCast, VarTypeKind, scope::NodeId};
 use hir::{
-    CustomTypeId, EnumId, ExpressionId, HirType, HirTypeKind, LocalId, Place, PlaceKind, Terminator
+    CustomTypeId, EnumId, ExpressionId, HirType, HirTypeKind, LocalId, Place, PlaceKind, Terminator,
 };
 use soul_utils::soul_error_internal;
 use soul_utils::{
@@ -209,7 +209,11 @@ impl<'a> HirContext<'a> {
     ) -> hir::Expression {
         let (values, element_ty) = match any_array {
             ast::AnyArray::ArrayLiteral(arr) => {
-                let values: Vec<_> = arr.values.iter().map(|v| self.lower_expression(v)).collect();
+                let values: Vec<_> = arr
+                    .values
+                    .iter()
+                    .map(|v| self.lower_expression(v))
+                    .collect();
                 let element_ty = values
                     .first()
                     .map(|v| self.tree.nodes.expressions[*v].ty)
@@ -243,7 +247,10 @@ impl<'a> HirContext<'a> {
         hir::Expression {
             id,
             ty: hir::LazyTypeId::Known(ty),
-            kind: hir::ExpressionKind::NewArray { values, ptr_type: ptr_ty },
+            kind: hir::ExpressionKind::NewArray {
+                values,
+                ptr_type: ptr_ty,
+            },
         }
     }
 
@@ -308,12 +315,11 @@ impl<'a> HirContext<'a> {
         is_mutable: &bool,
         span: Span,
     ) -> hir::Expression {
-
         // `&*expr` / `@*expr`: use a PlaceKind::Deref directly instead of
         // eagerly loading the deref into a temp and taking its address,
         // which would lose the original pointer identity.
         if let ast::ExpressionKind::Deref { inner, .. } = &expression.node {
-            return self.cast_pointer_to_ref(inner, id, *is_mutable, span)
+            return self.cast_pointer_to_ref(inner, id, *is_mutable, span);
         }
 
         let inner = self.lower_expression(expression);
@@ -364,24 +370,28 @@ impl<'a> HirContext<'a> {
     /// Special case: `@*expr` or `&*expr` — create a PlaceKind::Deref directly
     /// instead of eagerly loading the deref into a temp and taking
     /// the address of that temp (which loses the original pointer).
-    fn cast_pointer_to_ref(&mut self, deref_inner: &ast::Expression, id: ExpressionId, is_mutable: bool, span: Span) -> hir::Expression {
+    fn cast_pointer_to_ref(
+        &mut self,
+        deref_inner: &ast::Expression,
+        id: ExpressionId,
+        is_mutable: bool,
+        span: Span,
+    ) -> hir::Expression {
         let inner_expr = self.lower_expression(deref_inner);
         let inner_ty = self.tree.nodes.expressions[inner_expr].ty;
 
         let inner_place_kind = match &deref_inner.node {
-            ast::ExpressionKind::Variable { ident, .. } => {
-                match self.find_local(&ident) {
-                    Some(local) => PlaceKind::Local(local),
-                    None => {
-                        self.log_error(SoulError::new(
-                            format!("'{}' not found in scope", ident.as_str()),
-                            SoulErrorKind::NotFoundInScope,
-                            Some(ident.span),
-                        ));
-                        PlaceKind::Local(LocalId::error())
-                    }
+            ast::ExpressionKind::Variable { ident, .. } => match self.find_local(&ident) {
+                Some(local) => PlaceKind::Local(local),
+                None => {
+                    self.log_error(SoulError::new(
+                        format!("'{}' not found in scope", ident.as_str()),
+                        SoulErrorKind::NotFoundInScope,
+                        Some(ident.span),
+                    ));
+                    PlaceKind::Local(LocalId::error())
                 }
-            }
+            },
             _ => {
                 let temp_local = self.id_generator.alloc_local();
                 let variable = hir::Variable { local: temp_local };
@@ -390,19 +400,11 @@ impl<'a> HirContext<'a> {
             }
         };
 
-        let inner_place = Place::new(
-            self.id_generator.alloc_place(),
-            inner_place_kind,
-            span,
-        );
+        let inner_place = Place::new(self.id_generator.alloc_place(), inner_place_kind, span);
         let inner_place_id = self.insert_place(inner_place);
 
         let deref_place_id = self.id_generator.alloc_place();
-        let deref_place = Place::new(
-            deref_place_id,
-            PlaceKind::Deref(inner_place_id),
-            span,
-        );
+        let deref_place = Place::new(deref_place_id, PlaceKind::Deref(inner_place_id), span);
         let deref_place_id = self.insert_place(deref_place);
 
         let of_type = self.new_infer_type(vec![], None, span);

@@ -35,6 +35,7 @@ impl<'a> HirContext<'a> {
         let mut generics = vec![];
         let modifier = ty.modifier;
         let kind = match &ty.kind {
+            ast::TypeKind::Never => HirTypeKind::Never,
             ast::TypeKind::None => HirTypeKind::None,
             ast::TypeKind::Type => HirTypeKind::Type,
             ast::TypeKind::Stub(Stub {

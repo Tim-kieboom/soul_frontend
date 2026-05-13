@@ -218,6 +218,7 @@ fn owner_hint_from_expression(
         ExpressionKind::FunctionCall(function_call) => {
             if let Some(intrinsic) = function_call.intrinsic {
                 return match intrinsic {
+                    ast::Intrinsic::Exit => Some(TypeKind::Never),
                     ast::Intrinsic::InFile => Some(TypeKind::Primitive(PrimitiveTypes::CStr)),
                     ast::Intrinsic::InLine => Some(TypeKind::Primitive(PrimitiveTypes::Int)),
                     ast::Intrinsic::PtrOffset => None,

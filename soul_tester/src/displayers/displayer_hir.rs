@@ -217,15 +217,16 @@ impl<'a> HirDisplayer<'a> {
 
         self.display_depth();
         self.push('}');
-        
+
         if let Some(typed) = self.typed {
             self.push_str("<as: ");
-            let ty = typed.types_table
+            let ty = typed
+                .types_table
                 .blocks
                 .get(*id)
                 .copied()
                 .unwrap_or(TypeId::error());
-            
+
             self.display_type(ty.to_lazy());
             self.push('>');
         };
@@ -273,7 +274,6 @@ impl<'a> HirDisplayer<'a> {
 
         match &value.kind {
             hir::ExpressionKind::Array(array) => {
-
                 if let Some(ty) = array.collection_type {
                     self.display_type(ty);
                     self.push(':');
@@ -397,7 +397,9 @@ impl<'a> HirDisplayer<'a> {
                 for arm in arms {
                     self.display_depth();
                     match &arm.pattern {
-                        hir::MatchPatternHir::Literal(literal) => self.push_fmt(format_args!("{} => ", literal.value_to_string())),
+                        hir::MatchPatternHir::Literal(literal) => {
+                            self.push_fmt(format_args!("{} => ", literal.value_to_string()))
+                        }
                         hir::MatchPatternHir::Wildcard => self.push_str("_ => "),
                     }
 
@@ -505,9 +507,14 @@ impl<'a> HirDisplayer<'a> {
                 }
                 self.push(']');
             }
-            &hir::ExpressionKind::Drop { value } => {
+            hir::ExpressionKind::Drop { value } => {
                 self.push_str("intrinsic.Drop(");
                 self.display_expression(&value);
+                self.push(')');
+            }
+            hir::ExpressionKind::Exit { exit_code } => {
+                self.push_str("intrinsic.Exit(");
+                self.display_expression(exit_code);
                 self.push(')');
             }
         };

@@ -1,6 +1,9 @@
 use ast::Literal;
 
-use crate::{MirContext, mir::{self, BlockId}};
+use crate::{
+    MirContext,
+    mir::{self, BlockId},
+};
 
 impl<'a> MirContext<'a> {
     pub(super) fn lower_while(
@@ -309,11 +312,14 @@ impl<'a> MirContext<'a> {
         let join_bb = self.new_block();
         self.tree.blocks[join_bb].returnable = returnable;
 
-        self.insert_terminator(parent_bb, mir::Terminator::SwitchInt {
-            discriminant: scrutinee_op,
-            targets,
-            otherwise,
-        });
+        self.insert_terminator(
+            parent_bb,
+            mir::Terminator::SwitchInt {
+                discriminant: scrutinee_op,
+                targets,
+                otherwise,
+            },
+        );
 
         if let Some(target_place) = self.current.target_place {
             for (arm_bb, hir_body) in arm_blocks {
@@ -323,7 +329,8 @@ impl<'a> MirContext<'a> {
                 let end_block = self.expect_current_block();
 
                 if !*arm_end {
-                    if let Some(value) = value.filter(|v| !matches!(v.kind, mir::OperandKind::None)) {
+                    if let Some(value) = value.filter(|v| !matches!(v.kind, mir::OperandKind::None))
+                    {
                         self.push_statement_from(
                             mir::Statement::new(mir::StatementKind::Assign {
                                 place: target_place,
@@ -344,7 +351,7 @@ impl<'a> MirContext<'a> {
 
             self.current.block = Some(join_bb);
             return mir::Operand::new(ty, mir::OperandKind::None);
-        } 
+        }
 
         let mut temp: Option<mir::TempId> = None;
         for (arm_bb, hir_body) in arm_blocks {

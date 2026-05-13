@@ -73,6 +73,7 @@ impl<'a> LiteralInterpreter<'a> {
             | hir::ExpressionKind::Ref { .. }
             | hir::ExpressionKind::Call { .. }
             | hir::ExpressionKind::Cast { .. }
+            | hir::ExpressionKind::Exit { .. }
             | hir::ExpressionKind::Function(_)
             | hir::ExpressionKind::While { .. }
             | hir::ExpressionKind::EnumVariant { .. }
@@ -84,9 +85,7 @@ impl<'a> LiteralInterpreter<'a> {
             | hir::ExpressionKind::Drop { .. }
             | hir::ExpressionKind::Match { .. } => None,
 
-            hir::ExpressionKind::Array(array) => {
-                self.interpret_array(array, expression_id)
-            }
+            hir::ExpressionKind::Array(array) => self.interpret_array(array, expression_id),
 
             hir::ExpressionKind::StructConstructor { ty, values, .. } => {
                 self.interpret_struct_contructor(*ty, values, expression_id)
@@ -111,9 +110,13 @@ impl<'a> LiteralInterpreter<'a> {
         }
     }
 
-    fn interpret_array(&self, array: &hir::Array, expression_id: ExpressionId) -> Option<ComplexLiteral> {
+    fn interpret_array(
+        &self,
+        array: &hir::Array,
+        expression_id: ExpressionId,
+    ) -> Option<ComplexLiteral> {
         if let Some(_) = array.collection_type {
-            return None
+            return None;
         }
 
         let mut values = Vec::with_capacity(array.values.len());
@@ -122,9 +125,7 @@ impl<'a> LiteralInterpreter<'a> {
         }
 
         let array_type = self.types.types_table.expressions[expression_id];
-        Some(
-            ComplexLiteral::Array { array_type, values }
-        )
+        Some(ComplexLiteral::Array { array_type, values })
     }
 
     fn interpret_struct_contructor(

@@ -23,10 +23,11 @@ impl<'a> TypedHirContext<'a> {
         let blocks = take(&mut self.blocks);
 
         let table = typed_hir::TypeTable {
-            none_type: self.none_type,
-            never_type: self.never_type,
-            bool_type: self.bool_type,
-            u32_type: self.u32_type,
+            none_type: self.common_types.none_type,
+            never_type: self.common_types.never_type,
+            bool_type: self.common_types.bool_type,
+            u32_type: self.common_types.u32_type,
+            c_int_type: self.common_types.c_int_type,
             index_type: self.add_type(HirType::index_type()),
 
             expressions: self.resolve_map(expressions),

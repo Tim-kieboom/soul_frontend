@@ -1,18 +1,22 @@
-use std::path::{Path, PathBuf};
-
 use serde::Deserialize;
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SoulToml {
     pub package: Package,
+
     #[serde(default)]
-    pub dependencies: std::collections::HashMap<String, Dependency>,
+    pub dependencies: HashMap<String, Dependency>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Package {
     pub name: String,
     pub version: String,
+
     #[serde(default)]
     pub edition: String,
 }

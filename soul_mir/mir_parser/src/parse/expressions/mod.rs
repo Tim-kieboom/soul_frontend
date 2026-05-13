@@ -2,7 +2,9 @@ use ast::Literal;
 use hir::{Binary, ComplexLiteral, CustomTypeId, ExpressionId, StructId, TypeId, Unary};
 use hir_literal_interpreter::ToComplex;
 use soul_utils::{
-    Ident, Span, ids::{FunctionId, IdAlloc}, soul_error_internal
+    Ident, Span,
+    ids::{FunctionId, IdAlloc},
+    soul_error_internal,
 };
 use typed_hir::{Field, Struct, ThirTypeKind};
 use typed_hir_parser::UnifyPrimitiveCast;
@@ -30,7 +32,13 @@ impl<'a> MirContext<'a> {
         let operand = match &value.kind {
             hir::ExpressionKind::Array(_) => {
                 self.log_error(soul_error_internal!("mir Array not yet impl", Some(span)));
-                mir::Operand::new(value_type, mir::OperandKind::Comptime(ComplexLiteral::Array { array_type: value_type, values: vec![] }))
+                mir::Operand::new(
+                    value_type,
+                    mir::OperandKind::Comptime(ComplexLiteral::Array {
+                        array_type: value_type,
+                        values: vec![],
+                    }),
+                )
             }
             hir::ExpressionKind::Sizeof(_) => {
                 let ty = self.sizeof_type(value_id);
@@ -186,7 +194,6 @@ impl<'a> MirContext<'a> {
             }
 
             hir::ExpressionKind::Ref { place, mutable } => {
-
                 let place_id = self.lower_place(*place).pass(is_end);
 
                 mir::Operand::new(
@@ -281,15 +288,14 @@ impl<'a> MirContext<'a> {
             hir::ExpressionKind::While { condition, body } => {
                 self.lower_while(*condition, *body, is_end)
             }
-            hir::ExpressionKind::New(value) => {
-                self.lower_new_single(*value, value_type, is_end)
-            }
+            hir::ExpressionKind::New(value) => self.lower_new_single(*value, value_type, is_end),
             hir::ExpressionKind::NewArray { values, ptr_type } => {
                 self.lower_new_array(values, *ptr_type, value_type, span, is_end)
             }
             hir::ExpressionKind::Drop { value } => {
                 self.lower_drop(*value, value_type, span, is_end)
             }
+            hir::ExpressionKind::Exit { exit_code } => self.lower_exit(*exit_code, is_end),
             hir::ExpressionKind::Match { scrutinee, arms } => {
                 self.lower_match(*scrutinee, arms, value_type, is_end)
             }
@@ -302,7 +308,12 @@ impl<'a> MirContext<'a> {
         EndBlock::new(operand, is_end)
     }
 
-    fn lower_new_single(&mut self, value_id: hir::ExpressionId, heap_ptr_type: TypeId, is_end: &mut bool) -> mir::Operand {
+    fn lower_new_single(
+        &mut self,
+        value_id: hir::ExpressionId,
+        heap_ptr_type: TypeId,
+        is_end: &mut bool,
+    ) -> mir::Operand {
         let inner = self.lower_operand(value_id).pass(is_end);
         let inner_ty = self.expression_type(value_id);
         let ptr_temp = self.new_temp(heap_ptr_type);
@@ -319,8 +330,7 @@ impl<'a> MirContext<'a> {
         });
         self.push_statement(heap_stmt);
 
-        let ptr_operand =
-            mir::Operand::new(heap_ptr_type, mir::OperandKind::Temp(ptr_temp));
+        let ptr_operand = mir::Operand::new(heap_ptr_type, mir::OperandKind::Temp(ptr_temp));
         let store_place = self.new_place(mir::Place::new(
             mir::PlaceKind::Deref(ptr_operand),
             inner_ty,
@@ -334,13 +344,23 @@ impl<'a> MirContext<'a> {
         mir::Operand::new(heap_ptr_type, mir::OperandKind::Temp(ptr_temp))
     }
 
-    fn lower_new_array(&mut self, values: &Vec<ExpressionId>, ptr_type: TypeId, array_type: TypeId, span: Span, is_end: &mut bool) -> mir::Operand {
+    fn lower_new_array(
+        &mut self,
+        values: &Vec<ExpressionId>,
+        ptr_type: TypeId,
+        array_type: TypeId,
+        span: Span,
+        is_end: &mut bool,
+    ) -> mir::Operand {
         let count = values.len() as u64;
 
         let element_type = match self.id_to_type(array_type).kind {
             ThirTypeKind::Array { element, .. } => element,
             _ => {
-                self.log_error(soul_error_internal!("array type should be ThirTypeKind::Array", Some(span)));
+                self.log_error(soul_error_internal!(
+                    "array type should be ThirTypeKind::Array",
+                    Some(span)
+                ));
                 TypeId::error()
             }
         };
@@ -348,10 +368,7 @@ impl<'a> MirContext<'a> {
         let ptr_temp = self.new_temp(ptr_type);
 
         let heap_stmt = mir::Statement::new(mir::StatementKind::Assign {
-            place: self.new_place(mir::Place::new(
-                mir::PlaceKind::Temp(ptr_temp),
-                ptr_type,
-            )),
+            place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(ptr_temp), ptr_type)),
             value: mir::Rvalue::new(mir::RvalueKind::HeapAlloc {
                 ty: element_type,
                 count,
@@ -364,12 +381,9 @@ impl<'a> MirContext<'a> {
             let offset_type = self.hir_response.typed.types_table.u32_type;
             let offset_op = mir::Operand::new(
                 offset_type,
-                mir::OperandKind::Comptime(ComplexLiteral::Basic(
-                    Literal::Uint(i as u128),
-                )),
+                mir::OperandKind::Comptime(ComplexLiteral::Basic(Literal::Uint(i as u128))),
             );
-            let ptr_operand =
-                mir::Operand::new(ptr_type, mir::OperandKind::Temp(ptr_temp));
+            let ptr_operand = mir::Operand::new(ptr_type, mir::OperandKind::Temp(ptr_temp));
             let elem_ptr_temp = self.new_temp(ptr_type);
 
             let offset_stmt = mir::Statement::new(mir::StatementKind::Assign {
@@ -384,10 +398,7 @@ impl<'a> MirContext<'a> {
             });
             self.push_statement(offset_stmt);
 
-            let elem_ptr = mir::Operand::new(
-                ptr_type,
-                mir::OperandKind::Temp(elem_ptr_temp),
-            );
+            let elem_ptr = mir::Operand::new(ptr_type, mir::OperandKind::Temp(elem_ptr_temp));
             let store_place = self.new_place(mir::Place::new(
                 mir::PlaceKind::Deref(elem_ptr),
                 element_type,
@@ -404,9 +415,7 @@ impl<'a> MirContext<'a> {
         let len_type = self.hir_response.typed.types_table.u32_type;
         let const_len = mir::Operand::new(
             len_type,
-            mir::OperandKind::Comptime(ComplexLiteral::Basic(
-                Literal::Uint(count as u128),
-            )),
+            mir::OperandKind::Comptime(ComplexLiteral::Basic(Literal::Uint(count as u128))),
         );
 
         let aggregate = mir::Rvalue::new(mir::RvalueKind::Aggregate {
@@ -429,17 +438,30 @@ impl<'a> MirContext<'a> {
         mir::Operand::new(array_type, mir::OperandKind::Temp(result_temp))
     }
 
-    fn lower_drop(&mut self, value_id: hir::ExpressionId, value_type: TypeId, span: Span, is_end: &mut bool) -> mir::Operand {
+    fn lower_drop(
+        &mut self,
+        value_id: hir::ExpressionId,
+        value_type: TypeId,
+        span: Span,
+        is_end: &mut bool,
+    ) -> mir::Operand {
         let value = self.lower_operand(value_id).pass(is_end);
 
         let temp_id = self.new_temp(value_type);
         let drop_stmt = mir::Statement::new(mir::StatementKind::Assign {
-            place: self.new_place(mir::Place::new(
-                mir::PlaceKind::Temp(temp_id),
-                value_type,
-            )),
+            place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp_id), value_type)),
             value: mir::Rvalue::new(mir::RvalueKind::Drop { value, span }),
         });
+        self.push_statement(drop_stmt);
+
+        let none_type = self.hir_response.typed.types_table.none_type;
+        mir::Operand::new(none_type, mir::OperandKind::None)
+    }
+
+    fn lower_exit(&mut self, exit_code_id: hir::ExpressionId, is_end: &mut bool) -> mir::Operand {
+        let exit_code = self.lower_operand(exit_code_id).pass(is_end);
+
+        let drop_stmt = mir::Statement::new(mir::StatementKind::Exit { exit_code });
         self.push_statement(drop_stmt);
 
         let none_type = self.hir_response.typed.types_table.none_type;

@@ -1,6 +1,6 @@
 use inkwell::values::BasicValueEnum;
 use mir_parser::mir::{
-    BlockId, OperandKind, PlaceId, PlaceKind, Rvalue, RvalueKind, StatementKind,
+    BlockId, Operand, OperandKind, PlaceId, PlaceKind, Rvalue, RvalueKind, StatementKind,
 };
 use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},
@@ -25,6 +25,11 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                         self.log_error(err);
                     }
                 }
+                StatementKind::Exit { exit_code } => {
+                    if let Err(err) = self.lower_exit(exit_code, generics) {
+                        self.log_error(err);
+                    }
+                }
                 StatementKind::Call {
                     id,
                     arguments,
@@ -43,6 +48,16 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         }
     }
 
+    fn lower_exit(&mut self, exit_code: &Operand, generics: &GenericSubstitute) -> SoulResult<()> {
+        let Some(exit) = self.internal_functions.exit_function else {
+            return Err(soul_error_internal!("exit function is not defined", None));
+        };
+
+        let code = self.lower_operand(exit_code, generics)?.value;
+        self.builder.build_call(exit, &[code.into()])?;
+        Ok(())
+    }
+
     fn lower_assign(
         &mut self,
         place_id: PlaceId,
@@ -55,7 +70,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
         let ty = self.mir.tree.places[place_id].ty;
         let Some(ir_value) = self.lower_rvalue(value, ty, generics)? else {
-            return Ok(()) // for valueless rvalues like intrinsic.Drop
+            return Ok(()); // for valueless rvalues like intrinsic.Drop
         };
 
         match &self.mir.tree.places[place_id].kind {

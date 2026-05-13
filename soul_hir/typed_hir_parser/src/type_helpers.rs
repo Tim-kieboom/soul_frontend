@@ -354,15 +354,11 @@ impl UnifyPrimitiveCast for ThirTypeKind {
         types: &ThirTypesMap,
         should_be: &Self,
     ) -> Result<(), MishmatchReason> {
-        if matches!(self, ThirTypeKind::Never)
-            || matches!(should_be, ThirTypeKind::Never)
-        {
+        if matches!(self, ThirTypeKind::Never) || matches!(should_be, ThirTypeKind::Never) {
             return Ok(());
         }
 
-        if matches!(self, ThirTypeKind::Error)
-            || matches!(should_be, ThirTypeKind::Error)
-        {
+        if matches!(self, ThirTypeKind::Error) || matches!(should_be, ThirTypeKind::Error) {
             return Ok(());
         }
 

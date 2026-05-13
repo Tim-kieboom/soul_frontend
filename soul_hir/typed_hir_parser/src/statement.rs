@@ -42,7 +42,7 @@ impl<'a> TypedHirContext<'a> {
     pub(crate) fn infer_statement(&mut self, statement: &Statement) {
         let ty = match &statement.kind {
             StatementKind::Assign(assign) => self.infer_assign(assign).to_lazy(),
-            StatementKind::Break | StatementKind::Continue => self.none_type.to_lazy(),
+            StatementKind::Break | StatementKind::Continue => self.common_types.none_type.to_lazy(),
             StatementKind::Variable(variable) => {
                 self.infer_variable(variable, self.statement_span(statement.id))
             }
@@ -61,7 +61,7 @@ impl<'a> TypedHirContext<'a> {
 
             StatementKind::Return(value) => match *value {
                 Some(val) => self.infer_expression(val),
-                None => self.none_type.to_lazy(),
+                None => self.common_types.none_type.to_lazy(),
             },
         };
 
@@ -72,11 +72,11 @@ impl<'a> TypedHirContext<'a> {
         let place_span = self.place_span(assign.place);
         let expected = self.infer_place(assign.place);
         if !self.is_mutable_or_modifier_none(expected) {
-            
-            let modifier_str = self.get_type_modifier(expected)
+            let modifier_str = self
+                .get_type_modifier(expected)
                 .map(|m| m.as_str())
                 .unwrap_or("<empty>");
-            
+
             self.log_error(SoulError::new(
                 format!("trying to reassign but typeModifier is '{modifier_str}' (make it 'mut' instead)"),
                 SoulErrorKind::InvalidMutability,
@@ -150,7 +150,7 @@ impl<'a> TypedHirContext<'a> {
                 let span = self.statement_span(statement.id);
                 let got = match value {
                     Some(val) => self.infer_expression(val),
-                    None => self.none_type.to_lazy(),
+                    None => self.common_types.none_type.to_lazy(),
                 };
 
                 let value = value.unwrap_or(ExpressionId::error());
@@ -167,9 +167,9 @@ impl<'a> TypedHirContext<'a> {
             Some(ty) => ty,
             None => {
                 if !returnable && self.block_has_return(block) {
-                    self.never_type.to_lazy()
+                    self.common_types.never_type.to_lazy()
                 } else {
-                    self.none_type.to_lazy()
+                    self.common_types.none_type.to_lazy()
                 }
             }
         };
@@ -181,9 +181,10 @@ impl<'a> TypedHirContext<'a> {
         if matches!(block.terminator, Some(Terminator::Return(_))) {
             return true;
         }
-        block.statements.iter().any(|s| {
-            matches!(s.kind, hir::StatementKind::Return(_))
-        })
+        block
+            .statements
+            .iter()
+            .any(|s| matches!(s.kind, hir::StatementKind::Return(_)))
     }
 
     fn handle_block_terminator(
@@ -194,7 +195,7 @@ impl<'a> TypedHirContext<'a> {
     ) {
         if let Some(terminator) = block.terminator {
             if matches!(terminator, Terminator::Return(_)) && !returnable {
-                *return_type = Some(self.never_type.to_lazy());
+                *return_type = Some(self.common_types.never_type.to_lazy());
                 return;
             }
 

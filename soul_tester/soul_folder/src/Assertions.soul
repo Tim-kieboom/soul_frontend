@@ -1,0 +1,16 @@
+import (
+    .Io.{PrintAssertMsg}
+)
+
+Assert(
+    condition: bool, 
+    msg: [@]char = "", 
+    line: int = intrinsic.InLine(), 
+    file: [@]char = intrinsic.InFile(),
+) {
+
+    if condition == false {
+        PrintAssertMsg(msg, line, file)
+        intrinsic.Exit(1)
+    }
+}

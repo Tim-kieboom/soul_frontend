@@ -6,14 +6,12 @@ use inkwell::{
     AddressSpace,
     module::Linkage,
     types::{ArrayType, BasicType, StructType},
-    values::{ArrayValue, AsValueRef, BasicValue, BasicValueEnum, GlobalValue, PointerValue, StructValue},
+    values::{
+        ArrayValue, AsValueRef, BasicValue, BasicValueEnum, GlobalValue, PointerValue, StructValue,
+    },
 };
 use mir_parser::mir::{Operand, OperandKind, PlaceId, PlaceKind};
-use soul_utils::{
-    error::{SoulResult},
-    soul_error_internal,
-    soul_names::PrimitiveSize,
-};
+use soul_utils::{error::SoulResult, soul_error_internal, soul_names::PrimitiveSize};
 use typed_hir::{ThirTypeKind, display_thir::DisplayThirType};
 
 use crate::{GenericSubstitute, IrOperand, LlvmBackend, OperandInfo};
@@ -72,9 +70,16 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 #[cfg(debug_assertions)]
                 panic!();
 
-                #[cfg(not(debug_assertions))] {
+                #[cfg(not(debug_assertions))]
+                {
                     let id = self.current.function_key();
-                    return Err(soul_error_internal!(format!("operand should be Some(_) {:?}", self.function_keys.id_to_key(id)), None));
+                    return Err(soul_error_internal!(
+                        format!(
+                            "operand should be Some(_) {:?}",
+                            self.function_keys.id_to_key(id)
+                        ),
+                        None
+                    ));
                 }
             }
         })
@@ -90,26 +95,37 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             ComplexLiteral::Basic(literal) => {
                 self.lower_basic_literal(literal, should_be, generics)
             }
-            ComplexLiteral::Array {
-                array_type,
-                values,
-            } => {
-
+            ComplexLiteral::Array { array_type, values } => {
                 let hir_array_type = self.get_type_kind(*array_type)?;
                 let element_type = match hir_array_type {
                     ThirTypeKind::Array { element, .. } => element,
-                    _ => return Err(soul_error_internal!("arrayType can only be of ThirTypeKind::Array", None)), 
+                    _ => {
+                        return Err(soul_error_internal!(
+                            "arrayType can only be of ThirTypeKind::Array",
+                            None
+                        ));
+                    }
                 };
 
                 let hir_should_type = self.get_type_kind(should_be)?;
                 match hir_should_type {
-                    ThirTypeKind::Array { element, .. } if self.get_type_kind(*element)? == self.get_type_kind(*element_type)? => (),
+                    ThirTypeKind::Array { element, .. }
+                        if self.get_type_kind(*element)?
+                            == self.get_type_kind(*element_type)? =>
+                    {
+                        ()
+                    }
                     _ => {
                         let array_str = hir_array_type.display(&self.types.types_map);
                         let should_str = hir_should_type.display(&self.types.types_map);
-                        return Err(soul_error_internal!(format!("should type does not match array type {array_str} != {should_str}", ), None)) 
+                        return Err(soul_error_internal!(
+                            format!(
+                                "should type does not match array type {array_str} != {should_str}",
+                            ),
+                            None
+                        ));
                     }
-                } 
+                }
 
                 self.create_const_array(*array_type, *element_type, values, generics)
             }
@@ -123,11 +139,17 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 match hir_should_type.kind {
                     ThirTypeKind::CustomTypes(CustomTypeId::Struct(id)) if id == *struct_id => (),
                     _ => {
-                        let struct_str = self.get_type(*struct_type)?.display(&self.types.types_map);
+                        let struct_str =
+                            self.get_type(*struct_type)?.display(&self.types.types_map);
                         let should_str = hir_should_type.display(&self.types.types_map);
-                        return Err(soul_error_internal!(format!("should type does not match struct type {struct_str} != {should_str}", ), None)) 
+                        return Err(soul_error_internal!(
+                            format!(
+                                "should type does not match struct type {struct_str} != {should_str}",
+                            ),
+                            None
+                        ));
                     }
-                } 
+                }
 
                 let struct_ir = self.get_or_create_struct(*struct_id, generics)?;
                 self.lower_const_aggregate(struct_ir, *struct_type, values, generics)
@@ -136,12 +158,11 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
     }
 
     fn lower_ref(&self, place: PlaceId, generics: &GenericSubstitute) -> SoulResult<IrOperand<'a>> {
-
         // For Deref places, the inner operand is the pointer we want the address of.
         // Skip the generic lower_place_to_operand path (which loads the *value*)
         // and store the pointer directly into a new alloca.
         if let PlaceKind::Deref(operand) = &self.mir.tree.places[place].kind {
-            return self.deref_place(operand, place, generics)  
+            return self.deref_place(operand, place, generics);
         }
 
         let inner = self.lower_place_to_operand(place, generics)?;
@@ -154,7 +175,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 ..
             } => {
                 let ptr = inner.value.into_pointer_value();
-                let loaded = self.builder.build_load(inner.info.ir_type, ptr, "heap_slice")?;
+                let loaded = self
+                    .builder
+                    .build_load(inner.info.ir_type, ptr, "heap_slice")?;
                 IrOperand {
                     value: loaded,
                     info: OperandInfo::new_loaded(inner.info.type_id, inner.info.ir_type),
@@ -194,7 +217,12 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
     /// For Deref places, use the inner pointer operand directly
     /// (the pointer IS the address of the deref'd location).
-    fn deref_place(&self, operand: &Operand, place: PlaceId, generics: &GenericSubstitute) -> SoulResult<IrOperand<'a>>  {
+    fn deref_place(
+        &self,
+        operand: &Operand,
+        place: PlaceId,
+        generics: &GenericSubstitute,
+    ) -> SoulResult<IrOperand<'a>> {
         let ptr_op = self.lower_operand(operand, generics)?;
         let ptr = ptr_op.value.into_pointer_value();
         let ptr_type = ptr.get_type();
@@ -243,7 +271,10 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     }
                     other => {
                         return Err(soul_error_internal!(
-                            format!("literal should be primitive type not {}", other.display_variant()),
+                            format!(
+                                "literal should be primitive type not {}",
+                                other.display_variant()
+                            ),
                             None
                         ));
                     }
@@ -356,10 +387,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         })
     }
 
-   
-
     fn const_string_slice(&self, text: &String) -> (StructType<'a>, StructValue<'a>) {
-        
         let strings = self.strings.borrow_mut();
         let global = match strings.get(text).copied() {
             Some(val) => val,
@@ -370,7 +398,11 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         self.fixed_array_to_const_slice(ptr, text.len() as u64)
     }
 
-    fn create_global_string(&self, text: &str, mut strings: RefMut<'_, HashMap<String, GlobalValue<'a>>>) -> GlobalValue<'a> {
+    fn create_global_string(
+        &self,
+        text: &str,
+        mut strings: RefMut<'_, HashMap<String, GlobalValue<'a>>>,
+    ) -> GlobalValue<'a> {
         let bytes = self.context.const_string(text.as_bytes(), true);
         let array_ty = bytes.get_type();
 
@@ -433,15 +465,13 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         )
     }
 
-
     fn create_const_array(
-        &self, 
-        array_type_id: TypeId, 
+        &self,
+        array_type_id: TypeId,
         element_type_id: TypeId,
-        values: &Vec<hir::ComplexLiteral>, 
+        values: &Vec<hir::ComplexLiteral>,
         generics: &GenericSubstitute,
     ) -> SoulResult<IrOperand<'a>> {
-        
         let array_type = self.resolve_array_type(array_type_id, generics)?;
 
         let mut elements: Vec<BasicValueEnum<'a>> = Vec::with_capacity(values.len());
@@ -450,26 +480,39 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             elements.push(operand.value);
         }
 
-        let array_value = unsafe {
-            ArrayValue::new_const_array(&array_type, &elements)
-        };
+        let array_value = unsafe { ArrayValue::new_const_array(&array_type, &elements) };
 
-        Ok(IrOperand { 
-            value: array_value.into(), 
+        Ok(IrOperand {
+            value: array_value.into(),
             info: OperandInfo::new_loaded(array_type_id, array_type.into()),
         })
     }
-    
-    fn resolve_array_type(&self, type_id: TypeId, generics: &GenericSubstitute) -> SoulResult<ArrayType<'a>> {
-        
+
+    fn resolve_array_type(
+        &self,
+        type_id: TypeId,
+        generics: &GenericSubstitute,
+    ) -> SoulResult<ArrayType<'a>> {
         let ty = self.get_type(type_id)?;
         let (element, len) = match &ty.kind {
-            ThirTypeKind::Array { element, kind: ArrayKind::StackArray(len) } => (element, len),
-            _ => return Err(soul_error_internal!("arrayType should be of ThirTypeKind::Array{kind: ArrayKind::StackArray, ..}", None)),
+            ThirTypeKind::Array {
+                element,
+                kind: ArrayKind::StackArray(len),
+            } => (element, len),
+            _ => {
+                return Err(soul_error_internal!(
+                    "arrayType should be of ThirTypeKind::Array{kind: ArrayKind::StackArray, ..}",
+                    None
+                ));
+            }
         };
 
-        let ir_type = self.lower_type(*element, generics)?
-            .ok_or(soul_error_internal!("elementType of array should be Some(_)", None))?;
+        let ir_type = self
+            .lower_type(*element, generics)?
+            .ok_or(soul_error_internal!(
+                "elementType of array should be Some(_)",
+                None
+            ))?;
 
         Ok(ir_type.array_type(*len as u32))
     }

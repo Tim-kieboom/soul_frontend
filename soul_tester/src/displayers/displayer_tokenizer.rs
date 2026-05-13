@@ -4,7 +4,7 @@ use anyhow::Result;
 use soul_tokenizer::{Token, TokenStream};
 use soul_utils::{error::SoulResult, sementic_level::SementicFault};
 
-use crate::{MESSAGE_CONFIG, convert_soul_error::ToAnyhow, paths::Paths};
+use crate::{displayers::displayer_soul_error::ToAnyhow, globals, paths::Paths};
 
 pub fn display_tokens<'a>(
     paths: &Paths,
@@ -27,7 +27,7 @@ pub fn display_tokens<'a>(
                 return Err(SementicFault::error(err).to_anyhow(
                     &Paths::to_entry_file_path(&manifest)?.path,
                     source_file,
-                    MESSAGE_CONFIG,
+                    globals::MESSAGE_CONFIG,
                 ));
             }
         };

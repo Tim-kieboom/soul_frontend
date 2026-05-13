@@ -5,7 +5,12 @@ use soul_utils::span::Span;
 use crate::HirContext;
 
 impl<'a> HirContext<'a> {
-    pub(super) fn lower_match(&mut self, id: ExpressionId, ast_match: &Match, span: Span) -> hir::Expression {
+    pub(super) fn lower_match(
+        &mut self,
+        id: ExpressionId,
+        ast_match: &Match,
+        span: Span,
+    ) -> hir::Expression {
         let scrutinee = self.lower_expression(&ast_match.scrutinee);
 
         let mut arms = Vec::new();

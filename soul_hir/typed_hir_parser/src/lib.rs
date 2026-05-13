@@ -58,6 +58,25 @@ pub fn lower_typed_hir<'a>(
     context.finalize()
 }
 
+struct CommonTypes {
+    c_int_type: TypeId,
+    u32_type: TypeId,
+    none_type: TypeId,
+    never_type: TypeId,
+    bool_type: TypeId,
+}
+impl CommonTypes {
+    pub fn error() -> Self {
+        Self {
+            u32_type: TypeId::error(),
+            none_type: TypeId::error(),
+            bool_type: TypeId::error(),
+            never_type: TypeId::error(),
+            c_int_type: TypeId::error(),
+        }
+    }
+}
+
 struct TypedHirContext<'a> {
     types: TypesMap,
     hir: &'a HirTree,
@@ -68,10 +87,7 @@ struct TypedHirContext<'a> {
     current_function: Option<FunctionId>,
     field_names: VecMap<FieldId, String>,
 
-    u32_type: TypeId,
-    none_type: TypeId,
-    never_type: TypeId,
-    bool_type: TypeId,
+    common_types: CommonTypes,
     places: VecMap<PlaceId, LazyTypeId>,
     locals: VecMap<LocalId, LazyTypeId>,
     blocks: VecMap<BlockId, LazyTypeId>,
@@ -103,14 +119,11 @@ impl<'a> TypedHirContext<'a> {
             infer_table: InferTable::new(&hir.info.infers),
 
             fields: VecMap::new(),
+            sizeofs: VecMap::new(),
             auto_copys: VecSet::new(),
-            none_type: TypeId::error(),
-            never_type: TypeId::error(),
-            bool_type: TypeId::error(),
-            u32_type: TypeId::error(),
             place_fields: VecMap::new(),
             generic_defines: VecMap::new(),
-            sizeofs: VecMap::new(),
+            common_types: CommonTypes::error(),
             places: VecMap::with_capacity(hir.nodes.places.len()),
             locals: VecMap::with_capacity(hir.nodes.locals.len()),
             blocks: VecMap::with_capacity(hir.nodes.blocks.len()),
@@ -119,10 +132,11 @@ impl<'a> TypedHirContext<'a> {
             functions: VecMap::with_capacity(hir.nodes.functions.len()),
             expressions: VecMap::with_capacity(hir.nodes.expressions.len()),
         };
-        this.none_type = this.add_type(HirType::none_type());
-        this.never_type = this.add_type(HirType::never_type());
-        this.bool_type = this.add_type(HirType::bool_type());
-        this.u32_type = this.add_type(HirType::primitive_type(PrimitiveTypes::Uint32));
+        this.common_types.none_type = this.add_type(HirType::none_type());
+        this.common_types.never_type = this.add_type(HirType::never_type());
+        this.common_types.bool_type = this.add_type(HirType::bool_type());
+        this.common_types.u32_type = this.add_type(HirType::primitive_type(PrimitiveTypes::Uint32));
+        this.common_types.c_int_type = this.add_type(HirType::primitive_type(PrimitiveTypes::CInt));
         this
     }
 

@@ -3,13 +3,12 @@ use inkwell::AddressSpace;
 use crate::LlvmBackend;
 
 impl<'f, 'a> LlvmBackend<'f, 'a> {
-
     pub(crate) fn initialize_internal_functions(&mut self) {
         self.declare_exit();
         self.declare_malloc();
         self.declare_free();
         self.declare_arraycmp();
-    } 
+    }
 
     fn declare_exit(&mut self) {
         let void_type = self.context.void_type();
@@ -50,10 +49,18 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         let ptr_type = self.context.ptr_type(AddressSpace::default());
 
         let memcmp_type = bool_type.fn_type(
-            &[u32_type.into(), ptr_type.into(), uint_type.into(), ptr_type.into(), uint_type.into()],
+            &[
+                u32_type.into(),
+                ptr_type.into(),
+                uint_type.into(),
+                ptr_type.into(),
+                uint_type.into(),
+            ],
             false,
         );
-        let arraycmp_fn = self.module.add_function("__clib_arrayEqual", memcmp_type, None);
+        let arraycmp_fn = self
+            .module
+            .add_function("__clib_arrayEqual", memcmp_type, None);
         arraycmp_fn.set_linkage(inkwell::module::Linkage::External);
         self.internal_functions.arraycmp_function = Some(arraycmp_fn);
     }

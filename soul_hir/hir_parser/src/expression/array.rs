@@ -1,6 +1,7 @@
 use hir::{ExpressionId, LazyTypeId};
 use soul_utils::{
-    Ident, span::{ItemMetaData, Span}
+    Ident,
+    span::{ItemMetaData, Span},
 };
 
 use crate::{HirContext, create_local_name};
@@ -12,20 +13,22 @@ impl<'a> HirContext<'a> {
         array: &ast::Array,
         span: Span,
     ) -> hir::Expression {
-
-        let collection_type = array.collection_type
-            .as_ref()
-            .map(|ty| self.lower_type(ty, span));
-        
-        let element_type = array.element_type
+        let collection_type = array
+            .collection_type
             .as_ref()
             .map(|ty| self.lower_type(ty, span));
 
-        let values = array.values
-        .iter()
-        .map(|value| self.lower_expression(value))
-        .collect();
-    
+        let element_type = array
+            .element_type
+            .as_ref()
+            .map(|ty| self.lower_type(ty, span));
+
+        let values = array
+            .values
+            .iter()
+            .map(|value| self.lower_expression(value))
+            .collect();
+
         let hir_array = hir::Array {
             collection_type,
             element_type,

@@ -1,7 +1,7 @@
 use hir::{StructId, TypeId};
-use soul_utils::{ids::IdAlloc, span::Span};
 #[cfg(debug_assertions)]
 use soul_utils::soul_error_internal;
+use soul_utils::{ids::IdAlloc, span::Span};
 
 use crate::{
     EndBlock, MirContext,
@@ -11,9 +11,9 @@ use crate::{
 impl<'a> MirContext<'a> {
     pub fn lower_place(&mut self, place_id: hir::PlaceId) -> EndBlock<mir::PlaceId> {
         let is_end = &mut false;
-        
+
         let span = self.place_span(place_id);
-        
+
         let mir_place = match &self.hir_response.hir.nodes.places[place_id].kind {
             hir::PlaceKind::Local(local_id) => {
                 let local_info = &self.hir_response.hir.nodes.locals[*local_id];
@@ -23,9 +23,7 @@ impl<'a> MirContext<'a> {
                     self.lower_local(*local_id, span)
                 }
             }
-            hir::PlaceKind::Temp(local_id) => {
-                self.lower_temp(*local_id, place_id)
-            }
+            hir::PlaceKind::Temp(local_id) => self.lower_temp(*local_id, place_id),
             hir::PlaceKind::Deref(inner) => {
                 let ty = self.place_type(place_id);
 

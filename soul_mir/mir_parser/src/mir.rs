@@ -191,6 +191,9 @@ pub enum StatementKind {
         return_place: Option<PlaceId>,
     },
 
+    Exit {
+        exit_code: Operand,
+    },
     StorageStart(Vec<LocalId>),
     StorageDead(LocalId),
 }
@@ -245,10 +248,16 @@ pub enum RvalueKind {
     },
 
     /// Heap allocation: allocates `count * Type.sizeof` bytes on the heap and returns `*ty`.
-    HeapAlloc { ty: TypeId, count: u64 },
+    HeapAlloc {
+        ty: TypeId,
+        count: u64,
+    },
 
     /// Drop: frees heap-allocated memory for pointer/heap-array types.
-    Drop { value: Operand, span: Span },
+    Drop {
+        value: Operand,
+        span: Span,
+    },
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

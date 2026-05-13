@@ -4,7 +4,14 @@ use ast::{
 };
 use soul_tokenizer::{Number, Token, TokenKind};
 use soul_utils::{
-    Ident, StringLiteral, error::{SoulError, SoulErrorKind, SoulResult}, precedence::Precedence, soul_error_internal, soul_names::{AccessType, KeyWord, Operator, TypeModifier}, span::{Span, Spanned}, symbool_kind::SymbolKind, try_result::{ToResult, TryError}
+    Ident, StringLiteral,
+    error::{SoulError, SoulErrorKind, SoulResult},
+    precedence::Precedence,
+    soul_error_internal,
+    soul_names::{AccessType, KeyWord, Operator, TypeModifier},
+    span::{Span, Spanned},
+    symbool_kind::SymbolKind,
+    try_result::{ToResult, TryError},
 };
 
 use crate::parser::{
@@ -30,7 +37,6 @@ impl<'a, 'f> Parser<'a, 'f> {
     ) -> SoulResult<Expression> {
         let start_span = self.token().span;
 
-        
         let mut prefix_ops = vec![];
         self.collect_prefix_operators(&mut prefix_ops, start_span);
 
@@ -127,7 +133,11 @@ impl<'a, 'f> Parser<'a, 'f> {
     /// (`.`, `()`, `[]`) bind tighter — which is standard language semantics.
     /// `@*expr` → outer `@` wraps the result of inner `*`; we apply them in
     /// reverse order below so the outermost prefix wraps the innermost.
-    fn collect_prefix_operators(&mut self, prefix_ops: &mut Vec<(Span, UnaryKinds)>, start_span: Span) {
+    fn collect_prefix_operators(
+        &mut self,
+        prefix_ops: &mut Vec<(Span, UnaryKinds)>,
+        start_span: Span,
+    ) {
         while let TokenKind::Symbol(symbol) = &self.token().kind {
             match self.expect_unary_kind(start_span, *symbol) {
                 Ok(unary_kind) => {
@@ -139,7 +149,11 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
     }
 
-    fn apply_prefix_operators(&mut self, mut left: Expression, prefix_ops: Vec<(Span, UnaryKinds)>) -> Expression {
+    fn apply_prefix_operators(
+        &mut self,
+        mut left: Expression,
+        prefix_ops: Vec<(Span, UnaryKinds)>,
+    ) -> Expression {
         for (span, unary) in prefix_ops.into_iter().rev() {
             left = match unary {
                 UnaryKinds::UnaryOperator(unary) => Expression::new_unary(unary, left, span),
@@ -244,7 +258,6 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     fn parse_primary_ident(&mut self, start_span: Span) -> SoulResult<Expression> {
-        
         if let Some(primary) = self.parse_primary_keyword(start_span)? {
             return Ok(primary);
         }
@@ -296,7 +309,6 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     fn parse_primary_keyword(&mut self, start_span: Span) -> SoulResult<Option<Expression>> {
-        
         let ident = self.try_token_as_ident_str()?;
         let keyword = match KeyWord::from_str(ident) {
             Some(val) => val,
@@ -311,29 +323,20 @@ impl<'a, 'f> Parser<'a, 'f> {
             KeyWord::True | KeyWord::False => {
                 let value = keyword == KeyWord::True;
                 self.bump();
-                Expression::new_literal(
-                    Literal::Bool(value),
-                    self.token().span,
-                )
+                Expression::new_literal(Literal::Bool(value), self.token().span)
             }
 
             KeyWord::Null => {
                 self.bump();
-                Expression::new(
-                    ExpressionKind::Null(None),
-                    self.token().span,
-                )
+                Expression::new(ExpressionKind::Null(None), self.token().span)
             }
 
-            KeyWord::Fall
-            | KeyWord::Break
-            | KeyWord::Return
-            | KeyWord::Continue => {
+            KeyWord::Fall | KeyWord::Break | KeyWord::Return | KeyWord::Continue => {
                 return Err(SoulError::new(
                     format!("can not have {} in expression", keyword.as_str()),
                     SoulErrorKind::InvalidContext,
                     Some(self.token().span),
-                ))
+                ));
             }
 
             KeyWord::New => {
@@ -341,11 +344,13 @@ impl<'a, 'f> Parser<'a, 'f> {
                 match &self.token().kind {
                     &ROUND_OPEN => self.parse_new_ptr(start_span)?,
                     &COLON => self.parse_new_array(start_span)?,
-                    _ => return Err(SoulError::new(
-                        "expected '(' or ':[' after 'new'".to_string(),
-                        SoulErrorKind::InvalidTokenKind,
-                        Some(self.token().span),
-                    ))
+                    _ => {
+                        return Err(SoulError::new(
+                            "expected '(' or ':[' after 'new'".to_string(),
+                            SoulErrorKind::InvalidTokenKind,
+                            Some(self.token().span),
+                        ));
+                    }
                 }
             }
 
@@ -357,11 +362,8 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     fn parse_new_ptr(&mut self, start_span: Span) -> SoulResult<Expression> {
         self.expect(&ROUND_OPEN)?;
-        let inner = self.parse_expression(&[
-            ROUND_CLOSE,
-            TokenKind::EndLine,
-            TokenKind::EndFile,
-        ])?;
+        let inner =
+            self.parse_expression(&[ROUND_CLOSE, TokenKind::EndLine, TokenKind::EndFile])?;
         self.expect(&ROUND_CLOSE)?;
         Ok(Expression::new(
             ExpressionKind::New(Box::new(inner)),

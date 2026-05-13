@@ -1,10 +1,12 @@
 use crate::{GenericSubstitute, IrOperand, LlvmBackend, Local, OperandInfo};
 use ast::ArrayKind;
 use hir::{ComplexLiteral, StructId, TypeId};
-use inkwell::{types::StructType, values::BasicValueEnum, AddressSpace};
+use inkwell::{AddressSpace, types::StructType, values::BasicValueEnum};
 use mir_parser::mir::{self, AggregateBody, Place, PlaceId, Rvalue, RvalueKind};
 use soul_utils::{
-    Span, error::{SoulError, SoulErrorKind, SoulResult}, soul_error_internal
+    Span,
+    error::{SoulError, SoulErrorKind, SoulResult},
+    soul_error_internal,
 };
 use typed_hir::{FieldInfo, ThirTypeKind, display_thir::DisplayThirType};
 
@@ -40,9 +42,10 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             RvalueKind::StackArrayIndex { array, index } => {
                 self.lower_stack_array_index(array, index, ty, generics)?
             }
-            RvalueKind::HeapAlloc { ty: inner_type, count } => {
-                self.lower_heap_alloc(ty, *inner_type, *count, generics)?
-            }
+            RvalueKind::HeapAlloc {
+                ty: inner_type,
+                count,
+            } => self.lower_heap_alloc(ty, *inner_type, *count, generics)?,
             RvalueKind::Drop { value, span } => {
                 self.lower_drop(value, *span, generics)?;
                 return Ok(None);
@@ -82,8 +85,14 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         })
     }
 
-    fn lower_heap_alloc(&self, ty: TypeId, inner_type: TypeId, count: u64, generics: &GenericSubstitute) -> SoulResult<IrOperand<'a>> {
-        let size_bytes_u64 = self.sizeof(inner_type, generics)? as u64; 
+    fn lower_heap_alloc(
+        &self,
+        ty: TypeId,
+        inner_type: TypeId,
+        count: u64,
+        generics: &GenericSubstitute,
+    ) -> SoulResult<IrOperand<'a>> {
+        let size_bytes_u64 = self.sizeof(inner_type, generics)? as u64;
 
         let size_bytes = self.default_int_type.const_int(size_bytes_u64, false);
 
@@ -94,18 +103,25 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             size_bytes
         };
 
-        let malloc_fn = self.internal_functions.malloc_function.ok_or_else(|| {
-            soul_error_internal!("malloc function not declared", None)
-        })?;
+        let malloc_fn = self
+            .internal_functions
+            .malloc_function
+            .ok_or_else(|| soul_error_internal!("malloc function not declared", None))?;
         let call = self.builder.build_call(malloc_fn, &[total_size.into()])?;
-        let ptr = call.try_as_basic_value().basic().ok_or_else(|| {
-            soul_error_internal!("malloc call returned no value", None)
-        })?;
+        let ptr = call
+            .try_as_basic_value()
+            .basic()
+            .ok_or_else(|| soul_error_internal!("malloc call returned no value", None))?;
 
         self.new_loaded_operand(ptr, ty, generics)
     }
 
-    fn lower_drop(&self, value: &mir::Operand, span: Span, generics: &GenericSubstitute) -> SoulResult<()> {
+    fn lower_drop(
+        &self,
+        value: &mir::Operand,
+        span: Span,
+        generics: &GenericSubstitute,
+    ) -> SoulResult<()> {
         let value_op = self.lower_operand(value, generics)?;
         let hir_type = self.get_type(value.ty)?;
 
@@ -114,11 +130,17 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 let ptr = if value_op.value.is_pointer_value() {
                     value_op.value.into_pointer_value()
                 } else {
-                    return Err(soul_error_internal!("Drop: expected pointer value", Some(span)));
+                    return Err(soul_error_internal!(
+                        "Drop: expected pointer value",
+                        Some(span)
+                    ));
                 };
 
                 let Some(free_fn) = self.internal_functions.free_function else {
-                    return Err(soul_error_internal!("free function not declared", Some(span)))
+                    return Err(soul_error_internal!(
+                        "free function not declared",
+                        Some(span)
+                    ));
                 };
 
                 self.builder.build_call(free_fn, &[ptr.into()])?;
@@ -137,23 +159,28 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                         0,
                         "drop_heap_array_ptr",
                     )?;
-                    
-                    self.builder.build_load(
-                        self.context.ptr_type(AddressSpace::default()),
-                        data_ptr_ptr,
-                        "drop_heap_array_data",
-                    )?.into_pointer_value()
 
+                    self.builder
+                        .build_load(
+                            self.context.ptr_type(AddressSpace::default()),
+                            data_ptr_ptr,
+                            "drop_heap_array_data",
+                        )?
+                        .into_pointer_value()
                 } else {
-
                     if !value_op.value.is_struct_value() {
-                        return Err(soul_error_internal!("Drop: expected struct value for loaded heap array", Some(span)));
+                        return Err(soul_error_internal!(
+                            "Drop: expected struct value for loaded heap array",
+                            Some(span)
+                        ));
                     }
 
                     let struct_val = value_op.value.into_struct_value();
                     let struct_ty = heap_struct_ir_type.into_struct_type();
                     let ptr_type = self.context.ptr_type(AddressSpace::default());
-                    let ptr_alloca = self.builder.build_alloca(struct_ty, "drop_heap_array_temp")?;
+                    let ptr_alloca = self
+                        .builder
+                        .build_alloca(struct_ty, "drop_heap_array_temp")?;
                     let _ = self.builder.inkwell().build_store(ptr_alloca, struct_val);
                     let data_ptr_ptr = self.builder.build_struct_gep_index(
                         struct_ty,
@@ -161,7 +188,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                         0,
                         "drop_heap_array_data_ptr",
                     )?;
-                    self.builder.build_load(ptr_type, data_ptr_ptr, "drop_heap_array_data")?.into_pointer_value()
+                    self.builder
+                        .build_load(ptr_type, data_ptr_ptr, "drop_heap_array_data")?
+                        .into_pointer_value()
                 };
                 let free_fn = self.internal_functions.free_function.ok_or_else(|| {
                     soul_error_internal!("free function not declared", Some(span))
@@ -372,7 +401,8 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 let hir_type = self.get_type(ty)?;
                 match &hir_type.kind {
                     ThirTypeKind::Ref { .. } | ThirTypeKind::Pointer(_) => {
-                        let ir_type = self.lower_type(ty, generics)?
+                        let ir_type = self
+                            .lower_type(ty, generics)?
                             .unwrap_or(self.context.i8_type().into());
                         let loaded = self.builder.build_load(ir_type, ptr, "load_ref")?;
                         self.new_loaded_operand(loaded, ty, generics)
@@ -436,7 +466,10 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 ThirTypeKind::Pointer(inner) => inner,
                 other => {
                     return Err(SoulError::new(
-                        format!("PtrOffset requires a pointer type got {}", other.display_variant()),
+                        format!(
+                            "PtrOffset requires a pointer type got {}",
+                            other.display_variant()
+                        ),
                         SoulErrorKind::LlvmError,
                         None,
                     ));
@@ -453,21 +486,27 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
         let size_bytes_u64 = self.sizeof(pointee_ty, generics)? as u64;
 
-        let ptr_int = self.builder.build_ptr_to_int(pointer_val, self.default_int_type)?;
+        let ptr_int = self
+            .builder
+            .build_ptr_to_int(pointer_val, self.default_int_type)?;
 
         let size_bytes = self.default_int_type.const_int(size_bytes_u64, false);
 
         let offset_ext = if offset_val.get_type() == self.default_int_type {
             offset_val
         } else if offset_val.get_type().get_bit_width() < self.default_int_type.get_bit_width() {
-            self.builder.build_int_s_extend(offset_val, self.default_int_type)?
+            self.builder
+                .build_int_s_extend(offset_val, self.default_int_type)?
         } else {
-            self.builder.build_int_truncate(offset_val, self.default_int_type)?
+            self.builder
+                .build_int_truncate(offset_val, self.default_int_type)?
         };
 
         let byte_offset = self.builder.build_int_mul(offset_ext, size_bytes)?;
         let result_int = self.builder.build_int_add(ptr_int, byte_offset)?;
-        let result_ptr = self.builder.build_int_to_ptr(result_int, self.context.ptr_type(AddressSpace::default()))?;
+        let result_ptr = self
+            .builder
+            .build_int_to_ptr(result_int, self.context.ptr_type(AddressSpace::default()))?;
 
         Ok(IrOperand {
             value: result_ptr.into(),
@@ -510,20 +549,26 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
         let size_bytes_u64 = self.sizeof(element_ty, generics)? as u64;
 
-        let ptr_int = self.builder.build_ptr_to_int(array_ptr, self.default_int_type)?;
+        let ptr_int = self
+            .builder
+            .build_ptr_to_int(array_ptr, self.default_int_type)?;
 
         let size_bytes = self.default_int_type.const_int(size_bytes_u64, false);
         let index_ext = if index_val.get_type() == self.default_int_type {
             index_val
         } else if index_val.get_type().get_bit_width() < self.default_int_type.get_bit_width() {
-            self.builder.build_int_s_extend(index_val, self.default_int_type)?
+            self.builder
+                .build_int_s_extend(index_val, self.default_int_type)?
         } else {
-            self.builder.build_int_truncate(index_val, self.default_int_type)?
+            self.builder
+                .build_int_truncate(index_val, self.default_int_type)?
         };
 
         let byte_offset = self.builder.build_int_mul(index_ext, size_bytes)?;
         let result_int = self.builder.build_int_add(ptr_int, byte_offset)?;
-        let result_ptr = self.builder.build_int_to_ptr(result_int, self.context.ptr_type(AddressSpace::default()))?;
+        let result_ptr = self
+            .builder
+            .build_int_to_ptr(result_int, self.context.ptr_type(AddressSpace::default()))?;
 
         Ok(IrOperand {
             value: result_ptr.into(),

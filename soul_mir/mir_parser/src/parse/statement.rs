@@ -126,52 +126,59 @@ impl<'a> MirContext<'a> {
         }
 
         match local_info.kind {
-            LocalKind::Temp(value)
-            | LocalKind::Variable(Some(value)) => self.lower_variable_assign(value, variable, place_kind, is_end),
+            LocalKind::Temp(value) | LocalKind::Variable(Some(value)) => {
+                self.lower_variable_assign(value, variable, place_kind, is_end)
+            }
             _ => (),
         }
     }
 
     // Assign a value expression to a variable/temp, handling if-expressions and type casts.
-    fn lower_variable_assign(&mut self, value: ExpressionId, variable: &hir::Variable, place_kind: mir::PlaceKind, is_end: &mut bool) {
-            let target_place =
-                self.new_place(mir::Place::new(place_kind, self.local_type(variable.local)));
+    fn lower_variable_assign(
+        &mut self,
+        value: ExpressionId,
+        variable: &hir::Variable,
+        place_kind: mir::PlaceKind,
+        is_end: &mut bool,
+    ) {
+        let target_place =
+            self.new_place(mir::Place::new(place_kind, self.local_type(variable.local)));
 
-            let value_expr = &self.hir_response.hir.nodes.expressions[value];
-            if let ExpressionKind::If {
-                condition,
-                then_block,
-                else_block,
-                ends_with_else: _,
-            } = &value_expr.kind
-            {
-                let ty = self.hir_response.typed.types_table.expressions[value];
-                self.lower_if_assignment(
-                    *condition,
-                    *then_block,
-                    *else_block,
-                    ty,
-                    is_end,
-                    target_place,
-                );
-                return;
-            }
+        let value_expr = &self.hir_response.hir.nodes.expressions[value];
+        if let ExpressionKind::If {
+            condition,
+            then_block,
+            else_block,
+            ends_with_else: _,
+        } = &value_expr.kind
+        {
+            let ty = self.hir_response.typed.types_table.expressions[value];
+            self.lower_if_assignment(
+                *condition,
+                *then_block,
+                *else_block,
+                ty,
+                is_end,
+                target_place,
+            );
+            return;
+        }
 
-            let operand = self.lower_operand(value).pass(is_end);
-            let local_type = self.local_type(variable.local);
+        let operand = self.lower_operand(value).pass(is_end);
+        let local_type = self.local_type(variable.local);
 
-            let rvalue = if operand.ty != local_type {
-                self.cast_variable(operand, local_type)
-            } else {
-                mir::Rvalue::new(mir::RvalueKind::Operand(operand))
-            };
+        let rvalue = if operand.ty != local_type {
+            self.cast_variable(operand, local_type)
+        } else {
+            mir::Rvalue::new(mir::RvalueKind::Operand(operand))
+        };
 
-            let statement = mir::Statement::new(mir::StatementKind::Assign {
-                place: target_place,
-                value: rvalue,
-            });
+        let statement = mir::Statement::new(mir::StatementKind::Assign {
+            place: target_place,
+            value: rvalue,
+        });
 
-            self.push_statement(statement);
+        self.push_statement(statement);
     }
 
     fn cast_variable(&mut self, operand: mir::Operand, local_type: TypeId) -> mir::Rvalue {
@@ -180,28 +187,23 @@ impl<'a> MirContext<'a> {
         let compatible = left_type
             .unify_primitive_cast(&self.hir_response.typed.types_map, &right_type)
             .is_ok();
-        
+
         if !compatible {
-            return mir::Rvalue::new(mir::RvalueKind::Operand(operand))
+            return mir::Rvalue::new(mir::RvalueKind::Operand(operand));
         }
 
         let temp = self.new_temp(local_type);
-        let cast_place =self.new_place(mir::Place::new(
-            mir::PlaceKind::Temp(temp), 
-            local_type,
-        ));
+        let cast_place = self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp), local_type));
 
         let cast_rvalue = mir::Rvalue::new(mir::RvalueKind::CastUse {
             value: operand,
             cast_to: local_type,
         });
 
-        let cast_stmt = mir::Statement::new(
-            mir::StatementKind::Assign {
-                place: cast_place,
-                value: cast_rvalue,
-            }
-        );
+        let cast_stmt = mir::Statement::new(mir::StatementKind::Assign {
+            place: cast_place,
+            value: cast_rvalue,
+        });
 
         self.push_statement(cast_stmt);
         mir::Rvalue::new(mir::RvalueKind::Operand(mir::Operand::new(
@@ -307,7 +309,8 @@ fn is_valid_statement_expression(kind: &hir::ExpressionKind) -> bool {
         | hir::ExpressionKind::New(_)
         | hir::ExpressionKind::If { .. }
         | hir::ExpressionKind::Function(_)
-        | hir::ExpressionKind::Drop { .. } 
+        | hir::ExpressionKind::Exit { .. }
+        | hir::ExpressionKind::Drop { .. }
         | hir::ExpressionKind::Call { .. }
         | hir::ExpressionKind::While { .. }
         | hir::ExpressionKind::Match { .. }

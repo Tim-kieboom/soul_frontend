@@ -19,12 +19,12 @@ pub struct Benchmarks {
 
 impl Benchmarks {
     pub const fn const_default() -> Self {
-        Self { 
-            ir: Duration::new(0, 0), 
-            total: CrateBenchmark::const_default(), 
-            crates: VecMap::const_default() 
+        Self {
+            ir: Duration::new(0, 0),
+            total: CrateBenchmark::const_default(),
+            crates: VecMap::const_default(),
         }
-    } 
+    }
 
     pub fn source_read(&mut self, id: CrateId, time: Duration) {
         self.total.source_read += time;
@@ -69,8 +69,18 @@ impl Benchmarks {
         writeln!(sb, "LLVM IR:    {}", fmt_duration(self.ir)).expect("no fmt error");
 
         writeln!(sb, "\n=== Full Pipeline Percentages ===").expect("no fmt error");
-        writeln!(sb, "SourceRead: {:.1}%", percent(total.source_read, full_total)).expect("no fmt error");
-        writeln!(sb, "Tokenizer:  {:.1}%", percent(total.tokenize, full_total)).expect("no fmt error");
+        writeln!(
+            sb,
+            "SourceRead: {:.1}%",
+            percent(total.source_read, full_total)
+        )
+        .expect("no fmt error");
+        writeln!(
+            sb,
+            "Tokenizer:  {:.1}%",
+            percent(total.tokenize, full_total)
+        )
+        .expect("no fmt error");
         writeln!(sb, "AST:        {:.1}%", percent(total.ast, full_total)).expect("no fmt error");
         writeln!(sb, "HIR:        {:.1}%", percent(total.hir, full_total)).expect("no fmt error");
         writeln!(sb, "MIR:        {:.1}%", percent(total.mir, full_total)).expect("no fmt error");
@@ -96,7 +106,6 @@ impl Benchmarks {
 }
 
 impl CrateBenchmark {
-    
     pub const fn const_default() -> Self {
         const DEFAULT: Duration = Duration::new(0, 0);
         Self {
@@ -111,9 +120,9 @@ impl CrateBenchmark {
 
 fn percent(part: Duration, total: Duration) -> f64 {
     if total.is_zero() {
-        return 0.0
+        return 0.0;
     }
-    
+
     (part.as_secs_f64() / total.as_secs_f64()) * 100.0
 }
 
@@ -122,7 +131,7 @@ fn fmt_duration(d: Duration) -> String {
 
     match nano {
         0..1_000 => format!("{nano}ns"),
-        1_000..1_000_000 =>  format!("{:.1}µs", nano as f64 / 1_000.0),
+        1_000..1_000_000 => format!("{:.1}µs", nano as f64 / 1_000.0),
         1_000_000..1_000_000_000 => format!("{:.4}ms", nano as f64 / 1_000_000.0),
         _ => format!("{:.4}s", nano as f64 / 1_000_000_000.0),
     }
