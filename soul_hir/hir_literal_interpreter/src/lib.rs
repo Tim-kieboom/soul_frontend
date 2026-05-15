@@ -83,6 +83,10 @@ impl<'a> LiteralInterpreter<'a> {
             | hir::ExpressionKind::New(_)
             | hir::ExpressionKind::NewArray { .. }
             | hir::ExpressionKind::Drop { .. }
+            | hir::ExpressionKind::NewHeapArray { .. }
+            | hir::ExpressionKind::Alloc { .. }
+            | hir::ExpressionKind::Dealloc { .. }
+            | hir::ExpressionKind::Realloc { .. }
             | hir::ExpressionKind::Match { .. } => None,
 
             hir::ExpressionKind::Array(array) => self.interpret_array(array, expression_id),

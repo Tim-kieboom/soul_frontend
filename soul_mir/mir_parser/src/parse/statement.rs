@@ -303,7 +303,8 @@ fn is_valid_statement_expression(kind: &hir::ExpressionKind) -> bool {
         | hir::ExpressionKind::Binary { .. }
         | hir::ExpressionKind::StructConstructor { .. }
         | hir::ExpressionKind::PtrOffset { .. }
-        | hir::ExpressionKind::StackArrayIndex { .. } => false,
+        | hir::ExpressionKind::StackArrayIndex { .. }
+        | hir::ExpressionKind::NewHeapArray { .. } => false,
 
         hir::ExpressionKind::Block(_)
         | hir::ExpressionKind::New(_)
@@ -311,6 +312,9 @@ fn is_valid_statement_expression(kind: &hir::ExpressionKind) -> bool {
         | hir::ExpressionKind::Function(_)
         | hir::ExpressionKind::Exit { .. }
         | hir::ExpressionKind::Drop { .. }
+        | hir::ExpressionKind::Alloc { .. }
+        | hir::ExpressionKind::Dealloc { .. }
+        | hir::ExpressionKind::Realloc { .. }
         | hir::ExpressionKind::Call { .. }
         | hir::ExpressionKind::While { .. }
         | hir::ExpressionKind::Match { .. }

@@ -30,6 +30,11 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                         self.log_error(err);
                     }
                 }
+                StatementKind::Dealloc { ptr } => {
+                    if let Err(err) = self.lower_dealloc(ptr, generics) {
+                        self.log_error(err);
+                    }
+                }
                 StatementKind::Call {
                     id,
                     arguments,
@@ -55,6 +60,16 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
         let code = self.lower_operand(exit_code, generics)?.value;
         self.builder.build_call(exit, &[code.into()])?;
+        Ok(())
+    }
+
+    fn lower_dealloc(&mut self, ptr: &Operand, generics: &GenericSubstitute) -> SoulResult<()> {
+        let Some(free) = self.internal_functions.free_function else {
+            return Err(soul_error_internal!("free function is not defined", None));
+        };
+
+        let ptr_val = self.lower_operand(ptr, generics)?.value;
+        self.builder.build_call(free, &[ptr_val.into()])?;
         Ok(())
     }
 

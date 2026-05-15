@@ -512,6 +512,30 @@ impl<'a> HirDisplayer<'a> {
                 self.display_expression(&value);
                 self.push(')');
             }
+            hir::ExpressionKind::NewHeapArray { ptr, len } => {
+                self.push_str("intrinsic.NewHeapArray(");
+                self.display_expression(ptr);
+                self.push_str(", ");
+                self.display_expression(len);
+                self.push(')');
+            }
+            hir::ExpressionKind::Alloc { size } => {
+                self.push_str("intrinsic.Alloc(");
+                self.display_expression(size);
+                self.push(')');
+            }
+            hir::ExpressionKind::Dealloc { ptr } => {
+                self.push_str("intrinsic.Dealloc(");
+                self.display_expression(ptr);
+                self.push(')');
+            }
+            hir::ExpressionKind::Realloc { ptr, size } => {
+                self.push_str("intrinsic.Realloc(");
+                self.display_expression(ptr);
+                self.push_str(", ");
+                self.display_expression(size);
+                self.push(')');
+            }
             hir::ExpressionKind::Exit { exit_code } => {
                 self.push_str("intrinsic.Exit(");
                 self.display_expression(exit_code);
@@ -521,6 +545,7 @@ impl<'a> HirDisplayer<'a> {
     }
 
     fn display_place(&mut self, place: &hir::PlaceId) {
+        self.push_fmt(format_args!("/*{place:?}*/"));
         match &self.hir.nodes.places[*place].kind {
             hir::PlaceKind::Temp(local_id) => self.display_temp(*local_id),
             hir::PlaceKind::Local(local_id) => self.display_local(*local_id),

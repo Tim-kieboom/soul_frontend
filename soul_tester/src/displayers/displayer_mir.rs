@@ -346,6 +346,11 @@ impl<'a> MirDisplayer<'a> {
                 self.display_operand(exit_code);
                 self.push(')');
             }
+            mir::StatementKind::Dealloc { ptr } => {
+                self.push_str("intrinsic.Dealloc(");
+                self.display_operand(ptr);
+                self.push(')');
+            }
         }
     }
 
@@ -446,6 +451,18 @@ impl<'a> MirDisplayer<'a> {
             &RvalueKind::Drop { ref value, .. } => {
                 self.push_str("intrinsic.Drop(");
                 self.display_operand(value);
+                self.push(')');
+            }
+            mir::RvalueKind::Alloc { size } => {
+                self.push_str("intrinsic.Alloc(");
+                self.display_operand(size);
+                self.push(')');
+            }
+            mir::RvalueKind::Realloc { ptr, size } => {
+                self.push_str("intrinsic.Realloc(");
+                self.display_operand(ptr);
+                self.push_str(", ");
+                self.display_operand(size);
                 self.push(')');
             }
         }

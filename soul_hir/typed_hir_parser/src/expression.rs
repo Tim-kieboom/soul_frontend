@@ -61,6 +61,18 @@ impl<'a> TypedHirContext<'a> {
                 self.infer_expression(*value);
                 self.common_types.none_type.to_lazy()
             }
+            hir::ExpressionKind::NewHeapArray { ptr, len } => {
+                self.infer_new_heap_array(*ptr, *len, span)
+            }
+            hir::ExpressionKind::Alloc { size } => {
+                self.infer_alloc(*size, span)
+            }
+            hir::ExpressionKind::Dealloc { ptr } => {
+                self.infer_dealloc(*ptr)
+            }
+            hir::ExpressionKind::Realloc { ptr, size } => {
+                self.infer_realloc(*ptr, *size, span)
+            }
             hir::ExpressionKind::Exit { exit_code } => {
                 let value_type = self.infer_expression(*exit_code);
                 self.unify(
@@ -682,6 +694,77 @@ impl<'a> TypedHirContext<'a> {
                 LazyTypeId::error()
             }
         }
+    }
+
+    fn infer_new_heap_array(
+        &mut self,
+        ptr: ExpressionId,
+        len: ExpressionId,
+        span: Span,
+    ) -> LazyTypeId {
+        let _ = self.infer_expression(len);
+
+        let ptr_ty = self.infer_expression(ptr);
+        let resolved = match self.resolve_type_strict(ptr_ty, span) {
+            Some(val) => val,
+            None => return LazyTypeId::error(),
+        };
+
+        match &self.id_to_type(resolved).kind {
+            HirTypeKind::Pointer(element) => {
+                let element_ty = match self.resolve_type_strict(*element, span) {
+                    Some(val) => val,
+                    None => return LazyTypeId::error(),
+                };
+                let array_ty = self.add_type(HirType::new(HirTypeKind::Array {
+                    element: LazyTypeId::Known(element_ty),
+                    kind: ArrayKind::HeapArray,
+                }));
+                LazyTypeId::Known(array_ty)
+            }
+            _ => {
+                self.log_error(SoulError::new(
+                    "NewHeapArray requires a pointer as the first argument".to_string(),
+                    SoulErrorKind::TypeInferenceError,
+                    Some(span),
+                ));
+                LazyTypeId::error()
+            }
+        }
+    }
+
+    fn infer_alloc(
+        &mut self,
+        size: ExpressionId,
+        _span: Span,
+    ) -> LazyTypeId {
+        let _ = self.infer_expression(size);
+
+        let none_ty = self.common_types.none_type;
+        let ptr_none = self.add_type(HirType::pointer_type(LazyTypeId::Known(none_ty)));
+        LazyTypeId::Known(ptr_none)
+    }
+
+    fn infer_dealloc(
+        &mut self,
+        ptr: ExpressionId,
+    ) -> LazyTypeId {
+        let _ = self.infer_expression(ptr);
+        self.common_types.none_type.to_lazy()
+    }
+
+    fn infer_realloc(
+        &mut self,
+        ptr: ExpressionId,
+        size: ExpressionId,
+        _span: Span,
+    ) -> LazyTypeId {
+        let _ = self.infer_expression(ptr);
+        let _ = self.infer_expression(size);
+
+        let none_ty = self.common_types.none_type;
+        let ptr_none = self.add_type(HirType::pointer_type(LazyTypeId::Known(none_ty)));
+        LazyTypeId::Known(ptr_none)
     }
 
     fn infer_stack_array_index(

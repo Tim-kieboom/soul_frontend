@@ -1,15 +1,30 @@
 import (
     crate.Io
     crate.Test
+    crate.Fs.{File}
     crate.Mem.Slice.{Index}
     crate.Assertions.{Assert}
+    crate.Mem.Str.{StringBuilder}
 )
 
 main() {
-    string := "tim"
-    if string == "tim" {
-        Io.Println("is tim!!")
-    }
+
+    mut sb = StringBuilder.New()
+    sb.Push('h')
+    sb.PushStr("ello")
+
+    str := sb.IntoStr()
+    Io.Println(@str)
+
+    // file := File.Open(c"test.txt", 0)
+
+    // text := file.Read()
+    // Io.Println(@text)
+    // file.Close()
+    // string := "tim"
+    // if string == "tim" {
+    //     Io.Println("is tim!!")
+    // }
 
     // x := match 5 {
     //     10 => "10"
@@ -20,4 +35,5 @@ main() {
     //     _ => "other"
     // }
     // Io.Println(x)
+    // Io.Println("hello world")
 }

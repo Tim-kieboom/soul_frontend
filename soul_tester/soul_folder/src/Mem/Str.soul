@@ -1,0 +1,86 @@
+import (
+    .Slice.{Index}
+)
+
+extern "C" realloc(ptr: *char, size: int): *char
+
+struct StringBuilder {
+    mut array: *char
+    mut len: uint
+    mut cap: uint
+}
+use StringBuilder {
+    New(size: uint = 0): StringBuilder {
+        array := intrinsic.Alloc(size as int) as *char
+        StringBuilder{array, len: 0, cap: size}
+    }
+
+    Push(&this, value: char) {
+        
+        len := this.len
+        c := len+1 > this.cap
+        if c == true {
+
+            if len == 0 {
+                this.resize(1)
+            } else {
+                this.resize(len*2)
+            }
+        }
+
+        array := this.array
+        ptr := intrinsic.PtrOffset(array, len as int)
+        *ptr = value
+        this.len += 1
+    }
+
+    // PushCstr(&this, value: c_str) {
+        
+    //     mut current = value as *char 
+    //     while current != null {
+    //         ch := *current
+    //         this.Push(ch)
+    //         current = intrinsic.PtrOffset(current, 1)
+    //     }
+    // }
+
+    PushStr(&this, value: [@]char) {
+        
+        end := value.len
+        mut i = 0 
+        while i != end {
+            ch := Index<char>(value, i)
+            this.Push(ch)
+            i += 1
+        }
+    }
+
+    TryGet(@this, index: uint, value: &char): bool {
+        c := index > this.len
+        if c == true {
+            return false
+        }
+
+        ptr := intrinsic.PtrOffset(this.array, index as int)
+        letter := *ptr
+        *value = letter
+        true
+    }
+
+    IntoStr(this): [*]char {
+        len := this.len
+        ptr := this.array
+        intrinsic.NewHeapArray(ptr, len)
+    }
+
+    Drop(this) {
+        ptr := this.array
+        intrinsic.Dealloc(ptr)
+    }
+
+    resize(&this, newSize: uint) {
+        this.cap = newSize
+        array := this.array
+        this.array = intrinsic.Realloc(array, newSize as int) as *char
+    }
+}

@@ -174,6 +174,28 @@ pub enum ExpressionKind {
     Drop {
         value: ExpressionId,
     },
+
+    /// `NewHeapArray(ptr, len)` — wraps a raw pointer and length into a `[*]T`.
+    NewHeapArray {
+        ptr: ExpressionId,
+        len: ExpressionId,
+    },
+
+    /// `Alloc(size)` — allocates `size` bytes on the heap, returns `*none`.
+    Alloc {
+        size: ExpressionId,
+    },
+
+    /// `Dealloc(ptr)` — frees heap-allocated memory at `ptr: *none`.
+    Dealloc {
+        ptr: ExpressionId,
+    },
+
+    /// `Realloc(ptr, size)` — reallocates memory to `size` bytes, returns `*none`.
+    Realloc {
+        ptr: ExpressionId,
+        size: ExpressionId,
+    },
 }
 
 /// An array literal, e.g., `[1, 2, 3]`.

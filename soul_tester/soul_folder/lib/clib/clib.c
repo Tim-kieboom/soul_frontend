@@ -3,15 +3,18 @@
 // ---------------- #Array ----------------      
 
 u8* __clib_bytesRealloc(uint len, u8* ptr) {
-    if(ptr == NULL) {
+    if(ptr == NULL)
         return malloc(len);
-    }
     
     u8* new = realloc(ptr, len);
     if(ptr != NULL) 
         free(ptr);
 
     return new;
+}
+
+const str __clib_fopen_error(int exitCode) {
+    return strerror(exitCode);
 }
 
 /// !!DO NOT REMOVE!! this is a internal used function for array compare

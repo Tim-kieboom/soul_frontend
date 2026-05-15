@@ -132,6 +132,7 @@ pub struct InternalFunctions<'a> {
     exit_function: Option<FunctionValue<'a>>,
     malloc_function: Option<FunctionValue<'a>>,
     free_function: Option<FunctionValue<'a>>,
+    realloc_function: Option<FunctionValue<'a>>,
     arraycmp_function: Option<FunctionValue<'a>>,
 }
 

@@ -16,7 +16,15 @@ impl<'a> MirContext<'a> {
 
         let mir_place = match &self.hir_response.hir.nodes.places[place_id].kind {
             hir::PlaceKind::Local(local_id) => {
-                let local_info = &self.hir_response.hir.nodes.locals[*local_id];
+                
+                let Some(local_info) = self.hir_response.hir.nodes.locals.get(*local_id) else {
+                    self.log_error(soul_error_internal!(format!("{local_id:?} not found"), None));
+                    return EndBlock::new(
+                        mir::PlaceId::error(), 
+                        is_end,
+                    )
+                };
+
                 if local_info.is_temp() {
                     self.lower_temp(*local_id, place_id)
                 } else {

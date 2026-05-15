@@ -377,24 +377,36 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
                 self.new_loaded_operand(value, should_be, generics)?
             }
-            ast::Literal::Cstr(text) | ast::Literal::Str(text) => {
-                let (slice_type, value) = self.const_string_slice(&text);
+            ast::Literal::Cstr(text) => {
+                let ptr = self.const_string_ptr(&text);
+                let ptr_type = self.context.ptr_type(AddressSpace::default());
+                IrOperand {
+                    value: ptr.into(),
+                    info: crate::OperandInfo::new_loaded(should_be, ptr_type.into()),
+                }
+            }
+            ast::Literal::Str(text) => {
+                let (ty, value) = self.const_string_slice(&text);
                 IrOperand {
                     value: value.into(),
-                    info: crate::OperandInfo::new_loaded(should_be, slice_type.into()),
+                    info: crate::OperandInfo::new_loaded(should_be, ty.into()),
                 }
             }
         })
     }
 
-    fn const_string_slice(&self, text: &String) -> (StructType<'a>, StructValue<'a>) {
+    fn const_string_ptr(&self, text: &String) -> PointerValue<'a> {
         let strings = self.strings.borrow_mut();
         let global = match strings.get(text).copied() {
             Some(val) => val,
             None => self.create_global_string(text, strings),
         };
 
-        let ptr = global.as_basic_value_enum().into_pointer_value();
+        global.as_basic_value_enum().into_pointer_value()
+    }
+
+    fn const_string_slice(&self, text: &String) -> (StructType<'a>, StructValue<'a>) {
+        let ptr = self.const_string_ptr(text);
         self.fixed_array_to_const_slice(ptr, text.len() as u64)
     }
 

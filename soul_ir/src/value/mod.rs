@@ -50,6 +50,8 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 self.lower_drop(value, *span, generics)?;
                 return Ok(None);
             }
+            RvalueKind::Alloc { size } => self.lower_alloc(ty, size, generics)?,
+            RvalueKind::Realloc { ptr, size } => self.lower_realloc(ty, ptr, size, generics)?,
         }))
     }
 
@@ -114,6 +116,50 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             .ok_or_else(|| soul_error_internal!("malloc call returned no value", None))?;
 
         self.new_loaded_operand(ptr, ty, generics)
+    }
+
+    fn lower_alloc(
+        &self,
+        ty: TypeId,
+        size: &mir::Operand,
+        generics: &GenericSubstitute,
+    ) -> SoulResult<IrOperand<'a>> {
+        let malloc_fn = self
+            .internal_functions
+            .malloc_function
+            .ok_or_else(|| soul_error_internal!("malloc function not declared", None))?;
+
+        let size_val = self.lower_operand(size, generics)?.value;
+        let call = self.builder.build_call(malloc_fn, &[size_val.into()])?;
+        let ptr = call
+            .try_as_basic_value()
+            .basic()
+            .ok_or_else(|| soul_error_internal!("malloc call returned no value", None))?;
+
+        self.new_loaded_operand(ptr, ty, generics)
+    }
+
+    fn lower_realloc(
+        &self,
+        ty: TypeId,
+        ptr: &mir::Operand,
+        size: &mir::Operand,
+        generics: &GenericSubstitute,
+    ) -> SoulResult<IrOperand<'a>> {
+        let realloc_fn = self
+            .internal_functions
+            .realloc_function
+            .ok_or_else(|| soul_error_internal!("realloc function not declared", None))?;
+
+        let ptr_val = self.lower_operand(ptr, generics)?.value;
+        let size_val = self.lower_operand(size, generics)?.value;
+        let call = self.builder.build_call(realloc_fn, &[ptr_val.into(), size_val.into()])?;
+        let result = call
+            .try_as_basic_value()
+            .basic()
+            .ok_or_else(|| soul_error_internal!("realloc call returned no value", None))?;
+
+        self.new_loaded_operand(result, ty, generics)
     }
 
     fn lower_drop(

@@ -7,6 +7,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         self.declare_exit();
         self.declare_malloc();
         self.declare_free();
+        self.declare_realloc();
         self.declare_arraycmp();
     }
 
@@ -40,6 +41,15 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         let free_fn = self.module.add_function("free", free_type, None);
         free_fn.set_linkage(inkwell::module::Linkage::External);
         self.internal_functions.free_function = Some(free_fn);
+    }
+
+    fn declare_realloc(&mut self) {
+        let i64_type = self.context.i64_type();
+        let ptr_type = self.context.ptr_type(AddressSpace::default());
+        let realloc_type = ptr_type.fn_type(&[ptr_type.into(), i64_type.into()], false);
+        let realloc_fn = self.module.add_function("realloc", realloc_type, None);
+        realloc_fn.set_linkage(inkwell::module::Linkage::External);
+        self.internal_functions.realloc_function = Some(realloc_fn);
     }
 
     fn declare_arraycmp(&mut self) {

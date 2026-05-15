@@ -39,6 +39,18 @@ impl<'a> HirContext<'a> {
             if intrinsic == Intrinsic::Exit {
                 return self.lower_exit(id, &function_call.arguments);
             }
+            if intrinsic == Intrinsic::NewHeapArray {
+                return self.lower_new_heap_array(id, &function_call.arguments, function_call.name.span);
+            }
+            if intrinsic == Intrinsic::Alloc {
+                return self.lower_alloc(id, &function_call.arguments, function_call.name.span);
+            }
+            if intrinsic == Intrinsic::Dealloc {
+                return self.lower_dealloc(id, &function_call.arguments);
+            }
+            if intrinsic == Intrinsic::Realloc {
+                return self.lower_realloc(id, &function_call.arguments, function_call.name.span);
+            }
             return self.lower_intrinsic(
                 id,
                 intrinsic,
@@ -323,6 +335,10 @@ impl<'a> HirContext<'a> {
             }
             Intrinsic::Drop => unreachable!("Drop should be handled in lower_call"),
             Intrinsic::Exit => unreachable!("Exit should be handled in lower_call"),
+            Intrinsic::NewHeapArray => unreachable!("NewHeapArray should be handled in lower_call"),
+            Intrinsic::Alloc => unreachable!("Alloc should be handled in lower_call"),
+            Intrinsic::Dealloc => unreachable!("Dealloc should be handled in lower_call"),
+            Intrinsic::Realloc => unreachable!("Realloc should be handled in lower_call"),
         }
     }
 
@@ -403,6 +419,87 @@ impl<'a> HirContext<'a> {
             id,
             ty: self.add_type(HirType::none_type()).to_lazy(),
             kind: hir::ExpressionKind::Drop { value },
+        }
+    }
+
+    fn lower_new_heap_array(
+        &mut self,
+        id: hir::ExpressionId,
+        arguments: &[ast::Argument],
+        span: Span,
+    ) -> hir::Expression {
+        let ptr = arguments
+            .get(0)
+            .map(|arg| self.lower_expression(&arg.value))
+            .unwrap_or(ExpressionId::error());
+
+        let len = arguments
+            .get(1)
+            .map(|arg| self.lower_expression(&arg.value))
+            .unwrap_or(ExpressionId::error());
+
+        hir::Expression {
+            id,
+            ty: self.new_infer_type(vec![], None, span),
+            kind: hir::ExpressionKind::NewHeapArray { ptr, len },
+        }
+    }
+
+    fn lower_alloc(
+        &mut self,
+        id: hir::ExpressionId,
+        arguments: &[ast::Argument],
+        span: Span,
+    ) -> hir::Expression {
+        let size = arguments
+            .get(0)
+            .map(|arg| self.lower_expression(&arg.value))
+            .unwrap_or(ExpressionId::error());
+
+        hir::Expression {
+            id,
+            ty: self.new_infer_type(vec![], None, span),
+            kind: hir::ExpressionKind::Alloc { size },
+        }
+    }
+
+    fn lower_dealloc(
+        &mut self,
+        id: hir::ExpressionId,
+        arguments: &[ast::Argument],
+    ) -> hir::Expression {
+        let ptr = arguments
+            .get(0)
+            .map(|arg| self.lower_expression(&arg.value))
+            .unwrap_or(ExpressionId::error());
+
+        hir::Expression {
+            id,
+            ty: self.add_type(HirType::none_type()).to_lazy(),
+            kind: hir::ExpressionKind::Dealloc { ptr },
+        }
+    }
+
+    fn lower_realloc(
+        &mut self,
+        id: hir::ExpressionId,
+        arguments: &[ast::Argument],
+        span: Span,
+    ) -> hir::Expression {
+        let ptr = arguments
+            .get(0)
+            .map(|arg| self.lower_expression(&arg.value))
+            .unwrap_or(ExpressionId::error());
+
+        let size = arguments
+            .get(1)
+            .map(|arg| self.lower_expression(&arg.value))
+            .unwrap_or(ExpressionId::error());
+
+        hir::Expression {
+            id,
+            ty: self.new_infer_type(vec![], None, span),
+            kind: hir::ExpressionKind::Realloc { ptr, size },
         }
     }
 

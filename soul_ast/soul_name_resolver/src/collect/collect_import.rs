@@ -260,7 +260,9 @@ impl<'a> NameResolver<'a> {
                     ast::CustomType::Struct(struct_) => {
                         Self::resolve_struct(self.context, self.store, &self.current, struct_)
                     }
-                    ast::CustomType::Enum(_) => todo!("impl enum in collect items"),
+                    ast::CustomType::Enum(enum_) => {
+                        Self::resolve_enum(self.context, self.store, &self.current, enum_);
+                    }
                 }
             }
 

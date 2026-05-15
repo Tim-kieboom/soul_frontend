@@ -11,12 +11,12 @@ PrintAssert(
 ) {
 
     if condition == false {
-        PrintAssertMsg(msg, line, file)
+        PrintPanicMsg(msg, line, file)
     }
 }
 
-PrintAssertMsg(msg: [@]char, line: int, file: [@]char) {
-    Print("|Assert FAILED at ")
+PrintPanicMsg(msg: [@]char, line: int, file: [@]char) {
+    Print("|PANIC at ")
     Print(file)
     Print_char(':')
     Print_int(line)
@@ -75,6 +75,15 @@ Print_float(value: f64, base: u8 = 10, precision: u8 = 4, capital: bool = true) 
 
 Print_char(char: char) {
     Stdout.WriteChar(char)
+}
+
+Println_Cstr(cstr: c_str) {
+    Stdout.WriteCstr(cstr)
+    Endln()
+}
+
+Print_Cstr(cstr: c_str) {
+    Stdout.WriteCstr(cstr)
 }
 
 Println(text: [@]char) {

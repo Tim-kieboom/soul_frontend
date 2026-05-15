@@ -335,6 +335,20 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 .builder
                 .build_float_compare(cmp.to_float_cmp_no_nan(), l, r)
                 .map(BasicValueEnum::from),
+
+            (BasicValueEnum::PointerValue(l), BasicValueEnum::PointerValue(r)) => {
+                let l = self
+                    .builder
+                    .build_ptr_to_int(l, self.default_int_type)?;
+
+                let r = self
+                    .builder
+                    .build_ptr_to_int(r, self.default_int_type)?;
+
+                self.builder
+                    .build_int_compare(cmp.to_unsigned_int_cmp(), l, r)
+                    .map(BasicValueEnum::from)
+            }
             _ => Err(SoulError::new(
                 format!(
                     "bitwise_xor requires int or float values (left: {:?}, right: {:?})",

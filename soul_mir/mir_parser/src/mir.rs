@@ -194,6 +194,9 @@ pub enum StatementKind {
     Exit {
         exit_code: Operand,
     },
+    Dealloc {
+        ptr: Operand,
+    },
     StorageStart(Vec<LocalId>),
     StorageDead(LocalId),
 }
@@ -257,6 +260,17 @@ pub enum RvalueKind {
     Drop {
         value: Operand,
         span: Span,
+    },
+
+    /// Alloc(size) — allocates `size` bytes on the heap, returns `*none`.
+    Alloc {
+        size: Operand,
+    },
+
+    /// Realloc(ptr, size) — reallocates memory to `size` bytes, returns `*none`.
+    Realloc {
+        ptr: Operand,
+        size: Operand,
     },
 }
 

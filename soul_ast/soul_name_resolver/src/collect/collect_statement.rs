@@ -223,6 +223,10 @@ fn owner_hint_from_expression(
                     ast::Intrinsic::InLine => Some(TypeKind::Primitive(PrimitiveTypes::Int)),
                     ast::Intrinsic::PtrOffset => None,
                     ast::Intrinsic::StackArrayIndex => None,
+                    ast::Intrinsic::NewHeapArray => None,
+                    ast::Intrinsic::Alloc => None,
+                    ast::Intrinsic::Dealloc => None,
+                    ast::Intrinsic::Realloc => None,
                     ast::Intrinsic::Drop => None,
                 };
             }

@@ -139,6 +139,10 @@ pub enum Intrinsic {
     InLine,
     PtrOffset,
     StackArrayIndex,
+    NewHeapArray,
+    Alloc,
+    Dealloc,
+    Realloc,
 }
 
 impl Intrinsic {
@@ -149,6 +153,10 @@ impl Intrinsic {
             "InLine" => Some(Intrinsic::InLine),
             "PtrOffset" => Some(Intrinsic::PtrOffset),
             "StackArrayIndex" => Some(Intrinsic::StackArrayIndex),
+            "NewHeapArray" => Some(Intrinsic::NewHeapArray),
+            "Alloc" => Some(Intrinsic::Alloc),
+            "Dealloc" => Some(Intrinsic::Dealloc),
+            "Realloc" => Some(Intrinsic::Realloc),
             "Drop" => Some(Intrinsic::Drop),
             _ => None,
         }

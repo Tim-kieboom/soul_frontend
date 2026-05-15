@@ -292,6 +292,18 @@ impl<'a> MirContext<'a> {
             hir::ExpressionKind::NewArray { values, ptr_type } => {
                 self.lower_new_array(values, *ptr_type, value_type, span, is_end)
             }
+            hir::ExpressionKind::NewHeapArray { ptr, len } => {
+                self.lower_new_heap_array(*ptr, *len, value_type, span, is_end)
+            }
+            hir::ExpressionKind::Alloc { size } => {
+                self.lower_alloc(*size, value_type, span, is_end)
+            }
+            hir::ExpressionKind::Dealloc { ptr } => {
+                self.lower_dealloc(*ptr, is_end)
+            }
+            hir::ExpressionKind::Realloc { ptr, size } => {
+                self.lower_realloc(*ptr, *size, value_type, span, is_end)
+            }
             hir::ExpressionKind::Drop { value } => {
                 self.lower_drop(*value, value_type, span, is_end)
             }
@@ -436,6 +448,92 @@ impl<'a> MirContext<'a> {
         self.push_statement(result_stmt);
 
         mir::Operand::new(array_type, mir::OperandKind::Temp(result_temp))
+    }
+
+    fn lower_new_heap_array(
+        &mut self,
+        ptr_id: hir::ExpressionId,
+        len_id: hir::ExpressionId,
+        array_type: TypeId,
+        _span: Span,
+        is_end: &mut bool,
+    ) -> mir::Operand {
+        let ptr = self.lower_operand(ptr_id).pass(is_end);
+        let len = self.lower_operand(len_id).pass(is_end);
+
+        let array_struct = self.hir_response.typed.types_map.array_struct;
+        let result_temp = self.new_temp(array_type);
+
+        let aggregate = mir::Rvalue::new(mir::RvalueKind::Aggregate {
+            struct_type: array_struct,
+            body: mir::AggregateBody::Runtime(vec![ptr, len]),
+        });
+
+        let result_stmt = mir::Statement::new(mir::StatementKind::Assign {
+            place: self.new_place(mir::Place::new(
+                mir::PlaceKind::Temp(result_temp),
+                array_type,
+            )),
+            value: aggregate,
+        });
+        self.push_statement(result_stmt);
+
+        mir::Operand::new(array_type, mir::OperandKind::Temp(result_temp))
+    }
+
+    fn lower_alloc(
+        &mut self,
+        size_id: hir::ExpressionId,
+        value_type: TypeId,
+        span: Span,
+        is_end: &mut bool,
+    ) -> mir::Operand {
+        let _ = span;
+        let size = self.lower_operand(size_id).pass(is_end);
+        let temp = self.new_temp(value_type);
+
+        let statement = mir::Statement::new(mir::StatementKind::Assign {
+            place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp), value_type)),
+            value: mir::Rvalue::new(mir::RvalueKind::Alloc { size }),
+        });
+
+        self.push_statement(statement);
+        mir::Operand::new(value_type, mir::OperandKind::Temp(temp))
+    }
+
+    fn lower_dealloc(
+        &mut self,
+        ptr_id: hir::ExpressionId,
+        is_end: &mut bool,
+    ) -> mir::Operand {
+        let ptr = self.lower_operand(ptr_id).pass(is_end);
+
+        let statement = mir::Statement::new(mir::StatementKind::Dealloc { ptr });
+        self.push_statement(statement);
+
+        self.new_none_operand()
+    }
+
+    fn lower_realloc(
+        &mut self,
+        ptr_id: hir::ExpressionId,
+        size_id: hir::ExpressionId,
+        value_type: TypeId,
+        span: Span,
+        is_end: &mut bool,
+    ) -> mir::Operand {
+        let _ = span;
+        let ptr = self.lower_operand(ptr_id).pass(is_end);
+        let size = self.lower_operand(size_id).pass(is_end);
+        let temp = self.new_temp(value_type);
+
+        let statement = mir::Statement::new(mir::StatementKind::Assign {
+            place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp), value_type)),
+            value: mir::Rvalue::new(mir::RvalueKind::Realloc { ptr, size }),
+        });
+
+        self.push_statement(statement);
+        mir::Operand::new(value_type, mir::OperandKind::Temp(temp))
     }
 
     fn lower_drop(
@@ -650,7 +748,15 @@ impl<'a> MirContext<'a> {
 
     fn lower_load(&mut self, ty: TypeId, place: hir::PlaceId, is_end: &mut bool) -> mir::Operand {
         let place_id = self.lower_place(place).pass(is_end);
-        let operand = match &self.tree.places[place_id].kind {
+        let Some(place) = self.tree.places.get(place_id) else {
+            self.log_error(soul_error_internal!(format!("{place_id:?} not found"), None));
+            return mir::Operand::new(
+                TypeId::error(), 
+                mir::OperandKind::None,
+            )
+        };
+
+        let operand = match &place.kind {
             mir::PlaceKind::Local(local) => {
                 return mir::Operand::new(ty, mir::OperandKind::Local(*local));
             }
