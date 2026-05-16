@@ -1,7 +1,7 @@
 use Ok = Res.Ok
 use Err = Res.Err
 
-trait Error: Into<str>, Debug {}
+trait Error: Into<str>, Fmt {}
 
 union Res<V, E> 
 where

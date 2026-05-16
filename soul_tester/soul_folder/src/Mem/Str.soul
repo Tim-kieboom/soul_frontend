@@ -4,6 +4,24 @@ import (
 
 extern "C" realloc(ptr: *char, size: int): *char
 
+isNull(ptr: *char): bool {
+    ch := *ptr
+    ch == '\0'
+}
+
+Cstr_Len(cstr: c_str): uint {
+
+    mut len = 0 as uint
+    mut ptr = cstr as *char 
+    while !isNull(ptr) {
+        
+        len += 1
+        ptr = intrinsic.PtrOffset(ptr, 1)
+    }
+
+    len
+}
+
 struct StringBuilder {
     mut array: *char
     mut len: uint
@@ -34,23 +52,23 @@ use StringBuilder {
         this.len += 1
     }
 
-    // PushCstr(&this, value: c_str) {
+    PushCstr(&this, value: c_str) {
         
-    //     mut current = value as *char 
-    //     while current != null {
-    //         ch := *current
-    //         this.Push(ch)
-    //         current = intrinsic.PtrOffset(current, 1)
-    //     }
-    // }
+        mut current = value as *char 
+        while current != null {
+            ch := *current
+            this.Push(ch)
+            current = intrinsic.PtrOffset(current, 1)
+        }
+    }
 
     PushStr(&this, value: [@]char) {
         
         end := value.len
-        mut i = 0 
+        mut i: uint = 0 
         while i != end {
             ch := Index<char>(value, i)
-            this.Push(ch)
+            this.Push(*ch)
             i += 1
         }
     }

@@ -1,11 +1,9 @@
+
 struct ErrIndex {index: uint}
-use ErrIndex { 
-    impl Error {}
-    impl Fmt {
-        Fmt(@this, fmt: &impl Formatter): ResFmt {
-            fmt.push_fstr(f"index: {this.index} out of bounds")
-        }
-    }
+use ErrIndex {
+    impl Into<str> {..}
+    impl Error {..}
+    impl Fmt {..}
 }
 
 use ResIndex<T> = Res<T, ErrIndex>

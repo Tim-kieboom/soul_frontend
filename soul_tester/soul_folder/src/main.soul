@@ -1,20 +1,25 @@
 import (
     crate.Io
-    crate.Test
-    crate.Fs.{File}
-    crate.Mem.Slice.{Index}
-    crate.Assertions.{Assert}
-    crate.Mem.Str.{StringBuilder}
+    // crate.Test
+    // crate.Fs.{File}
+    // crate.Mem.Slice.{Index}
+    // crate.Assertions.{Assert}
+    // crate.Mem.Str.{StringBuilder}
 )
 
 main() {
 
-    mut sb = StringBuilder.New()
-    sb.Push('h')
-    sb.PushStr("ello")
+    // mut sb = StringBuilder.New()
+    // sb.Push('h')
+    // sb.PushStr("ello")
+    // // sb.PushCstr(c" world")
 
-    str := sb.IntoStr()
-    Io.Println(@str)
+    // str := sb.IntoStr()
+    // Io.Println(@str)
+
+    cstr := c"hello"
+    len := Cstr_Len(cstr)
+    Io.Println_uint(len)
 
     // file := File.Open(c"test.txt", 0)
 

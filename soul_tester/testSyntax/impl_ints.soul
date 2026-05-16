@@ -1,4 +1,4 @@
-literal $chars: [5]type = type:[
+literal $CHARS = type:[
     char,
     char8,
     char16,
@@ -6,16 +6,17 @@ literal $chars: [5]type = type:[
     char64,
 ]
 
-literal $floatingPoint: [4]type = type:[
+literal $FLOATS = type:[
     untypedFloat,
     f16,
     f32, 
     f64,
 ]
 
-literal $signedIntergers: [7]type = type:[
+literal $INTS = type:[
     untypedInt, 
-    int, 
+    c_int,
+    int,
     i8, 
     i16, 
     i32, 
@@ -23,8 +24,9 @@ literal $signedIntergers: [7]type = type:[
     i128,
 ]
 
-literal $unsignedIntergers: [7]type = type:[
+literal $UINTS = type:[
     untypedUint,
+    c_uint,
     uint, 
     u8, 
     u16, 
@@ -33,76 +35,55 @@ literal $unsignedIntergers: [7]type = type:[
     u128,
 ]
 
-literal $primitiveTypes: [23]type = type:[
-    bool,
-    
-    char,
-    char8,
-    char16,
-    char32,
-    char64,
+literal $NUMBERS = type:[
+    $FLOATS,
+    $INTS,
+    $UINTS,
+].Flatten()
 
-    untypedFloat,
-    f16,
-    f32, 
-    f64,
-
-    untypedInt, 
-    int, 
-    i8, 
-    i16, 
-    i32, 
-    i64, 
-    i128,
-
-    untypedUint,
-    uint, 
-    u8, 
-    u16, 
-    u32, 
-    u64, 
-    u128,
-]
+literal $PRIMITIVE_TYPES = type:[
+    type:[bool],
+    $CHARS,
+    $NUMBERS,
+].Flatten()
 
 trait PrimitiveType {}
 
-literal $emptyImpl($prims: [_]type, $traitType: type.trait): syntax {
+literal $implEmptyTrait(TS: [_]type, TRAIT: type.trait): syntax {
     
-    literal $impls = syntax{}
-    for $prim in $prims {
+    literal IMPLS = syntax{}
+    for T in TS {
         
-        $impls.Append(syntax{
-            use $prim impl $traitType {} 
+        IMPLS.Append(syntax{
+            use $T impl $TRAIT {} 
         })
     }
-    $impls
+    IMPLS
 }
 
-literal $implPrims($intergers: [_]type): syntax {   
+literal $implPrims(TS: [_]type): syntax {   
     
-    literal $impls = syntax{}
-    for $interger in $intergers {
+    literal IMPLS = syntax{}
+    for T in TS {
         
-        $impls.Append(
-            $implPrim($interger)
-        )
+        literal IMPL = T.Type() {
+            type.Interger(TYPE) => $implInterger(T_INT)
+            type.bool(_) => $implBool()
+            _ => panic("todo")
+        }
+
+        IMPLS.Append(IMPL)
     }
-    $impls
+    IMPLS
 }
 
-literal $implPrim($ty: type): syntax {
-    literal interger = $ty.toInterger()
-        .catch{literalPanic}
 
-    literal bytes = $ty.sizeof
-    literal bits = bytes * 8
-    literal isSigned = interger.isSigned()
-    literal max = if isSigned {(bits/2) ** 2 - 1} else {bits ** 2 - 1} 
-    literal min = if isSigned {(bits/2) ** 2 * -1} else {0}
+literal $implBool(): syntax {
+
     syntax{
-        use $ty {
-            literal MAX = max
-            literal MIN = min
+        use bool {
+            literal MAX = true
+            literal MIN = false
 
             #[inline]
             This(num: impl PrimitiveType) {
@@ -110,14 +91,40 @@ literal $implPrim($ty: type): syntax {
             }
 
             impl Sized {
-                ByteSize(): uint {bytes}
+                ByteSize(): uint {bool.typeof}
             }
         }
     }
 }
 
-$emptyImpl(
-    $primitiveTypes,
+literal $implInterger(T: type.Interger): syntax {
+    literal INTERGER = T.toInterger()
+        .Error{literalPanic}
+
+    literal BYTES = T.sizeof as T
+    literal BITS = BYTES * 8
+    literal IS_SIGNED = INTERGER.isSigned()
+    literal MAX = if IS_SIGNED {(BITS/2) ** 2 - 1} else {BITS ** 2 - 1} 
+    literal MIN = if IS_SIGNED {(BITS/2) ** 2 * -1} else {0}
+    syntax{
+        use #T {
+            literal MAX: #T = #MAX
+            literal MIN: #T = #MIN
+
+            #[inline]
+            This(num: impl PrimitiveType) {
+                num as This
+            }
+
+            impl Sized {
+                ByteSize(): uint {#T.sizeof}
+            }
+        }
+    }
+}
+
+$implEmptyTrait(
+    $PRIMITIVE_TYPES,
     PrimitiveType
 )
-$implPrims($primitiveTypes)
+$implPrims($PRIMITIVE_TYPES)

@@ -1,5 +1,4 @@
 use hir::{StructId, TypeId};
-#[cfg(debug_assertions)]
 use soul_utils::soul_error_internal;
 use soul_utils::{ids::IdAlloc, span::Span};
 

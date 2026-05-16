@@ -40,7 +40,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let mut prefix_ops = vec![];
         self.collect_prefix_operators(&mut prefix_ops, start_span);
 
-        let mut left = self.parse_primary()?;
+        let mut left = self.parse_primary(end_tokens)?;
 
         loop {
             if self.current_is_any(end_tokens) {
@@ -165,7 +165,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         left
     }
 
-    fn parse_primary(&mut self) -> SoulResult<Expression> {
+    fn parse_primary(&mut self, end_tokens: &[TokenKind]) -> SoulResult<Expression> {
         let start_span = self.token().span;
 
         let expression = match &self.token().kind {
@@ -190,7 +190,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 };
                 Expression::from_array(Spanned::new(arr, start_span))
             }
-            TokenKind::Ident(_) => self.parse_primary_ident(start_span)?,
+            TokenKind::Ident(_) => self.parse_primary_ident(end_tokens, start_span)?,
             TokenKind::CharLiteral(char) => {
                 let char = *char;
                 self.bump();
@@ -257,7 +257,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok(expression)
     }
 
-    fn parse_primary_ident(&mut self, start_span: Span) -> SoulResult<Expression> {
+    fn parse_primary_ident(&mut self, end_tokens: &[TokenKind], start_span: Span) -> SoulResult<Expression> {
         if let Some(primary) = self.parse_primary_keyword(start_span)? {
             return Ok(primary);
         }
@@ -290,7 +290,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                     Err(TryError::IsErr(err)) => return Err(err),
                 }
             }
-            &CURLY_OPEN => {
+            &CURLY_OPEN if !end_tokens.contains(&CURLY_OPEN) => {
                 return self
                     .parse_struct_contructor(ident, vec![], start_span)
                     .map(Expression::from_struct_contructor);

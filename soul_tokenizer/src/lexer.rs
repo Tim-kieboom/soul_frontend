@@ -216,10 +216,10 @@ impl<'a> Lexer<'a> {
                 Some('n') => '\n',
                 Some('r') => '\r',
                 Some('t') => '\t',
+                Some('0') => '\0',
                 Some('\'') => '\'',
                 Some('\\') => '\\',
-                Some(other) => other,
-                None => {
+                _ => {
                     return Err(SoulError::new(
                         "Unclosed char literal escape sequence",
                         SoulErrorKind::InvalidEscapeSequence,

@@ -1,13 +1,11 @@
 use anyhow::Result;
 use soul_utils::sementic_level::FaultCollector;
 
-pub mod benchmark;
+use utils::*;
 mod displayers;
+pub mod utils;
 mod frontend;
-mod globals;
 mod llvm;
-mod log;
-pub mod paths;
 
 fn main() -> Result<()> {
     log::init(&globals::PATHS.log_file)?;

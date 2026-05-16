@@ -1,0 +1,23 @@
+
+type Test
+use Test impl MyName {..}
+/*expance to: 
+```
+use Test impl MyName {
+    MyName(): str {
+        $Stringify(Test).copy
+    }
+} 
+```
+*/
+
+trait MyName {
+    MyName(): str
+}
+
+#[Default] 
+impl MyName {
+    MyName(): str {
+        $Stringify(This).copy
+    }    
+}

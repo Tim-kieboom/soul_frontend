@@ -12,6 +12,8 @@ use soul_utils::{
 use std::fmt::Write;
 use typed_hir::{ThirTypeKind, TypedHir, display_thir::DisplayThirType};
 
+const DISPLAY_PLACE_ID: bool = false;
+
 pub fn display_hir(ast_context: &AbtractSyntaxTree, hir: &HirTree) -> String {
     let mut displayer = HirDisplayer::new_hir(hir, ast_context);
 
@@ -545,7 +547,11 @@ impl<'a> HirDisplayer<'a> {
     }
 
     fn display_place(&mut self, place: &hir::PlaceId) {
-        self.push_fmt(format_args!("/*{place:?}*/"));
+        
+        if DISPLAY_PLACE_ID {
+            self.push_fmt(format_args!("/*{place:?}*/"));
+        }
+
         match &self.hir.nodes.places[*place].kind {
             hir::PlaceKind::Temp(local_id) => self.display_temp(*local_id),
             hir::PlaceKind::Local(local_id) => self.display_local(*local_id),

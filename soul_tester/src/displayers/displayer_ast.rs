@@ -514,7 +514,7 @@ impl<'a> AstDisplayer<'a> {
                 if let Some(condition) = &r#while.condition {
                     self.display_expression(condition);
                 }
-                self.push_str("{\n");
+                self.display_block(&r#while.block);
             }
             ast::ExpressionKind::Match(match_) => {
                 self.push_str("match ");

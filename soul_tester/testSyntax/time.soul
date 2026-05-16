@@ -37,13 +37,13 @@ use Duration {
     impl const Sub {
         const Sub(this, other: This): This {
             
+            mut seconds = this.seconds - other.seconds
             if this.nanoSeconds >= other.nanoSeconds {
-                seconds := this.seconds - other.seconds
                 nanoSeconds := this.nanoSeconds - other.nanoSeconds
                 return This{seconds, nanoSeconds}
             }
 
-            seconds := this.seconds - other.seconds - 1
+            seconds -= 1
             nanoSeconds := this.nanoSeconds + NANOS_PER_SEC - other.nanoSeconds
             This{seconds, nanoSeconds}
         }
