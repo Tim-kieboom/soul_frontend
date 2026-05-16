@@ -11,6 +11,7 @@ PrintAssert(
 ) {
 
     if condition == false {
+        Print("!!ASSERT FAILED!! ")
         PrintPanicMsg(msg, line, file)
     }
 }

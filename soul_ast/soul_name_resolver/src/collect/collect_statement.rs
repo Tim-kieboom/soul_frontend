@@ -141,7 +141,9 @@ impl<'a> NameResolver<'a> {
         let prev_in_global = self.current.in_global;
         let prev_function = self.current.function;
 
+        
         let id = self.declare_function(&mut function.signature);
+        self.current.function = Some(id);
 
         if is_main(&function.signature.node) {
             self.store.main_function = Some(id);
@@ -150,6 +152,9 @@ impl<'a> NameResolver<'a> {
         let signature = &mut function.signature.node;
         self.collect_type(&mut signature.methode_type);
         self.collect_type(&mut signature.return_type);
+
+        self.store
+            .insert_functions(id, signature.clone(), self.current.module);
 
         for param in &mut signature.parameters {
             if let Some(ref mut default) = param.default {
@@ -168,8 +173,7 @@ impl<'a> NameResolver<'a> {
         self.collect_scopeless_block(&mut function.block);
         self.pop_scope();
 
-        self.store
-            .insert_functions(id, signature.clone(), self.current.module);
+
         self.current.function = prev_function;
         self.current.in_global = prev_in_global;
     }

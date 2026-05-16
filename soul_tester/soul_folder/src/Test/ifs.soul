@@ -1,5 +1,6 @@
 import (
-    ./.Io
+    ./.Std.Io
+    ./.Std.Assertions.{Assert}
 )
 
 RunTests() {

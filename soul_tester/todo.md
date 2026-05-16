@@ -6,7 +6,7 @@
     (D) enum with expression
 
 (C) add match
-    (C) add numaric switch like match
+    (C) add numaric switch like match {cm}
     (D) add string switch like match
     (D) add array switch like match
     (E) add type matching

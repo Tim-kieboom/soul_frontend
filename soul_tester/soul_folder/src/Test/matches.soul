@@ -1,0 +1,78 @@
+import (
+    ./.Std.Io
+)
+
+RunTests() {
+    test_match_literal_int()
+    test_match_literal_uint()
+    test_match_literal_char()
+}
+
+test_match_literal_int() {
+    match_int(num: int): [@]char {
+        v := match num {
+            10 => "10"
+            5 => {
+                return "early return"
+            }
+            _ => "other"
+        }
+
+        v
+    }
+
+    res10 := match_int(10)
+    Io.PrintAssert(res10 == "10", msg: "match_int(10) should return \"10\"")
+
+    res5 := match_int(5)
+    Io.PrintAssert(res5 == "early return", msg: "match_int(5) should return \"early return\"")
+    
+    res9 := match_int(0)
+    Io.PrintAssert(res9 == "other", msg: "match_int(0) should return \"other\"")
+}
+
+test_match_literal_uint() {
+    match_uint(num: uint): [@]char {
+        v := match num {
+            10 => "10u"
+            5 => {
+                return "early return"
+            }
+            _ => "other"
+        }
+
+        v
+    }
+
+    res10 := match_uint(10)
+    Io.PrintAssert(res10 == "10u", msg: "match_uint(10) should return \"10u\"")
+
+    res5 := match_uint(5)
+    Io.PrintAssert(res5 == "early return", msg: "match_uint(5) should return \"early return\"")
+    
+    res9 := match_uint(0)
+    Io.PrintAssert(res9 == "other", msg: "match_uint(0) should return \"other\"")
+}
+
+test_match_literal_char() {
+    match_char(num: char): [@]char {
+        v := match num {
+            '1' => "1_char"
+            '5' => {
+                return "early return"
+            }
+            _ => "other"
+        }
+
+        v
+    }
+
+    res10 := match_char('1')
+    Io.PrintAssert(res10 == "1_char", msg: "match_char('1') should return \"1_char\"")
+
+    res5 := match_char('5')
+    Io.PrintAssert(res5 == "early return", msg: "match_char('5') should return \"early return\"")
+    
+    res9 := match_char('X')
+    Io.PrintAssert(res9 == "other", msg: "match_char('X') should return \"other\"")
+}

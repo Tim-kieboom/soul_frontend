@@ -1,44 +1,15 @@
 import (
-    crate.Io
-    // crate.Test
-    // crate.Fs.{File}
-    // crate.Mem.Slice.{Index}
-    // crate.Assertions.{Assert}
-    // crate.Mem.Str.{StringBuilder}
+    crate.Std.Io
+    crate.Test
+    // crate.Std.Fs.{File}
+    // crate.Std.Mem.Slice.{Index}
+    // crate.Std.Assertions.{Assert}
+    crate.Std.Mem.Str.{StringBuilder}
 )
 
+
 main() {
-
-    // mut sb = StringBuilder.New()
-    // sb.Push('h')
-    // sb.PushStr("ello")
-    // // sb.PushCstr(c" world")
-
-    // str := sb.IntoStr()
-    // Io.Println(@str)
-
-    cstr := c"hello"
-    len := Cstr_Len(cstr)
-    Io.Println_uint(len)
-
-    // file := File.Open(c"test.txt", 0)
-
-    // text := file.Read()
-    // Io.Println(@text)
-    // file.Close()
-    // string := "tim"
-    // if string == "tim" {
-    //     Io.Println("is tim!!")
-    // }
-
-    // x := match 5 {
-    //     10 => "10"
-    //     5 => {
-    //         Io.Println("early return")
-    //         return
-    //     }
-    //     _ => "other"
-    // }
-    // Io.Println(x)
-    // Io.Println("hello world")
+    Test.RunTests()
+    
+    Io.Println("hello world")
 }

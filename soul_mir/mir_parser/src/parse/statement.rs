@@ -164,7 +164,14 @@ impl<'a> MirContext<'a> {
             return;
         }
 
+        let is_match = matches!(value_expr.kind, ExpressionKind::Match { .. });
+        if is_match {
+            self.current.target_place = Some(target_place);
+        }
         let operand = self.lower_operand(value).pass(is_end);
+        if is_match {
+            self.current.target_place = None;
+        }
         let local_type = self.local_type(variable.local);
 
         let rvalue = if operand.ty != local_type {

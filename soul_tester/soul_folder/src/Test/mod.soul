@@ -1,9 +1,25 @@
 import (
     .ifs
     .enums
+    .matches
+    ./.Std.Io
+    ./.Std.Time.{Instance, Duration}
 )
+extern "C" __clib_delay_sec(seconds: c_int)
 
 RunTests() {
+    start := Instance.Now()
+    
     ifs.RunTests()
     enums.RunTests()
+    matches.RunTests()
+
+    logTime(start)
+}
+
+logTime(start: Instance) {
+    time: Duration = start.Elapsed()
+    ms := time.AsMillisf64()
+    Io.Print("Tests Time ms: ")
+    Io.Println_float(ms)
 }

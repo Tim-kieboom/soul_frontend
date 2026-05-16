@@ -277,19 +277,17 @@ impl<'a> MirContext<'a> {
         let mut wildcard_arm: Option<(BlockId, hir::BlockId)> = None;
         let mut arm_blocks = Vec::new();
 
-        let is_expr = self.current.target_place.is_none();
-
         for arm in arms {
             let arm_bb = self.new_block();
-            if !is_expr {
-                self.tree.blocks[arm_bb].returnable = returnable;
-            }
             arm_blocks.push((arm_bb, arm.body));
 
             match &arm.pattern {
                 hir::MatchPatternHir::Literal(lit) => {
-                    if let Literal::Int(val) = lit {
-                        targets.push((*val, arm_bb));
+                    match lit {
+                        Literal::Int(val) => targets.push((*val, arm_bb)),
+                        Literal::Uint(val) => targets.push((*val as i128, arm_bb)),
+                        Literal::Char(val) => targets.push((*val as i128, arm_bb)),
+                        _ => {} // Float, Bool, Str, Cstr not supported as match patterns
                     }
                 }
                 hir::MatchPatternHir::Wildcard => {
@@ -300,9 +298,6 @@ impl<'a> MirContext<'a> {
 
         if wildcard_arm.is_none() {
             let else_bb = self.new_block();
-            if !is_expr {
-                self.tree.blocks[else_bb].returnable = returnable;
-            }
             targets.push((0, else_bb));
             wildcard_arm = Some((else_bb, arms.last().map(|a| a.body).unwrap()));
         }

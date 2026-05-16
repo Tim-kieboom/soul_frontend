@@ -207,7 +207,7 @@ void __clib_delay_sec(int seconds) {
     while (((double)(clock() - start)) / CLOCKS_PER_SEC < seconds) {}
 }
 
-Duration __clib_Duration_now() {
+void __clib_Duration_now(/*out*/Duration* duration) {
     struct timespec ts = {0};
 
 #ifdef _WIN32
@@ -227,16 +227,8 @@ Duration __clib_Duration_now() {
     ts.tv_nsec = 0;
 #endif
 
-    return (Duration){
+    *duration = (Duration){
         .sec = (u64)ts.tv_sec,
         .nano = (u32)ts.tv_nsec, 
     };
-}
-
-// ---------------- #Pointers ----------------
-
-void* __clib_Nullptr() {return NULL;}
-
-u8* __clib_offset(u8* ptr, size_t index) {
-    return ptr + index;
 }

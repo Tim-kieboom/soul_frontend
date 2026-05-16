@@ -702,7 +702,15 @@ impl<'a> MirContext<'a> {
             fields[i] = operand;
         }
 
-        let body = if runtime {
+        let all_comptime = fields.iter().all(|op| matches!(op.kind, mir::OperandKind::Comptime(_)));
+
+        let body = if runtime || !all_comptime {
+            if !runtime && !all_comptime {
+                self.log_error(soul_error_internal!(
+                    "expected all fields to be compile-time known in struct constructor",
+                    None
+                ));
+            }
             mir::AggregateBody::Runtime(fields)
         } else {
             let literals = fields

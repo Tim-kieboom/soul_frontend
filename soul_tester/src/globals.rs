@@ -6,7 +6,7 @@ use soul_utils::{
 };
 use std::sync::{LazyLock, Mutex, MutexGuard};
 
-static RAW_PATHS: &[u8] = include_bytes!("../../paths.json");
+static RAW_PATHS: &[u8] = include_bytes!("../paths.json");
 static BENCHMARKS: Mutex<Benchmarks> = Mutex::new(Benchmarks::const_default());
 
 const OS: Os = Os::Windows;
@@ -20,7 +20,7 @@ pub(crate) static PATHS: LazyLock<Paths> =
     LazyLock::new(|| serde_json::from_slice(RAW_PATHS).expect("no json error"));
     
 pub(crate) const MESSAGE_CONFIG: MessageConfig = MessageConfig {
-    backtrace: true,
+    backtrace: false,
     colors: true,
 };
 

@@ -6,6 +6,7 @@ mod displayers;
 pub mod utils;
 mod frontend;
 mod llvm;
+mod globals;
 
 fn main() -> Result<()> {
     log::init(&globals::PATHS.log_file)?;

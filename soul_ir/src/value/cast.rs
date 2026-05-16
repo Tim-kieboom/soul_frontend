@@ -141,12 +141,12 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         info: PrimCastInfo<'a>,
         generics: &GenericSubstitute,
     ) -> SoulResult<IrOperand<'a>> {
-        let value = if info.source_size == info.cast_size {
-            self.same_size_cast(&info)?
+        let value = if info.one_is_float {
+            self.int_float_cast(&info)?
         } else if info.both_are_float {
             self.float_float_cast(&info)?
-        } else if info.one_is_float {
-            self.int_float_cast(&info)?
+        } else if info.source_size == info.cast_size {
+            self.same_size_cast(&info)?
         } else if info.source_size < info.cast_size {
             self.int_extend(&info)?
         } else {

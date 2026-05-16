@@ -1,8 +1,8 @@
 use ast::{
-    Block, ElseKind, Expression, ExpressionKind, If, IfArm, IfArmHelper, Literal, Match, MatchArm,
+    Block, ElseKind, Expression, ExpressionKind, If, IfArm, IfArmHelper, Match, MatchArm,
     MatchPattern, While,
 };
-use soul_tokenizer::{Number, TokenKind};
+use soul_tokenizer::TokenKind;
 use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},
     soul_names::{KeyWord, TypeModifier},
@@ -187,38 +187,14 @@ impl<'a, 'f> Parser<'a, 'f> {
             return Ok(MatchPattern::Wildcard);
         }
 
-        let token_kind = self.token().kind.clone();
-        match &token_kind {
-            TokenKind::Number(num) => {
-                let value = match num {
-                    Number::Uint(u) => *u as i128,
-                    Number::Int(i) => *i as i128,
-                    Number::Float(_) => {
-                        return Err(SoulError::new(
-                            "expected integer literal for match pattern",
-                            SoulErrorKind::InvalidIdent,
-                            Some(self.token().span),
-                        ));
-                    }
-                };
-                self.bump();
-                Ok(MatchPattern::Literal(Literal::Int(value)))
-            }
-            TokenKind::Ident(ident) => {
-                if let Ok(i) = ident.parse::<i128>() {
-                    self.bump();
-                    return Ok(MatchPattern::Literal(Literal::Int(i)));
-                }
-                Err(SoulError::new(
-                    "expected integer literal or '_' for match pattern",
-                    SoulErrorKind::InvalidIdent,
-                    Some(self.token().span),
-                ))
-            }
+        let end_tokens = [TokenKind::Symbol(SymbolKind::LambdaArray)];
+        let expr = self.parse_expression(&end_tokens)?;
+        match expr.node {
+            ExpressionKind::Literal((_, lit)) => Ok(MatchPattern::Literal(lit)),
             _ => Err(SoulError::new(
-                "expected integer literal or '_' for match pattern",
+                "expected a literal or '_' for match pattern",
                 SoulErrorKind::InvalidIdent,
-                Some(self.token().span),
+                Some(expr.span),
             )),
         }
     }

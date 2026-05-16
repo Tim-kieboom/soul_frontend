@@ -28,6 +28,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             ir_left.value = self
                 .builder
                 .build_load(ir_left.info.ir_type, ptr, "load_left")?;
+            ir_left.info.is_unloaded = false;
         }
 
         if ir_right.info.is_unloaded {
@@ -35,6 +36,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             ir_right.value = self
                 .builder
                 .build_load(ir_right.info.ir_type, ptr, "load_left")?;
+            ir_right.info.is_unloaded = false;
         }
 
         match operator.node {
@@ -78,7 +80,15 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         operator: &UnaryOperator,
         generics: &GenericSubstitute,
     ) -> SoulResult<IrOperand<'a>> {
-        let ir_value = self.lower_operand(value, generics)?;
+        let mut ir_value = self.lower_operand(value, generics)?;
+
+        if ir_value.info.is_unloaded {
+            let ptr = ir_value.get_or_convert_pointer(&self.builder)?;
+            ir_value.value = self
+                .builder
+                .build_load(ir_value.info.ir_type, ptr, "load_unary")?;
+            ir_value.info.is_unloaded = false;
+        }
 
         match &operator.node {
             ast::UnaryOperatorKind::Invalid => {

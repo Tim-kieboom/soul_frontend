@@ -87,10 +87,20 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             } => {
                 let discr = self.lower_operand(discriminant, generics)?;
                 let discr_val = discr.value.into_int_value();
+                let i64_type = self.context.i64_type();
+                let discr_val = if discr_val.get_type() != i64_type {
+                    if discr_val.get_type().get_bit_width() < i64_type.get_bit_width() {
+                        self.builder.build_int_z_extend(discr_val, i64_type)?
+                    } else {
+                        discr_val
+                    }
+                } else {
+                    discr_val
+                };
                 let otherwise_block = self.get_block(*otherwise);
                 let mut cases = Vec::new();
                 for (val, target) in targets {
-                    let case_val = self.context.i64_type().const_int(*val as u64, false);
+                    let case_val = i64_type.const_int(*val as u64, false);
                     cases.push((case_val, self.get_block(*target)));
                 }
                 self.builder

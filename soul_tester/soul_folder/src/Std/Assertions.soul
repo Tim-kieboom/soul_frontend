@@ -1,5 +1,5 @@
 import (
-    .Io.{PrintPanicMsg}
+    .Io.{PrintPanicMsg, Print}
 )
 
 Panic(
@@ -19,7 +19,7 @@ Assert(
 ) {
 
     if condition == false {
-        PrintPanicMsg(msg, line, file)
-        intrinsic.Exit(1)
+        Print("!!ASSERT FAILED!! ")
+        Panic(msg, line: line, file: file)
     }
 }

@@ -1,10 +1,11 @@
 import (
     .Slice.{Index}
+    ./.Assertions.{Assert}
 )
 
 extern "C" realloc(ptr: *char, size: int): *char
 
-isNull(ptr: *char): bool {
+isNullChar(ptr: *char): bool {
     ch := *ptr
     ch == '\0'
 }
@@ -13,7 +14,7 @@ Cstr_Len(cstr: c_str): uint {
 
     mut len = 0 as uint
     mut ptr = cstr as *char 
-    while !isNull(ptr) {
+    while !isNullChar(ptr) {
         
         len += 1
         ptr = intrinsic.PtrOffset(ptr, 1)
@@ -30,6 +31,7 @@ struct StringBuilder {
 use StringBuilder {
     New(size: uint = 0): StringBuilder {
         array := intrinsic.Alloc(size as int) as *char
+        Assert(array != null, msg: "intrinsic.Alloc failed")
         StringBuilder{array, len: 0, cap: size}
     }
 
@@ -97,8 +99,18 @@ use StringBuilder {
     }
 
     resize(&this, newSize: uint) {
+        if newSize == 0 {
+            this.cap = 0
+            old := this.array
+            this.array = null
+            intrinsic.Dealloc(old)
+            return
+        }
+
         this.cap = newSize
-        array := this.array
-        this.array = intrinsic.Realloc(array, newSize as int) as *char
+        mut ptr = this.array
+        this.array = intrinsic.Realloc(ptr, newSize as int) as *char       
+        ptr = this.array
+        Assert(ptr != null, msg: "intrinsic.Realloc failed")
     }
 }
