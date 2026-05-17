@@ -280,7 +280,7 @@ impl UnifyPrimitiveCastLazy for HirTypeKind {
                 }
             }
             (HirTypeKind::Pointer(_), HirTypeKind::Primitive(prim)) => {
-                return if !prim.is_numeric() {
+                return if !prim.is_numeric() && !matches!(prim, PrimitiveTypes::CStr) {
                     Err("can only cast pointer to numaric or other pointers".to_string())
                 } else {
                     Ok(())

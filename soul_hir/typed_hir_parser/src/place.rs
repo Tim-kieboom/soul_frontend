@@ -54,9 +54,22 @@ impl<'a> TypedHirContext<'a> {
                 };
 
                 let base_type = self.id_to_type(resolved);
-                match &base_type.kind {
-                    hir::HirTypeKind::Array { element, .. } => *element,
-                    _ => {
+                let array_type = match &base_type.kind {
+                    hir::HirTypeKind::Array { element, .. } => Some(*element),
+                    hir::HirTypeKind::Ref { of_type, .. } => {
+                        match self.resolve_type_strict(*of_type, span) {
+                            Some(id) => match &self.id_to_type(id).kind {
+                                hir::HirTypeKind::Array { element, .. } => Some(*element),
+                                _ => None,
+                            },
+                            None => None,
+                        }
+                    }
+                    _ => None,
+                };
+                match array_type {
+                    Some(element) => element,
+                    None => {
                         self.log_error(SoulError::new(
                             format!(
                                 "can only use index on an array type '{}' is not an array type",

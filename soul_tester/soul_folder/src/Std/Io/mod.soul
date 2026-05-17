@@ -57,19 +57,19 @@ Print_bool(value: bool) {
 }
 
 Print_int(value: int, base: u8 = 10, capital: bool = true) {
-    const fmtBuffer: [50]char
+    const fmtBuffer: [25]char
     cstr := fmt.FmtInt(value, base, @fmtBuffer, capital)
     Stdout.WriteCstr(cstr)
 }
 
 Print_uint(value: uint, base: u8 = 10, capital: bool = true) {
-    const fmtBuffer: [50]char
+    const fmtBuffer: [25]char
     cstr := fmt.FmtUint(value, base, @fmtBuffer, capital)
     Stdout.WriteCstr(cstr)
 }
 
 Print_float(value: f64, base: u8 = 10, precision: u8 = 4, capital: bool = true) {
-    const fmtBuffer: [50]char
+    const fmtBuffer: [25]char
     cstr := fmt.FmtFloat(value, base, @fmtBuffer, precision, capital)
     Stdout.WriteCstr(cstr)
 }

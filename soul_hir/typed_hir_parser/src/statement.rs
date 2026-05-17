@@ -222,7 +222,10 @@ impl<'a> TypedHirContext<'a> {
         let (value, span) = match self.get_variable_value(variable) {
             Some(val) => (val, self.expression_span(val)),
             None => {
-                self.type_local(variable.local, declared_type_id, TypeModifier::Const, span);
+                let modifier = self
+                    .lazy_id_get_modifier(declared_type_id)
+                    .unwrap_or(TypeModifier::Const);
+                self.type_local(variable.local, declared_type_id, modifier, span);
                 return declared_type_id;
             }
         };

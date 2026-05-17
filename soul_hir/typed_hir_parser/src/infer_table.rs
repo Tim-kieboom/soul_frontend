@@ -10,6 +10,7 @@ use soul_utils::{
     vec_map::VecMap,
 };
 
+use ast::ArrayKind;
 use crate::type_helpers::{ArrayKindCompatible, GetPriority, TypeCompatible};
 
 pub enum UnifyResult {
@@ -103,7 +104,17 @@ impl InferTable {
         let a_ty = self.get_type(types, a_id)?;
         let b_ty = self.get_type(types, b_id)?;
 
-        match (&a_ty.kind, &b_ty.kind) {
+        let a_kind = a_ty.kind;
+        let b_kind = b_ty.kind;
+
+        let display_type = |id: TypeId, types: &TypesMap, infers: &InferTypesMap| -> String {
+            types
+                .id_to_type(id)
+                .map(|ty| ty.display(types, infers))
+                .unwrap_or_default()
+        };
+
+        match (&a_kind, &b_kind) {
             (
                 HirTypeKind::Array {
                     element: a_el,
@@ -126,11 +137,11 @@ impl InferTable {
 
             (
                 HirTypeKind::Ref {
-                    of_type: a_id,
+                    of_type: a_ref_of,
                     mutable: a_mut,
                 },
                 HirTypeKind::Ref {
-                    of_type: b_id,
+                    of_type: b_ref_of,
                     mutable: b_mut,
                 },
             ) => {
@@ -138,36 +149,116 @@ impl InferTable {
                     return Err(SoulError::new(
                         format!(
                             "Type mismatch: expected {} got {}",
-                            a_ty.display(types, infers),
-                            b_ty.display(types, infers)
+                            display_type(a_id, types, infers),
+                            display_type(b_id, types, infers)
                         ),
                         SoulErrorKind::UnifyTypeError,
                         Some(span),
                     ));
                 }
-                self.unify_type_type(types, infers, *a_id, *b_id, span)
+                self.unify_type_type(types, infers, *a_ref_of, *b_ref_of, span)
             }
 
-            (HirTypeKind::Pointer(a_id), HirTypeKind::Pointer(b_id))
-            | (HirTypeKind::Optional(a_id), HirTypeKind::Optional(b_id)) => {
-                self.unify_type_type(types, infers, *a_id, *b_id, span)
+            (
+                HirTypeKind::Ref {
+                    of_type: ref_of,
+                    mutable,
+                },
+                HirTypeKind::Array {
+                    element: array_el,
+                    kind: array_kind,
+                },
+            )
+            | (
+                HirTypeKind::Array {
+                    element: array_el,
+                    kind: array_kind,
+                },
+                HirTypeKind::Ref {
+                    of_type: ref_of,
+                    mutable,
+                },
+            ) => {
+                let ref_of = *ref_of;
+                let mutable = *mutable;
+                let array_el = *array_el;
+                let array_kind = *array_kind;
+
+                let ref_of = self.resolve_type_lazy(types, infers, ref_of, span)?;
+                let ref_of_id = match ref_of {
+                    LazyTypeId::Known(id) => id,
+                    _ => {
+                        return Err(SoulError::new(
+                            format!(
+                                "Type mismatch: expected {} got {}",
+                                display_type(a_id, types, infers),
+                                display_type(b_id, types, infers)
+                            ),
+                            SoulErrorKind::UnifyTypeError,
+                            Some(span),
+                        ));
+                    }
+                };
+                let ref_of_ty = self.get_type(types, ref_of_id)?;
+                match &ref_of_ty.kind {
+                    HirTypeKind::Array {
+                        element: inner_el,
+                        kind: inner_kind,
+                    } => {
+                        let ok = match (inner_kind, &array_kind, mutable) {
+                            (ArrayKind::StackArray(_) | ArrayKind::HeapArray, ArrayKind::MutSlice, true)
+                            | (ArrayKind::StackArray(_) | ArrayKind::HeapArray, ArrayKind::ConstSlice, false) => true,
+                            _ => false,
+                        };
+                        if !ok {
+                            return Err(SoulError::new(
+                                format!(
+                                    "Type mismatch: expected {} got {}",
+                                    display_type(a_id, types, infers),
+                                    display_type(b_id, types, infers)
+                                ),
+                                SoulErrorKind::UnifyTypeError,
+                                Some(span),
+                            ));
+                        }
+                        self.unify_type_type(types, infers, *inner_el, array_el, span)
+                    }
+                    _ => Err(SoulError::new(
+                        format!(
+                            "Type mismatch: expected {} got {}",
+                            display_type(a_id, types, infers),
+                            display_type(b_id, types, infers)
+                        ),
+                        SoulErrorKind::UnifyTypeError,
+                        Some(span),
+                    )),
+                }
+            }
+
+            (HirTypeKind::Pointer(a_pt), HirTypeKind::Pointer(b_pt))
+            | (HirTypeKind::Optional(a_pt), HirTypeKind::Optional(b_pt)) => {
+                self.unify_type_type(types, infers, *a_pt, *b_pt, span)
             }
 
             (HirTypeKind::Never, _) | (_, HirTypeKind::Never) => Ok(UnifyResult::Ok),
 
             (HirTypeKind::Error, _) | (_, HirTypeKind::Error) => Ok(UnifyResult::Ok),
 
-            _ => a_ty.compatible_type_kind(b_ty).map_err(|reason| {
-                SoulError::new(
-                    format!(
-                        "Type mismatch: expected '{}' got '{}' because {reason}",
-                        a_ty.display(types, infers),
-                        b_ty.display(types, infers)
-                    ),
-                    SoulErrorKind::UnifyTypeError,
-                    Some(span),
-                )
-            }),
+            _ => {
+                let a_ty = self.get_type(types, a_id)?;
+                let b_ty = self.get_type(types, b_id)?;
+                a_ty.compatible_type_kind(b_ty).map_err(|reason| {
+                    SoulError::new(
+                        format!(
+                            "Type mismatch: expected '{}' got '{}' because {reason}",
+                            display_type(a_id, types, infers),
+                            display_type(b_id, types, infers)
+                        ),
+                        SoulErrorKind::UnifyTypeError,
+                        Some(span),
+                    )
+                })
+            }
         }
     }
 
@@ -347,17 +438,26 @@ impl InferTable {
                 let expecting = self.get_type(types, expect_id)?;
                 let is_type = self.get_type(types, ty)?;
 
-                expecting.compatible_type_kind(is_type).map_err(|reason| {
-                    SoulError::new(
-                        format!(
-                            "Type mismatch: expected {} got {} because {reason}",
-                            expecting.display(types, infers),
-                            is_type.display(types, infers)
-                        ),
-                        SoulErrorKind::UnifyTypeError,
-                        Some(span),
-                    )
-                })
+                if !Self::type_ref_array_compatible(
+                    types,
+                    infers,
+                    &expecting.kind,
+                    &is_type.kind,
+                ) {
+                    expecting.compatible_type_kind(is_type).map_err(|reason| {
+                        SoulError::new(
+                            format!(
+                                "Type mismatch: expected {} got {} because {reason}",
+                                expecting.display(types, infers),
+                                is_type.display(types, infers)
+                            ),
+                            SoulErrorKind::UnifyTypeError,
+                            Some(span),
+                        )
+                    })
+                } else {
+                    Ok(UnifyResult::Ok)
+                }
             }
 
             InferBinding::Alias(_) => unreachable!("find_root guarantees root is not Alias"),
@@ -516,6 +616,50 @@ impl InferTable {
         match infers.get_infer(infer) {
             Some(val) => Ok(val),
             None => Err(soul_error_internal!(format!("{:?} not found", infer), None)),
+        }
+    }
+
+    /// Check if one type is a `Ref { of_type: Array { StackArray/HeapArray, .. } }`
+    /// and the other is `Array { MutSlice/ConstSlice, .. }` with compatible mutability.
+    fn type_ref_array_compatible(
+        types: &TypesMap,
+        _infers: &InferTypesMap,
+        a: &HirTypeKind,
+        b: &HirTypeKind,
+    ) -> bool {
+        let (ref_of, ref_mut, array_kind) = match (a, b) {
+            (
+                HirTypeKind::Ref { of_type, mutable },
+                HirTypeKind::Array { kind, .. },
+            )
+            | (
+                HirTypeKind::Array { kind, .. },
+                HirTypeKind::Ref { of_type, mutable },
+            ) => (of_type, *mutable, *kind),
+            _ => return false,
+        };
+
+        let ref_of_id = match ref_of {
+            LazyTypeId::Known(id) => *id,
+            LazyTypeId::Infer(_) => return false,
+        };
+
+        let ref_of_ty = match types.id_to_type(ref_of_id) {
+            Some(ty) => ty,
+            None => return false,
+        };
+
+        match &ref_of_ty.kind {
+            HirTypeKind::Array {
+                kind: inner_kind, ..
+            } => {
+                matches!(
+                    (inner_kind, array_kind, ref_mut),
+                    (ArrayKind::StackArray(_) | ArrayKind::HeapArray, ArrayKind::MutSlice, true)
+                        | (ArrayKind::StackArray(_) | ArrayKind::HeapArray, ArrayKind::ConstSlice, false)
+                )
+            }
+            _ => false,
         }
     }
 }

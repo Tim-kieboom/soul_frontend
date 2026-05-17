@@ -18,9 +18,6 @@ use soul_utils::{
     span::Span,
     vec_map::VecMap,
 };
-const MUT: bool = true;
-const CONST: bool = false;
-
 impl<'a> TypedHirContext<'a> {
     pub(crate) fn infer_expression(&mut self, expression_id: hir::ExpressionId) -> LazyTypeId {
         if self.expressions.get(expression_id) == Some(&LazyTypeId::error()) {
@@ -609,29 +606,8 @@ impl<'a> TypedHirContext<'a> {
             }
         };
 
-        let resolved_ty = self.id_to_type(ty);
-        match &resolved_ty.kind {
-            hir::HirTypeKind::Array {
-                element,
-                kind: ArrayKind::HeapArray | ArrayKind::StackArray(_),
-            } => {
-                let kind = match mutable {
-                    MUT => ArrayKind::MutSlice,
-                    CONST => ArrayKind::ConstSlice,
-                };
-
-                let array_type = HirType::new(hir::HirTypeKind::Array {
-                    element: *element,
-                    kind,
-                });
-                self.add_type(array_type).to_lazy()
-            }
-
-            _ => {
-                let modifier = self.id_to_type(ty).modifier;
-                self.create_ref(ty.to_lazy(), mutable, modifier, span)
-            }
-        }
+        let modifier = self.id_to_type(ty).modifier;
+        self.create_ref(ty.to_lazy(), mutable, modifier, span)
     }
 
     fn create_ref(
