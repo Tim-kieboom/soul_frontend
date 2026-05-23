@@ -188,7 +188,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 ..
             } => {
                 let ptr = inner.value.into_pointer_value();
-                self.fixed_array_to_slice(ty, ptr, len)?
+                self.fixed_array_to_slice(ty, ptr, len, generics)?
             }
             _ => {
                 if inner.value.is_pointer_value() {
@@ -386,7 +386,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 }
             }
             ast::Literal::Str(text) => {
-                let (ty, value) = self.const_string_slice(&text);
+                let (ty, value) = self.const_string_slice(&text, generics);
                 IrOperand {
                     value: value.into(),
                     info: crate::OperandInfo::new_loaded(should_be, ty.into()),
@@ -405,9 +405,13 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         global.as_basic_value_enum().into_pointer_value()
     }
 
-    fn const_string_slice(&self, text: &String) -> (StructType<'a>, StructValue<'a>) {
+    fn const_string_slice(
+        &self,
+        text: &String,
+        generics: &GenericSubstitute,
+    ) -> (StructType<'a>, StructValue<'a>) {
         let ptr = self.const_string_ptr(text);
-        self.fixed_array_to_const_slice(ptr, text.len() as u64)
+        self.fixed_array_to_const_slice(ptr, text.len() as u64, generics)
     }
 
     fn create_global_string(
@@ -432,14 +436,10 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         slice_type_id: TypeId,
         ptr: PointerValue<'a>,
         len: u64,
+        generics: &GenericSubstitute,
     ) -> SoulResult<IrOperand<'a>> {
-        let slice_type = self.context.struct_type(
-            &[
-                self.context.ptr_type(AddressSpace::default()).into(),
-                self.default_int_type.into(),
-            ],
-            false,
-        );
+        let array_struct = self.types.types_map.array_struct;
+        let slice_type = self.get_or_create_struct(array_struct, generics)?;
 
         let slice_ptr = self.builder.build_alloca(slice_type, "slice")?;
         let len_val = self.default_int_type.const_int(len, false);
@@ -460,16 +460,14 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         &self,
         ptr: PointerValue<'a>,
         len: u64,
+        generics: &GenericSubstitute,
     ) -> (StructType<'a>, StructValue<'a>) {
         let len = self.default_int_type.const_int(len, false);
 
-        let slice_ty = self.context.struct_type(
-            &[
-                self.context.ptr_type(AddressSpace::default()).into(),
-                self.default_int_type.into(),
-            ],
-            false,
-        );
+        let array_struct = self.types.types_map.array_struct;
+        let slice_ty = self
+            .get_or_create_struct(array_struct, generics)
+            .expect("___Array struct should lower");
 
         (
             slice_ty,

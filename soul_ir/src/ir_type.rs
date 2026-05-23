@@ -41,9 +41,23 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             }),
             ThirTypeKind::Primitive(primitive_types) => self.lower_primitive_type(primitive_types),
 
-            ThirTypeKind::Ref { .. } | ThirTypeKind::Pointer(_) => {
+            ThirTypeKind::Pointer(_) => {
                 let ptr_type = self.context.ptr_type(AddressSpace::default());
                 Some(ptr_type.into())
+            }
+            ThirTypeKind::Ref { of_type, .. } => {
+                let array_struct = self.types.types_map.array_struct;
+                let pointee = self.get_type(of_type)?;
+                match &pointee.kind {
+                    ThirTypeKind::Array {
+                        kind: ast::ArrayKind::StackArray(_) | ast::ArrayKind::HeapArray,
+                        ..
+                    } => Some(self.get_or_create_struct(array_struct, generics)?.into()),
+                    _ => {
+                        let ptr_type = self.context.ptr_type(AddressSpace::default());
+                        Some(ptr_type.into())
+                    }
+                }
             }
             ThirTypeKind::Optional(type_id) => {
                 let element_type = match self.lower_type(type_id, generics)? {

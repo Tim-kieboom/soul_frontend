@@ -11,6 +11,6 @@ import (
 main() {
     Test.RunTests()
     
-    Io.Println_int(1)
+    Io.Println_int(10)
     Io.Println("hello world")
 }

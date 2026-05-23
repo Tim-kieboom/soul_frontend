@@ -15,8 +15,12 @@ fn main() -> Result<()> {
 
     let output = frontend::compile(&mut crate_store, &manifest)?;
 
-    llvm::compile(output, root_path, &manifest)?;
-    log::benchmark()
+    let success = llvm::compile(output, root_path, &manifest)?;
+    if success {
+        log::benchmark()?;
+    }
+
+    Ok(())
 }
 
 struct Output {

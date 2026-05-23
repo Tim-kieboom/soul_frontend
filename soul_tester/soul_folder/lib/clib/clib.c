@@ -85,9 +85,7 @@ double __clib_log(double exp, double base) {
 // ---------------- #Printers ----------------
 
 void __clib_printSoulStr(const char* ptr, const uint len) {
-    for(int i = 0; i < len; i++) {
-        putchar(ptr[i]);
-    }
+    printf("%*s", (int)len, ptr);
 }
 
 void __clib_printCStr(const str text) {

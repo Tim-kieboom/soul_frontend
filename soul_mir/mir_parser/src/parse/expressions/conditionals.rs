@@ -48,6 +48,14 @@ impl<'a> MirContext<'a> {
         self.insert_terminator(loop_bb, mir::Terminator::Goto(condition_bb));
         self.lower_block(body_id, loop_bb);
 
+        let end_block = self.expect_current_block();
+        if matches!(
+            self.tree.blocks[end_block].terminator,
+            mir::Terminator::Unreachable
+        ) {
+            self.insert_terminator(end_block, mir::Terminator::Goto(condition_bb));
+        }
+
         self.current.block = Some(join_bb);
         self.current.loop_finish = prev_finish;
         self.current.loop_continue = prev_continue;

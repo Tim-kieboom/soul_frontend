@@ -66,6 +66,8 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 //llvm doesn't care enum's are (u8, u16, u32 or u64)
                 self.new_loaded_operand(source_value, cast_to, generics)
             }
+            (ThirTypeKind::Ref{..}, ThirTypeKind::Pointer(_)) |
+            (ThirTypeKind::Pointer(_), ThirTypeKind::Ref{..}) |
             (ThirTypeKind::Pointer(_), ThirTypeKind::Pointer(_)) |
             (ThirTypeKind::Primitive(PrimitiveTypes::CStr), ThirTypeKind::Pointer(_)) => {
                 //llvm doesn't care ptr's are ptr's
