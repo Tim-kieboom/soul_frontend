@@ -263,6 +263,9 @@ impl<'a> NameResolver<'a> {
                     ast::CustomType::Enum(enum_) => {
                         Self::resolve_enum(self.context, self.store, &self.current, enum_);
                     }
+                    ast::CustomType::Union(union_) => {
+                        Self::resolve_union(self.context, self.store, &self.current, union_);
+                    }
                 }
             }
 

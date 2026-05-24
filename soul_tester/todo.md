@@ -5,13 +5,14 @@
     (C) basic c enum {cm}
     (D) enum with expression
 
+(C) add union
+
 (C) add match
     (C) add numaric switch like match {cm}
-    (D) add string switch like match
-    (D) add array switch like match
+    (D) add string switch like match {cm}
+    (D) add array switch like match {cm}
     (E) add type matching
 
-(C) add union
 
 (A) merge ast:Expression Array and Arracontructor using AnyArray
 

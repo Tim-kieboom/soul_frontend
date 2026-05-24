@@ -24,6 +24,9 @@ impl<'a> NameResolver<'a> {
             StatementKind::Enum(obj) => {
                 Self::resolve_enum(self.context, self.store, &self.current, obj);
             }
+            StatementKind::Union(obj) => {
+                Self::resolve_union(self.context, self.store, &self.current, obj);
+            }
             _ => (),
         }
     }
@@ -69,6 +72,7 @@ impl<'a> NameResolver<'a> {
             } => self.resolve_expression(expression),
             StatementKind::Import(_) => (), // maybe later track imports
             StatementKind::ExternalFunction(_) => (), // maybe later track imports
+            StatementKind::Union(_) => (),
         }
     }
 

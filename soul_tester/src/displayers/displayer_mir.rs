@@ -1,4 +1,11 @@
-use ast::AstModuleStore;
+use ast::{AstModuleStore, Literal};
+
+fn fields_len(body: &mir::AggregateBody) -> usize {
+    match body {
+        mir::AggregateBody::Runtime(fields) => fields.len(),
+        mir::AggregateBody::Comptime(literals) => literals.len(),
+    }
+}
 use hir::{ComplexLiteral, FieldId, HirTree, StructId, TypeId};
 use mir_parser::mir::{
     self, BlockId, FunctionBody, GlobalId, Local, LocalId, MirTree, ModuleNodeId, Operand, Place,
@@ -354,6 +361,30 @@ impl<'a> MirDisplayer<'a> {
         }
     }
 
+    fn find_union_for_struct(&self, struct_id: StructId) -> Option<&hir::Union> {
+        for (_, union) in self.hir.info.types.union_entries() {
+            if union.internal_struct == struct_id {
+                return Some(union);
+            }
+        }
+        None
+    }
+
+    fn resolve_compact_variant_idx(&self, body: &mir::AggregateBody) -> Option<usize> {
+        match body {
+            mir::AggregateBody::Runtime(fields) => match &fields.first()?.kind {
+                mir::OperandKind::Comptime(hir::ComplexLiteral::Basic(Literal::Int(idx))) => {
+                    Some(*idx as usize)
+                }
+                _ => None,
+            },
+            mir::AggregateBody::Comptime(literals) => match &literals.first()?.0 {
+                hir::ComplexLiteral::Basic(Literal::Int(idx)) => Some(*idx as usize),
+                _ => None,
+            },
+        }
+    }
+
     fn display_rvalue(&mut self, value: &Rvalue) {
         match &value.kind {
             mir::RvalueKind::Place(place) => {
@@ -361,6 +392,16 @@ impl<'a> MirDisplayer<'a> {
             }
             mir::RvalueKind::Aggregate { struct_type, body } => {
                 let object = self.hir.info.types.id_to_struct(*struct_type);
+                let variant_names: Vec<String> = self
+                    .find_union_for_struct(*struct_type)
+                    .map(|u| u.variants.iter().map(|v| v.name.to_string()).collect())
+                    .unwrap_or_default();
+                let is_compact = fields_len(body) == 2 && !variant_names.is_empty();
+                let variant_idx = if is_compact {
+                    self.resolve_compact_variant_idx(body)
+                } else {
+                    None
+                };
                 self.display_struct_name(*struct_type);
                 self.push('{');
                 match body {
@@ -368,9 +409,21 @@ impl<'a> MirDisplayer<'a> {
                         self.push_str("/*runtime*/");
                         let last_index = fields.len().saturating_sub(1);
                         for (i, field) in fields.iter().enumerate() {
-                            match object {
-                                Some(obj) => self.push_str(obj.fields[i].name.as_str()),
-                                None => write!(self.sb, "_{i}").expect("no fmt error"),
+                            if is_compact && i == 1 {
+                                if let Some(idx) = variant_idx {
+                                    if let Some(name) = variant_names.get(idx) {
+                                        self.push_str(name);
+                                    } else {
+                                        self.push_str("<?>");
+                                    }
+                                } else {
+                                    self.push_str("active");
+                                }
+                            } else {
+                                match object {
+                                    Some(obj) => self.push_str(obj.fields[i].name.as_str()),
+                                    None => write!(self.sb, "_{i}").expect("no fmt error"),
+                                }
                             }
 
                             self.push_str(": ");
@@ -384,9 +437,21 @@ impl<'a> MirDisplayer<'a> {
                         self.push_str("/*comptime*/");
                         let last_index = literals.len().saturating_sub(1);
                         for (i, (literal, _)) in literals.iter().enumerate() {
-                            match object {
-                                Some(obj) => self.push_str(obj.fields[i].name.as_str()),
-                                None => write!(self.sb, "_{i}").expect("no fmt error"),
+                            if is_compact && i == 1 {
+                                if let Some(idx) = variant_idx {
+                                    if let Some(name) = variant_names.get(idx) {
+                                        self.push_str(name);
+                                    } else {
+                                        self.push_str("<?>");
+                                    }
+                                } else {
+                                    self.push_str("active");
+                                }
+                            } else {
+                                match object {
+                                    Some(obj) => self.push_str(obj.fields[i].name.as_str()),
+                                    None => write!(self.sb, "_{i}").expect("no fmt error"),
+                                }
                             }
 
                             self.push_str(": ");

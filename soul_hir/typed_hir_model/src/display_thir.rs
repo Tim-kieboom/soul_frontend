@@ -66,6 +66,10 @@ impl DisplayThirType for ThirTypeKind {
                         Some(s) => sb.push_str(s.name.as_str()),
                         None => sb.push_str("<error>"),
                     },
+                    CustomTypeId::Union(union_id) => match types.id_to_union(union_id) {
+                        Some(s) => sb.push_str(s.name.as_str()),
+                        None => sb.push_str("<error>"),
+                    },
                 }
                 Ok(())
             }
@@ -117,6 +121,7 @@ impl ThirTypeKind {
             ThirTypeKind::CustomTypes(id) => match id {
                 CustomTypeId::Struct(_) => "<struct>",
                 CustomTypeId::Enum(_) => "<enum>",
+                CustomTypeId::Union(_) => "<union>",
             },
             ThirTypeKind::Primitive(primitive) => primitive.as_str(),
         }

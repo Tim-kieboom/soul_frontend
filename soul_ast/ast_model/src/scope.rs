@@ -389,6 +389,7 @@ pub struct ScopeTypeEntry {
 pub enum ScopeTypeEntryKind {
     Enum,
     Struct,
+    Union,
     LifeTime,
     GenericType,
 }

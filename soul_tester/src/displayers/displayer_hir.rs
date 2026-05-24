@@ -491,6 +491,24 @@ impl<'a> HirDisplayer<'a> {
                 self.push('.');
                 self.push_str(&variant_name.to_string());
             }
+            hir::ExpressionKind::UnionConstructor {
+                union_id,
+                variant_index: _,
+                variant_field_id: _,
+                value,
+            } => {
+                let union_name = self
+                    .hir
+                    .info
+                    .types
+                    .id_to_union(*union_id)
+                    .map(|u| u.name.as_str())
+                    .unwrap_or("<error>");
+                self.push_str(union_name);
+                self.push_str(".Variant(");
+                self.display_expression(value);
+                self.push(')');
+            }
             hir::ExpressionKind::PtrOffset { pointer, offset } => {
                 self.push_str("intrinsic.PtrOffset(");
                 self.display_expression(pointer);

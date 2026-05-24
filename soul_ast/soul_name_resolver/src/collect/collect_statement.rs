@@ -134,6 +134,13 @@ impl<'a> NameResolver<'a> {
                 self.collect_expression(&mut assignment.left);
                 self.collect_expression(&mut assignment.right);
             }
+            StatementKind::Union(obj) => {
+                self.declare_union(obj);
+
+                if self.current.in_global {
+                    self.header_insert_union(obj.clone());
+                }
+            }
         }
     }
 

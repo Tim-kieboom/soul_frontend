@@ -59,12 +59,14 @@ pub struct HeaderEntry {
 pub enum CustomType {
     Struct(Struct),
     Enum(Enum),
+    Union(Union),
 }
 impl CustomType {
     pub fn id(&self) -> Option<NodeId> {
         match self {
             CustomType::Struct(obj) => obj.id,
             CustomType::Enum(obj) => obj.id,
+            CustomType::Union(obj) => obj.id,
         }
     }
 
@@ -72,6 +74,7 @@ impl CustomType {
         match self {
             CustomType::Struct(obj) => &obj.name,
             CustomType::Enum(obj) => &obj.name,
+            CustomType::Union(obj) => &obj.name,
         }
     }
 }
@@ -263,6 +266,16 @@ impl DeclareStore {
 
         self.custom_types
             .insert(index, (CustomType::Enum(obj.clone()), module));
+    }
+
+    /// try Inserts a union into the store.
+    pub fn try_insert_union(&mut self, index: NodeId, obj: &Union, module: ModuleId) {
+        if self.custom_types.contains(index) {
+            return;
+        }
+
+        self.custom_types
+            .insert(index, (CustomType::Union(obj.clone()), module));
     }
 
     /// Gets the type of a struct by its node ID.

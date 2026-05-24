@@ -14,7 +14,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             .map(|sizeof| sizeof.bits / 8)
     }
 
-    fn sizeof_bit(&self, sizeof: TypeId, generics: &GenericSubstitute) -> SoulResult<Sizeof> {
+    pub(crate) fn sizeof_bit(&self, sizeof: TypeId, generics: &GenericSubstitute) -> SoulResult<Sizeof> {
         let sizeof = self.get_type(sizeof)?;
 
         if !sizeof.generics.is_empty() {
@@ -89,6 +89,46 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             ThirTypeKind::CustomTypes(id) => match id {
                 hir::CustomTypeId::Struct(struct_id) => self.sizeof_struct(struct_id, generics)?,
                 hir::CustomTypeId::Enum(_) => todo!(),
+                hir::CustomTypeId::Union(union_id) => {
+                    let union_info = self.types.types_map.id_to_union(union_id)
+                        .ok_or(soul_error_internal!(
+                            format!("union {:?} not found", union_id), None
+                        ))?;
+                        
+                    let index_type_id = self.types.types_table.index_type;
+                    let tag = self.sizeof_bit(index_type_id, generics)?;
+                    let mut max_bits = 0u32;
+                    let mut max_align = Alignment::Null;
+                    for &variant_type in &union_info.variant_types {
+                        let field = self.sizeof_bit(variant_type, generics)?;
+                        if field.bits > max_bits {
+                            max_bits = field.bits;
+                        }
+                        if field.alignment > max_align {
+                            max_align = field.alignment;
+                        }
+                    }
+                    let elem_bits = max_align.as_u32();
+                    let elem_bits = if elem_bits == 0 { 8 } else { elem_bits };
+                    let array_count = if max_bits == 0 {
+                        0
+                    } else {
+                        (max_bits + elem_bits - 1) / elem_bits
+                    };
+                    let array_bits = array_count * elem_bits;
+                    let total_align = if tag.alignment > max_align {
+                        tag.alignment
+                    } else {
+                        max_align
+                    };
+                    let padding = total_align.get_padding(tag.bits);
+                    let unaligned_bits = tag.bits + padding + array_bits;
+                    let total = (unaligned_bits + total_align.as_u32() - 1) / total_align.as_u32() * total_align.as_u32();
+                    Sizeof {
+                        bits: total,
+                        alignment: total_align,
+                    }
+                }
             },
         })
     }

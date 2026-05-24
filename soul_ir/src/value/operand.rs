@@ -93,6 +93,21 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
     ) -> SoulResult<IrOperand<'a>> {
         match literal {
             ComplexLiteral::Basic(literal) => {
+                // For Int(0), try the normal lowering but fall back to zeroinitializer
+                // for non-primitive types (used by union constructor unused variant fields)
+                if matches!(literal, Literal::Int(0)) {
+                    match self.lower_basic_literal(literal, should_be, generics) {
+                        Ok(val) => return Ok(val),
+                        Err(_) => {
+                            let ir_type = self.lower_type(should_be, generics)?
+                                .ok_or(soul_error_internal!(
+                                    "zeroinitializer type not found", None
+                                ))?;
+                            let value = ir_type.const_zero().into();
+                            return self.new_loaded_operand(value, should_be, generics);
+                        }
+                    }
+                }
                 self.lower_basic_literal(literal, should_be, generics)
             }
             ComplexLiteral::Array { array_type, values } => {

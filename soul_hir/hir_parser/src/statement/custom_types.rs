@@ -1,4 +1,4 @@
-use hir::{CustomTypeId, Field, HirType, Struct};
+use hir::{CustomTypeId, Field, HirType, HirTypeKind, Struct, Union, UnionVariant};
 use soul_utils::{Ident, Span, soul_error_internal};
 
 use crate::HirContext;
@@ -43,6 +43,112 @@ impl<'a> HirContext<'a> {
         match self.tree.info.types.id_to_struct_mut(struct_id) {
             Some(obj) => obj.fields = fields,
             None => (),
+        }
+    }
+
+    pub(crate) fn add_union(&mut self, object: &ast::Union) {
+        let name = object.name.clone();
+
+        let mut generics = vec![];
+        for generic in &object.generics {
+            let id = self.insert_generic(generic.name.to_string());
+            generics.push(id);
+        }
+
+        let union_id = self.tree.info.types.alloc_union();
+        let internal_struct_id = self.tree.info.types.alloc_struct();
+
+        self.insert_union(
+            union_id,
+            Union {
+                name,
+                variants: vec![],
+                internal_struct: internal_struct_id,
+            },
+        );
+
+        let internal_name = Ident::new(
+            format!("___Union_{}", object.name.as_str()),
+            object.name.span,
+        );
+        self.insert_struct(
+            internal_struct_id,
+            Struct {
+                name: internal_name,
+                fields: vec![],
+            },
+        );
+
+        let union_type = HirType::new(HirTypeKind::CustomType(CustomTypeId::Union(union_id)));
+        self.add_type(union_type);
+    }
+
+    pub(crate) fn lower_union(&mut self, object: &ast::Union) {
+        let Some(scope) = self.scopes.last() else {
+            self.log_error(soul_error_internal!(
+                format!("self.scopes.last() not found"),
+                Some(object.name.span)
+            ));
+            return;
+        };
+
+        let union_id = match scope.custom_types.get(object.name.as_str()) {
+            Some(CustomTypeId::Union(val)) => *val,
+            _ => {
+                self.log_error(soul_error_internal!(
+                    format!("union '{}' not found", object.name.as_str()),
+                    Some(object.name.span)
+                ));
+                return;
+            }
+        };
+
+        let union_def = match self.tree.info.types.id_to_union_mut(union_id) {
+            Some(val) => val,
+            None => return,
+        };
+        let internal_struct_id = union_def.internal_struct;
+
+        let index_type = self.add_type(HirType::index_type());
+
+        let tag_field_id = self.id_generator.alloc_field();
+        let tag_field = Field {
+            struct_id: internal_struct_id,
+            id: tag_field_id,
+            name: Ident::new("__tag".to_string(), object.name.span),
+            ty: index_type.to_lazy(),
+        };
+        self.tree.nodes.fields.insert(tag_field_id, tag_field.clone());
+
+        let mut hir_variants = vec![];
+        let mut internal_fields = vec![tag_field];
+        for (_i, variant) in object.variants.iter().enumerate() {
+            let variant_field_id = self.id_generator.alloc_field();
+            let variant_ty = self.lower_type(&variant.ty, variant.name.span);
+
+            let variant_field = Field {
+                struct_id: internal_struct_id,
+                id: variant_field_id,
+                name: variant.name.clone(),
+                ty: variant_ty,
+            };
+            self.tree.nodes.fields.insert(variant_field_id, variant_field.clone());
+            internal_fields.push(variant_field);
+
+            let union_field_id = self.tree.info.types.alloc_union_field();
+            hir_variants.push(UnionVariant {
+                id: union_field_id,
+                name: variant.name.clone(),
+                ty: variant_ty,
+            });
+        }
+
+        if let Some(union_def) = self.tree.info.types.id_to_union_mut(union_id) {
+            union_def.variants = hir_variants;
+        }
+
+        if let Some(internal_struct) = self.tree.info.types.id_to_struct_mut(internal_struct_id) {
+            internal_struct.fields = internal_fields;
         }
     }
 

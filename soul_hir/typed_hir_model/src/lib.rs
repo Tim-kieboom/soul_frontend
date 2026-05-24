@@ -3,7 +3,7 @@ use std::vec;
 use ast::ArrayKind;
 use hir::{
     BlockId, CustomTypeId, EnumId, ExpressionId, FieldId, GenericId, LazyTypeId, LocalId, PlaceId,
-    StatementId, StructId, TypeId,
+    StatementId, StructId, TypeId, UnionId,
 };
 use soul_utils::{
     bimap::BiMap,
@@ -28,6 +28,7 @@ pub struct ThirTypesMap {
     pub types: BiMap<TypeId, ThirType>,
     pub structs: VecMap<StructId, Struct>,
     pub enums: VecMap<EnumId, Enum>,
+    pub unions: VecMap<UnionId, UnionInfo>,
     pub generics: VecMap<GenericId, String>,
 }
 impl ThirTypesMap {
@@ -44,6 +45,7 @@ impl ThirTypesMap {
             )]),
             enums: VecMap::const_default(),
             structs: VecMap::const_default(),
+            unions: VecMap::const_default(),
             generics: VecMap::const_default(),
         }
     }
@@ -56,6 +58,9 @@ impl ThirTypesMap {
     }
     pub fn id_to_enum(&self, id: EnumId) -> Option<&Enum> {
         self.enums.get(id)
+    }
+    pub fn id_to_union(&self, id: UnionId) -> Option<&UnionInfo> {
+        self.unions.get(id)
     }
     pub fn id_to_generic(&self, id: GenericId) -> Option<&str> {
         self.generics.get(id).map(|s| s.as_str())
@@ -114,6 +119,13 @@ pub struct Enum {
     pub id: EnumId,
     pub name: String,
     pub variants: Vec<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct UnionInfo {
+    pub name: String,
+    pub internal_struct: StructId,
+    pub variant_types: Vec<TypeId>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

@@ -87,7 +87,8 @@ impl<'a> LiteralInterpreter<'a> {
             | hir::ExpressionKind::Alloc { .. }
             | hir::ExpressionKind::Dealloc { .. }
             | hir::ExpressionKind::Realloc { .. }
-            | hir::ExpressionKind::Match { .. } => None,
+            | hir::ExpressionKind::Match { .. }
+            | hir::ExpressionKind::UnionConstructor { .. } => None,
 
             hir::ExpressionKind::Array(array) => self.interpret_array(array, expression_id),
 

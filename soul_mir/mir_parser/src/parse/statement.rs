@@ -313,6 +313,7 @@ fn is_valid_statement_expression(kind: &hir::ExpressionKind) -> bool {
         | hir::ExpressionKind::Unary { .. }
         | hir::ExpressionKind::Binary { .. }
         | hir::ExpressionKind::StructConstructor { .. }
+        | hir::ExpressionKind::UnionConstructor { .. }
         | hir::ExpressionKind::PtrOffset { .. }
         | hir::ExpressionKind::StackArrayIndex { .. }
         | hir::ExpressionKind::NewHeapArray { .. } => false,

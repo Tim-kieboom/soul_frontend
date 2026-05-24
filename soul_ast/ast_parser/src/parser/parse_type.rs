@@ -8,6 +8,7 @@ use soul_utils::{
     error::{SoulError, SoulErrorKind},
     soul_error_internal,
     soul_names::{KeyWord, PrimitiveTypes, TypeModifier},
+    symbool_kind::SymbolKind,
     try_result::{
         ResultTryErr, ResultTryNotValue, TryErr, TryError, TryNotValue, TryOk, TryResult,
     },
@@ -99,6 +100,24 @@ impl<'a, 'f> Parser<'a, 'f> {
                 }
             };
         }
+
+        if self.current_is(&TokenKind::Symbol(SymbolKind::Dot)) {
+            let save = self.current_position();
+            self.bump();
+            if let Ok(variant) = self.try_bump_consume_ident() {
+                let span = ty.span.combine(variant.span);
+                return TryOk(SoulType::new(
+                    None,
+                    TypeKind::NamedVariant {
+                        base: Box::new(ty),
+                        variant,
+                    },
+                    span,
+                ));
+            }
+            self.go_to(save);
+        }
+
         Ok(ty)
     }
 

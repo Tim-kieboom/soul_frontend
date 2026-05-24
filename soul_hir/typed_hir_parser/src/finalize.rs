@@ -129,6 +129,25 @@ impl<'a> TypedHirContext<'a> {
             );
         }
 
+        for (id, union_) in self.hir.info.types.union_entries() {
+            let variant_types: Vec<TypeId> = union_
+                .variants
+                .iter()
+                .filter_map(|v| match v.ty {
+                    hir::LazyTypeId::Known(type_id) => Some(type_id),
+                    hir::LazyTypeId::Infer(_) => None,
+                })
+                .collect();
+            out.unions.insert(
+                id,
+                typed_hir::UnionInfo {
+                    name: union_.name.to_string(),
+                    internal_struct: union_.internal_struct,
+                    variant_types,
+                },
+            );
+        }
+
         for (id, struct_) in out.structs.entries() {
             let struct_type = HirTypeKind::CustomType(hir::CustomTypeId::Struct(id));
             if let Err(err) =
@@ -177,6 +196,9 @@ impl<'a> TypedHirContext<'a> {
                     }
                 }
                 HirTypeKind::CustomType(hir::CustomTypeId::Enum(_)) => {
+                    self.check_recursive_type(this, field_type, span)?
+                }
+                HirTypeKind::CustomType(hir::CustomTypeId::Union(_)) => {
                     self.check_recursive_type(this, field_type, span)?
                 }
                 HirTypeKind::Type

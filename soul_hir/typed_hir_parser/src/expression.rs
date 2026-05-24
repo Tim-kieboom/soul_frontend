@@ -7,7 +7,7 @@ use crate::{
 use ast::{ArrayKind, BinaryOperator, BinaryOperatorKind, FunctionKind, UnaryOperator};
 use hir::{
     Binary, BlockId, DisplayType, ExpressionId, HirType, HirTypeKind, LazyTypeId, PlaceId, Struct,
-    TypeId, Unary,
+    TypeId, Unary, UnionId, CustomTypeId,
 };
 use soul_utils::{
     Ident,
@@ -93,6 +93,12 @@ impl<'a> TypedHirContext<'a> {
                 enum_id,
                 variant_name,
             } => self.infer_enum_variant(*enum_id, variant_name, span),
+            hir::ExpressionKind::UnionConstructor {
+                union_id,
+                variant_index,
+                variant_field_id: _,
+                value,
+            } => self.infer_union_constructor(*union_id, *variant_index, *value, span),
             hir::ExpressionKind::DeRef(inner) => self.infer_deref(*inner, span),
             hir::ExpressionKind::Function(function) => self.functions[*function].to_lazy(),
             hir::ExpressionKind::Ref { place, mutable } => {
@@ -906,12 +912,26 @@ impl<'a> TypedHirContext<'a> {
                 return self.add_type(enum_type).to_lazy();
             }
         }
+        LazyTypeId::error()
+    }
 
-        self.log_error(SoulError::new(
-            format!("variant '{}' not found in enum", variant_name.as_str()),
-            SoulErrorKind::NotFoundInScope,
-            Some(variant_name.span),
-        ));
+    fn infer_union_constructor(
+        &mut self,
+        union_id: UnionId,
+        variant_index: usize,
+        value: ExpressionId,
+        span: Span,
+    ) -> LazyTypeId {
+        if let Some(union_def) = self.types.id_to_union(union_id) {
+            let variant_ty = union_def.variants.get(variant_index).map(|v| v.ty);
+            if let Some(variant_ty) = variant_ty {
+                let value_type = self.infer_expression(value);
+                self.unify(value, variant_ty, value_type, span);
+            }
+            let union_type =
+                HirType::new(HirTypeKind::CustomType(CustomTypeId::Union(union_id)));
+            return self.add_type(union_type).to_lazy();
+        }
         LazyTypeId::error()
     }
 

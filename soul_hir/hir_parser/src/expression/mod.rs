@@ -49,7 +49,12 @@ impl<'a> HirContext<'a> {
             ast::ExpressionKind::FieldAccess(field_access) => {
                 self.lower_field_access(id, field_access, span)
             }
-            ast::ExpressionKind::FunctionCall(function_call) => self.lower_call(id, function_call),
+            ast::ExpressionKind::FunctionCall(function_call) => {
+                match self.try_lower_union_constructor(id, function_call) {
+                    Some(expr) => expr,
+                    None => self.lower_call(id, function_call),
+                }
+            }
             ast::ExpressionKind::Literal((_node_id, literal)) => self.lower_literal(id, literal),
             ast::ExpressionKind::Variable {
                 id: _,
@@ -140,6 +145,62 @@ impl<'a> HirContext<'a> {
             ty: self.new_infer_type(vec![], None, span),
             kind: hir::ExpressionKind::Load(place),
         }
+    }
+
+    fn try_lower_union_constructor(
+        &mut self,
+        id: hir::ExpressionId,
+        function_call: &ast::FunctionCall,
+    ) -> Option<hir::Expression> {
+        let callee = function_call.callee.as_ref()?;
+
+        let type_name = match &callee.node {
+            ast::ExpressionKind::Variable { ident, .. } => ident.clone(),
+            _ => return None,
+        };
+
+        let union_id = {
+            let mut found = None;
+            for store in self.scopes.iter().rev() {
+                if let Some(CustomTypeId::Union(id)) = store.custom_types.get(type_name.as_str()) {
+                    found = Some(*id);
+                    break;
+                }
+            }
+            found?
+        };
+
+        let (variant_index, variant_field_id) = {
+            let union_def = self.tree.info.types.id_to_union(union_id)?;
+            let variant_index = union_def
+                .variants
+                .iter()
+                .position(|v| v.name.as_str() == function_call.name.as_str())?;
+            let variant_field_id = union_def.variants[variant_index].id;
+            (variant_index, variant_field_id)
+        };
+
+        let value = match function_call.arguments.first() {
+            Some(arg) => self.lower_expression(&arg.value),
+            None => {
+                let err_id = self.alloc_expression(function_call.name.span);
+                self.insert_expression(err_id, hir::Expression::error(err_id))
+            }
+        };
+
+        let union_hir_type = HirType::new(HirTypeKind::CustomType(CustomTypeId::Union(union_id)));
+        let ty = self.add_type(union_hir_type).to_lazy();
+
+        Some(hir::Expression {
+            id,
+            ty,
+            kind: hir::ExpressionKind::UnionConstructor {
+                union_id,
+                variant_index,
+                variant_field_id,
+                value,
+            },
+        })
     }
 
     fn desugar_array_contructor(

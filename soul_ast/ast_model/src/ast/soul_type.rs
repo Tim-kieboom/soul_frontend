@@ -35,6 +35,11 @@ pub enum TypeKind {
     Optional(Box<SoulType>),
     /// unknown type
     Stub(Stub),
+    /// Union variant type: `TypeName.Variant`
+    NamedVariant {
+        base: Box<SoulType>,
+        variant: Ident,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -170,7 +175,8 @@ impl TypeKind {
             TypeKind::Stub(_) |
             TypeKind::Array(_) |
             TypeKind::Optional(_) |
-            TypeKind::Primitive(_) => self,
+            TypeKind::Primitive(_) |
+            TypeKind::NamedVariant { .. } => self,
             
             TypeKind::Pointer(inner) |
             TypeKind::Reference(ReferenceType{ inner, ..}) => inner.kind.unwrap_wrappers(),

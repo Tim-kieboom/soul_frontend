@@ -1,4 +1,4 @@
-use ast::{Enum, Field, Statement, Struct};
+use ast::{Enum, Field, Statement, Struct, Union, UnionVariant};
 use soul_utils::{
     error::{SoulError, SoulResult},
     soul_names::{KeyWord, TypeModifier},
@@ -7,7 +7,7 @@ use soul_utils::{
 
 use crate::parser::{
     Parser,
-    parse_utils::{COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, STAMENT_END_TOKENS},
+    parse_utils::{COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, ROUND_OPEN, ROUND_CLOSE, STAMENT_END_TOKENS},
 };
 
 impl<'f, 'a> Parser<'f, 'a> {
@@ -98,6 +98,54 @@ impl<'f, 'a> Parser<'f, 'a> {
 
         Ok(Statement::new(
             ast::StatementKind::Struct(obj),
+            self.span_combine(start_span),
+        ))
+    }
+
+    pub(crate) fn parse_union(&mut self) -> SoulResult<Statement> {
+        let start_span = self.token().span;
+        self.expect_ident(KeyWord::Union.as_str())?;
+        let name = self.try_bump_consume_ident()?;
+        let generics = self.parse_generic_declare()?.unwrap_or(vec![]);
+        self.skip_end_lines();
+
+        self.expect(&ROUND_OPEN)?;
+        let mut variants = vec![];
+        loop {
+            self.skip_end_lines();
+            if self.current_is(&ROUND_CLOSE) {
+                break;
+            }
+            let variant_name = self.try_bump_consume_ident()?;
+            self.expect(&ROUND_OPEN)?;
+            let mut ty = self.try_parse_type().merge_to_result()?;
+            ty.modifier = Some(TypeModifier::Const);
+            self.expect(&ROUND_CLOSE)?;
+            variants.push(UnionVariant {
+                id: None,
+                name: variant_name,
+                ty,
+            });
+
+            self.skip_end_lines();
+            if !self.current_is(&COMMA) {
+                break;
+            }
+            self.bump();
+        }
+        self.skip_end_lines();
+        self.expect(&ROUND_CLOSE)?;
+
+        let obj = Union {
+            id: None,
+            name,
+            generics,
+            variants,
+            defined_in: None,
+        };
+
+        Ok(Statement::new(
+            ast::StatementKind::Union(obj),
             self.span_combine(start_span),
         ))
     }

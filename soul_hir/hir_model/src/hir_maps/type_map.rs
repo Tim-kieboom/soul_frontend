@@ -7,7 +7,7 @@ use soul_utils::{
 };
 
 use crate::{
-    Enum, EnumId, GenericId, InferTypeId, StructId, TypeId,
+    Enum, EnumId, GenericId, InferTypeId, StructId, TypeId, Union, UnionId, UnionFieldId,
     hir_type::{HirType, InferType, Struct},
 };
 
@@ -17,11 +17,14 @@ pub struct TypesMap {
     types: BiMap<TypeId, HirType>,
     structs: VecMap<StructId, Struct>,
     enums: VecMap<EnumId, Enum>,
+    unions: VecMap<UnionId, Union>,
     generics: VecMap<GenericId, String>,
 
     type_alloc: IdGenerator<TypeId>,
     enum_alloc: IdGenerator<EnumId>,
     struct_alloc: IdGenerator<StructId>,
+    union_alloc: IdGenerator<UnionId>,
+    union_field_alloc: IdGenerator<UnionFieldId>,
     generic_alloc: IdGenerator<GenericId>,
 }
 impl Default for TypesMap {
@@ -32,10 +35,13 @@ impl Default for TypesMap {
             types: Default::default(),
             enums: Default::default(),
             structs: Default::default(),
+            unions: Default::default(),
             generics: Default::default(),
             type_alloc: Default::default(),
             enum_alloc: Default::default(),
             struct_alloc: Default::default(),
+            union_alloc: Default::default(),
+            union_field_alloc: Default::default(),
             generic_alloc: Default::default(),
         }
     }
@@ -105,6 +111,10 @@ impl TypesMap {
         self.enums.entries()
     }
 
+    pub fn union_entries(&self) -> impl Iterator<Item = (UnionId, &Union)> {
+        self.unions.entries()
+    }
+
     pub fn types_keys(&self) -> impl Iterator<Item = TypeId> {
         self.types.keys()
     }
@@ -129,6 +139,30 @@ impl TypesMap {
 
     pub fn clone_enum_alloc(&self) -> IdGenerator<EnumId> {
         self.enum_alloc.clone()
+    }
+
+    pub fn alloc_union(&mut self) -> UnionId {
+        self.union_alloc.alloc()
+    }
+
+    pub fn insert_union(&mut self, id: UnionId, obj: Union) {
+        self.unions.insert(id, obj);
+    }
+
+    pub fn id_to_union(&self, id: UnionId) -> Option<&Union> {
+        self.unions.get(id)
+    }
+
+    pub fn id_to_union_mut(&mut self, id: UnionId) -> Option<&mut Union> {
+        self.unions.get_mut(id)
+    }
+
+    pub fn alloc_union_field(&mut self) -> UnionFieldId {
+        self.union_field_alloc.alloc()
+    }
+
+    pub fn clone_union_alloc(&self) -> IdGenerator<UnionId> {
+        self.union_alloc.clone()
     }
 
     pub fn clone_generic_alloc(&self) -> IdGenerator<GenericId> {

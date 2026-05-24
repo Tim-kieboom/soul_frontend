@@ -16,6 +16,7 @@ impl<'a> NameResolver<'a> {
             }
             ast::TypeKind::Pointer(soul_type) => self.collect_type(soul_type),
             ast::TypeKind::Optional(soul_type) => self.collect_type(soul_type),
+            ast::TypeKind::NamedVariant { base, variant: _ } => self.collect_type(base),
         }
     }
 }

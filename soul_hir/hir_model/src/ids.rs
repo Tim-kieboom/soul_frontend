@@ -11,5 +11,7 @@ impl_soul_ids!(
     GenericId,
     InferTypeId,
     StatementId,
-    ExpressionId
+    ExpressionId,
+    UnionId,
+    UnionFieldId
 );

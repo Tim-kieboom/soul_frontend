@@ -1,5 +1,6 @@
 use ast::{
-    Expression, ExpressionKind, ExternalRef, FunctionCall, FunctionKind, SoulType, TypeKind, VarTypeKind, scope::ScopeModuleEntry
+    Expression, ExpressionKind, ExternalRef, FunctionCall, FunctionKind, SoulType, TypeKind, VarTypeKind,
+    scope::{ScopeModuleEntry, ScopeTypeEntryKind},
 };
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
@@ -39,6 +40,11 @@ impl<'a> NameResolver<'a> {
             function_call.resolved = Some(FunctionId::error());
         };
 
+        // Union constructors are marked with error() to bypass validation
+        if function_call.resolved == Some(FunctionId::error()) {
+            return;
+        }
+
         let Some(function_id) = function_call.resolved else {
             return;
         };
@@ -70,6 +76,15 @@ impl<'a> NameResolver<'a> {
                 Some(span),
             ));
         }
+    }
+
+    fn is_callee_union(&self, callee: &Expression, _function_call: &FunctionCall) -> Option<bool> {
+        let ident = match &callee.node {
+            ExpressionKind::Variable { ident, .. } => ident,
+            _ => return None,
+        };
+        let entry = self.info.scopes.lookup_type(ident, self.current.module)?;
+        Some(matches!(entry.kind, ScopeTypeEntryKind::Union))
     }
 
     fn get_resolve(&mut self, function_call: &mut FunctionCall) {
@@ -181,6 +196,12 @@ impl<'a> NameResolver<'a> {
         let is_type_qualifier = type_qualifier.is_some();
 
         if is_type_qualifier {
+            if let Some(callee_expr) = function_call.callee.as_ref() {
+                if self.is_callee_union(callee_expr, function_call).unwrap_or(false) {
+                    function_call.resolved = Some(FunctionId::error());
+                    return;
+                }
+            }
             function_call.callee = None;
         } else if let Some(callee) = &mut function_call.callee {
             self.resolve_expression(callee);

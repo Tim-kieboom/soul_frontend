@@ -53,6 +53,10 @@ impl<'a> HirContext<'a> {
                 // already added in lower_module
                 return;
             }
+            ast::StatementKind::Union(object) => {
+                self.lower_union(object);
+                return;
+            }
             ast::StatementKind::Variable(variable) => {
                 hir::GlobalKind::Variable(self.lower_variable(variable))
             }
@@ -121,6 +125,9 @@ impl<'a> HirContext<'a> {
             }
             ast::StatementKind::Enum(_) => {
                 todo!()
+            }
+            ast::StatementKind::Union(_) => {
+                return None;
             }
             ast::StatementKind::Variable(variable) => {
                 hir::StatementKind::Variable(self.lower_variable(variable))

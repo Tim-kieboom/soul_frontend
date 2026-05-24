@@ -62,6 +62,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             KeyWord::Extern => self.parse_extern_function().try_err()?,
 
             KeyWord::Struct => self.parse_struct().try_err()?,
+            KeyWord::Union => self.parse_union().try_err()?,
 
             KeyWord::Use => self.parse_use().try_err()?,
 
@@ -81,7 +82,6 @@ impl<'a, 'f> Parser<'a, 'f> {
             | KeyWord::Impl
             | KeyWord::Trait
             | KeyWord::Class
-            | KeyWord::Union
             | KeyWord::Await
             | KeyWord::Typeof
             | KeyWord::InForLoop

@@ -10,7 +10,7 @@ use soul_utils::{
 };
 use typed_hir::ThirTypeKind;
 
-use crate::{GenericSubstitute, LlvmBackend, OperandInfo};
+use crate::{GenericSubstitute, LlvmBackend, OperandInfo, value::sizeof::Alignment};
 
 impl<'f, 'a> LlvmBackend<'f, 'a> {
     pub fn lower_type(
@@ -35,9 +35,52 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             }
             ThirTypeKind::CustomTypes(id) => Some(match id {
                 hir::CustomTypeId::Struct(struct_id) => {
-                    self.lower_struct(struct_id, generics).map(|s| s.into())?
+                    let s = self.lower_struct(struct_id, generics)?;
+                    <inkwell::types::BasicTypeEnum as From<inkwell::types::StructType>>::from(s)
                 }
                 hir::CustomTypeId::Enum(enum_id) => self.lower_enum(enum_id).into(),
+                hir::CustomTypeId::Union(union_id) => {
+                    let union_info = self.types.types_map.id_to_union(union_id)
+                        .ok_or(soul_error_internal!(
+                            format!("union {:?} not found in ThirTypesMap", union_id),
+                            None
+                        ))?;
+
+                        let index_ty = self.types.types_table.index_type;
+                    let tag_ir = match self.lower_type(index_ty, generics)? {
+                        Some(val) => val,
+                        None => self.default_int_type.into(),
+                    };
+
+                    let mut max_bits = 0u32;
+                    let mut max_align = Alignment::Null;
+                    for &variant_type in &union_info.variant_types {
+                        let field = self.sizeof_bit(variant_type, generics)?;
+                        if field.bits > max_bits {
+                            max_bits = field.bits;
+                        }
+                        if field.alignment > max_align {
+                            max_align = field.alignment;
+                        }
+                    }
+
+                    let elem_ty: inkwell::types::BasicTypeEnum<'a> = match max_align {
+                        Alignment::Null | Alignment::Bit8 => self.context.i8_type().into(),
+                        Alignment::Bit16 => self.context.i16_type().into(),
+                        Alignment::Bit32 => self.context.i32_type().into(),
+                        Alignment::Bit64 => self.context.i64_type().into(),
+                    };
+                    let elem_bits = max_align.as_u32();
+                    let elem_bits = if elem_bits == 0 { 8 } else { elem_bits };
+                    let array_count = if max_bits == 0 {
+                        0
+                    } else {
+                        (max_bits + elem_bits - 1) / elem_bits
+                    };
+                    let array_ty = elem_ty.array_type(array_count);
+                    let struct_ty = self.context.struct_type(&[tag_ir, array_ty.into()], false);
+                    <inkwell::types::BasicTypeEnum as From<inkwell::types::StructType>>::from(struct_ty)
+                }
             }),
             ThirTypeKind::Primitive(primitive_types) => self.lower_primitive_type(primitive_types),
 

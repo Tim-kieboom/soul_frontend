@@ -2,7 +2,7 @@ use std::fmt::{Arguments, Write};
 
 use ast::{
     AbtractSyntaxTree, Assignment, Block, ElseKind, Enum, Expression, Function, FunctionSignature,
-    Generic, IfArm, Import, SoulType, Statement, StatementKind, Struct, TypeKind, UseBlock,
+    Generic, IfArm, Import, SoulType, Statement, StatementKind, Struct, TypeKind, Union, UseBlock,
     Variable,
     scope::{NodeId, ScopeId},
 };
@@ -176,6 +176,7 @@ impl<'a> AstDisplayer<'a> {
 
         match &statement.node {
             ast::StatementKind::Enum(obj) => self.display_enum(obj),
+            ast::StatementKind::Union(obj) => self.display_union(obj),
             ast::StatementKind::Struct(obj) => self.display_struct(obj),
             ast::StatementKind::Import(import) => self.display_import(import),
             ast::StatementKind::Variable(variable) => self.display_variable(variable),
@@ -461,6 +462,21 @@ impl<'a> AstDisplayer<'a> {
         self.pop_scope();
         self.display_depth();
         self.push_str("}\n");
+    }
+
+    fn display_union(&mut self, obj: &Union) {
+        self.push_str(KeyWord::Union.as_str());
+        self.push(' ');
+        self.push_str(obj.name.as_str());
+        self.push_str(" {");
+        for variant in &obj.variants {
+            self.push(' ');
+            self.push_str(variant.name.as_str());
+            self.push('(');
+            self.display_typekind(&variant.ty.kind);
+            self.push(')');
+        }
+        self.push_str(" }\n");
     }
 
     fn display_expression(&mut self, expression: &Expression) {
@@ -749,6 +765,11 @@ impl<'a> AstDisplayer<'a> {
                 }
                 self.display_type(&reference_type.inner);
             }
+            ast::TypeKind::NamedVariant { base, variant } => {
+                self.display_type(base);
+                self.push('.');
+                self.push_str(variant.as_str());
+            }
         }
     }
 
@@ -798,6 +819,7 @@ impl<'a> AstDisplayer<'a> {
             }
             StatementKind::Enum(_)
             | StatementKind::Struct(_)
+            | StatementKind::Union(_)
             | StatementKind::Import(_)
             | StatementKind::Function(_)
             | StatementKind::UseBlock(_)
@@ -882,6 +904,7 @@ impl StatementKindHelper for StatementKind {
                 func.signature.node.id.to_statement_kind()
             }
             StatementKind::UseBlock(_) => None,
+            StatementKind::Union(obj) => obj.id.to_statement_kind(),
         }
     }
 }

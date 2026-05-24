@@ -1,5 +1,5 @@
 use crate::{
-    BlockId, EnumId, ExpressionId, LocalId, PlaceId, StructId, TypeId, hir_type::LazyTypeId,
+    BlockId, EnumId, ExpressionId, LocalId, PlaceId, StructId, TypeId, UnionId, UnionFieldId, hir_type::LazyTypeId,
 };
 use ast::{BinaryOperator, Literal, UnaryOperator};
 use soul_utils::{Ident, ids::FunctionId};
@@ -138,6 +138,13 @@ pub enum ExpressionKind {
     EnumVariant {
         enum_id: EnumId,
         variant_name: Ident,
+    },
+
+    UnionConstructor {
+        union_id: UnionId,
+        variant_index: usize,
+        variant_field_id: UnionFieldId,
+        value: ExpressionId,
     },
 
     Sizeof(LazyTypeId),

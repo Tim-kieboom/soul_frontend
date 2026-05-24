@@ -1,5 +1,5 @@
 use ast::Literal;
-use hir::{Binary, ComplexLiteral, CustomTypeId, ExpressionId, StructId, TypeId, Unary};
+use hir::{Binary, ComplexLiteral, CustomTypeId, ExpressionId, StructId, TypeId, Unary, UnionId};
 use hir_literal_interpreter::ToComplex;
 use soul_utils::{
     Ident, Span,
@@ -62,6 +62,14 @@ impl<'a> MirContext<'a> {
                 let value = ComplexLiteral::Basic(Literal::Int(index));
                 mir::Operand::new(value_type, mir::OperandKind::Comptime(value))
             }
+            hir::ExpressionKind::UnionConstructor {
+                union_id,
+                variant_index,
+                variant_field_id: _,
+                value,
+            } => self
+                .lower_union_constructor(*union_id, *variant_index, *value, value_type)
+                .pass(is_end),
             hir::ExpressionKind::Literal(literal) => mir::Operand::new(
                 value_type,
                 mir::OperandKind::Comptime(literal.clone().to_complex()),
@@ -740,6 +748,85 @@ impl<'a> MirContext<'a> {
         });
         self.push_statement(statement);
         let operand = mir::Operand::new(struct_type, mir::OperandKind::Temp(temp));
+        EndBlock::new(operand, is_end)
+    }
+
+    fn lower_union_constructor(
+        &mut self,
+        union_id: UnionId,
+        variant_index: usize,
+        value: ExpressionId,
+        union_type: TypeId,
+    ) -> EndBlock<Operand> {
+        let union_def = self
+            .hir_response
+            .hir
+            .info
+            .types
+            .id_to_union(union_id)
+            .expect("should have union");
+        let internal_struct_id = union_def.internal_struct;
+
+        let internal_struct = self
+            .hir_response
+            .typed
+            .types_map
+            .id_to_struct(internal_struct_id)
+            .expect("should have internal union struct");
+
+        let is_end = &mut false;
+        let mut runtime = false;
+        let mut fields = Vec::with_capacity(2);
+
+        let tag_ty = internal_struct.fields[0].ty;
+        let tag_operand = Operand::new(
+            tag_ty,
+            mir::OperandKind::Comptime(ComplexLiteral::Basic(Literal::Int(variant_index as i128))),
+        );
+        fields.push(tag_operand);
+
+        let operand = self.lower_operand(value).pass(is_end);
+        if !matches!(operand.kind, mir::OperandKind::Comptime(_)) {
+            runtime = true;
+        }
+        fields.push(operand);
+
+        let all_comptime = fields.iter().all(|op| matches!(op.kind, mir::OperandKind::Comptime(_)));
+        let body = if runtime || !all_comptime {
+            mir::AggregateBody::Runtime(fields)
+        } else {
+            let literals = fields
+                .into_iter()
+                .enumerate()
+                .map(|(i, op)| {
+                    let ty = if i == 0 {
+                        internal_struct.fields[0].ty
+                    } else {
+                        match &op.kind {
+                            mir::OperandKind::Comptime(_) => op.ty,
+                            _ => unreachable!(),
+                        }
+                    };
+                    match op.kind {
+                        mir::OperandKind::Comptime(literal) => (literal, ty),
+                        _ => unreachable!(),
+                    }
+                })
+                .collect();
+            mir::AggregateBody::Comptime(literals)
+        };
+
+        let ctor = mir::RvalueKind::Aggregate {
+            struct_type: internal_struct_id,
+            body,
+        };
+        let temp = self.new_temp(union_type);
+        let statement = mir::Statement::new(mir::StatementKind::Assign {
+            place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp), union_type)),
+            value: mir::Rvalue::new(ctor),
+        });
+        self.push_statement(statement);
+        let operand = mir::Operand::new(union_type, mir::OperandKind::Temp(temp));
         EndBlock::new(operand, is_end)
     }
 

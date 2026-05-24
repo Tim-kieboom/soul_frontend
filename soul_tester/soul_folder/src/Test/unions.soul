@@ -1,0 +1,34 @@
+import (
+    ./.Std.Io
+)
+
+struct Object {
+    field: i32
+    condition: bool
+}
+
+union Test (
+    Int(i32),
+    Float(f32),
+    Object(Object),
+)
+
+RunTests() {
+    test_init_union()
+}
+
+test_init_union() {
+    interger: Test = Test.Int(42)
+    float: Test = Test.Float(3.14)
+    object: Test = Test.Object(Object{field: 1, condition: true})
+
+    // Io.Assert(interger typeof Test.Int, msg: "interger should be of type Test.Int")
+    // if interger typeof Test.Int(num) {
+    //     Io.Assert(num == 42, msg: "interger should be Test.Int(42)")
+    // }
+
+    // match float {
+    //     Test.Float(num) => Io.Assert("float should be Test.Float(3.14)") 
+    //     _ => Io.Panic("float should be of type Test.Float")
+    // }
+}

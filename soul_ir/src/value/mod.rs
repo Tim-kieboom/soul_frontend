@@ -1,7 +1,8 @@
 use crate::{GenericSubstitute, IrOperand, LlvmBackend, Local, OperandInfo};
-use ast::ArrayKind;
+use ast::{ArrayKind, Literal};
 use hir::{ComplexLiteral, StructId, TypeId};
-use inkwell::{AddressSpace, types::StructType, values::BasicValueEnum};
+use inkwell::{AddressSpace, types::{BasicType, StructType}, values::BasicValueEnum};
+
 use mir_parser::mir::{self, AggregateBody, Place, PlaceId, Rvalue, RvalueKind};
 use soul_utils::{
     Span,
@@ -9,6 +10,8 @@ use soul_utils::{
     soul_error_internal,
 };
 use typed_hir::{FieldInfo, ThirTypeKind, display_thir::DisplayThirType};
+
+use crate::value::sizeof::Alignment;
 
 pub(crate) mod binary_unary;
 pub(crate) mod cast;
@@ -382,6 +385,11 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         body: &AggregateBody,
         generics: &GenericSubstitute,
     ) -> SoulResult<IrOperand<'a>> {
+        // Check if this struct is a union's internal struct → use compact layout
+        if let Some(compact_ty) = self.try_lower_compact_union(ty, struct_id, body, generics)? {
+            return Ok(compact_ty);
+        }
+
         let struct_ir = self.get_or_create_struct(struct_id, generics)?;
         match body {
             AggregateBody::Runtime(operands) => {
@@ -396,6 +404,126 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 self.lower_const_aggregate(struct_ir, ty, literals, generics)
             }
         }
+    }
+
+    /// If `struct_id` is a union's internal struct, lower a compact tagged union.
+    /// Returns `None` if this is not a union internal struct.
+    fn try_lower_compact_union(
+        &self,
+        ty: TypeId,
+        struct_id: StructId,
+        body: &AggregateBody,
+        generics: &GenericSubstitute,
+    ) -> SoulResult<Option<IrOperand<'a>>> {
+        let union_info = match self
+            .types
+            .types_map
+            .unions
+            .entries()
+            .find(|(_, info)| info.internal_struct == struct_id)
+            .map(|(_, info)| info)
+        {
+            Some(val) => val,
+            None => return Ok(None),
+        };
+
+        let variant_index = match body {
+            AggregateBody::Runtime(operands) => match &operands[0].kind {
+                mir::OperandKind::Comptime(ComplexLiteral::Basic(lit)) => match lit {
+                    Literal::Int(idx) => *idx as usize,
+                    _ => {
+                        return Err(soul_error_internal!(
+                            "union constructor tag should be Int literal",
+                            None
+                        ))
+                    }
+                },
+                _ => {
+                    return Err(soul_error_internal!(
+                        "union constructor tag should be comptime",
+                        None
+                    ))
+                }
+            },
+            AggregateBody::Comptime(literals) => match &literals[0].0 {
+                ComplexLiteral::Basic(lit) => match lit {
+                    Literal::Int(idx) => *idx as usize,
+                    _ => {
+                        return Err(soul_error_internal!(
+                            "union constructor tag should be Int literal in comptime aggregate",
+                            None
+                        ))
+                    }
+                },
+                _ => {
+                    return Err(soul_error_internal!(
+                        "union constructor tag should be comptime in comptime aggregate",
+                        None
+                    ))
+                }
+            },
+        };
+
+        let variant_ir = match body {
+            AggregateBody::Runtime(operands) => {
+                self.lower_operand(&operands[1], generics)?.value
+            }
+            AggregateBody::Comptime(literals) => {
+                self.lower_literal(&literals[1].0, literals[1].1, generics)?.value
+            }
+        };
+
+        let index_ty = self.types.types_table.index_type;
+        let tag_ir_ty = match self.lower_type(index_ty, generics)? {
+            Some(val) => val,
+            None => self.default_int_type.into(),
+        };
+        let mut max_bits = 0u32;
+        let mut max_align = Alignment::Null;
+        for &variant_type_id in &union_info.variant_types {
+            let field = self.sizeof_bit(variant_type_id, generics)?;
+            if field.bits > max_bits {
+                max_bits = field.bits;
+            }
+            if field.alignment > max_align {
+                max_align = field.alignment;
+            }
+        }
+        let elem_ty: inkwell::types::BasicTypeEnum<'a> = match max_align {
+            Alignment::Null | Alignment::Bit8 => self.context.i8_type().into(),
+            Alignment::Bit16 => self.context.i16_type().into(),
+            Alignment::Bit32 => self.context.i32_type().into(),
+            Alignment::Bit64 => self.context.i64_type().into(),
+        };
+        let elem_bits = max_align.as_u32();
+        let elem_bits = if elem_bits == 0 { 8 } else { elem_bits };
+        let array_count = if max_bits == 0 {
+            0
+        } else {
+            (max_bits + elem_bits - 1) / elem_bits
+        };
+        let array_ty = elem_ty.array_type(array_count);
+        let compact_struct_ty = self
+            .context
+            .struct_type(&[tag_ir_ty, array_ty.into()], false);
+
+        let ptr = self.builder.build_alloca(compact_struct_ty, "union")?;
+
+        let tag_value = self.context.i64_type().const_int(variant_index as u64, false);
+        self.builder.store_field(compact_struct_ty, ptr, tag_value, 0)?;
+
+        let data_ptr = self
+            .builder
+            .build_struct_gep_index(compact_struct_ty, ptr, 1, "union_data")?;
+        let variant_ptr = self.builder.build_pointer_cast(
+            data_ptr,
+            self.context.ptr_type(AddressSpace::default()),
+            "union_variant",
+        )?;
+        self.builder.store_parameter(variant_ptr, variant_ir)?;
+
+        self.new_unloaded_operand(ptr.into(), ty, generics)
+            .map(Some)
     }
 
     pub(crate) fn lower_aggregate(

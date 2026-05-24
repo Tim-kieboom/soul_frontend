@@ -46,6 +46,7 @@ pub enum StatementKind {
 
     Struct(Struct),
     Enum(Enum),
+    Union(Union),
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -76,6 +77,22 @@ pub struct Enum {
     pub name: Ident,
     pub id: Option<NodeId>,
     pub variants: Vec<Ident>,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Union {
+    pub id: Option<NodeId>,
+    pub name: Ident,
+    pub generics: Vec<Generic>,
+    pub variants: Vec<UnionVariant>,
+    pub defined_in: Option<ModuleId>,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct UnionVariant {
+    pub id: Option<NodeId>,
+    pub name: Ident,
+    pub ty: SoulType,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

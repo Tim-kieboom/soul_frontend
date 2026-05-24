@@ -151,6 +151,7 @@ impl<'a> HirContext<'a> {
             match &statement.node {
                 ast::StatementKind::Struct(object) => self.add_struct(object),
                 ast::StatementKind::Enum(object) => self.add_enum(object),
+                ast::StatementKind::Union(object) => self.add_union(object),
                 _ => (),
             }
         }

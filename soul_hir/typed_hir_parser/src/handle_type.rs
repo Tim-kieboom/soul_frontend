@@ -112,6 +112,10 @@ impl<'a> TypedHirContext<'a> {
         match id {
             CustomTypeId::Struct(struct_id) => self.get_struct_field(struct_id, field, span),
             CustomTypeId::Enum(_) => todo!(),
+            CustomTypeId::Union(union_id) => {
+                let union_info = self.types.id_to_union(union_id)?;
+                self.get_struct_field(union_info.internal_struct, field, span)
+            }
         }
     }
 
