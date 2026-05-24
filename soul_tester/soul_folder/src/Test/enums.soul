@@ -7,7 +7,6 @@ RunTests() {
     test_should_cmp_correctly()
 }
 
-
 test_should_have_correct_tag() {
     Io.PrintAssert(Basic.Zero  as u32 == 0, msg: "Basic.Zero should be 0")
     Io.PrintAssert(Basic.One   as u32 == 1, msg: "Basic.One should be 1")

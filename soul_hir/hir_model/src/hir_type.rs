@@ -164,6 +164,7 @@ impl HirType {
     pub const fn is_never(&self) -> bool {
         matches!(self.kind, HirTypeKind::Never)
     }
+
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

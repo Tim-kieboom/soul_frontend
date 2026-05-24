@@ -258,6 +258,8 @@ pub enum MatchPattern {
     Literal(Literal),
     /// A wildcard (default) pattern.
     Wildcard,
+    /// An array pattern: [elem1, elem2, ...]
+    Array(Vec<MatchPattern>),
 }
 
 /// A `return`, `fall`, or `break`-like expression.

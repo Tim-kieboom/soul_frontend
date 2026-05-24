@@ -271,6 +271,7 @@ impl<'a> TypedHirContext<'a> {
         }
     }
 
+
     fn get_priority_lazy_type(&mut self, left: LazyTypeId, right: LazyTypeId) -> LazyTypeId {
         let (left, right) = match (left, right) {
             (LazyTypeId::Known(l), LazyTypeId::Known(r)) => (l, r),

@@ -529,6 +529,18 @@ impl<'a> AstDisplayer<'a> {
                             self.push_str("  => ");
                         }
                         ast::MatchPattern::Wildcard => self.push_str("_ => "),
+                        ast::MatchPattern::Array(elements) => {
+                            self.push('[');
+                            for (i, el) in elements.iter().enumerate() {
+                                if i > 0 { self.push_str(", "); }
+                                match el {
+                                    ast::MatchPattern::Literal(lit) => self.push_str(&lit.value_to_string()),
+                                    ast::MatchPattern::Wildcard => self.push('_'),
+                                    ast::MatchPattern::Array(_) => self.push_str("[...]"),
+                                }
+                            }
+                            self.push_str("] => ");
+                        }
                     }
 
                     self.display_block(&arm.body);

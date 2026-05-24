@@ -174,6 +174,10 @@ impl<'a> MirContext<'a> {
         }
         let local_type = self.local_type(variable.local);
 
+        if is_match && matches!(operand.kind, mir::OperandKind::None) {
+            return;
+        }
+
         let rvalue = if operand.ty != local_type {
             self.cast_variable(operand, local_type)
         } else {

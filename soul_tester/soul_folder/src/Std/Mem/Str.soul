@@ -1,6 +1,6 @@
 import (
     .Slice.{Index}
-    ./.Assertions.{Assert}
+    ./.Io.{Assert}
 )
 
 extern "C" realloc(ptr: *char, size: int): *char

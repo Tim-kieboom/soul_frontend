@@ -16,6 +16,8 @@
 (A) merge ast:Expression Array and Arracontructor using AnyArray
 
 # Bugs
+- `__clib_Duration_now(&this.start)` (this.start does not work)
+- `const buffer: [64]` (no error is thrown)
 - `{ Io.Println("test") }` (unexpected `}` error)
 - `[@]char methode() {}` (`[@]char` the `[@]` is unexpected)
 - `call() as *char`

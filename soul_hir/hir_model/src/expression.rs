@@ -231,4 +231,5 @@ pub struct MatchArm {
 pub enum MatchPatternHir {
     Literal(Literal),
     Wildcard,
+    Array(Vec<MatchPatternHir>),
 }

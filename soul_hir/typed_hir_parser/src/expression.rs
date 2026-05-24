@@ -297,7 +297,19 @@ impl<'a> TypedHirContext<'a> {
             return return_type;
         }
 
-        for (argument, parameter) in arguments.iter().zip(function.parameters.iter()) {
+        let mut args_iter = arguments.iter().zip(function.parameters.iter());
+        if has_callee {
+            
+            if let Some((this, parameter)) = args_iter.next() {
+                let ty = self.infer_expression(*this);
+                let span = self.expression_span(*this);
+
+                let should_be = self.resolve_generic(&generic_defines, parameter.ty);
+                self.unify(*this, should_be, ty, span);
+            }
+        }
+
+        for (argument, parameter) in args_iter {
             let ty = self.infer_expression(*argument);
             let span = self.expression_span(*argument);
 
@@ -487,15 +499,6 @@ impl<'a> TypedHirContext<'a> {
             span,
         );
 
-        if return_type != self.common_types.none_type.to_lazy() {
-            self.log_error(SoulError::new(
-                "while loops with a condition can not have return type",
-                SoulErrorKind::InvalidContext,
-                Some(span),
-            ));
-            return LazyTypeId::error();
-        }
-
         self.common_types.none_type.to_lazy()
     }
 
@@ -505,7 +508,7 @@ impl<'a> TypedHirContext<'a> {
         arms: Vec<hir::MatchArm>,
         span: Span,
     ) -> LazyTypeId {
-        let _ = self.infer_expression(scrutinee);
+        let scrutinee_ty = self.infer_expression(scrutinee);
 
         let mut result_type: Option<LazyTypeId> = None;
         let mut has_wildcard = false;
@@ -523,7 +526,40 @@ impl<'a> TypedHirContext<'a> {
 
             match &arm.pattern {
                 hir::MatchPatternHir::Wildcard => has_wildcard = true,
-                hir::MatchPatternHir::Literal(_) => {}
+                hir::MatchPatternHir::Literal(lit) => {
+                    if matches!(lit, ast::Literal::Str(_)) {
+                        let resolved = self.resolve_type_strict(scrutinee_ty, span);
+                        if let Some(ty) = resolved {
+                            let is_array = matches!(
+                                self.id_to_type(ty).kind,
+                                HirTypeKind::Array { .. }
+                            );
+                            if !is_array {
+                                self.log_error(SoulError::new(
+                                    "string pattern requires an array type (string = [*]char)",
+                                    SoulErrorKind::UnifyTypeError,
+                                    Some(span),
+                                ));
+                            }
+                        }
+                    }
+                }
+                hir::MatchPatternHir::Array(_elements) => {
+                    let resolved = self.resolve_type_strict(scrutinee_ty, span);
+                    if let Some(ty) = resolved {
+                        let is_array = matches!(
+                            self.id_to_type(ty).kind,
+                            HirTypeKind::Array { .. }
+                        );
+                        if !is_array {
+                            self.log_error(SoulError::new(
+                                "array pattern requires an array type",
+                                SoulErrorKind::UnifyTypeError,
+                                Some(span),
+                            ));
+                        }
+                    }
+                }
             }
         }
 
@@ -591,6 +627,15 @@ impl<'a> TypedHirContext<'a> {
                 } = &self.id_to_type(resolved_place).kind
                 {
                     if *place_of == decl_of {
+                        return declared_type;
+                    }
+                    let same_kind = match (place_of, &decl_of) {
+                        (LazyTypeId::Known(p_id), LazyTypeId::Known(d_id)) => {
+                            self.id_to_type(*p_id).kind == self.id_to_type(*d_id).kind
+                        }
+                        _ => false,
+                    };
+                    if same_kind {
                         return declared_type;
                     }
                 }

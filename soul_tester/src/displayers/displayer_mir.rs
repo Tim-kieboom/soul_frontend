@@ -501,7 +501,13 @@ impl<'a> MirDisplayer<'a> {
     }
 
     fn display_place(&mut self, place_id: &PlaceId) {
-        let place = &self.mir.places[*place_id];
+        let place = match self.mir.places.get(*place_id) {
+            Some(val) => val,
+            None => {
+                self.push_str("/*Place <error>*/");
+                return
+            }
+        };
         self.inner_display_place(place);
     }
 

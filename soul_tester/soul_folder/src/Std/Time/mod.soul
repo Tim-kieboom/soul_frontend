@@ -6,21 +6,32 @@ literal MILLI_PER_SEC: u64 = 10 ** 3
 literal NANO_PER_MILLI: u64 = 10 ** 6
 
 extern "C" __clib_Duration_now(duration: &Duration)
+extern "C" __clib_delay_sec(sec: c_int)
+
+DelaySec(sec: c_int) {
+    __clib_delay_sec(sec)
+}
 
 struct Instance {
-    start: Duration
+    mut time: Duration
 }
 use Instance {
 
     Now(): Instance {
-        mut start = Duration{sec: 0, nano: 0}
-        __clib_Duration_now(&start)
-        Instance{start}
+        mut time = Duration{sec: 0, nano: 0}
+        __clib_Duration_now(&time)
+        Instance{time}
+    }
+
+    Reset(&this) {
+        mut time = Duration{sec: 0, nano: 0}
+        __clib_Duration_now(&time)
+        this.time = time
     }
 
     Elapsed(this): Duration {
         now := Instance.Now()
-        now.start.Sub(this.start)
+        now.time.Sub(this.time)
     }
 }
 

@@ -11,9 +11,7 @@ impl<'a> NameResolver<'a> {
                 self.resolve_expression(&mut match_expression.scrutinee);
                 for arm in &mut match_expression.arms {
                     self.resolve_block(&mut arm.body);
-                    match &mut arm.pattern {
-                        ast::MatchPattern::Wildcard | ast::MatchPattern::Literal(_) => (),
-                    }
+                    self.resolve_match_pattern(&arm.pattern);
                 }
             }
             ExpressionKind::Sizeof(_) => (),
@@ -194,5 +192,13 @@ impl<'a> NameResolver<'a> {
         }
 
         false
+    }
+
+    fn resolve_match_pattern(&mut self, pattern: &ast::MatchPattern) {
+        if let ast::MatchPattern::Array(elements) = pattern {
+            for elem in elements {
+                self.resolve_match_pattern(elem);
+            }
+        }
     }
 }

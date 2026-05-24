@@ -12,7 +12,7 @@ use soul_utils::{
 
 use crate::parser::{
     Parser,
-    parse_utils::{CURLY_CLOSE, CURLY_OPEN, STAMENT_END_TOKENS},
+    parse_utils::{COMMA, CURLY_CLOSE, CURLY_OPEN, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS},
 };
 
 const IF_STR: &str = KeyWord::If.as_str();
@@ -182,12 +182,38 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     fn parse_match_pattern(&mut self) -> SoulResult<MatchPattern> {
+        if self.current_is(&SQUARE_OPEN) {
+            self.bump();
+            let mut elements = Vec::new();
+            loop {
+                self.skip_end_lines();
+                if self.current_is(&SQUARE_CLOSE) {
+                    self.bump();
+                    break;
+                }
+                if !elements.is_empty() {
+                    self.expect(&COMMA)?;
+                    self.skip_end_lines();
+                    if self.current_is(&SQUARE_CLOSE) {
+                        self.bump();
+                        break;
+                    }
+                }
+                elements.push(self.parse_match_pattern()?);
+            }
+            return Ok(MatchPattern::Array(elements));
+        }
+
         if self.current_is_ident("_") {
             self.bump();
             return Ok(MatchPattern::Wildcard);
         }
 
-        let end_tokens = [TokenKind::Symbol(SymbolKind::LambdaArray)];
+        let end_tokens = [
+            TokenKind::Symbol(SymbolKind::LambdaArray),
+            COMMA,
+            SQUARE_CLOSE,
+        ];
         let expr = self.parse_expression(&end_tokens)?;
         match expr.node {
             ExpressionKind::Literal((_, lit)) => Ok(MatchPattern::Literal(lit)),

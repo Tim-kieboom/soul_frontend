@@ -1,7 +1,30 @@
 import (
-    .fmt
+    .Fmt
+    .Fmt.Formatter.{IoFormatter}
     .stdout.{Stdout}
 )
+
+Panic(
+    msg: [@]char, 
+    line: int = intrinsic.InLine(), 
+    file: [@]char = intrinsic.InFile(),  
+) {
+    PrintPanicMsg(msg, line, file)
+    intrinsic.Exit(1)
+}
+
+Assert(
+    condition: bool, 
+    msg: [@]char = "", 
+    line: int = intrinsic.InLine(), 
+    file: [@]char = intrinsic.InFile(),
+) {
+
+    if condition == false {
+        Print("!!ASSERT FAILED!! ")
+        Panic(msg, line: line, file: file)
+    }
+}
 
 PrintAssert(
     condition: bool, 
@@ -57,21 +80,18 @@ Print_bool(value: bool) {
 }
 
 Print_int(value: int, base: u8 = 10, capital: bool = true) {
-    const fmtBuffer: [25]char
-    cstr := fmt.FmtInt(value, base, @fmtBuffer, capital)
-    Stdout.WriteCstr(cstr)
+    mut fmt = IoFormatter{}
+    Fmt.I64(value as i64, &fmt)
 }
 
 Print_uint(value: uint, base: u8 = 10, capital: bool = true) {
-    const fmtBuffer: [25]char
-    cstr := fmt.FmtUint(value, base, @fmtBuffer, capital)
-    Stdout.WriteCstr(cstr)
+    mut fmt = IoFormatter{}
+    Fmt.U64(value as u64, &fmt)
 }
 
 Print_float(value: f64, base: u8 = 10, precision: u8 = 4, capital: bool = true) {
-    const fmtBuffer: [25]char
-    cstr := fmt.FmtFloat(value, base, @fmtBuffer, precision, capital)
-    Stdout.WriteCstr(cstr)
+    mut fmt = IoFormatter{}
+    Fmt.F64(value, &fmt)
 }
 
 Print_char(char: char) {

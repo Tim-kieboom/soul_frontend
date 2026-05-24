@@ -407,9 +407,9 @@ define_symbols!(
         ConstRef => "@", SymbolKind::ConstRef, 6,
 
         /// smaller equals
-        LessEq => "<=", SymbolKind::Ge, 4,
+        LessEq => "<=", SymbolKind::Le, 4,
         /// bigger equals
-        GreatEq => ">=", SymbolKind::Le, 4,
+        GreatEq => ">=", SymbolKind::Ge, 4,
         // smaller then
         LessThen => "<", SymbolKind::LeftArray, 4,
         // bigger then

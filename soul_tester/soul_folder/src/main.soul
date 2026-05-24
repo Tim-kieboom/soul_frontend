@@ -1,16 +1,10 @@
 import (
-    crate.Std.Io
     crate.Test
-    // crate.Std.Fs.{File}
-    // crate.Std.Mem.Slice.{Index}
-    // crate.Std.Assertions.{Assert}
-    crate.Std.Mem.Str.{StringBuilder}
+    // crate.Std.Io
 )
 
 
 main() {
     Test.RunTests()
-    
-    Io.Println_int(10)
-    Io.Println("hello world")
+    // Io.Println("hello world")
 }

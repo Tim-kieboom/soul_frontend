@@ -66,8 +66,8 @@ literal $implPrims(TS: [_]type): syntax {
     literal IMPLS = syntax{}
     for T in TS {
         
-        literal IMPL = T.Type() {
-            type.Interger(TYPE) => $implInterger(T_INT)
+        literal IMPL = match T.Type() {
+            type.Interger(T_INT) => $implInterger(T_INT)
             type.bool(_) => $implBool()
             _ => panic("todo")
         }

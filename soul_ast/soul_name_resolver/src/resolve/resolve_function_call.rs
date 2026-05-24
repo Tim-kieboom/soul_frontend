@@ -1,6 +1,5 @@
 use ast::{
-    Expression, ExpressionKind, ExternalRef, FunctionCall, FunctionKind, SoulType, TypeKind,
-    VarTypeKind, scope::ScopeModuleEntry,
+    Expression, ExpressionKind, ExternalRef, FunctionCall, FunctionKind, SoulType, TypeKind, VarTypeKind, scope::ScopeModuleEntry
 };
 use soul_utils::{
     error::{SoulError, SoulErrorKind},
@@ -95,7 +94,7 @@ impl<'a> NameResolver<'a> {
                         function_call.intrinsic_value =
                             Some(ast::IntrinsicValue::Literal(ast::Literal::Int(line)));
                     }
-                    return;
+                    return
                 }
             }
         }
@@ -218,7 +217,7 @@ impl<'a> NameResolver<'a> {
     fn get_owner_kind(
         &'a self,
         type_qualifier: &'a Option<SoulType>,
-        function_call: &mut FunctionCall,
+        function_call: &'a FunctionCall,
     ) -> Option<&'a TypeKind> {
         if let Some(ty) = &type_qualifier {
             return Some(&ty.kind);
@@ -234,7 +233,7 @@ impl<'a> NameResolver<'a> {
                 resolved: Some(node_id),
                 ..
             } => match &self.store.get_variable_type(*node_id)?.0 {
-                VarTypeKind::NonInveredType(soul_type) => Some(&soul_type.kind),
+                VarTypeKind::NonInveredType(soul_type) => Some(soul_type.kind.unwrap_wrappers()),
                 VarTypeKind::InveredType(_) => self
                     .store
                     .get_variable_owner_hint(*node_id)

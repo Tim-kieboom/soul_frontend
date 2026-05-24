@@ -13,12 +13,19 @@ impl<'a> HirContext<'a> {
     ) -> hir::Expression {
         let scrutinee = self.lower_expression(&ast_match.scrutinee);
 
-        let mut arms = Vec::new();
-        for arm in &ast_match.arms {
-            let pattern = match &arm.pattern {
+        fn lower_pattern(pat: &MatchPattern) -> MatchPatternHir {
+            match pat {
                 MatchPattern::Literal(lit) => MatchPatternHir::Literal(lit.clone()),
                 MatchPattern::Wildcard => MatchPatternHir::Wildcard,
-            };
+                MatchPattern::Array(elements) => {
+                    MatchPatternHir::Array(elements.iter().map(lower_pattern).collect())
+                }
+            }
+        }
+
+        let mut arms = Vec::new();
+        for arm in &ast_match.arms {
+            let pattern = lower_pattern(&arm.pattern);
             let body = self.lower_block(&arm.body);
             arms.push(MatchArmHir { pattern, body });
         }

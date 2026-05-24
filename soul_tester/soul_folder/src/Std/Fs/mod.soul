@@ -1,6 +1,6 @@
 import (
     ./.Io
-    ./.Assertions.{Panic}
+    ./.Io.{Assert}
     ./.Mem.Str.{StringBuilder}
 )
 

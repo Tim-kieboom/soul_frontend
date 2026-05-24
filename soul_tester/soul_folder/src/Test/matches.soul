@@ -6,6 +6,28 @@ RunTests() {
     test_match_literal_int()
     test_match_literal_uint()
     test_match_literal_char()
+    test_match_literal_array()
+    test_match_literal_string()
+}
+
+test_match_literal_array() {
+    r := match [1, 2, 3] {
+        [1, 2, 3] => true
+        [4, 5, 6] => false
+        _ => false
+    }
+
+    Io.PrintAssert(r, msg: "Array match should succeed")
+}
+
+test_match_literal_string() {
+    r := match "tim" {
+        "tim" => true
+        "other" => false
+        _ => false
+    }
+
+    Io.PrintAssert(r, msg: "String match should succeed")
 }
 
 test_match_literal_int() {
@@ -75,4 +97,28 @@ test_match_literal_char() {
     
     res9 := match_char('X')
     Io.PrintAssert(res9 == "other", msg: "match_char('X') should return \"other\"")
+}
+
+test_match_literal_string() {
+    match_str(s: [@]char): int {
+        v := match s {
+            "hello" => 10
+            "world" => 20
+            "" => 0
+            _ => -1
+        }
+        v
+    }
+
+    res1 := match_str("hello")
+    Io.PrintAssert(res1 == 10, msg: "match_str(\"hello\") should return 10")
+
+    res2 := match_str("world")
+    Io.PrintAssert(res2 == 20, msg: "match_str(\"world\") should return 20")
+
+    res3 := match_str("")
+    Io.PrintAssert(res3 == 0, msg: "match_str(\"\") should return 0")
+
+    res4 := match_str("other")
+    Io.PrintAssert(res4 == -1, msg: "match_str(\"other\") should return -1")
 }

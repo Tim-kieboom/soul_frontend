@@ -158,3 +158,22 @@ impl SoulType {
         self
     }
 }
+
+impl TypeKind {
+
+    /// unwraps refs and pointers `&*@int` -> `int`
+    pub fn unwrap_wrappers<'a>(&'a self) -> &'a Self {
+        match self {
+            TypeKind::None |
+            TypeKind::Type |
+            TypeKind::Never |
+            TypeKind::Stub(_) |
+            TypeKind::Array(_) |
+            TypeKind::Optional(_) |
+            TypeKind::Primitive(_) => self,
+            
+            TypeKind::Pointer(inner) |
+            TypeKind::Reference(ReferenceType{ inner, ..}) => inner.kind.unwrap_wrappers(),
+        }
+    }
+}

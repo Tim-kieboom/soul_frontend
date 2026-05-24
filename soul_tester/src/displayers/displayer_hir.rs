@@ -403,6 +403,18 @@ impl<'a> HirDisplayer<'a> {
                             self.push_fmt(format_args!("{} => ", literal.value_to_string()))
                         }
                         hir::MatchPatternHir::Wildcard => self.push_str("_ => "),
+                        hir::MatchPatternHir::Array(elements) => {
+                            self.push('[');
+                            for (i, el) in elements.iter().enumerate() {
+                                if i > 0 { self.push_str(", "); }
+                                match el {
+                                    hir::MatchPatternHir::Literal(lit) => self.push_str(&lit.value_to_string()),
+                                    hir::MatchPatternHir::Wildcard => self.push('_'),
+                                    hir::MatchPatternHir::Array(_) => self.push_str("[...]"),
+                                }
+                            }
+                            self.push_str("] => ");
+                        }
                     }
 
                     self.display_block(&arm.body);

@@ -8,11 +8,7 @@ impl<'a> NameResolver<'a> {
                 match_expression.id = Some(self.alloc_node());
                 self.collect_expression(&mut match_expression.scrutinee);
                 for arm in &mut match_expression.arms {
-                    match &arm.pattern {
-                        ast::MatchPattern::Literal(_) => (),
-                        ast::MatchPattern::Wildcard => (),
-                    }
-
+                    self.collect_match_pattern(&arm.pattern);
                     self.collect_block(&mut arm.body);
                 }
             }
@@ -167,6 +163,14 @@ impl<'a> NameResolver<'a> {
                     self.collect_block(&mut el.node.block);
                     current = el.node.else_branchs.as_mut();
                 }
+            }
+        }
+    }
+
+    fn collect_match_pattern(&mut self, pattern: &ast::MatchPattern) {
+        if let ast::MatchPattern::Array(elements) = pattern {
+            for elem in elements {
+                self.collect_match_pattern(elem);
             }
         }
     }

@@ -44,7 +44,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     kind: ArrayKind::StackArray(_),
                     ..
                 },
-                ThirTypeKind::Pointer(_),
+                ThirTypeKind::Pointer(_) | ThirTypeKind::Primitive(PrimitiveTypes::CStr),
             ) => {
                 let value = source_operand.get_or_convert_pointer(&self.builder)?.into();
                 Ok(IrOperand {
@@ -69,7 +69,8 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             (ThirTypeKind::Ref{..}, ThirTypeKind::Pointer(_)) |
             (ThirTypeKind::Pointer(_), ThirTypeKind::Ref{..}) |
             (ThirTypeKind::Pointer(_), ThirTypeKind::Pointer(_)) |
-            (ThirTypeKind::Primitive(PrimitiveTypes::CStr), ThirTypeKind::Pointer(_)) => {
+            (ThirTypeKind::Primitive(PrimitiveTypes::CStr), ThirTypeKind::Pointer(_)) |
+            (ThirTypeKind::Pointer(_), ThirTypeKind::Primitive(PrimitiveTypes::CStr)) => {
                 //llvm doesn't care ptr's are ptr's
                 self.new_loaded_operand(source_value, cast_to, generics)
             }

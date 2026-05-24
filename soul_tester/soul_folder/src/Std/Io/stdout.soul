@@ -1,7 +1,9 @@
+extern "C" __clib_printI64(n: i64)
+extern "C" __clib_printU64(n: u64)
+extern "C" __clib_printF64(n: f64)
 extern "C" __clib_printChar(ch: char)
 extern "C" __clib_printCStr(ptr: c_str)
 extern "C" __clib_printSoulStr(ptr: *char, len: uint)
-
 struct Stdout {}
 
 Stdout WriteChar(ch: char) {
@@ -14,4 +16,24 @@ Stdout WriteCstr(cstr: c_str) {
 
 Stdout WriteStr(text: [@]char) {
     __clib_printSoulStr(text as *char, text.len)
+}
+
+Stdout WriteI64(n: i64) {
+    __clib_printI64(n)
+}
+
+Stdout WriteU64(n: u64) {
+    __clib_printU64(n)
+}
+
+Stdout WriteF64(n: f64) {
+    __clib_printF64(n)
+}
+
+Stdout WriteBool(n: bool) {
+    if n {
+        __clib_printCStr(c"true")
+    } else {
+        __clib_printCStr(c"false")
+    }
 }

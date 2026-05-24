@@ -108,8 +108,20 @@ impl<'a, 'f> Parser<'a, 'f> {
         start_span: Span,
     ) -> SoulResult<Spanned<StructConstructor>> {
         self.expect(&CURLY_OPEN)?;
-
+        self.skip_end_lines();
         let struct_type = self.type_from_ident(ident, generics);
+
+        if self.current_is(&CURLY_CLOSE) {
+            self.bump();
+
+            let ctor = StructConstructor {
+                id: None,
+                values: vec![],
+                defaults: false,
+                struct_type,
+            };
+            return Ok(Spanned::new(ctor, self.span_combine(start_span)))
+        }
 
         let mut defaults = false;
         let mut values = vec![];
