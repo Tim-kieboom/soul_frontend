@@ -120,7 +120,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 defaults: false,
                 struct_type,
             };
-            return Ok(Spanned::new(ctor, self.span_combine(start_span)))
+            return Ok(Spanned::new(ctor, self.span_combine(start_span)));
         }
 
         let mut defaults = false;

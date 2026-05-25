@@ -1,5 +1,6 @@
 use ast::{
-    Expression, ExpressionKind, ExternalRef, FunctionCall, FunctionKind, SoulType, TypeKind, VarTypeKind,
+    Expression, ExpressionKind, ExternalRef, FunctionCall, FunctionKind, SoulType, TypeKind,
+    VarTypeKind,
     scope::{ScopeModuleEntry, ScopeTypeEntryKind},
 };
 use soul_utils::{
@@ -109,7 +110,7 @@ impl<'a> NameResolver<'a> {
                         function_call.intrinsic_value =
                             Some(ast::IntrinsicValue::Literal(ast::Literal::Int(line)));
                     }
-                    return
+                    return;
                 }
             }
         }
@@ -197,7 +198,10 @@ impl<'a> NameResolver<'a> {
 
         if is_type_qualifier {
             if let Some(callee_expr) = function_call.callee.as_ref() {
-                if self.is_callee_union(callee_expr, function_call).unwrap_or(false) {
+                if self
+                    .is_callee_union(callee_expr, function_call)
+                    .unwrap_or(false)
+                {
                     function_call.resolved = Some(FunctionId::error());
                     return;
                 }

@@ -1,4 +1,4 @@
-literal $CHARS = type:[
+literal CHARS = type:[
     char,
     char8,
     char16,
@@ -6,14 +6,14 @@ literal $CHARS = type:[
     char64,
 ]
 
-literal $FLOATS = type:[
+literal FLOATS = type:[
     untypedFloat,
     f16,
     f32, 
     f64,
 ]
 
-literal $INTS = type:[
+literal INTS = type:[
     untypedInt, 
     c_int,
     int,
@@ -24,7 +24,7 @@ literal $INTS = type:[
     i128,
 ]
 
-literal $UINTS = type:[
+literal UINTS = type:[
     untypedUint,
     c_uint,
     uint, 
@@ -35,96 +35,92 @@ literal $UINTS = type:[
     u128,
 ]
 
-literal $NUMBERS = type:[
-    $FLOATS,
-    $INTS,
-    $UINTS,
+literal NUMBERS = type:[
+    FLOATS,
+    INTS,
+    UINTS,
 ].Flatten()
 
-literal $PRIMITIVE_TYPES = type:[
+literal PRIMITIVE_TYPES = type:[
     type:[bool],
-    $CHARS,
-    $NUMBERS,
+    CHARS,
+    NUMBERS,
 ].Flatten()
 
 trait PrimitiveType {}
 
-literal $implEmptyTrait(TS: [_]type, TRAIT: type.trait): syntax {
-    
-    literal IMPLS = syntax{}
-    for T in TS {
-        
-        IMPLS.Append(syntax{
-            use $T impl $TRAIT {} 
-        })
-    }
-    IMPLS
-}
-
-literal $implPrims(TS: [_]type): syntax {   
-    
-    literal IMPLS = syntax{}
-    for T in TS {
-        
-        literal IMPL = match T.Type() {
-            type.Interger(T_INT) => $implInterger(T_INT)
-            type.bool(_) => $implBool()
-            _ => panic("todo")
-        }
-
-        IMPLS.Append(IMPL)
-    }
-    IMPLS
-}
-
-
-literal $implBool(): syntax {
-
-    syntax{
-        use bool {
-            literal MAX = true
-            literal MIN = false
-
-            #[inline]
-            This(num: impl PrimitiveType) {
-                num as This
-            }
-
-            impl Sized {
-                ByteSize(): uint {bool.typeof}
-            }
-        }
-    }
-}
-
-literal $implInterger(T: type.Interger): syntax {
-    literal INTERGER = T.toInterger()
-        .Error{literalPanic}
-
-    literal BYTES = T.sizeof as T
-    literal BITS = BYTES * 8
-    literal IS_SIGNED = INTERGER.isSigned()
-    literal MAX = if IS_SIGNED {(BITS/2) ** 2 - 1} else {BITS ** 2 - 1} 
-    literal MIN = if IS_SIGNED {(BITS/2) ** 2 * -1} else {0}
-    syntax{
-        use #T {
-            literal MAX: #T = #MAX
-            literal MIN: #T = #MIN
-
-            #[inline]
-            This(num: impl PrimitiveType) {
-                num as This
-            }
-
-            impl Sized {
-                ByteSize(): uint {#T.sizeof}
-            }
-        }
-    }
-}
-
-$implEmptyTrait(
-    $PRIMITIVE_TYPES,
+syntax.implEmptyTrait(
+    PRIMITIVE_TYPES,
     PrimitiveType
 )
-$implPrims($PRIMITIVE_TYPES)
+syntax.implPrims(PRIMITIVE_TYPES)
+
+use syntax {
+
+    literal implEmptyTrait(this, TS: [_]type, TRAIT: type.trait) {
+        
+        for T in TS {
+            
+            this.AddSyntax(syntax{
+                use $T impl $TRAIT {} 
+            })
+        }
+    }
+
+    literal implPrims(this, TS: [_]type) {   
+        
+        for T in TS {
+            
+            match T {
+                type.Interger(T_INT) => syntax.implInterger(T_INT)
+                type.bool(_) => syntax.implBool()
+                _ => panic("todo")
+            }
+        }
+    }
+
+
+    literal implBool(this) {
+
+        this.AddSyntax(syntax{
+            use bool {
+                literal MAX = true
+                literal MIN = false
+
+                This(num: impl PrimitiveType) {
+                    num as This
+                }
+
+                impl Sized {
+                    ByteSize(): uint {bool.typeof}
+                }
+            }
+        })
+    }
+
+    literal implInterger(this, T: type.Interger) {
+        literal INTERGER = T.toInterger()
+            .Err{literalPanic}
+
+        literal BYTES = T.sizeof as T
+        literal BITS = BYTES * 8
+        literal IS_SIGNED = INTERGER.isSigned()
+        literal MAX = if IS_SIGNED {(BITS/2) ** 2 - 1} else {BITS ** 2 - 1} 
+        literal MIN = if IS_SIGNED {(BITS/2) ** 2 * -1} else {0}
+
+        this.AddSyntax(syntax{
+            use $T {
+                literal MIN: $T = $MIN
+                literal MAX: $T = $MAX
+
+                This(num: impl PrimitiveType) {
+                    num as This
+                }
+
+                impl Sized {
+                    ByteSize(): u32 {$T.sizeof}
+                }
+            }
+        })
+    }
+}

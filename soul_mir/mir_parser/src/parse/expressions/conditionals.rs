@@ -386,11 +386,7 @@ impl<'a> MirContext<'a> {
 
         let all_arm_blocks: Vec<(BlockId, hir::BlockId)> = lit_arm_blocks
             .into_iter()
-            .chain(
-                array_arm_blocks
-                    .into_iter()
-                    .map(|(bb, body, _)| (bb, body)),
-            )
+            .chain(array_arm_blocks.into_iter().map(|(bb, body, _)| (bb, body)))
             .chain(
                 string_arm_blocks
                     .into_iter()
@@ -494,7 +490,10 @@ impl<'a> MirContext<'a> {
 
         let thir_type = self.id_to_type(scrutinee_ty);
         let (elem_ty, _array_len) = match &thir_type.kind {
-            ThirTypeKind::Array { element, kind: ArrayKind::StackArray(len) } => (*element, *len),
+            ThirTypeKind::Array {
+                element,
+                kind: ArrayKind::StackArray(len),
+            } => (*element, *len),
             _ => return fallthrough,
         };
 
@@ -503,28 +502,30 @@ impl<'a> MirContext<'a> {
             let chain_entry = self.new_block();
             self.tree.blocks[chain_entry].returnable = returnable;
 
-            let has_wildcard = elements.iter().any(|e| matches!(e, MatchPatternHir::Wildcard));
-            
+            let has_wildcard = elements
+                .iter()
+                .any(|e| matches!(e, MatchPatternHir::Wildcard));
+
             if !has_wildcard {
                 self.lower_array_arm_wildcard(
-                    elements, 
-                    scrutinee_ty, 
-                    scrutinee_op.clone(), 
-                    chain_entry, 
-                    bool_ty, 
-                    next_bb, 
+                    elements,
+                    scrutinee_ty,
+                    scrutinee_op.clone(),
+                    chain_entry,
+                    bool_ty,
+                    next_bb,
                     *arm_bb,
                 );
             } else {
                 self.lower_array_arm(
-                    elements, 
-                    scrutinee_ty, 
-                    &scrutinee_op, 
-                    chain_entry, 
-                    returnable, 
-                    elem_ty, 
-                    bool_ty, 
-                    next_bb, 
+                    elements,
+                    scrutinee_ty,
+                    &scrutinee_op,
+                    chain_entry,
+                    returnable,
+                    elem_ty,
+                    bool_ty,
+                    next_bb,
                     *arm_bb,
                 );
             }
@@ -537,7 +538,7 @@ impl<'a> MirContext<'a> {
 
     fn lower_array_arm(
         &mut self,
-        elements: &Vec<MatchPatternHir>, 
+        elements: &Vec<MatchPatternHir>,
         scrutinee_ty: hir::TypeId,
         scrutinee_op: &mir::Operand,
         chain_entry: BlockId,
@@ -576,16 +577,15 @@ impl<'a> MirContext<'a> {
 
                     let ptr_op = mir::Operand::new(scrutinee_ty, mir::OperandKind::Temp(ptr_temp));
                     let elem_temp = self.new_temp(elem_ty);
-                    let elem_place = self.new_place(mir::Place::new(
-                        mir::PlaceKind::Temp(elem_temp),
-                        elem_ty,
-                    ));
+                    let elem_place =
+                        self.new_place(mir::Place::new(mir::PlaceKind::Temp(elem_temp), elem_ty));
                     self.push_statement_from(
                         mir::Statement::new(mir::StatementKind::Assign {
                             place: elem_place,
-                            value: mir::Rvalue::new(mir::RvalueKind::Place(
-                                mir::Place::new(mir::PlaceKind::Deref(ptr_op), elem_ty),
-                            )),
+                            value: mir::Rvalue::new(mir::RvalueKind::Place(mir::Place::new(
+                                mir::PlaceKind::Deref(ptr_op),
+                                elem_ty,
+                            ))),
                         }),
                         current_bb,
                     );
@@ -593,10 +593,8 @@ impl<'a> MirContext<'a> {
                     let elem_op = mir::Operand::new(elem_ty, mir::OperandKind::Temp(elem_temp));
                     let lit_op = mir::Operand::new(elem_ty, mir::OperandKind::Comptime(lit_value));
                     let eq_temp = self.new_temp(bool_ty);
-                    let eq_place = self.new_place(mir::Place::new(
-                        mir::PlaceKind::Temp(eq_temp),
-                        bool_ty,
-                    ));
+                    let eq_place =
+                        self.new_place(mir::Place::new(mir::PlaceKind::Temp(eq_temp), bool_ty));
                     self.push_statement_from(
                         mir::Statement::new(mir::StatementKind::Assign {
                             place: eq_place,
@@ -639,8 +637,8 @@ impl<'a> MirContext<'a> {
     }
 
     fn lower_array_arm_wildcard(
-        &mut self, 
-        elements: &Vec<MatchPatternHir>, 
+        &mut self,
+        elements: &Vec<MatchPatternHir>,
         scrutinee_ty: hir::TypeId,
         scrutinee_op: mir::Operand,
         chain_entry: BlockId,
@@ -665,10 +663,7 @@ impl<'a> MirContext<'a> {
         );
 
         let eq_temp = self.new_temp(bool_ty);
-        let eq_place = self.new_place(mir::Place::new(
-            mir::PlaceKind::Temp(eq_temp),
-            bool_ty,
-        ));
+        let eq_place = self.new_place(mir::Place::new(mir::PlaceKind::Temp(eq_temp), bool_ty));
         self.push_statement_from(
             mir::Statement::new(mir::StatementKind::Assign {
                 place: eq_place,
@@ -676,8 +671,7 @@ impl<'a> MirContext<'a> {
                     left: scrutinee_op.clone(),
                     operator: BinaryOperator::new(
                         BinaryOperatorKind::Eq,
-                        self.hir_response.hir.info.spans.expressions
-                            [hir::ExpressionId::error()],
+                        self.hir_response.hir.info.spans.expressions[hir::ExpressionId::error()],
                     ),
                     right: pattern_array,
                 }),
@@ -717,10 +711,7 @@ impl<'a> MirContext<'a> {
             );
 
             let eq_temp = self.new_temp(bool_ty);
-            let eq_place = self.new_place(mir::Place::new(
-                mir::PlaceKind::Temp(eq_temp),
-                bool_ty,
-            ));
+            let eq_place = self.new_place(mir::Place::new(mir::PlaceKind::Temp(eq_temp), bool_ty));
             self.push_statement_from(
                 mir::Statement::new(mir::StatementKind::Assign {
                     place: eq_place,

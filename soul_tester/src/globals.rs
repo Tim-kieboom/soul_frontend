@@ -18,7 +18,7 @@ const DEBUG_VIEW_LITERAL_RESOLVE: bool = false;
 
 pub(crate) static PATHS: LazyLock<Paths> =
     LazyLock::new(|| serde_json::from_slice(RAW_PATHS).expect("no json error"));
-    
+
 pub(crate) const MESSAGE_CONFIG: MessageConfig = MessageConfig {
     backtrace: crate::BACKTRACE,
     colors: true,

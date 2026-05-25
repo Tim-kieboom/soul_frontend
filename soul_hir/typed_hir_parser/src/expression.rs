@@ -6,8 +6,8 @@ use crate::{
 };
 use ast::{ArrayKind, BinaryOperator, BinaryOperatorKind, FunctionKind, UnaryOperator};
 use hir::{
-    Binary, BlockId, DisplayType, ExpressionId, HirType, HirTypeKind, LazyTypeId, PlaceId, Struct,
-    TypeId, Unary, UnionId, CustomTypeId,
+    Binary, BlockId, CustomTypeId, DisplayType, ExpressionId, HirType, HirTypeKind, LazyTypeId,
+    PlaceId, Struct, TypeId, TypeOf, Unary, UnionId,
 };
 use soul_utils::{
     Ident,
@@ -61,15 +61,9 @@ impl<'a> TypedHirContext<'a> {
             hir::ExpressionKind::NewHeapArray { ptr, len } => {
                 self.infer_new_heap_array(*ptr, *len, span)
             }
-            hir::ExpressionKind::Alloc { size } => {
-                self.infer_alloc(*size, span)
-            }
-            hir::ExpressionKind::Dealloc { ptr } => {
-                self.infer_dealloc(*ptr)
-            }
-            hir::ExpressionKind::Realloc { ptr, size } => {
-                self.infer_realloc(*ptr, *size, span)
-            }
+            hir::ExpressionKind::Alloc { size } => self.infer_alloc(*size, span),
+            hir::ExpressionKind::Dealloc { ptr } => self.infer_dealloc(*ptr),
+            hir::ExpressionKind::Realloc { ptr, size } => self.infer_realloc(*ptr, *size, span),
             hir::ExpressionKind::Exit { exit_code } => {
                 let value_type = self.infer_expression(*exit_code);
                 self.unify(
@@ -99,6 +93,9 @@ impl<'a> TypedHirContext<'a> {
                 variant_field_id: _,
                 value,
             } => self.infer_union_constructor(*union_id, *variant_index, *value, span),
+            hir::ExpressionKind::UnionTag(value) => self.infer_union_tag(*value, span),
+            hir::ExpressionKind::UnionExtract { value } => self.infer_union_extract(*value, span),
+            hir::ExpressionKind::TypeOf(typeof_) => self.infer_typeof(typeof_),
             hir::ExpressionKind::DeRef(inner) => self.infer_deref(*inner, span),
             hir::ExpressionKind::Function(function) => self.functions[*function].to_lazy(),
             hir::ExpressionKind::Ref { place, mutable } => {
@@ -187,6 +184,44 @@ impl<'a> TypedHirContext<'a> {
         });
 
         self.add_type(hir_type).to_lazy()
+    }
+
+    fn infer_union_tag(&mut self, value: ExpressionId, _span: Span) -> LazyTypeId {
+        let _ = self.infer_expression(value);
+        self.add_type(HirType::index_type()).to_lazy()
+    }
+
+    fn infer_union_extract(&mut self, value: ExpressionId, span: Span) -> LazyTypeId {
+        let _ = self.infer_expression(value);
+        self.new_infer(span)
+    }
+
+    fn infer_typeof(&mut self, typeof_: &TypeOf) -> LazyTypeId {
+        let TypeOf {
+            value,
+            union_id,
+            variant_index,
+            binding,
+        } = typeof_;
+        let bool_type = self
+            .add_type(HirType::primitive_type(PrimitiveTypes::Boolean))
+            .to_lazy();
+
+        let _ = self.infer_expression(*value);
+
+        let Some(local_id) = *binding else {
+            return bool_type;
+        };
+
+        let Some(union_def) = self.types.id_to_union(*union_id) else {
+            return bool_type;
+        };
+
+        if let Some(variant) = union_def.variants.get(*variant_index) {
+            let variant_ty = variant.ty;
+            self.locals.insert(local_id, variant_ty);
+        }
+        bool_type
     }
 
     fn infer_if(
@@ -305,7 +340,6 @@ impl<'a> TypedHirContext<'a> {
 
         let mut args_iter = arguments.iter().zip(function.parameters.iter());
         if has_callee {
-            
             if let Some((this, parameter)) = args_iter.next() {
                 let ty = self.infer_expression(*this);
                 let span = self.expression_span(*this);
@@ -536,10 +570,8 @@ impl<'a> TypedHirContext<'a> {
                     if matches!(lit, ast::Literal::Str(_)) {
                         let resolved = self.resolve_type_strict(scrutinee_ty, span);
                         if let Some(ty) = resolved {
-                            let is_array = matches!(
-                                self.id_to_type(ty).kind,
-                                HirTypeKind::Array { .. }
-                            );
+                            let is_array =
+                                matches!(self.id_to_type(ty).kind, HirTypeKind::Array { .. });
                             if !is_array {
                                 self.log_error(SoulError::new(
                                     "string pattern requires an array type (string = [*]char)",
@@ -553,10 +585,8 @@ impl<'a> TypedHirContext<'a> {
                 hir::MatchPatternHir::Array(_elements) => {
                     let resolved = self.resolve_type_strict(scrutinee_ty, span);
                     if let Some(ty) = resolved {
-                        let is_array = matches!(
-                            self.id_to_type(ty).kind,
-                            HirTypeKind::Array { .. }
-                        );
+                        let is_array =
+                            matches!(self.id_to_type(ty).kind, HirTypeKind::Array { .. });
                         if !is_array {
                             self.log_error(SoulError::new(
                                 "array pattern requires an array type",
@@ -760,11 +790,7 @@ impl<'a> TypedHirContext<'a> {
         }
     }
 
-    fn infer_alloc(
-        &mut self,
-        size: ExpressionId,
-        _span: Span,
-    ) -> LazyTypeId {
+    fn infer_alloc(&mut self, size: ExpressionId, _span: Span) -> LazyTypeId {
         let _ = self.infer_expression(size);
 
         let none_ty = self.common_types.none_type;
@@ -772,20 +798,12 @@ impl<'a> TypedHirContext<'a> {
         LazyTypeId::Known(ptr_none)
     }
 
-    fn infer_dealloc(
-        &mut self,
-        ptr: ExpressionId,
-    ) -> LazyTypeId {
+    fn infer_dealloc(&mut self, ptr: ExpressionId) -> LazyTypeId {
         let _ = self.infer_expression(ptr);
         self.common_types.none_type.to_lazy()
     }
 
-    fn infer_realloc(
-        &mut self,
-        ptr: ExpressionId,
-        size: ExpressionId,
-        _span: Span,
-    ) -> LazyTypeId {
+    fn infer_realloc(&mut self, ptr: ExpressionId, size: ExpressionId, _span: Span) -> LazyTypeId {
         let _ = self.infer_expression(ptr);
         let _ = self.infer_expression(size);
 
@@ -928,8 +946,7 @@ impl<'a> TypedHirContext<'a> {
                 let value_type = self.infer_expression(value);
                 self.unify(value, variant_ty, value_type, span);
             }
-            let union_type =
-                HirType::new(HirTypeKind::CustomType(CustomTypeId::Union(union_id)));
+            let union_type = HirType::new(HirTypeKind::CustomType(CustomTypeId::Union(union_id)));
             return self.add_type(union_type).to_lazy();
         }
         LazyTypeId::error()

@@ -99,10 +99,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     match self.lower_basic_literal(literal, should_be, generics) {
                         Ok(val) => return Ok(val),
                         Err(_) => {
-                            let ir_type = self.lower_type(should_be, generics)?
-                                .ok_or(soul_error_internal!(
-                                    "zeroinitializer type not found", None
-                                ))?;
+                            let ir_type = self.lower_type(should_be, generics)?.ok_or(
+                                soul_error_internal!("zeroinitializer type not found", None),
+                            )?;
                             let value = ir_type.const_zero().into();
                             return self.new_loaded_operand(value, should_be, generics);
                         }

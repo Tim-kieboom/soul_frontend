@@ -548,9 +548,13 @@ impl<'a> AstDisplayer<'a> {
                         ast::MatchPattern::Array(elements) => {
                             self.push('[');
                             for (i, el) in elements.iter().enumerate() {
-                                if i > 0 { self.push_str(", "); }
+                                if i > 0 {
+                                    self.push_str(", ");
+                                }
                                 match el {
-                                    ast::MatchPattern::Literal(lit) => self.push_str(&lit.value_to_string()),
+                                    ast::MatchPattern::Literal(lit) => {
+                                        self.push_str(&lit.value_to_string())
+                                    }
                                     ast::MatchPattern::Wildcard => self.push('_'),
                                     ast::MatchPattern::Array(_) => self.push_str("[...]"),
                                 }
@@ -717,6 +721,24 @@ impl<'a> AstDisplayer<'a> {
                         self.display_expression(&ctor.element);
                         self.push(']');
                     }
+                }
+            }
+            ast::ExpressionKind::TypeOf {
+                expr,
+                type_name,
+                variant_name,
+                binding,
+                binding_id: _,
+            } => {
+                self.display_expression(expr);
+                self.push_str(" typeof ");
+                self.push_str(type_name.as_str());
+                self.push('.');
+                self.push_str(variant_name.as_str());
+                if let Some(binding) = binding {
+                    self.push('(');
+                    self.push_str(binding.as_str());
+                    self.push(')');
                 }
             }
         }

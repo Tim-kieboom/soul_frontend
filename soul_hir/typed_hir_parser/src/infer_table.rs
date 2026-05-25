@@ -10,8 +10,8 @@ use soul_utils::{
     vec_map::VecMap,
 };
 
-use ast::ArrayKind;
 use crate::type_helpers::{ArrayKindCompatible, GetPriority, TypeCompatible};
+use ast::ArrayKind;
 
 pub enum UnifyResult {
     /// fully unifyable
@@ -206,8 +206,16 @@ impl InferTable {
                         kind: inner_kind,
                     } => {
                         let ok = match (inner_kind, &array_kind, mutable) {
-                            (ArrayKind::StackArray(_) | ArrayKind::HeapArray, ArrayKind::MutSlice, true)
-                            | (ArrayKind::StackArray(_) | ArrayKind::HeapArray, ArrayKind::ConstSlice, false) => true,
+                            (
+                                ArrayKind::StackArray(_) | ArrayKind::HeapArray,
+                                ArrayKind::MutSlice,
+                                true,
+                            )
+                            | (
+                                ArrayKind::StackArray(_) | ArrayKind::HeapArray,
+                                ArrayKind::ConstSlice,
+                                false,
+                            ) => true,
                             _ => false,
                         };
                         if !ok {
@@ -438,12 +446,7 @@ impl InferTable {
                 let expecting = self.get_type(types, expect_id)?;
                 let is_type = self.get_type(types, ty)?;
 
-                if !Self::type_ref_array_compatible(
-                    types,
-                    infers,
-                    &expecting.kind,
-                    &is_type.kind,
-                ) {
+                if !Self::type_ref_array_compatible(types, infers, &expecting.kind, &is_type.kind) {
                     expecting.compatible_type_kind(is_type).map_err(|reason| {
                         SoulError::new(
                             format!(
@@ -628,14 +631,10 @@ impl InferTable {
         b: &HirTypeKind,
     ) -> bool {
         let (ref_of, ref_mut, array_kind) = match (a, b) {
-            (
-                HirTypeKind::Ref { of_type, mutable },
-                HirTypeKind::Array { kind, .. },
-            )
-            | (
-                HirTypeKind::Array { kind, .. },
-                HirTypeKind::Ref { of_type, mutable },
-            ) => (of_type, *mutable, *kind),
+            (HirTypeKind::Ref { of_type, mutable }, HirTypeKind::Array { kind, .. })
+            | (HirTypeKind::Array { kind, .. }, HirTypeKind::Ref { of_type, mutable }) => {
+                (of_type, *mutable, *kind)
+            }
             _ => return false,
         };
 
@@ -655,8 +654,15 @@ impl InferTable {
             } => {
                 matches!(
                     (inner_kind, array_kind, ref_mut),
-                    (ArrayKind::StackArray(_) | ArrayKind::HeapArray, ArrayKind::MutSlice, true)
-                        | (ArrayKind::StackArray(_) | ArrayKind::HeapArray, ArrayKind::ConstSlice, false)
+                    (
+                        ArrayKind::StackArray(_) | ArrayKind::HeapArray,
+                        ArrayKind::MutSlice,
+                        true
+                    ) | (
+                        ArrayKind::StackArray(_) | ArrayKind::HeapArray,
+                        ArrayKind::ConstSlice,
+                        false
+                    )
                 )
             }
             _ => false,

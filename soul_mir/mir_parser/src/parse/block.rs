@@ -63,27 +63,25 @@ impl<'a> MirContext<'a> {
                     self.insert_terminator(this_block, mir::Terminator::Goto(target));
                     block_operand.filter(|value| !matches!(value.kind, OperandKind::None))
                 }
-                None => {
-                    match &block.terminator {
-                        Some(expression) => {
-                            let expression_id = expression.get_expression_id();
-                            let value = if block_operand_id == Some(expression_id) {
-                                match block_operand {
-                                    Some(val) => val,
-                                    None => self.lower_operand(expression_id).pass(is_end),
-                                }
-                            } else {
-                                self.lower_operand(expression_id).pass(is_end)
-                            };
-                            if matches!(value.kind, OperandKind::None) {
-                                None
-                            } else {
-                                Some(value)
+                None => match &block.terminator {
+                    Some(expression) => {
+                        let expression_id = expression.get_expression_id();
+                        let value = if block_operand_id == Some(expression_id) {
+                            match block_operand {
+                                Some(val) => val,
+                                None => self.lower_operand(expression_id).pass(is_end),
                             }
+                        } else {
+                            self.lower_operand(expression_id).pass(is_end)
+                        };
+                        if matches!(value.kind, OperandKind::None) {
+                            None
+                        } else {
+                            Some(value)
                         }
-                        None => block_operand.filter(|value| !matches!(value.kind, OperandKind::None)),
                     }
-                }
+                    None => block_operand.filter(|value| !matches!(value.kind, OperandKind::None)),
+                },
                 _ => {
                     self.log_error(soul_error_internal!(
                         "should not have this terminator kind in block",

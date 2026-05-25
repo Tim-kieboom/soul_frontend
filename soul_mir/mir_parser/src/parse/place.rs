@@ -15,13 +15,12 @@ impl<'a> MirContext<'a> {
 
         let mir_place = match &self.hir_response.hir.nodes.places[place_id].kind {
             hir::PlaceKind::Local(local_id) => {
-                
                 let Some(local_info) = self.hir_response.hir.nodes.locals.get(*local_id) else {
-                    self.log_error(soul_error_internal!(format!("{local_id:?} not found"), None));
-                    return EndBlock::new(
-                        mir::PlaceId::error(), 
-                        is_end,
-                    )
+                    self.log_error(soul_error_internal!(
+                        format!("{local_id:?} not found"),
+                        None
+                    ));
+                    return EndBlock::new(mir::PlaceId::error(), is_end);
                 };
 
                 if local_info.is_temp() {
@@ -123,7 +122,6 @@ impl<'a> MirContext<'a> {
     }
 
     // Look up a HIR local in the MIR-local remap and wrap it in a `PlaceKind::Local`.
-    #[allow(unused_variables)]
     fn lower_local(&mut self, local_id: hir::LocalId, span: Span) -> mir::PlaceId {
         let local = match self.local_remap.get(local_id) {
             Some(val) => *val,

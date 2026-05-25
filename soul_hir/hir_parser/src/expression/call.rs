@@ -40,7 +40,11 @@ impl<'a> HirContext<'a> {
                 return self.lower_exit(id, &function_call.arguments);
             }
             if intrinsic == Intrinsic::NewHeapArray {
-                return self.lower_new_heap_array(id, &function_call.arguments, function_call.name.span);
+                return self.lower_new_heap_array(
+                    id,
+                    &function_call.arguments,
+                    function_call.name.span,
+                );
             }
             if intrinsic == Intrinsic::Alloc {
                 return self.lower_alloc(id, &function_call.arguments, function_call.name.span);
@@ -50,6 +54,16 @@ impl<'a> HirContext<'a> {
             }
             if intrinsic == Intrinsic::Realloc {
                 return self.lower_realloc(id, &function_call.arguments, function_call.name.span);
+            }
+            if intrinsic == Intrinsic::UnionTag {
+                return self.lower_union_tag(id, &function_call.arguments, function_call.name.span);
+            }
+            if intrinsic == Intrinsic::UnionExtract {
+                return self.lower_union_extract(
+                    id,
+                    &function_call.arguments,
+                    function_call.name.span,
+                );
             }
             return self.lower_intrinsic(
                 id,
@@ -339,6 +353,8 @@ impl<'a> HirContext<'a> {
             Intrinsic::Alloc => unreachable!("Alloc should be handled in lower_call"),
             Intrinsic::Dealloc => unreachable!("Dealloc should be handled in lower_call"),
             Intrinsic::Realloc => unreachable!("Realloc should be handled in lower_call"),
+            Intrinsic::UnionTag => unreachable!("UnionTag should be handled in lower_call"),
+            Intrinsic::UnionExtract => unreachable!("UnionExtract should be handled in lower_call"),
         }
     }
 
@@ -500,6 +516,42 @@ impl<'a> HirContext<'a> {
             id,
             ty: self.new_infer_type(vec![], None, span),
             kind: hir::ExpressionKind::Realloc { ptr, size },
+        }
+    }
+
+    fn lower_union_tag(
+        &mut self,
+        id: hir::ExpressionId,
+        arguments: &[ast::Argument],
+        span: Span,
+    ) -> hir::Expression {
+        let value = arguments
+            .get(0)
+            .map(|arg| self.lower_expression(&arg.value))
+            .unwrap_or(ExpressionId::error());
+
+        hir::Expression {
+            id,
+            ty: self.new_infer_type(vec![], None, span),
+            kind: hir::ExpressionKind::UnionTag(value),
+        }
+    }
+
+    fn lower_union_extract(
+        &mut self,
+        id: hir::ExpressionId,
+        arguments: &[ast::Argument],
+        span: Span,
+    ) -> hir::Expression {
+        let value = arguments
+            .get(0)
+            .map(|arg| self.lower_expression(&arg.value))
+            .unwrap_or(ExpressionId::error());
+
+        hir::Expression {
+            id,
+            ty: self.new_infer_type(vec![], None, span),
+            kind: hir::ExpressionKind::UnionExtract { value },
         }
     }
 

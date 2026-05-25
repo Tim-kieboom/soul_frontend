@@ -530,6 +530,16 @@ impl<'a> MirDisplayer<'a> {
                 self.display_operand(size);
                 self.push(')');
             }
+            mir::RvalueKind::UnionTag { value } => {
+                self.push_str("intrinsic.UnionTag(");
+                self.display_operand(value);
+                self.push(')');
+            }
+            mir::RvalueKind::UnionExtract { value } => {
+                self.push_str("intrinsic.UnionExtract(");
+                self.display_operand(value);
+                self.push(')');
+            }
         }
     }
 
@@ -570,7 +580,7 @@ impl<'a> MirDisplayer<'a> {
             Some(val) => val,
             None => {
                 self.push_str("/*Place <error>*/");
-                return
+                return;
             }
         };
         self.inner_display_place(place);

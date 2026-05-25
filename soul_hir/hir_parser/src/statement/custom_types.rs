@@ -118,7 +118,10 @@ impl<'a> HirContext<'a> {
             name: Ident::new("__tag".to_string(), object.name.span),
             ty: index_type.to_lazy(),
         };
-        self.tree.nodes.fields.insert(tag_field_id, tag_field.clone());
+        self.tree
+            .nodes
+            .fields
+            .insert(tag_field_id, tag_field.clone());
 
         let mut hir_variants = vec![];
         let mut internal_fields = vec![tag_field];
@@ -132,7 +135,10 @@ impl<'a> HirContext<'a> {
                 name: variant.name.clone(),
                 ty: variant_ty,
             };
-            self.tree.nodes.fields.insert(variant_field_id, variant_field.clone());
+            self.tree
+                .nodes
+                .fields
+                .insert(variant_field_id, variant_field.clone());
             internal_fields.push(variant_field);
 
             let union_field_id = self.tree.info.types.alloc_union_field();

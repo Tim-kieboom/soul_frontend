@@ -1,7 +1,11 @@
 use crate::{GenericSubstitute, IrOperand, LlvmBackend, Local, OperandInfo};
 use ast::{ArrayKind, Literal};
 use hir::{ComplexLiteral, StructId, TypeId};
-use inkwell::{AddressSpace, types::{BasicType, StructType}, values::BasicValueEnum};
+use inkwell::{
+    AddressSpace,
+    types::{BasicType, StructType},
+    values::BasicValueEnum,
+};
 
 use mir_parser::mir::{self, AggregateBody, Place, PlaceId, Rvalue, RvalueKind};
 use soul_utils::{
@@ -55,6 +59,8 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             }
             RvalueKind::Alloc { size } => self.lower_alloc(ty, size, generics)?,
             RvalueKind::Realloc { ptr, size } => self.lower_realloc(ty, ptr, size, generics)?,
+            RvalueKind::UnionTag { value } => self.lower_union_tag(value, generics)?,
+            RvalueKind::UnionExtract { value } => self.lower_union_extract(value, generics)?,
         }))
     }
 
@@ -142,6 +148,74 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
         self.new_loaded_operand(ptr, ty, generics)
     }
 
+    fn lower_union_tag(
+        &self,
+        value: &mir::Operand,
+        generics: &GenericSubstitute,
+    ) -> SoulResult<IrOperand<'a>> {
+        let union_op = self.lower_operand(value, generics)?;
+        let union_ty = value.ty;
+        let index_ty_id = self.types.types_table.index_type;
+        let tag_ir = self
+            .lower_type(index_ty_id, generics)?
+            .ok_or(soul_error_internal!("index type should lower", None))?;
+        if union_op.info.is_unloaded {
+            let ptr = union_op.value.into_pointer_value();
+            let compact_ty = self
+                .lower_type(union_ty, generics)?
+                .ok_or(soul_error_internal!("union type should lower", None))?
+                .into_struct_type();
+            let tag_ptr = self
+                .builder
+                .build_struct_gep_index(compact_ty, ptr, 0, "tag")?;
+            let tag_val = self.builder.build_load(tag_ir, tag_ptr, "union_tag")?;
+            self.new_loaded_operand(tag_val, index_ty_id, generics)
+        } else {
+            let tag_val = self
+                .builder
+                .inkwell()
+                .build_extract_value(union_op.value.into_struct_value(), 0, "union_tag")
+                .map_err(|e| SoulError::new(e.to_string(), SoulErrorKind::LlvmError, None))?;
+            self.new_loaded_operand(tag_val, index_ty_id, generics)
+        }
+    }
+
+    fn lower_union_extract(
+        &self,
+        value: &mir::Operand,
+        generics: &GenericSubstitute,
+    ) -> SoulResult<IrOperand<'a>> {
+        let union_op = self.lower_operand(value, generics)?;
+        let union_ty = value.ty;
+        if union_op.info.is_unloaded {
+            let ptr = union_op.value.into_pointer_value();
+            let compact_ty = self
+                .lower_type(union_ty, generics)?
+                .ok_or(soul_error_internal!("union type should lower", None))?
+                .into_struct_type();
+            let data_ptr = self
+                .builder
+                .build_struct_gep_index(compact_ty, ptr, 1, "data")?;
+
+            let data_ir = compact_ty
+                .get_field_type_at_index(1)
+                .ok_or(soul_error_internal!(
+                    "compact union has no data field",
+                    None
+                ))?;
+            let data_val = self.builder.build_load(data_ir, data_ptr, "union_data")?;
+
+            self.new_loaded_operand(data_val, union_ty, generics)
+        } else {
+            let data_val = self
+                .builder
+                .inkwell()
+                .build_extract_value(union_op.value.into_struct_value(), 1, "union_data")
+                .map_err(|e| SoulError::new(e.to_string(), SoulErrorKind::LlvmError, None))?;
+            self.new_loaded_operand(data_val, union_ty, generics)
+        }
+    }
+
     fn lower_realloc(
         &self,
         ty: TypeId,
@@ -156,7 +230,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
         let ptr_val = self.lower_operand(ptr, generics)?.value;
         let size_val = self.lower_operand(size, generics)?.value;
-        let call = self.builder.build_call(realloc_fn, &[ptr_val.into(), size_val.into()])?;
+        let call = self
+            .builder
+            .build_call(realloc_fn, &[ptr_val.into(), size_val.into()])?;
         let result = call
             .try_as_basic_value()
             .basic()
@@ -435,14 +511,14 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                         return Err(soul_error_internal!(
                             "union constructor tag should be Int literal",
                             None
-                        ))
+                        ));
                     }
                 },
                 _ => {
                     return Err(soul_error_internal!(
                         "union constructor tag should be comptime",
                         None
-                    ))
+                    ));
                 }
             },
             AggregateBody::Comptime(literals) => match &literals[0].0 {
@@ -452,24 +528,23 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                         return Err(soul_error_internal!(
                             "union constructor tag should be Int literal in comptime aggregate",
                             None
-                        ))
+                        ));
                     }
                 },
                 _ => {
                     return Err(soul_error_internal!(
                         "union constructor tag should be comptime in comptime aggregate",
                         None
-                    ))
+                    ));
                 }
             },
         };
 
         let variant_ir = match body {
-            AggregateBody::Runtime(operands) => {
-                self.lower_operand(&operands[1], generics)?.value
-            }
+            AggregateBody::Runtime(operands) => self.lower_operand(&operands[1], generics)?.value,
             AggregateBody::Comptime(literals) => {
-                self.lower_literal(&literals[1].0, literals[1].1, generics)?.value
+                self.lower_literal(&literals[1].0, literals[1].1, generics)?
+                    .value
             }
         };
 
@@ -509,12 +584,16 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
         let ptr = self.builder.build_alloca(compact_struct_ty, "union")?;
 
-        let tag_value = self.context.i64_type().const_int(variant_index as u64, false);
-        self.builder.store_field(compact_struct_ty, ptr, tag_value, 0)?;
+        let tag_value = self
+            .context
+            .i64_type()
+            .const_int(variant_index as u64, false);
+        self.builder
+            .store_field(compact_struct_ty, ptr, tag_value, 0)?;
 
-        let data_ptr = self
-            .builder
-            .build_struct_gep_index(compact_struct_ty, ptr, 1, "union_data")?;
+        let data_ptr =
+            self.builder
+                .build_struct_gep_index(compact_struct_ty, ptr, 1, "union_data")?;
         let variant_ptr = self.builder.build_pointer_cast(
             data_ptr,
             self.context.ptr_type(AddressSpace::default()),

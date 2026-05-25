@@ -308,15 +308,18 @@ fn is_valid_statement_expression(kind: &hir::ExpressionKind) -> bool {
         | hir::ExpressionKind::DeRef(_)
         | hir::ExpressionKind::Sizeof(_)
         | hir::ExpressionKind::Literal(_)
+        | hir::ExpressionKind::UnionTag(_)
         | hir::ExpressionKind::Ref { .. }
         | hir::ExpressionKind::Cast { .. }
         | hir::ExpressionKind::Unary { .. }
+        | hir::ExpressionKind::TypeOf { .. }
         | hir::ExpressionKind::Binary { .. }
-        | hir::ExpressionKind::StructConstructor { .. }
-        | hir::ExpressionKind::UnionConstructor { .. }
         | hir::ExpressionKind::PtrOffset { .. }
+        | hir::ExpressionKind::UnionExtract { .. }
+        | hir::ExpressionKind::NewHeapArray { .. }
         | hir::ExpressionKind::StackArrayIndex { .. }
-        | hir::ExpressionKind::NewHeapArray { .. } => false,
+        | hir::ExpressionKind::UnionConstructor { .. }
+        | hir::ExpressionKind::StructConstructor { .. } => false,
 
         hir::ExpressionKind::Block(_)
         | hir::ExpressionKind::New(_)

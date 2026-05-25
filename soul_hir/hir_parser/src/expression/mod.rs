@@ -1,7 +1,8 @@
 use ast::{ArrayContructor, ArrayKind, FieldAccess, Literal};
 use ast::{AsTypeCast, VarTypeKind, scope::NodeId};
 use hir::{
-    CustomTypeId, EnumId, ExpressionId, HirType, HirTypeKind, LocalId, Place, PlaceKind, Terminator,
+    CustomTypeId, EnumId, ExpressionId, HirType, HirTypeKind, LocalId, Place, PlaceKind,
+    Terminator, TypeOf, UnionId,
 };
 use soul_utils::soul_error_internal;
 use soul_utils::{
@@ -71,6 +72,21 @@ impl<'a> HirContext<'a> {
             }
             ast::ExpressionKind::New(expr) => self.lower_new(id, expr, span),
             ast::ExpressionKind::NewArray(any_array) => self.lower_new_array(id, any_array, span),
+            ast::ExpressionKind::TypeOf {
+                expr,
+                type_name,
+                variant_name,
+                binding,
+                binding_id,
+            } => self.lower_typeof(
+                id,
+                expr,
+                type_name.clone(),
+                variant_name.clone(),
+                binding.clone(),
+                *binding_id,
+                span,
+            ),
 
             ast::ExpressionKind::ExternalExpression(_) => {
                 self.log_error(soul_error_internal!(
@@ -680,6 +696,85 @@ impl<'a> HirContext<'a> {
                 expression,
             }),
         }
+    }
+
+    fn lower_typeof(
+        &mut self,
+        id: hir::ExpressionId,
+        expr: &ast::Expression,
+        type_name: Ident,
+        variant_name: Ident,
+        binding: Option<Ident>,
+        binding_id: Option<ast::scope::NodeId>,
+        span: Span,
+    ) -> hir::Expression {
+        let value = self.lower_expression(expr);
+
+        let Some(union_id) = self.lookup_union(&type_name) else {
+            self.log_error(SoulError::new(
+                format!("'{}' is not a union type", type_name.as_str()),
+                SoulErrorKind::InvalidIdent,
+                Some(span),
+            ));
+            return hir::Expression::error(id);
+        };
+
+        let union = match self.tree.info.types.id_to_union(union_id) {
+            Some(val) => val,
+            None => return hir::Expression::error(id),
+        };
+
+        let variant_index = match union
+            .variants
+            .iter()
+            .position(|v| v.name.as_str() == variant_name.as_str())
+        {
+            Some(idx) => idx,
+            None => {
+                self.log_error(SoulError::new(
+                    format!(
+                        "'{}' is not a variant of '{}'",
+                        variant_name.as_str(),
+                        type_name.as_str()
+                    ),
+                    SoulErrorKind::InvalidIdent,
+                    Some(span),
+                ));
+                return hir::Expression::error(id);
+            }
+        };
+
+        let binding_local = binding.map(|binding_ident| {
+            let local = self.id_generator.alloc_local();
+            let ty = self.new_infer_type(vec![], None, binding_ident.span);
+            self.insert_variable(&binding_ident, local, ty, None);
+            if let Some(node_id) = binding_id {
+                self.node_id_to_local.insert(node_id, local);
+            }
+            local
+        });
+
+        hir::Expression {
+            id,
+            ty: self.new_infer_type(vec![], None, span),
+            kind: hir::ExpressionKind::TypeOf(TypeOf {
+                value,
+                union_id,
+                variant_index,
+                binding: binding_local,
+            }),
+        }
+    }
+
+    fn lookup_union(&mut self, type_name: &Ident) -> Option<UnionId> {
+        let mut found = None;
+        for store in self.scopes.iter().rev() {
+            if let Some(hir::CustomTypeId::Union(id)) = store.custom_types.get(type_name.as_str()) {
+                found = Some(*id);
+                break;
+            }
+        }
+        found
     }
 
     pub(crate) fn insert_expression(

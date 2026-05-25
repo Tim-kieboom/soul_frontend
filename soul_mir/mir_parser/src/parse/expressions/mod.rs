@@ -1,10 +1,11 @@
-use ast::Literal;
-use hir::{Binary, ComplexLiteral, CustomTypeId, ExpressionId, StructId, TypeId, Unary, UnionId};
+use ast::{BinaryOperatorKind, Literal};
+use hir::{Binary, ComplexLiteral, CustomTypeId, TypeId, TypeOf, Unary};
 use hir_literal_interpreter::ToComplex;
 use soul_utils::{
     Ident, Span,
     ids::{FunctionId, IdAlloc},
     soul_error_internal,
+    span::Spanned,
 };
 use typed_hir::{Field, Struct, ThirTypeKind};
 use typed_hir_parser::UnifyPrimitiveCast;
@@ -14,7 +15,9 @@ use crate::{
     mir::{self, Operand},
 };
 
+mod ccontructors;
 mod conditionals;
+mod heap;
 
 impl<'a> MirContext<'a> {
     pub(crate) fn lower_operand(&mut self, value_id: hir::ExpressionId) -> EndBlock<mir::Operand> {
@@ -251,6 +254,36 @@ impl<'a> MirContext<'a> {
                 mir::Operand::new(value_type, mir::OperandKind::Temp(temp))
             }
 
+            hir::ExpressionKind::UnionTag(value) => {
+                let inner = self.lower_operand(*value).pass(is_end);
+                let temp = self.new_temp(value_type);
+
+                let statement = mir::Statement::new(mir::StatementKind::Assign {
+                    place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp), value_type)),
+                    value: mir::Rvalue::new(mir::RvalueKind::UnionTag { value: inner }),
+                });
+
+                self.push_statement(statement);
+                mir::Operand::new(value_type, mir::OperandKind::Temp(temp))
+            }
+
+            hir::ExpressionKind::UnionExtract { value } => {
+                let inner = self.lower_operand(*value).pass(is_end);
+                let temp = self.new_temp(value_type);
+
+                let statement = mir::Statement::new(mir::StatementKind::Assign {
+                    place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp), value_type)),
+                    value: mir::Rvalue::new(mir::RvalueKind::UnionExtract { value: inner }),
+                });
+
+                self.push_statement(statement);
+                mir::Operand::new(value_type, mir::OperandKind::Temp(temp))
+            }
+
+            hir::ExpressionKind::TypeOf(typeof_) => {
+                self.lower_typeof(typeof_, value_type, span, is_end)
+            }
+
             hir::ExpressionKind::StackArrayIndex { array, index } => {
                 let array_operand = self.lower_operand(*array).pass(is_end);
                 let index_operand = self.lower_operand(*index).pass(is_end);
@@ -306,9 +339,7 @@ impl<'a> MirContext<'a> {
             hir::ExpressionKind::Alloc { size } => {
                 self.lower_alloc(*size, value_type, span, is_end)
             }
-            hir::ExpressionKind::Dealloc { ptr } => {
-                self.lower_dealloc(*ptr, is_end)
-            }
+            hir::ExpressionKind::Dealloc { ptr } => self.lower_dealloc(*ptr, is_end),
             hir::ExpressionKind::Realloc { ptr, size } => {
                 self.lower_realloc(*ptr, *size, value_type, span, is_end)
             }
@@ -328,240 +359,74 @@ impl<'a> MirContext<'a> {
         EndBlock::new(operand, is_end)
     }
 
-    fn lower_new_single(
+    fn lower_typeof(
         &mut self,
-        value_id: hir::ExpressionId,
-        heap_ptr_type: TypeId,
-        is_end: &mut bool,
-    ) -> mir::Operand {
-        let inner = self.lower_operand(value_id).pass(is_end);
-        let inner_ty = self.expression_type(value_id);
-        let ptr_temp = self.new_temp(heap_ptr_type);
-
-        let heap_stmt = mir::Statement::new(mir::StatementKind::Assign {
-            place: self.new_place(mir::Place::new(
-                mir::PlaceKind::Temp(ptr_temp),
-                heap_ptr_type,
-            )),
-            value: mir::Rvalue::new(mir::RvalueKind::HeapAlloc {
-                ty: inner_ty,
-                count: 1,
-            }),
-        });
-        self.push_statement(heap_stmt);
-
-        let ptr_operand = mir::Operand::new(heap_ptr_type, mir::OperandKind::Temp(ptr_temp));
-        let store_place = self.new_place(mir::Place::new(
-            mir::PlaceKind::Deref(ptr_operand),
-            inner_ty,
-        ));
-        let store_stmt = mir::Statement::new(mir::StatementKind::Assign {
-            place: store_place,
-            value: mir::Rvalue::new(mir::RvalueKind::Operand(inner)),
-        });
-        self.push_statement(store_stmt);
-
-        mir::Operand::new(heap_ptr_type, mir::OperandKind::Temp(ptr_temp))
-    }
-
-    fn lower_new_array(
-        &mut self,
-        values: &Vec<ExpressionId>,
-        ptr_type: TypeId,
-        array_type: TypeId,
+        typeof_: &TypeOf,
+        value_type: TypeId,
         span: Span,
         is_end: &mut bool,
     ) -> mir::Operand {
-        let count = values.len() as u64;
+        let TypeOf {
+            value,
+            union_id,
+            variant_index,
+            binding,
+        } = typeof_;
+        let inner = self.lower_operand(*value).pass(is_end);
+        let tag_type = self.hir_response.typed.types_table.index_type;
+        let tag_temp = self.new_temp(tag_type);
 
-        let element_type = match self.id_to_type(array_type).kind {
-            ThirTypeKind::Array { element, .. } => element,
-            _ => {
-                self.log_error(soul_error_internal!(
-                    "array type should be ThirTypeKind::Array",
-                    Some(span)
-                ));
-                TypeId::error()
-            }
-        };
-
-        let ptr_temp = self.new_temp(ptr_type);
-
-        let heap_stmt = mir::Statement::new(mir::StatementKind::Assign {
-            place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(ptr_temp), ptr_type)),
-            value: mir::Rvalue::new(mir::RvalueKind::HeapAlloc {
-                ty: element_type,
-                count,
+        let tag_stmt = mir::Statement::new(mir::StatementKind::Assign {
+            place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(tag_temp), tag_type)),
+            value: mir::Rvalue::new(mir::RvalueKind::UnionTag {
+                value: inner.clone(),
             }),
         });
-        self.push_statement(heap_stmt);
+        self.push_statement(tag_stmt);
 
-        for (i, val_id) in values.iter().enumerate() {
-            let val = self.lower_operand(*val_id).pass(is_end);
-            let offset_type = self.hir_response.typed.types_table.u32_type;
-            let offset_op = mir::Operand::new(
-                offset_type,
-                mir::OperandKind::Comptime(ComplexLiteral::Basic(Literal::Uint(i as u128))),
-            );
-            let ptr_operand = mir::Operand::new(ptr_type, mir::OperandKind::Temp(ptr_temp));
-            let elem_ptr_temp = self.new_temp(ptr_type);
+        let tag_operand = mir::Operand::new(tag_type, mir::OperandKind::Temp(tag_temp));
 
-            let offset_stmt = mir::Statement::new(mir::StatementKind::Assign {
-                place: self.new_place(mir::Place::new(
-                    mir::PlaceKind::Temp(elem_ptr_temp),
-                    ptr_type,
-                )),
-                value: mir::Rvalue::new(mir::RvalueKind::PtrOffset {
-                    pointer: ptr_operand,
-                    offset: offset_op,
-                }),
+        let int_val = ComplexLiteral::Basic(Literal::Int(*variant_index as i128));
+        let idx_operand = mir::Operand::new(tag_type, mir::OperandKind::Comptime(int_val));
+
+        let temp = self.new_temp(value_type);
+        let stmt = mir::Statement::new(mir::StatementKind::Assign {
+            place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp), value_type)),
+            value: mir::Rvalue::new(mir::RvalueKind::Binary {
+                left: tag_operand,
+                operator: Spanned::new(BinaryOperatorKind::Eq, span),
+                right: idx_operand,
+            }),
+        });
+        self.push_statement(stmt);
+        let operand = mir::Operand::new(value_type, mir::OperandKind::Temp(temp));
+
+        if let Some(local_id) = binding {
+            let Some(union) = self.hir_response.typed.types_map.id_to_union(*union_id) else {
+                return operand;
+            };
+
+            let variant_type = union.variant_types[*variant_index];
+            let mir_local = self.new_local(*local_id, variant_type, None);
+
+            // Extract the union value and assign to the binding local
+            let extract_temp = self.new_temp(variant_type);
+            let extract_stmt = mir::Statement::new(mir::StatementKind::Assign {
+                place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(extract_temp), variant_type)),
+                value: mir::Rvalue::new(mir::RvalueKind::UnionExtract { value: inner }),
             });
-            self.push_statement(offset_stmt);
+            self.push_statement(extract_stmt);
 
-            let elem_ptr = mir::Operand::new(ptr_type, mir::OperandKind::Temp(elem_ptr_temp));
-            let store_place = self.new_place(mir::Place::new(
-                mir::PlaceKind::Deref(elem_ptr),
-                element_type,
-            ));
-            let store_stmt = mir::Statement::new(mir::StatementKind::Assign {
-                place: store_place,
-                value: mir::Rvalue::new(mir::RvalueKind::Operand(val)),
+            let extract_operand = mir::Operand::new(variant_type, mir::OperandKind::Temp(extract_temp));
+            let local_place = self.new_place(mir::Place::new(mir::PlaceKind::Local(mir_local), variant_type));
+            let assign_stmt = mir::Statement::new(mir::StatementKind::Assign {
+                place: local_place,
+                value: mir::Rvalue::new(mir::RvalueKind::Operand(extract_operand)),
             });
-            self.push_statement(store_stmt);
+            self.push_statement(assign_stmt);
         }
 
-        let array_struct = self.hir_response.typed.types_map.array_struct;
-        let result_temp = self.new_temp(array_type);
-        let len_type = self.hir_response.typed.types_table.u32_type;
-        let const_len = mir::Operand::new(
-            len_type,
-            mir::OperandKind::Comptime(ComplexLiteral::Basic(Literal::Uint(count as u128))),
-        );
-
-        let aggregate = mir::Rvalue::new(mir::RvalueKind::Aggregate {
-            struct_type: array_struct,
-            body: mir::AggregateBody::Runtime(vec![
-                mir::Operand::new(ptr_type, mir::OperandKind::Temp(ptr_temp)),
-                const_len,
-            ]),
-        });
-
-        let result_stmt = mir::Statement::new(mir::StatementKind::Assign {
-            place: self.new_place(mir::Place::new(
-                mir::PlaceKind::Temp(result_temp),
-                array_type,
-            )),
-            value: aggregate,
-        });
-        self.push_statement(result_stmt);
-
-        mir::Operand::new(array_type, mir::OperandKind::Temp(result_temp))
-    }
-
-    fn lower_new_heap_array(
-        &mut self,
-        ptr_id: hir::ExpressionId,
-        len_id: hir::ExpressionId,
-        array_type: TypeId,
-        _span: Span,
-        is_end: &mut bool,
-    ) -> mir::Operand {
-        let ptr = self.lower_operand(ptr_id).pass(is_end);
-        let len = self.lower_operand(len_id).pass(is_end);
-
-        let array_struct = self.hir_response.typed.types_map.array_struct;
-        let result_temp = self.new_temp(array_type);
-
-        let aggregate = mir::Rvalue::new(mir::RvalueKind::Aggregate {
-            struct_type: array_struct,
-            body: mir::AggregateBody::Runtime(vec![ptr, len]),
-        });
-
-        let result_stmt = mir::Statement::new(mir::StatementKind::Assign {
-            place: self.new_place(mir::Place::new(
-                mir::PlaceKind::Temp(result_temp),
-                array_type,
-            )),
-            value: aggregate,
-        });
-        self.push_statement(result_stmt);
-
-        mir::Operand::new(array_type, mir::OperandKind::Temp(result_temp))
-    }
-
-    fn lower_alloc(
-        &mut self,
-        size_id: hir::ExpressionId,
-        value_type: TypeId,
-        span: Span,
-        is_end: &mut bool,
-    ) -> mir::Operand {
-        let _ = span;
-        let size = self.lower_operand(size_id).pass(is_end);
-        let temp = self.new_temp(value_type);
-
-        let statement = mir::Statement::new(mir::StatementKind::Assign {
-            place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp), value_type)),
-            value: mir::Rvalue::new(mir::RvalueKind::Alloc { size }),
-        });
-
-        self.push_statement(statement);
-        mir::Operand::new(value_type, mir::OperandKind::Temp(temp))
-    }
-
-    fn lower_dealloc(
-        &mut self,
-        ptr_id: hir::ExpressionId,
-        is_end: &mut bool,
-    ) -> mir::Operand {
-        let ptr = self.lower_operand(ptr_id).pass(is_end);
-
-        let statement = mir::Statement::new(mir::StatementKind::Dealloc { ptr });
-        self.push_statement(statement);
-
-        self.new_none_operand()
-    }
-
-    fn lower_realloc(
-        &mut self,
-        ptr_id: hir::ExpressionId,
-        size_id: hir::ExpressionId,
-        value_type: TypeId,
-        span: Span,
-        is_end: &mut bool,
-    ) -> mir::Operand {
-        let _ = span;
-        let ptr = self.lower_operand(ptr_id).pass(is_end);
-        let size = self.lower_operand(size_id).pass(is_end);
-        let temp = self.new_temp(value_type);
-
-        let statement = mir::Statement::new(mir::StatementKind::Assign {
-            place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp), value_type)),
-            value: mir::Rvalue::new(mir::RvalueKind::Realloc { ptr, size }),
-        });
-
-        self.push_statement(statement);
-        mir::Operand::new(value_type, mir::OperandKind::Temp(temp))
-    }
-
-    fn lower_drop(
-        &mut self,
-        value_id: hir::ExpressionId,
-        value_type: TypeId,
-        span: Span,
-        is_end: &mut bool,
-    ) -> mir::Operand {
-        let value = self.lower_operand(value_id).pass(is_end);
-
-        let temp_id = self.new_temp(value_type);
-        let drop_stmt = mir::Statement::new(mir::StatementKind::Assign {
-            place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp_id), value_type)),
-            value: mir::Rvalue::new(mir::RvalueKind::Drop { value, span }),
-        });
-        self.push_statement(drop_stmt);
-
-        let none_type = self.hir_response.typed.types_table.none_type;
-        mir::Operand::new(none_type, mir::OperandKind::None)
+        operand
     }
 
     fn lower_exit(&mut self, exit_code_id: hir::ExpressionId, is_end: &mut bool) -> mir::Operand {
@@ -670,166 +535,6 @@ impl<'a> MirContext<'a> {
         EndBlock::new(operand, is_end)
     }
 
-    fn lower_struct_constructor(
-        &mut self,
-        values: &Vec<(Ident, ExpressionId)>,
-        struct_id: StructId,
-        struct_type: TypeId,
-    ) -> EndBlock<Operand> {
-        let r#struct = self
-            .hir_response
-            .typed
-            .types_map
-            .id_to_struct(struct_id)
-            .expect("should have struct");
-
-        let dummy = Operand::new(TypeId::error(), mir::OperandKind::None);
-        let is_end = &mut false;
-
-        let mut runtime = false;
-        let mut fields = Vec::new();
-
-        fields.resize(r#struct.fields.len(), dummy);
-
-        for (name, value) in values {
-            let i = match self.find_field_index(r#struct, name.as_str()) {
-                Some(val) => val,
-                None => continue,
-            };
-
-            let value_type = self.expression_type(*value);
-            let operand = match self.get_expression_literal(*value) {
-                Some(literal) => {
-                    Operand::new(value_type, mir::OperandKind::Comptime(literal.clone()))
-                }
-                None => {
-                    runtime = true;
-                    self.lower_operand(*value).pass(is_end)
-                }
-            };
-            fields[i] = operand;
-        }
-
-        let all_comptime = fields.iter().all(|op| matches!(op.kind, mir::OperandKind::Comptime(_)));
-
-        let body = if runtime || !all_comptime {
-            if !runtime && !all_comptime {
-                self.log_error(soul_error_internal!(
-                    "expected all fields to be compile-time known in struct constructor",
-                    None
-                ));
-            }
-            mir::AggregateBody::Runtime(fields)
-        } else {
-            let literals = fields
-                .into_iter()
-                .enumerate()
-                .map(|(i, op)| {
-                    let ty = r#struct.fields[i].ty;
-                    match op.kind {
-                        mir::OperandKind::Comptime(literal) => (literal, ty),
-                        _ => unreachable!(),
-                    }
-                })
-                .collect();
-
-            mir::AggregateBody::Comptime(literals)
-        };
-
-        let ctor = mir::RvalueKind::Aggregate {
-            struct_type: struct_id,
-            body,
-        };
-        let temp = self.new_temp(struct_type);
-
-        let statement = mir::Statement::new(mir::StatementKind::Assign {
-            place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp), struct_type)),
-            value: mir::Rvalue::new(ctor),
-        });
-        self.push_statement(statement);
-        let operand = mir::Operand::new(struct_type, mir::OperandKind::Temp(temp));
-        EndBlock::new(operand, is_end)
-    }
-
-    fn lower_union_constructor(
-        &mut self,
-        union_id: UnionId,
-        variant_index: usize,
-        value: ExpressionId,
-        union_type: TypeId,
-    ) -> EndBlock<Operand> {
-        let union_def = self
-            .hir_response
-            .hir
-            .info
-            .types
-            .id_to_union(union_id)
-            .expect("should have union");
-        let internal_struct_id = union_def.internal_struct;
-
-        let internal_struct = self
-            .hir_response
-            .typed
-            .types_map
-            .id_to_struct(internal_struct_id)
-            .expect("should have internal union struct");
-
-        let is_end = &mut false;
-        let mut runtime = false;
-        let mut fields = Vec::with_capacity(2);
-
-        let tag_ty = internal_struct.fields[0].ty;
-        let tag_operand = Operand::new(
-            tag_ty,
-            mir::OperandKind::Comptime(ComplexLiteral::Basic(Literal::Int(variant_index as i128))),
-        );
-        fields.push(tag_operand);
-
-        let operand = self.lower_operand(value).pass(is_end);
-        if !matches!(operand.kind, mir::OperandKind::Comptime(_)) {
-            runtime = true;
-        }
-        fields.push(operand);
-
-        let all_comptime = fields.iter().all(|op| matches!(op.kind, mir::OperandKind::Comptime(_)));
-        let body = if runtime || !all_comptime {
-            mir::AggregateBody::Runtime(fields)
-        } else {
-            let literals = fields
-                .into_iter()
-                .enumerate()
-                .map(|(i, op)| {
-                    let ty = if i == 0 {
-                        internal_struct.fields[0].ty
-                    } else {
-                        match &op.kind {
-                            mir::OperandKind::Comptime(_) => op.ty,
-                            _ => unreachable!(),
-                        }
-                    };
-                    match op.kind {
-                        mir::OperandKind::Comptime(literal) => (literal, ty),
-                        _ => unreachable!(),
-                    }
-                })
-                .collect();
-            mir::AggregateBody::Comptime(literals)
-        };
-
-        let ctor = mir::RvalueKind::Aggregate {
-            struct_type: internal_struct_id,
-            body,
-        };
-        let temp = self.new_temp(union_type);
-        let statement = mir::Statement::new(mir::StatementKind::Assign {
-            place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp), union_type)),
-            value: mir::Rvalue::new(ctor),
-        });
-        self.push_statement(statement);
-        let operand = mir::Operand::new(union_type, mir::OperandKind::Temp(temp));
-        EndBlock::new(operand, is_end)
-    }
-
     fn find_field_index(&self, r#struct: &Struct, name: &str) -> Option<usize> {
         let field_name = |field: &Field| &self.hir_response.hir.nodes.fields[field.id].name;
 
@@ -844,11 +549,11 @@ impl<'a> MirContext<'a> {
     fn lower_load(&mut self, ty: TypeId, place: hir::PlaceId, is_end: &mut bool) -> mir::Operand {
         let place_id = self.lower_place(place).pass(is_end);
         let Some(place) = self.tree.places.get(place_id) else {
-            self.log_error(soul_error_internal!(format!("{place_id:?} not found"), None));
-            return mir::Operand::new(
-                TypeId::error(), 
-                mir::OperandKind::None,
-            )
+            self.log_error(soul_error_internal!(
+                format!("{place_id:?} not found"),
+                None
+            ));
+            return mir::Operand::new(TypeId::error(), mir::OperandKind::None);
         };
 
         let operand = match &place.kind {

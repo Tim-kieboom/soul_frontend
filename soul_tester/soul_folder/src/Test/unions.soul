@@ -3,7 +3,7 @@ import (
 )
 
 struct Object {
-    field: i32
+    field: i64
     condition: bool
 }
 
@@ -19,16 +19,68 @@ RunTests() {
 
 test_init_union() {
     interger: Test = Test.Int(42)
-    float: Test = Test.Float(3.14)
-    object: Test = Test.Object(Object{field: 1, condition: true})
+    float := Test.Float(3.14)
+    object := Test.Object(Object{field: 1, condition: true})
 
-    // Io.Assert(interger typeof Test.Int, msg: "interger should be of type Test.Int")
-    // if interger typeof Test.Int(num) {
-    //     Io.Assert(num == 42, msg: "interger should be Test.Int(42)")
-    // }
+    Io.Assert(interger typeof Test.Int, msg: "interger should be of type Test.Int")
+    Io.Assert(float typeof Test.Float, msg: "float should be of type Test.Float")
+    Io.Assert(object typeof Test.Object, msg: "object should be of type Test.Object")
+    
+    Io.Assert(intrinsic.UnionTag(interger) == 0, msg: "interger tag should be 0 (Int)")
+    Io.Assert(intrinsic.UnionTag(float) == 1, msg: "float tag should be 1 (Float)")
+    Io.Assert(intrinsic.UnionTag(object) == 2, msg: "object tag should be 2 (Object)")
 
-    // match float {
-    //     Test.Float(num) => Io.Assert("float should be Test.Float(3.14)") 
-    //     _ => Io.Panic("float should be of type Test.Float")
-    // }
+    if interger typeof Test.Int(num) {
+        Io.Println_int(num as int)
+        Io.Assert(num == 42)
+    }
 }
+
+// union MyResult {
+//     Ok(int),
+//     Err([@]char),
+// }
+
+// test_union_match_methodes() { 
+//     literal OK_VALUE = 1
+//     literal ERROR_MSG = "error"
+//     ok := MyResult.Ok(OK_VALUE)
+//     err := MyResult.Err(ERROR_MSG)
+
+//     /* expanse to
+//         mut number: int = match ok {
+//             MyResult.Err(_) => -1
+//             other => other
+//         }
+//     */
+//     mut number: int = ok.Err{-1}
+//     Io.Assert(number == OK_VALUE)
+
+//     /* expanse to
+//         number = match ok {
+//             MyResult.Err(msg) => Io.Panic(msg) //Io.Panic should return never type
+//             other => other
+//         }
+//     */
+//     number = ok.Err{msg => Io.Panic(msg)}
+//     // number = ok.Err{Io.Panic} //later automaicly use msg as argument in Io.Panic like in lambdas
+
+//     /* expanse to
+//         msg: [@]char = match err {
+//             MyResult.Ok(_) => Io.Panic("err should be typeof MyResult.Err") //Io.Panic should return never type
+//             other => other
+//         }
+//     */
+//     msg: [@]char = err.Ok{Io.Panic("err should be typeof MyResult.Err")}
+//     Io.Assert(msg == ERROR_MSG)
+
+//     /* expanse to
+//         match err {
+//             MyResult.Ok(_) => Io.Panic("err should be typeof MyResult.Err") //Io.Panic should return never type
+//             MyResult.Err(msg) => Io.Assert(msg == ERROR_MSG)
+//         } //return type none
+//     */
+//     err
+//         .Ok{Io.Panic("err should be typeof MyResult.Err")}
+//         .Err{msg => Io.Assert(msg == ERROR_MSG)}
+// }

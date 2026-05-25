@@ -1,23 +1,76 @@
 
 type Test
-use Test impl MyName {..}
+use Test {
+    impl MyName, Display, Serialize, Deserialize {..}
+}
 /*expance to: 
 ```
-use Test impl MyName {
-    MyName(): str {
-        $Stringify(Test).copy
+use Test {
+    impl MyName {
+        MyName(): str {
+            Stringify<Test>().copy
+        }
+    } 
+    impl Display {
+        Display(@this): str {
+            fmt := match Test.type {
+                type.struct => structDisplayer<Test>()
+                _ => panic("not yet impl")
+            }
+            fmt(this)
+        }
     }
-} 
+    //ect..
+}
 ```
 */
 
 trait MyName {
     MyName(): str
 }
-
-#[Default] 
-impl MyName {
+use .. impl MyName {
     MyName(): str {
-        $Stringify(This).copy
-    }    
+        literal TYPE = This.type
+        TYPE.name.copy
+    }
+}
+
+trait Display {
+    Display(@this): str
+}
+use .. impl Display {
+    Display(@this): str {
+        fmt := match This.type {
+            type.struct => structDisplayer<This>()
+            _ => panic("not yet impl")
+        }
+        fmt(this)
+    }
+}
+
+literal structDisplayer<Ty>(): Fn(@Ty) -> str 
+where 
+    Ty: type.struct
+{
+    obj: @Ty => {
+        literal TYPE: type.struct = Ty.type
+        mut sb = StringBuilder()
+
+        sb.PushStr(TYPE.name)
+        sb.Push('{')
+ 
+        literal lastIndex = TYPE.fields.Len() - 1
+        for i, fieldInfo in TYPE.fields {
+            literalAssert(fieldInfo.fieldType impl typeof Display)
+            sb.PushStr(fieldInfo.name)
+            sb.PushStr(": ")
+            field := TYPE.GetField(obj, i)
+            sb.PushStr(@field.value.Display())
+            if i != lastIndex {
+                sb.PushStr(", ")
+            }
+        }
+ 
+        sb.Push('}')
+    }
 }

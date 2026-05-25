@@ -7,7 +7,9 @@ use soul_utils::{
 
 use crate::parser::{
     Parser,
-    parse_utils::{COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, ROUND_OPEN, ROUND_CLOSE, STAMENT_END_TOKENS},
+    parse_utils::{
+        COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, ROUND_CLOSE, ROUND_OPEN, STAMENT_END_TOKENS,
+    },
 };
 
 impl<'f, 'a> Parser<'f, 'a> {

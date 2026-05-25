@@ -1,5 +1,6 @@
 use crate::{
-    BlockId, EnumId, ExpressionId, LocalId, PlaceId, StructId, TypeId, UnionId, UnionFieldId, hir_type::LazyTypeId,
+    BlockId, EnumId, ExpressionId, LocalId, PlaceId, StructId, TypeId, UnionFieldId, UnionId,
+    hir_type::LazyTypeId,
 };
 use ast::{BinaryOperator, Literal, UnaryOperator};
 use soul_utils::{Ident, ids::FunctionId};
@@ -149,6 +150,18 @@ pub enum ExpressionKind {
 
     Sizeof(LazyTypeId),
 
+    /// `intrinsic.UnionTag(union_val)` — returns the variant tag of a union value.
+    UnionTag(ExpressionId),
+
+    /// `intrinsic.UnionExtract(union_val)` — extracts the active variant's value.
+    UnionExtract {
+        value: ExpressionId,
+    },
+
+    /// `value typeof Type.Variant` — type check, returns `bool`.
+    /// When `binding` is `Some`, the variant value is extracted and stored in the local.
+    TypeOf(TypeOf),
+
     /// Pointer offset: given a `*T` and an integer offset, returns a new `*T`
     /// advanced by `offset * sizeof(T)` bytes.
     PtrOffset {
@@ -203,6 +216,15 @@ pub enum ExpressionKind {
         ptr: ExpressionId,
         size: ExpressionId,
     },
+}
+
+/// An typeof operation, e.g., `value typeof Union.Variant(binding)`.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TypeOf {
+    pub value: ExpressionId,
+    pub union_id: UnionId,
+    pub variant_index: usize,
+    pub binding: Option<LocalId>,
 }
 
 /// An array literal, e.g., `[1, 2, 3]`.

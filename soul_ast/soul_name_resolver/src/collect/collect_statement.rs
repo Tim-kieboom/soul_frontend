@@ -148,7 +148,6 @@ impl<'a> NameResolver<'a> {
         let prev_in_global = self.current.in_global;
         let prev_function = self.current.function;
 
-        
         let id = self.declare_function(&mut function.signature);
         self.current.function = Some(id);
 
@@ -179,7 +178,6 @@ impl<'a> NameResolver<'a> {
         self.declare_parameters(&mut signature.parameters);
         self.collect_scopeless_block(&mut function.block);
         self.pop_scope();
-
 
         self.current.function = prev_function;
         self.current.in_global = prev_in_global;
@@ -239,6 +237,8 @@ fn owner_hint_from_expression(
                     ast::Intrinsic::Dealloc => None,
                     ast::Intrinsic::Realloc => None,
                     ast::Intrinsic::Drop => None,
+                    ast::Intrinsic::UnionTag => Some(TypeKind::Primitive(PrimitiveTypes::Int)),
+                    ast::Intrinsic::UnionExtract => None,
                 };
             }
 

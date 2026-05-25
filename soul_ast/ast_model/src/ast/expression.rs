@@ -92,6 +92,17 @@ pub enum ExpressionKind {
 
     /// `new:[1, 2, 3]` or `new:[for N => init]` — heap-allocate an array, returns `[*]T`.
     NewArray(AnyArray),
+
+    /// `expr typeof Type.Variant` — type check a union value
+    /// When `binding` is `Some`, the variant value is extracted and stored in the bound variable.
+    /// `binding_id` is the NodeId of the bound variable (set by name resolver).
+    TypeOf {
+        expr: Box<Expression>,
+        type_name: Ident,
+        variant_name: Ident,
+        binding: Option<Ident>,
+        binding_id: Option<NodeId>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -143,6 +154,8 @@ pub enum Intrinsic {
     Alloc,
     Dealloc,
     Realloc,
+    UnionTag,
+    UnionExtract,
 }
 
 impl Intrinsic {
@@ -158,6 +171,8 @@ impl Intrinsic {
             "Dealloc" => Some(Intrinsic::Dealloc),
             "Realloc" => Some(Intrinsic::Realloc),
             "Drop" => Some(Intrinsic::Drop),
+            "UnionTag" => Some(Intrinsic::UnionTag),
+            "UnionExtract" => Some(Intrinsic::UnionExtract),
             _ => None,
         }
     }
@@ -475,6 +490,7 @@ impl ExpressionKind {
             ExpressionKind::New(_) => "New",
             ExpressionKind::NewArray(_) => "NewArray",
             ExpressionKind::Match(_) => "Match",
+            ExpressionKind::TypeOf { .. } => "TypeOf",
         }
     }
 }

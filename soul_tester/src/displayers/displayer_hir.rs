@@ -1,7 +1,7 @@
 use ast::AbtractSyntaxTree;
 use hir::{
     Binary, DisplayType, ExpressionId, FieldId, FunctionBody, HirTree, HirType, HirTypeKind,
-    InferTypeId, LazyTypeId, LocalId, LocalKind, StructId, TypeId, Unary,
+    InferTypeId, LazyTypeId, LocalId, LocalKind, StructId, TypeId, TypeOf, Unary,
 };
 use soul_utils::{
     ids::{FunctionId, IdAlloc},
@@ -406,9 +406,13 @@ impl<'a> HirDisplayer<'a> {
                         hir::MatchPatternHir::Array(elements) => {
                             self.push('[');
                             for (i, el) in elements.iter().enumerate() {
-                                if i > 0 { self.push_str(", "); }
+                                if i > 0 {
+                                    self.push_str(", ");
+                                }
                                 match el {
-                                    hir::MatchPatternHir::Literal(lit) => self.push_str(&lit.value_to_string()),
+                                    hir::MatchPatternHir::Literal(lit) => {
+                                        self.push_str(&lit.value_to_string())
+                                    }
                                     hir::MatchPatternHir::Wildcard => self.push('_'),
                                     hir::MatchPatternHir::Array(_) => self.push_str("[...]"),
                                 }
@@ -573,11 +577,56 @@ impl<'a> HirDisplayer<'a> {
                 self.display_expression(exit_code);
                 self.push(')');
             }
+            hir::ExpressionKind::UnionTag(value) => {
+                self.push_str("intrinsic.UnionTag(");
+                self.display_expression(value);
+                self.push(')');
+            }
+            hir::ExpressionKind::UnionExtract { value } => {
+                self.push_str("intrinsic.UnionExtract(");
+                self.display_expression(value);
+                self.push(')');
+            }
+            hir::ExpressionKind::TypeOf(typeof_) => {
+                let TypeOf {
+                    value,
+                    union_id,
+                    variant_index,
+                    binding,
+                } = typeof_;
+                self.display_expression(value);
+                self.push_str(" typeof ");
+                let union_name = self
+                    .hir
+                    .info
+                    .types
+                    .id_to_union(*union_id)
+                    .map(|u| u.name.as_str())
+                    .unwrap_or("<error>");
+
+                self.push_str(union_name);
+                self.push('.');
+
+                let str = self
+                    .hir
+                    .info
+                    .types
+                    .id_to_union(*union_id)
+                    .map(|union| union.variants.get(*variant_index).map(|v| v.name.as_str()))
+                    .flatten()
+                    .unwrap_or("<error>");
+
+                self.push_str(str);
+                if let Some(binding) = binding {
+                    self.push('(');
+                    self.display_local(*binding);
+                    self.push(')');
+                }
+            }
         };
     }
 
     fn display_place(&mut self, place: &hir::PlaceId) {
-        
         if DISPLAY_PLACE_ID {
             self.push_fmt(format_args!("/*{place:?}*/"));
         }

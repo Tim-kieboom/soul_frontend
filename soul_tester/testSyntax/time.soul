@@ -1,5 +1,5 @@
-literal MILLI_PER_SEC: u64 = 10 * 3
-literal NANO_PER_MILLI: u64 = 10 * 6
+literal MILLI_PER_SEC: u64 = 10 ** 3
+literal NANO_PER_MILLI: u64 = 10 ** 6
 
 extern "C" __clib_Duration_now(): Duration
 

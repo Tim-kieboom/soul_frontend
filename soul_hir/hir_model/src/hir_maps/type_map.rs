@@ -7,7 +7,7 @@ use soul_utils::{
 };
 
 use crate::{
-    Enum, EnumId, GenericId, InferTypeId, StructId, TypeId, Union, UnionId, UnionFieldId,
+    Enum, EnumId, GenericId, InferTypeId, StructId, TypeId, Union, UnionFieldId, UnionId,
     hir_type::{HirType, InferType, Struct},
 };
 

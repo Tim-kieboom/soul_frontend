@@ -52,7 +52,9 @@ impl<'a> NameResolver<'a> {
                 self.resolve_expression(&mut binary.right);
             }
             ExpressionKind::If(r#if) => {
+                self.current.in_if_condition = true;
                 self.resolve_expression(&mut r#if.condition);
+                self.current.in_if_condition = false;
                 self.resolve_block(&mut r#if.block);
 
                 let mut current = r#if.else_branchs.as_mut();
@@ -63,7 +65,9 @@ impl<'a> NameResolver<'a> {
                             current = None;
                         }
                         ElseKind::ElseIf(el) => {
+                            self.current.in_if_condition = true;
                             self.resolve_expression(&mut el.node.condition);
+                            self.current.in_if_condition = false;
                             self.resolve_block(&mut el.node.block);
                             current = el.node.else_branchs.as_mut();
                         }
@@ -115,6 +119,22 @@ impl<'a> NameResolver<'a> {
             | ExpressionKind::Default(_)
             | ExpressionKind::Literal(_)
             | ExpressionKind::ExternalExpression(_) => (),
+            ExpressionKind::TypeOf {
+                expr,
+                type_name: _,
+                variant_name: _,
+                binding,
+                binding_id: _,
+            } => {
+                self.resolve_expression(expr);
+                if binding.is_some() && !self.current.in_if_condition {
+                    self.log_error(SoulError::new(
+                        "typeof with binding can only be used as an if condition".to_string(),
+                        SoulErrorKind::InvalidContext,
+                        Some(span),
+                    ));
+                }
+            }
         }
     }
 

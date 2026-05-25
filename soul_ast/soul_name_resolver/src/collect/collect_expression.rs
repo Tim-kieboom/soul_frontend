@@ -1,5 +1,7 @@
 use crate::NameResolver;
+use ast::scope::ScopeValue;
 use ast::{AnyArray, ElseKind, Expression, ExpressionKind, If};
+use soul_utils::error::{SoulError, SoulErrorKind};
 
 impl<'a> NameResolver<'a> {
     pub(super) fn collect_expression(&mut self, expression: &mut Expression) {
@@ -126,6 +128,37 @@ impl<'a> NameResolver<'a> {
             ExpressionKind::ExternalExpression(_) => todo!("impl external expressions"),
             ExpressionKind::Default(id) => *id = Some(self.alloc_node()),
             ExpressionKind::Literal((id, _)) => *id = Some(self.alloc_node()),
+            ExpressionKind::TypeOf {
+                expr,
+                binding,
+                binding_id,
+                type_name: _,
+                variant_name: _,
+            } => {
+                self.collect_expression(expr);
+                if let Some(ident) = binding {
+                    if !self.current.in_if_condition {
+                        self.log_error(SoulError::new(
+                            "typeof with binding can only be used as an if condition".to_string(),
+                            SoulErrorKind::InvalidContext,
+                            Some(ident.span),
+                        ));
+                        return;
+                    }
+                    let id = self.alloc_node();
+                    *binding_id = Some(id);
+                    if self
+                        .insert_value(ident.as_str(), id, ScopeValue::Variable)
+                        .is_some()
+                    {
+                        self.log_error(SoulError::new(
+                            format!("name {} already exists in scope", ident.as_str()),
+                            SoulErrorKind::AlreadyFoundInScope,
+                            Some(ident.span),
+                        ));
+                    }
+                }
+            }
             ExpressionKind::Variable { id, .. } => {
                 *id = Some(self.alloc_node());
             }
@@ -147,8 +180,12 @@ impl<'a> NameResolver<'a> {
     }
 
     fn collect_if(&mut self, r#if: &mut If) {
+        self.push_scope(&mut r#if.block.scope_id);
+        self.current.in_if_condition = true;
         self.collect_expression(&mut r#if.condition);
-        self.collect_block(&mut r#if.block);
+        self.current.in_if_condition = false;
+        self.collect_scopeless_block(&mut r#if.block);
+        self.pop_scope();
 
         let mut current = r#if.else_branchs.as_mut();
 
@@ -159,8 +196,14 @@ impl<'a> NameResolver<'a> {
                     current = None;
                 }
                 ElseKind::ElseIf(el) => {
-                    self.collect_expression(&mut el.node.condition);
-                    self.collect_block(&mut el.node.block);
+                    let elif = &mut el.node;
+                    self.push_scope(&mut elif.block.scope_id);
+                    self.current.in_if_condition = true;
+                    self.collect_expression(&mut elif.condition);
+                    self.current.in_if_condition = false;
+                    self.collect_scopeless_block(&mut r#if.block);
+                    self.pop_scope();
+
                     current = el.node.else_branchs.as_mut();
                 }
             }

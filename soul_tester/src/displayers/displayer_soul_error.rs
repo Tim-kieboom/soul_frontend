@@ -124,7 +124,7 @@ fn get_source_snippet(out: &mut String, span: &Span, mut lines: Lines, begin_spa
     use std::fmt::Write;
 
     if span.start_line == 0 || span.end_line == 0 {
-        return
+        return;
     }
 
     for _ in 0..(span.start_line.saturating_sub(2)) {
@@ -143,7 +143,7 @@ fn get_source_snippet(out: &mut String, span: &Span, mut lines: Lines, begin_spa
     }
 
     if all_remaining_lines.is_empty() {
-        return
+        return;
     }
 
     let start_idx = 0;

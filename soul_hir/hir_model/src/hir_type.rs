@@ -7,7 +7,10 @@ use soul_utils::{
     vec_map::VecMapIndex,
 };
 
-use crate::{EnumId, FieldId, GenericId, InferTypeId, InferTypesMap, StructId, TypeId, TypesMap, UnionId, UnionFieldId};
+use crate::{
+    EnumId, FieldId, GenericId, InferTypeId, InferTypesMap, StructId, TypeId, TypesMap,
+    UnionFieldId, UnionId,
+};
 
 pub type HirType = InnerType<HirTypeKind>;
 pub type InferType = InnerType<InferTypeId>;
@@ -164,7 +167,6 @@ impl HirType {
     pub const fn is_never(&self) -> bool {
         matches!(self.kind, HirTypeKind::Never)
     }
-
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

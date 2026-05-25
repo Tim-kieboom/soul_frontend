@@ -1,9 +1,15 @@
+import (
+    Core.Fmt
+)
 
 struct ErrIndex {index: uint}
 use ErrIndex {
-    impl Into<str> {..}
-    impl Error {..}
-    impl Fmt {..}
+    impl Error {}
+    impl Fmt {
+        Fmt(@this, fmt: &Fmt.Formatter): Fmt.Res {
+            fmt.PushFmt(f"index: {this.index} is out of bounds")
+        }
+    }
 }
 
 use ResIndex<T> = Res<T, ErrIndex>
@@ -13,42 +19,38 @@ use<T, N as uint> [N]T {
         this.len
     }
 
-    impl const ConsumeIndex<T> {
-        const ConsumeIndex(this, index: uint): ResIndex<T> {
-            
+    const AsPtr(@this): *T {
+        (*this) as *T
+    }
+
+    const AsPtrMut(&this): *mut T {
+        (*this) as *mut T
+    }
+
+    impl const Index {
+        type Item = T
+
+        const Index(@this, index: uint): ResIndex<@This.Item> {
             if index > N {
                 return Err(ErrIndex{index})
             }
 
             ptr := this.ptr ?? panic("should not be null")
             Ok(
-                *(ptr + index)
+                @*intrinsic.PtrOffset(ptr, index as int)
             )
         }
     }
 
-    impl const RefIndex<T> {
-        const RefIndex(@this, index: uint): ResIndex<@T> {
+    impl const IndexMut<T> {
+        const IndexMut(&this, index: uint): ResIndex<&This.Item> {
             if index > N {
                 return Err(ErrIndex{index})
             }
 
             ptr := this.ptr ?? panic("should not be null")
             Ok(
-                @*(ptr + index)
-            )
-        }
-    }
-
-    impl const MutIndex<T> {
-        MutIndex(&this, index: uint): ResIndex<&T> {
-            if index > N {
-                return Err(ErrIndex{index})
-            }
-
-            ptr := this.ptr ?? panic("should not be null")
-            Ok(
-                &*(ptr + index)
+                &*intrinsic.PtrOffset(ptr, index as int)
             )
         }
     }

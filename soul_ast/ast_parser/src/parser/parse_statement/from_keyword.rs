@@ -83,7 +83,6 @@ impl<'a, 'f> Parser<'a, 'f> {
             | KeyWord::Trait
             | KeyWord::Class
             | KeyWord::Await
-            | KeyWord::Typeof
             | KeyWord::InForLoop
             | KeyWord::GenericWhere => {
                 return TryErr(SoulError::new(
@@ -93,7 +92,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 ));
             }
 
-            KeyWord::As => {
+            KeyWord::As | KeyWord::Typeof => {
                 return TryErr(soul_error_internal!(
                     format!(
                         "keyword '{}' should be parsed in expression not statement",

@@ -5,7 +5,7 @@
     (C) basic c enum {cm}
     (D) enum with expression
 
-(C) add union
+(C) add union {cm}
 
 (C) add match
     (C) add numaric switch like match {cm}

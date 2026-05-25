@@ -250,6 +250,16 @@ pub enum RvalueKind {
         index: Operand,
     },
 
+    /// `UnionTag(union_value)` — returns the variant tag of a union value.
+    UnionTag {
+        value: Operand,
+    },
+
+    /// `UnionExtract(union_value)` — extracts the active variant's value.
+    UnionExtract {
+        value: Operand,
+    },
+
     /// Heap allocation: allocates `count * Type.sizeof` bytes on the heap and returns `*ty`.
     HeapAlloc {
         ty: TypeId,

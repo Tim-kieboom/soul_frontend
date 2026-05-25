@@ -290,8 +290,9 @@ impl UnifyPrimitiveCastLazy for HirTypeKind {
                 return Err("can only type cast primitive types".to_string());
             }
 
-            (_, HirTypeKind::Pointer(_)) |
-            (_, HirTypeKind::Primitive(PrimitiveTypes::CStr)) => return Ok(()),
+            (_, HirTypeKind::Pointer(_)) | (_, HirTypeKind::Primitive(PrimitiveTypes::CStr)) => {
+                return Ok(());
+            }
 
             (HirTypeKind::Optional(a_id), HirTypeKind::Optional(b_id)) => {
                 let a = match try_get_type_lazy(types, *a_id) {

@@ -1,7 +1,7 @@
 use Ok = Res.Ok
 use Err = Res.Err
 
-trait Error: Into<str>, Fmt {}
+trait Error: Fmt {}
 
 union Res<V, E> 
 where
@@ -30,7 +30,7 @@ main() {
     expends to:
     ```
         match resFunc() {
-            Err(it) => return,
+            Err(_) => return,
             other => other,
         }
     ```
@@ -40,7 +40,7 @@ main() {
 
     option := try{
         op: ?int = 1
-        text: ?str = op?.To<str>()
+        text: ?str = op.pass.To<str>()
     }
 }
 

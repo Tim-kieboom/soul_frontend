@@ -1,5 +1,8 @@
 use ast::Stub;
-use hir::{CustomTypeId, EnumId, GenericId, HirType, HirTypeKind, LazyTypeId, StructId, TypeId, TypesMap, UnionId};
+use hir::{
+    CustomTypeId, EnumId, GenericId, HirType, HirTypeKind, LazyTypeId, StructId, TypeId, TypesMap,
+    UnionId,
+};
 use soul_utils::{
     error::{SoulError, SoulErrorKind, SoulResult},
     soul_names::{PrimitiveTypes, TypeModifier},
@@ -89,40 +92,44 @@ impl<'a> HirContext<'a> {
             ast::TypeKind::NamedVariant { base, variant } => {
                 let base_type = Self::convert_type(base, scopes, call_generics, types, span)?;
                 match base_type {
-                    LazyTypeId::Known(type_id) => {
-                        match types.id_to_type(type_id) {
-                            Some(hir_type) => match &hir_type.kind {
-                                HirTypeKind::CustomType(CustomTypeId::Union(union_id)) => {
-                                    if let Some(union_def) = types.id_to_union(*union_id) {
-                                        let found = union_def.variants.iter()
-                                            .any(|v| v.name.as_str() == variant.as_str());
-                                        if !found {
-                                            return Err(SoulError::new(
-                                                format!("variant '{}' not found in union '{}'",
-                                                    variant.as_str(),
-                                                    union_def.name.as_str()),
-                                                SoulErrorKind::TypeNotFound,
-                                                Some(span),
-                                            ));
-                                        }
+                    LazyTypeId::Known(type_id) => match types.id_to_type(type_id) {
+                        Some(hir_type) => match &hir_type.kind {
+                            HirTypeKind::CustomType(CustomTypeId::Union(union_id)) => {
+                                if let Some(union_def) = types.id_to_union(*union_id) {
+                                    let found = union_def
+                                        .variants
+                                        .iter()
+                                        .any(|v| v.name.as_str() == variant.as_str());
+                                    if !found {
+                                        return Err(SoulError::new(
+                                            format!(
+                                                "variant '{}' not found in union '{}'",
+                                                variant.as_str(),
+                                                union_def.name.as_str()
+                                            ),
+                                            SoulErrorKind::TypeNotFound,
+                                            Some(span),
+                                        ));
                                     }
-                                    hir_type.kind.clone()
                                 }
-                                _ => {
-                                    return Err(SoulError::new(
-                                        format!("'{}' is not a union type", variant.as_str()),
-                                        SoulErrorKind::TypeNotFound,
-                                        Some(span),
-                                    ));
-                                }
-                            },
-                            None => return Err(SoulError::new(
+                                hir_type.kind.clone()
+                            }
+                            _ => {
+                                return Err(SoulError::new(
+                                    format!("'{}' is not a union type", variant.as_str()),
+                                    SoulErrorKind::TypeNotFound,
+                                    Some(span),
+                                ));
+                            }
+                        },
+                        None => {
+                            return Err(SoulError::new(
                                 "base type not found",
                                 SoulErrorKind::TypeNotFound,
                                 Some(span),
-                            )),
+                            ));
                         }
-                    }
+                    },
                     LazyTypeId::Infer(_) => {
                         return Err(SoulError::new(
                             "base type must be known for named variant",

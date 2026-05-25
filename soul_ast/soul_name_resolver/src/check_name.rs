@@ -1,5 +1,7 @@
 use soul_utils::{
-    Ident, error::{SoulError, SoulErrorKind, SoulResult}, print_breakpoint, soul_error_internal
+    Ident,
+    error::{SoulError, SoulErrorKind, SoulResult},
+    print_breakpoint, soul_error_internal,
 };
 
 use crate::NameResolver;
@@ -21,19 +23,21 @@ impl<'a> NameResolver<'a> {
         }
 
         let Some(id) = self.current.function else {
-            return
+            return;
         };
 
         let Some((function, _)) = self.store.get_function(id) else {
-            self.log_error(soul_error_internal!(format!("parent function {id:?} not found"), Some(name.span)));
-            return
+            self.log_error(soul_error_internal!(
+                format!("parent function {id:?} not found"),
+                Some(name.span)
+            ));
+            return;
         };
 
         if function.name.as_str() == name.as_str() {
-
             self.log_error(SoulError::new(
-                "parent and child function can not have the same name", 
-                SoulErrorKind::InvalidFunctionName, 
+                "parent and child function can not have the same name",
+                SoulErrorKind::InvalidFunctionName,
                 Some(name.span),
             ));
         }

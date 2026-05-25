@@ -113,6 +113,22 @@ impl<'a, 'f> Parser<'a, 'f> {
                         Err(TryError::IsErr(err)) => return Err(err),
                     };
                 }
+                ExpressionOperator::TypeOf {
+                    type_name,
+                    variant_name,
+                    binding,
+                } => {
+                    left = Expression::new(
+                        ExpressionKind::TypeOf {
+                            expr: Box::new(left),
+                            type_name,
+                            variant_name,
+                            binding,
+                            binding_id: None,
+                        },
+                        self.span_combine(start_span),
+                    );
+                }
                 ExpressionOperator::Access(AccessType::AccessIndex) => {
                     let index = self.parse_expression(&[
                         SQUARE_CLOSE,
@@ -257,7 +273,11 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok(expression)
     }
 
-    fn parse_primary_ident(&mut self, end_tokens: &[TokenKind], start_span: Span) -> SoulResult<Expression> {
+    fn parse_primary_ident(
+        &mut self,
+        end_tokens: &[TokenKind],
+        start_span: Span,
+    ) -> SoulResult<Expression> {
         if let Some(primary) = self.parse_primary_keyword(start_span)? {
             return Ok(primary);
         }
@@ -466,6 +486,25 @@ impl<'a, 'f> Parser<'a, 'f> {
                     let type_cast = self.try_parse_type().merge_to_result()?;
                     return Ok(ExpressionOperator::Cast(type_cast));
                 }
+                Some(KeyWord::Typeof) => {
+                    self.bump();
+                    let type_name = self.try_bump_consume_ident()?;
+                    self.expect(&TokenKind::Symbol(SymbolKind::Dot))?;
+                    let variant_name = self.try_bump_consume_ident()?;
+                    let binding = if self.current_is(&TokenKind::Symbol(SymbolKind::RoundOpen)) {
+                        self.bump();
+                        let name = self.try_bump_consume_ident()?;
+                        self.expect(&TokenKind::Symbol(SymbolKind::RoundClose))?;
+                        Some(name)
+                    } else {
+                        None
+                    };
+                    return Ok(ExpressionOperator::TypeOf {
+                        type_name,
+                        variant_name,
+                        binding,
+                    });
+                }
                 _ => get_invalid_error(self.token()),
             },
             TokenKind::Symbol(sym) => {
@@ -573,6 +612,11 @@ enum ExpressionOperator {
     Binary(BinaryOperator),
     Access(AccessType),
     Cast(SoulType),
+    TypeOf {
+        type_name: Ident,
+        variant_name: Ident,
+        binding: Option<Ident>,
+    },
 }
 
 pub trait ConvertOperator {

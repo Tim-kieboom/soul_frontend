@@ -3,10 +3,10 @@ use soul_utils::sementic_level::FaultCollector;
 
 use utils::*;
 mod displayers;
-pub mod utils;
 mod frontend;
-mod llvm;
 mod globals;
+mod llvm;
+pub mod utils;
 
 /// if true prints backtrace for each soulError in faults
 const BACKTRACE: bool = false;
