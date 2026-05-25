@@ -407,13 +407,9 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     None
                 ))?;
 
-        let field_type = self
-            .lower_type(field_info.field_type, generics)?
-            .ok_or(soul_error_internal!("type should be Some", None))?;
-
         let field = self
             .builder
-            .build_field_access(base_type, field_type, base_ptr, field_info)?;
+            .build_field_access(base_type, base_ptr, field_info)?;
 
         self.new_unloaded_operand(field.into(), field_info.field_type, generics)
     }

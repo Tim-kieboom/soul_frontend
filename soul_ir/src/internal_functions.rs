@@ -37,7 +37,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
 
     fn declare_free(&mut self) {
         let ptr_type = self.context.ptr_type(AddressSpace::default());
-        let free_type = self.context.i8_type().fn_type(&[ptr_type.into()], false);
+        let free_type = self.context.void_type().fn_type(&[ptr_type.into()], false);
         let free_fn = self.module.add_function("free", free_type, None);
         free_fn.set_linkage(inkwell::module::Linkage::External);
         self.internal_functions.free_function = Some(free_fn);

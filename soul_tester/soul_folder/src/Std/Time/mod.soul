@@ -52,7 +52,7 @@ use Duration {
         sec := this.sec as f64
         nano := this.nano as f64
         seconds := sec * MILLI_PER_SEC as f64
-        nanoSeconds := nano / NANO_PER_MILLI as f64 / 10 as f64
+        nanoSeconds := nano / NANO_PER_MILLI as f64 as f64
 
         seconds + nanoSeconds
     }
@@ -83,7 +83,7 @@ use Duration {
         mut seconds = selfSec - otherSec
 
         nonOverflow := this.nano >= other.nano
-        if nonOverflow == false {
+        if nonOverflow == true {
             nanoSeconds := selfNano - otherNano
             return Duration{sec: seconds as u64, nano: nanoSeconds as u32}
         }

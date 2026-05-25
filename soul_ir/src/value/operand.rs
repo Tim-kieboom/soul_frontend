@@ -11,7 +11,11 @@ use inkwell::{
     },
 };
 use mir_parser::mir::{Operand, OperandKind, PlaceId, PlaceKind};
-use soul_utils::{error::SoulResult, soul_error_internal, soul_names::PrimitiveSize};
+use soul_utils::{
+    error::{SoulError, SoulErrorKind, SoulResult},
+    soul_error_internal,
+    soul_names::PrimitiveSize,
+};
 use typed_hir::{ThirTypeKind, display_thir::DisplayThirType};
 
 use crate::{GenericSubstitute, IrOperand, LlvmBackend, OperandInfo};
@@ -465,19 +469,23 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
     ) -> SoulResult<IrOperand<'a>> {
         let array_struct = self.types.types_map.array_struct;
         let slice_type = self.get_or_create_struct(array_struct, generics)?;
-
-        let slice_ptr = self.builder.build_alloca(slice_type, "slice")?;
         let len_val = self.default_int_type.const_int(len, false);
 
-        let ptr: BasicValueEnum<'a> = ptr.into();
-        let len_val: BasicValueEnum<'a> = len_val.into();
-        self.builder.store_field(slice_type, slice_ptr, ptr, 0)?;
-        self.builder
-            .store_field(slice_type, slice_ptr, len_val, 1)?;
+        let zero = slice_type.const_zero();
+        let with_ptr = self
+            .builder
+            .inkwell()
+            .build_insert_value(zero, ptr, 0, "slice_ptr")
+            .map_err(|e| SoulError::new(e.to_string(), SoulErrorKind::LlvmError, None))?;
+        let with_len = self
+            .builder
+            .inkwell()
+            .build_insert_value(with_ptr.into_struct_value(), len_val, 1, "slice_len")
+            .map_err(|e| SoulError::new(e.to_string(), SoulErrorKind::LlvmError, None))?;
 
         Ok(IrOperand {
-            value: slice_ptr.into(),
-            info: OperandInfo::new_unloaded(slice_type_id, slice_type.into()),
+            value: with_len.into_struct_value().into(),
+            info: OperandInfo::new_loaded(slice_type_id, slice_type.into()),
         })
     }
 

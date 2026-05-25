@@ -24,6 +24,7 @@ use typed_hir::{ThirType, ThirTypeKind, TypedHir, display_thir::DisplayThirType}
 pub fn display_mir(mir: &MirTree, hir: &HirResponse, ast_modules: &AstModuleStore) -> String {
     let mut displayer = MirDisplayer::new(mir, hir, ast_modules);
 
+    displayer.display_globals();
     displayer.display_module(mir.root_module);
     displayer.consume_to_string()
 }
@@ -74,6 +75,12 @@ impl<'a> MirDisplayer<'a> {
 
     fn consume_to_string(self) -> String {
         self.sb
+    }
+
+    fn display_globals(&mut self) {
+        for global in self.mir.globals.keys() {
+            self.display_global(global);
+        }
     }
 
     fn display_module(&mut self, module_id: ModuleId) {

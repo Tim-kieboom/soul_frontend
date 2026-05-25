@@ -1,10 +1,15 @@
 import (
-    crate.Test
-    // crate.Std.Io
+    // crate.Test
+    crate.Std.Io
+    crate.Std.Time.{Instance, Duration}
 )
 
-
 main() {
-    Test.RunTests()
-    // Io.Println("hello world")
+    // Test.RunTests()
+
+    time := Instance.Now()
+    Io.Println("hello world")
+    duration: Duration = time.Elapsed()
+    milli := duration.AsMillisf64()
+    Io.Print_float(milli)
 }

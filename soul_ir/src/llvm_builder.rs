@@ -514,34 +514,17 @@ impl<'ctx> IrBuilder<'ctx> {
             .map_err(build_error)
     }
 
-    pub fn build_field_access<T, F>(
+    pub fn build_field_access<T>(
         &self,
         base_type: T,
-        field_type: F,
         base_ptr: PointerValue<'ctx>,
         field_info: &FieldInfo,
     ) -> SoulResult<PointerValue<'ctx>>
     where
         T: BasicType<'ctx>,
-        F: BasicType<'ctx> + Copy,
     {
         let field_ptr = self.get_field_ptr(base_type, base_ptr, field_info)?;
-
-        let loaded_value = self
-            .inkwell
-            .build_load(field_type, field_ptr, "load_field")
-            .map_err(build_error)?;
-
-        let field_alloca = self
-            .inkwell
-            .build_alloca(field_type, "field_tmp")
-            .map_err(build_error)?;
-
-        self.inkwell
-            .build_store(field_alloca, loaded_value)
-            .map_err(build_error)?;
-
-        Ok(field_alloca)
+        Ok(field_ptr)
     }
 
     pub fn store_field<T, V>(
