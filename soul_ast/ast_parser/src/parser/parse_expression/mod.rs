@@ -1,7 +1,7 @@
 use ast::{
-    scope::NodeId, Array, AsTypeCast, BinaryOperator, BinaryOperatorKind, Block, Expression,
-    ExpressionKind, Literal, MatchMethod, MatchMethodArm, SoulType, Statement, StatementKind,
-    UnaryOperator, UnaryOperatorKind,
+    Array, AsTypeCast, BinaryOperator, BinaryOperatorKind, Block, Expression, ExpressionKind,
+    Literal, MatchMethod, MatchMethodArm, SoulType, Statement, StatementKind, UnaryOperator,
+    UnaryOperatorKind, scope::NodeId,
 };
 use soul_tokenizer::{Number, Token, TokenKind};
 use soul_utils::{
@@ -632,7 +632,8 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.skip_end_lines();
             if self.current_is(&LAMBDA_ARROW) {
                 self.bump();
-                let expr = self.parse_expression(&[CURLY_CLOSE, TokenKind::EndLine, TokenKind::EndFile])?;
+                let expr =
+                    self.parse_expression(&[CURLY_CLOSE, TokenKind::EndLine, TokenKind::EndFile])?;
                 let expr_span = expr.span;
                 self.expect(&CURLY_CLOSE)?;
                 let statement = Statement::new(

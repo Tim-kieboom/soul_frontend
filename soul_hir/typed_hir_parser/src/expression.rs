@@ -724,10 +724,7 @@ impl<'a> TypedHirContext<'a> {
 
             if covered[variant_index] {
                 self.log_error(SoulError::new(
-                    format!(
-                        "duplicate variant '{}' in match method",
-                        arm.variant_name
-                    ),
+                    format!("duplicate variant '{}' in match method", arm.variant_name),
                     SoulErrorKind::InvalidContext,
                     Some(span),
                 ));
@@ -772,13 +769,10 @@ impl<'a> TypedHirContext<'a> {
 
                 match result_type {
                     Some(prev) => {
-                        let _ = self.unify(
-                            ExpressionId::error(),
-                            prev,
-                            resolved_variant_type,
-                            span,
-                        );
-                        result_type = Some(self.get_priority_lazy_type(prev, resolved_variant_type));
+                        let _ =
+                            self.unify(ExpressionId::error(), prev, resolved_variant_type, span);
+                        result_type =
+                            Some(self.get_priority_lazy_type(prev, resolved_variant_type));
                     }
                     None => result_type = Some(resolved_variant_type),
                 }

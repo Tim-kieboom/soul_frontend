@@ -1,14 +1,11 @@
 use ast::{ArrayKind, BinaryOperator, BinaryOperatorKind, Literal};
 use hir::{ComplexLiteral, MatchPatternHir, TypeId, UnionId};
-use typed_hir::ThirTypeKind;
 use mir::BlockId;
+use typed_hir::ThirTypeKind;
 
 use soul_utils::ids::IdAlloc;
 
-use crate::{
-    MirContext,
-    mir,
-};
+use crate::{MirContext, mir};
 
 impl<'a> MirContext<'a> {
     pub(super) fn lower_while(
@@ -292,8 +289,13 @@ impl<'a> MirContext<'a> {
         let mut lit_arm_blocks = Vec::new();
         let mut array_arm_blocks = Vec::new();
         let mut string_arm_blocks = Vec::new();
-        let mut constructor_arms: Vec<(BlockId, hir::BlockId, Option<hir::LocalId>, UnionId, usize)> =
-            Vec::new();
+        let mut constructor_arms: Vec<(
+            BlockId,
+            hir::BlockId,
+            Option<hir::LocalId>,
+            UnionId,
+            usize,
+        )> = Vec::new();
         let mut binding_arms: Vec<(BlockId, hir::LocalId)> = Vec::new();
         let mut has_constructor = false;
 
@@ -436,17 +438,19 @@ impl<'a> MirContext<'a> {
                 let mir_local = self.new_local(*local_id, variant_type, None);
                 let extract_temp = self.new_temp(variant_type);
                 let extract_stmt = mir::Statement::new(mir::StatementKind::Assign {
-                    place: self.new_place(
-                        mir::Place::new(mir::PlaceKind::Temp(extract_temp), variant_type),
-                    ),
+                    place: self.new_place(mir::Place::new(
+                        mir::PlaceKind::Temp(extract_temp),
+                        variant_type,
+                    )),
                     value: mir::Rvalue::new(mir::RvalueKind::UnionExtract {
                         value: scrutinee_op.clone(),
                     }),
                 });
                 self.push_statement(extract_stmt);
-                let local_place = self.new_place(
-                    mir::Place::new(mir::PlaceKind::Local(mir_local), variant_type),
-                );
+                let local_place = self.new_place(mir::Place::new(
+                    mir::PlaceKind::Local(mir_local),
+                    variant_type,
+                ));
                 let assign_stmt = mir::Statement::new(mir::StatementKind::Assign {
                     place: local_place,
                     value: mir::Rvalue::new(mir::RvalueKind::Operand(mir::Operand::new(
@@ -462,9 +466,10 @@ impl<'a> MirContext<'a> {
             let local_type = scrutinee_op.ty;
             self.current.block = Some(*arm_bb);
             let mir_local = self.new_local(*local_id, local_type, None);
-            let local_place = self.new_place(
-                mir::Place::new(mir::PlaceKind::Local(mir_local), local_type),
-            );
+            let local_place = self.new_place(mir::Place::new(
+                mir::PlaceKind::Local(mir_local),
+                local_type,
+            ));
             let assign_stmt = mir::Statement::new(mir::StatementKind::Assign {
                 place: local_place,
                 value: mir::Rvalue::new(mir::RvalueKind::Operand(scrutinee_op.clone())),
@@ -615,7 +620,11 @@ impl<'a> MirContext<'a> {
             },
         );
 
-        let union_info = self.hir_response.typed.types_map.id_to_union(mm_info.union_id);
+        let union_info = self
+            .hir_response
+            .typed
+            .types_map
+            .id_to_union(mm_info.union_id);
 
         let has_target_place = self.current.target_place.is_some();
         let mut temp: Option<mir::TempId> = None;
@@ -630,17 +639,19 @@ impl<'a> MirContext<'a> {
                 let mir_local = self.new_local(local_id, variant_type, None);
                 let extract_temp = self.new_temp(variant_type);
                 let extract_stmt = mir::Statement::new(mir::StatementKind::Assign {
-                    place: self.new_place(
-                        mir::Place::new(mir::PlaceKind::Temp(extract_temp), variant_type),
-                    ),
+                    place: self.new_place(mir::Place::new(
+                        mir::PlaceKind::Temp(extract_temp),
+                        variant_type,
+                    )),
                     value: mir::Rvalue::new(mir::RvalueKind::UnionExtract {
                         value: scrutinee_op.clone(),
                     }),
                 });
                 self.push_statement(extract_stmt);
-                let local_place = self.new_place(
-                    mir::Place::new(mir::PlaceKind::Local(mir_local), variant_type),
-                );
+                let local_place = self.new_place(mir::Place::new(
+                    mir::PlaceKind::Local(mir_local),
+                    variant_type,
+                ));
                 let assign_stmt = mir::Statement::new(mir::StatementKind::Assign {
                     place: local_place,
                     value: mir::Rvalue::new(mir::RvalueKind::Operand(mir::Operand::new(
@@ -658,9 +669,10 @@ impl<'a> MirContext<'a> {
 
                 let extract_temp = self.new_temp(variant_type);
                 let extract_stmt = mir::Statement::new(mir::StatementKind::Assign {
-                    place: self.new_place(
-                        mir::Place::new(mir::PlaceKind::Temp(extract_temp), variant_type),
-                    ),
+                    place: self.new_place(mir::Place::new(
+                        mir::PlaceKind::Temp(extract_temp),
+                        variant_type,
+                    )),
                     value: mir::Rvalue::new(mir::RvalueKind::UnionExtract {
                         value: scrutinee_op.clone(),
                     }),
@@ -711,8 +723,7 @@ impl<'a> MirContext<'a> {
                 let value = self.lower_block(body_id, *arm_bb).pass(arm_end);
 
                 if !*arm_end {
-                    if let Some(value) =
-                        value.filter(|v| !matches!(v.kind, mir::OperandKind::None))
+                    if let Some(value) = value.filter(|v| !matches!(v.kind, mir::OperandKind::None))
                     {
                         let end_block = self.expect_current_block();
 
@@ -795,9 +806,14 @@ impl<'a> MirContext<'a> {
             let chain_entry = self.new_block();
             self.tree.blocks[chain_entry].returnable = returnable;
 
-            let has_wildcard = elements
-                .iter()
-                .any(|e| matches!(e, MatchPatternHir::Wildcard | MatchPatternHir::Binding(_) | MatchPatternHir::Constructor { .. }));
+            let has_wildcard = elements.iter().any(|e| {
+                matches!(
+                    e,
+                    MatchPatternHir::Wildcard
+                        | MatchPatternHir::Binding(_)
+                        | MatchPatternHir::Constructor { .. }
+                )
+            });
 
             if !has_wildcard {
                 self.lower_array_arm_wildcard(

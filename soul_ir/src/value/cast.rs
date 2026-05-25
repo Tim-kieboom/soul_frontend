@@ -142,9 +142,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                             0,
                             "array_data",
                         )
-                        .map_err(|e| {
-                            SoulError::new(e.to_string(), SoulErrorKind::LlvmError, None)
-                        })?
+                        .map_err(|e| SoulError::new(e.to_string(), SoulErrorKind::LlvmError, None))?
                         .into_pointer_value();
                     let info = crate::OperandInfo::new_loaded(cast_to, cast_type);
                     Ok(IrOperand {

@@ -415,13 +415,20 @@ impl<'a> MirContext<'a> {
             // Extract the union value and assign to the binding local
             let extract_temp = self.new_temp(variant_type);
             let extract_stmt = mir::Statement::new(mir::StatementKind::Assign {
-                place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(extract_temp), variant_type)),
+                place: self.new_place(mir::Place::new(
+                    mir::PlaceKind::Temp(extract_temp),
+                    variant_type,
+                )),
                 value: mir::Rvalue::new(mir::RvalueKind::UnionExtract { value: inner }),
             });
             self.push_statement(extract_stmt);
 
-            let extract_operand = mir::Operand::new(variant_type, mir::OperandKind::Temp(extract_temp));
-            let local_place = self.new_place(mir::Place::new(mir::PlaceKind::Local(mir_local), variant_type));
+            let extract_operand =
+                mir::Operand::new(variant_type, mir::OperandKind::Temp(extract_temp));
+            let local_place = self.new_place(mir::Place::new(
+                mir::PlaceKind::Local(mir_local),
+                variant_type,
+            ));
             let assign_stmt = mir::Statement::new(mir::StatementKind::Assign {
                 place: local_place,
                 value: mir::Rvalue::new(mir::RvalueKind::Operand(extract_operand)),

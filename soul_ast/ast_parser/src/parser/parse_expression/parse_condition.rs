@@ -213,11 +213,9 @@ impl<'a, 'f> Parser<'a, 'f> {
             return Ok(MatchPattern::Wildcard);
         }
 
-
         let ident_name = match &self.token().kind {
             TokenKind::Ident(name) => name.clone(),
             _ => {
-
                 let end_tokens = [
                     TokenKind::Symbol(SymbolKind::LambdaArray),
                     COMMA,
@@ -235,7 +233,6 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
         };
 
-
         if soul_utils::soul_names::KeyWord::from_str(&ident_name).is_some() {
             let end_tokens = [
                 TokenKind::Symbol(SymbolKind::LambdaArray),
@@ -252,7 +249,6 @@ impl<'a, 'f> Parser<'a, 'f> {
                 )),
             };
         }
-
 
         let saved = self.current_position();
         let type_name_span = self.token().span;
@@ -296,7 +292,6 @@ impl<'a, 'f> Parser<'a, 'f> {
                 binding_id: None,
             });
         }
-
 
         self.go_to(saved);
         let bind_span = self.token().span;

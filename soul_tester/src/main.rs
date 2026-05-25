@@ -1,5 +1,8 @@
 use anyhow::Result;
-use soul_utils::{compile_options::{Arch, Os}, sementic_level::FaultCollector};
+use soul_utils::{
+    compile_options::{Arch, Os},
+    sementic_level::FaultCollector,
+};
 
 use utils::*;
 mod displayers;
