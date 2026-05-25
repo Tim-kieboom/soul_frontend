@@ -178,6 +178,29 @@ impl<'a> NameResolver<'a> {
                     self.collect_expression(value);
                 }
             }
+            ExpressionKind::MatchMethod(mm) => {
+                mm.id = Some(self.alloc_node());
+                self.collect_expression(&mut mm.expr);
+                for arm in &mut mm.arms {
+                    self.push_scope(&mut arm.body.scope_id);
+                    if let Some((binding_ident, binding_id)) = &mut arm.binding {
+                        let id = self.alloc_node();
+                        *binding_id = Some(id);
+                        if self
+                            .insert_value(binding_ident.as_str(), id, ScopeValue::Variable)
+                            .is_some()
+                        {
+                            self.log_error(SoulError::new(
+                                format!("name {} already exists in scope", binding_ident.as_str()),
+                                SoulErrorKind::AlreadyFoundInScope,
+                                Some(binding_ident.span),
+                            ));
+                        }
+                    }
+                    self.collect_scopeless_block(&mut arm.body);
+                    self.pop_scope();
+                }
+            }
         }
     }
 

@@ -88,6 +88,10 @@ impl<'a> HirContext<'a> {
                 span,
             ),
 
+            ast::ExpressionKind::MatchMethod(mm) => {
+                return self.lower_match_method(id, mm, span);
+            }
+
             ast::ExpressionKind::ExternalExpression(_) => {
                 self.log_error(soul_error_internal!(
                     "ExternalExpression expression is unstable",
@@ -784,5 +788,38 @@ impl<'a> HirContext<'a> {
     ) -> ExpressionId {
         self.tree.nodes.expressions.insert(id, expression);
         id
+    }
+
+    pub(super) fn lower_match_method(
+        &mut self,
+        id: ExpressionId,
+        mm: &ast::MatchMethod,
+        span: Span,
+    ) -> ExpressionId {
+        let value = self.lower_expression(&mm.expr);
+        let mut arms = Vec::new();
+        for arm in &mm.arms {
+            let binding_local = arm.binding.as_ref().map(|(binding_ident, node_id)| {
+                let local = self.id_generator.alloc_local();
+                let ty = self.new_infer_type(vec![], None, binding_ident.span);
+                self.insert_variable(binding_ident, local, ty, None);
+                if let Some(node_id) = node_id {
+                    self.node_id_to_local.insert(*node_id, local);
+                }
+                local
+            });
+            let body = self.lower_block(&arm.body);
+            arms.push(hir::MatchMethodArmHir {
+                variant_name: arm.variant_name.to_string(),
+                binding: binding_local,
+                body,
+            });
+        }
+        let expr = hir::Expression {
+            id,
+            ty: self.new_infer_type(vec![], None, span),
+            kind: hir::ExpressionKind::MatchMethod(hir::MatchMethodHir { value, arms }),
+        };
+        self.insert_expression(id, expr)
     }
 }

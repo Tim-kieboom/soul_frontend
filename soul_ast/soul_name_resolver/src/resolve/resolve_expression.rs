@@ -135,6 +135,12 @@ impl<'a> NameResolver<'a> {
                     ));
                 }
             }
+            ExpressionKind::MatchMethod(mm) => {
+                self.resolve_expression(&mut mm.expr);
+                for arm in &mut mm.arms {
+                    self.resolve_block(&mut arm.body);
+                }
+            }
         }
     }
 

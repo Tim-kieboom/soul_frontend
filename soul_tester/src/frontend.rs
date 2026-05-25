@@ -131,14 +131,14 @@ fn run_crate_frontend(
 ) -> Result<Output> {
     let timer = Instant::now();
     let source_file = to_source_file(&entry.path)?;
-    globals::get_benchmarks()?.source_read(crate_id, timer.elapsed());
+    globals::benchmark()?.source_read(crate_id, timer.elapsed());
 
     let root = module_store.get_root_id();
 
     let timer = Instant::now();
     let tokens = to_token_stream(&source_file, root);
     display_tokenizer(&globals::PATHS, manifest, root, &source_file)?;
-    globals::get_benchmarks()?.tokenize(crate_id, timer.elapsed());
+    globals::benchmark()?.tokenize(crate_id, timer.elapsed());
 
     let timer = Instant::now();
     let ast = to_ast(
@@ -149,7 +149,7 @@ fn run_crate_frontend(
         crate_store,
         source.clone(),
     );
-    globals::get_benchmarks()?.ast(crate_id, timer.elapsed());
+    globals::benchmark()?.ast(crate_id, timer.elapsed());
     display_ast(manifest, module_store, &ast)?;
 
     let timer = Instant::now();
@@ -162,7 +162,7 @@ fn run_crate_frontend(
         source.clone(),
     );
     display_hir(manifest, &hir, &ast)?;
-    globals::get_benchmarks()?.hir(crate_id, timer.elapsed());
+    globals::benchmark()?.hir(crate_id, timer.elapsed());
     clear_hir_type_map(&mut hir);
 
     let timer = Instant::now();
@@ -174,7 +174,7 @@ fn run_crate_frontend(
         crate_exports,
         root,
     );
-    globals::get_benchmarks()?.mir(crate_id, timer.elapsed());
+    globals::benchmark()?.mir(crate_id, timer.elapsed());
     display_mir(manifest, &mir, &hir, &ast)?;
 
     Ok(Output {

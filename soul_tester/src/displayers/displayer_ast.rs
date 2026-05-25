@@ -779,6 +779,24 @@ impl<'a> AstDisplayer<'a> {
                     self.push(')');
                 }
             }
+            ast::ExpressionKind::MatchMethod(mm) => {
+                self.display_expression(&mm.expr);
+                for arm in &mm.arms {
+                    self.push('.');
+                    self.push_str(arm.variant_name.as_str());
+                    self.push_str(" {");
+                    if let Some((binding_ident, _)) = &arm.binding {
+                        self.push(' ');
+                        self.push_str(binding_ident.as_str());
+                        self.push_str(" =>");
+                    }
+                    for stmt in &arm.body.statements {
+                        self.push(' ');
+                        self.display_statement(stmt);
+                    }
+                    self.push_str(" }");
+                }
+            }
         }
     }
 

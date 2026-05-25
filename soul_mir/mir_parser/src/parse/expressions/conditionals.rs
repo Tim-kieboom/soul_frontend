@@ -1,12 +1,13 @@
 use ast::{ArrayKind, BinaryOperator, BinaryOperatorKind, Literal};
 use hir::{ComplexLiteral, MatchPatternHir, TypeId, UnionId};
 use typed_hir::ThirTypeKind;
+use mir::BlockId;
 
 use soul_utils::ids::IdAlloc;
 
 use crate::{
     MirContext,
-    mir::{self, BlockId},
+    mir,
 };
 
 impl<'a> MirContext<'a> {
@@ -563,6 +564,211 @@ impl<'a> MirContext<'a> {
                 None => mir::OperandKind::None,
             },
         )
+    }
+
+    pub(super) fn lower_match_method(
+        &mut self,
+        expr_id: hir::ExpressionId,
+        mm: &hir::MatchMethodHir,
+        ty: hir::TypeId,
+        is_end: &mut bool,
+    ) -> mir::Operand {
+        let Some(mm_info) = self.hir_response.typed.types_map.match_methods.get(expr_id) else {
+            return mir::Operand::new(ty, mir::OperandKind::None);
+        };
+
+        let scrutinee_op = self.lower_operand(mm.value).pass(is_end);
+        let scrutinee_ty = self.expression_type(mm.value);
+
+        let parent_bb = self.expect_current_block();
+        let returnable = self.tree.blocks[parent_bb].returnable;
+
+        let tag_type = self.hir_response.typed.types_table.index_type;
+        let tag_temp = self.new_temp(tag_type);
+        let tag_stmt = mir::Statement::new(mir::StatementKind::Assign {
+            place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(tag_temp), tag_type)),
+            value: mir::Rvalue::new(mir::RvalueKind::UnionTag {
+                value: scrutinee_op.clone(),
+            }),
+        });
+        self.push_statement(tag_stmt);
+        let discriminant = mir::Operand::new(tag_type, mir::OperandKind::Temp(tag_temp));
+
+        let join_bb = self.new_block();
+        self.tree.blocks[join_bb].returnable = returnable;
+
+        let mut switch_targets: Vec<(i128, BlockId)> = Vec::new();
+        let mut arm_blocks: Vec<(BlockId, &typed_hir::ResolvedMatchMethodArm)> = Vec::new();
+
+        for arm in &mm_info.arms {
+            let arm_bb = self.new_block();
+            switch_targets.push((arm.variant_index as i128, arm_bb));
+            arm_blocks.push((arm_bb, arm));
+        }
+
+        self.insert_terminator(
+            parent_bb,
+            mir::Terminator::SwitchInt {
+                discriminant,
+                targets: switch_targets,
+                otherwise: join_bb,
+            },
+        );
+
+        let union_info = self.hir_response.typed.types_map.id_to_union(mm_info.union_id);
+
+        let has_target_place = self.current.target_place.is_some();
+        let mut temp: Option<mir::TempId> = None;
+
+        for (arm_bb, arm) in &arm_blocks {
+            self.current.block = Some(*arm_bb);
+
+            if let Some(local_id) = arm.binding {
+                let variant_type = union_info
+                    .map(|u| u.variant_types[arm.variant_index])
+                    .unwrap_or(scrutinee_ty);
+                let mir_local = self.new_local(local_id, variant_type, None);
+                let extract_temp = self.new_temp(variant_type);
+                let extract_stmt = mir::Statement::new(mir::StatementKind::Assign {
+                    place: self.new_place(
+                        mir::Place::new(mir::PlaceKind::Temp(extract_temp), variant_type),
+                    ),
+                    value: mir::Rvalue::new(mir::RvalueKind::UnionExtract {
+                        value: scrutinee_op.clone(),
+                    }),
+                });
+                self.push_statement(extract_stmt);
+                let local_place = self.new_place(
+                    mir::Place::new(mir::PlaceKind::Local(mir_local), variant_type),
+                );
+                let assign_stmt = mir::Statement::new(mir::StatementKind::Assign {
+                    place: local_place,
+                    value: mir::Rvalue::new(mir::RvalueKind::Operand(mir::Operand::new(
+                        variant_type,
+                        mir::OperandKind::Temp(extract_temp),
+                    ))),
+                });
+                self.push_statement(assign_stmt);
+            }
+
+            if arm.is_implicit {
+                let variant_type = union_info
+                    .map(|u| u.variant_types[arm.variant_index])
+                    .unwrap_or(scrutinee_ty);
+
+                let extract_temp = self.new_temp(variant_type);
+                let extract_stmt = mir::Statement::new(mir::StatementKind::Assign {
+                    place: self.new_place(
+                        mir::Place::new(mir::PlaceKind::Temp(extract_temp), variant_type),
+                    ),
+                    value: mir::Rvalue::new(mir::RvalueKind::UnionExtract {
+                        value: scrutinee_op.clone(),
+                    }),
+                });
+                self.push_statement(extract_stmt);
+
+                let value = mir::Operand::new(variant_type, mir::OperandKind::Temp(extract_temp));
+
+                let end_block = self.expect_current_block();
+
+                if has_target_place {
+                    if !matches!(value.kind, mir::OperandKind::None) {
+                        self.push_statement_from(
+                            mir::Statement::new(mir::StatementKind::Assign {
+                                place: self.current.target_place.unwrap(),
+                                value: mir::Rvalue::new(mir::RvalueKind::Operand(value)),
+                            }),
+                            end_block,
+                        );
+                    }
+                } else if !matches!(value.kind, mir::OperandKind::None) {
+                    let temp_id = match temp {
+                        Some(id) => id,
+                        None => {
+                            let id = self.new_temp(ty);
+                            temp = Some(id);
+                            id
+                        }
+                    };
+                    let place = self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp_id), ty));
+                    self.push_statement_from(
+                        mir::Statement::new(mir::StatementKind::Assign {
+                            place,
+                            value: mir::Rvalue::new(mir::RvalueKind::Operand(value)),
+                        }),
+                        end_block,
+                    );
+                }
+
+                if matches!(
+                    self.tree.blocks[end_block].terminator,
+                    mir::Terminator::Unreachable
+                ) {
+                    self.insert_terminator(end_block, mir::Terminator::Goto(join_bb));
+                }
+            } else if let Some(body_id) = arm.body {
+                let arm_end = &mut false;
+                let value = self.lower_block(body_id, *arm_bb).pass(arm_end);
+
+                if !*arm_end {
+                    if let Some(value) =
+                        value.filter(|v| !matches!(v.kind, mir::OperandKind::None))
+                    {
+                        let end_block = self.expect_current_block();
+
+                        if has_target_place {
+                            self.push_statement_from(
+                                mir::Statement::new(mir::StatementKind::Assign {
+                                    place: self.current.target_place.unwrap(),
+                                    value: mir::Rvalue::new(mir::RvalueKind::Operand(value)),
+                                }),
+                                end_block,
+                            );
+                        } else {
+                            let temp_id = match temp {
+                                Some(id) => id,
+                                None => {
+                                    let id = self.new_temp(ty);
+                                    temp = Some(id);
+                                    id
+                                }
+                            };
+                            let place =
+                                self.new_place(mir::Place::new(mir::PlaceKind::Temp(temp_id), ty));
+                            self.push_statement_from(
+                                mir::Statement::new(mir::StatementKind::Assign {
+                                    place,
+                                    value: mir::Rvalue::new(mir::RvalueKind::Operand(value)),
+                                }),
+                                end_block,
+                            );
+                        }
+                    }
+                }
+
+                let end_block = self.expect_current_block();
+                if matches!(
+                    self.tree.blocks[end_block].terminator,
+                    mir::Terminator::Unreachable
+                ) {
+                    self.insert_terminator(end_block, mir::Terminator::Goto(join_bb));
+                }
+            }
+        }
+
+        self.current.block = Some(join_bb);
+
+        if has_target_place {
+            mir::Operand::new(ty, mir::OperandKind::None)
+        } else {
+            mir::Operand::new(
+                ty,
+                match temp {
+                    Some(temp_id) => mir::OperandKind::Temp(temp_id),
+                    None => mir::OperandKind::None,
+                },
+            )
+        }
     }
 
     fn lower_array_arm_chain(

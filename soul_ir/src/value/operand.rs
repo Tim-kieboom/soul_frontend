@@ -48,16 +48,27 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
             OperandKind::Local(local_id) => {
                 let mir_local = &self.mir.tree.locals[*local_id];
 
-                let ty = match self.lower_type(mir_local.ty(), generics)? {
-                    Some(val) => val,
-                    None => self.context.i8_type().into(),
-                };
-
                 let local = self.get_local(*local_id);
 
                 let ptr = match local {
                     crate::Local::Runtime(val) => val,
                     crate::Local::Comptime(literal_operand) => return Ok(literal_operand),
+                };
+
+                let hir_type = self.get_type(mir_local.ty())?;
+                if matches!(
+                    &hir_type.kind,
+                    ThirTypeKind::Array {
+                        kind: ArrayKind::StackArray(_),
+                        ..
+                    }
+                ) {
+                    return self.new_unloaded_operand(ptr.into(), mir_local.ty(), generics);
+                }
+
+                let ty = match self.lower_type(mir_local.ty(), generics)? {
+                    Some(val) => val,
+                    None => self.context.i8_type().into(),
                 };
 
                 let value = self.builder.build_load(ty, ptr, "load")?;

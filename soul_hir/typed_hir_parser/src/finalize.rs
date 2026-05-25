@@ -157,6 +157,8 @@ impl<'a> TypedHirContext<'a> {
             }
         }
 
+        out.match_methods = std::mem::take(&mut self.match_methods);
+
         out
     }
 

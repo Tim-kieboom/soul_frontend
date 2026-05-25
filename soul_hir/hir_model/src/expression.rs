@@ -102,6 +102,10 @@ pub enum ExpressionKind {
         arms: Vec<MatchArm>,
     },
 
+    /// A match-method expression: `expr.Variant{body}` / chained.
+    /// Variant names are resolved to indices in THIR/MIR.
+    MatchMethod(MatchMethodHir),
+
     Block(BlockId),
 
     // --- Calls ---
@@ -269,4 +273,20 @@ pub enum MatchPatternHir {
         variant_index: usize,
         binding: Option<LocalId>,
     },
+}
+
+/// A match-method expression in HIR: `expr.Variant{body}` / chained.
+/// Variant names are stored as strings; resolved to indices in THIR/MIR.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct MatchMethodHir {
+    pub value: ExpressionId,
+    pub arms: Vec<MatchMethodArmHir>,
+}
+
+/// A single arm in a HIR match-method expression.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct MatchMethodArmHir {
+    pub variant_name: String,
+    pub binding: Option<LocalId>,
+    pub body: BlockId,
 }

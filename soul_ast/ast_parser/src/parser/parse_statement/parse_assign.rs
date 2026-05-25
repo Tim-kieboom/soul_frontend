@@ -13,7 +13,7 @@ use soul_utils::{
 
 use crate::parser::{
     Parser,
-    parse_utils::{SEMI_COLON, STAMENT_END_TOKENS},
+    parse_utils::{CURLY_CLOSE, SEMI_COLON, STAMENT_END_TOKENS},
 };
 
 static ASSIGNMENT_TOKENS: LazyLock<Vec<TokenKind>> = LazyLock::new(|| {
@@ -23,6 +23,7 @@ static ASSIGNMENT_TOKENS: LazyLock<Vec<TokenKind>> = LazyLock::new(|| {
         .map(TokenKind::Symbol)
         .chain(iter::once(TokenKind::EndLine))
         .chain(iter::once(SEMI_COLON))
+        .chain(iter::once(CURLY_CLOSE))
         .collect()
 });
 

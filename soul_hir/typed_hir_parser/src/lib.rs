@@ -98,6 +98,7 @@ struct TypedHirContext<'a> {
     sizeofs: VecMap<ExpressionId, LazyTypeId>,
     expressions: VecMap<ExpressionId, LazyTypeId>,
     generic_defines: VecMap<GenericId, VecSet<TypeId>>,
+    match_methods: VecMap<ExpressionId, typed_hir::MatchMethodInfo>,
 
     context: &'a mut CrateContext,
 }
@@ -131,6 +132,7 @@ impl<'a> TypedHirContext<'a> {
             field_names: VecMap::with_capacity(hir.nodes.fields.len()),
             functions: VecMap::with_capacity(hir.nodes.functions.len()),
             expressions: VecMap::with_capacity(hir.nodes.expressions.len()),
+            match_methods: VecMap::new(),
         };
         this.common_types.none_type = this.add_type(HirType::none_type());
         this.common_types.never_type = this.add_type(HirType::never_type());

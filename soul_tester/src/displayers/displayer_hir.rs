@@ -612,6 +612,19 @@ impl<'a> HirDisplayer<'a> {
                 self.display_expression(value);
                 self.push(')');
             }
+            hir::ExpressionKind::MatchMethod(mm) => {
+                self.display_expression(&mm.value);
+                for arm in &mm.arms {
+                    self.push('.');
+                    self.push_str(&arm.variant_name);
+                    if let Some(binding) = arm.binding {
+                        self.push('(');
+                        self.display_local(binding);
+                        self.push(')');
+                    }
+                    self.push_str("{...}");
+                }
+            }
             hir::ExpressionKind::TypeOf(typeof_) => {
                 let TypeOf {
                     value,

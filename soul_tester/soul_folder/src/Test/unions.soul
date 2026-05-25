@@ -49,51 +49,23 @@ test_init_union() {
     }
 }
 
-// union MyResult {
-//     Ok(int),
-//     Err([@]char),
-// }
+union MyResult (
+    Ok(int),
+    Err([@]char),
+)
 
-// test_union_match_methodes() { 
-//     literal OK_VALUE = 1
-//     literal ERROR_MSG = "error"
-//     ok := MyResult.Ok(OK_VALUE)
-//     err := MyResult.Err(ERROR_MSG)
+test_union_match_methodes() { 
+    literal OK_VALUE = 1
+    ok := MyResult.Ok(OK_VALUE)
+    err := MyResult.Err("error")
 
-//     /* expanse to
-//         mut number: int = match ok {
-//             MyResult.Err(_) => -1
-//             other => other
-//         }
-//     */
-//     mut number: int = ok.Err{-1}
-//     Io.Assert(number == OK_VALUE)
+    mut number: int = ok.Err{-1}
+    Io.Assert(number == OK_VALUE)
 
-//     /* expanse to
-//         number = match ok {
-//             MyResult.Err(msg) => Io.Panic(msg) //Io.Panic should return never type
-//             other => other
-//         }
-//     */
-//     number = ok.Err{msg => Io.Panic(msg)}
-//     // number = ok.Err{Io.Panic} //later automaicly use msg as argument in Io.Panic like in lambdas
+    number = err.Ok{return}
+    Io.Assert(number == OK_VALUE)
 
-//     /* expanse to
-//         msg: [@]char = match err {
-//             MyResult.Ok(_) => Io.Panic("err should be typeof MyResult.Err") //Io.Panic should return never type
-//             other => other
-//         }
-//     */
-//     msg: [@]char = err.Ok{Io.Panic("err should be typeof MyResult.Err")}
-//     Io.Assert(msg == ERROR_MSG)
-
-//     /* expanse to
-//         match err {
-//             MyResult.Ok(_) => Io.Panic("err should be typeof MyResult.Err") //Io.Panic should return never type
-//             MyResult.Err(msg) => Io.Assert(msg == ERROR_MSG)
-//         } //return type none
-//     */
-//     err
-//         .Ok{Io.Panic("err should be typeof MyResult.Err")}
-//         .Err{msg => Io.Assert(msg == ERROR_MSG)}
-// }
+    ok
+        .Ok{val => Io.Assert(val == 1)}
+        .Err{val => Io.Assert(val == "error")}
+}

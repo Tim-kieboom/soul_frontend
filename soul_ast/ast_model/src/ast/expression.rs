@@ -103,6 +103,9 @@ pub enum ExpressionKind {
         binding: Option<Ident>,
         binding_id: Option<NodeId>,
     },
+    /// A match-method expression: `expr.Variant{body}` or `expr.Variant{param => body}`.
+    /// Chained calls are flattened into multiple arms: `expr.V1{...}.V2{...}`.
+    MatchMethod(MatchMethod),
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -289,6 +292,27 @@ pub enum MatchPattern {
     },
 }
 
+/// A match-method expression `expr.Variant{body}` or chained `expr.V1{...}.V2{...}`.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct MatchMethod {
+    pub id: Option<NodeId>,
+    /// The scrutinee expression (left side of the dot).
+    pub expr: BoxExpression,
+    /// The match arms, one per `.Variant{...}` segment.
+    pub arms: Vec<MatchMethodArm>,
+}
+
+/// A single arm in a match-method expression.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct MatchMethodArm {
+    /// The variant name (e.g., `Err` in `ok.Err{-1}`).
+    pub variant_name: Ident,
+    /// Optional binding parameter (e.g., `msg` in `err.Err{msg => body}`).
+    pub binding: Option<(Ident, Option<NodeId>)>,
+    /// The body block.
+    pub body: Block,
+}
+
 /// A `return`, `fall`, or `break`-like expression.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ReturnLike {
@@ -424,6 +448,11 @@ impl Expression {
         Expression::new(ExpressionKind::FunctionCall(node), span)
     }
 
+    pub fn from_match_method(mm: Spanned<MatchMethod>) -> Expression {
+        let Spanned { node, span } = mm;
+        Expression::new(ExpressionKind::MatchMethod(node), span)
+    }
+
     pub fn from_struct_contructor(ctor: Spanned<StructConstructor>) -> Expression {
         let Spanned { node, span } = ctor;
         Expression::new(ExpressionKind::StructConstructor(node), span)
@@ -503,6 +532,7 @@ impl ExpressionKind {
             ExpressionKind::NewArray(_) => "NewArray",
             ExpressionKind::Match(_) => "Match",
             ExpressionKind::TypeOf { .. } => "TypeOf",
+            ExpressionKind::MatchMethod(_) => "MatchMethod",
         }
     }
 }

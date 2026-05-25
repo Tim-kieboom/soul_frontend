@@ -108,6 +108,9 @@ impl<'a> TypedHirContext<'a> {
             hir::ExpressionKind::Match { scrutinee, arms } => {
                 self.infer_match(*scrutinee, arms.clone(), span)
             }
+            hir::ExpressionKind::MatchMethod(mm) => {
+                self.infer_match_method(expression_id, mm, span)
+            }
             hir::ExpressionKind::Unary(Unary {
                 operator,
                 expression,
@@ -645,6 +648,160 @@ impl<'a> TypedHirContext<'a> {
         }
 
         result_type
+    }
+
+    fn infer_match_method(
+        &mut self,
+        expr_id: ExpressionId,
+        mm: &hir::MatchMethodHir,
+        span: Span,
+    ) -> LazyTypeId {
+        let scrutinee_ty = self.infer_expression(mm.value);
+
+        // Resolve scrutinee type to find the union
+        let scrutinee_type_id = match self.resolve_type_strict(scrutinee_ty, span) {
+            Some(id) if id != TypeId::error() => id,
+            _ => return LazyTypeId::error(),
+        };
+
+        let hir_type = self.id_to_type(scrutinee_type_id);
+        let union_id = match &hir_type.kind {
+            HirTypeKind::CustomType(CustomTypeId::Union(id)) => *id,
+            _ => {
+                self.log_error(SoulError::new(
+                    "match method requires a union-typed scrutinee".to_string(),
+                    SoulErrorKind::InvalidContext,
+                    Some(span),
+                ));
+                return LazyTypeId::error();
+            }
+        };
+
+        // Extract union data upfront to avoid borrow issues
+        let union_name;
+        let variant_data: Vec<(String, LazyTypeId)>;
+        {
+            let Some(union_def) = self.types.id_to_union(union_id) else {
+                self.log_error(SoulError::new(
+                    "union type not found".to_string(),
+                    SoulErrorKind::TypeNotFound,
+                    Some(span),
+                ));
+                return LazyTypeId::error();
+            };
+            union_name = union_def.name.to_string();
+            variant_data = union_def
+                .variants
+                .iter()
+                .map(|v| (v.name.to_string(), v.ty))
+                .collect();
+        }
+
+        let num_variants = variant_data.len();
+        let mut covered: Vec<bool> = vec![false; num_variants];
+        let mut resolved_arms: Vec<typed_hir::ResolvedMatchMethodArm> = Vec::new();
+        let mut result_type: Option<LazyTypeId> = None;
+
+        // First pass: resolve explicit arms, set up bindings
+        for arm in &mm.arms {
+            let variant_index = match variant_data
+                .iter()
+                .position(|(name, _)| name == &arm.variant_name)
+            {
+                Some(idx) => idx,
+                None => {
+                    self.log_error(SoulError::new(
+                        format!(
+                            "'{}' is not a variant of '{}'",
+                            arm.variant_name, union_name
+                        ),
+                        SoulErrorKind::InvalidIdent,
+                        Some(span),
+                    ));
+                    return LazyTypeId::error();
+                }
+            };
+
+            if covered[variant_index] {
+                self.log_error(SoulError::new(
+                    format!(
+                        "duplicate variant '{}' in match method",
+                        arm.variant_name
+                    ),
+                    SoulErrorKind::InvalidContext,
+                    Some(span),
+                ));
+                return LazyTypeId::error();
+            }
+            covered[variant_index] = true;
+
+            // Set binding local type
+            if let Some(local_id) = arm.binding {
+                let resolved = self.resolve_type_lazy(variant_data[variant_index].1, span);
+                if resolved != LazyTypeId::error() {
+                    self.locals.insert(local_id, resolved);
+                } else {
+                    let infer = self.new_infer(span);
+                    self.locals.insert(local_id, infer);
+                }
+            }
+
+            // Infer body type
+            let arm_type = self.infer_block_expression(arm.body);
+            match result_type {
+                Some(prev) => {
+                    let _ = self.unify(ExpressionId::error(), prev, arm_type, span);
+                    result_type = Some(self.get_priority_lazy_type(prev, arm_type));
+                }
+                None => result_type = Some(arm_type),
+            }
+
+            resolved_arms.push(typed_hir::ResolvedMatchMethodArm {
+                variant_index,
+                is_implicit: false,
+                binding: arm.binding,
+                body: Some(arm.body),
+            });
+        }
+
+        // Add implicit arms for uncovered variants
+        for (idx, is_covered) in covered.iter().enumerate() {
+            if !*is_covered {
+                let variant_type = variant_data[idx].1;
+                let resolved_variant_type = self.resolve_type_lazy(variant_type, span);
+
+                match result_type {
+                    Some(prev) => {
+                        let _ = self.unify(
+                            ExpressionId::error(),
+                            prev,
+                            resolved_variant_type,
+                            span,
+                        );
+                        result_type = Some(self.get_priority_lazy_type(prev, resolved_variant_type));
+                    }
+                    None => result_type = Some(resolved_variant_type),
+                }
+
+                resolved_arms.push(typed_hir::ResolvedMatchMethodArm {
+                    variant_index: idx,
+                    is_implicit: true,
+                    binding: None,
+                    body: None,
+                });
+            }
+        }
+
+        // Store resolved info for MIR
+        self.match_methods.insert(
+            expr_id,
+            typed_hir::MatchMethodInfo {
+                union_id,
+                arms: resolved_arms,
+            },
+        );
+
+        result_type.unwrap_or(self.common_types.none_type.to_lazy())
     }
 
     fn infer_cast(&mut self, value: ExpressionId, cast_to: LazyTypeId) -> LazyTypeId {

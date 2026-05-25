@@ -91,7 +91,8 @@ impl<'a> LiteralInterpreter<'a> {
             | hir::ExpressionKind::UnionConstructor { .. }
             | hir::ExpressionKind::UnionTag(_)
             | hir::ExpressionKind::UnionExtract { .. }
-            | hir::ExpressionKind::TypeOf { .. } => None,
+            | hir::ExpressionKind::TypeOf { .. }
+            | hir::ExpressionKind::MatchMethod(_) => None,
 
             hir::ExpressionKind::Array(array) => self.interpret_array(array, expression_id),
 

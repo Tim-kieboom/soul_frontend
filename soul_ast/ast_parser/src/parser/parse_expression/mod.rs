@@ -1,6 +1,7 @@
 use ast::{
-    Array, AsTypeCast, BinaryOperator, BinaryOperatorKind, Expression, ExpressionKind, Literal,
-    SoulType, UnaryOperator, UnaryOperatorKind,
+    scope::NodeId, Array, AsTypeCast, BinaryOperator, BinaryOperatorKind, Block, Expression,
+    ExpressionKind, Literal, MatchMethod, MatchMethodArm, SoulType, Statement, StatementKind,
+    UnaryOperator, UnaryOperatorKind,
 };
 use soul_tokenizer::{Number, Token, TokenKind};
 use soul_utils::{
@@ -17,8 +18,8 @@ use soul_utils::{
 use crate::parser::{
     Parser,
     parse_utils::{
-        ARRAY, ARROW_LEFT, COLON, CURLY_OPEN, DECREMENT, INCREMENT, ROUND_CLOSE, ROUND_OPEN,
-        SQUARE_CLOSE, SQUARE_OPEN,
+        ARRAY, ARROW_LEFT, COLON, CURLY_CLOSE, CURLY_OPEN, DECREMENT, INCREMENT, LAMBDA_ARROW,
+        ROUND_CLOSE, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN,
     },
 };
 
@@ -43,6 +44,16 @@ impl<'a, 'f> Parser<'a, 'f> {
         let mut left = self.parse_primary(end_tokens)?;
 
         loop {
+            // Handle EndLine followed by a dot (method chaining across lines)
+            if self.current_is(&TokenKind::EndLine) && self.current_is_any(end_tokens) {
+                let saved = self.current_position();
+                self.skip_end_lines();
+                if self.current_is(&TokenKind::Symbol(SymbolKind::Dot)) {
+                    continue;
+                }
+                self.go_to(saved);
+            }
+
             if self.current_is_any(end_tokens) {
                 break;
             }
@@ -95,9 +106,30 @@ impl<'a, 'f> Parser<'a, 'f> {
                     let ident = self.try_bump_consume_ident()?;
 
                     if self.current_is(&CURLY_OPEN) {
-                        left = self
-                            .parse_struct_contructor(ident, generics, start_span)
-                            .map(Expression::from_struct_contructor)?;
+                        let (binding, body) = self.parse_match_method_arm(start_span)?;
+
+                        if let ExpressionKind::MatchMethod(ref mut mm) = left.node {
+                            mm.arms.push(MatchMethodArm {
+                                variant_name: ident,
+                                binding,
+                                body,
+                            });
+                            left.span = self.span_combine(start_span);
+                        } else {
+                            let mm = MatchMethod {
+                                id: None,
+                                expr: Box::new(left),
+                                arms: vec![MatchMethodArm {
+                                    variant_name: ident,
+                                    binding,
+                                    body,
+                                }],
+                            };
+                            left = Expression::new(
+                                ExpressionKind::MatchMethod(mm),
+                                self.span_combine(start_span),
+                            );
+                        }
 
                         continue;
                     }
@@ -585,6 +617,46 @@ impl<'a, 'f> Parser<'a, 'f> {
                 Some(ident.span),
             )),
         }
+    }
+
+    fn parse_match_method_arm(
+        &mut self,
+        start_span: Span,
+    ) -> SoulResult<(Option<(Ident, Option<NodeId>)>, Block)> {
+        let save_pos = self.current_position();
+
+        self.expect(&CURLY_OPEN)?;
+        self.skip_end_lines();
+
+        if let Ok(ident) = self.try_bump_consume_ident() {
+            self.skip_end_lines();
+            if self.current_is(&LAMBDA_ARROW) {
+                self.bump();
+                let expr = self.parse_expression(&[CURLY_CLOSE, TokenKind::EndLine, TokenKind::EndFile])?;
+                let expr_span = expr.span;
+                self.expect(&CURLY_CLOSE)?;
+                let statement = Statement::new(
+                    StatementKind::Expression {
+                        id: None,
+                        expression: expr,
+                        ends_semicolon: false,
+                    },
+                    expr_span,
+                );
+                let body = Block {
+                    modifier: TypeModifier::Mut,
+                    statements: vec![statement],
+                    scope_id: None,
+                    node_id: None,
+                    span: self.span_combine(start_span),
+                };
+                return Ok((Some((ident, None)), body));
+            }
+        }
+
+        self.go_to(save_pos);
+        let body = self.parse_block(TypeModifier::Mut)?;
+        Ok((None, body))
     }
 }
 

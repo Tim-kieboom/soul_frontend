@@ -36,7 +36,7 @@ pub(crate) fn faults(faults: &FaultCollector, module_store: &ModuleStore) {
 pub(crate) fn benchmark() -> Result<()> {
     let mut total_times = String::new();
 
-    globals::get_benchmarks()?.write_total(&mut total_times)?;
+    globals::benchmark()?.write_total(&mut total_times)?;
     logger::info!("{total_times}");
     Ok(())
 }

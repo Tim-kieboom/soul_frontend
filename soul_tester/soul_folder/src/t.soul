@@ -3,6 +3,15 @@ struct Duration {
     mut nano: u32
 }
 
+l() {
+    number := f(10, num => num+1)
+    Io.Assert(number == 11)
+}
+
+f(n: int, lambda: impl FnRef(int) -> int): int {
+    lambda(n)
+}
+
 extern "C" __clib_printChar(ch: char)
 extern "C" __clib_printCStr(text: *char)
 

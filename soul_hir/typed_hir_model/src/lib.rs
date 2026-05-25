@@ -30,6 +30,7 @@ pub struct ThirTypesMap {
     pub enums: VecMap<EnumId, Enum>,
     pub unions: VecMap<UnionId, UnionInfo>,
     pub generics: VecMap<GenericId, String>,
+    pub match_methods: VecMap<ExpressionId, MatchMethodInfo>,
 }
 impl ThirTypesMap {
     pub fn new(array_struct: StructId) -> Self {
@@ -47,6 +48,7 @@ impl ThirTypesMap {
             structs: VecMap::const_default(),
             unions: VecMap::const_default(),
             generics: VecMap::const_default(),
+            match_methods: VecMap::const_default(),
         }
     }
 
@@ -164,6 +166,27 @@ pub struct LazyFieldInfo {
     pub base_type: TypeId,
     pub field_index: usize,
     pub field_type: LazyTypeId,
+}
+
+/// Resolved match-method info for `expr.Variant{body}` / chained expressions.
+/// Populated by THIR inference, consumed by MIR lowering.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct MatchMethodInfo {
+    pub union_id: UnionId,
+    pub arms: Vec<ResolvedMatchMethodArm>,
+}
+
+/// A single arm in a resolved match method.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ResolvedMatchMethodArm {
+    /// The variant index in the union.
+    pub variant_index: usize,
+    /// Whether this arm was auto-generated (extracts inner value of an uncovered variant).
+    pub is_implicit: bool,
+    /// Optional binding local id (for explicit arms with binding).
+    pub binding: Option<LocalId>,
+    /// The body block id. `None` for implicit arms (MIR generates UnionExtract directly).
+    pub body: Option<BlockId>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

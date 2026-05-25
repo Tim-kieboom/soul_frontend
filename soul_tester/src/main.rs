@@ -1,5 +1,5 @@
 use anyhow::Result;
-use soul_utils::sementic_level::FaultCollector;
+use soul_utils::{compile_options::{Arch, Os}, sementic_level::FaultCollector};
 
 use utils::*;
 mod displayers;
@@ -8,12 +8,15 @@ mod globals;
 mod llvm;
 pub mod utils;
 
+const OS: Os = Os::Windows;
+const ARCH: Arch = Arch::X86_64;
+
 /// if true prints backtrace for each soulError in faults
 const BACKTRACE: bool = false;
 
 fn main() -> Result<()> {
     log::init(&globals::PATHS.log_file)?;
-    let (manifest, mut crate_store) = globals::PATHS.load_crates()?;
+    let (manifest, mut crate_store) = globals::PATHS.read_toml()?;
     let root_path = globals::PATHS.project_path();
 
     let output = frontend::compile(&mut crate_store, &manifest)?;

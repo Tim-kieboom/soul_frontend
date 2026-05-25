@@ -63,7 +63,7 @@ impl Paths {
         Ok(())
     }
 
-    pub fn load_crates(&self) -> Result<(SoulToml, CrateStore)> {
+    pub fn read_toml(&self) -> Result<(SoulToml, CrateStore)> {
         let manifest_path = self.project_path().join("Soul.toml");
         let manifest = SoulToml::from_path(&manifest_path)?;
 

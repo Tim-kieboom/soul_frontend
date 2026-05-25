@@ -25,7 +25,7 @@ pub(crate) fn compile(output: Output, manifest: &Path, toml: &SoulToml) -> Resul
 
     let timer = Instant::now();
     let ir = soul_ir::to_llvm_ir(&request, &globals::COMPILER_OPTIONS, &mut faults.faults);
-    globals::get_benchmarks()?.ir = timer.elapsed();
+    globals::benchmark()?.ir = timer.elapsed();
     log::faults(&faults, &ModuleStore::new(PathBuf::new()));
 
     #[cfg(not(debug_assertions))]
