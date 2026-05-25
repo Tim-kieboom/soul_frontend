@@ -552,7 +552,42 @@ impl<'a> TypedHirContext<'a> {
 
         let mut result_type: Option<LazyTypeId> = None;
         let mut has_wildcard = false;
+        let mut has_constructor = false;
 
+        // First pass: set up pattern bindings so they are visible to the body
+        for arm in &arms {
+            match &arm.pattern {
+                hir::MatchPatternHir::Wildcard => has_wildcard = true,
+                hir::MatchPatternHir::Binding(local_id) => {
+                    has_wildcard = true;
+                    self.locals.insert(*local_id, scrutinee_ty);
+                }
+                hir::MatchPatternHir::Constructor {
+                    union_id,
+                    variant_index,
+                    binding,
+                } => {
+                    has_constructor = true;
+                    if let Some(local_id) = binding {
+                        if let Some(union_def) = self.types.id_to_union(*union_id) {
+                            if let Some(variant) = union_def.variants.get(*variant_index) {
+                                let resolved = self.resolve_type_lazy(variant.ty, span);
+                                if resolved != LazyTypeId::error() {
+                                    self.locals.insert(*local_id, resolved);
+                                }
+                            }
+                        }
+                        if self.locals.get(*local_id).is_none() {
+                            let new_infer = self.new_infer(span);
+                            self.locals.insert(*local_id, new_infer);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        // Second pass: infer body and validate patterns
         for arm in &arms {
             let arm_type = self.infer_block_expression(arm.body);
 
@@ -565,7 +600,6 @@ impl<'a> TypedHirContext<'a> {
             }
 
             match &arm.pattern {
-                hir::MatchPatternHir::Wildcard => has_wildcard = true,
                 hir::MatchPatternHir::Literal(lit) => {
                     if matches!(lit, ast::Literal::Str(_)) {
                         let resolved = self.resolve_type_strict(scrutinee_ty, span);
@@ -596,12 +630,13 @@ impl<'a> TypedHirContext<'a> {
                         }
                     }
                 }
+                _ => {}
             }
         }
 
         let result_type = result_type.unwrap_or(self.common_types.none_type.to_lazy());
 
-        if !has_wildcard {
+        if !has_wildcard && !has_constructor {
             self.log_error(SoulError::new(
                 "match expression should have a wildcard arm ('_')",
                 SoulErrorKind::InvalidContext,

@@ -31,8 +31,21 @@ test_init_union() {
     Io.Assert(intrinsic.UnionTag(object) == 2, msg: "object tag should be 2 (Object)")
 
     if interger typeof Test.Int(num) {
-        Io.Println_int(num as int)
         Io.Assert(num == 42)
+    }
+
+    match float {
+        Test.Float(num) => Io.Assert(num == 3.14)
+        _ => Io.Panic("should be Test.Float")
+    }
+
+    match object {
+        Test.Int(_) => Io.Panic("should be Test.Object")
+        Test.Float(_) => Io.Panic("should be Test.Object")
+        Test.Object(obj) => {
+            Io.Assert(obj.field == 1)
+            Io.Assert(obj.condition == true)
+        }
     }
 }
 

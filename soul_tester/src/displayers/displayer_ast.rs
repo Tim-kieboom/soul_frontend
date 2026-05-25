@@ -545,6 +545,10 @@ impl<'a> AstDisplayer<'a> {
                             self.push_str("  => ");
                         }
                         ast::MatchPattern::Wildcard => self.push_str("_ => "),
+                        ast::MatchPattern::Binding { ident, .. } => {
+                            self.push_str(ident.as_str());
+                            self.push_str(" => ");
+                        }
                         ast::MatchPattern::Array(elements) => {
                             self.push('[');
                             for (i, el) in elements.iter().enumerate() {
@@ -556,10 +560,44 @@ impl<'a> AstDisplayer<'a> {
                                         self.push_str(&lit.value_to_string())
                                     }
                                     ast::MatchPattern::Wildcard => self.push('_'),
+                                    ast::MatchPattern::Binding { ident, .. } => {
+                                        self.push_str(ident.as_str())
+                                    }
                                     ast::MatchPattern::Array(_) => self.push_str("[...]"),
+                                    ast::MatchPattern::Constructor {
+                                        type_name,
+                                        variant_name,
+                                        binding,
+                                        ..
+                                    } => {
+                                        self.push_str(type_name.as_str());
+                                        self.push('.');
+                                        self.push_str(variant_name.as_str());
+                                        if let Some(bind) = binding {
+                                            self.push('(');
+                                            self.push_str(bind.as_str());
+                                            self.push(')');
+                                        }
+                                    }
                                 }
                             }
                             self.push_str("] => ");
+                        }
+                        ast::MatchPattern::Constructor {
+                            type_name,
+                            variant_name,
+                            binding,
+                            ..
+                        } => {
+                            self.push_str(type_name.as_str());
+                            self.push('.');
+                            self.push_str(variant_name.as_str());
+                            if let Some(bind) = binding {
+                                self.push('(');
+                                self.push_str(bind.as_str());
+                                self.push(')');
+                            }
+                            self.push_str(" => ");
                         }
                     }
 

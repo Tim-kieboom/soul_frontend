@@ -4,6 +4,7 @@ use ast::{
 };
 use soul_tokenizer::TokenKind;
 use soul_utils::{
+    Ident,
     error::{SoulError, SoulErrorKind, SoulResult},
     soul_names::{KeyWord, TypeModifier},
     span::Spanned,
@@ -12,7 +13,10 @@ use soul_utils::{
 
 use crate::parser::{
     Parser,
-    parse_utils::{COMMA, CURLY_CLOSE, CURLY_OPEN, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS},
+    parse_utils::{
+        COMMA, CURLY_CLOSE, CURLY_OPEN, DOT, ROUND_CLOSE, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN,
+        STAMENT_END_TOKENS,
+    },
 };
 
 const IF_STR: &str = KeyWord::If.as_str();
@@ -209,19 +213,97 @@ impl<'a, 'f> Parser<'a, 'f> {
             return Ok(MatchPattern::Wildcard);
         }
 
-        let end_tokens = [
-            TokenKind::Symbol(SymbolKind::LambdaArray),
-            COMMA,
-            SQUARE_CLOSE,
-        ];
-        let expr = self.parse_expression(&end_tokens)?;
-        match expr.node {
-            ExpressionKind::Literal((_, lit)) => Ok(MatchPattern::Literal(lit)),
-            _ => Err(SoulError::new(
-                "expected a literal or '_' for match pattern",
-                SoulErrorKind::InvalidIdent,
-                Some(expr.span),
-            )),
+
+        let ident_name = match &self.token().kind {
+            TokenKind::Ident(name) => name.clone(),
+            _ => {
+
+                let end_tokens = [
+                    TokenKind::Symbol(SymbolKind::LambdaArray),
+                    COMMA,
+                    SQUARE_CLOSE,
+                ];
+                let expr = self.parse_expression(&end_tokens)?;
+                return match expr.node {
+                    ExpressionKind::Literal((_, lit)) => Ok(MatchPattern::Literal(lit)),
+                    _ => Err(SoulError::new(
+                        "expected a literal or '_' for match pattern",
+                        SoulErrorKind::InvalidIdent,
+                        Some(expr.span),
+                    )),
+                };
+            }
+        };
+
+
+        if soul_utils::soul_names::KeyWord::from_str(&ident_name).is_some() {
+            let end_tokens = [
+                TokenKind::Symbol(SymbolKind::LambdaArray),
+                COMMA,
+                SQUARE_CLOSE,
+            ];
+            let expr = self.parse_expression(&end_tokens)?;
+            return match expr.node {
+                ExpressionKind::Literal((_, lit)) => Ok(MatchPattern::Literal(lit)),
+                _ => Err(SoulError::new(
+                    "expected a literal or '_' for match pattern",
+                    SoulErrorKind::InvalidIdent,
+                    Some(expr.span),
+                )),
+            };
         }
+
+
+        let saved = self.current_position();
+        let type_name_span = self.token().span;
+        self.bump();
+        if self.current_is(&DOT) {
+            self.bump();
+            let variant_name = match &self.token().kind {
+                TokenKind::Ident(name) => name.clone(),
+                _ => {
+                    return Err(SoulError::new(
+                        "expected variant name after '.' in constructor pattern",
+                        SoulErrorKind::InvalidIdent,
+                        Some(self.token().span),
+                    ));
+                }
+            };
+            let variant_span = self.token().span;
+            self.bump();
+            let binding = if self.current_is(&ROUND_OPEN) {
+                self.bump();
+                let inner = if self.current_is_ident("_") {
+                    self.bump();
+                    None
+                } else if let TokenKind::Ident(bind_name) = &self.token().kind {
+                    let bind_span = self.token().span;
+                    let bind_name = bind_name.clone();
+                    self.bump();
+                    Some(Ident::new(bind_name, bind_span))
+                } else {
+                    None
+                };
+                self.expect(&ROUND_CLOSE)?;
+                inner
+            } else {
+                None
+            };
+            return Ok(MatchPattern::Constructor {
+                type_name: Ident::new(ident_name, type_name_span),
+                variant_name: Ident::new(variant_name, variant_span),
+                binding,
+                binding_id: None,
+            });
+        }
+
+
+        self.go_to(saved);
+        let bind_span = self.token().span;
+        self.bump();
+        Ok(MatchPattern::Binding {
+            ident: Ident::new(ident_name, bind_span),
+            id: None,
+        })
     }
 }

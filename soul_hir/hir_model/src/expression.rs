@@ -260,5 +260,13 @@ pub struct MatchArm {
 pub enum MatchPatternHir {
     Literal(Literal),
     Wildcard,
+    /// Binds the scrutinee to a local variable.
+    Binding(LocalId),
     Array(Vec<MatchPatternHir>),
+    /// A union constructor pattern: `Type.Variant(binding)`.
+    Constructor {
+        union_id: UnionId,
+        variant_index: usize,
+        binding: Option<LocalId>,
+    },
 }

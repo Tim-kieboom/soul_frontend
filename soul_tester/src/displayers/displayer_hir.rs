@@ -403,6 +403,9 @@ impl<'a> HirDisplayer<'a> {
                             self.push_fmt(format_args!("{} => ", literal.value_to_string()))
                         }
                         hir::MatchPatternHir::Wildcard => self.push_str("_ => "),
+                        hir::MatchPatternHir::Binding(local_id) => {
+                            self.push_fmt(format_args!("Binding(${:?}) => ", local_id))
+                        }
                         hir::MatchPatternHir::Array(elements) => {
                             self.push('[');
                             for (i, el) in elements.iter().enumerate() {
@@ -414,10 +417,32 @@ impl<'a> HirDisplayer<'a> {
                                         self.push_str(&lit.value_to_string())
                                     }
                                     hir::MatchPatternHir::Wildcard => self.push('_'),
+                                    hir::MatchPatternHir::Binding(_) => self.push_str("$binding"),
                                     hir::MatchPatternHir::Array(_) => self.push_str("[...]"),
+                                    hir::MatchPatternHir::Constructor {
+                                        variant_index,
+                                        binding,
+                                        ..
+                                    } => {
+                                        self.push_fmt(format_args!("variant({})", variant_index));
+                                        if binding.is_some() {
+                                            self.push_str("($bind)");
+                                        }
+                                    }
                                 }
                             }
                             self.push_str("] => ");
+                        }
+                        hir::MatchPatternHir::Constructor {
+                            variant_index,
+                            binding,
+                            ..
+                        } => {
+                            self.push_fmt(format_args!("Constructor({})", variant_index));
+                            if let Some(_) = binding {
+                                self.push_str("($bind)");
+                            }
+                            self.push_str(" => ");
                         }
                     }
 

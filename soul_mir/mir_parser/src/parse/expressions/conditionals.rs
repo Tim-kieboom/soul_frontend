@@ -1,5 +1,5 @@
 use ast::{ArrayKind, BinaryOperator, BinaryOperatorKind, Literal};
-use hir::{ComplexLiteral, MatchPatternHir, TypeId};
+use hir::{ComplexLiteral, MatchPatternHir, TypeId, UnionId};
 use typed_hir::ThirTypeKind;
 
 use soul_utils::ids::IdAlloc;
@@ -291,6 +291,10 @@ impl<'a> MirContext<'a> {
         let mut lit_arm_blocks = Vec::new();
         let mut array_arm_blocks = Vec::new();
         let mut string_arm_blocks = Vec::new();
+        let mut constructor_arms: Vec<(BlockId, hir::BlockId, Option<hir::LocalId>, UnionId, usize)> =
+            Vec::new();
+        let mut binding_arms: Vec<(BlockId, hir::LocalId)> = Vec::new();
+        let mut has_constructor = false;
 
         for arm in arms {
             let arm_bb = self.new_block();
@@ -320,21 +324,55 @@ impl<'a> MirContext<'a> {
                     wildcard_arm = Some((arm_bb, arm.body));
                     lit_arm_blocks.push((arm_bb, arm.body));
                 }
+                hir::MatchPatternHir::Binding(local_id) => {
+                    wildcard_arm = Some((arm_bb, arm.body));
+                    binding_arms.push((arm_bb, *local_id));
+                    lit_arm_blocks.push((arm_bb, arm.body));
+                }
                 hir::MatchPatternHir::Array(elements) => {
                     array_arm_blocks.push((arm_bb, arm.body, elements.clone()));
+                }
+                hir::MatchPatternHir::Constructor {
+                    union_id,
+                    variant_index,
+                    binding,
+                } => {
+                    has_constructor = true;
+                    targets.push((*variant_index as i128, arm_bb));
+                    constructor_arms.push((arm_bb, arm.body, *binding, *union_id, *variant_index));
+                    lit_arm_blocks.push((arm_bb, arm.body));
                 }
             }
         }
 
+        let discriminant = if has_constructor {
+            let tag_type = self.hir_response.typed.types_table.index_type;
+            let tag_temp = self.new_temp(tag_type);
+            let tag_stmt = mir::Statement::new(mir::StatementKind::Assign {
+                place: self.new_place(mir::Place::new(mir::PlaceKind::Temp(tag_temp), tag_type)),
+                value: mir::Rvalue::new(mir::RvalueKind::UnionTag {
+                    value: scrutinee_op.clone(),
+                }),
+            });
+            self.push_statement(tag_stmt);
+            mir::Operand::new(tag_type, mir::OperandKind::Temp(tag_temp))
+        } else {
+            scrutinee_op.clone()
+        };
+
+        let join_bb = self.new_block();
+
         if wildcard_arm.is_none() {
-            let else_bb = self.new_block();
-            targets.push((0, else_bb));
-            wildcard_arm = Some((else_bb, arms.last().map(|a| a.body).unwrap()));
+            if has_constructor {
+                wildcard_arm = Some((join_bb, arms.last().map(|a| a.body).unwrap()));
+            } else {
+                let else_bb = self.new_block();
+                targets.push((0, else_bb));
+                wildcard_arm = Some((else_bb, arms.last().map(|a| a.body).unwrap()));
+            }
         }
 
         let otherwise = wildcard_arm.as_ref().unwrap().0;
-
-        let join_bb = self.new_block();
         self.tree.blocks[join_bb].returnable = returnable;
 
         let switch_parent = if array_arm_blocks.is_empty() && string_arm_blocks.is_empty() {
@@ -375,13 +413,62 @@ impl<'a> MirContext<'a> {
             self.insert_terminator(
                 switch_parent,
                 mir::Terminator::SwitchInt {
-                    discriminant: scrutinee_op,
+                    discriminant,
                     targets,
                     otherwise,
                 },
             );
         } else {
             self.insert_terminator(switch_parent, mir::Terminator::Goto(otherwise));
+        }
+
+        for (arm_bb, _hir_body, binding_local, union_id, variant_index) in &constructor_arms {
+            if let Some(local_id) = binding_local {
+                self.current.block = Some(*arm_bb);
+                let variant_type = self
+                    .hir_response
+                    .typed
+                    .types_map
+                    .id_to_union(*union_id)
+                    .map(|u| u.variant_types[*variant_index])
+                    .unwrap_or(scrutinee_ty);
+                let mir_local = self.new_local(*local_id, variant_type, None);
+                let extract_temp = self.new_temp(variant_type);
+                let extract_stmt = mir::Statement::new(mir::StatementKind::Assign {
+                    place: self.new_place(
+                        mir::Place::new(mir::PlaceKind::Temp(extract_temp), variant_type),
+                    ),
+                    value: mir::Rvalue::new(mir::RvalueKind::UnionExtract {
+                        value: scrutinee_op.clone(),
+                    }),
+                });
+                self.push_statement(extract_stmt);
+                let local_place = self.new_place(
+                    mir::Place::new(mir::PlaceKind::Local(mir_local), variant_type),
+                );
+                let assign_stmt = mir::Statement::new(mir::StatementKind::Assign {
+                    place: local_place,
+                    value: mir::Rvalue::new(mir::RvalueKind::Operand(mir::Operand::new(
+                        variant_type,
+                        mir::OperandKind::Temp(extract_temp),
+                    ))),
+                });
+                self.push_statement(assign_stmt);
+            }
+        }
+
+        for (arm_bb, local_id) in &binding_arms {
+            let local_type = scrutinee_op.ty;
+            self.current.block = Some(*arm_bb);
+            let mir_local = self.new_local(*local_id, local_type, None);
+            let local_place = self.new_place(
+                mir::Place::new(mir::PlaceKind::Local(mir_local), local_type),
+            );
+            let assign_stmt = mir::Statement::new(mir::StatementKind::Assign {
+                place: local_place,
+                value: mir::Rvalue::new(mir::RvalueKind::Operand(scrutinee_op.clone())),
+            });
+            self.push_statement(assign_stmt);
         }
 
         let all_arm_blocks: Vec<(BlockId, hir::BlockId)> = lit_arm_blocks
@@ -504,7 +591,7 @@ impl<'a> MirContext<'a> {
 
             let has_wildcard = elements
                 .iter()
-                .any(|e| matches!(e, MatchPatternHir::Wildcard));
+                .any(|e| matches!(e, MatchPatternHir::Wildcard | MatchPatternHir::Binding(_) | MatchPatternHir::Constructor { .. }));
 
             if !has_wildcard {
                 self.lower_array_arm_wildcard(
@@ -552,6 +639,8 @@ impl<'a> MirContext<'a> {
         for (i, pattern_elem) in elements.iter().enumerate() {
             match pattern_elem {
                 MatchPatternHir::Wildcard => continue,
+                MatchPatternHir::Binding(_) => continue,
+                MatchPatternHir::Constructor { .. } => continue,
                 MatchPatternHir::Literal(lit) => {
                     let lit_value = ComplexLiteral::Basic(lit.clone());
 
@@ -650,7 +739,7 @@ impl<'a> MirContext<'a> {
             .iter()
             .map(|e| match e {
                 MatchPatternHir::Literal(lit) => ComplexLiteral::Basic(lit.clone()),
-                _ => unreachable!(),
+                _ => ComplexLiteral::Basic(Literal::Int(0)),
             })
             .collect();
 

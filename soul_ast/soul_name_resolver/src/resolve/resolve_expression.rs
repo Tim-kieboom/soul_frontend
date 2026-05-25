@@ -121,10 +121,10 @@ impl<'a> NameResolver<'a> {
             | ExpressionKind::ExternalExpression(_) => (),
             ExpressionKind::TypeOf {
                 expr,
-                type_name: _,
-                variant_name: _,
                 binding,
+                type_name: _,
                 binding_id: _,
+                variant_name: _,
             } => {
                 self.resolve_expression(expr);
                 if binding.is_some() && !self.current.in_if_condition {

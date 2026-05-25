@@ -10,8 +10,10 @@ impl<'a> NameResolver<'a> {
                 match_expression.id = Some(self.alloc_node());
                 self.collect_expression(&mut match_expression.scrutinee);
                 for arm in &mut match_expression.arms {
-                    self.collect_match_pattern(&arm.pattern);
-                    self.collect_block(&mut arm.body);
+                    self.push_scope(&mut arm.body.scope_id);
+                    self.collect_match_pattern(&mut arm.pattern);
+                    self.collect_scopeless_block(&mut arm.body);
+                    self.pop_scope();
                 }
             }
             ExpressionKind::Sizeof(ty) => self.collect_type(ty),
@@ -210,11 +212,48 @@ impl<'a> NameResolver<'a> {
         }
     }
 
-    fn collect_match_pattern(&mut self, pattern: &ast::MatchPattern) {
-        if let ast::MatchPattern::Array(elements) = pattern {
-            for elem in elements {
-                self.collect_match_pattern(elem);
+    fn collect_match_pattern(&mut self, pattern: &mut ast::MatchPattern) {
+        match pattern {
+            ast::MatchPattern::Array(elements) => {
+                for elem in elements {
+                    self.collect_match_pattern(elem);
+                }
             }
+            ast::MatchPattern::Binding { ident, id } => {
+                let node_id = self.alloc_node();
+                *id = Some(node_id);
+                if self
+                    .insert_value(ident.as_str(), node_id, ScopeValue::Variable)
+                    .is_some()
+                {
+                    self.log_error(SoulError::new(
+                        format!("name {} already exists in scope", ident.as_str()),
+                        SoulErrorKind::AlreadyFoundInScope,
+                        Some(ident.span),
+                    ));
+                }
+            }
+            ast::MatchPattern::Constructor {
+                binding,
+                binding_id,
+                ..
+            } => {
+                if let Some(ident) = binding {
+                    let node_id = self.alloc_node();
+                    *binding_id = Some(node_id);
+                    if self
+                        .insert_value(ident.as_str(), node_id, ScopeValue::Variable)
+                        .is_some()
+                    {
+                        self.log_error(SoulError::new(
+                            format!("name {} already exists in scope", ident.as_str()),
+                            SoulErrorKind::AlreadyFoundInScope,
+                            Some(ident.span),
+                        ));
+                    }
+                }
+            }
+            _ => {}
         }
     }
 }

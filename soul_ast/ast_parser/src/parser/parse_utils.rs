@@ -29,6 +29,7 @@ pub const ARROW_RIGHT: TokenKind = TokenKind::Symbol(SymbolKind::RightArray);
 pub const SQUARE_OPEN: TokenKind = TokenKind::Symbol(SymbolKind::SquareOpen);
 pub const CURLY_CLOSE: TokenKind = TokenKind::Symbol(SymbolKind::CurlyClose);
 pub const ROUND_CLOSE: TokenKind = TokenKind::Symbol(SymbolKind::RoundClose);
+pub const DOT: TokenKind = TokenKind::Symbol(SymbolKind::Dot);
 pub const LAMBDA_ARROW: TokenKind = TokenKind::Symbol(SymbolKind::LambdaArray);
 pub const SQUARE_CLOSE: TokenKind = TokenKind::Symbol(SymbolKind::SquareClose);
 pub const COLON_ASSIGN: TokenKind = TokenKind::Symbol(SymbolKind::ColonAssign);

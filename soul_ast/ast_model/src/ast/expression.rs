@@ -273,8 +273,20 @@ pub enum MatchPattern {
     Literal(Literal),
     /// A wildcard (default) pattern.
     Wildcard,
+    /// A binding pattern: `name` binds the scrutinee to a variable.
+    Binding {
+        ident: Ident,
+        id: Option<NodeId>,
+    },
     /// An array pattern: [elem1, elem2, ...]
     Array(Vec<MatchPattern>),
+    /// A union constructor pattern: `Type.Variant(binding)`.
+    Constructor {
+        type_name: Ident,
+        variant_name: Ident,
+        binding: Option<Ident>,
+        binding_id: Option<NodeId>,
+    },
 }
 
 /// A `return`, `fall`, or `break`-like expression.
