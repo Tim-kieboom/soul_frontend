@@ -214,13 +214,14 @@ impl<'a> NameResolver<'a> {
         let name = function_call.name.node.clone();
         let owner_kind = self.get_owner_kind(&type_qualifier, function_call).cloned();
 
-        function_call.resolved = self.lookup_function(&name);
-
-        if function_call.resolved.is_none() {
-            function_call.resolved = self
-                .store
-                .find_function(&name, owner_kind.as_ref());
-        }
+        function_call.resolved = if owner_kind.is_some() {
+            self.store
+                .find_function(&name, owner_kind.as_ref())
+                .or_else(|| self.lookup_function(&name))
+        } else {
+            self.lookup_function(&name)
+                .or_else(|| self.store.find_function(&name, None))
+        };
     }
 
     fn resolve_external_function(

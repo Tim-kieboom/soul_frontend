@@ -4,6 +4,7 @@ import (
     .matches
     .unions
     .bugs
+    .traits
     ./.Std.Io
     ./.Std.Time.{Instance, Duration}
 )
@@ -17,6 +18,7 @@ RunTests() {
     matches.RunTests()
     unions.RunTests()
     bugs.RunTests()
+    traits.RunTests()
     logTime(total.Elapsed())
 }
 

@@ -75,12 +75,13 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             KeyWord::Enum => self.parse_enum().try_err()?,
 
+            KeyWord::Trait => self.parse_trait().try_err()?,
+            KeyWord::Impl => self.parse_standalone_impl().try_err()?,
+
             KeyWord::For
             | KeyWord::Dyn
             | KeyWord::Fall
             | KeyWord::Copy
-            | KeyWord::Impl
-            | KeyWord::Trait
             | KeyWord::Class
             | KeyWord::Await
             | KeyWord::InForLoop

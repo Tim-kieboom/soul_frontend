@@ -1,5 +1,5 @@
 use hir::{CustomTypeId, Field, HirType, HirTypeKind, Struct, Union, UnionVariant};
-use soul_utils::{Ident, Span, soul_error_internal};
+use soul_utils::{Ident, Span, soul_error_internal, span::ItemMetaData};
 
 use crate::HirContext;
 
@@ -189,5 +189,62 @@ impl<'a> HirContext<'a> {
             .apply_generics(vec![len_type]),
         );
         self.insert_struct(struct_id, Struct { name, fields });
+    }
+
+    pub(crate) fn lower_trait(&mut self, object: &ast::Trait) {
+        if object.id.is_none() {
+            self.log_error(soul_error_internal!(
+                format!("Trait '{}' has no id", object.name.as_str()),
+                Some(object.name.span)
+            ));
+            return;
+        };
+
+        let trait_id = self.tree.info.types.alloc_trait();
+        let mut method_ids = vec![];
+
+        for method in &object.methods {
+            match method.signature.node.id {
+                Some(fid) => method_ids.push(fid),
+                None => {
+                    self.log_error(soul_error_internal!(
+                        format!(
+                            "Trait method '{}' has no id",
+                            method.signature.node.name.as_str()
+                        ),
+                        Some(method.signature.span)
+                    ));
+                }
+            }
+        }
+
+        self.tree.info.types.insert_trait(
+            trait_id,
+            hir::Trait {
+                name: object.name.clone(),
+                methods: method_ids,
+            },
+        );
+
+        let Some(scope) = self.scopes.last_mut() else {
+            return;
+        };
+        scope
+            .custom_types
+            .insert(object.name.to_string(), CustomTypeId::Trait(trait_id));
+    }
+
+    pub(crate) fn lower_impl_block(
+        &mut self,
+        object: &ast::ImplBlock,
+        meta_data: &ItemMetaData,
+        span: Span,
+    ) {
+        for method in &object.methodes {
+            let function_id = self.lower_function(method);
+            let kind = hir::GlobalKind::Function(function_id);
+            let id = self.alloc_statement(meta_data, span);
+            self.insert_global(self.current.module, hir::Global::new(kind, id));
+        }
     }
 }

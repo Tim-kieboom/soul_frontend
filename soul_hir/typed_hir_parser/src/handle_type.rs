@@ -116,6 +116,7 @@ impl<'a> TypedHirContext<'a> {
                 let union_info = self.types.id_to_union(union_id)?;
                 self.get_struct_field(union_info.internal_struct, field, span)
             }
+            CustomTypeId::Trait(_) => None,
         }
     }
 

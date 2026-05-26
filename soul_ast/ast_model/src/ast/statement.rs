@@ -47,6 +47,8 @@ pub enum StatementKind {
     Struct(Struct),
     Enum(Enum),
     Union(Union),
+    /// A trait definition.
+    Trait(Trait),
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -60,6 +62,8 @@ pub struct UseBlock {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ImplBlock {
     pub impl_trait: SoulType,
+    pub for_type: Option<SoulType>,
+    pub generics: Vec<Generic>,
     pub methodes: Vec<Function>,
 }
 
@@ -147,6 +151,16 @@ pub enum ImportKind {
 pub enum ImportItem {
     Normal(Ident),
     Alias { name: Ident, alias: Ident },
+}
+
+/// A trait definition.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Trait {
+    pub id: Option<NodeId>,
+    pub name: Ident,
+    pub generics: Vec<Generic>,
+    pub methods: Vec<Function>,
+    pub defined_in: Option<ModuleId>,
 }
 
 /// A function definition with a signature and body block.

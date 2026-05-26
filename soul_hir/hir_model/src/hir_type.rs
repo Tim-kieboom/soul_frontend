@@ -1,14 +1,14 @@
 use ast::{ArrayKind, Literal};
 use soul_utils::{
     Ident,
-    ids::IdAlloc,
+    ids::{FunctionId, IdAlloc},
     soul_names::{PrimitiveTypes, TypeModifier},
     symbool_kind::SymbolKind,
     vec_map::VecMapIndex,
 };
 
 use crate::{
-    EnumId, FieldId, GenericId, InferTypeId, InferTypesMap, StructId, TypeId, TypesMap,
+    EnumId, FieldId, GenericId, InferTypeId, InferTypesMap, StructId, TraitId, TypeId, TypesMap,
     UnionFieldId, UnionId,
 };
 
@@ -212,6 +212,7 @@ pub enum CustomTypeId {
     Struct(StructId),
     Enum(EnumId),
     Union(UnionId),
+    Trait(TraitId),
 }
 impl CustomTypeId {
     pub fn to_hir_kind(self) -> HirTypeKind {
@@ -253,6 +254,12 @@ pub struct UnionVariant {
     pub id: UnionFieldId,
     pub name: Ident,
     pub ty: LazyTypeId,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Trait {
+    pub name: Ident,
+    pub methods: Vec<FunctionId>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -356,6 +363,10 @@ impl DisplayType for HirTypeKind {
                         Some(val) => sb.push_str(val.name.as_str()),
                         None => sb.push_str("<error>"),
                     },
+                    CustomTypeId::Trait(trait_id) => match types.id_to_trait(trait_id) {
+                        Some(val) => sb.push_str(val.name.as_str()),
+                        None => sb.push_str("<error>"),
+                    },
                 }
                 Ok(())
             }
@@ -409,6 +420,7 @@ impl HirTypeKind {
                 CustomTypeId::Enum(_) => "<enum>",
                 CustomTypeId::Struct(_) => "<struct>",
                 CustomTypeId::Union(_) => "<union>",
+                CustomTypeId::Trait(_) => "<trait>",
             },
             HirTypeKind::Primitive(primitive) => primitive.as_str(),
         }

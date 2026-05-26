@@ -1,0 +1,49 @@
+import (
+    ./.Std.Io
+)
+
+RunTests() {
+    test_basic_trait()
+    test_trait_generic()
+}
+
+test_basic_trait() {
+    obj := MyStruct{ value: 42 }
+    result := obj.GetValue()
+    Io.PrintAssert(result == 42, msg: "trait method GetValue should return 42")
+}
+
+test_trait_generic() {
+    a := Pair{ first: 10, second: 20 }
+    sum := a.Sum()
+    Io.PrintAssert(sum == 30, msg: "generic trait Sum should return 30")
+}
+
+trait HasValue {
+    GetValue(@this): int
+}
+
+struct MyStruct {
+    value: int
+}
+
+use MyStruct impl HasValue {
+    GetValue(@this): int {
+        this.value
+    }
+}
+
+trait Addable {
+    Sum(@this): int
+}
+
+struct Pair {
+    first: int
+    second: int
+}
+
+use Pair impl Addable {
+    Sum(@this): int {
+        this.first + this.second
+    }
+}

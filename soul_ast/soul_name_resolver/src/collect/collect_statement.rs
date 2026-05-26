@@ -42,8 +42,15 @@ impl<'a> NameResolver<'a> {
                     self.collect_function(methode);
                 }
 
-                if !impls.is_empty() {
-                    todo!()
+                for impl_block in impls.iter_mut() {
+                    self.collect_type(&mut impl_block.impl_trait);
+                    if let Some(ref mut for_type) = impl_block.for_type {
+                        self.collect_type(for_type);
+                    }
+                    for methode in impl_block.methodes.iter_mut() {
+                        self.check_function_name(&methode.signature.node.name);
+                        self.collect_function(methode);
+                    }
                 }
                 self.current.in_global = prev;
 
@@ -141,6 +148,17 @@ impl<'a> NameResolver<'a> {
                     self.header_insert_union(obj.clone());
                 }
             }
+            StatementKind::Trait(obj) => {
+                self.declare_trait(obj);
+                for methode in obj.methods.iter_mut() {
+                    self.check_function_name(&methode.signature.node.name);
+                    self.collect_function(methode);
+                }
+                if self.current.in_global {
+                    self.header_insert_trait(obj.clone());
+                }
+            }
+
         }
     }
 

@@ -37,8 +37,8 @@ impl<'a> HirContext<'a> {
                     self.pop_scope();
                 }
 
-                if !impls.is_empty() {
-                    todo!()
+                for impl_block in impls {
+                    self.lower_impl_block(impl_block, &global.meta_data, global.span);
                 }
                 return;
             }
@@ -55,6 +55,10 @@ impl<'a> HirContext<'a> {
             }
             ast::StatementKind::Union(object) => {
                 self.lower_union(object);
+                return;
+            }
+            ast::StatementKind::Trait(object) => {
+                self.lower_trait(object);
                 return;
             }
             ast::StatementKind::Variable(variable) => {
@@ -111,8 +115,8 @@ impl<'a> HirContext<'a> {
                     self.pop_scope();
                 }
 
-                if !impls.is_empty() {
-                    todo!()
+                for impl_block in impls {
+                    self.lower_impl_block(impl_block, &global.meta_data, global.span);
                 }
                 return None;
             }
@@ -126,7 +130,7 @@ impl<'a> HirContext<'a> {
             ast::StatementKind::Enum(_) => {
                 todo!()
             }
-            ast::StatementKind::Union(_) => {
+            ast::StatementKind::Union(_) | ast::StatementKind::Trait(_) => {
                 return None;
             }
             ast::StatementKind::Variable(variable) => {

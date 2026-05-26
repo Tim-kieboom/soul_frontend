@@ -266,6 +266,9 @@ impl<'a> NameResolver<'a> {
                     ast::CustomType::Union(union_) => {
                         Self::resolve_union(self.context, self.store, &self.current, union_);
                     }
+                    ast::CustomType::Trait(_trait_) => {
+                        // TODO: resolve trait in Phase 1 Step 3
+                    }
                 }
             }
 

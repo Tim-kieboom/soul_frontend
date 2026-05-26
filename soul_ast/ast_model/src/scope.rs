@@ -392,6 +392,7 @@ pub enum ScopeTypeEntryKind {
     Union,
     LifeTime,
     GenericType,
+    Trait,
 }
 
 pub enum ScopeValueKind<'a> {

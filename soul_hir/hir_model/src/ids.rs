@@ -13,5 +13,6 @@ impl_soul_ids!(
     StatementId,
     ExpressionId,
     UnionId,
-    UnionFieldId
+    UnionFieldId,
+    TraitId
 );

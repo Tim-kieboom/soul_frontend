@@ -137,6 +137,12 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                             alignment: total_align,
                         }
                     }
+                    hir::CustomTypeId::Trait(_) => {
+                        return Err(soul_error_internal!(
+                            format!("traits have no runtime size"),
+                            None
+                        ));
+                    }
                 }
             }
         })

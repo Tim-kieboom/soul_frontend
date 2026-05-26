@@ -60,6 +60,7 @@ pub enum CustomType {
     Struct(Struct),
     Enum(Enum),
     Union(Union),
+    Trait(Trait),
 }
 impl CustomType {
     pub fn id(&self) -> Option<NodeId> {
@@ -67,6 +68,7 @@ impl CustomType {
             CustomType::Struct(obj) => obj.id,
             CustomType::Enum(obj) => obj.id,
             CustomType::Union(obj) => obj.id,
+            CustomType::Trait(obj) => obj.id,
         }
     }
 
@@ -75,6 +77,7 @@ impl CustomType {
             CustomType::Struct(obj) => &obj.name,
             CustomType::Enum(obj) => &obj.name,
             CustomType::Union(obj) => &obj.name,
+            CustomType::Trait(obj) => &obj.name,
         }
     }
 }
@@ -266,6 +269,16 @@ impl DeclareStore {
 
         self.custom_types
             .insert(index, (CustomType::Enum(obj.clone()), module));
+    }
+
+    /// try Inserts a trait into the store.
+    pub fn try_insert_trait(&mut self, index: NodeId, obj: &Trait, module: ModuleId) {
+        if self.custom_types.contains(index) {
+            return;
+        }
+
+        self.custom_types
+            .insert(index, (CustomType::Trait(obj.clone()), module));
     }
 
     /// try Inserts a union into the store.

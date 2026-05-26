@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 
 use ast::{
-    Block, Enum, FunctionSignature, NamedTupleElement, NamedTupleType, Struct, Union, VarTypeKind,
+    Block, Enum, FunctionSignature, NamedTupleElement, NamedTupleType, Struct, Trait, Union,
+    VarTypeKind,
     scope::{
         NodeId, Scope, ScopeBuilder, ScopeId, ScopeTypeEntry, ScopeTypeEntryKind, ScopeValue,
         ScopeValueKind,
@@ -180,6 +181,34 @@ impl<'a> NameResolver<'a> {
             trait_parent: None,
             span: name.span,
             kind: ScopeTypeEntryKind::Enum,
+        };
+
+        let old_entry = self
+            .current_scope_mut()
+            .insert_types(name.as_str(), scope_type);
+
+        if old_entry.is_some() {
+            self.log_error(SoulError::new(
+                format!("type of name {} already exists in scope", name.as_str()),
+                SoulErrorKind::AlreadyFoundInScope,
+                Some(name.span),
+            ));
+        }
+
+        id
+    }
+
+    fn declare_trait(&mut self, obj: &mut Trait) -> NodeId {
+        let id = self.alloc_node();
+        obj.id = Some(id);
+        obj.defined_in = Some(self.current.module);
+
+        let name = &obj.name;
+        let scope_type = ScopeTypeEntry {
+            node_id: id,
+            trait_parent: None,
+            span: name.span,
+            kind: ScopeTypeEntryKind::Trait,
         };
 
         let old_entry = self

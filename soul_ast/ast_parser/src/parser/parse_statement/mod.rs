@@ -302,6 +302,8 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.expect(&CURLY_CLOSE)?;
         Ok(ImplBlock {
             impl_trait,
+            for_type: None,
+            generics: vec![],
             methodes,
         })
     }

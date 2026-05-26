@@ -51,6 +51,8 @@ pub struct Stub {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Generic {
     pub name: Ident,
+    /// Optional trait bound: `T: TraitName`
+    pub bound: Option<SoulType>,
 }
 
 /// Array type

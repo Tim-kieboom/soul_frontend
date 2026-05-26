@@ -7,7 +7,8 @@ use soul_utils::{
 };
 
 use crate::{
-    Enum, EnumId, GenericId, InferTypeId, StructId, TypeId, Union, UnionFieldId, UnionId,
+    Enum, EnumId, GenericId, InferTypeId, StructId, Trait, TraitId, TypeId, Union, UnionFieldId,
+    UnionId,
     hir_type::{HirType, InferType, Struct},
 };
 
@@ -18,6 +19,7 @@ pub struct TypesMap {
     structs: VecMap<StructId, Struct>,
     enums: VecMap<EnumId, Enum>,
     unions: VecMap<UnionId, Union>,
+    traits: VecMap<TraitId, Trait>,
     generics: VecMap<GenericId, String>,
 
     type_alloc: IdGenerator<TypeId>,
@@ -26,6 +28,7 @@ pub struct TypesMap {
     union_alloc: IdGenerator<UnionId>,
     union_field_alloc: IdGenerator<UnionFieldId>,
     generic_alloc: IdGenerator<GenericId>,
+    trait_alloc: IdGenerator<TraitId>,
 }
 impl Default for TypesMap {
     fn default() -> Self {
@@ -36,6 +39,7 @@ impl Default for TypesMap {
             enums: Default::default(),
             structs: Default::default(),
             unions: Default::default(),
+            traits: Default::default(),
             generics: Default::default(),
             type_alloc: Default::default(),
             enum_alloc: Default::default(),
@@ -43,6 +47,7 @@ impl Default for TypesMap {
             union_alloc: Default::default(),
             union_field_alloc: Default::default(),
             generic_alloc: Default::default(),
+            trait_alloc: Default::default(),
         }
     }
 }
@@ -77,6 +82,26 @@ impl TypesMap {
 
     pub fn insert_struct(&mut self, id: StructId, obj: Struct) {
         self.structs.insert(id, obj);
+    }
+
+    pub fn insert_trait(&mut self, id: TraitId, obj: Trait) {
+        self.traits.insert(id, obj);
+    }
+
+    pub fn alloc_trait(&mut self) -> TraitId {
+        self.trait_alloc.alloc()
+    }
+
+    pub fn id_to_trait(&self, id: TraitId) -> Option<&Trait> {
+        self.traits.get(id)
+    }
+
+    pub fn id_to_trait_mut(&mut self, id: TraitId) -> Option<&mut Trait> {
+        self.traits.get_mut(id)
+    }
+
+    pub fn clone_trait_alloc(&self) -> IdGenerator<TraitId> {
+        self.trait_alloc.clone()
     }
 
     pub fn insert_enum(&mut self, id: EnumId, obj: Enum) {

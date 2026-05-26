@@ -70,6 +70,7 @@ impl DisplayThirType for ThirTypeKind {
                         Some(s) => sb.push_str(s.name.as_str()),
                         None => sb.push_str("<error>"),
                     },
+                    CustomTypeId::Trait(_trait_id) => sb.push_str("<trait>"),
                 }
                 Ok(())
             }
@@ -122,6 +123,7 @@ impl ThirTypeKind {
                 CustomTypeId::Struct(_) => "<struct>",
                 CustomTypeId::Enum(_) => "<enum>",
                 CustomTypeId::Union(_) => "<union>",
+                CustomTypeId::Trait(_) => "<trait>",
             },
             ThirTypeKind::Primitive(primitive) => primitive.as_str(),
         }

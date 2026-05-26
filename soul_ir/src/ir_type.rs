@@ -85,6 +85,12 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                             struct_ty,
                         )
                     }
+                    hir::CustomTypeId::Trait(_) => {
+                        return Err(soul_error_internal!(
+                            format!("traits have no runtime type representation"),
+                            None
+                        ));
+                    }
                 })
             }
             ThirTypeKind::Primitive(primitive_types) => self.lower_primitive_type(primitive_types),

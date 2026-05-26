@@ -203,6 +203,7 @@ impl<'a> TypedHirContext<'a> {
                 HirTypeKind::CustomType(hir::CustomTypeId::Union(_)) => {
                     self.check_recursive_type(this, field_type, span)?
                 }
+                HirTypeKind::CustomType(hir::CustomTypeId::Trait(_)) => continue,
                 HirTypeKind::Type
                 | HirTypeKind::None
                 | HirTypeKind::Never

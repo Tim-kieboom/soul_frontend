@@ -43,8 +43,10 @@ impl<'a> NameResolver<'a> {
                     self.resolves_function(methode);
                 }
 
-                if !impls.is_empty() {
-                    todo!()
+                for impl_block in impls.iter_mut() {
+                    for methode in &mut impl_block.methodes {
+                        self.resolves_function(methode);
+                    }
                 }
             }
             StatementKind::Struct(obj) => {
@@ -73,6 +75,13 @@ impl<'a> NameResolver<'a> {
             StatementKind::Import(_) => (), // maybe later track imports
             StatementKind::ExternalFunction(_) => (), // maybe later track imports
             StatementKind::Union(_) => (),
+            StatementKind::Trait(obj) => {
+                Self::resolve_trait(self.context, self.store, &self.current, obj);
+                for methode in &mut obj.methods {
+                    self.resolves_function(methode);
+                }
+            }
+
         }
     }
 

@@ -7,7 +7,7 @@ use inkwell::{
     module::Linkage,
     types::{ArrayType, BasicType, StructType},
     values::{
-        ArrayValue, AsValueRef, BasicValue, BasicValueEnum, GlobalValue, PointerValue, StructValue,
+        ArrayValue, BasicValue, BasicValueEnum, GlobalValue, PointerValue, StructValue,
     },
 };
 use mir_parser::mir::{Operand, OperandKind, PlaceId, PlaceKind};
@@ -235,10 +235,24 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                         info,
                     });
                 }
-                let value = unsafe { BasicValueEnum::new(inner.value.as_value_ref()) };
+
+                let pointee_ir = self
+                    .lower_type(ty, generics)?
+                    .ok_or(soul_error_internal!("ref pointee type should be concrete", None))?;
+                let value_ptr = self.builder.build_alloca(pointee_ir, "ref_value")?;
+                self.builder.store_operand(value_ptr, inner.clone())?;
+
+                let ptr_type = value_ptr.get_type();
+                let new_ptr = self.builder.build_alloca(ptr_type, "ref_ptr")?;
+                let operand_to_store = IrOperand {
+                    value: value_ptr.into(),
+                    info: OperandInfo::new_loaded(inner.info.type_id, ptr_type.into()),
+                };
+                self.builder.store_operand(new_ptr, operand_to_store)?;
+                let info = OperandInfo::new_unloaded(ty, ptr_type.into());
                 IrOperand {
-                    value,
-                    info: inner.info.clone(),
+                    value: new_ptr.into(),
+                    info,
                 }
             }
         })

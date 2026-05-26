@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use ast::{
     AbtractSyntaxTree, AstModuleStore, CustomType, DeclareStore, EntryKind, Enum, Function, Struct,
-    Union, Variable,
+    Trait, Union, Variable,
     meta_data::AstMetadata,
     scope::{NodeId, ScopeValue},
 };
@@ -167,6 +167,20 @@ impl<'a> NameResolver<'a> {
         })
     }
 
+    fn header_insert_trait(&mut self, obj: Trait) -> Option<EntryKind<CustomType>> {
+        let is_public = self.is_name_public(obj.name.as_str());
+        let header = &mut self.modules[self.current.module].header;
+        let entry = match header.get_mut(obj.name.as_str()) {
+            Some(val) => val,
+            None => header.entry(obj.name.to_string()).or_default(),
+        };
+
+        entry.struct_type.replace(EntryKind {
+            value: ast::CustomType::Trait(obj),
+            is_public,
+        })
+    }
+
     fn header_insert_union(&mut self, obj: Union) -> Option<EntryKind<CustomType>> {
         let is_public = self.is_name_public(obj.name.as_str());
         let header = &mut self.modules[self.current.module].header;
@@ -179,6 +193,29 @@ impl<'a> NameResolver<'a> {
             value: ast::CustomType::Union(obj),
             is_public,
         })
+    }
+
+    fn resolve_trait(
+        faults: &mut CrateContext,
+        store: &mut DeclareStore,
+        current: &Current,
+        obj: &Trait,
+    ) {
+        let id = match obj.id {
+            Some(val) => val,
+            None => {
+                Self::static_log_error(
+                    faults,
+                    soul_error_internal!(
+                        format!("Trait: '{}' node_id is None", obj.name.as_str()),
+                        None
+                    ),
+                );
+                return;
+            }
+        };
+
+        store.try_insert_trait(id, obj, current.module);
     }
 
     fn resolve_union(

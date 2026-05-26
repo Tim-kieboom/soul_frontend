@@ -326,7 +326,13 @@ impl<'a, 'f> Parser<'a, 'f> {
         let mut generics = vec![];
         loop {
             let name = self.try_bump_consume_ident()?;
-            generics.push(Generic { name });
+            let bound = if self.current_is(&COLON) {
+                self.bump();
+                Some(self.try_parse_type().merge_to_result()?)
+            } else {
+                None
+            };
+            generics.push(Generic { name, bound });
 
             if self.current_is(&ARROW_RIGHT) {
                 self.bump();

@@ -2,8 +2,8 @@ use std::fmt::{Arguments, Write};
 
 use ast::{
     AbtractSyntaxTree, Assignment, Block, ElseKind, Enum, Expression, Function, FunctionSignature,
-    Generic, IfArm, Import, SoulType, Statement, StatementKind, Struct, TypeKind, Union, UseBlock,
-    Variable,
+    Generic, IfArm, Import, SoulType, Statement, StatementKind, Struct, Trait, TypeKind,
+    Union, UseBlock, Variable,
     scope::{NodeId, ScopeId},
 };
 use soul_utils::{
@@ -184,6 +184,7 @@ impl<'a> AstDisplayer<'a> {
             ast::StatementKind::Assignment(assignment) => self.display_assignment(assignment),
             ast::StatementKind::Function(function)
             | ast::StatementKind::ExternalFunction(function) => self.display_function(function),
+            ast::StatementKind::Trait(obj) => self.display_trait(obj),
             ast::StatementKind::Expression {
                 expression,
                 ends_semicolon,
@@ -480,6 +481,27 @@ impl<'a> AstDisplayer<'a> {
             self.push(')');
         }
         self.push_str(" }\n");
+    }
+
+    fn display_trait(&mut self, obj: &Trait) {
+        self.push_str("trait ");
+        self.push_str(obj.name.as_str());
+        if !obj.generics.is_empty() {
+            self.push('<');
+            for (i, generic) in obj.generics.iter().enumerate() {
+                if i > 0 {
+                    self.push_str(", ");
+                }
+                self.push_str(generic.name.as_str());
+            }
+            self.push('>');
+        }
+        self.push_str(" { ");
+        for method in &obj.methods {
+            self.push_str(method.signature.node.name.as_str());
+            self.push(' ');
+        }
+        self.push_str("}\n");
     }
 
     fn display_expression(&mut self, expression: &Expression) {
@@ -905,7 +927,8 @@ impl<'a> AstDisplayer<'a> {
             | StatementKind::Function(_)
             | StatementKind::UseBlock(_)
             | StatementKind::Expression { .. }
-            | StatementKind::ExternalFunction(_) => (),
+            | StatementKind::ExternalFunction(_)
+            | StatementKind::Trait(_) => (),
         }
 
         self.push_str("*/\n");
@@ -986,6 +1009,7 @@ impl StatementKindHelper for StatementKind {
             }
             StatementKind::UseBlock(_) => None,
             StatementKind::Union(obj) => obj.id.to_statement_kind(),
+            StatementKind::Trait(_) => None,
         }
     }
 }

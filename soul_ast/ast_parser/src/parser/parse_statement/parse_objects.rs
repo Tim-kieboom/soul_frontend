@@ -1,8 +1,10 @@
-use ast::{Enum, Field, Statement, Struct, Union, UnionVariant};
+use ast::{
+    Block, Enum, Field, Function, Statement, Struct, Trait, Union, UnionVariant,
+};
 use soul_utils::{
-    error::{SoulError, SoulResult},
+    error::{SoulError, SoulErrorKind, SoulResult},
     soul_names::{KeyWord, TypeModifier},
-    try_result::{ResultTryErr, ResultTryNotValue, ToResult, TryErr, TryOk, TryResult},
+    try_result::{ResultMapNotValue, ResultTryErr, ResultTryNotValue, ToResult, TryErr, TryOk, TryResult},
 };
 
 use crate::parser::{
@@ -149,6 +151,73 @@ impl<'f, 'a> Parser<'f, 'a> {
         Ok(Statement::new(
             ast::StatementKind::Union(obj),
             self.span_combine(start_span),
+        ))
+    }
+
+    pub(crate) fn parse_trait(&mut self) -> SoulResult<Statement> {
+        let start_span = self.token().span;
+        self.expect_ident(KeyWord::Trait.as_str())?;
+        let name = self.try_bump_consume_ident()?;
+        let generics = self.parse_generic_declare()?.unwrap_or(vec![]);
+        self.skip_end_lines();
+
+        let mut methods = vec![];
+        self.expect(&CURLY_OPEN)?;
+        loop {
+            self.skip_end_lines();
+            if self.current_is(&CURLY_CLOSE) {
+                break;
+            }
+
+            let mut method_name = self.try_bump_consume_ident()?;
+            let modifier = match TypeModifier::from_str(method_name.as_str()) {
+                Some(modifier) => {
+                    method_name = self.try_bump_consume_ident()?;
+                    modifier
+                }
+                None => TypeModifier::Mut,
+            };
+
+            let signature = self
+                .try_parse_function_signature(
+                    method_name.span,
+                    self.default_methode_type(modifier, method_name.span),
+                    method_name,
+                    None,
+                )
+                .map_try_not_value(|(_, err)| *err)
+                .merge_to_result()?;
+
+            methods.push(Function {
+                signature,
+                block: Block {
+                    modifier: TypeModifier::Mut,
+                    statements: vec![],
+                    scope_id: None,
+                    node_id: None,
+                    span: start_span,
+                },
+            });
+        }
+        self.expect(&CURLY_CLOSE)?;
+
+        Ok(Statement::new(
+            ast::StatementKind::Trait(Trait {
+                id: None,
+                name,
+                generics,
+                methods,
+                defined_in: None,
+            }),
+            self.span_combine(start_span),
+        ))
+    }
+
+    pub(crate) fn parse_standalone_impl(&mut self) -> SoulResult<Statement> {
+        Err(SoulError::new(
+            "'impl' must be inside a 'use' block. Use 'use Type impl Trait { ... }' instead.".to_string(),
+            SoulErrorKind::InvalidContext,
+            Some(self.token().span),
         ))
     }
 
