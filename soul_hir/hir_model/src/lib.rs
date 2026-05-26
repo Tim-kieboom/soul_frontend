@@ -57,6 +57,7 @@ impl HirTree {
             is_public: true,
             id: ast_root.id,
             globals: vec![],
+            inner_functions: vec![],
             modules: ast_root.modules.entries().collect(),
         };
         let root_id = root.id;
@@ -82,6 +83,7 @@ impl HirTree {
                 is_public,
                 id: module_id,
                 globals: vec![],
+                inner_functions: vec![],
                 modules: sub_modules,
             };
             self.nodes.modules.insert(module_id, module);
@@ -94,6 +96,7 @@ pub struct Module {
     pub id: ModuleId,
     pub is_public: bool,
     pub globals: Vec<Global>,
+    pub inner_functions: Vec<FunctionId>,
     pub modules: Vec<ModuleId>,
 }
 

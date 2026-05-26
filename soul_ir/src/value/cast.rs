@@ -79,9 +79,16 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 self.new_loaded_operand(source_value, cast_to, generics)
             }
             (ThirTypeKind::Primitive(_), ThirTypeKind::Pointer(_)) => {
-                // int → ptr
-                let (source, cast) = (source_value.into_int_value(), cast_type.into_pointer_type());
-                let res = self.builder.build_int_to_ptr(source, cast)?;
+                // int/float → ptr
+                let cast_ptr = cast_type.into_pointer_type();
+                let int_val = if source_value.is_float_value() {
+                    let float_val = source_value.into_float_value();
+                    let int_ty = self.context.i64_type();
+                    self.builder.build_float_to_signed_int(float_val, int_ty)?
+                } else {
+                    source_value.into_int_value()
+                };
+                let res = self.builder.build_int_to_ptr(int_val, cast_ptr)?;
 
                 self.new_loaded_operand(res.into(), cast_to, generics)
             }
@@ -105,7 +112,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 )?;
                 self.cast_primitives(info, generics)
             }
-            (ThirTypeKind::Array { .. }, ThirTypeKind::Pointer(_)) => {
+            (ThirTypeKind::Array { .. }, ThirTypeKind::Pointer(_) | ThirTypeKind::Primitive(PrimitiveTypes::CStr)) => {
                 if source_operand.info.is_unloaded || !source_operand.value.is_struct_value() {
                     let base_ptr = source_operand.get_or_convert_pointer(&self.builder)?;
                     if source_operand.info.ir_type.is_struct_type() {

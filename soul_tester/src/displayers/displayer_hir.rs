@@ -109,6 +109,10 @@ impl<'a> HirDisplayer<'a> {
             self.display_global(global);
             self.push('\n');
         }
+        for function_id in &module.inner_functions {
+            self.display_function(*function_id);
+            self.push('\n');
+        }
         for module_id in &module.modules {
             self.display_module(*module_id);
         }

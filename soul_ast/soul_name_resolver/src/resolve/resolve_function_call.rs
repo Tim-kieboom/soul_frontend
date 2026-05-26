@@ -211,14 +211,15 @@ impl<'a> NameResolver<'a> {
             self.resolve_expression(callee);
         }
 
-        let owner_kind = self.get_owner_kind(&type_qualifier, function_call);
+        let name = function_call.name.node.clone();
+        let owner_kind = self.get_owner_kind(&type_qualifier, function_call).cloned();
 
-        function_call.resolved = self
-            .store
-            .find_function(function_call.name.as_str(), owner_kind);
+        function_call.resolved = self.lookup_function(&name);
 
         if function_call.resolved.is_none() {
-            function_call.resolved = self.lookup_function(function_call.name.as_str());
+            function_call.resolved = self
+                .store
+                .find_function(&name, owner_kind.as_ref());
         }
     }
 

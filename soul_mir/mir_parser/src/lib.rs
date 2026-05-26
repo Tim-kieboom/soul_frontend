@@ -19,7 +19,7 @@ mod id_generators;
 pub mod mir;
 mod parse;
 mod utils;
-use crate::{id_generators::IdGenerators, mir::MirTree};
+use crate::{id_generators::IdGenerators, mir::{MirTree, ModuleNodeId}};
 
 pub fn mir_lower(
     hir_reponse: &HirResponse,
@@ -152,7 +152,7 @@ impl<'a> MirContext<'a> {
             return;
         };
 
-        let mut nodes = Vec::with_capacity(module.globals.len());
+        let mut nodes = Vec::with_capacity(module.globals.len() + module.inner_functions.len());
         for global in &module.globals {
             if let Some(id) = self.lower_global(global, is_end) {
                 nodes.push(id);
@@ -161,6 +161,14 @@ impl<'a> MirContext<'a> {
             if *is_end {
                 break;
             }
+        }
+
+        for function_id in &module.inner_functions {
+            if self.hir_response.hir.main == Some(*function_id) {
+                continue;
+            }
+            self.lower_function(*function_id);
+            nodes.push(ModuleNodeId::FunctionId(*function_id));
         }
 
         let ast_module = &self.ast_modules[id];

@@ -93,7 +93,7 @@ impl<'a> TypedHirContext<'a> {
             .unwrap_or(TypeId::error())
     }
 
-    fn infer_function(&mut self, function_id: FunctionId) -> TypeId {
+    pub(crate) fn infer_function(&mut self, function_id: FunctionId) -> TypeId {
         self.current_function = Some(function_id);
         let function = &self.hir.nodes.functions[function_id];
 

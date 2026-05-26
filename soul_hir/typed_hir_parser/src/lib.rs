@@ -53,6 +53,9 @@ pub fn lower_typed_hir<'a>(
         for global in &module.globals {
             context.infer_global(global);
         }
+        for function_id in &module.inner_functions {
+            context.infer_function(*function_id);
+        }
     }
 
     context.finalize()

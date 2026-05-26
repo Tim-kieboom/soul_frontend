@@ -6,7 +6,7 @@ use soul_utils::{
     span::ModuleId,
 };
 
-use crate::HirContext;
+use crate::{CurrentBody, HirContext};
 mod block;
 mod custom_types;
 mod function;
@@ -134,11 +134,21 @@ impl<'a> HirContext<'a> {
             }
             ast::StatementKind::Function(function)
             | ast::StatementKind::ExternalFunction(function) => {
-                let id = self.alloc_statement(&global.meta_data, global.span);
-
                 let hir_function = self.lower_function(function);
-                let kind = hir::GlobalKind::Function(hir_function);
-                self.insert_global(module_id, hir::Global::new(kind, id));
+
+                match self.current.body {
+                    CurrentBody::Global => {
+                        let id = self.alloc_statement(&global.meta_data, global.span);
+                        let kind = hir::GlobalKind::Function(hir_function);
+                        self.insert_global(module_id, hir::Global::new(kind, id));
+                    }
+                    CurrentBody::Block(_) => {
+                        self.tree.nodes.modules[module_id]
+                            .inner_functions
+                            .push(hir_function);
+                    }
+                }
+
                 return None;
             }
             ast::StatementKind::Assignment(assignment) => hir::StatementKind::Assign(Assign {

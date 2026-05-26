@@ -203,7 +203,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 kind: ArrayKind::HeapArray,
                 ..
             } => {
-                let ptr = inner.value.into_pointer_value();
+                let ptr = inner.get_or_convert_pointer(&self.builder)?;
                 let loaded = self
                     .builder
                     .build_load(inner.info.ir_type, ptr, "heap_slice")?;
@@ -216,7 +216,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                 kind: ArrayKind::StackArray(len),
                 ..
             } => {
-                let ptr = inner.value.into_pointer_value();
+                let ptr = inner.get_or_convert_pointer(&self.builder)?;
                 self.fixed_array_to_slice(ty, ptr, len, generics)?
             }
             _ => {

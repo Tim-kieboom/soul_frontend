@@ -3,23 +3,15 @@ import (
 )
 
 RunTests() {
-    // Bug 4: { expr } block statement should parse
     test_block_statement()
-
-    // Bug 5: [@]char return type on method should parse
     test_slice_return_type()
-
-    // Bug 7: return *ptr should generate valid LLVM
     test_return_deref()
-
-    // Bug 8: if condition {} (bare variable) should work
     test_if_bare_condition()
-
-    // Bug 9: Fn(): int { if true { return 1 } else { return 2 } }
     test_if_else_return()
+    test_inner_function()
+    test_inner_with_same_name_from_different_outer()
 }
 
-// Bug 4: { statement } should parse as block statement
 test_block_statement() {
     mut value = 0
     {
@@ -28,7 +20,6 @@ test_block_statement() {
     Io.Assert(value == 42, msg: "Bug 4: block statement should set value to 42")
 }
 
-// Bug 5: method returning [@]char should parse
 test_slice_return_type() {
     greeting(): [@]char {
         "hello"
@@ -38,7 +29,6 @@ test_slice_return_type() {
     Io.Assert(true)
 }
 
-// Bug 7: return *ptr should generate valid LLVM IR
 test_return_deref() {
     deref_val(p: &int): int {
         return *p
@@ -49,7 +39,6 @@ test_return_deref() {
     Io.Assert(result == 99, msg: "Bug 7: return *ptr should be 99")
 }
 
-// Bug 8: if condition {} with bare variable condition
 test_if_bare_condition() {
     condition: bool = true
 
@@ -60,7 +49,6 @@ test_if_bare_condition() {
     Io.Assert(result == 1, msg: "Bug 8: if bare condition should set result to 1")
 }
 
-// Bug 9: Fn with if-else return in both branches
 test_if_else_return() {
     pick(n: int): int {
         if n > 0 {
@@ -72,4 +60,31 @@ test_if_else_return() {
 
     Io.Assert(pick(1) == 1, msg: "Bug 9: if-else return should be 1")
     Io.Assert(pick(-1) == 2, msg: "Bug 9: if-else return should be 2")
+}
+
+
+test_inner_function() {
+    inner(): int { 42 }
+
+    result := inner()
+    Io.Assert(result == 42, msg: "Bug 10: inner function should return 42")
+}
+
+outer_with_helper_a(): int {
+    helper(): int { 100 }
+
+    helper()
+}
+
+outer_with_helper_b(): int {
+    helper(): int { 200 }
+
+    helper()
+}
+
+test_inner_with_same_name_from_different_outer() {
+    result_a := outer_with_helper_a()
+    result_b := outer_with_helper_b()
+    Io.Assert(result_a == 100, msg: "Bug 10: outer_with_helper_a should return 100")
+    Io.Assert(result_b == 200, msg: "Bug 10: outer_with_helper_b should return 200")
 }
