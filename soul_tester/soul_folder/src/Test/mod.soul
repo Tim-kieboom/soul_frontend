@@ -3,6 +3,7 @@ import (
     .enums
     .matches
     .unions
+    .bugs
     ./.Std.Io
     ./.Std.Time.{Instance, Duration}
 )
@@ -15,6 +16,7 @@ RunTests() {
     enums.RunTests()
     matches.RunTests()
     unions.RunTests()
+    bugs.RunTests()
     logTime(total.Elapsed())
 }
 

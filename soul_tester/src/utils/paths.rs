@@ -101,6 +101,6 @@ impl Paths {
 }
 
 fn check_pathbuf(path: &PathBuf) -> std::io::Result<()> {
-    std::fs::metadata(&path)?;
+    std::fs::metadata(path)?;
     Ok(())
 }

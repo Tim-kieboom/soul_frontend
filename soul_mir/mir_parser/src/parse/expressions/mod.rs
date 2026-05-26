@@ -483,7 +483,11 @@ impl<'a> MirContext<'a> {
     ) -> EndBlock<mir::Operand> {
         let is_end = &mut false;
 
-        let function = &self.hir_response.hir.nodes.functions[function_id];
+        let Some(function) = self.hir_response.hir.nodes.functions.get(function_id) else {
+            self.log_error(soul_error_internal!(format!("{function_id:?} not found"), None));
+            return EndBlock::new(Operand::new(self.hir_response.typed.types_table.none_type, mir::OperandKind::None), is_end)
+        };
+
         let parameters = &function.parameters;
         let mut arguments = vec![];
         for (i, parameter) in parameters.iter().enumerate() {

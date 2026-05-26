@@ -85,15 +85,15 @@ impl<'a> MirContext<'a> {
 
             let condition = self.lower_operand(hir_condition).pass(is_end);
 
-            self.lower_arm_with_target(then_block, then, after_if, ty, target_place, is_end);
+            let then_falls = self.lower_arm_with_target(then_block, then, after_if, ty, target_place, is_end);
 
-            let arm = match else_block {
+            let (arm, else_falls) = match else_block {
                 Some(arm_block) => {
                     let arm = self.new_block();
-                    self.lower_arm_with_target(arm_block, arm, after_if, ty, target_place, is_end);
-                    arm
+                    let else_falls = self.lower_arm_with_target(arm_block, arm, after_if, ty, target_place, is_end);
+                    (arm, else_falls)
                 }
-                None => after_if,
+                None => (after_if, true),
             };
 
             self.insert_terminator(
@@ -104,7 +104,9 @@ impl<'a> MirContext<'a> {
                     arm,
                 },
             );
-            self.current.block = Some(after_if);
+            if then_falls || else_falls {
+                self.current.block = Some(after_if);
+            }
             return mir::Operand::new(ty, mir::OperandKind::None);
         }
 
@@ -118,15 +120,15 @@ impl<'a> MirContext<'a> {
         let condition = self.lower_operand(hir_condition).pass(is_end);
 
         let temp = &mut None;
-        self.lower_arm(then_block, then, after_if, ty, temp, is_end);
+        let then_falls = self.lower_arm(then_block, then, after_if, ty, temp, is_end);
 
-        let arm = match else_block {
+        let (arm, else_falls) = match else_block {
             Some(arm_block) => {
                 let arm = self.new_block();
-                self.lower_arm(arm_block, arm, after_if, ty, temp, is_end);
-                arm
+                let else_falls = self.lower_arm(arm_block, arm, after_if, ty, temp, is_end);
+                (arm, else_falls)
             }
-            None => after_if,
+            None => (after_if, true),
         };
 
         self.insert_terminator(
@@ -137,7 +139,9 @@ impl<'a> MirContext<'a> {
                 arm,
             },
         );
-        self.current.block = Some(after_if);
+        if then_falls || else_falls {
+            self.current.block = Some(after_if);
+        }
         mir::Operand::new(
             ty,
             match temp {
@@ -167,15 +171,15 @@ impl<'a> MirContext<'a> {
 
         self.current.target_place = Some(target_place);
 
-        self.lower_arm_with_target(then_block, then, after_if, ty, target_place, is_end);
+        let then_falls = self.lower_arm_with_target(then_block, then, after_if, ty, target_place, is_end);
 
-        let arm = match else_block {
+        let (arm, else_falls) = match else_block {
             Some(arm_block) => {
                 let arm = self.new_block();
-                self.lower_arm_with_target(arm_block, arm, after_if, ty, target_place, is_end);
-                arm
+                let else_falls = self.lower_arm_with_target(arm_block, arm, after_if, ty, target_place, is_end);
+                (arm, else_falls)
             }
-            None => after_if,
+            None => (after_if, true),
         };
 
         self.insert_terminator(
@@ -186,7 +190,9 @@ impl<'a> MirContext<'a> {
                 arm,
             },
         );
-        self.current.block = Some(after_if);
+        if then_falls || else_falls {
+            self.current.block = Some(after_if);
+        }
         self.current.target_place = None;
     }
 
@@ -198,7 +204,7 @@ impl<'a> MirContext<'a> {
         ty: hir::TypeId,
         temp: &mut Option<mir::TempId>,
         _is_end: &mut bool,
-    ) {
+    ) -> bool {
         self.current.block = Some(arm);
         let arm_end = &mut false;
         let value = self.lower_block(hir_block, arm).pass(arm_end);
@@ -233,6 +239,9 @@ impl<'a> MirContext<'a> {
             mir::Terminator::Unreachable
         ) {
             self.insert_terminator(end_block, mir::Terminator::Goto(join));
+            true
+        } else {
+            !*arm_end
         }
     }
 
@@ -244,7 +253,7 @@ impl<'a> MirContext<'a> {
         _ty: hir::TypeId,
         target_place: mir::PlaceId,
         _is_end: &mut bool,
-    ) {
+    ) -> bool {
         self.current.block = Some(arm);
         let arm_end = &mut false;
         let value = self.lower_block(hir_block, arm).pass(arm_end);
@@ -268,6 +277,9 @@ impl<'a> MirContext<'a> {
             mir::Terminator::Unreachable
         ) {
             self.insert_terminator(end_block, mir::Terminator::Goto(join));
+            true
+        } else {
+            !*arm_end
         }
     }
 

@@ -69,7 +69,17 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     fn inner_parse_type(&mut self) -> TryResult<SoulType, SoulError> {
         let wrapper = self.get_type_wrapper()?;
-        let mut ty = self.get_base_type()?;
+        let mut ty = match self.get_base_type() {
+            Ok(ty) => ty,
+            Err(TryError::IsNotValue(_)) if !wrapper.is_empty() => {
+                return TryErr(SoulError::new(
+                    "expected element type after array size, e.g. [64]char",
+                    SoulErrorKind::InvalidType,
+                    Some(self.token().span),
+                ));
+            }
+            Err(e) => return Err(e),
+        };
 
         const CONST: bool = false;
         const MUT: bool = true;

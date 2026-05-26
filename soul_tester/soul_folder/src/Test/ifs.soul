@@ -5,7 +5,7 @@ import (
 
 RunTests() {
     test_ReturnIf_should_return_1()
-    // test_ReturnIfElse_should_return_5()
+    test_ReturnIfElse_should_return_5()
     // test_ReturnIfElseIf_should_return_3()
     test_NestedIf_should_return_10()
     test_IfWithoutElse_should_return_0()
@@ -27,18 +27,18 @@ test_ReturnIf_should_return_1() {
     Io.PrintAssert(value == 0, msg: "value should be 0")
 }
 
-// test_ReturnIfElse_should_return_5() {
-//     returnIfElse(): int {
-//         if true {
-//             return 5
-//         } else {
-//             return 2
-//         }
-//     }
+test_ReturnIfElse_should_return_5() {
+    returnIfElse(): int {
+        if true {
+            return 5
+        } else {
+            return 2
+        }
+    }
 
-//     value := returnIfElse()
-//     Io.PrintAssert(value == 5, "|'test_ReturnIfElse_should_return_5()' FAILED file: Test/ifs.soul| value should be 5")
-// }
+    value := returnIfElse()
+    Io.PrintAssert(value == 5, msg: "test_ReturnIfElse_should_return_5 FAILED")
+}
 
 // test_ReturnIfElseIf_should_return_3() {
 //     returnIfElseIf(): int {

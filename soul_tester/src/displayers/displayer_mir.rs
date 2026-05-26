@@ -369,12 +369,10 @@ impl<'a> MirDisplayer<'a> {
     }
 
     fn find_union_for_struct(&self, struct_id: StructId) -> Option<&hir::Union> {
-        for (_, union) in self.hir.info.types.union_entries() {
-            if union.internal_struct == struct_id {
-                return Some(union);
-            }
-        }
-        None
+        
+        self.hir.info.types.union_entries()
+            .find(|(_, union)| union.internal_struct == struct_id)
+            .map(|(_, union)| union)
     }
 
     fn resolve_compact_variant_idx(&self, body: &mir::AggregateBody) -> Option<usize> {
@@ -520,7 +518,7 @@ impl<'a> MirDisplayer<'a> {
                 self.push_fmt(format_args!("{}", count));
                 self.push_str(")*/");
             }
-            &RvalueKind::Drop { ref value, .. } => {
+            RvalueKind::Drop { value, .. } => {
                 self.push_str("intrinsic.Drop(");
                 self.display_operand(value);
                 self.push(')');

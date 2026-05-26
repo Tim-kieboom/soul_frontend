@@ -107,15 +107,7 @@ impl<'f, 'a> LlvmBackend<'f, 'a> {
                     .build_switch(discr_val, otherwise_block, &cases)?;
             }
             Terminator::Unreachable => {
-                #[cfg(debug_assertions)]
-                panic!("should not have unreachable");
-
-                #[cfg(not(debug_assertions))]
-                self.log_error(soul_utils::error::SoulError::new(
-                    "should not have unreachable",
-                    soul_utils::error::SoulErrorKind::LlvmError,
-                    None,
-                ));
+                self.builder.build_unreachable()?;
             }
         };
 

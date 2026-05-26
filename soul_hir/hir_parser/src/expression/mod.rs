@@ -403,6 +403,47 @@ impl<'a> HirContext<'a> {
             return self.cast_pointer_to_ref(inner, id, *is_mutable, span);
         }
 
+        // `&field` / `@field`: use the field's place directly instead of
+        // loading the field into a temp and taking the temp's address.
+        if let ast::ExpressionKind::FieldAccess(field) = &expression.node {
+            let place = self.lower_field(field, span);
+
+            let of_type = self.new_infer_type(vec![], None, span);
+            let ty = self.add_type(HirType::new(HirTypeKind::Ref {
+                of_type,
+                mutable: *is_mutable,
+            }));
+
+            return hir::Expression {
+                id,
+                ty: hir::LazyTypeId::Known(ty),
+                kind: hir::ExpressionKind::Ref {
+                    place,
+                    mutable: *is_mutable,
+                },
+            };
+        }
+
+        // `&index` / `@index`: use the index place directly.
+        if let ast::ExpressionKind::Index(_) = &expression.node {
+            let place = self.lower_place(expression);
+
+            let of_type = self.new_infer_type(vec![], None, span);
+            let ty = self.add_type(HirType::new(HirTypeKind::Ref {
+                of_type,
+                mutable: *is_mutable,
+            }));
+
+            return hir::Expression {
+                id,
+                ty: hir::LazyTypeId::Known(ty),
+                kind: hir::ExpressionKind::Ref {
+                    place,
+                    mutable: *is_mutable,
+                },
+            };
+        }
+
         let inner = self.lower_expression(expression);
         let of_type = self.tree.nodes.expressions[inner].ty;
 

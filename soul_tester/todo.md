@@ -5,16 +5,15 @@
     (C) basic c enum {cm}
     (D) enum with expression
 
-(C) add union {cm}
+(D) add union struct  
 
-(C) add match {cm}
-    (C) add numaric switch like match {cm}
-    (D) add string switch like match {cm}
-    (D) add array switch like match {cm}
-    (E) add type matching {cm}
-
-
-(A) merge ast:Expression Array and Arracontructor using AnyArray
+(D) add match
+    (D) variable match
+    (D) if match
+    (D) tuple match
+    
+(E) make borrow checker
+(F) make coroutines
 
 # Bugs
 - `__clib_Duration_now(&this.start)` (this.start does not work)

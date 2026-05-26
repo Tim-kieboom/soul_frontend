@@ -25,7 +25,7 @@ pub fn display_tokens<'a>(
             Ok(val) => val,
             Err(err) => {
                 return Err(SementicFault::error(err).to_anyhow(
-                    &Paths::to_entry_file_path(&manifest)?.path,
+                    &Paths::to_entry_file_path(manifest)?.path,
                     source_file,
                     globals::MESSAGE_CONFIG,
                 ));

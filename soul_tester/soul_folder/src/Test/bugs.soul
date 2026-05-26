@@ -1,0 +1,75 @@
+import (
+    ./.Std.Io
+)
+
+RunTests() {
+    // Bug 4: { expr } block statement should parse
+    test_block_statement()
+
+    // Bug 5: [@]char return type on method should parse
+    test_slice_return_type()
+
+    // Bug 7: return *ptr should generate valid LLVM
+    test_return_deref()
+
+    // Bug 8: if condition {} (bare variable) should work
+    test_if_bare_condition()
+
+    // Bug 9: Fn(): int { if true { return 1 } else { return 2 } }
+    test_if_else_return()
+}
+
+// Bug 4: { statement } should parse as block statement
+test_block_statement() {
+    mut value = 0
+    {
+        value = 42
+    }
+    Io.Assert(value == 42, msg: "Bug 4: block statement should set value to 42")
+}
+
+// Bug 5: method returning [@]char should parse
+test_slice_return_type() {
+    greeting(): [@]char {
+        "hello"
+    }
+
+    s := greeting()
+    Io.Assert(true)
+}
+
+// Bug 7: return *ptr should generate valid LLVM IR
+test_return_deref() {
+    deref_val(p: &int): int {
+        return *p
+    }
+
+    mut x = 99
+    result := deref_val(&x)
+    Io.Assert(result == 99, msg: "Bug 7: return *ptr should be 99")
+}
+
+// Bug 8: if condition {} with bare variable condition
+test_if_bare_condition() {
+    condition: bool = true
+
+    mut result = 0
+    if condition {
+        result = 1
+    }
+    Io.Assert(result == 1, msg: "Bug 8: if bare condition should set result to 1")
+}
+
+// Bug 9: Fn with if-else return in both branches
+test_if_else_return() {
+    pick(n: int): int {
+        if n > 0 {
+            return 1
+        } else {
+            return 2
+        }
+    }
+
+    Io.Assert(pick(1) == 1, msg: "Bug 9: if-else return should be 1")
+    Io.Assert(pick(-1) == 2, msg: "Bug 9: if-else return should be 2")
+}

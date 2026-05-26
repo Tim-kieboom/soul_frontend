@@ -17,7 +17,7 @@ use crate::parser::{
     Parser,
     parse_utils::{
         ARROW_LEFT, COLON, COLON_ASSIGN, CURLY_CLOSE, CURLY_OPEN, ROUND_OPEN, SEMI_COLON,
-        STAMENT_END_TOKENS, STAR,
+        SQUARE_OPEN, STAMENT_END_TOKENS, STAMENT_SKIP_TOKENS, STAR,
     },
 };
 
@@ -101,7 +101,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let begin_position = self.current_position();
         let start_span = self.token().span;
 
-        self.skip_till(STAMENT_END_TOKENS);
+        self.skip_till(STAMENT_SKIP_TOKENS);
 
         let possible_kind = match &self.token().kind {
             TokenKind::Ident(_) => self.try_parse_from_ident(start_span),
@@ -110,6 +110,9 @@ impl<'a, 'f> Parser<'a, 'f> {
                 self.span_combine(start_span),
                 self.ends_semicolon(),
             )),
+            &SQUARE_OPEN => self
+                .try_parse_methode(start_span)
+                .map_try_not_value(|_| SoulError::empty()),
             &STAR => return self.parse_assign(start_span),
             TokenKind::Unknown(char) => {
                 return Err(SoulError::new(

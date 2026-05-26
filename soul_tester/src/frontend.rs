@@ -63,7 +63,7 @@ fn compiler_root_crate(
         source_path,
         &entry_file,
         &mut module_store,
-        &crate_store,
+        crate_store,
         context,
         &all_exports,
     )?;

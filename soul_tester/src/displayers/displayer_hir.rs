@@ -439,7 +439,7 @@ impl<'a> HirDisplayer<'a> {
                             ..
                         } => {
                             self.push_fmt(format_args!("Constructor({})", variant_index));
-                            if let Some(_) = binding {
+                            if binding.is_some() {
                                 self.push_str("($bind)");
                             }
                             self.push_str(" => ");
@@ -570,7 +570,7 @@ impl<'a> HirDisplayer<'a> {
             }
             hir::ExpressionKind::Drop { value } => {
                 self.push_str("intrinsic.Drop(");
-                self.display_expression(&value);
+                self.display_expression(value);
                 self.push(')');
             }
             hir::ExpressionKind::NewHeapArray { ptr, len } => {
@@ -650,8 +650,7 @@ impl<'a> HirDisplayer<'a> {
                     .info
                     .types
                     .id_to_union(*union_id)
-                    .map(|union| union.variants.get(*variant_index).map(|v| v.name.as_str()))
-                    .flatten()
+                    .and_then(|union| union.variants.get(*variant_index).map(|v| v.name.as_str()))
                     .unwrap_or("<error>");
 
                 self.push_str(str);

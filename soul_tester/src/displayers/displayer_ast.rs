@@ -365,18 +365,21 @@ impl<'a> AstDisplayer<'a> {
                 self.push(' ');
             }
 
-            if let Err(_) = path.module.write_display(
+
+            let result = path.module.write_display(
                 &self
                     .module_store
                     .get_path(self.module_store.get_root_id())
-                    .map(|p| p.parent())
-                    .flatten()
+                    .and_then(|p| p.parent())
                     .map(|p| p.to_path_buf())
                     .unwrap_or_default(),
                 &mut self.sb,
-            ) {
+            );
+ 
+            if result.is_err() {
                 self.push_str("<error>");
             }
+
             match &path.kind {
                 ast::ImportKind::This => self.push_fmt(format_args!("{SEPERATOR}this")),
                 ast::ImportKind::Items {
