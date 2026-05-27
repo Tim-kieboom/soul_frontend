@@ -118,6 +118,8 @@ pub struct AsTypeCast {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Index {
     pub id: Option<NodeId>,
+    pub index_ref: Option<FunctionId>,
+    pub index_mut: Option<FunctionId>,
     /// The collection being indexed.
     pub collection: BoxExpression,
     /// The index expression.
@@ -471,6 +473,8 @@ impl Expression {
         Expression::new(
             ExpressionKind::Index(Index {
                 id: None,
+                index_ref: None,
+                index_mut: None,
                 collection: Box::new(collection),
                 index: Box::new(index),
             }),

@@ -1,4 +1,5 @@
-use ast::{AnyArray, ElseKind, Expression, ExpressionKind, FieldAccess};
+use ast::{AnyArray, Argument, ElseKind, Expression, ExpressionKind, FieldAccess, FunctionCall};
+use soul_utils::Ident;
 use soul_utils::error::{SoulError, SoulErrorKind};
 
 use crate::NameResolver;
@@ -33,6 +34,40 @@ impl<'a> NameResolver<'a> {
             ExpressionKind::Index(index) => {
                 self.resolve_expression(&mut index.collection);
                 self.resolve_expression(&mut index.index);
+
+                let mut ref_call = FunctionCall {
+                    generics: vec![],
+                    id: None,
+                    arguments: vec![Argument {
+                        name: None,
+                        value: (*index.index).clone(),
+                    }],
+                    resolved: None,
+                    name: Ident::new("IndexRef".to_string(), span),
+                    callee: Some(Box::new((*index.collection).clone())),
+                    external_ref: None,
+                    intrinsic: None,
+                    intrinsic_value: None,
+                };
+                self.resolve_function_call(&mut ref_call, span);
+                index.index_ref = ref_call.resolved;
+
+                let mut mut_call = FunctionCall {
+                    generics: vec![],
+                    id: None,
+                    arguments: vec![Argument {
+                        name: None,
+                        value: (*index.index).clone(),
+                    }],
+                    resolved: None,
+                    name: Ident::new("IndexMut".to_string(), span),
+                    callee: Some(Box::new((*index.collection).clone())),
+                    external_ref: None,
+                    intrinsic: None,
+                    intrinsic_value: None,
+                };
+                self.resolve_function_call(&mut mut_call, span);
+                index.index_mut = mut_call.resolved;
             }
             ExpressionKind::FunctionCall(function_call) => {
                 self.resolve_function_call(function_call, span);

@@ -1035,8 +1035,8 @@ impl<'a> TypedHirContext<'a> {
     }
 
     fn infer_deref(&mut self, inner: ExpressionId, span: Span) -> LazyTypeId {
-        let inner = self.infer_expression(inner);
-        let ty = match self.resolve_type_strict(inner, span) {
+        let inner_ty = self.infer_expression(inner);
+        let ty = match self.resolve_type_strict(inner_ty, span) {
             Some(val) => val,
             None => return LazyTypeId::error(),
         };

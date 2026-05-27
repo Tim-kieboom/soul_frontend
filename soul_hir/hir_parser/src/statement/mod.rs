@@ -155,10 +155,39 @@ impl<'a> HirContext<'a> {
 
                 return None;
             }
-            ast::StatementKind::Assignment(assignment) => hir::StatementKind::Assign(Assign {
-                place: self.lower_place(&assignment.left),
-                value: self.lower_expression(&assignment.right),
-            }),
+            ast::StatementKind::Assignment(assignment) => {
+                if let ast::ExpressionKind::Index(index) = &assignment.left.node {
+                    let call_expr = self.lower_index_trait_call(index, true, assignment.left.span);
+                    let call_ty = self.tree.nodes.expressions[call_expr].ty;
+
+                    let temp_local = self.id_generator.alloc_local();
+                    let variable = hir::Variable { local: temp_local };
+                    self.insert_desugar_variable(variable, call_ty, call_expr, assignment.left.span);
+
+                    let local_place_id = self.id_generator.alloc_place();
+                    let local_place = self.insert_place(hir::Place::new(
+                        local_place_id,
+                        hir::PlaceKind::Local(temp_local),
+                        assignment.left.span,
+                    ));
+                    let deref_place_id = self.id_generator.alloc_place();
+                    let deref_place = self.insert_place(hir::Place::new(
+                        deref_place_id,
+                        hir::PlaceKind::Deref(local_place),
+                        assignment.left.span,
+                    ));
+
+                    hir::StatementKind::Assign(Assign {
+                        place: deref_place,
+                        value: self.lower_expression(&assignment.right),
+                    })
+                } else {
+                    hir::StatementKind::Assign(Assign {
+                        place: self.lower_place(&assignment.left),
+                        value: self.lower_expression(&assignment.right),
+                    })
+                }
+            }
             ast::StatementKind::Expression {
                 id: _,
                 expression,

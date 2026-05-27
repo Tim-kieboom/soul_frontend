@@ -1,4 +1,4 @@
-use ast::{ArrayContructor, ArrayKind, FieldAccess, Literal};
+use ast::{Argument, ArrayContructor, ArrayKind, FieldAccess, FunctionCall, Literal};
 use ast::{AsTypeCast, VarTypeKind, scope::NodeId};
 use hir::{
     CustomTypeId, EnumId, ExpressionId, HirType, HirTypeKind, LocalId, Place, PlaceKind,
@@ -424,23 +424,14 @@ impl<'a> HirContext<'a> {
             };
         }
 
-        // `&index` / `@index`: use the index place directly.
-        if let ast::ExpressionKind::Index(_) = &expression.node {
-            let place = self.lower_place(expression);
-
-            let of_type = self.new_infer_type(vec![], None, span);
-            let ty = self.add_type(HirType::new(HirTypeKind::Ref {
-                of_type,
-                mutable: *is_mutable,
-            }));
-
+        // `&index` / `@index`: desugar through IndexMut / IndexRef trait call.
+        if let ast::ExpressionKind::Index(index) = &expression.node {
+            let call = self.lower_index_trait_call(index, *is_mutable, span);
+            let call_expr = self.tree.nodes.expressions[call].clone();
             return hir::Expression {
                 id,
-                ty: hir::LazyTypeId::Known(ty),
-                kind: hir::ExpressionKind::Ref {
-                    place,
-                    mutable: *is_mutable,
-                },
+                ty: call_expr.ty,
+                kind: call_expr.kind,
             };
         }
 
@@ -694,20 +685,45 @@ impl<'a> HirContext<'a> {
     }
 
     fn lower_index(&mut self, id: ExpressionId, index: &ast::Index, span: Span) -> hir::Expression {
-        let place = Place::new(
-            self.id_generator.alloc_place(),
-            PlaceKind::Index {
-                base: self.lower_place(&index.collection),
-                index: self.lower_expression(&index.index),
-            },
-            span,
-        );
-
+        let ref_call = self.lower_index_trait_call(index, false, span);
         hir::Expression {
             id,
             ty: self.new_infer_type(vec![], None, span),
-            kind: hir::ExpressionKind::Load(self.insert_place(place)),
+            kind: hir::ExpressionKind::DeRef(ref_call),
         }
+    }
+
+    pub(crate) fn lower_index_trait_call(
+        &mut self,
+        index: &ast::Index,
+        mutable: bool,
+        span: Span,
+    ) -> ExpressionId {
+        let resolved = if mutable {
+            index.index_mut
+        } else {
+            index.index_ref
+        };
+
+        let name = if mutable { "IndexMut" } else { "IndexRef" };
+        let function_call = FunctionCall {
+            generics: vec![],
+            id: None,
+            arguments: vec![Argument {
+                name: None,
+                value: (*index.index).clone(),
+            }],
+            resolved,
+            name: Ident::new(name.to_string(), span),
+            callee: Some(Box::new((*index.collection).clone())),
+            external_ref: None,
+            intrinsic: None,
+            intrinsic_value: None,
+        };
+
+        let id = self.alloc_expression(span);
+        let call = self.lower_call(id, &function_call);
+        self.insert_expression(id, call)
     }
 
     fn lower_block_expression(&mut self, block: &ast::Block) -> hir::ExpressionId {

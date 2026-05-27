@@ -44,7 +44,105 @@ impl<'a, 'f> Parser<'a, 'f> {
         let mut left = self.parse_primary(end_tokens)?;
 
         loop {
-            // Handle EndLine followed by a dot (method chaining across lines)
+            if self.current_is(&TokenKind::EndLine) && self.current_is_any(end_tokens) {
+                let saved = self.current_position();
+                self.skip_end_lines();
+                if self.current_is(&TokenKind::Symbol(SymbolKind::Dot)) {
+                    continue;
+                }
+                self.go_to(saved);
+            }
+
+            if self.current_is_any(end_tokens) {
+                break;
+            }
+
+            self.skip_end_lines();
+            if self.current_is_any(end_tokens) {
+                break;
+            }
+
+            if self.current_is(&TokenKind::EndFile) {
+                return Err(SoulError::new(
+                    "unexpected end of file while parsing expression".to_string(),
+                    SoulErrorKind::UnexpecedFileEnd,
+                    Some(self.span_combine(start_span)),
+                ));
+            }
+
+            let token_kind = &self.token().kind;
+            match token_kind {
+                TokenKind::Symbol(SymbolKind::Dot) => (),
+                TokenKind::Symbol(SymbolKind::SquareOpen) => (),
+                _ => break,
+            };
+
+            match self.consume_expression_operator(start_span)? {
+                ExpressionOperator::Access(AccessType::AccessThis) => {
+                    let generics = if self.current_is(&ARROW_LEFT) {
+                        self.parse_generic_define().merge_to_result()?
+                    } else {
+                        vec![]
+                    };
+
+                    let ident = self.try_bump_consume_ident()?;
+
+                    if self.current_is(&CURLY_OPEN) {
+                        let (binding, body) = self.parse_match_method_arm(start_span)?;
+
+                        if let ExpressionKind::MatchMethod(ref mut mm) = left.node {
+                            mm.arms.push(MatchMethodArm {
+                                variant_name: ident,
+                                binding,
+                                body,
+                            });
+                            left.span = self.span_combine(start_span);
+                        } else {
+                            let mm = MatchMethod {
+                                id: None,
+                                expr: Box::new(left),
+                                arms: vec![MatchMethodArm {
+                                    variant_name: ident,
+                                    binding,
+                                    body,
+                                }],
+                            };
+                            left = Expression::new(
+                                ExpressionKind::MatchMethod(mm),
+                                self.span_combine(start_span),
+                            );
+                        }
+
+                        continue;
+                    }
+
+                    left = match self.try_parse_function_call_generic(
+                        start_span,
+                        Some(&left),
+                        generics,
+                        &ident,
+                    ) {
+                        Ok(call) => Expression::from_function_call(call),
+                        Err(TryError::IsNotValue(_)) => self.parse_field_access(left, ident)?,
+                        Err(TryError::IsErr(err)) => return Err(err),
+                    };
+                }
+                ExpressionOperator::Access(AccessType::AccessIndex) => {
+                    let index = self.parse_expression(&[
+                        SQUARE_CLOSE,
+                        TokenKind::EndLine,
+                        TokenKind::EndFile,
+                    ])?;
+                    self.expect(&SQUARE_CLOSE)?;
+                    left = Expression::new_index(left, index, self.span_combine(start_span))
+                }
+                _ => break,
+            }
+        }
+
+        left = self.apply_prefix_operators(left, prefix_ops);
+
+        loop {
             if self.current_is(&TokenKind::EndLine) && self.current_is_any(end_tokens) {
                 let saved = self.current_position();
                 self.skip_end_lines();
@@ -96,55 +194,6 @@ impl<'a, 'f> Parser<'a, 'f> {
                     left =
                         Expression::new_binary(left, operator, right, self.span_combine(start_span))
                 }
-                ExpressionOperator::Access(AccessType::AccessThis) => {
-                    let generics = if self.current_is(&ARROW_LEFT) {
-                        self.parse_generic_define().merge_to_result()?
-                    } else {
-                        vec![]
-                    };
-
-                    let ident = self.try_bump_consume_ident()?;
-
-                    if self.current_is(&CURLY_OPEN) {
-                        let (binding, body) = self.parse_match_method_arm(start_span)?;
-
-                        if let ExpressionKind::MatchMethod(ref mut mm) = left.node {
-                            mm.arms.push(MatchMethodArm {
-                                variant_name: ident,
-                                binding,
-                                body,
-                            });
-                            left.span = self.span_combine(start_span);
-                        } else {
-                            let mm = MatchMethod {
-                                id: None,
-                                expr: Box::new(left),
-                                arms: vec![MatchMethodArm {
-                                    variant_name: ident,
-                                    binding,
-                                    body,
-                                }],
-                            };
-                            left = Expression::new(
-                                ExpressionKind::MatchMethod(mm),
-                                self.span_combine(start_span),
-                            );
-                        }
-
-                        continue;
-                    }
-
-                    left = match self.try_parse_function_call_generic(
-                        start_span,
-                        Some(&left),
-                        generics,
-                        &ident,
-                    ) {
-                        Ok(call) => Expression::from_function_call(call),
-                        Err(TryError::IsNotValue(_)) => self.parse_field_access(left, ident)?,
-                        Err(TryError::IsErr(err)) => return Err(err),
-                    };
-                }
                 ExpressionOperator::TypeOf {
                     type_name,
                     variant_name,
@@ -161,19 +210,10 @@ impl<'a, 'f> Parser<'a, 'f> {
                         self.span_combine(start_span),
                     );
                 }
-                ExpressionOperator::Access(AccessType::AccessIndex) => {
-                    let index = self.parse_expression(&[
-                        SQUARE_CLOSE,
-                        TokenKind::EndLine,
-                        TokenKind::EndFile,
-                    ])?;
-                    self.expect(&SQUARE_CLOSE)?;
-                    left = Expression::new_index(left, index, self.span_combine(start_span))
-                }
+                _ => break,
             }
         }
 
-        left = self.apply_prefix_operators(left, prefix_ops);
         Ok(left)
     }
 

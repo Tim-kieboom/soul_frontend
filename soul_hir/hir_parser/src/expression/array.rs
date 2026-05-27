@@ -42,7 +42,7 @@ impl<'a> HirContext<'a> {
         }
     }
 
-    pub(super) fn insert_desugar_variable(
+    pub(crate) fn insert_desugar_variable(
         &mut self,
         variable: hir::Variable,
         ty: LazyTypeId,
