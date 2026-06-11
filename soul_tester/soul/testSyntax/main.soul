@@ -1,0 +1,59 @@
+import (
+    std.fmt
+)
+
+pub sum(a: int, b: int): int {
+    a + b
+}
+
+type unsigned = uint
+type interger = distinct int
+
+use int {
+    pub sum(this, b: int): int {
+        this + b
+    }
+}
+
+struct Foo {
+    pub field: int = 1
+    pub mut mutable: char = ' '
+
+    This.() {
+        this.field = 2
+        this.mutable = 'a'        
+    }
+
+    This.[int](array) {
+        this.field = array[0]
+    }
+
+    methode(&this) {
+        println("do stuff")
+    }
+}
+
+reflect(value: &any) {
+    
+    match value.typeof {
+        Type.Struct(info) => println("{} {{ {} }}", info.name, info.fields)
+        Type.Enum(info) => println("{}.{}", info.name, value.variant)
+        Type.Primitive(info) => println(value)
+    }
+}
+
+main() {
+    println("hello world")
+    fmt.format("{}.{}", 1, "hello world")
+    num := int.(1)
+    mut arr: [4]int = [int: 1, 2, 4, 5]
+    arr = [int: for 4 => 1]
+    arr = [int: for 4 => undefined]
+
+    arr: &[]int = &arr
+    arr: &mut []int = &mut arr
+    
+    arr := List.[1, 2, 3]
+    ptr := new(1)
+    arr: []int = new.[1,2,3,4]
+}

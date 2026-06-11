@@ -1,0 +1,8 @@
+pub sum(a: int, b: int): int {
+    a + b
+}
+
+main() {
+    println("hello world")
+}
+
