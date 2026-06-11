@@ -1,8 +1,0 @@
-[package]
-name = "Test"
-version = "0.1.0"
-edition = "2026"
-
-[dependencies]
-# Std = { path = "lib/soul_std", version = "0.1.0" }
-# Core = { path = "lib/soul_core", version = "0.1.0" }

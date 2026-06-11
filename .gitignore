@@ -1,11 +1,4 @@
 # soul compiler outputs
 *.VSCodeCounter
 *.soulc
-*.soulAST
-*.soulAST.json
 *.ll
-soul_tester/path.json
-
-soul_tester/log.txt
-soul_tester/paths.json
-bottleneck.md
