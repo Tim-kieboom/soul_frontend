@@ -31,10 +31,9 @@ define_str_enum!(
         Literal => "literal", 0,
         Const => "const", 0,
         Mut => "mut", 0,
+        Pub => "pub", 0,
 
         Null => "null", 0,
-        True => "true", 0,
-        False => "false", 0,
 
         New => "new", 0,
         Use => "use", 0,
@@ -43,5 +42,8 @@ define_str_enum!(
         Typeof => "typeof", 0,
         Import => "import", 0,
         Extern => "extern", 0,
+
+        True => "true", 0,
+        False => "false", 0,
     }
 );

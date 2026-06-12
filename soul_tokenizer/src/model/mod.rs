@@ -1,7 +1,8 @@
-pub(crate) mod keyword;
-pub(crate) mod symbol;
+pub mod keyword;
+pub mod symbol;
+pub mod types;
 
-use crate::model::{keyword::KeyWord, symbol::Symbol};
+use crate::model::{keyword::{KeyWord}, types::Types, symbol::Symbol};
 use soul_utils::{literal::Literal, span::Span};
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -10,6 +11,7 @@ pub enum TokenKind {
     Keyword(KeyWord),
     Symbol(Symbol),
     Ident(String),
+    Types(Types),
     EndLine,
     EndFile,
 }

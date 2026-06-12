@@ -3,8 +3,9 @@ use soul_utils::span::{ModuleId, Span};
 use crate::model::{Token, TokenKind};
 use crate::lexer::Lexer;
 
-pub(crate) mod model;
+pub mod model;
 pub(crate) mod lexer;
+pub(crate) mod str_iter;
 
 #[cfg(test)]
 mod tests;

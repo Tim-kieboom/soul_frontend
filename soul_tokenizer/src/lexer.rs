@@ -1,15 +1,12 @@
-use std::{iter::{Peekable}, str::Chars};
-
 use soul_utils::{fault::{Fault, SoulResult}, literal::{Literal, Number, StringLiteral, StringTag}, span::{ModuleId, Span, SpanLine}};
-
-use crate::model::{Token, TokenKind, symbol::Symbol};
+use crate::{model::{Token, TokenKind, keyword::KeyWord, symbol::Symbol, types::Types}, str_iter::StrIter};
 
 #[derive(Debug, Clone)]
 pub struct Lexer<'a> {
     module: ModuleId,
     line: SpanLine,
     current: Option<char>,
-    input: Peekable<Chars<'a>>,
+    input: StrIter<'a>,
 }
 
 impl<'a> Lexer<'a> {
@@ -22,7 +19,7 @@ impl<'a> Lexer<'a> {
                 offset: 0,
             },
             current: None,
-            input: source.chars().peekable(),
+            input: StrIter::new(source),
         };
         lexer.next_char();
         lexer
@@ -43,7 +40,7 @@ impl<'a> Lexer<'a> {
 
     /// Peeks at the next character without consuming it.
     pub(crate) fn peek_char(&mut self) -> Option<char> {
-        self.input.peek().copied()
+        self.input.peek()
     }
 
     pub(crate) fn next(&mut self) -> SoulResult<Token> {
@@ -56,7 +53,6 @@ impl<'a> Lexer<'a> {
         }
 
         self.skip_whitespace();
-        let mut line = self.line;
 
         let peek = self.peek_char();
         if self.current == Some('/') && peek == Some('/') {
@@ -64,13 +60,14 @@ impl<'a> Lexer<'a> {
             self.skip_whitespace();
             return Ok(Token::new(
                 TokenKind::EndLine,
-                self.span(line),
+                Span::new_line(self.module, self.line),
             ));
         } else if self.current == Some('/') && peek == Some('*') {
             self.skip_multi_comment();
             self.skip_whitespace();
         }
 
+        let line = self.line;
         if let Some(symbol) = self.try_get_symbol() {
             
             let kind = if self.is_negative_number(symbol) {
@@ -92,7 +89,7 @@ impl<'a> Lexer<'a> {
         
         let kind = self.get_token_kind(current, line)?;
         if kind == TokenKind::EndLine {
-            line.offset += 1;
+            return Ok(Token::new(kind, Span::new_line(self.module, line)))
         }
 
         Ok(Token::new(kind, self.span(line)))
@@ -113,6 +110,9 @@ impl<'a> Lexer<'a> {
         Ok(match char {
             '\n' | '\r' => {
                 self.next_char();
+                if char == '\r' && self.current ==  Some('\n') {
+                    self.next_char()
+                }
                 TokenKind::EndLine
             }
             '"' => {
@@ -120,7 +120,16 @@ impl<'a> Lexer<'a> {
                 TokenKind::Literal(Literal::StringLiteral(string))
             }
             '\'' => TokenKind::Literal(Literal::Char(self.lex_char(line)?)),
-            ch if is_ident(ch) => TokenKind::Ident(self.lex_ident()),
+            ch if is_ident(ch) => {
+                let ident_str = self.lex_ident();
+                if let Some(keyword) = KeyWord::from_str(ident_str) {
+                    TokenKind::Keyword(keyword)
+                } else if let Some(types) = Types::from_str(ident_str) {
+                    TokenKind::Types(types)
+                } else {
+                    TokenKind::Ident(ident_str.to_string())
+                }
+            }
             ch if is_number(ch) => TokenKind::Literal(Literal::Number(self.lex_number(line)?)),
             _ => {
                 self.next_char();
@@ -132,19 +141,18 @@ impl<'a> Lexer<'a> {
         })
     }
 
-    fn lex_ident(&mut self) -> String {
-        let mut ident = String::new();
+    fn lex_ident(&mut self) -> &str {
 
+        let start = self.input.position();
         while let Some(char) = self.current {
             if char.is_alphabetic() || char == '_' || is_number(char) {
-                ident.push(char);
                 self.next_char();
             } else {
                 break;
             }
         }
 
-        ident
+        &self.input.slice(start..self.input.position())
     }
 
     fn lex_char(&mut self, line: SpanLine) -> SoulResult<char> {
@@ -350,7 +358,11 @@ impl<'a> Lexer<'a> {
     }
 
     fn span(&self, line: SpanLine) -> Span {
-        Span::new(self.module, line, self.line)
+        Span::new(
+            self.module, 
+            line,
+            self.line
+        )
     }
 }
 

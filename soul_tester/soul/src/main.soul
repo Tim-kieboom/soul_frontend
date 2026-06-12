@@ -3,6 +3,8 @@ pub sum(a: int, b: int): int {
 }
 
 main() {
+    ch := 'a'
+    cstring := c"cstr"
     println("hello world")
 }
 

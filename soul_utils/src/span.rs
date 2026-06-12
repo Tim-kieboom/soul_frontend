@@ -2,7 +2,7 @@ use crate::{ids::IdAlloc, impl_soul_ids};
 
 impl_soul_ids!(ModuleId);
 
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SpanLine {
     pub line: usize,
     pub offset: usize,
@@ -30,6 +30,11 @@ impl Span {
             start: SpanLine { line: 0, offset: 0 },
             end: SpanLine { line: 0, offset: 0 },
         }
+    }
+
+    pub fn is_single(&self) -> bool {
+        let offset = self.end.offset.saturating_sub(self.start.offset); 
+        self.start.line == self.end.line && offset <= 1
     }
 
     pub fn error() -> Self {

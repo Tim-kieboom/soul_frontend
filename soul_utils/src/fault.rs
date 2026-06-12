@@ -39,6 +39,15 @@ impl Fault {
             span,
         }
     }
+
+    pub fn to_string(&self) -> String {
+        let span_msg = if let Some(span) = self.span {
+            format!("as {}:{};", span.start.line, span.start.offset)
+        } else {
+            String::new()
+        };
+        format!("!!error!! {} {}", span_msg, self.message)
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
