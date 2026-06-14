@@ -2,24 +2,6 @@
 
 # Phase 2: Lexer
 
-## Tokens
-
-* [ ] Identifiers
-* [ ] Keywords
-* [ ] Integer literals
-* [ ] Float literals
-* [ ] String literals
-* [ ] Character literals
-* [ ] Comments
-* [ ] Operators
-* [ ] Delimiters
-
-## Diagnostics
-
-* [ ] Invalid characters
-* [ ] Unterminated strings
-* [ ] Unterminated comments
-
 ## Tests
 
 * [ ] Tokenization tests

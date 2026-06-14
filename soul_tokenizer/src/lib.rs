@@ -1,4 +1,5 @@
-use soul_utils::fault::{Fault, SoulResult};
+use soul_utils::error::SoulResult;
+use soul_utils::fault::{Fault};
 use soul_utils::span::{ModuleId, Span};
 use crate::model::{Token, TokenKind};
 use crate::lexer::Lexer;
@@ -18,6 +19,7 @@ pub struct TokenStreamPosition<'a>(TokenStream<'a>);
 pub struct TokenStream<'a> {
     lexer: Lexer<'a>,
     current: Token,
+    index: usize,
 }
 
 /// Converts source code into a token stream for parsing.
@@ -29,11 +31,16 @@ impl<'a> TokenStream<'a> {
     /// Creates a new token stream from the given source code.
     pub fn new(source: &'a str, module: ModuleId) -> SoulResult<Self> {
         let mut this = Self {
+            index: 0,
             lexer: Lexer::new(source, module),
             current: Token::new(TokenKind::EndLine, Span::default(module)),
         };
         this.initialize()?;
         Ok(this)
+    }
+
+    pub fn index(&self) -> usize {
+        self.index
     }
 
     fn initialize(&mut self) -> SoulResult<()> {
@@ -57,13 +64,15 @@ impl<'a> TokenStream<'a> {
 
     /// Peeks at the next token without advancing the stream position.
     pub fn peek(&self) -> SoulResult<Token> {
-        let mut lexer = self.lexer.clone();
-        lexer.next()
+        self.lexer
+            .clone()
+            .next()
     }
 
     /// Advances the stream to the next token, updating the current token.
     pub fn advance(&mut self) -> SoulResult<()> {
         self.current = self.lexer.next()?;
+        self.index += 1;
         Ok(())
     }
 

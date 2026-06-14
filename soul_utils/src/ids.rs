@@ -14,6 +14,10 @@ macro_rules! impl_soul_ids {
                 serde::Serialize, serde::Deserialize
             )]
             pub struct $ty(usize);
+            
+            impl $ty {
+                pub const ERROR: $ty = $ty(0);
+            }
 
             impl $crate::collections::vec_map::VecMapIndex for $ty {
                 fn new_index(value: usize) -> Self {

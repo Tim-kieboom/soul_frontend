@@ -1,12 +1,8 @@
 [package]
-name = "soul_utils"
+name = "ast_model"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.150"
-
-[features]
-absolute_internal_error_path = []
-error_backtrace = []
+soul_utils = { version = "0.1.0", path = "../../soul_utils" }

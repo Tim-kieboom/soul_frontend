@@ -1,6 +1,7 @@
+use std::fmt::Debug;
+
 use crate::span::Span;
 
-pub type SoulResult<T> = Result<T, Fault>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
 pub enum Severity {
@@ -9,62 +10,126 @@ pub enum Severity {
     Error = 2,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct Fault {
-    pub severity: Severity,
-    pub message: String,
-    pub span: Option<Span>,
+    severity: Severity,
+    message: String,
+    span: Option<Span>,
+
+    #[cfg(feature = "error_backtrace")]
+    backtrace: String,
 }
 impl Fault {
     pub fn error(message: impl Into<String>, span: Option<Span>) -> Self  {
-        Fault { 
-            severity: Severity::Error, 
-            message: message.into(), 
+        Fault::new( 
+            Severity::Error, 
+            message.into(), 
             span,
-        }
+        )
     }
 
     pub fn warning(message: impl Into<String>, span: Option<Span>) -> Self  {
-        Fault { 
-            severity: Severity::Warning, 
-            message: message.into(), 
+        Fault::new( 
+            Severity::Warning, 
+            message.into(), 
             span,
-        }
+        )
     }
 
     pub fn note(message: impl Into<String>, span: Option<Span>) -> Self {
+        Fault::new( 
+            Severity::Note, 
+            message.into(), 
+            span,
+        )
+    }
+
+    #[cfg(feature = "error_backtrace")]
+    pub fn empty() -> Self {
         Fault { 
-            severity: Severity::Note, 
-            message: message.into(), 
+            backtrace: String::new(),
+            severity: Severity::Error, 
+            message: String::new(), 
+            span: None,
+        }
+    }
+
+    #[cfg(not(feature = "error_backtrace"))]
+    pub fn empty() -> Self {
+        Fault { 
+            severity: Severity::Error, 
+            message: String::new(), 
+            span: None,
+        }
+    }
+
+    #[cfg(feature = "error_backtrace")]
+    fn new(severity: Severity, message: String, span: Option<Span>) -> Self {
+        Fault { 
+            backtrace: Backtrace::force_capture().to_string(),
+            severity, 
+            message, 
             span,
         }
     }
 
-    pub fn to_string(&self) -> String {
+    #[cfg(not(feature = "error_backtrace"))]
+    fn new(severity: Severity, message: String, span: Option<Span>) -> Self {
+        Fault { 
+            severity, 
+            message, 
+            span,
+        }
+    }
+
+    pub fn severity(&self) -> Severity {
+        self.severity
+    }
+
+    pub fn span(&self) -> Option<Span> {
+        self.span
+    }
+
+    pub fn message(&self) -> &String {
+        &self.message
+    }
+
+    #[cfg(feature = "error_backtrace")]
+    pub fn backtract(&self) -> &String {
+        &self.backtrace
+    }
+}
+impl Debug for Fault {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let span_msg = if let Some(span) = self.span {
             format!("as {}:{};", span.start.line, span.start.offset)
         } else {
             String::new()
         };
-        format!("!!error!! {} {}", span_msg, self.message)
+
+        f.write_fmt(format_args!("!!error!! {} {}", span_msg, self.message))
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct FaultCollector {
-    faults: Vec<Fault>,
+    pub faults: Vec<Fault>,
 }
 impl FaultCollector {
     
-    pub fn error(&mut self, message: impl Into<String>, span: Option<Span>) {
+    pub fn push(&mut self, fault: Fault) {
+        self.faults.push(fault);
+    }
+
+    pub fn push_error(&mut self, message: impl Into<String>, span: Option<Span>) {
         self.faults.push(Fault::error(message, span));
     }
 
-    pub fn warning(&mut self, message: impl Into<String>, span: Option<Span>) {
+    pub fn push_warning(&mut self, message: impl Into<String>, span: Option<Span>) {
         self.faults.push(Fault::warning(message, span));
     }
 
-    pub fn note(&mut self, message: impl Into<String>, span: Option<Span>) {
+    pub fn push_note(&mut self, message: impl Into<String>, span: Option<Span>) {
         self.faults.push(Fault::note(message, span));
     }
 

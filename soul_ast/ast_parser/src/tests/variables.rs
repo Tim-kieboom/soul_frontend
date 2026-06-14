@@ -1,0 +1,60 @@
+use ast_model::{expression::ExpressionKind, literal::Literal, soul_type::SoulType, statements::{StatementKind, Variable}};
+use soul_utils::TypeModifier;
+
+use crate::tests::{get_statement, parse};
+
+#[test]
+fn variable_declaration_with_init() {
+    let (module, store, _) = parse("x := 5");
+    let stmt = get_statement(&store, &module, 0);
+    let Variable { name, modifier, ty, initialize_value, .. } = match &stmt.node {
+        StatementKind::Variable(v) => v,
+        _ => panic!("expected Variable"),
+    };
+    assert_eq!(name.as_str(), "x");
+    assert_eq!(*modifier, TypeModifier::Const);
+    assert!(ty.is_none());
+    assert!(initialize_value.is_some());
+
+    let init = &store.expressions[initialize_value.unwrap()];
+    assert_eq!(
+        init.node,
+        ExpressionKind::Literal((None, Literal::Uint(5)))
+    );
+}
+
+#[test]
+fn variable_declaration_typed() {
+    let (module, store, _) = parse("x: int = 10");
+    let stmt = get_statement(&store, &module, 0);
+    let Variable { ty, .. } = match &stmt.node {
+        StatementKind::Variable(v) => v,
+        _ => panic!("expected Variable"),
+    };
+    assert_eq!(*ty, Some(SoulType::Primitive(soul_utils::soul_names::PrimitiveTypes::Int)));
+}
+
+#[test]
+fn variable_declaration_no_init() {
+    let (module, store, _) = parse("mut x: int");
+    let stmt = get_statement(&store, &module, 0);
+    let Variable { initialize_value, name, modifier, .. } = match &stmt.node {
+        StatementKind::Variable(v) => v,
+        _ => panic!("expected Variable"),
+    };
+    assert_eq!(name.as_str(), "x");
+    assert_eq!(*modifier, TypeModifier::Mut);
+    assert!(initialize_value.is_none());
+}
+
+#[test]
+fn mutable_variable() {
+    let (module, store, _) = parse("mut x := 5");
+    let stmt = get_statement(&store, &module, 0);
+    let Variable { name, modifier, .. } = match &stmt.node {
+        StatementKind::Variable(v) => v,
+        _ => panic!("expected Variable"),
+    };
+    assert_eq!(name.as_str(), "x");
+    assert_eq!(*modifier, TypeModifier::Mut);
+}

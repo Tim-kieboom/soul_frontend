@@ -6,6 +6,14 @@ define_str_enum!(
     /// These keywords are used for control flow, type definitions, and other
     /// language constructs.
     pub enum KeyWord {
+        Literal => "literal", 0,
+        Const => "const", 0,
+        Mut => "mut", 0,
+        Pub => "pub", 0,
+        
+        True => "true", 0,
+        False => "false", 0,
+        
         If => "if", 5,
         Else => "else", 5,
 
@@ -28,13 +36,9 @@ define_str_enum!(
 
         Copy => "copy", 0,
 
-        Literal => "literal", 0,
-        Const => "const", 0,
-        Mut => "mut", 0,
-        Pub => "pub", 0,
-
         Null => "null", 0,
 
+        As => "as", 0,
         New => "new", 0,
         Use => "use", 0,
         Crate => "crate", 0,
@@ -42,8 +46,5 @@ define_str_enum!(
         Typeof => "typeof", 0,
         Import => "import", 0,
         Extern => "extern", 0,
-
-        True => "true", 0,
-        False => "false", 0,
     }
 );

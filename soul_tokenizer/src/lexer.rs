@@ -1,5 +1,11 @@
-use soul_utils::{fault::{Fault, SoulResult}, literal::{Literal, Number, StringLiteral, StringTag}, span::{ModuleId, Span, SpanLine}};
-use crate::{model::{Token, TokenKind, keyword::KeyWord, symbol::Symbol, types::Types}, str_iter::StrIter};
+#[cfg(debug_assertions)]
+use std::sync::Once;
+
+use soul_utils::{error::SoulResult, fault::Fault, literal::{TokenLiteral, Number, StringLiteral, StringTag}, soul_names::Symbol, span::{ModuleId, Span, SpanLine}};
+use crate::{model::{Token, TokenKind, keyword::KeyWord, types::Types}, str_iter::StrIter};
+
+#[cfg(debug_assertions)]
+static TRY_GET_SYMBOL_INIT: Once = Once::new();
 
 #[derive(Debug, Clone)]
 pub struct Lexer<'a> {
@@ -71,7 +77,7 @@ impl<'a> Lexer<'a> {
         if let Some(symbol) = self.try_get_symbol() {
             
             let kind = if self.is_negative_number(symbol) {
-                TokenKind::Literal(Literal::Number(self.lex_number(line)?))
+                TokenKind::Literal(TokenLiteral::Number(self.lex_number(line)?))
             }  else {
                 self.next_char();
                 TokenKind::Symbol(symbol)
@@ -103,7 +109,7 @@ impl<'a> Lexer<'a> {
                 StringTag::CStr => StringLiteral::Cstr(str),
             };
 
-            return Ok(TokenKind::Literal(Literal::StringLiteral(string)))
+            return Ok(TokenKind::Literal(TokenLiteral::String(string)))
         }
 
 
@@ -117,9 +123,9 @@ impl<'a> Lexer<'a> {
             }
             '"' => {
                 let string = StringLiteral::Str(self.lex_string(line)?);
-                TokenKind::Literal(Literal::StringLiteral(string))
+                TokenKind::Literal(TokenLiteral::String(string))
             }
-            '\'' => TokenKind::Literal(Literal::Char(self.lex_char(line)?)),
+            '\'' => TokenKind::Literal(TokenLiteral::Char(self.lex_char(line)?)),
             ch if is_ident(ch) => {
                 let ident_str = self.lex_ident();
                 if let Some(keyword) = KeyWord::from_str(ident_str) {
@@ -130,7 +136,7 @@ impl<'a> Lexer<'a> {
                     TokenKind::Ident(ident_str.to_string())
                 }
             }
-            ch if is_number(ch) => TokenKind::Literal(Literal::Number(self.lex_number(line)?)),
+            ch if is_number(ch) => TokenKind::Literal(TokenLiteral::Number(self.lex_number(line)?)),
             _ => {
                 self.next_char();
                 return Err(Fault::error(
@@ -298,25 +304,21 @@ impl<'a> Lexer<'a> {
     fn try_get_symbol(&mut self) -> Option<Symbol> {
         let current = self.current?;
         
-        let mut pos = 0;
-        let mut buf = [0u8; 8];
-        let first = current.encode_utf8(&mut buf[pos..]).len();
-        pos += first;
+        #[cfg(debug_assertions)]
+        TRY_GET_SYMBOL_INIT.call_once(|| 
+            debug_assert!(Symbol::STRING_VALUES.iter().all(|name| name.len() <= 2))
+        );
+
         if let Some(peek) = self.peek_char() {
-            pos += peek.encode_utf8(&mut buf[pos..]).len();
-        };
-        
-        let str_slice: &str = std::str::from_utf8(&buf[..pos]).ok()?;
-        
-        match Symbol::from_str(str_slice) {
-            Some(symbol) => {
-                if pos > first {
-                    self.next_char();
-                }
-                Some(symbol)
+            let two_str = [current, peek].iter().collect::<String>();
+            
+            if let Some(symbol) = Symbol::from_str(&two_str) {
+                self.next_char();
+                return Some(symbol);
             }
-            None => Symbol::from_str(&str_slice[..first]),
         }
+        
+        Symbol::from_str(&current.to_string())
     }
 
     fn is_negative_number(&mut self, symbol: Symbol) -> bool {

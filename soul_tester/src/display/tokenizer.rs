@@ -8,7 +8,7 @@ use crate::display::display_span;
 pub(crate) fn display_tokens<'a>(tokens: TokenStream<'a>, writer: &mut impl Write) -> Result<()> {
     
     for token in tokens {
-        let token = token.map_err(|err| anyhow::Error::msg(err.to_string()))?;
+        let token = token.map_err(|err| anyhow::Error::msg(err.message()))?;
         writer.write("Span(".as_bytes())?;
         display_span(token.span, writer)?;
         
@@ -34,7 +34,7 @@ trait Display {
 impl Display for Literal {
     fn display(&self, writer: &mut impl Write) -> std::io::Result<()> {
         match self {
-            Self::StringLiteral(str) => match str {
+            Self::String(str) => match str {
                 StringLiteral::Str(str) => writer.write_fmt(format_args!("str({str:?})")),
                 StringLiteral::Cstr(str) => writer.write_fmt(format_args!("cstr({str:?})")),
             },
