@@ -9,10 +9,10 @@ pub(crate) struct StrIter<'a> {
 }
 impl<'a> StrIter<'a> {
     pub(crate) fn new(source: &'a str) -> Self {
-        Self{
+        Self {
             chars: source.chars().peekable(),
-            next_position: 0, 
-            position: 0, 
+            next_position: 0,
+            position: 0,
             source,
         }
     }
@@ -22,7 +22,6 @@ impl<'a> StrIter<'a> {
     }
 
     pub(crate) fn next(&mut self) -> Option<char> {
-        
         self.position = self.next_position;
         if let Some(ch) = self.chars.next() {
             self.next_position += ch.len_utf8();

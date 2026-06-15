@@ -4,7 +4,9 @@ use soul_tokenizer::{
     TokenStreamPosition,
     model::{Token, TokenKind, keyword::KeyWord},
 };
-use soul_utils::{Ident, TypeModifier, error::SoulResult, fault::Fault, soul_names::Symbol, span::Span};
+use soul_utils::{
+    Ident, TypeModifier, error::SoulResult, fault::Fault, soul_names::Symbol, span::Span,
+};
 
 use crate::parser::Parser;
 
@@ -174,7 +176,9 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let last_index = expected.len().saturating_sub(1);
         for (i, token) in expected.iter().enumerate() {
-            token.write_display(&mut tokens_string).expect("no fmt error");
+            token
+                .write_display(&mut tokens_string)
+                .expect("no fmt error");
             if i != last_index {
                 tokens_string.push_str("`, `");
             }
@@ -190,8 +194,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     pub(crate) fn try_bump_type_modiffier(&mut self) -> Option<TypeModifier> {
-
-        Some(match self.token().kind  {
+        Some(match self.token().kind {
             TokenKind::Keyword(KeyWord::Mut) => {
                 self.bump();
                 TypeModifier::Mut

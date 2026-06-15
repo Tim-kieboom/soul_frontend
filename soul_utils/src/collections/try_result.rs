@@ -1,6 +1,5 @@
 use crate::{error::SoulResult, fault::Fault};
 
-
 /// Error type for try-parsing operations.
 ///
 /// - `TryError::IsNotValue(R)` - the value is not of the expected type

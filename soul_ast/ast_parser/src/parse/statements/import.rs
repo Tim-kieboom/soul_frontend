@@ -1,12 +1,14 @@
 use ast_model::statements::{Import, ImportItem, ImportKind, ImportPath, Statement, StatementKind};
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
-use soul_utils::{Ident, collections::soul_import_path::SoulImportPath, error::SoulResult, fault::Fault, soul_names::Symbol};
+use soul_utils::{
+    Ident, collections::soul_import_path::SoulImportPath, error::SoulResult, fault::Fault,
+    soul_names::Symbol,
+};
 
 use crate::{
     parser::Parser,
     utils::{AS_STR, COMMA, CURLY_CLOSE, CURLY_OPEN, ROUND_CLOSE, ROUND_OPEN, STAR},
 };
-
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub(super) fn parse_import(&mut self) -> SoulResult<Statement> {
@@ -14,8 +16,12 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let mut paths = vec![];
         match &self.token().kind {
-            TokenKind::Keyword(KeyWord::Import) => { self.bump(); }
-            _ => { self.expect_ident(KeyWord::Import.as_str())?; }
+            TokenKind::Keyword(KeyWord::Import) => {
+                self.bump();
+            }
+            _ => {
+                self.expect_ident(KeyWord::Import.as_str())?;
+            }
         }
         if self.current_is(&ROUND_OPEN) {
             self.bump();
@@ -135,10 +141,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             while self.current_is(&PREV_SUPER) {
                 self.bump();
                 if !current_path.pop() {
-                    return Err(Fault::error(
-                        "could not pop path",
-                        Some(self.token().span),
-                    ));
+                    return Err(Fault::error("could not pop path", Some(self.token().span)));
                 }
 
                 self.expect(&SEPARATOR)?;

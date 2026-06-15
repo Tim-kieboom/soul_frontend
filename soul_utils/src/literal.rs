@@ -1,6 +1,5 @@
-use std::fmt::Debug;
-
 use crate::soul_names::PrimitiveTypes;
+use std::fmt::{Debug, Write};
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Number {
@@ -18,7 +17,7 @@ pub enum StringLiteral {
 #[derive(Debug, Clone, PartialEq)]
 pub enum StringTag {
     /// `c`
-    CStr, 
+    CStr,
 }
 impl StringTag {
     pub fn from_char(ch: char) -> Option<Self> {
@@ -43,6 +42,19 @@ impl StringLiteral {
             StringLiteral::Cstr(_) => Some(StringTag::CStr),
         }
     }
+
+    pub fn as_type_str(&self) -> &'static str {
+        match self {
+            StringLiteral::Str(_) => "str",
+            StringLiteral::Cstr(_) => PrimitiveTypes::CStr.as_str(),
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            StringLiteral::Str(str) | StringLiteral::Cstr(str) => str,
+        }
+    }
 }
 
 impl Number {
@@ -52,17 +64,15 @@ impl Number {
         sb
     }
 
-    pub fn write_display(&self, sb: &mut String) -> std::fmt::Result {
-        use std::fmt::Write;
-
+    pub fn write_display(&self, writer: &mut String) -> std::fmt::Result {
         const INT_STR: &str = PrimitiveTypes::UntypedInt.as_str();
         const UINT_STR: &str = PrimitiveTypes::UntypedUint.as_str();
         const FLOAT_STR: &str = PrimitiveTypes::UntypedFloat.as_str();
 
         match self {
-            Number::Int(num) => write!(sb, "{num}: {INT_STR}"),
-            Number::Uint(num) => write!(sb, "{num}: {UINT_STR}"),
-            Number::Float(num) => write!(sb, "{num}: {FLOAT_STR}"),
+            Number::Int(num) => write!(writer, "{INT_STR}.({num})"),
+            Number::Uint(num) => write!(writer, "{UINT_STR}.({num})"),
+            Number::Float(num) => write!(writer, "{FLOAT_STR}.({num})"),
         }?;
         Ok(())
     }

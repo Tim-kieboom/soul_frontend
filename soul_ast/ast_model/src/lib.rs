@@ -1,15 +1,32 @@
 pub use crate::ast::*;
+use crate::{
+    ast::{
+        block::{Block, BlockId},
+        expression::{Expression, ExpressionId},
+        statements::{ExternalFunction, Function, FunctionSignature, Statement, StatementId},
+    },
+    declare_store::DeclareStore,
+};
+use soul_utils::{
+    FunctionId,
+    collections::{vec_map::VecMap, vec_set::VecSet},
+    ids::IdGenerator,
+    span::{ModuleId, Spanned},
+};
 use std::collections::HashMap;
-use soul_utils::{FunctionId, collections::{vec_map::VecMap, vec_set::VecSet}, ids::IdGenerator, span::{ModuleId, Spanned}};
-use crate::{ast::{block::{Block, BlockId}, expression::{Expression, ExpressionId}, statements::{ExternalFunction, Function, FunctionSignature, Statement, StatementId}}, declare_store::DeclareStore};
 
 mod ast;
-pub mod scope;
 pub mod declare_store;
+pub mod scope;
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ModuleStore {
-    pub modules: VecMap<ModuleId, Module>,
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct AbstractSyntaxTree {
+    pub modules: AstModuleStore,
+}
+
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct AstModuleStore {
+    modules: VecMap<ModuleId, Module>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -17,17 +34,9 @@ pub enum FunctionKind {
     Normal(Function),
     External(ExternalFunction),
 }
-impl FunctionKind {
-    pub fn signature(&self) -> &Spanned<FunctionSignature> {
-        match self {
-            FunctionKind::Normal(function) => &function.signature,
-            FunctionKind::External(external_function) => &external_function.signature,
-        }
-    }
-}
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
-pub struct AstStore { 
+pub struct AstStore {
     pub declares: DeclareStore,
     pub blocks: VecMap<BlockId, Block>,
     pub statements: VecMap<StatementId, Statement>,
@@ -38,6 +47,56 @@ pub struct AstStore {
     statement_generator: IdGenerator<StatementId>,
     expression_generator: IdGenerator<ExpressionId>,
 }
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Module {
+    pub id: ModuleId,
+    pub name: String,
+    pub global: BlockId,
+    pub parent: Option<ModuleId>,
+    pub modules: VecSet<ModuleId>,
+    pub header: HashMap<String, HeaderEntry>,
+}
+
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct HeaderEntry {
+    pub variable: Option<EntryKind<NodeId>>,
+    pub function: Option<EntryKind<FunctionId>>,
+}
+
+#[derive(Debug, Clone, Copy, Default, serde::Serialize, serde::Deserialize)]
+pub struct EntryKind<T> {
+    pub value: T,
+    pub is_public: bool,
+}
+
+impl AstModuleStore {
+    pub fn insert(&mut self, id: ModuleId, module: Module) -> Option<Module> {
+        self.modules.insert(id, module)
+    }
+
+    pub fn as_vecmap(&self) -> &VecMap<ModuleId, Module> {
+        &self.modules
+    }
+
+    pub fn contains(&self, id: ModuleId) -> bool {
+        self.modules.get(id).is_some()
+    }
+
+    pub fn get_mut(&mut self, id: ModuleId) -> Option<&mut Module> {
+        self.modules.get_mut(id)
+    }
+}
+
+impl FunctionKind {
+    pub fn signature(&self) -> &Spanned<FunctionSignature> {
+        match self {
+            FunctionKind::Normal(function) => &function.signature,
+            FunctionKind::External(external_function) => &external_function.signature,
+        }
+    }
+}
+
 impl AstStore {
     pub fn insert_block(&mut self, block: Block) -> BlockId {
         let id = self.block_generator.alloc();
@@ -66,26 +125,4 @@ impl AstStore {
         self.statements.insert(id, statement);
         id
     }
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct Module {
-    pub id: ModuleId,
-    pub name: String,
-    pub global: BlockId,
-    pub parent: Option<ModuleId>,
-    pub modules: VecSet<ModuleId>,
-    pub header: HashMap<String, HeaderEntry>,
-}
-
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
-pub struct HeaderEntry {
-    pub variable: Option<EntryKind<NodeId>>,
-    pub function: Option<EntryKind<FunctionId>>,
-}
-
-#[derive(Debug, Clone, Copy, Default, serde::Serialize, serde::Deserialize)]
-pub struct EntryKind<T> {
-    pub value: T,
-    pub is_public: bool,
 }

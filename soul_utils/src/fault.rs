@@ -2,15 +2,16 @@ use std::fmt::Debug;
 
 use crate::span::Span;
 
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 pub enum Severity {
     Note = 0,
     Warning = 1,
     Error = 2,
 }
 
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Fault {
     severity: Severity,
     message: String,
@@ -20,64 +21,54 @@ pub struct Fault {
     backtrace: String,
 }
 impl Fault {
-    pub fn error(message: impl Into<String>, span: Option<Span>) -> Self  {
-        Fault::new( 
-            Severity::Error, 
-            message.into(), 
-            span,
-        )
+    pub fn error(message: impl Into<String>, span: Option<Span>) -> Self {
+        Fault::new(Severity::Error, message.into(), span)
     }
 
-    pub fn warning(message: impl Into<String>, span: Option<Span>) -> Self  {
-        Fault::new( 
-            Severity::Warning, 
-            message.into(), 
-            span,
-        )
+    pub fn warning(message: impl Into<String>, span: Option<Span>) -> Self {
+        Fault::new(Severity::Warning, message.into(), span)
     }
 
     pub fn note(message: impl Into<String>, span: Option<Span>) -> Self {
-        Fault::new( 
-            Severity::Note, 
-            message.into(), 
-            span,
-        )
+        Fault::new(Severity::Note, message.into(), span)
     }
 
     #[cfg(feature = "error_backtrace")]
     pub fn empty() -> Self {
-        Fault { 
+        Fault {
             backtrace: String::new(),
-            severity: Severity::Error, 
-            message: String::new(), 
+            severity: Severity::Error,
+            message: String::new(),
             span: None,
         }
     }
 
     #[cfg(not(feature = "error_backtrace"))]
     pub fn empty() -> Self {
-        Fault { 
-            severity: Severity::Error, 
-            message: String::new(), 
+        Fault {
+            severity: Severity::Error,
+            message: String::new(),
             span: None,
         }
     }
 
     #[cfg(feature = "error_backtrace")]
     fn new(severity: Severity, message: String, span: Option<Span>) -> Self {
-        Fault { 
+        use std::backtrace::Backtrace;
+
+        Fault {
             backtrace: Backtrace::force_capture().to_string(),
-            severity, 
-            message, 
+            severity,
+            message,
             span,
         }
     }
 
     #[cfg(not(feature = "error_backtrace"))]
     fn new(severity: Severity, message: String, span: Option<Span>) -> Self {
-        Fault { 
-            severity, 
-            message, 
+        Fault {
+            severity,
+            message,
             span,
         }
     }
@@ -99,24 +90,12 @@ impl Fault {
         &self.backtrace
     }
 }
-impl Debug for Fault {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let span_msg = if let Some(span) = self.span {
-            format!("as {}:{};", span.start.line, span.start.offset)
-        } else {
-            String::new()
-        };
-
-        f.write_fmt(format_args!("!!error!! {} {}", span_msg, self.message))
-    }
-}
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct FaultCollector {
     pub faults: Vec<Fault>,
 }
 impl FaultCollector {
-    
     pub fn push(&mut self, fault: Fault) {
         self.faults.push(fault);
     }
@@ -142,8 +121,6 @@ impl FaultCollector {
     }
 
     pub fn fails(&self, fail_level: Severity) -> bool {
-        self.faults
-            .iter()
-            .any(|d| d.severity == fail_level)
+        self.faults.iter().any(|d| d.severity == fail_level)
     }
 }

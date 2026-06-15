@@ -9,7 +9,10 @@ fn expression_literal_int() {
     match &stmt.node {
         StatementKind::Expression { expression, .. } => {
             let expr = &store.expressions[*expression];
-            assert_eq!(expr.node, ExpressionKind::Literal((None, Literal::Uint(42))));
+            assert_eq!(
+                expr.node,
+                ExpressionKind::Literal((None, Literal::Uint(42)))
+            );
         }
         _ => panic!("expected Expression statement"),
     }
@@ -22,7 +25,10 @@ fn expression_literal_float() {
     match &stmt.node {
         StatementKind::Expression { expression, .. } => {
             let expr = &store.expressions[*expression];
-            assert_eq!(expr.node, ExpressionKind::Literal((None, Literal::Float(3.14))));
+            assert_eq!(
+                expr.node,
+                ExpressionKind::Literal((None, Literal::Float(3.14)))
+            );
         }
         _ => panic!("expected Expression statement"),
     }

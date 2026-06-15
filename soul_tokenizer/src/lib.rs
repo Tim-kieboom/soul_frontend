@@ -1,11 +1,11 @@
-use soul_utils::error::SoulResult;
-use soul_utils::fault::{Fault};
-use soul_utils::span::{ModuleId, Span};
-use crate::model::{Token, TokenKind};
 use crate::lexer::Lexer;
+use crate::model::{Token, TokenKind};
+use soul_utils::error::SoulResult;
+use soul_utils::fault::Fault;
+use soul_utils::span::{ModuleId, Span};
 
-pub mod model;
 pub(crate) mod lexer;
+pub mod model;
 pub(crate) mod str_iter;
 
 #[cfg(test)]
@@ -64,9 +64,7 @@ impl<'a> TokenStream<'a> {
 
     /// Peeks at the next token without advancing the stream position.
     pub fn peek(&self) -> SoulResult<Token> {
-        self.lexer
-            .clone()
-            .next()
+        self.lexer.clone().next()
     }
 
     /// Advances the stream to the next token, updating the current token.

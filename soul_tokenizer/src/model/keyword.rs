@@ -10,10 +10,10 @@ define_str_enum!(
         Const => "const", 0,
         Mut => "mut", 0,
         Pub => "pub", 0,
-        
+
         True => "true", 0,
         False => "false", 0,
-        
+
         If => "if", 5,
         Else => "else", 5,
 
@@ -27,7 +27,7 @@ define_str_enum!(
         Struct => "struct", 0,
         Trait => "trait", 0,
         Enum => "enum", 0,
-        
+
         Type => "type", 0,
         Distinct => "distinct", 0,
 

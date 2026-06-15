@@ -21,7 +21,7 @@ pub enum SoulType {
     NamedVariant {
         base: Box<SoulType>,
         variant: Ident,
-    }
+    },
 }
 
 /// Array type
@@ -67,8 +67,18 @@ pub struct Generic {
     pub bound: Option<SoulType>,
 }
 
+impl Stub {
+    pub fn new(name: String) -> Self {
+        Self { name, generics: vec![] }
+    }
+}
+
 impl ReferenceType {
     pub fn new(ty: SoulType, mutable: bool) -> Self {
-        Self { inner: Box::new(ty), lifetime: None, mutable }
+        Self {
+            inner: Box::new(ty),
+            lifetime: None,
+            mutable,
+        }
     }
 }

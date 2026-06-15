@@ -23,10 +23,10 @@ use crate::{
     },
 };
 
-mod import;
 mod assign;
 mod from_keyword;
 mod from_modfier;
+mod import;
 mod variable;
 
 impl<'a, 'f> Parser<'a, 'f> {
@@ -127,10 +127,10 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     pub(super) fn inner_parse_statement(&mut self) -> SoulResult<Statement> {
         let begin_position = self.tokens.current_position();
-        
+
         self.skip_while_any(STAMENT_SKIP_TOKENS);
         let start_span = self.token().span;
-        
+
         let possible_kind = match &self.token().kind {
             TokenKind::Ident(_) => self.try_parse_from_ident(start_span),
             &CURLY_OPEN => {
@@ -174,15 +174,13 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     fn try_parse_from_ident(&mut self, start_span: Span) -> TryResult<Statement, Fault> {
-
-
         let ident = self.try_token_as_ident_str().try_err()?;
         if let Some(keyword) = KeyWord::from_str(ident) {
             return self.try_parse_from_keyword(start_span, keyword);
         }
 
         match &self.peek().kind {
-            &ROUND_OPEN | &ARROW_LEFT => TryNotValue(Fault::empty()),
+            &ROUND_OPEN | &ARROW_LEFT => self.parse_any_function().try_err(),
             &COLON | &COLON_ASSIGN => self.parse_variable().try_err(),
             _ => self.parse_from_unknown_ident(start_span).try_err(),
         }
@@ -209,8 +207,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     fn inner_parse_methode(&mut self, start_span: Span) -> TryResult<Statement, ()> {
-        let modifier = self.try_bump_type_modiffier()
-            .unwrap_or(TypeModifier::Mut);
+        let modifier = self.try_bump_type_modiffier().unwrap_or(TypeModifier::Mut);
 
         let methode_type = match self.try_parse_type() {
             Ok(val) => val,

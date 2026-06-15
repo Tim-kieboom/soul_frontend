@@ -1,8 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::{fault::Fault};
-#[cfg(feature = "error_backtrace")]
-use std::backtrace::Backtrace;
+use crate::fault::Fault;
 
 // A result type alias for operations that can fail with a `Fault`.
 pub type SoulResult<T> = Result<T, Fault>;
@@ -43,7 +41,12 @@ fn inner_relative_to_project(file_path: &str) -> Option<String> {
 macro_rules! soul_error_internal {
     ($msg:expr, $span:expr) => {
         $crate::fault::Fault::error(
-            format!("!!internal_error!! {} at {}:{}", $msg, file!().to_string(), line!()),
+            format!(
+                "!!internal_error!! {} at {}:{}",
+                $msg,
+                file!().to_string(),
+                line!()
+            ),
             $span,
         )
     };
@@ -64,7 +67,12 @@ macro_rules! soul_error_internal {
 macro_rules! soul_error_internal {
     ($msg:expr, $span:expr) => {
         $crate::fault::Fault::error(
-            format!("!!internal_error!! {} at {}:{}", $msg, $crate::error::relative_to_project(file!()), line!()),
+            format!(
+                "!!internal_error!! {} at {}:{}",
+                $msg,
+                $crate::error::relative_to_project(file!()),
+                line!()
+            ),
             $span,
         )
     };

@@ -1,8 +1,17 @@
 #[cfg(debug_assertions)]
 use std::sync::Once;
 
-use soul_utils::{error::SoulResult, fault::Fault, literal::{TokenLiteral, Number, StringLiteral, StringTag}, soul_names::Symbol, span::{ModuleId, Span, SpanLine}};
-use crate::{model::{Token, TokenKind, keyword::KeyWord, types::Types}, str_iter::StrIter};
+use crate::{
+    model::{Token, TokenKind, keyword::KeyWord, types::Types},
+    str_iter::StrIter,
+};
+use soul_utils::{
+    error::SoulResult,
+    fault::Fault,
+    literal::{Number, StringLiteral, StringTag, TokenLiteral},
+    soul_names::Symbol,
+    span::{ModuleId, Span, SpanLine},
+};
 
 #[cfg(debug_assertions)]
 static TRY_GET_SYMBOL_INIT: Once = Once::new();
@@ -16,14 +25,10 @@ pub struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-
     pub(crate) fn new(source: &'a str, module: ModuleId) -> Self {
         let mut lexer = Lexer {
             module,
-            line: SpanLine {
-                line: 1,
-                offset: 0,
-            },
+            line: SpanLine { line: 1, offset: 0 },
             current: None,
             input: StrIter::new(source),
         };
@@ -50,12 +55,8 @@ impl<'a> Lexer<'a> {
     }
 
     pub(crate) fn next(&mut self) -> SoulResult<Token> {
-        
         if self.current.is_none() {
-            return Ok(Token::new(
-                TokenKind::EndFile, 
-                self.span(self.line)
-            ))
+            return Ok(Token::new(TokenKind::EndFile, self.span(self.line)));
         }
 
         self.skip_whitespace();
@@ -75,48 +76,42 @@ impl<'a> Lexer<'a> {
 
         let line = self.line;
         if let Some(symbol) = self.try_get_symbol() {
-            
             let kind = if self.is_negative_number(symbol) {
                 TokenKind::Literal(TokenLiteral::Number(self.lex_number(line)?))
-            }  else {
+            } else {
                 self.next_char();
                 TokenKind::Symbol(symbol)
             };
 
-            return Ok(Token::new(kind, self.span(line)))   
+            return Ok(Token::new(kind, self.span(line)));
         }
 
         let Some(current) = self.current else {
-            return Ok(Token::new(
-                TokenKind::EndFile, 
-                self.span(self.line)
-            ))
+            return Ok(Token::new(TokenKind::EndFile, self.span(self.line)));
         };
-        
+
         let kind = self.get_token_kind(current, line)?;
         if kind == TokenKind::EndLine {
-            return Ok(Token::new(kind, Span::new_line(self.module, line)))
+            return Ok(Token::new(kind, Span::new_line(self.module, line)));
         }
 
         Ok(Token::new(kind, self.span(line)))
     }
 
     fn get_token_kind(&mut self, char: char, line: SpanLine) -> SoulResult<TokenKind> {
-        
         if let Some(tag) = self.try_get_string_tag(char) {
             let str = self.lex_string(line)?;
             let string = match tag {
                 StringTag::CStr => StringLiteral::Cstr(str),
             };
 
-            return Ok(TokenKind::Literal(TokenLiteral::String(string)))
+            return Ok(TokenKind::Literal(TokenLiteral::String(string)));
         }
-
 
         Ok(match char {
             '\n' | '\r' => {
                 self.next_char();
-                if char == '\r' && self.current ==  Some('\n') {
+                if char == '\r' && self.current == Some('\n') {
                     self.next_char()
                 }
                 TokenKind::EndLine
@@ -141,14 +136,13 @@ impl<'a> Lexer<'a> {
                 self.next_char();
                 return Err(Fault::error(
                     format!("{char:?} is unknown"),
-                    Some(self.span(line))
+                    Some(self.span(line)),
                 ));
             }
         })
     }
 
     fn lex_ident(&mut self) -> &str {
-
         let start = self.input.position();
         while let Some(char) = self.current {
             if char.is_alphabetic() || char == '_' || is_number(char) {
@@ -183,10 +177,7 @@ impl<'a> Lexer<'a> {
         } else if let Some(char) = self.current {
             char
         } else {
-            return Err(Fault::error(
-                "Unclosed char literal",
-                Some(self.span(line)),
-            ));
+            return Err(Fault::error("Unclosed char literal", Some(self.span(line))));
         };
 
         if self.peek_char() != Some('\'') {
@@ -256,7 +247,9 @@ impl<'a> Lexer<'a> {
             self.next_char();
         }
 
-        while let Some(ch) = self.current && is_number(ch) {
+        while let Some(ch) = self.current
+            && is_number(ch)
+        {
             string.push(ch);
             self.next_char();
         }
@@ -266,26 +259,20 @@ impl<'a> Lexer<'a> {
         }
 
         if is_float {
-            string.parse::<f64>().map(Number::Float).map_err(|err| {
-                Fault::error(
-                    err.to_string(),
-                    Some(self.span(line)),
-                )
-            })
+            string
+                .parse::<f64>()
+                .map(Number::Float)
+                .map_err(|err| Fault::error(err.to_string(), Some(self.span(line))))
         } else if has_minus {
-            string.parse::<i64>().map(Number::Int).map_err(|err| {
-                Fault::error(
-                    err.to_string(),
-                    Some(self.span(line)),
-                )
-            })
+            string
+                .parse::<i64>()
+                .map(Number::Int)
+                .map_err(|err| Fault::error(err.to_string(), Some(self.span(line))))
         } else {
-            string.parse::<u64>().map(Number::Uint).map_err(|err| {
-                Fault::error(
-                    err.to_string(),
-                    Some(self.span(line)),
-                )
-            })
+            string
+                .parse::<u64>()
+                .map(Number::Uint)
+                .map_err(|err| Fault::error(err.to_string(), Some(self.span(line))))
         }
     }
 
@@ -293,7 +280,9 @@ impl<'a> Lexer<'a> {
         string.push('.');
         self.next_char();
 
-        while let Some(ch) = self.current && is_number(ch) {
+        while let Some(ch) = self.current
+            && is_number(ch)
+        {
             string.push(ch);
             self.next_char();
         }
@@ -303,27 +292,26 @@ impl<'a> Lexer<'a> {
 
     fn try_get_symbol(&mut self) -> Option<Symbol> {
         let current = self.current?;
-        
+
         #[cfg(debug_assertions)]
-        TRY_GET_SYMBOL_INIT.call_once(|| 
-            debug_assert!(Symbol::STRING_VALUES.iter().all(|name| name.len() <= 2))
-        );
+        TRY_GET_SYMBOL_INIT
+            .call_once(|| debug_assert!(Symbol::STRING_VALUES.iter().all(|name| name.len() <= 2)));
 
         if let Some(peek) = self.peek_char() {
             let two_str = [current, peek].iter().collect::<String>();
-            
+
             if let Some(symbol) = Symbol::from_str(&two_str) {
                 self.next_char();
                 return Some(symbol);
             }
         }
-        
+
         Symbol::from_str(&current.to_string())
     }
 
     fn is_negative_number(&mut self, symbol: Symbol) -> bool {
         if symbol != Symbol::Minus {
-            return false
+            return false;
         }
 
         match self.peek_char() {
@@ -331,7 +319,6 @@ impl<'a> Lexer<'a> {
             None => false,
         }
     }
-
 
     fn skip_line_comment(&mut self) {
         while let Some(char) = self.current {
@@ -360,11 +347,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn span(&self, line: SpanLine) -> Span {
-        Span::new(
-            self.module, 
-            line,
-            self.line
-        )
+        Span::new(self.module, line, self.line)
     }
 }
 

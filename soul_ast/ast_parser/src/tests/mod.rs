@@ -2,31 +2,22 @@ use std::path::PathBuf;
 
 use ast_model::{
     AstStore, Module,
-    expression::{
-        ExpressionKind, FunctionCall,
-        StructConstructor,
-    },
+    expression::{ExpressionKind, FunctionCall, StructConstructor},
     literal::Literal,
-    operators::{BinaryOperatorKind},
+    operators::BinaryOperatorKind,
     soul_type::SoulType,
-    statements::{
-        Assignment, Import, ImportKind, Statement, StatementKind, Variable,
-    },
+    statements::{Assignment, Import, ImportKind, Statement, StatementKind, Variable},
 };
 use soul_tokenizer::to_token_stream;
-use soul_utils::{
-    CrateContext,
-    ids::IdAlloc,
-    span::ModuleId,
-};
+use soul_utils::{CrateContext, ids::IdAlloc, span::ModuleId};
 
 use crate::{ParseInfo, parse_module};
 
-mod variables;
+mod big_test;
+mod conditional;
 mod functions;
 mod literals;
-mod conditional;
-mod big_test;
+mod variables;
 
 fn module_id() -> ModuleId {
     ModuleId::begin()
@@ -39,13 +30,12 @@ fn parse(source: &str) -> (Module, AstStore, CrateContext) {
     let mut context = CrateContext::default();
     let info = ParseInfo {
         id: mid,
-        name: "test".into(),
         parent: None,
         source_folder: PathBuf::from("test"),
         store: &mut store,
         context: &mut context,
     };
-    let module = parse_module(stream, info);
+    let module = parse_module(stream, "test".to_string(), info);
     (module, store, context)
 }
 
@@ -86,10 +76,7 @@ fn binary_addition() {
                     assert_eq!(bin.operator.value, BinaryOperatorKind::Add);
                     let left = &store.expressions[bin.left];
                     let right = &store.expressions[bin.right];
-                    assert_eq!(
-                        left.node,
-                        ExpressionKind::Literal((None, Literal::Uint(1)))
-                    );
+                    assert_eq!(left.node, ExpressionKind::Literal((None, Literal::Uint(1))));
                     assert_eq!(
                         right.node,
                         ExpressionKind::Literal((None, Literal::Uint(2)))
@@ -251,8 +238,6 @@ fn new_ptr() {
     }
 }
 
-
-
 // ----------------------------------------------------------------
 //  Type alias
 // ----------------------------------------------------------------
@@ -296,7 +281,10 @@ fn multiple_statements() {
 #[test]
 fn error_on_bad_token() {
     let (_, _, context) = parse("???");
-    assert!(!context.faults.faults.is_empty(), "expected faults on bad input");
+    assert!(
+        !context.faults.faults.is_empty(),
+        "expected faults on bad input"
+    );
 }
 
 #[test]
@@ -347,7 +335,9 @@ fn chained_function_calls() {
                     assert!(callee.is_some());
                     let inner = &store.expressions[callee.unwrap()];
                     match &inner.node {
-                        ExpressionKind::FunctionCall(FunctionCall { name: inner_name, .. }) => {
+                        ExpressionKind::FunctionCall(FunctionCall {
+                            name: inner_name, ..
+                        }) => {
                             assert_eq!(inner_name.as_str(), "foo");
                         }
                         _ => panic!("expected inner FunctionCall"),
@@ -392,9 +382,11 @@ fn reference_type_variable() {
     };
     assert_eq!(
         *ty,
-        Some(SoulType::Reference(ast_model::soul_type::ReferenceType::new(
-            SoulType::Primitive(soul_utils::soul_names::PrimitiveTypes::Int),
-            true
-        )))
+        Some(SoulType::Reference(
+            ast_model::soul_type::ReferenceType::new(
+                SoulType::Primitive(soul_utils::soul_names::PrimitiveTypes::Int),
+                true
+            )
+        ))
     );
 }

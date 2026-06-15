@@ -14,14 +14,13 @@ mod utils;
 mod tests;
 
 pub struct ParseInfo<'f> {
-    id: ModuleId,
-    name: String,
-    parent: Option<ModuleId>,
-    source_folder: PathBuf,
-    store: &'f mut AstStore,
-    context: &'f mut CrateContext,
+    pub id: ModuleId,
+    pub parent: Option<ModuleId>,
+    pub source_folder: PathBuf,
+    pub store: &'f mut AstStore,
+    pub context: &'f mut CrateContext,
 }
 
-pub fn parse_module<'a, 'f>(input: TokenStream<'a>, info: ParseInfo<'f>) -> Module {
-    Parser::parse(input, info)
+pub fn parse_module<'a, 'f>(input: TokenStream<'a>, name: String, info: ParseInfo<'f>) -> Module {
+    Parser::parse(input, name, info)
 }

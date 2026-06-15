@@ -1,6 +1,5 @@
 use std::path::{Path, PathBuf, StripPrefixError};
 
-
 /// A path to a Soul page/module.
 ///
 /// Represents a hierarchical path to a module or page in the Soul language,

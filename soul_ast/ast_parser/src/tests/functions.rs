@@ -1,4 +1,8 @@
-use ast_model::{expression::{ExpressionKind, FunctionCall}, soul_type::SoulType, statements::{Function, StatementKind}};
+use ast_model::{
+    expression::{ExpressionKind, FunctionCall},
+    soul_type::SoulType,
+    statements::{Function, StatementKind},
+};
 
 use crate::tests::{get_statement, parse};
 
@@ -88,7 +92,9 @@ fn function_call_no_args() {
         StatementKind::Expression { expression, .. } => {
             let expr = &store.expressions[*expression];
             match &expr.node {
-                ExpressionKind::FunctionCall(FunctionCall { name, arguments, .. }) => {
+                ExpressionKind::FunctionCall(FunctionCall {
+                    name, arguments, ..
+                }) => {
                     assert_eq!(name.as_str(), "foo");
                     assert!(arguments.is_empty());
                 }
@@ -107,7 +113,9 @@ fn function_call_with_args() {
         StatementKind::Expression { expression, .. } => {
             let expr = &store.expressions[*expression];
             match &expr.node {
-                ExpressionKind::FunctionCall(FunctionCall { name, arguments, .. }) => {
+                ExpressionKind::FunctionCall(FunctionCall {
+                    name, arguments, ..
+                }) => {
                     assert_eq!(name.as_str(), "add");
                     assert_eq!(arguments.len(), 2);
                 }
@@ -157,10 +165,7 @@ fn function_with_this_ref() {
         _ => panic!("expected Normal function"),
     };
     use ast_model::statements::FunctionThisKind;
-    assert_eq!(
-        signature.value.function_kind,
-        FunctionThisKind::MutRef
-    );
+    assert_eq!(signature.value.function_kind, FunctionThisKind::MutRef);
 }
 
 // ----------------------------------------------------------------

@@ -1,4 +1,4 @@
-use ast_model::{AstStore, Module, block::Block};
+use ast_model::{AstStore, Module, block::Block, soul_type::SoulType};
 use soul_tokenizer::TokenStream;
 #[cfg(debug_assertions)]
 use soul_tokenizer::model::Token;
@@ -28,10 +28,11 @@ pub(crate) struct Parser<'a, 'f> {
     pub(crate) tokens: TokenStream<'a>,
     pub(crate) store: &'f mut AstStore,
     pub(crate) context: &'f mut CrateContext,
+    pub(crate) current_this: Option<SoulType>,
     pub(crate) source_path: PathBuf,
 }
 impl<'a, 'f> Parser<'a, 'f> {
-    pub fn parse(tokens: TokenStream<'a>, info: ParseInfo<'f>) -> Module {
+    pub fn parse(tokens: TokenStream<'a>, name: String, info: ParseInfo<'f>) -> Module {
         let mut this = Self::new(tokens, info.store, info.context, info.source_folder);
 
         #[cfg(debug_assertions)]
@@ -50,9 +51,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         });
 
         Module {
+            name,
             global,
             id: info.id,
-            name: info.name,
             parent: info.parent,
             modules: VecSet::new(),
             header: HashMap::default(),
@@ -96,6 +97,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             store,
             context,
             source_path,
+            current_this: None,
         }
     }
 }

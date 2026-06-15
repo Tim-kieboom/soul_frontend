@@ -1,7 +1,16 @@
 use std::{iter, sync::LazyLock};
 
-use crate::{parse::statements::variable::AssignType, parser::Parser, utils::{CURLY_CLOSE, SEMI_COLON, STAMENT_END_TOKENS}};
-use ast_model::{AstStore, expression::{Expression, ExpressionId}, operators::{BinaryOperator, BinaryOperatorKind}, statements::{Assignment, Statement, StatementKind}};
+use crate::{
+    parse::statements::variable::AssignType,
+    parser::Parser,
+    utils::{CURLY_CLOSE, SEMI_COLON, STAMENT_END_TOKENS},
+};
+use ast_model::{
+    AstStore,
+    expression::{Expression, ExpressionId},
+    operators::{BinaryOperator, BinaryOperatorKind},
+    statements::{Assignment, Statement, StatementKind},
+};
 use soul_tokenizer::model::TokenKind;
 use soul_utils::{error::SoulResult, fault::Fault, span::Span};
 
@@ -45,13 +54,8 @@ impl<'a, 'f> Parser<'a, 'f> {
         };
 
         let rvalue = self.parse_expression_id(STAMENT_END_TOKENS)?;
-        let resolved_rvalue = resolve_assign_type(
-            self.store, 
-            lvalue, 
-            assign, 
-            rvalue, 
-            assign_token.span,
-        );
+        let resolved_rvalue =
+            resolve_assign_type(self.store, lvalue, assign, rvalue, assign_token.span);
 
         self.bump();
 
@@ -90,13 +94,10 @@ fn resolve_assign_type(
         AssignType::Assign | AssignType::Declaration => return rvalue,
     };
 
-    store.insert_expression(
-        Expression::new_binary(
-            lvalue.clone(),
-            operator, 
-            rvalue,
-            full_span,
-        )
-    )
+    store.insert_expression(Expression::new_binary(
+        lvalue.clone(),
+        operator,
+        rvalue,
+        full_span,
+    ))
 }
-

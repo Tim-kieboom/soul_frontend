@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use soul_utils::{FunctionId, TypeModifier, collections::vec_map::VecMap, span::ModuleId};
 use crate::{NodeId, soul_type::SoulType, statements::FunctionSignature};
+use soul_utils::{FunctionId, TypeModifier, collections::vec_map::VecMap, span::ModuleId};
 
 /// A store of all declarations in a module.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
@@ -36,7 +36,8 @@ impl DeclareStore {
         if let Some(entries) = self.function_names.get_mut(function.name.as_str()) {
             entries.push(index);
         } else {
-            self.function_names.insert(function.name.to_string(), vec![index]);
+            self.function_names
+                .insert(function.name.to_string(), vec![index]);
         }
         self.functions.insert(index, (function, module));
     }
@@ -57,14 +58,13 @@ impl DeclareStore {
         name: &str,
         owner_kind: Option<&SoulType>,
     ) -> Option<(FunctionId, ModuleId)> {
-        
         let functions = self.function_names.get(name)?;
         for id in functions {
             let (signature, module) = &self.functions[*id];
             match owner_kind {
                 Some(owner) if &signature.method_type == owner => return Some((*id, *module)),
                 None if matches!(signature.method_type, SoulType::None) => {
-                    return Some((*id, *module))
+                    return Some((*id, *module));
                 }
                 _ => continue,
             }
@@ -74,31 +74,37 @@ impl DeclareStore {
     }
 
     pub fn find_function_in_module(&self, name: &str, module: ModuleId) -> Option<FunctionId> {
-        
         let functions = self.function_names.get(name)?;
         for id in functions {
             let (_, module_id) = self.functions[*id];
             if module_id == module {
-                return Some(*id)
+                return Some(*id);
             }
         }
 
         None
     }
 
-    pub fn functions(
-        &self,
-    ) -> &VecMap<FunctionId, (FunctionSignature, ModuleId)> {
+    pub fn functions(&self) -> &VecMap<FunctionId, (FunctionSignature, ModuleId)> {
         &self.functions
     }
 
     /// Gets the type of a variable by its node ID.
-    pub fn get_variable_type(&self, index: NodeId) -> Option<&(TypeModifier, Option<SoulType>, ModuleId)> {
+    pub fn get_variable_type(
+        &self,
+        index: NodeId,
+    ) -> Option<&(TypeModifier, Option<SoulType>, ModuleId)> {
         self.variable_type.get(index)
     }
 
     /// Sets the type of a variable.
-    pub fn insert_variable_type(&mut self, index: NodeId, modifier: TypeModifier, ty: Option<SoulType>, module: ModuleId) {
+    pub fn insert_variable_type(
+        &mut self,
+        index: NodeId,
+        modifier: TypeModifier,
+        ty: Option<SoulType>,
+        module: ModuleId,
+    ) {
         self.variable_type.insert(index, (modifier, ty, module));
     }
 }

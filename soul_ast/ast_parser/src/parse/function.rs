@@ -3,26 +3,52 @@ use ast_model::{
     expression::{Argument, ExpressionId, FunctionCall},
     soul_type::{Generic, SoulType},
     statements::{
-        ExternLanguage, ExternalFunction, Function, FunctionSignature, FunctionThisKind, Parameter, Statement
+        ExternLanguage, ExternalFunction, Function, FunctionSignature, FunctionThisKind, Parameter,
+        Statement,
     },
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
-    FunctionId, Ident, TypeModifier, collections::try_result::{
+    FunctionId, Ident, TypeModifier,
+    collections::try_result::{
         ResultTryErr, ResultTryNotValue, ToResult, TryErr, TryError, TryNotValue, TryOk, TryResult,
-    }, error::SoulResult, fault::Fault, literal::{StringLiteral, TokenLiteral}, span::{Span, Spanned}
+    },
+    error::SoulResult,
+    fault::Fault,
+    literal::{StringLiteral, TokenLiteral},
+    span::{Span, Spanned},
 };
 
 use crate::{
     parser::Parser,
     utils::{
         ARROW_LEFT, ARROW_RIGHT, ASSIGN, COLON, COMMA, CONST_REF, CURLY_OPEN, MUT_REF, ROUND_CLOSE,
-        ROUND_OPEN,
+        ROUND_OPEN, SEMI_COLON,
     },
 };
 
 type FuncResult<T> = TryResult<T, (Ident, Fault)>;
 impl<'a, 'f> Parser<'a, 'f> {
+    
+    pub(crate) fn parse_any_function(&mut self) -> SoulResult<Statement> {
+        let ident = self.try_bump_consume_ident()?;
+        let modifier = self.try_bump_type_modiffier().unwrap_or(TypeModifier::Mut);
+
+        let span = self.token().span;
+        match self.try_parse_function_declaration(
+            span,
+            modifier,
+            self.current_this.clone().unwrap_or(SoulType::None),
+            ident,
+        ) {
+            Ok(val) => Ok(Statement::from_function(val)),
+            Err(TryError::IsErr(err)) => Err(err),
+            Err(TryError::IsNotValue((ident, _err))) => self
+                .try_parse_function_call(span, None, &ident)
+                .merge_to_result()
+                .map(|el| Statement::from_function_call(self.store, el, self.current_is(&SEMI_COLON))),
+        }
+    }
 
     pub(crate) fn try_parse_function_call(
         &mut self,
@@ -127,10 +153,18 @@ impl<'a, 'f> Parser<'a, 'f> {
         let name = self.try_bump_consume_ident()?;
 
         let span = self.token().span;
-        match self.try_parse_function_signature(span, TypeModifier::Mut, SoulType::None, name, Some(external)) {
+        match self.try_parse_function_signature(
+            span,
+            TypeModifier::Mut,
+            SoulType::None,
+            name,
+            Some(external),
+        ) {
             Ok(signature) => {
                 let span = signature.span;
-                let id = self.store.insert_function(FunctionKind::External(ExternalFunction{signature}));
+                let id = self
+                    .store
+                    .insert_function(FunctionKind::External(ExternalFunction { signature }));
                 Ok(Statement::from_external_function(Spanned::new(id, span)))
             }
             Err(TryError::IsErr(err)) => Err(err),
@@ -324,7 +358,8 @@ impl<'a, 'f> Parser<'a, 'f> {
                 Loop::Continue => continue,
             }
 
-            let modifier = self.try_bump_type_modiffier()
+            let modifier = self
+                .try_bump_type_modiffier()
                 .unwrap_or(TypeModifier::Const);
 
             let name = self.try_bump_consume_ident().try_not_value()?;

@@ -1,5 +1,9 @@
-
-use soul_utils::{ids::IdAlloc, literal::{TokenLiteral, Number}, soul_names::Symbol, span::ModuleId};
+use soul_utils::{
+    ids::IdAlloc,
+    literal::{Number, TokenLiteral},
+    soul_names::Symbol,
+    span::ModuleId,
+};
 
 use crate::{TokenKind, lexer::Lexer};
 
@@ -27,7 +31,11 @@ fn lex_single_identifier() {
     let tokens = lexer_to_vec("hello");
 
     assert_eq!(tokens.len(), 1);
-    assert!(matches!(tokens[0], TokenKind::Ident(ref s) if s == "hello"), "`{}` should be `hello`", tokens[0].display());
+    assert!(
+        matches!(tokens[0], TokenKind::Ident(ref s) if s == "hello"),
+        "`{}` should be `hello`",
+        tokens[0].display()
+    );
 }
 
 #[test]
@@ -35,9 +43,21 @@ fn lex_multiple_identifiers_with_whitespace() {
     let tokens = lexer_to_vec("foo bar   baz");
 
     assert_eq!(tokens.len(), 3);
-    assert!(matches!(tokens[0], TokenKind::Ident(ref s) if s == "foo"), "`{}` should be `foo`", tokens[0].display());
-    assert!(matches!(tokens[1], TokenKind::Ident(ref s) if s == "bar"), "`{}` should be `bar`", tokens[1].display());
-    assert!(matches!(tokens[2], TokenKind::Ident(ref s) if s == "baz"), "`{}` should be `baz`", tokens[2].display());
+    assert!(
+        matches!(tokens[0], TokenKind::Ident(ref s) if s == "foo"),
+        "`{}` should be `foo`",
+        tokens[0].display()
+    );
+    assert!(
+        matches!(tokens[1], TokenKind::Ident(ref s) if s == "bar"),
+        "`{}` should be `bar`",
+        tokens[1].display()
+    );
+    assert!(
+        matches!(tokens[2], TokenKind::Ident(ref s) if s == "baz"),
+        "`{}` should be `baz`",
+        tokens[2].display()
+    );
 }
 
 #[test]
@@ -45,7 +65,10 @@ fn lex_positive_integer_number() {
     let tokens = lexer_to_vec("123");
 
     assert_eq!(tokens.len(), 1);
-    assert_eq!(tokens[0], TokenKind::Literal(TokenLiteral::Number(Number::Uint(123))));
+    assert_eq!(
+        tokens[0],
+        TokenKind::Literal(TokenLiteral::Number(Number::Uint(123)))
+    );
 }
 
 #[test]
@@ -53,7 +76,10 @@ fn lex_float_number() {
     let tokens = lexer_to_vec("12.34");
 
     assert_eq!(tokens.len(), 1);
-    assert_eq!(tokens[0], TokenKind::Literal(TokenLiteral::Number(Number::Float(12.34))));
+    assert_eq!(
+        tokens[0],
+        TokenKind::Literal(TokenLiteral::Number(Number::Float(12.34)))
+    );
 }
 
 #[test]

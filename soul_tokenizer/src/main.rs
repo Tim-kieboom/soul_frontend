@@ -7,7 +7,7 @@ fn main() {
         Ok(val) => val,
         Err(err) => {
             eprintln!("{err:?}");
-            return
+            return;
         }
     };
 

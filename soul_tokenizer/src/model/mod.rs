@@ -1,7 +1,7 @@
 pub mod keyword;
 pub mod types;
 
-use crate::model::{keyword::{KeyWord}, types::Types};
+use crate::model::{keyword::KeyWord, types::Types};
 use soul_utils::{literal::TokenLiteral, soul_names::Symbol, span::Span};
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

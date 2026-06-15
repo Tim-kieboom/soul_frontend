@@ -1,4 +1,9 @@
-use ast_model::{expression::ExpressionKind, literal::Literal, soul_type::SoulType, statements::{StatementKind, Variable}};
+use ast_model::{
+    expression::ExpressionKind,
+    literal::Literal,
+    soul_type::SoulType,
+    statements::{StatementKind, Variable},
+};
 use soul_utils::TypeModifier;
 
 use crate::tests::{get_statement, parse};
@@ -7,7 +12,13 @@ use crate::tests::{get_statement, parse};
 fn variable_declaration_with_init() {
     let (module, store, _) = parse("x := 5");
     let stmt = get_statement(&store, &module, 0);
-    let Variable { name, modifier, ty, initialize_value, .. } = match &stmt.node {
+    let Variable {
+        name,
+        modifier,
+        ty,
+        initialize_value,
+        ..
+    } = match &stmt.node {
         StatementKind::Variable(v) => v,
         _ => panic!("expected Variable"),
     };
@@ -17,10 +28,7 @@ fn variable_declaration_with_init() {
     assert!(initialize_value.is_some());
 
     let init = &store.expressions[initialize_value.unwrap()];
-    assert_eq!(
-        init.node,
-        ExpressionKind::Literal((None, Literal::Uint(5)))
-    );
+    assert_eq!(init.node, ExpressionKind::Literal((None, Literal::Uint(5))));
 }
 
 #[test]
@@ -31,14 +39,24 @@ fn variable_declaration_typed() {
         StatementKind::Variable(v) => v,
         _ => panic!("expected Variable"),
     };
-    assert_eq!(*ty, Some(SoulType::Primitive(soul_utils::soul_names::PrimitiveTypes::Int)));
+    assert_eq!(
+        *ty,
+        Some(SoulType::Primitive(
+            soul_utils::soul_names::PrimitiveTypes::Int
+        ))
+    );
 }
 
 #[test]
 fn variable_declaration_no_init() {
     let (module, store, _) = parse("mut x: int");
     let stmt = get_statement(&store, &module, 0);
-    let Variable { initialize_value, name, modifier, .. } = match &stmt.node {
+    let Variable {
+        initialize_value,
+        name,
+        modifier,
+        ..
+    } = match &stmt.node {
         StatementKind::Variable(v) => v,
         _ => panic!("expected Variable"),
     };

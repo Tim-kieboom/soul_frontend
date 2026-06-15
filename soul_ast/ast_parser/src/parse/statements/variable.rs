@@ -12,10 +12,8 @@ use crate::{
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_variable(&mut self) -> SoulResult<Statement> {
-        
         const DEFAULT_MODIFIER: TypeModifier = TypeModifier::Const;
-        let modifier = self.try_bump_type_modiffier()
-            .unwrap_or(DEFAULT_MODIFIER);
+        let modifier = self.try_bump_type_modiffier().unwrap_or(DEFAULT_MODIFIER);
 
         let name = self.try_bump_consume_ident()?;
         let name_span = name.span();

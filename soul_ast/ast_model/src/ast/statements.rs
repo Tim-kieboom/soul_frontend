@@ -1,5 +1,17 @@
-use soul_utils::{FunctionId, Ident, TypeModifier, collections::soul_import_path::SoulImportPath, error::SoulResult, fault::Fault, impl_soul_ids, span::{ItemMetaData, ModuleId, Span, Spanned}};
-use crate::{AstStore, NodeId, block::BlockId, expression::{Expression, ExpressionId, ExpressionKind, FunctionCall}, soul_type::{Generic, SoulType}};
+use crate::{
+    AstStore, NodeId,
+    block::BlockId,
+    expression::{Expression, ExpressionId, ExpressionKind, FunctionCall},
+    soul_type::{Generic, SoulType},
+};
+use soul_utils::{
+    FunctionId, Ident, TypeModifier,
+    collections::soul_import_path::SoulImportPath,
+    error::SoulResult,
+    fault::Fault,
+    impl_soul_ids,
+    span::{ItemMetaData, ModuleId, Span, Spanned},
+};
 
 impl_soul_ids!(StatementId);
 
@@ -173,7 +185,7 @@ pub struct Assignment {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ExternalFunction {
     /// The function's signature (name, parameters, return type, etc.).
-    pub signature: Spanned<FunctionSignature>
+    pub signature: Spanned<FunctionSignature>,
 }
 
 /// A function definition with a signature and body block.
@@ -189,7 +201,7 @@ pub struct Function {
 pub struct FunctionSignature {
     pub id: FunctionId,
 
-    pub modifier: TypeModifier, 
+    pub modifier: TypeModifier,
     /// The name of the function.
     pub name: Ident,
     /// Method type, if specified.
@@ -279,17 +291,21 @@ impl Statement {
         }
     }
 
-    pub fn from_expression(store: &AstStore, expression: ExpressionId, ends_semicolon: bool) -> Self {
+    pub fn from_expression(
+        store: &AstStore,
+        expression: ExpressionId,
+        ends_semicolon: bool,
+    ) -> Self {
         let span = store.expressions[expression].span;
         Self::new(
-            StatementKind::Expression { 
-                id: None, 
-                expression, 
-                ends_semicolon, 
-            }, 
-            span
+            StatementKind::Expression {
+                id: None,
+                expression,
+                ends_semicolon,
+            },
+            span,
         )
-    } 
+    }
 
     pub fn from_external_function(function: Spanned<FunctionId>) -> Self {
         let Spanned { value, span } = function;
@@ -300,13 +316,22 @@ impl Statement {
         let Spanned { value, span } = function;
         Self::new(StatementKind::Function(value), span)
     }
-    
-    pub fn from_function_call(store: &mut AstStore, call: Spanned<FunctionCall>, ends_semicolon: bool) -> Self {
+
+    pub fn from_function_call(
+        store: &mut AstStore,
+        call: Spanned<FunctionCall>,
+        ends_semicolon: bool,
+    ) -> Self {
         let value = store.insert_expression(Expression::from_function_call(call));
         Self::from_expression(store, value, ends_semicolon)
     }
 
-    pub fn new_block(store: &mut AstStore, block: BlockId, span: Span, ends_semicolon: bool) -> Self {
+    pub fn new_block(
+        store: &mut AstStore,
+        block: BlockId,
+        span: Span,
+        ends_semicolon: bool,
+    ) -> Self {
         let expression = Expression::new(ExpressionKind::Block(block), span);
 
         Self::new(
@@ -317,29 +342,31 @@ impl Statement {
             },
             span,
         )
-    }   
+    }
 
     pub fn try_set_is_public(&mut self, is_public: bool, span: Span) -> SoulResult<()> {
         match self.node {
-            StatementKind::Enum(_) |
-            StatementKind::Trait(_) |
-            StatementKind::Struct(_) |
-            StatementKind::TypeDef(_) |
-            StatementKind::Variable(_) |
-            StatementKind::Function(_) |
-            StatementKind::ExternalFunction(_) => self.is_public = is_public,
+            StatementKind::Enum(_)
+            | StatementKind::Trait(_)
+            | StatementKind::Struct(_)
+            | StatementKind::TypeDef(_)
+            | StatementKind::Variable(_)
+            | StatementKind::Function(_)
+            | StatementKind::ExternalFunction(_) => self.is_public = is_public,
 
-            StatementKind::Import(_) |
-            StatementKind::UseBlock(_) |
-            StatementKind::Assignment(_) |
-            StatementKind::Expression { .. } => return Err(Fault::error(
-                format!("{} can not be public", self.node.variant_name()),
-                Some(span)
-            )),
+            StatementKind::Import(_)
+            | StatementKind::UseBlock(_)
+            | StatementKind::Assignment(_)
+            | StatementKind::Expression { .. } => {
+                return Err(Fault::error(
+                    format!("{} can not be public", self.node.variant_name()),
+                    Some(span),
+                ));
+            }
         }
 
         Ok(())
-    } 
+    }
 }
 impl StatementKind {
     pub const fn variant_name(&self) -> &'static str {
@@ -356,5 +383,5 @@ impl StatementKind {
             StatementKind::Expression { .. } => "expression",
             StatementKind::ExternalFunction(_) => "externalFunction",
         }
-    } 
+    }
 }

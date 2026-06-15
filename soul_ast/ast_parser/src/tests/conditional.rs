@@ -1,4 +1,8 @@
-use ast_model::{expression::{ExpressionKind, If, IfBranch, Match, MatchPattern}, literal::Literal, statements::StatementKind};
+use ast_model::{
+    expression::{ExpressionKind, If, IfBranch, Match, MatchPattern},
+    literal::Literal,
+    statements::StatementKind,
+};
 
 use crate::tests::{get_statement, parse};
 
@@ -13,7 +17,12 @@ fn if_statement() {
         StatementKind::Expression { expression, .. } => {
             let expr = &store.expressions[*expression];
             match &expr.node {
-                ExpressionKind::If(If { condition, block, branch, .. }) => {
+                ExpressionKind::If(If {
+                    condition,
+                    block,
+                    branch,
+                    ..
+                }) => {
                     let cond = &store.expressions[*condition];
                     assert_eq!(
                         cond.node,
@@ -38,15 +47,13 @@ fn if_else_statement() {
         StatementKind::Expression { expression, .. } => {
             let expr = &store.expressions[*expression];
             match &expr.node {
-                ExpressionKind::If(If { branch, .. }) => {
-                    match branch.as_ref().unwrap().as_ref() {
-                        IfBranch::Else(block_id) => {
-                            let body = &store.blocks[*block_id];
-                            assert!(body.statements.is_empty());
-                        }
-                        _ => panic!("expected Else branch"),
+                ExpressionKind::If(If { branch, .. }) => match branch.as_ref().unwrap().as_ref() {
+                    IfBranch::Else(block_id) => {
+                        let body = &store.blocks[*block_id];
+                        assert!(body.statements.is_empty());
                     }
-                }
+                    _ => panic!("expected Else branch"),
+                },
                 _ => panic!("expected If expression"),
             }
         }
@@ -65,7 +72,9 @@ fn match_statement() {
         StatementKind::Expression { expression, .. } => {
             let expr = &store.expressions[*expression];
             match &expr.node {
-                ExpressionKind::Match(Match { scrutinee, arms, .. }) => {
+                ExpressionKind::Match(Match {
+                    scrutinee, arms, ..
+                }) => {
                     let scrut = &store.expressions[*scrutinee];
                     match &scrut.node {
                         ExpressionKind::Variable(v) => assert_eq!(v.name.as_str(), "x"),
@@ -106,12 +115,12 @@ fn return_with_value() {
             let expr = &store.expressions[*expression];
             match &expr.node {
                 ExpressionKind::Return(Some(val)) => {
-                        let val_expr = &store.expressions[*val];
-                        assert_eq!(
-                            val_expr.node,
-                            ExpressionKind::Literal((None, Literal::Uint(42)))
-                        );
-                    }
+                    let val_expr = &store.expressions[*val];
+                    assert_eq!(
+                        val_expr.node,
+                        ExpressionKind::Literal((None, Literal::Uint(42)))
+                    );
+                }
                 _ => panic!("expected Return(Some)"),
             }
         }

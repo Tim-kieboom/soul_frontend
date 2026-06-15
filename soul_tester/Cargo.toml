@@ -5,7 +5,10 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.102"
+ast_model = { version = "0.1.0", path = "../soul_ast/ast_model" }
+ast_parser = { version = "0.1.0", path = "../soul_ast/ast_parser" }
+ast_run = { version = "0.1.0", path = "../soul_ast/ast_run" }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
 soul_tokenizer = { version = "0.1.0", path = "../soul_tokenizer" }
-soul_utils = { version = "0.1.0", path = "../soul_utils" }
+soul_utils = { version = "0.1.0", path = "../soul_utils", features = ["error_backtrace"]}

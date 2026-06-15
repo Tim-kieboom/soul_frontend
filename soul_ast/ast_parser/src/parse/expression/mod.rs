@@ -1,9 +1,14 @@
 use std::mem::swap;
 
 use ast_model::{
-    block::{Block, BlockId}, expression::{
-        Array, Binding, Constructor, Expression, ExpressionId, ExpressionKind, MatchMethod, MatchMethodArm, TypeOf, VariableExpression
-    }, literal::Literal, operators::{BinaryOperator, BinaryOperatorKind, UnaryOperator, UnaryOperatorKind}, statements::Statement
+    block::{Block, BlockId},
+    expression::{
+        Array, Binding, Constructor, Expression, ExpressionId, ExpressionKind, MatchMethod,
+        MatchMethodArm, TypeOf, VariableExpression,
+    },
+    literal::Literal,
+    operators::{BinaryOperator, BinaryOperatorKind, UnaryOperator, UnaryOperatorKind},
+    statements::Statement,
 };
 use soul_tokenizer::model::{Token, TokenKind, keyword::KeyWord};
 use soul_utils::{
@@ -22,7 +27,8 @@ use crate::{
     parse::expression::precedence::Precedence,
     parser::Parser,
     utils::{
-        ARRAY, ARROW_LEFT, COLON, CURLY_CLOSE, CURLY_OPEN, DOT, LAMBDA_ARROW, ROUND_CLOSE, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN
+        ARRAY, ARROW_LEFT, COLON, CURLY_CLOSE, CURLY_OPEN, DOT, LAMBDA_ARROW, ROUND_CLOSE,
+        ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN,
     },
 };
 
@@ -86,10 +92,8 @@ impl<'a, 'f> Parser<'a, 'f> {
                 }
                 _ => break,
             }
-
-
         }
-        
+
         left = self.apply_prefix_operators(left, prefix_operators);
 
         loop {
@@ -119,16 +123,16 @@ impl<'a, 'f> Parser<'a, 'f> {
                     let right = self.pratt_parse_expression(next_min_precedence, end_tokens)?;
                     let span = self.span_combine(start_span);
                     left = Expression::new_binary(
-                        self.store.insert_expression(left), 
-                        operator, 
-                        self.store.insert_expression(right), 
+                        self.store.insert_expression(left),
+                        operator,
+                        self.store.insert_expression(right),
                         span,
                     );
                 }
-                ExpressionOperator::TypeOf { 
-                    type_name, 
-                    variant_name, 
-                    binding, 
+                ExpressionOperator::TypeOf {
+                    type_name,
+                    variant_name,
+                    binding,
                 } => {
                     let typeof_ = TypeOf {
                         type_name,
@@ -138,8 +142,8 @@ impl<'a, 'f> Parser<'a, 'f> {
                         value: self.store.insert_expression(left),
                     };
                     left = Expression::new(
-                        ExpressionKind::TypeOf(typeof_), 
-                        self.span_combine(start_span)
+                        ExpressionKind::TypeOf(typeof_),
+                        self.span_combine(start_span),
                     )
                 }
                 _ => break,
@@ -182,9 +186,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             TokenKind::Symbol(symbool_kind) => {
                 if let Some(bin) = try_to_binary_operator(symbool_kind) {
                     let peek = self.peek();
-                    Precedence::new(
-                        self.try_multi_binary(&peek, bin).precedence()
-                    )
+                    Precedence::new(self.try_multi_binary(&peek, bin).precedence())
                 } else if let Some(access) = AccessType::from_symbool(*symbool_kind) {
                     Precedence::new(access.precedence())
                 } else if let Some(unary) = try_to_unary_operator(symbool_kind) {
@@ -219,7 +221,8 @@ impl<'a, 'f> Parser<'a, 'f> {
         left: &mut Expression,
         start_span: Span,
     ) -> SoulResult<()> {
-        let index = self.parse_expression_id(&[SQUARE_CLOSE, TokenKind::EndLine, TokenKind::EndFile])?;
+        let index =
+            self.parse_expression_id(&[SQUARE_CLOSE, TokenKind::EndLine, TokenKind::EndFile])?;
         self.expect(&SQUARE_CLOSE)?;
 
         let mut value = Expression::error();
@@ -247,10 +250,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             let name = match value.node {
                 ExpressionKind::Variable(VariableExpression { name, .. }) => name,
-                _ => return Err(Fault::error(
-                    "should be ident",
-                    Some(value.span)
-                ))
+                _ => return Err(Fault::error("should be ident", Some(value.span))),
             };
 
             let arguments = self.parse_arguments()?;
@@ -265,7 +265,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 self.span_combine(start_span),
             );
 
-            return Ok(())
+            return Ok(());
         }
 
         let ident = self.try_bump_consume_ident()?;
@@ -382,7 +382,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     fn consume_expression_operator(&mut self, start_span: Span) -> SoulResult<ExpressionOperator> {
         fn get_invalid_error(token: &Token) -> SoulResult<ExpressionOperator> {
             Err(Fault::error(
-                format!("'{}' is not a valid operator", token.kind.display()),
+                format!("`{}` is not a valid operator", token.kind.display()),
                 Some(token.span),
             ))
         }
@@ -599,7 +599,11 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
     }
 
-    fn parse_keyword_primary(&mut self, start_span: Span, keyword: KeyWord) -> SoulResult<Option<Expression>> {
+    fn parse_keyword_primary(
+        &mut self,
+        start_span: Span,
+        keyword: KeyWord,
+    ) -> SoulResult<Option<Expression>> {
         Ok(Some(match keyword {
             KeyWord::If => self.parse_if()?,
             KeyWord::Match => self.parse_match()?,
@@ -718,7 +722,7 @@ fn try_to_binary_operator(symbol: &Symbol) -> Option<BinaryOperatorKind> {
 }
 
 fn try_to_unary_operator(symbol: &Symbol) -> Option<UnaryOperatorKind> {
-    match Operator::from_symbool(*symbol).map(|el| el.to_unary())  {
+    match Operator::from_symbool(*symbol).map(|el| el.to_unary()) {
         Some(Some(val)) => Some(val),
         _ => None,
     }

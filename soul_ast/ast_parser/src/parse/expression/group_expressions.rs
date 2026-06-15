@@ -39,7 +39,6 @@ impl<'a, 'f> Parser<'a, 'f> {
             Err(TryError::IsNotValue(_)) => None,
         };
 
-
         if self.current_is_keyword(KeyWord::For) {
             self.parse_array_filler(collection_type, element_type, start_span)
                 .map(AnyArray::from_array_filler)

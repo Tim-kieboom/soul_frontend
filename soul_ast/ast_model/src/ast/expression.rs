@@ -1,6 +1,15 @@
-use soul_utils::{FunctionId, Ident, impl_soul_ids, span::{Span, Spanned}};
+use soul_utils::{
+    FunctionId, Ident, impl_soul_ids,
+    span::{Span, Spanned},
+};
 
-use crate::{AstStore, NodeId, block::BlockId, literal::Literal, operators::{BinaryOperator, UnaryOperator}, soul_type::SoulType};
+use crate::{
+    AstStore, NodeId,
+    block::BlockId,
+    literal::Literal,
+    operators::{BinaryOperator, UnaryOperator},
+    soul_type::SoulType,
+};
 
 impl_soul_ids!(ExpressionId);
 
@@ -47,7 +56,7 @@ pub enum ExpressionKind {
     Unary(Unary),
     /// A binary operation (addition, multiplication, comparison, etc.) `1 + 2`.
     Binary(Binary),
-    
+
     /// reference, e.g., `&x` or `&mut x`.
     Ref(Ref),
     /// A dereference, e.g., `*ptr`.
@@ -74,7 +83,6 @@ pub enum ExpressionKind {
     Continue,
     Return(Option<ExpressionId>),
 }
-
 
 /// `expr typeof Type.Variant` — type check a union value
 /// When `binding` is `Some`, the variant value is extracted and stored in the bound variable.
@@ -164,8 +172,8 @@ pub struct MatchContructor {
 /// A binding pattern: `name` binds the scrutinee to a variable.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Binding {
-    pub ident: Ident, 
-    pub id: Option<NodeId>
+    pub ident: Ident,
+    pub id: Option<NodeId>,
 }
 
 /// An `if` statement or expression.
@@ -247,7 +255,7 @@ pub struct Binary {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum AnyArray {
     Array(Array),
-    ArrayFiller(ArrayFiller)
+    ArrayFiller(ArrayFiller),
 }
 
 /// An array literal, e.g., `[1, 2, 3]`, `List.[1, 2, 3]`.
@@ -327,7 +335,10 @@ pub struct Argument {
 
 impl Expression {
     pub const fn error() -> Self {
-        Self { node: ExpressionKind::Null(None), span: Span::error() }
+        Self {
+            node: ExpressionKind::Null(None),
+            span: Span::error(),
+        }
     }
 
     pub const fn new(node: ExpressionKind, span: Span) -> Self {
@@ -349,7 +360,14 @@ impl Expression {
 
     pub fn new_variable(name: Ident) -> Expression {
         let span = name.span();
-        Expression::new(ExpressionKind::Variable(VariableExpression { id: None, resolved: None, name }), span)
+        Expression::new(
+            ExpressionKind::Variable(VariableExpression {
+                id: None,
+                resolved: None,
+                name,
+            }),
+            span,
+        )
     }
 
     pub fn new_binary(
@@ -384,12 +402,18 @@ impl Expression {
 
     pub fn from_function_call(call: Spanned<FunctionCall>) -> Expression {
         let Spanned { value, span } = call;
-        Self { node: ExpressionKind::FunctionCall(value), span }
+        Self {
+            node: ExpressionKind::FunctionCall(value),
+            span,
+        }
     }
 
     pub fn from_struct_contructor(ctor: Spanned<StructConstructor>) -> Expression {
         let Spanned { value, span } = ctor;
-        Self { node: ExpressionKind::StructConstructor(value), span }
+        Self {
+            node: ExpressionKind::StructConstructor(value),
+            span,
+        }
     }
 
     pub fn new_unary(op: UnaryOperator, value: ExpressionId, span: Span) -> Expression {
@@ -402,19 +426,16 @@ impl Expression {
     }
 
     pub fn new_ref(is_mutable: bool, value: ExpressionId, new_span: Span) -> Expression {
-        let new_ref = ExpressionKind::Ref(Ref { 
-            value, 
-            id: None, 
-            is_mutable, 
+        let new_ref = ExpressionKind::Ref(Ref {
+            value,
+            id: None,
+            is_mutable,
         });
         Expression::new(new_ref, new_span)
     }
 
     pub fn new_deref(value: ExpressionId, new_span: Span) -> Expression {
-        let deref = ExpressionKind::Deref(Deref {
-            value,
-            id: None,
-        });
+        let deref = ExpressionKind::Deref(Deref { value, id: None });
         Expression::new(deref, new_span)
     }
 
@@ -430,7 +451,6 @@ impl Expression {
     }
 
     pub fn new_field(store: &AstStore, object: ExpressionId, field: Ident) -> Expression {
-        
         let span = store.expressions[object].span.combine(field.span());
         Expression::new(
             ExpressionKind::FieldAccess(FieldAccess {
@@ -447,12 +467,18 @@ impl Expression {
 impl AnyArray {
     pub fn from_array(arr: Spanned<Array>) -> Spanned<Self> {
         let Spanned { value, span } = arr;
-        Spanned{value: AnyArray::Array(value), span: span}
+        Spanned {
+            value: AnyArray::Array(value),
+            span: span,
+        }
     }
 
     pub fn from_array_filler(arr: Spanned<ArrayFiller>) -> Spanned<Self> {
         let Spanned { value, span } = arr;
-        Spanned{value: AnyArray::ArrayFiller(value), span: span}
+        Spanned {
+            value: AnyArray::ArrayFiller(value),
+            span: span,
+        }
     }
 }
 

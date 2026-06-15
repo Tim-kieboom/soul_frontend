@@ -1,6 +1,8 @@
-use crate::{Ident, collections::vec_map::VecMapIndex, ids::IdAlloc, impl_soul_ids};
+use std::fmt::Debug;
 
-impl_soul_ids!(ModuleId); 
+use crate::{Ident, impl_soul_ids};
+
+impl_soul_ids!(ModuleId);
 
 /// Metadata associated with an AST item.
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
@@ -28,7 +30,7 @@ pub struct SpanLine {
     pub offset: usize,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Span {
     pub module: ModuleId,
     pub start: SpanLine,
@@ -42,7 +44,10 @@ impl<T> Spanned<T> {
 
     pub fn map<R, F: FnOnce(T) -> R>(self, mapper: F) -> Spanned<R> {
         let Spanned { value, span } = self;
-        Spanned { value: mapper(value), span }
+        Spanned {
+            value: mapper(value),
+            span,
+        }
     }
 }
 
@@ -52,7 +57,11 @@ impl Span {
     }
 
     pub const fn new_line(module: ModuleId, span: SpanLine) -> Self {
-        Self { module, start: span, end: span }
+        Self {
+            module,
+            start: span,
+            end: span,
+        }
     }
 
     pub const fn default(module: ModuleId) -> Self {
@@ -64,7 +73,7 @@ impl Span {
     }
 
     pub fn is_single(&self) -> bool {
-        let offset = self.end.offset.saturating_sub(self.start.offset); 
+        let offset = self.end.offset.saturating_sub(self.start.offset);
         self.start.line == self.end.line && offset <= 1
     }
 
@@ -88,8 +97,14 @@ impl Span {
 
         Self {
             module: self.module,
-            end: SpanLine { line: end_line, offset: end_offset },
-            start: SpanLine { line: start_line, offset: start_offset },
+            end: SpanLine {
+                line: end_line,
+                offset: end_offset,
+            },
+            start: SpanLine {
+                line: start_line,
+                offset: start_offset,
+            },
         }
     }
 
@@ -115,5 +130,21 @@ impl Span {
         } else {
             other.end.offset
         }
+    }
+}
+impl Debug for Span {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Span {
+            module: _,
+            start,
+            end,
+        } = self;
+        f.write_fmt(format_args!("{}:{}", start.line, start.offset))?;
+        if self.is_single() {
+            return Ok(());
+        }
+
+        f.write_fmt(format_args!("-{}:{}", end.line, end.offset))?;
+        Ok(())
     }
 }

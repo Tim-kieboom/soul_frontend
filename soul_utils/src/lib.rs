@@ -3,12 +3,14 @@ use std::fmt::Display;
 use crate::{fault::FaultCollector, span::Span};
 
 pub mod collections;
-pub mod soul_names;
-pub mod literal;
+pub mod compiler_options;
 pub mod error;
 pub mod fault;
-pub mod span;
 pub mod ids;
+pub mod literal;
+pub mod soul_names;
+pub mod span;
+pub mod char_colors;
 
 impl_soul_ids!(FunctionId);
 

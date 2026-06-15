@@ -1,12 +1,23 @@
-use std::{sync::LazyLock};
+use std::sync::LazyLock;
 
-use ast_model::{soul_type::SoulType, statements::{Statement, Variable}};
+use ast_model::{
+    soul_type::SoulType,
+    statements::{Statement, Variable},
+};
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord, types::Types};
 use soul_utils::{
-    Ident, TypeModifier, collections::try_result::{ResultMapNotValue, ResultTryErr, TryErr, TryOk, TryResult}, error::SoulResult, fault::Fault, span::Span
+    Ident, TypeModifier,
+    collections::try_result::{ResultMapNotValue, ResultTryErr, TryErr, TryOk, TryResult},
+    error::SoulResult,
+    fault::Fault,
+    span::Span,
 };
 
-use crate::{parse::statements::variable::AssignType, parser::Parser, utils::{ARROW_LEFT, COLON, CURLY_OPEN, ROUND_OPEN, SEMI_COLON, STAMENT_END_TOKENS}};
+use crate::{
+    parse::statements::variable::AssignType,
+    parser::Parser,
+    utils::{ARROW_LEFT, COLON, CURLY_OPEN, ROUND_OPEN, SEMI_COLON, STAMENT_END_TOKENS},
+};
 
 const RAW_ILIGAL_NAMES: &[&[&str]] = &[
     Types::STRING_VALUES,
@@ -47,7 +58,6 @@ impl<'a, 'f> Parser<'a, 'f> {
         };
 
         if self.current_is_any(&[ROUND_OPEN, ARROW_LEFT]) {
-
             return self
                 .try_parse_function_declaration(start_span, modifier, SoulType::None, name)
                 .map(Statement::from_function)
@@ -127,10 +137,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     fn invalid_assign(&self) -> Fault {
         Fault::error(
-            format!(
-                "'{}' should be '=' or ':='", 
-                self.token().kind.display(),
-            ),
+            format!("'{}' should be '=' or ':='", self.token().kind.display(),),
             Some(self.token().span),
         )
     }
