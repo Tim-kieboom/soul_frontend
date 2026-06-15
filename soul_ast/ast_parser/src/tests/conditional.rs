@@ -3,6 +3,7 @@ use ast_model::{
     literal::Literal,
     statements::StatementKind,
 };
+use soul_utils::fault::Severity;
 
 use crate::tests::{get_statement, parse};
 
@@ -11,7 +12,9 @@ use crate::tests::{get_statement, parse};
 // ----------------------------------------------------------------
 #[test]
 fn if_statement() {
-    let (module, store, _) = parse("if true {}");
+    let (module, store, context) = parse("if true {}");
+    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+
     let stmt = get_statement(&store, &module, 0);
     match &stmt.node {
         StatementKind::Expression { expression, .. } => {
@@ -41,7 +44,9 @@ fn if_statement() {
 
 #[test]
 fn if_else_statement() {
-    let (module, store, _) = parse("if true {} else {}");
+    let (module, store, context) = parse("if true {} else {}");
+    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    
     let stmt = get_statement(&store, &module, 0);
     match &stmt.node {
         StatementKind::Expression { expression, .. } => {
@@ -66,7 +71,9 @@ fn if_else_statement() {
 // ----------------------------------------------------------------
 #[test]
 fn match_statement() {
-    let (module, store, _) = parse(r#"match x { _ => true }"#);
+    let (module, store, context) = parse(r#"match x { _ => true }"#);
+    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+
     let stmt = get_statement(&store, &module, 0);
     match &stmt.node {
         StatementKind::Expression { expression, .. } => {
@@ -95,7 +102,9 @@ fn match_statement() {
 // ----------------------------------------------------------------
 #[test]
 fn return_void() {
-    let (module, store, _) = parse("return");
+    let (module, store, context) = parse("return");
+    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+
     let stmt = get_statement(&store, &module, 0);
     match &stmt.node {
         StatementKind::Expression { expression, .. } => {
@@ -108,7 +117,9 @@ fn return_void() {
 
 #[test]
 fn return_with_value() {
-    let (module, store, _) = parse("return 42");
+    let (module, store, context) = parse("return 42");
+    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+
     let stmt = get_statement(&store, &module, 0);
     match &stmt.node {
         StatementKind::Expression { expression, .. } => {
@@ -130,7 +141,9 @@ fn return_with_value() {
 
 #[test]
 fn break_statement() {
-    let (module, store, _) = parse("break");
+    let (module, store, context) = parse("break");
+    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+
     let stmt = get_statement(&store, &module, 0);
     match &stmt.node {
         StatementKind::Expression { expression, .. } => {

@@ -478,7 +478,11 @@ impl<'a, 'f> Parser<'a, 'f> {
                 Expression::from_any_array(array)
             }
             &ROUND_OPEN => {
-                return Err(soul_error_internal!("tuple not yet impl", Some(start_span)));
+                self.bump();
+                let expr =
+                    self.parse_expression(&[ROUND_CLOSE, TokenKind::EndLine, TokenKind::EndFile])?;
+                self.expect(&ROUND_CLOSE)?;
+                expr
             }
             &ARRAY => {
                 self.bump();

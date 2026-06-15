@@ -1,18 +1,23 @@
-use std::str::Lines;
+use crate::{config::PrintConfigs, display::writer::Writer};
 use anyhow::Result;
+use soul_utils::char_colors::*;
 use soul_utils::fault::Severity;
 use soul_utils::{fault::Fault, span::Span};
-use soul_utils::char_colors::*;
-use crate::{config::PrintConfigs, display::writer::Writer};
+use std::str::Lines;
 
-pub(crate) fn display_fault(fault: &Fault, source_file: &str, configs: &PrintConfigs, writer: &mut impl Writer) -> Result<()> {
+pub(crate) fn display_fault(
+    fault: &Fault,
+    source_file: &str,
+    configs: &PrintConfigs,
+    writer: &mut impl Writer,
+) -> Result<()> {
     let span = fault.span();
     let start_line = span.map(|el| el.start.line).unwrap_or(0);
     let number_len = start_line.to_string().len();
     let begin_space = " ".repeat(number_len + 2);
-    
-    let red = if configs.color {RED} else {""};
-    let default = if configs.color {DEFAULT} else {""};
+
+    let red = if configs.color { RED } else { "" };
+    let default = if configs.color { DEFAULT } else { "" };
     if configs.backtrace {
         writer.push_fmt(format_args!("{red}{}{default}\n", fault.backtract()))?;
     }
@@ -26,10 +31,14 @@ pub(crate) fn display_fault(fault: &Fault, source_file: &str, configs: &PrintCon
 }
 
 fn fault_message(fault: &Fault, writer: &mut impl Writer, configs: &PrintConfigs) -> Result<()> {
-    let cyan = if configs.color {CYAN} else {""};
-    let default = if configs.color {DEFAULT} else {""};
-    let severity_color = if configs.color {severity_level_color(fault.severity())} else {""};
-    
+    let cyan = if configs.color { CYAN } else { "" };
+    let default = if configs.color { DEFAULT } else { "" };
+    let severity_color = if configs.color {
+        severity_level_color(fault.severity())
+    } else {
+        ""
+    };
+
     let severity = match fault.severity() {
         Severity::Note => "!!note!!",
         Severity::Error => "!!error!!",
@@ -37,13 +46,23 @@ fn fault_message(fault: &Fault, writer: &mut impl Writer, configs: &PrintConfigs
     };
 
     match fault.span() {
-        Some(span) => writer.push_fmt(format_args!("{severity_color}{severity}{cyan} at {span:?}; {}{default}", fault.message())),
-        None => writer.push_fmt(format_args!("{severity_color}{severity}{cyan} {}{default}", fault.message())),
+        Some(span) => writer.push_fmt(format_args!(
+            "{severity_color}{severity}{cyan} at {span:?}; {}{default}",
+            fault.message()
+        )),
+        None => writer.push_fmt(format_args!(
+            "{severity_color}{severity}{cyan} {}{default}",
+            fault.message()
+        )),
     }
 }
 
-fn get_source_snippet(writer: &mut impl Writer, span: &Span, mut lines: Lines, begin_space: &str) -> Result<()> {
-
+fn get_source_snippet(
+    writer: &mut impl Writer,
+    span: &Span,
+    mut lines: Lines,
+    begin_space: &str,
+) -> Result<()> {
     if span.start.line == 0 || span.end.line == 0 {
         return Ok(());
     }

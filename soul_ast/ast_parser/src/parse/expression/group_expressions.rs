@@ -148,6 +148,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 id: None,
                 element_type,
                 collection_type,
+                for_index: None,
             },
             self.span_combine(start_span),
         ))

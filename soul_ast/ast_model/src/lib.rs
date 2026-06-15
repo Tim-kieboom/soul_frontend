@@ -19,8 +19,9 @@ mod ast;
 pub mod declare_store;
 pub mod scope;
 
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AbstractSyntaxTree {
+    pub root: ModuleId,
     pub modules: AstModuleStore,
 }
 
@@ -70,6 +71,12 @@ pub struct EntryKind<T> {
     pub is_public: bool,
 }
 
+impl AbstractSyntaxTree {
+    pub fn new(root: ModuleId) -> Self {
+        Self { root, modules: AstModuleStore::default() }
+    }
+}
+
 impl AstModuleStore {
     pub fn insert(&mut self, id: ModuleId, module: Module) -> Option<Module> {
         self.modules.insert(id, module)
@@ -83,6 +90,10 @@ impl AstModuleStore {
         self.modules.get(id).is_some()
     }
 
+    pub fn get(&self, id: ModuleId) -> Option<&Module> {
+        self.modules.get(id)
+    }
+
     pub fn get_mut(&mut self, id: ModuleId) -> Option<&mut Module> {
         self.modules.get_mut(id)
     }
@@ -93,6 +104,13 @@ impl FunctionKind {
         match self {
             FunctionKind::Normal(function) => &function.signature,
             FunctionKind::External(external_function) => &external_function.signature,
+        }
+    }
+
+    pub fn signature_mut(&mut self) -> &mut Spanned<FunctionSignature> {
+        match self {
+            FunctionKind::Normal(function) => &mut function.signature,
+            FunctionKind::External(external_function) => &mut external_function.signature,
         }
     }
 }

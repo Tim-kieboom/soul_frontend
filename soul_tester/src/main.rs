@@ -1,8 +1,6 @@
-use crate::{
-    display::{fault::display_fault, tokenizer::display_tokens},
-};
+use crate::display::{ast::display_ast_tree, fault::display_fault, tokenizer::display_tokens};
 use anyhow::Result;
-use ast_model::AstStore;
+use ast_model::{AbstractSyntaxTree, AstStore};
 use ast_parser::ParseInfo;
 use ast_run::to_ast;
 use soul_tokenizer::{TokenStream, to_token_stream};
@@ -31,8 +29,10 @@ fn frontend() -> Result<()> {
     let module_id = ModuleId::begin();
 
     let file = std::fs::read_to_string(&config::CONFIG.main_path)?;
-    let tokens =
-        to_token_stream(&file, module_id).map_err(|err| anyhow::Error::msg(format!("{err:?}")))?;
+    let tokens = match to_token_stream(&file, module_id) {
+        Ok(val) => val,
+        Err(err) => return Err(anyhow::Error::msg(format!("{err:?}"))),
+    };
 
     display_tokenizer(&tokens)?;
 
@@ -45,19 +45,18 @@ fn frontend() -> Result<()> {
         store: &mut store,
         context: &mut context,
     };
-    let _ast = to_ast(tokens, module_store, info, &config::COMPILER_OPTIONS);
+    let ast = to_ast(tokens, module_store, info, &config::COMPILER_OPTIONS);
     for fault in context.faults.iter() {
         display_fault(fault, &file, &config::PRINT_CONFIGS, &mut stdout())?;
     }
-    println!("{store:#?}");
-
+    
+    display_ast(&ast, &store)?;
     Ok(())
 }
 
 fn display_tokenizer<'a>(tokens: &TokenStream<'a>) -> Result<()> {
-    let output_path = Path::new(&config::CONFIG.output_path)
-        .join("tokenizer")
-        .join("tokens.soulc");
+    let mut output_path = Path::new(&config::CONFIG.output_path).join("tokenizer");
+    output_path.push("tokens.soulc");
 
     std::fs::create_dir_all(&output_path.parent().expect("just joined a parent"))?;
     let mut writer = OpenOptions::new()
@@ -68,6 +67,23 @@ fn display_tokenizer<'a>(tokens: &TokenStream<'a>) -> Result<()> {
         .map_err(|err| anyhow::anyhow!("Failed to create output file({output_path:?}): {}", err))?;
 
     display_tokens(tokens.clone(), &mut writer)?;
+    writer.flush()?;
+    Ok(())
+}
+
+fn display_ast<'a>(tree: &AbstractSyntaxTree, store: &AstStore) -> Result<()> {
+    let mut output_path = Path::new(&config::CONFIG.output_path).join("ast");
+    output_path.push("ast.soulc");
+
+    std::fs::create_dir_all(&output_path.parent().expect("just joined a parent"))?;
+    let mut writer = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(&output_path)
+        .map_err(|err| anyhow::anyhow!("Failed to create output file({output_path:?}): {}", err))?;
+
+    display_ast_tree(tree, Path::new(&config::CONFIG.src_path), store, &mut writer)?;
     writer.flush()?;
     Ok(())
 }

@@ -21,7 +21,7 @@ define_str_enum!(
         /// `&`
         And => "&",
         /// `@`
-        ConstRef => "@",
+        AtSign => "@",
         /// `$`
         Money => "$",
         /// `|`
@@ -51,7 +51,7 @@ define_str_enum!(
         /// `^=`
         XorEq => "^=",
         /// `=>`
-        LambdaArray => "=>",
+        LambdaArrow => "=>",
         /// `==`
         Eq => "==",
         /// `!`
@@ -212,7 +212,7 @@ define_symbols!(
         /// subtraction
         Sub => "-", Symbol::Minus, 5,
         /// constref
-        ConstRef => "@", Symbol::ConstRef, 6,
+        ConstRef => "@", Symbol::AtSign, 6,
 
         /// smaller equals
         LessEq => "<=", Symbol::Le, 4,

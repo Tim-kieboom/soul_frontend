@@ -78,10 +78,19 @@ impl<'a, 'f> Parser<'a, 'f> {
                 statement
                     .try_set_is_public(true, pub_span.combine(start_span))
                     .try_err()?;
+                
+                match statement.node {
+                    StatementKind::Function(id) |
+                    StatementKind::ExternalFunction(id) => {
+                        self.store.functions[id].signature_mut().value.is_public = true;
+                    }
+                    _ => (),
+                }
                 statement
             }
 
             KeyWord::As
+            | KeyWord::Impl
             | KeyWord::Copy
             | KeyWord::Crate
             | KeyWord::Typeof

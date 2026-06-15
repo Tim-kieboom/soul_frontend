@@ -12,7 +12,7 @@ pub fn to_ast<'a, 'f>(
     _options: &CompilerOptions,
 ) -> AbstractSyntaxTree {
     let root = module_store.get_root_id();
-    let mut ast = AbstractSyntaxTree::default();
+    let mut ast = AbstractSyntaxTree::new(root);
 
     let name = ENTRY_MOD_NAME.to_string();
     let module = parse_module(tokens, name, info);

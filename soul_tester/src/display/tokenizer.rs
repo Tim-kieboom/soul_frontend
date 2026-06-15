@@ -2,11 +2,10 @@ use anyhow::Result;
 use soul_tokenizer::{TokenStream, model::TokenKind};
 use soul_utils::literal::{Number, StringLiteral, TokenLiteral};
 
-use crate::display::{writer::Writer};
+use crate::display::writer::Writer;
 
 pub(crate) fn display_tokens<'a>(tokens: TokenStream<'a>, writer: &mut impl Writer) -> Result<()> {
     for token in tokens {
-
         let token = token.map_err(|err| anyhow::Error::msg(format!("{err:?}")))?;
         let tab = if token.span.is_single() {
             "\t\t\t"

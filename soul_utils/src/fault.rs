@@ -120,6 +120,10 @@ impl FaultCollector {
         self.faults.into_iter()
     }
 
+    pub fn count_severity(&self, severity: Severity) -> usize {
+        self.faults.iter().filter(|f| f.severity() == severity).count()
+    }
+
     pub fn fails(&self, fail_level: Severity) -> bool {
         self.faults.iter().any(|d| d.severity == fail_level)
     }

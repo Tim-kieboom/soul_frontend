@@ -10,7 +10,7 @@ use soul_utils::{
     error::SoulResult,
     fault::Fault,
     impl_soul_ids,
-    span::{ItemMetaData, ModuleId, Span, Spanned},
+    span::{ItemMetaData, Span, Spanned},
 };
 
 impl_soul_ids!(StatementId);
@@ -69,8 +69,7 @@ pub struct Trait {
     pub id: Option<NodeId>,
     pub name: Ident,
     pub generics: Vec<Generic>,
-    pub methods: Vec<Function>,
-    pub defined_in: Option<ModuleId>,
+    pub methods: Vec<FunctionId>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -86,30 +85,33 @@ pub struct Struct {
     pub name: Ident,
     pub generics: Vec<Generic>,
     pub fields: Vec<Field>,
-    pub defined_in: Option<ModuleId>,
+    pub methods: Vec<FunctionId>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Field {
     pub id: Option<NodeId>,
+    pub is_pubic: bool,
+    pub modifier: TypeModifier,
     pub name: Ident,
     pub ty: SoulType,
+    pub default: Option<ExpressionId>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct UseBlock {
-    pub use_type: SoulType,
-    pub generics: Vec<Generic>,
+    pub use_generics: Vec<Generic>,
+    pub ty: SoulType,
+    pub type_generics: Vec<SoulType>,
     pub impls: Vec<ImplBlock>,
-    pub methodes: Vec<Function>,
+    pub methodes: Vec<FunctionId>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ImplBlock {
     pub impl_trait: SoulType,
-    pub for_type: Option<SoulType>,
-    pub generics: Vec<Generic>,
-    pub methodes: Vec<Function>,
+    pub type_generics: Vec<SoulType>,
+    pub methodes: Vec<FunctionId>,
 }
 
 /// Imported paths
@@ -201,6 +203,7 @@ pub struct Function {
 pub struct FunctionSignature {
     pub id: FunctionId,
 
+    pub is_public: bool,
     pub modifier: TypeModifier,
     /// The name of the function.
     pub name: Ident,
@@ -252,9 +255,9 @@ impl FunctionThisKind {
     pub fn display(&self) -> Option<&'static str> {
         match self {
             FunctionThisKind::Static => None,
-            FunctionThisKind::MutRef => Some("&this"),
+            FunctionThisKind::MutRef => Some("&mut this"),
             FunctionThisKind::Consume => Some("this"),
-            FunctionThisKind::ConstRef => Some("@this"),
+            FunctionThisKind::ConstRef => Some("&this"),
         }
     }
 }

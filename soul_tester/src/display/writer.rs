@@ -1,4 +1,8 @@
-use std::{fmt::Arguments, fs::File, io::{Stdout, Write}};
+use std::{
+    fmt::Arguments,
+    fs::File,
+    io::{Stdout, Write},
+};
 
 use anyhow::Result;
 
@@ -15,12 +19,12 @@ impl Writer for String {
         write(self, args)?;
         Ok(())
     }
-    
+
     fn push_str(&mut self, str: &str) -> Result<()> {
         self.push_str(str);
         Ok(())
     }
-    
+
     fn push_char(&mut self, ch: char) -> Result<()> {
         self.push(ch);
         Ok(())

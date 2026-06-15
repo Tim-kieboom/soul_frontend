@@ -274,6 +274,7 @@ pub struct ArrayFiller {
     pub id: Option<NodeId>,
 
     pub amount: ExpressionId,
+    pub for_index: Option<Ident>,
     pub element: ExpressionId,
     pub element_type: Option<SoulType>,
     pub collection_type: Option<SoulType>,

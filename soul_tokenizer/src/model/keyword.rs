@@ -41,6 +41,7 @@ define_str_enum!(
         As => "as", 0,
         New => "new", 0,
         Use => "use", 0,
+        Impl => "impl", 0,
         Crate => "crate", 0,
         Sizeof => "sizeof", 0,
         Typeof => "typeof", 0,

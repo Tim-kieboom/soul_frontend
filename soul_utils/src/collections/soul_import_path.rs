@@ -48,6 +48,12 @@ impl SoulImportPath {
         this
     }
 
+    pub fn display(&self, root_dir: &Path) -> Result<String, StripPrefixError> {
+        let mut sb = String::new();
+        self.write_display(root_dir, &mut sb)?;
+        Ok(sb)
+    }
+
     pub fn write_display(&self, root_dir: &Path, sb: &mut String) -> Result<(), StripPrefixError> {
         const SEPERATOR: &str = ".";
 

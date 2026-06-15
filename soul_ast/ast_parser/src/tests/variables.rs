@@ -4,13 +4,15 @@ use ast_model::{
     soul_type::SoulType,
     statements::{StatementKind, Variable},
 };
-use soul_utils::TypeModifier;
+use soul_utils::{TypeModifier, fault::Severity};
 
 use crate::tests::{get_statement, parse};
 
 #[test]
 fn variable_declaration_with_init() {
-    let (module, store, _) = parse("x := 5");
+    let (module, store, context) = parse("x := 5");
+    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+
     let stmt = get_statement(&store, &module, 0);
     let Variable {
         name,
@@ -33,7 +35,9 @@ fn variable_declaration_with_init() {
 
 #[test]
 fn variable_declaration_typed() {
-    let (module, store, _) = parse("x: int = 10");
+    let (module, store, context) = parse("x: int = 10");
+    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+
     let stmt = get_statement(&store, &module, 0);
     let Variable { ty, .. } = match &stmt.node {
         StatementKind::Variable(v) => v,
@@ -49,7 +53,9 @@ fn variable_declaration_typed() {
 
 #[test]
 fn variable_declaration_no_init() {
-    let (module, store, _) = parse("mut x: int");
+    let (module, store, context) = parse("mut x: int");
+    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+
     let stmt = get_statement(&store, &module, 0);
     let Variable {
         initialize_value,
@@ -67,7 +73,9 @@ fn variable_declaration_no_init() {
 
 #[test]
 fn mutable_variable() {
-    let (module, store, _) = parse("mut x := 5");
+    let (module, store, context) = parse("mut x := 5");
+    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+
     let stmt = get_statement(&store, &module, 0);
     let Variable { name, modifier, .. } = match &stmt.node {
         StatementKind::Variable(v) => v,

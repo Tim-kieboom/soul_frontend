@@ -104,10 +104,14 @@ impl<'a, 'f> Parser<'a, 'f> {
         methode_type: SoulType,
         name: Ident,
     ) -> FuncResult<Spanned<FunctionId>> {
-        self.inner_function_declaration(start_span, modifier, methode_type, name, None)
-            .map(|spanned| {
-                spanned.map(|function| self.store.insert_function(FunctionKind::Normal(function)))
-            })
+        let position = self.tokens.current_position();
+        match self.inner_function_declaration(start_span, modifier, methode_type, name, None) {
+            Ok(spanned) => Ok(spanned.map(|function| self.store.insert_function(FunctionKind::Normal(function)))),
+            Err(err) => {
+                self.go_to(position);
+                Err(err)
+            }
+        }
     }
 
     pub(crate) fn parse_extern_function(&mut self) -> SoulResult<Statement> {
@@ -304,6 +308,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             return_type,
             method_type,
             function_kind,
+            is_public: false, // is done in from_keyword
             id: self.store.alloc_function(),
         };
 

@@ -73,7 +73,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             let pattern = self.parse_match_pattern()?;
             self.skip_end_lines();
 
-            if !self.current_is(&TokenKind::Symbol(Symbol::LambdaArray)) {
+            if !self.current_is(&TokenKind::Symbol(Symbol::LambdaArrow)) {
                 return Err(Fault::error(
                     "expected '=>' in match arm",
                     Some(self.token().span),
@@ -179,7 +179,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let ident_name = match &self.token().kind {
             TokenKind::Ident(name) => name.clone(),
             _ => {
-                let end_tokens = [TokenKind::Symbol(Symbol::LambdaArray), COMMA, SQUARE_CLOSE];
+                let end_tokens = [TokenKind::Symbol(Symbol::LambdaArrow), COMMA, SQUARE_CLOSE];
                 let expr = self.parse_expression(&end_tokens)?;
                 return match expr.node {
                     ExpressionKind::Literal((_, lit)) => Ok(MatchPattern::Literal(lit)),
@@ -192,7 +192,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         };
 
         if KeyWord::from_str(&ident_name).is_some() {
-            let end_tokens = [TokenKind::Symbol(Symbol::LambdaArray), COMMA, SQUARE_CLOSE];
+            let end_tokens = [TokenKind::Symbol(Symbol::LambdaArrow), COMMA, SQUARE_CLOSE];
             let expr = self.parse_expression(&end_tokens)?;
             return match expr.node {
                 ExpressionKind::Literal((_, lit)) => Ok(MatchPattern::Literal(lit)),
