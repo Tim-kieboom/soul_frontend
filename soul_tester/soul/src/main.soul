@@ -3,6 +3,7 @@ pub sum(a: int, b: int): int {
 }
 
 extern "C" malloc(size: uint): RawPtr
+extern "C" intPtr(ptr: RawPtr<int>)
 
 // pub trait Index {
 //     type Out

@@ -46,6 +46,22 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     fn parse_token_type(&mut self, type_val: Types) -> TryResult<SoulType, Fault> {
         self.bump();
+        if type_val == Types::RawPtr {
+            let inner = if self.current_is(&ARROW_LEFT) {
+                let mut generics = self.parse_generic_define()?;
+                if generics.len() != 1 {
+                    return TryErr(Fault::error(
+                        "RawPtr expects exactly one generic type parameter, e.g. RawPtr<int>",
+                        Some(self.token().span),
+                    ));
+                }
+                Some(Box::new(generics.remove(0)))
+            } else {
+                None
+            };
+            return TryOk(SoulType::RawPtr(inner));
+        }
+
         let prim = match type_val {
             Types::None => return TryOk(SoulType::None),
             Types::Boolean => PrimitiveTypes::Boolean,
@@ -99,7 +115,8 @@ impl<'a, 'f> Parser<'a, 'f> {
             ty = match wrap {
                 ParseWrappers::ConstRef => SoulType::Reference(ReferenceType::new(ty, CONST)),
                 ParseWrappers::MutRef => SoulType::Reference(ReferenceType::new(ty, MUT)),
-                ParseWrappers::Pointer => SoulType::Pointer(Box::new(ty)),
+                ParseWrappers::ConstPointer => SoulType::Pointer(ReferenceType::new(ty, CONST)),
+                ParseWrappers::MutPointer => SoulType::Pointer(ReferenceType::new(ty, MUT)),
                 ParseWrappers::Option => SoulType::Optional(Box::new(ty)),
                 ParseWrappers::Array(kind) => {
                     let array = ArrayType {
@@ -188,7 +205,14 @@ impl<'a, 'f> Parser<'a, 'f> {
                         Some(ParseWrappers::ConstRef)
                     }
                 }
-                POINTER => Some(ParseWrappers::Pointer),
+                POINTER => {
+                    if matches!(self.peek().kind, TokenKind::Keyword(KeyWord::Mut)) {
+                        self.bump();
+                        Some(ParseWrappers::MutPointer)
+                    } else {
+                        Some(ParseWrappers::ConstPointer)
+                    }
+                }
                 OPTIONAL => Some(ParseWrappers::Option),
                 ARRAY => Some(ParseWrappers::Array(ArrayKind::HeapArray)),
                 SQUARE_OPEN => Some(ParseWrappers::Array(self.get_array_type_wrapper()?)),
@@ -250,7 +274,8 @@ impl<'a, 'f> Parser<'a, 'f> {
 enum ParseWrappers {
     ConstRef,
     MutRef,
-    Pointer,
+    ConstPointer,
+    MutPointer,
     Option,
     Array(ArrayKind),
 }

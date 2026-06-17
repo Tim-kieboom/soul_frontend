@@ -42,6 +42,28 @@ reflect(value: &any) {
     }
 }
 
+enum CEnum: str {
+    One = "one"
+    Two = "two"   
+}
+
+enum Union {
+    String(str)
+    Object(field: int, condition: bool)
+}
+
+enums() {
+    one := CEnum.One(number: 1, name: "")
+    valeu: str = one.toValue()
+    CEnum.fromValue("one")
+
+    un := Union.String("test".copy)
+    match un {
+        Union.String(text) => println(text),
+        Union.Object(field, condition) => println(f"{field} {condition}")
+    }
+}
+
 main() {
     println("hello world")
     fmt.format("{}.{}", 1, "hello world")

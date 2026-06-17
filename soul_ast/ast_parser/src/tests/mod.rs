@@ -1140,17 +1140,109 @@ fn pointer_type_variable() {
         StatementKind::Variable(v) => v,
         _ => panic!("expected Variable"),
     };
+
+    let inner = Box::new(SoulType::Primitive(
+        PrimitiveTypes::Int
+    ));
     assert_eq!(
         *ty,
-        Some(SoulType::Pointer(Box::new(SoulType::Primitive(
-            PrimitiveTypes::Int
-        ))))
+        Some(SoulType::Pointer(ReferenceType { inner, lifetime: None, mutable: false }))
+    );
+}
+
+#[test]
+fn pointer_mut_type_variable() {
+    let (module, store, context) = parse("mut x: *mut int");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let Variable { ty, .. } = match &stmt.node {
+        StatementKind::Variable(v) => v,
+        _ => panic!("expected Variable"),
+    };
+
+    let inner = Box::new(SoulType::Primitive(
+        PrimitiveTypes::Int
+    ));
+    assert_eq!(
+        *ty,
+        Some(SoulType::Pointer(ReferenceType { inner, lifetime: None, mutable: true }))
     );
 }
 
 // ----------------------------------------------------------------
 //  Named variant type
 // ----------------------------------------------------------------
+// ----------------------------------------------------------------
+//  RawPtr type
+// ----------------------------------------------------------------
+#[test]
+fn raw_ptr_type_void() {
+    let (module, store, context) = parse("mut x: RawPtr");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let Variable { ty, .. } = match &stmt.node {
+        StatementKind::Variable(v) => v,
+        _ => panic!("expected Variable"),
+    };
+    assert_eq!(*ty, Some(SoulType::RawPtr(None)));
+}
+
+#[test]
+fn raw_ptr_type_with_generic() {
+    let (module, store, context) = parse("mut x: RawPtr<int>");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let Variable { ty, .. } = match &stmt.node {
+        StatementKind::Variable(v) => v,
+        _ => panic!("expected Variable"),
+    };
+    assert_eq!(
+        *ty,
+        Some(SoulType::RawPtr(Some(Box::new(SoulType::Primitive(
+            PrimitiveTypes::Int
+        )))))
+    );
+}
+
+#[test]
+fn raw_ptr_type_explicit_none() {
+    let (module, store, context) = parse("mut x: RawPtr<none>");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let Variable { ty, .. } = match &stmt.node {
+        StatementKind::Variable(v) => v,
+        _ => panic!("expected Variable"),
+    };
+    assert_eq!(
+        *ty,
+        Some(SoulType::RawPtr(Some(Box::new(SoulType::None))))
+    );
+}
+
 #[test]
 fn named_variant_type_variable() {
     let (module, store, context) = parse("mut x: Foo.Bar");

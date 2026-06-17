@@ -13,7 +13,10 @@ pub enum SoulType {
     /// Reference type: `&int`` or `&mut int`
     Reference(ReferenceType),
     /// Pointer type: `*int`
-    Pointer(Box<SoulType>),
+    Pointer(ReferenceType),
+    /// Raw pointer type: `RawPtr` or `RawPtr<int>`. Nullable by default.
+    /// When no generic is specified, it's a void pointer (`RawPtr<none>`).
+    RawPtr(Option<Box<SoulType>>),
     /// Optional type: `?int`
     Optional(Box<SoulType>),
     /// unknown type

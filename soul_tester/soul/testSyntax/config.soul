@@ -22,7 +22,7 @@ use config.Allocator impl config.Allocable {
             ptr := RawPtr<T>.(malloc(T.sizeof + len))
             assert(ptr != null)
             for i, value in values {
-                *ptr.offset(i) = value
+                *@RawPtrOffset(ptr, 1) = value
             }
 
             []T.(ptr, len)

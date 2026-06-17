@@ -654,8 +654,14 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 }
                 self.write_type(&array.of_type)
             }
-            SoulType::Reference(reference) => {
-                self.write_char('&')?;
+            SoulType::Reference(reference) |
+            SoulType::Pointer(reference) => {
+                if matches!(ty, SoulType::Pointer(_)) {
+                    self.write_char('*')?;
+                } else {
+                    self.write_char('&')?;
+                }
+
                 if let Some(lifetime) = &reference.lifetime {
                     self.write_fmt(format_args!("'{} ", lifetime.as_str()))?;
                 }
@@ -664,9 +670,14 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 }
                 self.write_type(&reference.inner)
             }
-            SoulType::Pointer(soul_type) => {
-                self.write_char('*')?;
-                self.write_type(&soul_type)
+            SoulType::RawPtr(inner) => {
+                self.write_str("RawPtr")?;
+                if let Some(inner) = inner {
+                    self.write_char('<')?;
+                    self.write_type(inner)?;
+                    self.write_char('>')?;
+                }
+                Ok(())
             }
             SoulType::Optional(soul_type) => {
                 self.write_char('?')?;
