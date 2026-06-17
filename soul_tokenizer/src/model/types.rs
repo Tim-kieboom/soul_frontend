@@ -34,5 +34,6 @@ define_str_enum! {
 
         Any => "any",
         None => "none",
+        RawPtr => "RawPtr",
     }
 }

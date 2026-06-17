@@ -190,6 +190,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                     Precedence::MIN
                 }
             }
+            TokenKind::Keyword(keyword) => Precedence::new(keyword.precedence()),
             TokenKind::Symbol(symbool_kind) => {
                 if let Some(bin) = try_to_binary_operator(symbool_kind) {
                     let peek = self.peek();
@@ -419,26 +420,13 @@ impl<'a, 'f> Parser<'a, 'f> {
         match &self.token().kind {
             TokenKind::Ident(ident) => match KeyWord::from_str(ident.as_str()) {
                 Some(KeyWord::Typeof) => {
-                    self.bump();
-                    let type_name = self.try_bump_consume_ident()?;
-                    self.expect(&TokenKind::Symbol(Symbol::Dot))?;
-                    let variant_name = self.try_bump_consume_ident()?;
-                    let binding = if self.current_is(&TokenKind::Symbol(Symbol::RoundOpen)) {
-                        self.bump();
-                        let name = self.try_bump_consume_ident()?;
-                        self.expect(&TokenKind::Symbol(Symbol::RoundClose))?;
-                        Some(name)
-                    } else {
-                        None
-                    };
-                    return Ok(ExpressionOperator::TypeOf {
-                        type_name,
-                        variant_name,
-                        binding,
-                    });
+                    return self.parse_typeof_operator(start_span);
                 }
                 _ => get_invalid_error(self.token()),
             },
+            TokenKind::Keyword(KeyWord::Typeof) => {
+                return self.parse_typeof_operator(start_span);
+            }
             TokenKind::Symbol(sym) => {
                 if let Some(access) = AccessType::from_symbool(*sym) {
                     self.bump();
@@ -492,6 +480,26 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
             _ => binary,
         }
+    }
+
+    fn parse_typeof_operator(&mut self, _start_span: Span) -> SoulResult<ExpressionOperator> {
+        self.bump();
+        let type_name = self.try_bump_consume_ident()?;
+        self.expect(&TokenKind::Symbol(Symbol::Dot))?;
+        let variant_name = self.try_bump_consume_ident()?;
+        let binding = if self.current_is(&TokenKind::Symbol(Symbol::RoundOpen)) {
+            self.bump();
+            let name = self.try_bump_consume_ident()?;
+            self.expect(&TokenKind::Symbol(Symbol::RoundClose))?;
+            Some(name)
+        } else {
+            None
+        };
+        Ok(ExpressionOperator::TypeOf {
+            type_name,
+            variant_name,
+            binding,
+        })
     }
 
     fn parse_primary(&mut self, end_tokens: &[TokenKind]) -> SoulResult<Expression> {

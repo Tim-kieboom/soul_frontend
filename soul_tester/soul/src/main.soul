@@ -1,7 +1,8 @@
-foo().bar()
 pub sum(a: int, b: int): int {
     a + b
 }
+
+extern "C" malloc(size: uint): RawPtr
 
 // pub trait Index {
 //     type Out

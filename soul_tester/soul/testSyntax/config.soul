@@ -1,0 +1,37 @@
+import (
+    core.config
+)
+extern "C" malloc(size: uint): RawPtr<none>
+extern "C" free(ptr: RawPtr<none>)
+
+use config.Allocator impl config.Allocable {
+    
+    alloc<T: Sized>(value: T): *T {
+        unsafe {
+            ptr := RawPtr<T>.(malloc(T.sizeof))
+            assert(ptr != null)
+            *ptr = value
+            
+            *T.(ptr)
+        }
+    }
+
+    allocArray<T: Sized>(values: [_]T): []T {
+        unsafe {
+            len := values.len()
+            ptr := RawPtr<T>.(malloc(T.sizeof + len))
+            assert(ptr != null)
+            for i, value in values {
+                *ptr.offset(i) = value
+            }
+
+            []T.(ptr, len)
+        }
+    }
+
+    dealloc(ptr: *any) {
+        unsafe {
+            free(RawPtr<none>.(ptr))
+        }
+    }
+}

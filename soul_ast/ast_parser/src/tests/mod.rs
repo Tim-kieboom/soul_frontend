@@ -2,10 +2,10 @@ use std::path::PathBuf;
 
 use ast_model::{
     AstStore, Module,
-    expression::{ExpressionKind, FunctionCall, StructConstructor},
+    expression::{AnyArray, Constructor, ExpressionKind, FunctionCall, MatchMethod, StructConstructor, TypeOf},
     literal::Literal,
     operators::BinaryOperatorKind,
-    soul_type::{ReferenceType, SoulType},
+    soul_type::{ArrayKind, ArrayType, ReferenceType, SoulType, Stub},
     statements::{Assignment, Import, ImportKind, Statement, StatementKind, Variable},
 };
 use soul_tokenizer::to_token_stream;
@@ -17,6 +17,7 @@ mod big_test;
 mod conditional;
 mod functions;
 mod literals;
+mod structs;
 mod variables;
 
 fn module_id() -> ModuleId {
@@ -620,4 +621,562 @@ fn mut_reference_type_variable() {
             )
         ))
     );
+}
+
+// ----------------------------------------------------------------
+//  Struct constructor — empty and with defaults
+// ----------------------------------------------------------------
+#[test]
+fn struct_constructor_empty() {
+    let (module, store, context) = parse("Point {}");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    match &stmt.node {
+        StatementKind::Expression { expression, .. } => {
+            let expr = &store.expressions[*expression];
+            match &expr.node {
+                ExpressionKind::StructConstructor(StructConstructor {
+                    values, defaults, ..
+                }) => {
+                    assert!(values.is_empty());
+                    assert!(!defaults);
+                }
+                _ => panic!("expected StructConstructor"),
+            }
+        }
+        _ => panic!("expected Expression statement"),
+    }
+}
+
+#[test]
+fn struct_constructor_defaults() {
+    let (module, store, context) = parse("Point { x: 1, .. }");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    match &stmt.node {
+        StatementKind::Expression { expression, .. } => {
+            let expr = &store.expressions[*expression];
+            match &expr.node {
+                ExpressionKind::StructConstructor(StructConstructor {
+                    values, defaults, ..
+                }) => {
+                    assert_eq!(values.len(), 1);
+                    assert!(defaults);
+                }
+                _ => panic!("expected StructConstructor"),
+            }
+        }
+        _ => panic!("expected Expression statement"),
+    }
+}
+
+// ----------------------------------------------------------------
+//  Array literal / filler
+// ----------------------------------------------------------------
+#[test]
+fn array_literal() {
+    let (module, store, context) = parse("[1, 2, 3]");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    match &stmt.node {
+        StatementKind::Expression { expression, .. } => {
+            let expr = &store.expressions[*expression];
+            match &expr.node {
+                ExpressionKind::Array(AnyArray::Array(arr)) => {
+                    assert_eq!(arr.values.len(), 3);
+                }
+                other => panic!("expected Array, got {:?}", other),
+            }
+        }
+        _ => panic!("expected Expression statement"),
+    }
+}
+
+#[test]
+fn array_filler() {
+    let (module, store, context) = parse("[for 3 => 0]");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    match &stmt.node {
+        StatementKind::Expression { expression, .. } => {
+            let expr = &store.expressions[*expression];
+            match &expr.node {
+                ExpressionKind::Array(AnyArray::ArrayFiller(filler)) => {
+                    let amount = &store.expressions[filler.amount];
+                    let element = &store.expressions[filler.element];
+                    assert_eq!(amount.node, ExpressionKind::Literal((None, Literal::Uint(3))));
+                    assert_eq!(element.node, ExpressionKind::Literal((None, Literal::Uint(0))));
+                }
+                other => panic!("expected ArrayFiller, got {:?}", other),
+            }
+        }
+        _ => panic!("expected Expression statement"),
+    }
+}
+
+// ----------------------------------------------------------------
+//  New array
+// ----------------------------------------------------------------
+#[test]
+fn new_array() {
+    let (module, store, context) = parse("new[1, 2]");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    match &stmt.node {
+        StatementKind::Expression { expression, .. } => {
+            let expr = &store.expressions[*expression];
+            match &expr.node {
+                ExpressionKind::NewArray(AnyArray::Array(arr)) => {
+                    assert_eq!(arr.values.len(), 2);
+                }
+                other => panic!("expected NewArray, got {:?}", other),
+            }
+        }
+        _ => panic!("expected Expression statement"),
+    }
+}
+
+// ----------------------------------------------------------------
+//  Deref expression
+// ----------------------------------------------------------------
+#[test]
+fn deref_expression() {
+    let (module, store, context) = parse("*ptr");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    match &stmt.node {
+        StatementKind::Expression { expression, .. } => {
+            let expr = &store.expressions[*expression];
+            match &expr.node {
+                ExpressionKind::Deref(d) => {
+                    let inner = &store.expressions[d.value];
+                    match &inner.node {
+                        ExpressionKind::Variable(v) => assert_eq!(v.name.as_str(), "ptr"),
+                        _ => panic!("expected Variable inside Deref"),
+                    }
+                }
+                other => panic!("expected Deref, got {:?}", other),
+            }
+        }
+        _ => panic!("expected Expression statement"),
+    }
+}
+
+// ----------------------------------------------------------------
+//  TypeOf expression
+// ----------------------------------------------------------------
+#[test]
+fn typeof_expression() {
+    let (module, store, context) = parse("x typeof Foo.Bar");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    match &stmt.node {
+        StatementKind::Expression { expression, .. } => {
+            let expr = &store.expressions[*expression];
+            match &expr.node {
+                ExpressionKind::TypeOf(TypeOf {
+                    type_name,
+                    variant_name,
+                    binding,
+                    ..
+                }) => {
+                    assert_eq!(type_name.as_str(), "Foo");
+                    assert_eq!(variant_name.as_str(), "Bar");
+                    assert!(binding.is_none());
+                }
+                other => panic!("expected TypeOf, got {:?}", other),
+            }
+        }
+        _ => panic!("expected Expression statement"),
+    }
+}
+
+#[test]
+fn typeof_expression_with_binding() {
+    let (module, store, context) = parse("x typeof Foo.Bar(baz)");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    match &stmt.node {
+        StatementKind::Expression { expression, .. } => {
+            let expr = &store.expressions[*expression];
+            match &expr.node {
+                ExpressionKind::TypeOf(TypeOf {
+                    type_name,
+                    variant_name,
+                    binding,
+                    ..
+                }) => {
+                    assert_eq!(type_name.as_str(), "Foo");
+                    assert_eq!(variant_name.as_str(), "Bar");
+                    assert_eq!(binding.as_ref().map(|b| b.as_str()), Some("baz"));
+                }
+                other => panic!("expected TypeOf, got {:?}", other),
+            }
+        }
+        _ => panic!("expected Expression statement"),
+    }
+}
+
+// ----------------------------------------------------------------
+//  Match-method expression
+// ----------------------------------------------------------------
+#[test]
+fn match_method_expression() {
+    let (module, store, context) = parse("x.Variant { true }");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    match &stmt.node {
+        StatementKind::Expression { expression, .. } => {
+            let expr = &store.expressions[*expression];
+            match &expr.node {
+                ExpressionKind::MatchMethod(MatchMethod {
+                    scrutinee, arms, ..
+                }) => {
+                    let scrut = &store.expressions[*scrutinee];
+                    match &scrut.node {
+                        ExpressionKind::Variable(v) => assert_eq!(v.name.as_str(), "x"),
+                        _ => panic!("expected Variable scrutinee"),
+                    }
+                    assert_eq!(arms.len(), 1);
+                    assert_eq!(arms[0].variant_name.as_str(), "Variant");
+                }
+                other => panic!("expected MatchMethod, got {:?}", other),
+            }
+        }
+        _ => panic!("expected Expression statement"),
+    }
+}
+
+// ----------------------------------------------------------------
+//  Constructor expression (Type.(args))
+// ----------------------------------------------------------------
+#[test]
+fn constructor_expression() {
+    let (module, store, context) = parse("Foo.(1, 2)");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    match &stmt.node {
+        StatementKind::Expression { expression, .. } => {
+            let expr = &store.expressions[*expression];
+            match &expr.node {
+                ExpressionKind::Constructor(Constructor { ty, arguments, .. }) => {
+                    assert_eq!(
+                        *ty,
+                        SoulType::Stub(Stub {
+                            name: "Foo".into(),
+                            generics: vec![]
+                        })
+                    );
+                    assert_eq!(arguments.len(), 2);
+                }
+                other => panic!("expected Constructor, got {:?}", other),
+            }
+        }
+        _ => panic!("expected Expression statement"),
+    }
+}
+
+// ----------------------------------------------------------------
+//  Compound assignments (+=, -=, etc.)
+// ----------------------------------------------------------------
+#[test]
+fn compound_add_assign() {
+    let (module, store, context) = parse("x += 5");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    match &stmt.node {
+        StatementKind::Assignment(Assignment { left, right, .. }) => {
+            let l = &store.expressions[*left];
+            match &l.node {
+                ExpressionKind::Variable(v) => assert_eq!(v.name.as_str(), "x"),
+                _ => panic!("expected Variable on LHS"),
+            }
+            let r = &store.expressions[*right];
+            match &r.node {
+                ExpressionKind::Binary(bin) => {
+                    assert_eq!(bin.operator.value, BinaryOperatorKind::Add);
+                }
+                other => panic!("expected Binary(Add) in RHS, got {:?}", other),
+            }
+        }
+        _ => panic!("expected Assignment statement"),
+    }
+}
+
+#[test]
+fn compound_sub_assign() {
+    let (module, store, context) = parse("x -= 3");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    match &stmt.node {
+        StatementKind::Assignment(Assignment { left, right, .. }) => {
+            let l = &store.expressions[*left];
+            match &l.node {
+                ExpressionKind::Variable(v) => assert_eq!(v.name.as_str(), "x"),
+                _ => panic!("expected Variable on LHS"),
+            }
+            let r = &store.expressions[*right];
+            match &r.node {
+                ExpressionKind::Binary(bin) => {
+                    assert_eq!(bin.operator.value, BinaryOperatorKind::Sub);
+                }
+                other => panic!("expected Binary(Sub) in RHS, got {:?}", other),
+            }
+        }
+        _ => panic!("expected Assignment statement"),
+    }
+}
+
+// ----------------------------------------------------------------
+//  Array type annotations
+// ----------------------------------------------------------------
+#[test]
+fn array_type_wildcard_variable() {
+    let (module, store, context) = parse("mut x: [_]int");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let Variable { ty, .. } = match &stmt.node {
+        StatementKind::Variable(v) => v,
+        _ => panic!("expected Variable"),
+    };
+    assert_eq!(
+        *ty,
+        Some(SoulType::Array(ArrayType {
+            of_type: Box::new(SoulType::Primitive(PrimitiveTypes::Int)),
+            kind: ArrayKind::StackArrayWildcard,
+        }))
+    );
+}
+
+#[test]
+fn array_type_const_slice_variable() {
+    let (module, store, context) = parse("mut x: [&]int");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let Variable { ty, .. } = match &stmt.node {
+        StatementKind::Variable(v) => v,
+        _ => panic!("expected Variable"),
+    };
+    assert_eq!(
+        *ty,
+        Some(SoulType::Array(ArrayType {
+            of_type: Box::new(SoulType::Primitive(PrimitiveTypes::Int)),
+            kind: ArrayKind::ConstSlice,
+        }))
+    );
+}
+
+#[test]
+fn array_type_mut_slice_variable() {
+    let (module, store, context) = parse("mut x: [&mut]int");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let Variable { ty, .. } = match &stmt.node {
+        StatementKind::Variable(v) => v,
+        _ => panic!("expected Variable"),
+    };
+    assert_eq!(
+        *ty,
+        Some(SoulType::Array(ArrayType {
+            of_type: Box::new(SoulType::Primitive(PrimitiveTypes::Int)),
+            kind: ArrayKind::MutSlice,
+        }))
+    );
+}
+
+#[test]
+fn array_type_heap_variable() {
+    let (module, store, context) = parse("mut x: []int");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let Variable { ty, .. } = match &stmt.node {
+        StatementKind::Variable(v) => v,
+        _ => panic!("expected Variable"),
+    };
+    assert_eq!(
+        *ty,
+        Some(SoulType::Array(ArrayType {
+            of_type: Box::new(SoulType::Primitive(PrimitiveTypes::Int)),
+            kind: ArrayKind::HeapArray,
+        }))
+    );
+}
+
+#[test]
+fn array_type_sized_variable() {
+    let (module, store, context) = parse("mut x: [5]int");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let Variable { ty, .. } = match &stmt.node {
+        StatementKind::Variable(v) => v,
+        _ => panic!("expected Variable"),
+    };
+    assert_eq!(
+        *ty,
+        Some(SoulType::Array(ArrayType {
+            of_type: Box::new(SoulType::Primitive(PrimitiveTypes::Int)),
+            kind: ArrayKind::StackArray(5),
+        }))
+    );
+}
+
+// ----------------------------------------------------------------
+//  Pointer type
+// ----------------------------------------------------------------
+#[test]
+fn pointer_type_variable() {
+    let (module, store, context) = parse("mut x: *int");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let Variable { ty, .. } = match &stmt.node {
+        StatementKind::Variable(v) => v,
+        _ => panic!("expected Variable"),
+    };
+    assert_eq!(
+        *ty,
+        Some(SoulType::Pointer(Box::new(SoulType::Primitive(
+            PrimitiveTypes::Int
+        ))))
+    );
+}
+
+// ----------------------------------------------------------------
+//  Named variant type
+// ----------------------------------------------------------------
+#[test]
+fn named_variant_type_variable() {
+    let (module, store, context) = parse("mut x: Foo.Bar");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let Variable { ty, .. } = match &stmt.node {
+        StatementKind::Variable(v) => v,
+        _ => panic!("expected Variable"),
+    };
+    match ty {
+        Some(SoulType::NamedVariant { base, variant }) => {
+            assert_eq!(variant.as_str(), "Bar");
+            assert_eq!(
+                **base,
+                SoulType::Stub(Stub {
+                    name: "Foo".into(),
+                    generics: vec![]
+                })
+            );
+        }
+        other => panic!("expected NamedVariant, got {:?}", other),
+    }
 }

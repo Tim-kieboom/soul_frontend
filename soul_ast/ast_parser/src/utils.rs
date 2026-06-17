@@ -231,6 +231,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn current_is_keyword(&self, expected: KeyWord) -> bool {
         match &self.token().kind {
             TokenKind::Ident(ident) => KeyWord::from_str(ident.as_str()) == Some(expected),
+            TokenKind::Keyword(keyword) => *keyword == expected,
             _ => false,
         }
     }

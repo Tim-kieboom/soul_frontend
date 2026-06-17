@@ -27,6 +27,10 @@ impl<'a, 'f> Parser<'a, 'f> {
         let prev_type = self.current.this_type.take();
         self.current.this_type = Some(this_type);
         loop {
+            self.skip_end_lines();
+            if self.current_is(&CURLY_CLOSE) {
+                break;
+            }
             let start_span = self.token().span;
             let statement = self.parse_statement()?;
             let is_public = statement.is_public();

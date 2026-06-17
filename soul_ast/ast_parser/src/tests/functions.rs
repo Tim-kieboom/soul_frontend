@@ -227,6 +227,147 @@ fn function_with_this_ref() {
 }
 
 // ----------------------------------------------------------------
+//  Method-style functions (with `&mut this`)
+// ----------------------------------------------------------------
+#[test]
+fn function_with_mut_this() {
+    let (module, store, context) = parse("foo(&mut this) {}");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let func_id = match &stmt.node {
+        StatementKind::Function(id) => *id,
+        _ => panic!("expected Function"),
+    };
+    let func = &store.functions[func_id];
+    let ast_model::statements::Function { signature, .. } = match func {
+        ast_model::FunctionKind::Normal(f) => f,
+        _ => panic!("expected Normal function"),
+    };
+    assert_eq!(
+        signature.value.function_kind,
+        ast_model::statements::FunctionThisKind::MutRef
+    );
+}
+
+// ----------------------------------------------------------------
+//  Method-style functions (with `this` consume)
+// ----------------------------------------------------------------
+#[test]
+fn function_with_this_consume() {
+    let (module, store, context) = parse("foo(this) {}");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let func_id = match &stmt.node {
+        StatementKind::Function(id) => *id,
+        _ => panic!("expected Function"),
+    };
+    let func = &store.functions[func_id];
+    let ast_model::statements::Function { signature, .. } = match func {
+        ast_model::FunctionKind::Normal(f) => f,
+        _ => panic!("expected Normal function"),
+    };
+    assert_eq!(
+        signature.value.function_kind,
+        ast_model::statements::FunctionThisKind::Consume
+    );
+}
+
+// ----------------------------------------------------------------
+//  Function with generics
+// ----------------------------------------------------------------
+#[test]
+fn function_with_generics() {
+    let (module, store, context) = parse("foo<T>(x: T) {}");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let func_id = match &stmt.node {
+        StatementKind::Function(id) => *id,
+        _ => panic!("expected Function"),
+    };
+    let func = &store.functions[func_id];
+    let ast_model::statements::Function { signature, .. } = match func {
+        ast_model::FunctionKind::Normal(f) => f,
+        _ => panic!("expected Normal function"),
+    };
+    assert_eq!(signature.value.generics.len(), 1);
+    assert_eq!(signature.value.generics[0].name.as_str(), "T");
+    assert_eq!(signature.value.parameters.len(), 1);
+    assert_eq!(signature.value.parameters[0].name.as_str(), "x");
+}
+
+// ----------------------------------------------------------------
+//  Function with parameter default
+// ----------------------------------------------------------------
+#[test]
+fn function_with_parameter_default() {
+    let (module, store, context) = parse("foo(x: int = 5) {}");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let func_id = match &stmt.node {
+        StatementKind::Function(id) => *id,
+        _ => panic!("expected Function"),
+    };
+    let func = &store.functions[func_id];
+    let ast_model::statements::Function { signature, .. } = match func {
+        ast_model::FunctionKind::Normal(f) => f,
+        _ => panic!("expected Normal function"),
+    };
+    assert_eq!(signature.value.parameters.len(), 1);
+    assert!(signature.value.parameters[0].default.is_some());
+}
+
+// ----------------------------------------------------------------
+//  Pub function
+// ----------------------------------------------------------------
+#[test]
+fn pub_function() {
+    let (module, store, context) = parse("pub foo() {}");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    assert!(stmt.is_public());
+    let func_id = match &stmt.node {
+        StatementKind::Function(id) => *id,
+        _ => panic!("expected Function"),
+    };
+    let func = &store.functions[func_id];
+    let ast_model::statements::Function { signature, .. } = match func {
+        ast_model::FunctionKind::Normal(f) => f,
+        _ => panic!("expected Normal function"),
+    };
+    assert_eq!(signature.value.name.as_str(), "foo");
+}
+
+// ----------------------------------------------------------------
 //  Method call on value
 // ----------------------------------------------------------------
 #[test]
