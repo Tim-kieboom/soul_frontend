@@ -18,7 +18,7 @@ import (
 /*
     comment and stuff
 */
-fn test() {
+test() {
     x := 42 // foo
     mut y := 10
     z: int = 20
@@ -27,7 +27,7 @@ fn test() {
     a := -x
     b := !false
     c := &x
-    d := @x
+    d := &mut x
     e := 1 + 2
     f := 3 * 4
     g := (1 + 2) * 3
@@ -72,7 +72,12 @@ pub const GLOBAL := 100
 #[test]
 fn all_kinds() {
     let (module, store, context) = parse(CODE);
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let block = &store.blocks[module.global];
 
@@ -97,7 +102,11 @@ fn all_kinds() {
     assert_eq!(paths1.len(), 2);
     assert_eq!(paths1[0].kind, ImportKind::Glob);
     let item = match &paths1[1].kind {
-        ImportKind::Items { this: false, this_alias: None, items } => &items[0],
+        ImportKind::Items {
+            this: false,
+            this_alias: None,
+            items,
+        } => &items[0],
         _ => panic!("paths 1: expected Items"),
     };
 
@@ -450,7 +459,10 @@ fn all_kinds() {
     };
 
     assert_eq!(if_.branch, None);
-    assert_eq!(store.expressions[if_.condition].node, ExpressionKind::Literal((None, Literal::Bool(true))));
+    assert_eq!(
+        store.expressions[if_.condition].node,
+        ExpressionKind::Literal((None, Literal::Bool(true)))
+    );
     let statement_id = store.blocks[if_.block].statements[0];
     match &store.statements[statement_id].node {
         StatementKind::Expression { expression: id, .. } => {
@@ -460,9 +472,9 @@ fn all_kinds() {
     };
 
     /*
-        36: 
+        36:
         match x {
-            1 => false 
+            1 => false
             _ => true
         } - match
     */
@@ -483,7 +495,10 @@ fn all_kinds() {
     }
 
     assert_eq!(match_.arms.len(), 2);
-    assert_eq!(match_.arms[0].pattern, MatchPattern::Literal(Literal::Uint(1)));
+    assert_eq!(
+        match_.arms[0].pattern,
+        MatchPattern::Literal(Literal::Uint(1))
+    );
     assert_eq!(match_.arms[1].pattern, MatchPattern::Wildcard);
 
     // 37: return 42  — return with value
@@ -522,22 +537,35 @@ fn all_kinds() {
     // --- statement 3: type alias --------------------------------------------
     let stmt3 = &store.statements[block.statements[3]];
     match &stmt3.node {
-        StatementKind::TypeDef(TypeDef{ new_type, old_type, is_distinct, .. }) => {
+        StatementKind::TypeDef(TypeDef {
+            new_type,
+            old_type,
+            is_distinct,
+            ..
+        }) => {
             assert!(!is_distinct);
             assert_eq!(*new_type, SoulType::Stub(Stub::new("MyInt".to_string())));
             assert_eq!(*old_type, SoulType::Primitive(PrimitiveTypes::Int));
-        },
+        }
         other => panic!("statement 3: expected TypeDef, got {:?}", other),
     }
 
     // --- statement 4: distinct type alias --------------------------------------------
     let stmt4 = &store.statements[block.statements[4]];
     match &stmt4.node {
-        StatementKind::TypeDef(TypeDef{ new_type, old_type, is_distinct, .. }) => {
+        StatementKind::TypeDef(TypeDef {
+            new_type,
+            old_type,
+            is_distinct,
+            ..
+        }) => {
             assert!(is_distinct);
-            assert_eq!(*new_type, SoulType::Stub(Stub::new("DistinctInt".to_string())));
+            assert_eq!(
+                *new_type,
+                SoulType::Stub(Stub::new("DistinctInt".to_string()))
+            );
             assert_eq!(*old_type, SoulType::Primitive(PrimitiveTypes::Int));
-        },
+        }
         other => panic!("statement 3: expected TypeDef, got {:?}", other),
     }
 

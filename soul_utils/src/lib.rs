@@ -2,6 +2,7 @@ use std::fmt::Display;
 
 use crate::{fault::FaultCollector, span::Span};
 
+pub mod char_colors;
 pub mod collections;
 pub mod compiler_options;
 pub mod error;
@@ -10,7 +11,6 @@ pub mod ids;
 pub mod literal;
 pub mod soul_names;
 pub mod span;
-pub mod char_colors;
 
 impl_soul_ids!(FunctionId);
 
@@ -31,7 +31,16 @@ define_str_enum! {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Ident(String, Span);
 impl Ident {
-    pub fn new(value: String, span: Span) -> Self {
+    pub fn new(value: impl Into<String>, span: Span) -> Self {
+        Self(value.into(), span)
+    }
+
+    pub fn from_str_slice(slice: &[&str], span: Span) -> Self {
+        let len = slice.iter().map(|str| str.len()).sum();
+        let mut value = String::with_capacity(len);
+        for str in slice {
+            value.push_str(str);
+        }
         Self(value, span)
     }
 

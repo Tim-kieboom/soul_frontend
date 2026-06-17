@@ -14,7 +14,7 @@ use soul_utils::{
 
 use crate::{
     parser::Parser,
-    utils::{COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, FOR, LAMBDA_ARROW, SQUARE_CLOSE, SQUARE_OPEN},
+    utils::{ARRAY, COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, FOR, LAMBDA_ARROW, SQUARE_CLOSE, SQUARE_OPEN},
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
@@ -23,11 +23,20 @@ impl<'a, 'f> Parser<'a, 'f> {
         collection_type: Option<SoulType>,
     ) -> SoulResult<Spanned<AnyArray>> {
         let start_span = self.token().span;
+        if self.current_is(&ARRAY) {
+            self.bump();
+            return Ok(Spanned::new(AnyArray::Array(
+                Array::default()), 
+                self.span_combine(start_span)
+            ));
+        }
+
         self.expect(&SQUARE_OPEN)?;
 
         let position = self.tokens.current_position();
         let element_type = match self.try_parse_type() {
             Ok(ty) if self.current_is(&COLON) => {
+                self.bump();
                 self.skip_end_lines();
                 Some(ty)
             }

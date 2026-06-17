@@ -59,7 +59,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         if self.current_is_any(&[ROUND_OPEN, ARROW_LEFT]) {
             return self
-                .try_parse_function_declaration(start_span, modifier, SoulType::None, name)
+                .try_parse_function_declaration_id(start_span, modifier, &SoulType::None, name)
                 .map(Statement::from_function)
                 .map_try_not_value(|(_, err)| err);
         }

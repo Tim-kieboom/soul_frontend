@@ -34,7 +34,8 @@ fn frontend() -> Result<()> {
         Err(err) => return Err(anyhow::Error::msg(format!("{err:?}"))),
     };
 
-    display_tokenizer(&tokens)?;
+    display_tokenizer(&tokens)
+        .map_err(|err| anyhow::Error::msg(format!("in display_tokenizer: {err}")))?;
 
     let mut store = AstStore::default();
     let mut context = CrateContext::default();
@@ -49,8 +50,10 @@ fn frontend() -> Result<()> {
     for fault in context.faults.iter() {
         display_fault(fault, &file, &config::PRINT_CONFIGS, &mut stdout())?;
     }
-    
-    display_ast(&ast, &store)?;
+
+    display_ast(&ast, &store)
+        .map_err(|err| anyhow::Error::msg(format!("in display_ast: {err}")))?;
+
     Ok(())
 }
 
@@ -83,7 +86,12 @@ fn display_ast<'a>(tree: &AbstractSyntaxTree, store: &AstStore) -> Result<()> {
         .open(&output_path)
         .map_err(|err| anyhow::anyhow!("Failed to create output file({output_path:?}): {}", err))?;
 
-    display_ast_tree(tree, Path::new(&config::CONFIG.src_path), store, &mut writer)?;
+    display_ast_tree(
+        tree,
+        Path::new(&config::CONFIG.src_path),
+        store,
+        &mut writer,
+    )?;
     writer.flush()?;
     Ok(())
 }

@@ -5,11 +5,11 @@ use ast_model::{
     expression::{ExpressionKind, FunctionCall, StructConstructor},
     literal::Literal,
     operators::BinaryOperatorKind,
-    soul_type::SoulType,
+    soul_type::{ReferenceType, SoulType},
     statements::{Assignment, Import, ImportKind, Statement, StatementKind, Variable},
 };
 use soul_tokenizer::to_token_stream;
-use soul_utils::{CrateContext, fault::Severity, ids::IdAlloc, span::ModuleId};
+use soul_utils::{CrateContext, fault::Severity, ids::IdAlloc, soul_names::PrimitiveTypes, span::ModuleId};
 
 use crate::{ParseInfo, parse_module};
 
@@ -50,7 +50,12 @@ fn get_statement<'a>(store: &'a AstStore, module: &Module, index: usize) -> &'a 
 #[test]
 fn empty_module() {
     let (module, store, context) = parse("");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let block = &store.blocks[module.global];
     assert!(block.statements.is_empty(), "expected no statements");
@@ -59,7 +64,12 @@ fn empty_module() {
 #[test]
 fn only_newlines() {
     let (module, store, context) = parse("\n\n\n\n");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let block = &store.blocks[module.global];
     assert!(block.statements.is_empty());
@@ -71,7 +81,12 @@ fn only_newlines() {
 #[test]
 fn binary_addition() {
     let (module, store, context) = parse("1 + 2");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     match &stmt.node {
@@ -101,7 +116,12 @@ fn binary_addition() {
 #[test]
 fn parenthesized_expression() {
     let (module, store, context) = parse("(1 + 2) * 3");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     match &stmt.node {
@@ -122,7 +142,10 @@ fn parenthesized_expression() {
                         other => panic!("expected inner Binary(Add), got {:?}", other),
                     }
                     let right = &store.expressions[outer.right];
-                    assert_eq!(right.node, ExpressionKind::Literal((None, Literal::Uint(3))));
+                    assert_eq!(
+                        right.node,
+                        ExpressionKind::Literal((None, Literal::Uint(3)))
+                    );
                 }
                 other => panic!("expected outer Binary(Mul), got {:?}", other),
             }
@@ -134,13 +157,21 @@ fn parenthesized_expression() {
 #[test]
 fn simple_parens() {
     let (module, store, context) = parse("(42)");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     match &stmt.node {
         StatementKind::Expression { expression, .. } => {
             let expr = &store.expressions[*expression];
-            assert_eq!(expr.node, ExpressionKind::Literal((None, Literal::Uint(42))));
+            assert_eq!(
+                expr.node,
+                ExpressionKind::Literal((None, Literal::Uint(42)))
+            );
         }
         other => panic!("expected Expression statement, got {:?}", other),
     }
@@ -149,7 +180,12 @@ fn simple_parens() {
 #[test]
 fn nested_parens() {
     let (module, store, context) = parse("((1 + 2))");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     match &stmt.node {
@@ -172,7 +208,12 @@ fn nested_parens() {
 #[test]
 fn simple_assignment() {
     let (module, store, context) = parse("x = 5");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     match &stmt.node {
@@ -195,7 +236,12 @@ fn simple_assignment() {
 #[test]
 fn struct_constructor() {
     let (module, store, context) = parse("Point { x: 1, y: 2 }");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     match &stmt.node {
@@ -228,7 +274,12 @@ fn struct_constructor() {
 #[test]
 fn struct_constructor_shorthand() {
     let (module, store, context) = parse("Point { x, y }");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     match &stmt.node {
@@ -251,7 +302,12 @@ fn struct_constructor_shorthand() {
 #[test]
 fn simple_import() {
     let (module, store, context) = parse("import foo.bar");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     match &stmt.node {
@@ -266,8 +322,13 @@ fn simple_import() {
 #[test]
 fn import_glob() {
     let (module, store, context) = parse("import foo.bar.*");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
-    
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
     let stmt = get_statement(&store, &module, 0);
     match &stmt.node {
         StatementKind::Import(Import { paths, .. }) => {
@@ -284,7 +345,12 @@ fn import_glob() {
 #[test]
 fn block_expression() {
     let (module, store, context) = parse("{ x := 1 }");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     match &stmt.node {
@@ -308,7 +374,12 @@ fn block_expression() {
 #[test]
 fn new_ptr() {
     let (module, store, context) = parse("new(42)");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     match &stmt.node {
@@ -335,7 +406,12 @@ fn new_ptr() {
 #[test]
 fn type_alias() {
     let (module, store, context) = parse("type MyInt = int");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     match &stmt.node {
@@ -365,7 +441,12 @@ fn multiple_statements() {
     let source = "x := 1\ny := 2\nz := 3";
 
     let (module, store, context) = parse(source);
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let block = &store.blocks[module.global];
     assert_eq!(block.statements.len(), 3);
@@ -395,7 +476,12 @@ fn error_partial_expression() {
 #[test]
 fn field_access() {
     let (module, store, context) = parse("obj.field");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     match &stmt.node {
@@ -423,7 +509,12 @@ fn field_access() {
 #[test]
 fn chained_function_calls() {
     let (module, store, context) = parse("foo().bar()");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     match &stmt.node {
@@ -456,7 +547,12 @@ fn chained_function_calls() {
 #[test]
 fn optional_type_variable() {
     let (module, store, context) = parse("x: ?int = null");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     let Variable { ty, .. } = match &stmt.node {
@@ -476,8 +572,13 @@ fn optional_type_variable() {
 // ----------------------------------------------------------------
 #[test]
 fn reference_type_variable() {
-    let (module, store, context) = parse("x: &int = null");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    let (module, store, context) = parse("x: &int = &1");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     let Variable { ty, .. } = match &stmt.node {
@@ -487,8 +588,34 @@ fn reference_type_variable() {
     assert_eq!(
         *ty,
         Some(SoulType::Reference(
-            ast_model::soul_type::ReferenceType::new(
-                SoulType::Primitive(soul_utils::soul_names::PrimitiveTypes::Int),
+            ReferenceType::new(
+                SoulType::Primitive(PrimitiveTypes::Int),
+                false
+            )
+        ))
+    );
+}
+
+#[test]
+fn mut_reference_type_variable() {
+    let (module, store, context) = parse("x: &mut int = &mut 1");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let Variable { ty, .. } = match &stmt.node {
+        StatementKind::Variable(v) => v,
+        _ => panic!("expected Variable"),
+    };
+    assert_eq!(
+        *ty,
+        Some(SoulType::Reference(
+            ReferenceType::new(
+                SoulType::Primitive(PrimitiveTypes::Int),
                 true
             )
         ))

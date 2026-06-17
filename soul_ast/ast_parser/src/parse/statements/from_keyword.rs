@@ -78,14 +78,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 statement
                     .try_set_is_public(true, pub_span.combine(start_span))
                     .try_err()?;
-                
-                match statement.node {
-                    StatementKind::Function(id) |
-                    StatementKind::ExternalFunction(id) => {
-                        self.store.functions[id].signature_mut().value.is_public = true;
-                    }
-                    _ => (),
-                }
+
                 statement
             }
 
@@ -109,7 +102,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             KeyWord::Use => todo!(),
             KeyWord::Enum => todo!(),
             KeyWord::Trait => todo!(),
-            KeyWord::Struct => todo!(),
+            KeyWord::Struct => return self.parse_struct().try_err(),
             KeyWord::Type => return self.parse_type_statement(start_span).try_err(),
         })
     }

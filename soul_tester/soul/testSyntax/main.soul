@@ -48,12 +48,16 @@ main() {
     num := int.(1)
     mut arr: [4]int = [int: 1, 2, 4, 5]
     arr = [int: for 4 => 1]
-    arr = [int: for 4 => undefined]
+    arr = unsafe{ [int: for 4 => undefined] }
 
-    arr: &[]int = &arr
-    arr: &mut []int = &mut arr
+    arr1: [&]int = &arr
+    arr2: [&mut]int = &mut arr
+    arr3: &mut [4]int = &mut arr
     
-    arr := List.[1, 2, 3]
-    ptr := new(1)
-    arr: []int = new.[1,2,3,4]
+    arr4 := List.[1, 2, 3]
+    arr5: []int = new[1,2,3,4]
+    ptr: *int = new(1)
+    ptr2: ?*int = null
+    ptr2 = new(1)
+    ptr3: *int = ptr2 ?? return
 }

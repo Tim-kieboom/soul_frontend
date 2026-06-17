@@ -7,13 +7,10 @@ use crate::display::writer::Writer;
 pub(crate) fn display_tokens<'a>(tokens: TokenStream<'a>, writer: &mut impl Writer) -> Result<()> {
     for token in tokens {
         let token = token.map_err(|err| anyhow::Error::msg(format!("{err:?}")))?;
-        let tab = if token.span.is_single() {
-            "\t\t\t"
-        } else {
-            "\t\t"
-        };
+        let span_str = format!("{:?}", token.span);
+        let tab = " ".repeat(30 - span_str.len());
 
-        writer.push_fmt(format_args!("Span({:?}){tab}>> ", token.span))?;
+        writer.push_fmt(format_args!("Span({span_str}){tab}>> ",))?;
         match token.kind {
             TokenKind::Literal(literal) => _ = literal.display(writer)?,
             TokenKind::Keyword(key_word) => {

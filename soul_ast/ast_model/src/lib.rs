@@ -73,7 +73,10 @@ pub struct EntryKind<T> {
 
 impl AbstractSyntaxTree {
     pub fn new(root: ModuleId) -> Self {
-        Self { root, modules: AstModuleStore::default() }
+        Self {
+            root,
+            modules: AstModuleStore::default(),
+        }
     }
 }
 

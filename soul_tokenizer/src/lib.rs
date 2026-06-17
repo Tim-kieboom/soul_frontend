@@ -1,4 +1,4 @@
-use crate::lexer::Lexer;
+use crate::lexer::{Lexer};
 use crate::model::{Token, TokenKind};
 use soul_utils::error::SoulResult;
 use soul_utils::fault::Fault;
@@ -11,7 +11,6 @@ pub(crate) mod str_iter;
 #[cfg(test)]
 mod tests;
 
-#[derive(Debug, Clone)]
 /// Position snapshot of a TokenStream for save/restore functionality.
 pub struct TokenStreamPosition<'a>(TokenStream<'a>);
 
@@ -63,7 +62,7 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Peeks at the next token without advancing the stream position.
-    pub fn peek(&self) -> SoulResult<Token> {
+    pub fn peek(&mut self) -> SoulResult<Token> {
         self.lexer.clone().next()
     }
 

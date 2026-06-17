@@ -12,8 +12,8 @@ use soul_utils::{
 use crate::{
     parser::Parser,
     utils::{
-        ARRAY, ARROW_LEFT, CONST_REF, CURLY_OPEN, MUT_REF, OPTIONAL, POINTER, ROUND_OPEN,
-        SQUARE_CLOSE, SQUARE_OPEN,
+        ARRAY, ARROW_LEFT, CURLY_OPEN, OPTIONAL, POINTER, REF, ROUND_OPEN, SQUARE_CLOSE,
+        SQUARE_OPEN,
     },
 };
 
@@ -180,10 +180,16 @@ impl<'a, 'f> Parser<'a, 'f> {
         let mut wrappers = vec![];
         loop {
             let possible_wrap = match self.token().kind {
-                MUT_REF => Some(ParseWrappers::MutRef),
+                REF => {
+                    if matches!(self.peek().kind, TokenKind::Keyword(KeyWord::Mut)) {
+                        self.bump();
+                        Some(ParseWrappers::MutRef)
+                    } else {
+                        Some(ParseWrappers::ConstRef)
+                    }
+                }
                 POINTER => Some(ParseWrappers::Pointer),
                 OPTIONAL => Some(ParseWrappers::Option),
-                CONST_REF => Some(ParseWrappers::ConstRef),
                 ARRAY => Some(ParseWrappers::Array(ArrayKind::HeapArray)),
                 SQUARE_OPEN => Some(ParseWrappers::Array(self.get_array_type_wrapper()?)),
                 _ => None,
@@ -204,20 +210,31 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     fn get_array_type_wrapper(&mut self) -> TryResult<ArrayKind, Fault> {
         self.bump();
-        let kind = match &self.token().kind {
-            &CONST_REF => ArrayKind::ConstSlice,
-            &MUT_REF => ArrayKind::MutSlice,
-            TokenKind::Literal(TokenLiteral::Number(Number::Uint(size))) => {
-                ArrayKind::StackArray(*size)
-            }
-            other => {
-                return TryNotValue(Fault::error(
-                    format!(
-                        "token '{}' not allowed in array typeWrapper",
-                        other.display()
-                    ),
-                    Some(self.token().span),
-                ));
+
+        let kind = if self.current_is_ident("_") {
+            ArrayKind::StackArrayWildcard
+        } else {
+            match &self.token().kind {
+                &REF => {
+                    if matches!(self.peek().kind, TokenKind::Keyword(KeyWord::Mut)) {
+                        self.bump();
+                        ArrayKind::MutSlice
+                    } else {
+                        ArrayKind::ConstSlice
+                    }
+                }
+                TokenKind::Literal(TokenLiteral::Number(Number::Uint(size))) => {
+                    ArrayKind::StackArray(*size)
+                }
+                other => {
+                    return TryNotValue(Fault::error(
+                        format!(
+                            "token '{}' not allowed in array typeWrapper",
+                            other.display()
+                        ),
+                        Some(self.token().span),
+                    ));
+                }
             }
         };
 

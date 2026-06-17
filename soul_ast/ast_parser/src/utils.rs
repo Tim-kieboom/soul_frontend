@@ -12,16 +12,15 @@ use crate::parser::Parser;
 
 pub const AS_STR: &str = KeyWord::As.as_str();
 pub const DOT: TokenKind = TokenKind::Symbol(Symbol::Dot);
+pub const REF: TokenKind = TokenKind::Symbol(Symbol::And);
 pub const FOR: TokenKind = TokenKind::Keyword(KeyWord::For);
 pub const STAR: TokenKind = TokenKind::Symbol(Symbol::Star);
-pub const MUT_REF: TokenKind = TokenKind::Symbol(Symbol::And);
 pub const COMMA: TokenKind = TokenKind::Symbol(Symbol::Comma);
 pub const ARRAY: TokenKind = TokenKind::Symbol(Symbol::Array);
 pub const COLON: TokenKind = TokenKind::Symbol(Symbol::Colon);
 pub const ASSIGN: TokenKind = TokenKind::Symbol(Symbol::Assign);
 pub const POINTER: TokenKind = TokenKind::Symbol(Symbol::Star);
 pub const OPTIONAL: TokenKind = TokenKind::Symbol(Symbol::Question);
-pub const CONST_REF: TokenKind = TokenKind::Symbol(Symbol::AtSign);
 pub const CURLY_OPEN: TokenKind = TokenKind::Symbol(Symbol::CurlyOpen);
 pub const ROUND_OPEN: TokenKind = TokenKind::Symbol(Symbol::RoundOpen);
 pub const ARROW_LEFT: TokenKind = TokenKind::Symbol(Symbol::LeftArray);
@@ -33,6 +32,7 @@ pub const ROUND_CLOSE: TokenKind = TokenKind::Symbol(Symbol::RoundClose);
 pub const LAMBDA_ARROW: TokenKind = TokenKind::Symbol(Symbol::LambdaArrow);
 pub const SQUARE_CLOSE: TokenKind = TokenKind::Symbol(Symbol::SquareClose);
 pub const COLON_ASSIGN: TokenKind = TokenKind::Symbol(Symbol::ColonAssign);
+pub const DOUBLE_QUESTION: TokenKind = TokenKind::Symbol(Symbol::DoubleQuestion);
 pub const STAMENT_END_TOKENS: &[TokenKind] = &[
     CURLY_CLOSE,
     TokenKind::EndFile,

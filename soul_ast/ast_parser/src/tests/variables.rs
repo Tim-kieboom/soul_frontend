@@ -11,7 +11,12 @@ use crate::tests::{get_statement, parse};
 #[test]
 fn variable_declaration_with_init() {
     let (module, store, context) = parse("x := 5");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     let Variable {
@@ -36,7 +41,12 @@ fn variable_declaration_with_init() {
 #[test]
 fn variable_declaration_typed() {
     let (module, store, context) = parse("x: int = 10");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     let Variable { ty, .. } = match &stmt.node {
@@ -54,7 +64,12 @@ fn variable_declaration_typed() {
 #[test]
 fn variable_declaration_no_init() {
     let (module, store, context) = parse("mut x: int");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     let Variable {
@@ -74,7 +89,12 @@ fn variable_declaration_no_init() {
 #[test]
 fn mutable_variable() {
     let (module, store, context) = parse("mut x := 5");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     let Variable { name, modifier, .. } = match &stmt.node {

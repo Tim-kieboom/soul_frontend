@@ -1,10 +1,46 @@
+foo().bar()
 pub sum(a: int, b: int): int {
     a + b
+}
+
+// pub trait Index {
+//     type Out
+//     index(&this, index: I): &Out
+// }
+
+// pub trait IndexMut: Index {
+//     indexMut(&mut this, index: :I): &mut This.Out
+// }
+
+pub struct Map {
+
+    pub struct KeyValue {
+        pub mut key: Key
+        pub mut value: Value
+    }
+
+    list := List.[]
+    pub mut field = 1
+
+    // This.() {
+    //     This{..}
+    // }
+
+    // pub This.[int](list) {
+    //     This{list, ..}
+    // }
+
+    sum(this, b: int): int {
+        this + b
+    }
 }
 
 main() {
     ch := 'a'
     cstring := c"cstr"
+    mut obj := Foo.(1)
+    obj.increment()
+    obj.sum(1)
     println("hello world")
 }
 

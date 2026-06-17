@@ -27,7 +27,7 @@ static ASSIGNMENT_TOKENS: LazyLock<Vec<TokenKind>> = LazyLock::new(|| {
 });
 
 impl<'a, 'f> Parser<'a, 'f> {
-    pub(crate) fn parse_assign(&mut self, start_span: Span) -> SoulResult<Statement> {
+    pub(crate) fn parse_assign_or_expression(&mut self, start_span: Span) -> SoulResult<Statement> {
         let lvalue = self.parse_expression_id(&ASSIGNMENT_TOKENS)?;
         if self.current_is_any(STAMENT_END_TOKENS) {
             return Ok(Statement::from_expression(

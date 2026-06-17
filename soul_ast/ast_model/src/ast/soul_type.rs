@@ -34,6 +34,8 @@ pub struct ArrayType {
 }
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ArrayKind {
+    /// StackArrayWildcard `[_]int` set infered size same as C stackArray
+    StackArrayWildcard,
     /// stackArray `[2]int` set size same as C stackArray
     StackArray(u64),
     /// heapArray `[]int` runtime sized array that lifes on the heap
@@ -69,7 +71,10 @@ pub struct Generic {
 
 impl Stub {
     pub fn new(name: String) -> Self {
-        Self { name, generics: vec![] }
+        Self {
+            name,
+            generics: vec![],
+        }
     }
 }
 

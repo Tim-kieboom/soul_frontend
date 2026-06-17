@@ -83,19 +83,31 @@ pub struct Enum {
 pub struct Struct {
     pub id: Option<NodeId>,
     pub name: Ident,
-    pub generics: Vec<Generic>,
     pub fields: Vec<Field>,
-    pub methods: Vec<FunctionId>,
+    pub generics: Vec<Generic>,
+    pub statements: Vec<StatementId>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Field {
-    pub id: Option<NodeId>,
-    pub is_pubic: bool,
-    pub modifier: TypeModifier,
-    pub name: Ident,
-    pub ty: SoulType,
-    pub default: Option<ExpressionId>,
+    pub value: Variable,
+    pub is_public: bool,
+}
+impl Field {
+    pub fn new(value: Variable, is_public: bool) -> Self {
+        Self { value, is_public }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Methode {
+    pub value: FunctionId,
+    pub is_public: bool,
+}
+impl Methode {
+    pub fn new(value: FunctionId, is_public: bool) -> Self {
+        Self { value, is_public }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -203,7 +215,6 @@ pub struct Function {
 pub struct FunctionSignature {
     pub id: FunctionId,
 
-    pub is_public: bool,
     pub modifier: TypeModifier,
     /// The name of the function.
     pub name: Ident,
@@ -345,6 +356,10 @@ impl Statement {
             },
             span,
         )
+    }
+
+    pub fn is_public(&self) -> bool {
+        self.is_public
     }
 
     pub fn try_set_is_public(&mut self, is_public: bool, span: Span) -> SoulResult<()> {

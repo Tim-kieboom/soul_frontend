@@ -15,6 +15,16 @@ pub(crate) struct DebugViewer {
     pub(crate) current: Token,
 }
 
+#[derive(Debug)]
+pub(crate) struct Current {
+    pub(crate) this_type: Option<SoulType>,
+}
+impl Default for Current {
+    fn default() -> Self {
+        Self { this_type: None }
+    }
+}
+
 /// Recursive descent parser that builds AST from token stream.
 ///
 /// Manages token consumption, error recovery, scope tracking, and debug
@@ -28,8 +38,8 @@ pub(crate) struct Parser<'a, 'f> {
     pub(crate) tokens: TokenStream<'a>,
     pub(crate) store: &'f mut AstStore,
     pub(crate) context: &'f mut CrateContext,
-    pub(crate) current_this: Option<SoulType>,
     pub(crate) source_path: PathBuf,
+    pub(crate) current: Current,
 }
 impl<'a, 'f> Parser<'a, 'f> {
     pub fn parse(tokens: TokenStream<'a>, name: String, info: ParseInfo<'f>) -> Module {
@@ -72,7 +82,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             store,
             context,
             source_path,
-            current_this: None,
+            current: Current::default(),
         }
     }
 
@@ -97,7 +107,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             store,
             context,
             source_path,
-            current_this: None,
+            current: Current::default(),
         }
     }
 }

@@ -259,7 +259,7 @@ pub enum AnyArray {
 }
 
 /// An array literal, e.g., `[1, 2, 3]`, `List.[1, 2, 3]`.
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Array {
     pub id: Option<NodeId>,
 

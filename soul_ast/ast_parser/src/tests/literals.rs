@@ -6,7 +6,12 @@ use crate::tests::{get_statement, parse};
 #[test]
 fn expression_literal_int() {
     let (module, store, context) = parse("42");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     match &stmt.node {
@@ -24,7 +29,12 @@ fn expression_literal_int() {
 #[test]
 fn expression_literal_float() {
     let (module, store, context) = parse("3.14");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     match &stmt.node {
@@ -42,7 +52,12 @@ fn expression_literal_float() {
 #[test]
 fn expression_literal_string() {
     let (module, store, context) = parse(r#""hello""#);
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     match &stmt.node {
@@ -60,7 +75,12 @@ fn expression_literal_string() {
 #[test]
 fn expression_literal_bool() {
     let (module, store, context) = parse("true");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     match &stmt.node {
@@ -78,8 +98,13 @@ fn expression_literal_bool() {
 #[test]
 fn expression_null() {
     let (module, store, context) = parse("null");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
-    
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
     let stmt = get_statement(&store, &module, 0);
     match &stmt.node {
         StatementKind::Expression { expression, .. } => {

@@ -3,8 +3,7 @@ use std::mem::swap;
 use ast_model::{
     block::{Block, BlockId},
     expression::{
-        Array, Binding, Constructor, Expression, ExpressionId, ExpressionKind, MatchMethod,
-        MatchMethodArm, TypeOf, VariableExpression,
+        Array, Binding, Constructor, Expression, ExpressionId, ExpressionKind, MatchMethod, MatchMethodArm, TypeOf, VariableExpression
     },
     literal::Literal,
     operators::{BinaryOperator, BinaryOperatorKind, UnaryOperator, UnaryOperatorKind},
@@ -41,25 +40,33 @@ impl<'a, 'f> Parser<'a, 'f> {
         &mut self,
         end_tokens: &[TokenKind],
     ) -> SoulResult<ExpressionId> {
-        let value = self.pratt_parse_expression(Precedence::MIN, end_tokens)?;
+        let value = self.pratt_parse_expression(Precedence::MIN, end_tokens, None)?;
         Ok(self.store.insert_expression(value))
     }
 
     pub(crate) fn parse_expression(&mut self, end_tokens: &[TokenKind]) -> SoulResult<Expression> {
-        self.pratt_parse_expression(Precedence::MIN, end_tokens)
+        self.pratt_parse_expression(Precedence::MIN, end_tokens, None)
+    }
+
+    pub(crate) fn parse_primary_expression(&mut self, primary: Expression, end_tokens: &[TokenKind]) -> SoulResult<Expression> {
+        self.pratt_parse_expression(Precedence::MIN, end_tokens, Some(primary))
     }
 
     fn pratt_parse_expression(
         &mut self,
         min_precedence: Precedence,
         end_tokens: &[TokenKind],
+        primary: Option<Expression>,
     ) -> SoulResult<Expression> {
         let start_span = self.token().span;
 
         let mut prefix_operators = vec![];
         self.collect_prefix_operators(&mut prefix_operators, start_span);
 
-        let mut left = self.parse_primary(end_tokens)?;
+        let mut left = match primary {
+            Some(value) => value,
+            None => self.parse_primary(end_tokens)?,
+        };
 
         loop {
             match self.check_for_end_tokens(end_tokens) {
@@ -120,7 +127,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             match self.consume_expression_operator(start_span)? {
                 ExpressionOperator::Binary(operator) => {
                     let next_min_precedence = precedence.next();
-                    let right = self.pratt_parse_expression(next_min_precedence, end_tokens)?;
+                    let right = self.pratt_parse_expression(next_min_precedence, end_tokens, None)?;
                     let span = self.span_combine(start_span);
                     left = Expression::new_binary(
                         self.store.insert_expression(left),
@@ -266,7 +273,29 @@ impl<'a, 'f> Parser<'a, 'f> {
             );
 
             return Ok(());
-        }
+        } 
+        
+        if self.current_is_any(&[SQUARE_OPEN, ARRAY]) {
+            
+            if !matches!(left.node, ExpressionKind::Variable(_)) {
+                return Err(Fault::error(
+                    format!("`{}` is invalid", Symbol::Dot.as_str()), 
+                    Some(self.token().span)
+                ))
+            }
+
+            let mut value = Expression::error();
+            std::mem::swap(left, &mut value);
+            let name = match value.node {
+                ExpressionKind::Variable(variable) => variable.name,
+                _ => unreachable!(),
+            };
+            let collection_type = self.type_from_ident(name, generics);
+            *left = Expression::from_any_array(
+                self.parse_array(Some(collection_type))?
+            );
+            return Ok(())
+        } 
 
         let ident = self.try_bump_consume_ident()?;
 
@@ -569,7 +598,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
             &ROUND_OPEN | &ARROW_LEFT => {
                 match self.try_parse_function_call(start_span, None, &ident) {
-                    Ok(val) => return Ok(Expression::from_function_call(val)),
+                    Ok(val) => return Ok(val),
                     Err(TryError::IsNotValue(_)) => (),
                     Err(TryError::IsErr(err)) => return Err(err),
                 };
@@ -634,7 +663,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 self.bump();
                 match &self.token().kind {
                     &ROUND_OPEN => self.parse_new_ptr(start_span)?,
-                    &SQUARE_OPEN => self.parse_new_array(start_span)?,
+                    &SQUARE_OPEN | &ARRAY => self.parse_new_array(start_span)?,
                     _ => {
                         return Err(Fault::error(
                             "expected '(' or ':[' after 'new'".to_string(),
@@ -660,7 +689,12 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     fn parse_new_array(&mut self, start_span: Span) -> SoulResult<Expression> {
-        self.expect(&COLON)?;
+        const START: &[TokenKind] = &[SQUARE_OPEN, ARRAY];
+    
+        if !self.current_is_any(START) {
+            return Err(self.get_expect_any_error(START))
+        }
+
         let array = self.parse_array(None)?;
         Ok(Expression::new(
             ExpressionKind::NewArray(array.value),
@@ -688,7 +722,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
     }
 
-    fn expect_unary_kind(&self, start_span: Span, symbool: Symbol) -> SoulResult<UnaryKinds> {
+    fn expect_unary_kind(&mut self, start_span: Span, symbool: Symbol) -> SoulResult<UnaryKinds> {
         let op = match Operator::from_symbool(symbool) {
             Some(val) => val,
             None => {
@@ -708,8 +742,13 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         match op {
             Operator::Mul => Ok(UnaryKinds::Deref),
-            Operator::BitAnd => Ok(UnaryKinds::Ref { mutable: true }),
-            Operator::ConstRef => Ok(UnaryKinds::Ref { mutable: false }),
+            Operator::BitAnd => {
+                let mutable = matches!(self.peek().kind, TokenKind::Keyword(KeyWord::Mut));
+                if mutable {
+                    self.bump();
+                }
+                Ok(UnaryKinds::Ref { mutable })
+            }
             _ => Err(Fault::error(
                 format!("`{}` is not a valid unary operator", op.as_str()),
                 Some(self.span_combine(start_span)),
@@ -800,7 +839,7 @@ impl ConvertOperator for Operator {
             Operator::BitAnd => BinaryOperatorKind::BitAnd,
             Operator::BitXor => BinaryOperatorKind::BitXor,
 
-            Operator::Not | Operator::ConstRef => return None,
+            Operator::Not | Operator::AtSign => return None,
         })
     }
 }

@@ -15,7 +15,10 @@
                     "--bin=soul_tester"
                 ]
             },
-            "args": []
+            "args": [],
+            "env": {
+                "RUST_BACKTRACE": "1"
+            }
         },
         {
             "name": "Debug unit tests in executable 'soul_tester'",

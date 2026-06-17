@@ -1,14 +1,12 @@
 use ast_model::{
+    FunctionKind,
     block::{Block, BlockId},
     statements::{Statement, StatementId},
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
     TypeModifier,
-    collections::try_result::{
-        ResultMapNotValue, ResultTryErr, ResultTryNotValue, TryErr, TryError, TryNotValue, TryOk,
-        TryResult,
-    },
+    collections::try_result::{ResultTryErr, TryErr, TryError, TryNotValue, TryOk, TryResult},
     error::SoulResult,
     fault::Fault,
     soul_names::Symbol,
@@ -16,17 +14,17 @@ use soul_utils::{
 };
 
 use crate::{
-    parser::Parser,
-    utils::{
-        ARROW_LEFT, COLON, COLON_ASSIGN, CURLY_CLOSE, CURLY_OPEN, ROUND_OPEN, SEMI_COLON,
-        SQUARE_OPEN, STAMENT_END_TOKENS, STAMENT_SKIP_TOKENS, STAR,
-    },
+    parser::Parser, utils::{
+        ARROW_LEFT, COLON, COLON_ASSIGN, CURLY_CLOSE, CURLY_OPEN, DOT, ROUND_OPEN, SEMI_COLON,
+        STAMENT_END_TOKENS, STAMENT_SKIP_TOKENS, STAR,
+    }
 };
 
 mod assign;
 mod from_keyword;
 mod from_modfier;
 mod import;
+mod objects;
 mod variable;
 
 impl<'a, 'f> Parser<'a, 'f> {
@@ -53,7 +51,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     pub(super) fn skip_over_statement(&mut self) {
-        let mut curly_bracket_stack = 0_usize;
+        let mut curly_bracket_stack = 0usize;
 
         while !self.current_is(&TokenKind::EndFile) {
             self.bump();
@@ -67,6 +65,9 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
 
             if self.current_is_any(STAMENT_END_TOKENS) && curly_bracket_stack == 0 {
+                if self.current_is(&CURLY_CLOSE) {
+                    self.bump();
+                }
                 return;
             }
         }
@@ -140,10 +141,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
                 TryOk(Statement::new_block(self.store, block, span, semicolon))
             }
-            &SQUARE_OPEN => self
-                .try_parse_methode(start_span)
-                .map_try_not_value(|_| Fault::empty()),
-            &STAR => return self.parse_assign(start_span),
+            &STAR => return self.parse_assign_or_expression(start_span),
             TokenKind::Keyword(keyword) => {
                 let kw = *keyword;
                 match self.try_parse_from_keyword(start_span, kw) {
@@ -179,7 +177,8 @@ impl<'a, 'f> Parser<'a, 'f> {
             return self.try_parse_from_keyword(start_span, keyword);
         }
 
-        match &self.peek().kind {
+        let peek = self.peek();
+        match &peek.kind {
             &ROUND_OPEN | &ARROW_LEFT => self.parse_any_function().try_err(),
             &COLON | &COLON_ASSIGN => self.parse_variable().try_err(),
             _ => self.parse_from_unknown_ident(start_span).try_err(),
@@ -187,39 +186,32 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     fn parse_from_unknown_ident(&mut self, start_span: Span) -> SoulResult<Statement> {
-        match self.try_parse_methode(start_span) {
-            Ok(val) => return Ok(val),
-            Err(TryError::IsErr(err)) => return Err(err),
-            _ => (),
-        };
+        
+        if self.current_is(&DOT) {
+            let ident = self.try_bump_consume_ident()?;
+            if ident.as_str() != "This" {
+                return Err(Fault::error(
+                    format!("`{}` invalid", self.token().kind.display()),
+                    Some(self.span_combine(start_span)),
+                ));
+            }
 
-        self.parse_assign(start_span)
-    }
-
-    fn try_parse_methode(&mut self, start_span: Span) -> TryResult<Statement, ()> {
-        let begin = self.tokens.current_position();
-        let result = self.inner_parse_methode(start_span);
-        if result.is_err() {
-            self.go_to(begin);
+            let this = self.current.this_type.take();
+            let result = match &this {
+                Some(ty) => self.parse_function_contructor(ty, TypeModifier::Mut),
+                None => Err(Fault::error(
+                    "contructor function should habe methode type",
+                    Some(self.span_combine(start_span)),
+                )),
+            };
+            self.current.this_type = this;
+            return result
+                .map(|spanned| {
+                    spanned.map(|func| self.store.insert_function(FunctionKind::Normal(func)))
+                })
+                .map(Statement::from_function);
         }
-
-        result
-    }
-
-    fn inner_parse_methode(&mut self, start_span: Span) -> TryResult<Statement, ()> {
-        let modifier = self.try_bump_type_modiffier().unwrap_or(TypeModifier::Mut);
-
-        let methode_type = match self.try_parse_type() {
-            Ok(val) => val,
-            Err(TryError::IsErr(err)) => return TryErr(err),
-            _ => return TryNotValue(()),
-        };
-
-        let name = self.try_bump_consume_ident().try_not_value()?;
-        match self.try_parse_function_declaration(start_span, modifier, methode_type, name) {
-            Ok(val) => TryOk(Statement::from_function(val)),
-            Err(TryError::IsErr(err)) => TryErr(err),
-            Err(TryError::IsNotValue(_)) => TryNotValue(()),
-        }
+        
+        self.parse_assign_or_expression(start_span)
     }
 }

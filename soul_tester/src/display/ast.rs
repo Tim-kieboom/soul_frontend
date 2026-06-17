@@ -1,10 +1,28 @@
-use std::{backtrace::Backtrace, fmt::{Arguments, Debug}, path::Path};
+use std::{
+    backtrace::Backtrace,
+    fmt::{Arguments, Debug},
+    path::Path,
+};
 
-use anyhow::Result;
-use ast_model::{AbstractSyntaxTree, AstStore, FunctionKind, block::BlockId, expression::{AnyArray, ExpressionId, ExpressionKind, ForCondition, IfBranch, MatchPattern}, soul_type::{ArrayKind, Generic, SoulType}, statements::{Assignment, Enum, ImplBlock, Import, ImportItem, ImportKind, StatementId, StatementKind, Struct, Trait, TypeDef, UseBlock, Variable}};
-use soul_tokenizer::model::keyword::KeyWord;
-use soul_utils::{FunctionId, TypeModifier, collections::vec_map::{VecMap, VecMapIndex}, soul_names::{PrimitiveTypes, Symbol}, span::ModuleId};
 use crate::display::writer::Writer;
+use anyhow::Result;
+use ast_model::{
+    AbstractSyntaxTree, AstStore, FunctionKind,
+    block::BlockId,
+    expression::{AnyArray, ExpressionId, ExpressionKind, ForCondition, IfBranch, MatchPattern},
+    soul_type::{ArrayKind, Generic, SoulType},
+    statements::{
+        Assignment, Enum, ImplBlock, Import, ImportItem, ImportKind, StatementId, StatementKind,
+        Struct, Trait, TypeDef, UseBlock, Variable,
+    },
+};
+use soul_tokenizer::model::keyword::KeyWord;
+use soul_utils::{
+    FunctionId, TypeModifier,
+    collections::vec_map::{VecMap, VecMapIndex},
+    soul_names::{PrimitiveTypes, Symbol},
+    span::ModuleId,
+};
 
 const IF_STR: &str = KeyWord::If.as_str();
 const NEW_STR: &str = KeyWord::New.as_str();
@@ -29,25 +47,40 @@ struct Displayer<'a, W: Writer> {
 
     root_dir: &'a Path,
     store: &'a AstStore,
-    ast: &'a AbstractSyntaxTree, 
+    ast: &'a AbstractSyntaxTree,
 }
 
-pub(crate) fn display_ast_tree<'a>(ast: &AbstractSyntaxTree, root_dir: &Path, store: &AstStore, writer: &mut impl Writer) -> Result<()> {
+pub(crate) fn display_ast_tree<'a>(
+    ast: &AbstractSyntaxTree,
+    root_dir: &Path,
+    store: &AstStore,
+    writer: &mut impl Writer,
+) -> Result<()> {
     let mut displayer = Displayer::new(ast, root_dir, store, writer);
     displayer.write_module(ast.root)
 }
 
 impl<'a, W: Writer> Displayer<'a, W> {
-    fn new(ast: &'a AbstractSyntaxTree, root_dir: &'a Path, store: &'a AstStore, writer: &'a mut W) -> Self {
-        Self { writer, root_dir, depth: String::new(), store, ast }
+    fn new(
+        ast: &'a AbstractSyntaxTree,
+        root_dir: &'a Path,
+        store: &'a AstStore,
+        writer: &'a mut W,
+    ) -> Self {
+        Self {
+            writer,
+            root_dir,
+            depth: String::new(),
+            store,
+            ast,
+        }
     }
-    
+
     fn write_module(&mut self, id: ModuleId) -> Result<()> {
-        
         let module = self.ast.modules.as_vecmap().get_err(id)?;
         self.write_fmt(format_args!("mod {} {{\n", module.name))?;
         let block = self.store.blocks.get_err(module.global)?;
-    
+
         self.push_depth();
         for id in &block.statements {
             self.write_depth()?;
@@ -87,6 +120,10 @@ impl<'a, W: Writer> Displayer<'a, W> {
 
     fn write_statement(&mut self, id: StatementId) -> Result<()> {
         let statement = self.store.statements.get_err(id)?;
+        if statement.is_public() {
+            self.write_str("pub ")?;
+        }
+
         match &statement.node {
             StatementKind::Enum(enum_) => self.write_enum(enum_),
             StatementKind::Trait(trait_) => self.write_trait(trait_),
@@ -95,10 +132,14 @@ impl<'a, W: Writer> Displayer<'a, W> {
             StatementKind::TypeDef(type_def) => self.write_typedef(type_def),
             StatementKind::Variable(variable) => self.write_variable(variable),
             StatementKind::UseBlock(use_block) => self.write_use_block(use_block),
-            StatementKind::Function(function_id) => self.write_any_function(*function_id),
+            StatementKind::Function(function) => self.write_any_function(*function),
             StatementKind::Assignment(assignment) => self.write_assignment(assignment),
-            StatementKind::ExternalFunction(function_id) => self.write_any_function(*function_id),
-            StatementKind::Expression { expression, ends_semicolon, .. } => {
+            StatementKind::ExternalFunction(external_function) => self.write_any_function(*external_function),
+            StatementKind::Expression {
+                expression,
+                ends_semicolon,
+                ..
+            } => {
                 self.write_expression(*expression)?;
                 if *ends_semicolon {
                     self.write_char(';')?;
@@ -155,7 +196,11 @@ impl<'a, W: Writer> Displayer<'a, W> {
     }
 
     fn write_variable(&mut self, variable: &Variable) -> Result<()> {
-        self.write_fmt(format_args!("{} {}", variable.modifier.as_str(), variable.name.as_str()))?;
+        self.write_fmt(format_args!(
+            "{} {}",
+            variable.modifier.as_str(),
+            variable.name.as_str()
+        ))?;
         if let Some(ty) = &variable.ty {
             self.write_str(": ")?;
             self.write_type(ty)?;
@@ -185,22 +230,33 @@ impl<'a, W: Writer> Displayer<'a, W> {
         self.write_generic_defines(&struct_.generics)?;
         self.write_str("{\n")?;
         self.push_depth();
-        self.write_depth()?;
+
         for field in &struct_.fields {
-            if field.is_pubic {
+            self.write_depth()?;
+            if field.is_public {
                 self.write_str("pub ")?;
             }
 
-            self.write_fmt(format_args!("{} {}: ", field.modifier.as_str(), field.name.as_str()))?;
-            self.write_type(&field.ty)?;
-            if let Some(value) = &field.default {
+            self.write_fmt(format_args!(
+                "{} {}",
+                field.value.modifier.as_str(),
+                field.value.name.as_str()
+            ))?;
+            if let Some(ty) = &field.value.ty {
+                self.write_str(": ")?;
+                self.write_type(ty)?;
+            }
+            if let Some(value) = &field.value.initialize_value {
                 self.write_str(" = ")?;
                 self.write_expression(*value)?;
             }
+            self.write_endln()?;
         }
 
-        for methode in &struct_.methods {
-            self.write_any_function(*methode)?;
+        for statement in &struct_.statements {
+            self.write_depth()?;
+            self.write_statement(*statement)?;
+            self.write_endln()?;
         }
         self.pop_depth();
         self.write_depth()?;
@@ -217,9 +273,15 @@ impl<'a, W: Writer> Displayer<'a, W> {
             match &path.kind {
                 ImportKind::This => self.write_str("this")?,
                 ImportKind::Glob => self.write_char('*')?,
-                ImportKind::Alias(ident) => self.write_fmt(format_args!(" as {}", ident.as_str()))?,
+                ImportKind::Alias(ident) => {
+                    self.write_fmt(format_args!(" as {}", ident.as_str()))?
+                }
                 ImportKind::Module => (),
-                ImportKind::Items { this, this_alias, items } => {
+                ImportKind::Items {
+                    this,
+                    this_alias,
+                    items,
+                } => {
                     self.write_char('{')?;
                     if *this {
                         self.write_str("this")?;
@@ -232,7 +294,11 @@ impl<'a, W: Writer> Displayer<'a, W> {
                     for (i, item) in items.iter().enumerate() {
                         match item {
                             ImportItem::Normal(ident) => self.write_str(ident.as_str())?,
-                            ImportItem::Alias { name, alias } => self.write_fmt(format_args!("{} as {}", name.as_str(), alias.as_str()))?,
+                            ImportItem::Alias { name, alias } => self.write_fmt(format_args!(
+                                "{} as {}",
+                                name.as_str(),
+                                alias.as_str()
+                            ))?,
                         }
                         if i != last_index {
                             self.write_str(", ")?;
@@ -269,7 +335,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
     fn write_trait(&mut self, trait_: &Trait) -> Result<()> {
         self.write_fmt(format_args!("{TRAIT_STR} {} {{\n", trait_.name.as_str()))?;
         self.push_depth();
-        
+
         for methode in &trait_.methods {
             self.write_depth()?;
             self.write_any_function(*methode)?;
@@ -285,23 +351,32 @@ impl<'a, W: Writer> Displayer<'a, W> {
         let signature = &function.signature().value;
 
         if let Some(external) = signature.external {
-            self.write_fmt(format_args!("{} {} ", KeyWord::Extern.as_str(), external.as_str()))?;
+            self.write_fmt(format_args!(
+                "{} \"{}\" ",
+                KeyWord::Extern.as_str(),
+                external.as_str()
+            ))?;
         }
 
-        if signature.is_public {
-            self.write_str("pub ")?;
-        }
-        self.write_str(signature.modifier.as_str())?;
-        self.write_char(' ')?;
-        if let Some(kind) = signature.function_kind.display() {
-            self.write_fmt(format_args!(" {kind} "))?;
+        if signature.modifier != TypeModifier::Mut {
+            self.write_fmt(format_args!("{} ", signature.modifier.as_str()))?;
         }
         self.write_str(signature.name.as_str())?;
         self.write_generic_defines(&signature.generics)?;
         self.write_char('(')?;
         let last_index = signature.parameters.len().saturating_sub(1);
+        if let Some(kind) = signature.function_kind.display() {
+            self.write_str(kind)?;
+            if !signature.parameters.is_empty() {
+                self.write_str(", ")?;
+            }
+        }
         for (i, parameter) in signature.parameters.iter().enumerate() {
-            self.write_fmt(format_args!("{} {}: ", parameter.modifier.as_str(), parameter.name.as_str()))?;
+            self.write_fmt(format_args!(
+                "{} {}: ",
+                parameter.modifier.as_str(),
+                parameter.name.as_str()
+            ))?;
             self.write_type(&parameter.ty)?;
             if let Some(value) = parameter.default {
                 self.write_expression(value)?;
@@ -378,15 +453,11 @@ impl<'a, W: Writer> Displayer<'a, W> {
                     if i != last_index {
                         self.write_str(", ")?;
                     }
-                } 
+                }
                 self.write_char('}')
             }
-            ExpressionKind::Variable(variable) => {
-                self.write_str(variable.name.as_str())
-            }
-            ExpressionKind::Array(any_array) => {
-                self.write_any_array(any_array)
-            },
+            ExpressionKind::Variable(variable) => self.write_str(variable.name.as_str()),
+            ExpressionKind::Array(any_array) => self.write_any_array(any_array),
             ExpressionKind::Sizeof(soul_type) => {
                 self.write_type(soul_type)?;
                 self.write_fmt(format_args!(".{SIZEOF_STR}"))
@@ -435,28 +506,39 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 self.write_str(" {\n")?;
                 self.push_depth();
                 for arm in &match_.arms {
+                    self.write_depth()?;
                     self.write_match_pattern(&arm.pattern)?;
                     self.write_fmt(format_args!(" {LAMDA_ARROW_STR} "))?;
                     self.write_block(arm.body)?;
+                    self.write_endln()?;
                 }
                 self.pop_depth();
+                self.write_depth()?;
+                self.write_char('}')?;
                 Ok(())
             }
             ExpressionKind::MatchMethod(match_methode) => {
                 self.write_expression(match_methode.scrutinee)?;
-                self.push_depth();                
+                self.push_depth();
+                self.write_endln()?;
                 let last_index = match_methode.arms.len().saturating_sub(1);
                 for (i, arm) in match_methode.arms.iter().enumerate() {
+                    self.write_depth()?;
                     self.write_fmt(format_args!(".{}{{", arm.variant_name.as_str()))?;
                     if let Some(binding) = &arm.binding {
-                        self.write_fmt(format_args!("{} {LAMDA_ARROW_STR}", binding.ident.as_str()))?;
+                        self.write_fmt(format_args!(
+                            "{} {LAMDA_ARROW_STR}",
+                            binding.ident.as_str()
+                        ))?;
                     }
                     self.write_block(arm.body)?;
+                    self.write_char('}')?;
                     if i != last_index {
                         self.write_endln()?;
                     }
                 }
                 self.pop_depth();
+                self.write_depth()?;
                 Ok(())
             }
             ExpressionKind::For(for_) => {
@@ -464,7 +546,11 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 match &for_.condition {
                     ForCondition::Loop => (),
                     ForCondition::While(condition) => self.write_expression(*condition)?,
-                    ForCondition::Foreach { element, index, collection } => {
+                    ForCondition::Foreach {
+                        element,
+                        index,
+                        collection,
+                    } => {
                         if let Some(index) = index {
                             self.write_fmt(format_args!("{}, ", index.as_str()))?;
                         }
@@ -478,7 +564,11 @@ impl<'a, W: Writer> Displayer<'a, W> {
             ExpressionKind::TypeOf(type_of) => {
                 self.write_expression(type_of.value)?;
                 self.write_fmt(format_args!(" {TYPEOF_STR} "))?;
-                self.write_fmt(format_args!("{}.{}", type_of.type_name.as_str(), type_of.variant_name.as_str()))?;
+                self.write_fmt(format_args!(
+                    "{}.{}",
+                    type_of.type_name.as_str(),
+                    type_of.variant_name.as_str()
+                ))?;
                 if let Some(binding) = &type_of.binding {
                     self.write_fmt(format_args!("({})", binding.as_str()))?;
                 }
@@ -514,7 +604,11 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 self.write_char(']')
             }
             MatchPattern::Constructor(ctor) => {
-                self.write_fmt(format_args!("{}.{}", ctor.type_name.as_str(), ctor.variant_name.as_str()))?;
+                self.write_fmt(format_args!(
+                    "{}.{}",
+                    ctor.type_name.as_str(),
+                    ctor.variant_name.as_str()
+                ))?;
                 if let Some(binding) = &ctor.binding {
                     self.write_fmt(format_args!("({})", binding.as_str()))?;
                 }
@@ -552,13 +646,14 @@ impl<'a, W: Writer> Displayer<'a, W> {
             SoulType::Primitive(primitive_types) => self.write_str(primitive_types.as_str()),
             SoulType::Array(array) => {
                 match array.kind {
+                    ArrayKind::StackArrayWildcard => self.write_str("[_]")?,
                     ArrayKind::StackArray(num) => self.write_fmt(format_args!("[{num}]"))?,
                     ArrayKind::HeapArray => self.write_str("[]")?,
                     ArrayKind::MutSlice => self.write_str("[&mut]")?,
                     ArrayKind::ConstSlice => self.write_str("[&]")?,
                 }
                 self.write_type(&array.of_type)
-            },
+            }
             SoulType::Reference(reference) => {
                 self.write_char('&')?;
                 if let Some(lifetime) = &reference.lifetime {
@@ -581,7 +676,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 self.write_str(&stub.name)?;
                 self.write_generic_types(&stub.generics)?;
                 Ok(())
-            },
+            }
             SoulType::NamedVariant { base, variant } => {
                 self.write_type(base)?;
                 self.write_fmt(format_args!(".{}", variant.as_str()))
@@ -634,9 +729,9 @@ impl<'a, W: Writer> Displayer<'a, W> {
 
     fn write_generic_defines(&mut self, generics: &Vec<Generic>) -> Result<()> {
         if generics.is_empty() {
-            return Ok(())
+            return Ok(());
         }
-        
+
         self.write_char('<')?;
         let last_index = generics.len().saturating_sub(1);
         for (i, generic) in generics.iter().enumerate() {
@@ -645,7 +740,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 self.write_str(": ")?;
                 self.write_type(bound)?;
             }
-            
+
             if i != last_index {
                 self.write_str(", ")?;
             }
@@ -655,9 +750,9 @@ impl<'a, W: Writer> Displayer<'a, W> {
 
     fn write_generic_types(&mut self, generics: &Vec<SoulType>) -> Result<()> {
         if generics.is_empty() {
-            return Ok(())
+            return Ok(());
         }
-        
+
         self.write_char('<')?;
         let last_index = generics.len().saturating_sub(1);
         for (i, generic) in generics.iter().enumerate() {
@@ -703,6 +798,9 @@ trait GetErr<I, V> {
 }
 impl<I: VecMapIndex + Debug + Clone, V> GetErr<I, V> for VecMap<I, V> {
     fn get_err(&self, index: I) -> Result<&V> {
-        self.get(index.clone()).ok_or(anyhow::Error::msg(format!("{index:?} is not found; {}", Backtrace::force_capture().to_string())))
+        self.get(index.clone()).ok_or(anyhow::Error::msg(format!(
+            "{index:?} is not found; {}",
+            Backtrace::force_capture().to_string()
+        )))
     }
 }

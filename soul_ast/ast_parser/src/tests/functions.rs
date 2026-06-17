@@ -9,8 +9,13 @@ use crate::tests::{get_statement, parse};
 
 #[test]
 fn simple_function() {
-    let (module, store, context) = parse("fn foo() {}");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    let (module, store, context) = parse("foo() {}");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     let func_id = match &stmt.node {
@@ -32,8 +37,13 @@ fn simple_function() {
 
 #[test]
 fn function_with_params() {
-    let (module, store, context) = parse("fn add(a: int, b: int) {}");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    let (module, store, context) = parse("add(a: int, b: int) {}");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     let func_id = match &stmt.node {
@@ -52,8 +62,13 @@ fn function_with_params() {
 
 #[test]
 fn function_with_return_type() {
-    let (module, store, context) = parse("fn add(a: int, b: int): int {}");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    let (module, store, context) = parse("add(a: int, b: int): int {}");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     let func_id = match &stmt.node {
@@ -73,8 +88,13 @@ fn function_with_return_type() {
 
 #[test]
 fn function_with_body() {
-    let (module, store, context) = parse("fn foo() { x := 5 }");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    let (module, store, context) = parse("foo() { x := 5 }");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     let func_id = match &stmt.node {
@@ -96,8 +116,13 @@ fn function_with_body() {
 #[test]
 fn function_call_no_args() {
     let (module, store, context) = parse("foo()");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
-    
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
     println!("{store:#?}");
     let stmt = get_statement(&store, &module, 0);
     match &stmt.node {
@@ -120,8 +145,13 @@ fn function_call_no_args() {
 #[test]
 fn function_call_with_args() {
     let (module, store, context) = parse("add(1, 2)");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
-    
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
     let stmt = get_statement(&store, &module, 0);
     match &stmt.node {
         StatementKind::Expression { expression, .. } => {
@@ -146,8 +176,13 @@ fn function_call_with_args() {
 #[test]
 fn extern_function_c() {
     let (module, store, context) = parse(r#"extern "C" printf(fmt: &char): int {}"#);
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
-    
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
     let stmt = get_statement(&store, &module, 0);
     match &stmt.node {
         StatementKind::ExternalFunction(id) => {
@@ -169,9 +204,14 @@ fn extern_function_c() {
 // ----------------------------------------------------------------
 #[test]
 fn function_with_this_ref() {
-    let (module, store, context) = parse("fn foo(&this) {}");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
-    
+    let (module, store, context) = parse("foo(&this) {}");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
     let stmt = get_statement(&store, &module, 0);
     let func_id = match &stmt.node {
         StatementKind::Function(id) => *id,
@@ -183,7 +223,7 @@ fn function_with_this_ref() {
         _ => panic!("expected Normal function"),
     };
     use ast_model::statements::FunctionThisKind;
-    assert_eq!(signature.value.function_kind, FunctionThisKind::MutRef);
+    assert_eq!(signature.value.function_kind, FunctionThisKind::ConstRef);
 }
 
 // ----------------------------------------------------------------
@@ -192,7 +232,12 @@ fn function_with_this_ref() {
 #[test]
 fn method_call() {
     let (module, store, context) = parse("obj.method()");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     match &stmt.node {

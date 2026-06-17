@@ -197,47 +197,47 @@ define_symbols!(
     /// These operators are used in expressions for arithmetic, logical, bitwise,
     /// and comparison operations.
     pub enum Operator {
-        /// logical not
+        /// logical not `!`
         Not => "!", Symbol::Not, 8,
-        /// lvalue(exponent) root rvalue(base)
+        /// lvalue(exponent) root rvalue(base) `</`
         Root => "</", Symbol::Root, 7,
-        /// multiplication
+        /// multiplication `*`
         Mul => "*", Symbol::Star, 6,
-        /// divide
+        /// divide `/`
         Div => "/", Symbol::Slash, 6,
-        /// modulo
+        /// modulo `%`
         Mod => "%", Symbol::Mod, 6,
-        /// addition
+        /// addition `+`
         Add => "+", Symbol::Plus, 5,
-        /// subtraction
+        /// subtraction `-`
         Sub => "-", Symbol::Minus, 5,
-        /// constref
-        ConstRef => "@", Symbol::AtSign, 6,
+        /// atSign `@`
+        AtSign => "@", Symbol::AtSign, 6,
 
-        /// smaller equals
+        /// smaller equals `<=`
         LessEq => "<=", Symbol::Le, 4,
-        /// bigger equals
+        /// bigger equals `>=`
         GreatEq => ">=", Symbol::Ge, 4,
-        // smaller then
+        // smaller then `<`
         LessThen => "<", Symbol::LeftArray, 4,
-        // bigger then
+        // bigger then `>`
         GreatThen => ">", Symbol::RightArray, 4,
-        /// not equals
+        /// not equals `!=`
         NotEq => "!=", Symbol::NotEq, 3,
-        /// equal
+        /// equal `==`
         Eq => "==", Symbol::Eq, 3,
 
         /// range (`begin..end`)
         Range => "..", Symbol::DoubleDot, 1,
 
-        /// bitwise or
+        /// bitwise or `|`
         BitOr => "|", Symbol::Or, 1,
-        /// bitwise and
+        /// bitwise and `&`
         BitAnd => "&", Symbol::And, 1,
-        /// bitwise xor
+        /// bitwise xor `^`
         BitXor => "^", Symbol::Xor, 2,
 
-        /// logical or
+        /// logical or `||`
         LogOr => "||", Symbol::DoubleOr, 0,
     }
 );

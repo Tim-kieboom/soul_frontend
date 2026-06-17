@@ -1,7 +1,7 @@
 use ast_model::{
     FunctionKind,
-    expression::{Argument, ExpressionId, FunctionCall},
-    soul_type::{Generic, SoulType},
+    expression::{Argument, Expression, ExpressionId, FunctionCall},
+    soul_type::{ArrayKind, ArrayType, Generic, SoulType},
     statements::{
         ExternLanguage, ExternalFunction, Function, FunctionSignature, FunctionThisKind, Parameter,
         Statement,
@@ -9,44 +9,46 @@ use ast_model::{
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
-    FunctionId, Ident, TypeModifier,
-    collections::try_result::{
-        ResultTryErr, ResultTryNotValue, ToResult, TryErr, TryError, TryNotValue, TryOk, TryResult,
-    },
-    error::SoulResult,
-    fault::Fault,
-    literal::{StringLiteral, TokenLiteral},
-    span::{Span, Spanned},
+    FunctionId, Ident, TypeModifier, collections::try_result::{
+        ResultMapNotValue, ResultTryErr, ResultTryNotValue, ToResult, TryErr, TryError,
+        TryNotValue, TryOk, TryResult,
+    }, error::SoulResult, fault::Fault, literal::{StringLiteral, TokenLiteral}, span::{Span, Spanned}
 };
 
 use crate::{
     parser::Parser,
     utils::{
-        ARROW_LEFT, ARROW_RIGHT, ASSIGN, COLON, COMMA, CONST_REF, CURLY_OPEN, MUT_REF, ROUND_CLOSE,
-        ROUND_OPEN, SEMI_COLON,
+        ARROW_LEFT, ARROW_RIGHT, ASSIGN, COLON, COMMA, CURLY_OPEN, DOT, DOUBLE_QUESTION, REF, ROUND_CLOSE, ROUND_OPEN, SEMI_COLON, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS
     },
 };
 
 type FuncResult<T> = TryResult<T, (Ident, Fault)>;
 impl<'a, 'f> Parser<'a, 'f> {
-    
     pub(crate) fn parse_any_function(&mut self) -> SoulResult<Statement> {
+        let modifier = self.try_bump_type_modiffier();
         let ident = self.try_bump_consume_ident()?;
-        let modifier = self.try_bump_type_modiffier().unwrap_or(TypeModifier::Mut);
 
         let span = self.token().span;
-        match self.try_parse_function_declaration(
+
+        let this_type = self.current.this_type.take().unwrap_or(SoulType::None);
+        let result = self.try_parse_function_declaration_id(
             span,
-            modifier,
-            self.current_this.clone().unwrap_or(SoulType::None),
+            modifier.unwrap_or(TypeModifier::Mut),
+            &this_type,
             ident,
-        ) {
+        );
+        self.current.this_type = Some(this_type);
+
+        match result {
             Ok(val) => Ok(Statement::from_function(val)),
             Err(TryError::IsErr(err)) => Err(err),
             Err(TryError::IsNotValue((ident, _err))) => self
                 .try_parse_function_call(span, None, &ident)
                 .merge_to_result()
-                .map(|el| Statement::from_function_call(self.store, el, self.current_is(&SEMI_COLON))),
+                .map(|expression| {
+                    let id = self.store.insert_expression(expression);
+                    Statement::from_expression(self.store, id, self.current_is(&SEMI_COLON))
+                }),
         }
     }
 
@@ -55,7 +57,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         start_span: Span,
         callee: Option<ExpressionId>,
         name: &Ident,
-    ) -> TryResult<Spanned<FunctionCall>, Fault> {
+    ) -> TryResult<Expression, Fault> {
         if !self.current_is_any(&[ROUND_OPEN, ARROW_LEFT]) {
             return TryNotValue(self.get_expect_any_error(&[ROUND_OPEN, ARROW_LEFT]));
         }
@@ -66,7 +68,14 @@ impl<'a, 'f> Parser<'a, 'f> {
             vec![]
         };
 
-        self.try_parse_function_call_generic(start_span, callee, generics, name)
+        let call = self.try_parse_function_call_generic(start_span, callee, generics, name)?;
+        match &self.token().kind {
+            &DOT | &DOUBLE_QUESTION | &SQUARE_OPEN => {
+                let primary = Expression::from_function_call(call);
+                self.parse_primary_expression(primary, STAMENT_END_TOKENS).try_err()
+            }
+            _ => TryOk(Expression::from_function_call(call))
+        }
     }
 
     pub(crate) fn try_parse_function_call_generic(
@@ -97,16 +106,29 @@ impl<'a, 'f> Parser<'a, 'f> {
         ))
     }
 
+    pub(crate) fn try_parse_function_declaration_id(
+        &mut self,
+        start_span: Span,
+        modifier: TypeModifier,
+        methode_type: &SoulType,
+        name: Ident,
+    ) -> FuncResult<Spanned<FunctionId>> {
+        self.try_parse_function_declaration(start_span, modifier, methode_type, name)
+            .map(|spanned| {
+                spanned.map(|function| self.store.insert_function(FunctionKind::Normal(function)))
+            })
+    }
+
     pub(crate) fn try_parse_function_declaration(
         &mut self,
         start_span: Span,
         modifier: TypeModifier,
-        methode_type: SoulType,
+        methode_type: &SoulType,
         name: Ident,
-    ) -> FuncResult<Spanned<FunctionId>> {
+    ) -> FuncResult<Spanned<Function>> {
         let position = self.tokens.current_position();
         match self.inner_function_declaration(start_span, modifier, methode_type, name, None) {
-            Ok(spanned) => Ok(spanned.map(|function| self.store.insert_function(FunctionKind::Normal(function)))),
+            Ok(spanned) => Ok(spanned),
             Err(err) => {
                 self.go_to(position);
                 Err(err)
@@ -160,7 +182,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         match self.try_parse_function_signature(
             span,
             TypeModifier::Mut,
-            SoulType::None,
+            &SoulType::None,
             name,
             Some(external),
         ) {
@@ -180,7 +202,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         &mut self,
         start_span: Span,
         modifier: TypeModifier,
-        methode_type: SoulType,
+        methode_type: &SoulType,
         name: Ident,
         external: Option<ExternLanguage>,
     ) -> FuncResult<Spanned<FunctionSignature>> {
@@ -208,7 +230,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         result
     }
 
-    pub fn parse_generic_declare(&mut self) -> SoulResult<Option<Vec<Generic>>> {
+    pub(crate) fn parse_generic_declare(&mut self) -> SoulResult<Option<Vec<Generic>>> {
         if !self.current_is(&ARROW_LEFT) {
             return Ok(None);
         }
@@ -263,11 +285,77 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok(values)
     }
 
+    pub(crate) fn parse_function_contructor(
+        &mut self,
+        ty: &SoulType,
+        modifier: TypeModifier,
+    ) -> SoulResult<Spanned<Function>> {
+        let start_span = self.token().span;
+        self.expect(&DOT)?;
+        match &self.token().kind {
+            &ROUND_OPEN => {
+                let name = Ident::new("___ctor", start_span);
+                let mut methode = self
+                    .try_parse_function_declaration(start_span, modifier, &ty, name)
+                    .map_try_not_value(|(_, err)| err)
+                    .merge_to_result()?
+                    .value;
+
+                let signature = &mut methode.signature.value;
+                signature.return_type = ty.clone();
+
+                Ok(Spanned::new(methode, self.span_combine(start_span)))
+            }
+            &SQUARE_OPEN => {
+                let name = Ident::new("___arrayCtor", start_span);
+                self.bump();
+                let mut ty = self.try_parse_type().merge_to_result()?;
+                ty = SoulType::Array(ArrayType {
+                    of_type: Box::new(ty),
+                    kind: ArrayKind::StackArrayWildcard,
+                });
+                self.expect(&SQUARE_CLOSE)?;
+                self.expect(&ROUND_OPEN)?;
+                let arg = self.try_bump_consume_ident()?;
+                self.expect(&ROUND_CLOSE)?;
+                let block = self.parse_block(TypeModifier::Mut)?;
+
+                let id = self.store.alloc_function();
+                let function = Function {
+                    signature: Spanned::new(
+                        FunctionSignature {
+                            id,
+                            name,
+                            modifier,
+                            method_type: ty.clone(),
+                            return_type: ty.clone(),
+                            parameters: vec![Parameter {
+                                name: arg,
+                                ty,
+                                modifier: TypeModifier::Const,
+                                node_id: None,
+                                default: None,
+                            }],
+                            generics: vec![],
+                            function_kind: FunctionThisKind::Static,
+                            external: None,
+                        },
+                        self.span_combine(start_span),
+                    ),
+                    block,
+                };
+
+                Ok(Spanned::new(function, self.span_combine(start_span)))
+            }
+            _ => Err(self.get_expect_any_error(&[ROUND_OPEN, SQUARE_OPEN])),
+        }
+    }
+
     fn inner_parse_function_signature(
         &mut self,
         start_span: Span,
         modifier: TypeModifier,
-        method_type: SoulType,
+        method_type: &SoulType,
         name: Ident,
         external: Option<ExternLanguage>,
     ) -> FuncResult<Spanned<FunctionSignature>> {
@@ -306,10 +394,9 @@ impl<'a, 'f> Parser<'a, 'f> {
             generics,
             parameters,
             return_type,
-            method_type,
             function_kind,
-            is_public: false, // is done in from_keyword
             id: self.store.alloc_function(),
+            method_type: method_type.clone(),
         };
 
         TryOk(Spanned::new(signature, self.span_combine(start_span)))
@@ -319,7 +406,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         &mut self,
         start_span: Span,
         modifier: TypeModifier,
-        methode_type: SoulType,
+        methode_type: &SoulType,
         name: Ident,
         external: Option<ExternLanguage>,
     ) -> FuncResult<Spanned<Function>> {
@@ -415,13 +502,14 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     fn inner_parameter_this(&mut self, kind: &mut FunctionThisKind) -> TryResult<Loop, Fault> {
         let this = match &self.token().kind {
-            &CONST_REF => {
+            &REF => {
                 self.bump();
-                Some(FunctionThisKind::ConstRef)
-            }
-            &MUT_REF => {
-                self.bump();
-                Some(FunctionThisKind::MutRef)
+                if matches!(self.token().kind, TokenKind::Keyword(KeyWord::Mut)) {
+                    self.bump();
+                    Some(FunctionThisKind::MutRef)
+                } else {
+                    Some(FunctionThisKind::ConstRef)
+                }
             }
             TokenKind::Ident(val) if val == "this" => Some(FunctionThisKind::Consume),
             _ => None,
