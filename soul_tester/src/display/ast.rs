@@ -12,8 +12,7 @@ use ast_model::{
     expression::{AnyArray, ExpressionId, ExpressionKind, ForCondition, IfBranch, MatchPattern},
     soul_type::{ArrayKind, Generic, SoulType},
     statements::{
-        Assignment, Enum, ImplBlock, Import, ImportItem, ImportKind, StatementId, StatementKind,
-        Struct, Trait, TypeDef, UseBlock, Variable,
+        Assignment, Enum, EnumVariant, ImplBlock, Import, ImportItem, ImportKind, Parameter, StatementId, StatementKind, Struct, Trait, TypeDef, UseBlock, Variable
     },
 };
 use soul_tokenizer::model::keyword::KeyWord;
@@ -330,12 +329,28 @@ impl<'a, W: Writer> Displayer<'a, W> {
     }
 
     fn write_enum(&mut self, enum_: &Enum) -> Result<()> {
-        self.write_fmt(format_args!("{ENUM_STR} {} {{\n", enum_.name.as_str()))?;
+        self.write_fmt(format_args!("{ENUM_STR} {}", enum_.name.as_str()))?;
+        if let Some(ty) = &enum_.impl_type {
+            self.write_str(": ")?;
+            self.write_type(ty)?;
+        }
+
+        self.write_str(" {{\n")?;
         self.push_depth();
         let last_index = enum_.variants.len().saturating_sub(1);
         for (i, variant) in enum_.variants.iter().enumerate() {
             self.write_depth()?;
-            self.write_str(variant.as_str())?;
+            match variant {
+                EnumVariant::Ident(ident) => self.write_str(ident.as_str())?,
+                EnumVariant::Assigned { name, value } => {
+                    self.write_fmt(format_args!("{} = ", name.as_str()))?;
+                    self.write_expression(*value)?
+                }
+                EnumVariant::Union { name, parameters } => {
+                    self.write_fmt(format_args!("{}", name.as_str()))?;
+                    self.write_parameters(&parameters)?;
+                }
+            }
             if i != last_index {
                 self.write_char(',')?;
             }
@@ -378,14 +393,26 @@ impl<'a, W: Writer> Displayer<'a, W> {
         self.write_str(signature.name.as_str())?;
         self.write_generic_defines(&signature.generics)?;
         self.write_char('(')?;
-        let last_index = signature.parameters.len().saturating_sub(1);
         if let Some(kind) = signature.function_kind.display() {
             self.write_str(kind)?;
             if !signature.parameters.is_empty() {
                 self.write_str(", ")?;
             }
         }
-        for (i, parameter) in signature.parameters.iter().enumerate() {
+        self.write_parameters(&signature.parameters)?;
+        self.write_str("): ")?;
+        self.write_type(&signature.return_type)?;
+        let block = match function {
+            FunctionKind::Normal(function) => function.block,
+            FunctionKind::External(_) => return Ok(()),
+        };
+        self.write_char(' ')?;
+        self.write_block(block)
+    }
+
+    fn write_parameters(&mut self, parameters: &[Parameter]) -> Result<()> {
+        let last_index = parameters.len().saturating_sub(1);
+        for (i, parameter) in parameters.iter().enumerate() {
             self.write_fmt(format_args!(
                 "{} {}: ",
                 parameter.modifier.as_str(),
@@ -399,14 +426,8 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 self.write_str(", ")?;
             }
         }
-        self.write_str("): ")?;
-        self.write_type(&signature.return_type)?;
-        let block = match function {
-            FunctionKind::Normal(function) => function.block,
-            FunctionKind::External(_) => return Ok(()),
-        };
-        self.write_char(' ')?;
-        self.write_block(block)
+
+        Ok(())
     }
 
     fn write_expression(&mut self, id: ExpressionId) -> Result<()> {

@@ -22,6 +22,7 @@ mod conditional;
 mod functions;
 mod literals;
 mod structs;
+mod use_block;
 mod variables;
 
 fn module_id() -> ModuleId {

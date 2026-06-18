@@ -1,5 +1,3 @@
-use std::mem::swap;
-
 use ast_model::{
     FunctionKind,
     expression::{Argument, Expression, ExpressionId, FunctionCall},
@@ -26,8 +24,8 @@ use soul_utils::{
 use crate::{
     parser::Parser,
     utils::{
-        ARROW_LEFT, ARROW_RIGHT, ASSIGN, COLON, COMMA, CURLY_OPEN, DOT, DOUBLE_QUESTION, REF,
-        ROUND_CLOSE, ROUND_OPEN, SEMI_COLON, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS,
+        ARRAY, ARROW_LEFT, ARROW_RIGHT, ASSIGN, COLON, COMMA, CURLY_OPEN, DOT, DOUBLE_QUESTION,
+        REF, ROUND_CLOSE, ROUND_OPEN, SEMI_COLON, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS,
     },
 };
 const CONTRUCTOR_STR: &str = "___ctor";
@@ -79,6 +77,27 @@ impl<'a, 'f> Parser<'a, 'f> {
             vec![]
         };
 
+        if self.current_is(&DOT) {
+            if callee.is_some() {
+                return TryErr(Fault::error(
+                    format!("`{}` invalid", Symbol::Dot.as_str()),
+                    Some(self.span_combine(start_span)),
+                ));
+            }
+
+            self.bump();
+            if self.current_is_any(&[SQUARE_OPEN, ARRAY]) {
+                let collection_type = self.type_from_ident(name.clone(), generics);
+                let array = self.parse_array(Some(collection_type)).try_err()?;
+                return TryOk(Expression::from_any_array(array));
+            }
+
+            return TryErr(Fault::error(
+                "expected array literal after type constructor",
+                Some(self.token().span),
+            ));
+        }
+
         let call = self.try_parse_function_call_generic(start_span, callee, generics, name)?;
         match &self.token().kind {
             &DOT | &DOUBLE_QUESTION | &SQUARE_OPEN => {
@@ -94,24 +113,10 @@ impl<'a, 'f> Parser<'a, 'f> {
         &mut self,
         start_span: Span,
         callee: Option<ExpressionId>,
-        mut generics: Vec<SoulType>,
+        generics: Vec<SoulType>,
         ident: &Ident,
     ) -> TryResult<Spanned<FunctionCall>, Fault> {
         let start_position = self.tokens.current_position();
-
-        if self.current_is(&DOT) {
-            if callee.is_some() {
-                return TryErr(Fault::error(
-                    format!("`{}` invalid", Symbol::Dot.as_str()),
-                    Some(self.span_combine(start_span)),
-                ));
-            }
-
-            self.bump();
-            let mut type_generics = vec![];
-            swap(&mut generics, &mut type_generics);
-            todo!("impl ctor")
-        }
 
         if !self.current_is(&ROUND_OPEN) {
             self.goto(start_position);

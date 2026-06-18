@@ -76,7 +76,21 @@ pub struct Trait {
 pub struct Enum {
     pub name: Ident,
     pub id: Option<NodeId>,
-    pub variants: Vec<Ident>,
+    pub variants: Vec<EnumVariant>,
+    pub impl_type: Option<SoulType>,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum EnumVariant {
+    Ident(Ident),
+    Assigned {
+        name: Ident,
+        value: ExpressionId,
+    },
+    Union {
+        name: Ident,
+        parameters: Vec<Parameter>,
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

@@ -11,11 +11,14 @@ pub sum(a: int, b: int): int {
 //     indexMut(&mut this, index: :I): &mut This.Out
 // }
 
-// enum Numbers {
-//     One,
-//     Two,
-//     Three,
-// }
+enum Numbers: int {
+    One,
+    Two = "foo",
+    Three(
+        mut a: int, 
+        mut l: uint
+    ),
+}
 
 pub struct Map {
 

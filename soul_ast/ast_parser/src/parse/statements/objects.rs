@@ -1,13 +1,13 @@
 use ast_model::{
     soul_type::{SoulType, Stub},
-    statements::{Field, Statement, StatementKind, Struct},
+    statements::{Enum, EnumVariant, Field, Parameter, Statement, StatementKind, Struct},
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
-use soul_utils::error::SoulResult;
+use soul_utils::{Ident, TypeModifier, collections::try_result::ToResult, error::SoulResult};
 
 use crate::{
     parser::Parser,
-    utils::{CURLY_CLOSE, CURLY_OPEN},
+    utils::{ASSIGN, COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, ROUND_CLOSE, ROUND_OPEN},
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
@@ -82,4 +82,91 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.span_combine(struct_span),
         ))
     }
+
+    pub(crate) fn parse_enum(&mut self) -> SoulResult<Statement> {
+        let start_span = self.token().span;
+        self.expect(&TokenKind::Keyword(KeyWord::Enum))?;
+        let name = self.try_bump_consume_ident()?;
+
+        let impl_type = if self.current_is(&COLON) {
+            self.bump();
+            Some(self.try_parse_type().merge_to_result()?)
+        } else {
+            None
+        };
+
+        let mut variants = vec![];
+        self.expect(&CURLY_OPEN)?;
+        loop {
+            self.skip_end_lines();
+            if self.current_is(&CURLY_CLOSE) {
+                break;
+            }
+
+            let ident = self.try_bump_consume_ident()?;
+            let variant = match &self.token().kind {
+                &ROUND_OPEN => self.parse_enum_union(ident)?,
+                &ASSIGN => self.parse_enum_assign(ident)?,
+                _ => EnumVariant::Ident(ident),
+            };
+
+            variants.push(variant);
+            self.skip_end_lines();
+            if !self.current_is(&COMMA) {
+                break
+            }
+
+            self.bump();
+        }
+        self.expect(&CURLY_CLOSE)?;
+
+        let enum_ = Enum {
+            id: None,
+            name,
+            variants,
+            impl_type,
+        };
+        Ok(Statement::new(StatementKind::Enum(enum_), self.span_combine(start_span))) 
+    }
+
+    fn parse_enum_assign(&mut self, ident: Ident) -> SoulResult<EnumVariant> {
+        self.expect(&ASSIGN)?;
+
+        let value = self.parse_expression_id(&[COMMA, CURLY_CLOSE])?;
+        Ok(EnumVariant::Assigned { name: ident, value })
+    }
+
+    fn parse_enum_union(&mut self, ident: Ident) -> SoulResult<EnumVariant> {
+        
+        let mut parameters = vec![];
+        self.expect(&ROUND_OPEN)?;
+        loop {
+            self.skip_end_lines();
+            if self.current_is(&ROUND_CLOSE) {
+                break;
+            }
+
+            let modifier = self.try_bump_type_modiffier().unwrap_or(TypeModifier::Const);
+            let name = self.try_bump_consume_ident()?;
+
+            self.expect(&COLON)?;
+            let ty = self.try_parse_type().merge_to_result()?;
+            parameters.push(Parameter{
+                ty,
+                name,
+                modifier,
+                node_id: None,
+                default: None,
+            });
+
+            self.skip_end_lines();
+            if !self.current_is(&COMMA) {
+                break
+            }
+
+            self.bump();
+        }
+        self.expect(&ROUND_CLOSE)?;
+        Ok(EnumVariant::Union { name: ident, parameters })
+    } 
 }

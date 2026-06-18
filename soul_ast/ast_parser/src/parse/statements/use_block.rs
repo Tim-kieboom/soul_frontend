@@ -5,7 +5,8 @@ use soul_utils::{TypeModifier, collections::try_result::{ResultMapNotValue, ToRe
 use crate::{parser::Parser, utils::{CONST, CURLY_CLOSE, CURLY_OPEN, LITERAL, MUT, PUB}};
 
 impl<'a, 'f> Parser<'a, 'f> {
-    pub(super) fn parse_use_block(&mut self, start_span: Span) -> SoulResult<Statement> {
+    pub(super) fn parse_use_block(&mut self) -> SoulResult<Statement> {
+        let start_span = self.token().span;
         self.expect(&TokenKind::Keyword(KeyWord::Use))?;
         let use_generics = self.parse_generic_declare()?
             .unwrap_or(vec![]);

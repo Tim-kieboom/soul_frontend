@@ -20,7 +20,7 @@ use crate::{
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
-    pub(super) fn parse_array(
+    pub(crate) fn parse_array(
         &mut self,
         collection_type: Option<SoulType>,
     ) -> SoulResult<Spanned<AnyArray>> {

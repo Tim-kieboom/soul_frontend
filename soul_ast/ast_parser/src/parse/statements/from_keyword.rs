@@ -99,15 +99,16 @@ impl<'a, 'f> Parser<'a, 'f> {
                 ));
             }
 
-            KeyWord::Use => return self.parse_use_block(start_span).try_err(),
-            KeyWord::Enum => todo!(),
+            KeyWord::Use => return self.parse_use_block().try_err(),
+            KeyWord::Enum => return self.parse_enum().try_err(),
             KeyWord::Trait => todo!(),
             KeyWord::Struct => return self.parse_struct().try_err(),
-            KeyWord::Type => return self.parse_type_statement(start_span).try_err(),
+            KeyWord::Type => return self.parse_type_statement().try_err(),
         })
     }
 
-    fn parse_type_statement(&mut self, start_span: Span) -> SoulResult<Statement> {
+    fn parse_type_statement(&mut self) -> SoulResult<Statement> {
+        let start_span = self.token().span;
         self.expect(&TokenKind::Keyword(KeyWord::Type))?;
 
         let new_type = self.try_parse_type().merge_to_result()?;
