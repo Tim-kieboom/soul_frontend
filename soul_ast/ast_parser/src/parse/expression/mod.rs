@@ -3,7 +3,8 @@ use std::mem::swap;
 use ast_model::{
     block::{Block, BlockId},
     expression::{
-        Array, Binding, Constructor, Expression, ExpressionId, ExpressionKind, MatchMethod, MatchMethodArm, TypeOf, VariableExpression
+        Array, Binding, Constructor, Expression, ExpressionId, ExpressionKind, MatchMethod,
+        MatchMethodArm, TypeOf, VariableExpression,
     },
     literal::Literal,
     operators::{BinaryOperator, BinaryOperatorKind, UnaryOperator, UnaryOperatorKind},
@@ -48,7 +49,11 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.pratt_parse_expression(Precedence::MIN, end_tokens, None)
     }
 
-    pub(crate) fn parse_primary_expression(&mut self, primary: Expression, end_tokens: &[TokenKind]) -> SoulResult<Expression> {
+    pub(crate) fn parse_primary_expression(
+        &mut self,
+        primary: Expression,
+        end_tokens: &[TokenKind],
+    ) -> SoulResult<Expression> {
         self.pratt_parse_expression(Precedence::MIN, end_tokens, Some(primary))
     }
 
@@ -127,7 +132,8 @@ impl<'a, 'f> Parser<'a, 'f> {
             match self.consume_expression_operator(start_span)? {
                 ExpressionOperator::Binary(operator) => {
                     let next_min_precedence = precedence.next();
-                    let right = self.pratt_parse_expression(next_min_precedence, end_tokens, None)?;
+                    let right =
+                        self.pratt_parse_expression(next_min_precedence, end_tokens, None)?;
                     let span = self.span_combine(start_span);
                     left = Expression::new_binary(
                         self.store.insert_expression(left),
@@ -166,7 +172,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             if self.current_is(&DOT) {
                 return Loop::Continue;
             }
-            self.go_to(saved);
+            self.goto(saved);
         }
 
         if self.current_is_any(end_tokens) {
@@ -274,15 +280,14 @@ impl<'a, 'f> Parser<'a, 'f> {
             );
 
             return Ok(());
-        } 
-        
+        }
+
         if self.current_is_any(&[SQUARE_OPEN, ARRAY]) {
-            
             if !matches!(left.node, ExpressionKind::Variable(_)) {
                 return Err(Fault::error(
-                    format!("`{}` is invalid", Symbol::Dot.as_str()), 
-                    Some(self.token().span)
-                ))
+                    format!("`{}` is invalid", Symbol::Dot.as_str()),
+                    Some(self.token().span),
+                ));
             }
 
             let mut value = Expression::error();
@@ -292,11 +297,9 @@ impl<'a, 'f> Parser<'a, 'f> {
                 _ => unreachable!(),
             };
             let collection_type = self.type_from_ident(name, generics);
-            *left = Expression::from_any_array(
-                self.parse_array(Some(collection_type))?
-            );
-            return Ok(())
-        } 
+            *left = Expression::from_any_array(self.parse_array(Some(collection_type))?);
+            return Ok(());
+        }
 
         let ident = self.try_bump_consume_ident()?;
 
@@ -380,7 +383,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.skip_end_lines();
 
         let Ok(ident) = self.try_bump_consume_ident() else {
-            self.go_to(save_pos);
+            self.goto(save_pos);
             let body = self.parse_block(TypeModifier::Mut)?;
             return Ok((None, body));
         };
@@ -404,7 +407,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             return Ok((Some(Binding::new(ident)), block));
         }
 
-        self.go_to(save_pos);
+        self.goto(save_pos);
         let body = self.parse_block(TypeModifier::Mut)?;
         Ok((None, body))
     }
@@ -443,7 +446,6 @@ impl<'a, 'f> Parser<'a, 'f> {
 
                 get_invalid_error(self.token())
             }
-
             _ => get_invalid_error(self.token()),
         }
     }
@@ -698,9 +700,9 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     fn parse_new_array(&mut self, start_span: Span) -> SoulResult<Expression> {
         const START: &[TokenKind] = &[SQUARE_OPEN, ARRAY];
-    
+
         if !self.current_is_any(START) {
-            return Err(self.get_expect_any_error(START))
+            return Err(self.get_expect_any_error(START));
         }
 
         let array = self.parse_array(None)?;

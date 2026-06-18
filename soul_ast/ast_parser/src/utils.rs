@@ -110,7 +110,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     /// Restores token stream to saved position.
-    pub(crate) fn go_to(&mut self, position: TokenStreamPosition<'a>) {
+    pub(crate) fn goto(&mut self, position: TokenStreamPosition<'a>) {
         self.tokens.set_position(position);
 
         #[cfg(debug_assertions)]

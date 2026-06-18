@@ -1,10 +1,6 @@
 use std::path::PathBuf;
 
-use crate::{
-    collections::bimap::BiMap,
-    ids::{IdAlloc, IdGenerator},
-    span::ModuleId,
-};
+use crate::{collections::bimap::BiMap, ids::IdGenerator, span::ModuleId};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ModuleStore {
@@ -13,14 +9,18 @@ pub struct ModuleStore {
     alloc: IdGenerator<ModuleId>,
 }
 impl ModuleStore {
-    pub fn new(root_path: PathBuf) -> Self {
-        let mut this = Self {
+    pub fn new() -> Self {
+        let mut alloc = IdGenerator::new();
+        let root = alloc.alloc();
+        Self {
+            root,
+            alloc,
             map: BiMap::new(),
-            root: ModuleId::error(),
-            alloc: IdGenerator::new(),
-        };
-        this.root = this.insert(root_path);
-        this
+        }
+    }
+
+    pub fn insert_root(&mut self, root_path: PathBuf) {
+        self.map.force_insert(self.get_root_id(), root_path)
     }
 
     pub fn get_or_insert(&mut self, path: &PathBuf) -> ModuleId {

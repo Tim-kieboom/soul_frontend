@@ -53,11 +53,11 @@ struct Displayer<'a, W: Writer> {
 pub(crate) fn display_ast_tree<'a>(
     ast: &AbstractSyntaxTree,
     root_dir: &Path,
-    store: &AstStore,
     writer: &mut impl Writer,
 ) -> Result<()> {
-    let mut displayer = Displayer::new(ast, root_dir, store, writer);
-    displayer.write_module(ast.root)
+    let mut displayer = Displayer::new(ast, root_dir, &ast.store, writer);
+    displayer.write_module(ast.root)?;
+    writer.writer_flush()
 }
 
 impl<'a, W: Writer> Displayer<'a, W> {
@@ -134,7 +134,9 @@ impl<'a, W: Writer> Displayer<'a, W> {
             StatementKind::UseBlock(use_block) => self.write_use_block(use_block),
             StatementKind::Function(function) => self.write_any_function(*function),
             StatementKind::Assignment(assignment) => self.write_assignment(assignment),
-            StatementKind::ExternalFunction(external_function) => self.write_any_function(*external_function),
+            StatementKind::ExternalFunction(external_function) => {
+                self.write_any_function(*external_function)
+            }
             StatementKind::Expression {
                 expression,
                 ends_semicolon,
@@ -654,8 +656,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 }
                 self.write_type(&array.of_type)
             }
-            SoulType::Reference(reference) |
-            SoulType::Pointer(reference) => {
+            SoulType::Reference(reference) | SoulType::Pointer(reference) => {
                 if matches!(ty, SoulType::Pointer(_)) {
                     self.write_char('*')?;
                 } else {

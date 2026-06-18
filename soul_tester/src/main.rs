@@ -1,16 +1,13 @@
 use crate::display::{ast::display_ast_tree, fault::display_fault, tokenizer::display_tokens};
-use anyhow::Result;
-use ast_model::{AbstractSyntaxTree, AstStore};
-use ast_parser::ParseInfo;
+use anyhow::{Result};
+use ast_model::AbstractSyntaxTree;
 use ast_run::to_ast;
 use soul_tokenizer::{TokenStream, to_token_stream};
-use soul_utils::{
-    CrateContext, collections::module_store::ModuleStore, ids::IdAlloc, span::ModuleId,
-};
+use soul_utils::collections::module_store::ModuleStore;
 use std::{
-    fs::OpenOptions,
-    io::{Write, stdout},
-    path::{Path, PathBuf},
+    fs::{File, OpenOptions},
+    io::stdout,
+    path::Path,
 };
 
 mod config;
@@ -24,74 +21,59 @@ fn main() {
 }
 
 fn frontend() -> Result<()> {
-    let source_folder = PathBuf::from(&config::CONFIG.src_path);
-    let module_store = ModuleStore::new(source_folder.clone());
-    let module_id = ModuleId::begin();
+    let source_folder = config::CONFIG.source_path().to_path_buf();
+    let main_path = source_folder.join("main.soul");
+    let mut module_store = ModuleStore::new();
 
-    let file = std::fs::read_to_string(&config::CONFIG.main_path)?;
-    let tokens = match to_token_stream(&file, module_id) {
-        Ok(val) => val,
-        Err(err) => return Err(anyhow::Error::msg(format!("{err:?}"))),
-    };
+    let file = std::fs::read_to_string(&main_path)?;
+    let tokens = to_token_stream(&file, module_store.get_root_id())
+        .map_err(|err| anyhow::anyhow!("in tokenizer: {err:?}"))?;
 
-    display_tokenizer(&tokens)
-        .map_err(|err| anyhow::Error::msg(format!("in display_tokenizer: {err}")))?;
+    module_store.insert_root(main_path);
+    display_tokenizer(&tokens).map_err(|err| anyhow::anyhow!("in display_tokenizer: {err}"))?;
 
-    let mut store = AstStore::default();
-    let mut context = CrateContext::default();
-    let info = ParseInfo {
-        parent: None,
-        id: module_id,
+    let ast = to_ast(
+        tokens,
+        module_store,
         source_folder,
-        store: &mut store,
-        context: &mut context,
-    };
-    let ast = to_ast(tokens, module_store, info, &config::COMPILER_OPTIONS);
-    for fault in context.faults.iter() {
+        &config::COMPILER_OPTIONS,
+    );
+    for fault in ast.faults() {
         display_fault(fault, &file, &config::PRINT_CONFIGS, &mut stdout())?;
     }
 
-    display_ast(&ast, &store)
-        .map_err(|err| anyhow::Error::msg(format!("in display_ast: {err}")))?;
+    display_ast(&ast).map_err(|err| anyhow::anyhow!("in display_ast: {err}"))?;
 
     Ok(())
 }
 
 fn display_tokenizer<'a>(tokens: &TokenStream<'a>) -> Result<()> {
-    let mut output_path = Path::new(&config::CONFIG.output_path).join("tokenizer");
+    let mut output_path = config::CONFIG.output_path().join("tokenizer");
     output_path.push("tokens.soulc");
 
-    std::fs::create_dir_all(&output_path.parent().expect("just joined a parent"))?;
-    let mut writer = OpenOptions::new()
-        .create(true)
-        .write(true)
-        .truncate(true)
-        .open(&output_path)
-        .map_err(|err| anyhow::anyhow!("Failed to create output file({output_path:?}): {}", err))?;
-
+    let mut writer = write_create_file(&output_path)?;
     display_tokens(tokens.clone(), &mut writer)?;
-    writer.flush()?;
     Ok(())
 }
 
-fn display_ast<'a>(tree: &AbstractSyntaxTree, store: &AstStore) -> Result<()> {
-    let mut output_path = Path::new(&config::CONFIG.output_path).join("ast");
-    output_path.push("ast.soulc");
+fn display_ast<'a>(tree: &AbstractSyntaxTree) -> Result<()> {
+    let mut output_path = config::CONFIG.output_path().join("ast");
+    output_path.push("tree.soulc");
 
-    std::fs::create_dir_all(&output_path.parent().expect("just joined a parent"))?;
-    let mut writer = OpenOptions::new()
+    let mut writer = write_create_file(&output_path)?;
+    display_ast_tree(tree, config::CONFIG.source_path(), &mut writer)?;
+    Ok(())
+}
+
+fn write_create_file(path: &Path) -> Result<File> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    OpenOptions::new()
         .create(true)
         .write(true)
         .truncate(true)
-        .open(&output_path)
-        .map_err(|err| anyhow::anyhow!("Failed to create output file({output_path:?}): {}", err))?;
-
-    display_ast_tree(
-        tree,
-        Path::new(&config::CONFIG.src_path),
-        store,
-        &mut writer,
-    )?;
-    writer.flush()?;
-    Ok(())
+        .open(&path)
+        .map_err(|err| anyhow::anyhow!("Failed to create output file({path:?}): {}", err))
 }

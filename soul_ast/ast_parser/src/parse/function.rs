@@ -1,3 +1,5 @@
+use std::mem::swap;
+
 use ast_model::{
     FunctionKind,
     expression::{Argument, Expression, ExpressionId, FunctionCall},
@@ -9,18 +11,27 @@ use ast_model::{
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
-    FunctionId, Ident, TypeModifier, collections::try_result::{
+    FunctionId, Ident, TypeModifier,
+    collections::try_result::{
         ResultMapNotValue, ResultTryErr, ResultTryNotValue, ToResult, TryErr, TryError,
         TryNotValue, TryOk, TryResult,
-    }, error::SoulResult, fault::Fault, literal::{StringLiteral, TokenLiteral}, span::{Span, Spanned}
+    },
+    error::SoulResult,
+    fault::Fault,
+    literal::{StringLiteral, TokenLiteral},
+    soul_names::Symbol,
+    span::{Span, Spanned},
 };
 
 use crate::{
     parser::Parser,
     utils::{
-        ARROW_LEFT, ARROW_RIGHT, ASSIGN, COLON, COMMA, CURLY_OPEN, DOT, DOUBLE_QUESTION, REF, ROUND_CLOSE, ROUND_OPEN, SEMI_COLON, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS
+        ARROW_LEFT, ARROW_RIGHT, ASSIGN, COLON, COMMA, CURLY_OPEN, DOT, DOUBLE_QUESTION, REF,
+        ROUND_CLOSE, ROUND_OPEN, SEMI_COLON, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS,
     },
 };
+const CONTRUCTOR_STR: &str = "___ctor";
+const ARRAY_CONTRUCTOR_STR: &str = "___arrayCtor";
 
 type FuncResult<T> = TryResult<T, (Ident, Fault)>;
 impl<'a, 'f> Parser<'a, 'f> {
@@ -72,9 +83,10 @@ impl<'a, 'f> Parser<'a, 'f> {
         match &self.token().kind {
             &DOT | &DOUBLE_QUESTION | &SQUARE_OPEN => {
                 let primary = Expression::from_function_call(call);
-                self.parse_primary_expression(primary, STAMENT_END_TOKENS).try_err()
+                self.parse_primary_expression(primary, STAMENT_END_TOKENS)
+                    .try_err()
             }
-            _ => TryOk(Expression::from_function_call(call))
+            _ => TryOk(Expression::from_function_call(call)),
         }
     }
 
@@ -82,13 +94,27 @@ impl<'a, 'f> Parser<'a, 'f> {
         &mut self,
         start_span: Span,
         callee: Option<ExpressionId>,
-        generics: Vec<SoulType>,
-        name: &Ident,
+        mut generics: Vec<SoulType>,
+        ident: &Ident,
     ) -> TryResult<Spanned<FunctionCall>, Fault> {
         let start_position = self.tokens.current_position();
 
+        if self.current_is(&DOT) {
+            if callee.is_some() {
+                return TryErr(Fault::error(
+                    format!("`{}` invalid", Symbol::Dot.as_str()),
+                    Some(self.span_combine(start_span)),
+                ));
+            }
+
+            self.bump();
+            let mut type_generics = vec![];
+            swap(&mut generics, &mut type_generics);
+            todo!("impl ctor")
+        }
+
         if !self.current_is(&ROUND_OPEN) {
-            self.go_to(start_position);
+            self.goto(start_position);
             return TryNotValue(self.get_expect_error(&CURLY_OPEN));
         }
 
@@ -100,7 +126,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 id: None,
                 arguments,
                 resolved: None,
-                name: name.clone(),
+                name: ident.clone(),
             },
             self.span_combine(start_span),
         ))
@@ -130,7 +156,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         match self.inner_function_declaration(start_span, modifier, methode_type, name, None) {
             Ok(spanned) => Ok(spanned),
             Err(err) => {
-                self.go_to(position);
+                self.goto(position);
                 Err(err)
             }
         }
@@ -211,7 +237,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.inner_parse_function_signature(start_span, modifier, methode_type, name, external);
 
         if result.is_err() {
-            self.go_to(begin_position);
+            self.goto(begin_position);
         }
 
         result
@@ -224,7 +250,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let result = self.inner_parameters();
         if result.is_err() {
-            self.go_to(begin);
+            self.goto(begin);
         }
 
         result
@@ -294,7 +320,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.expect(&DOT)?;
         match &self.token().kind {
             &ROUND_OPEN => {
-                let name = Ident::new("___ctor", start_span);
+                let name = Ident::new(CONTRUCTOR_STR, start_span);
                 let mut methode = self
                     .try_parse_function_declaration(start_span, modifier, &ty, name)
                     .map_try_not_value(|(_, err)| err)
@@ -307,7 +333,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 Ok(Spanned::new(methode, self.span_combine(start_span)))
             }
             &SQUARE_OPEN => {
-                let name = Ident::new("___arrayCtor", start_span);
+                let name = Ident::new(ARRAY_CONTRUCTOR_STR, start_span);
                 self.bump();
                 let mut ty = self.try_parse_type().merge_to_result()?;
                 ty = SoulType::Array(ArrayType {
@@ -363,7 +389,10 @@ impl<'a, 'f> Parser<'a, 'f> {
             return TryNotValue((name, self.get_expect_any_error(&[ROUND_OPEN, ARROW_LEFT])));
         }
 
-        let generics = self.parse_generic_declare().try_err()?.unwrap_or(vec![]);
+        let generics = match self.parse_generic_declare() {
+            Ok(val) => val.unwrap_or(vec![]),
+            Err(err) => return TryNotValue((name, err)),
+        };
 
         if !self.current_is(&ROUND_OPEN) {
             return TryErr(self.get_expect_error(&ROUND_OPEN));

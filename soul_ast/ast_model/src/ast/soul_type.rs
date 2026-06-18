@@ -73,9 +73,9 @@ pub struct Generic {
 }
 
 impl Stub {
-    pub fn new(name: String) -> Self {
+    pub fn new(name: impl Into<String>) -> Self {
         Self {
-            name,
+            name: name.into(),
             generics: vec![],
         }
     }

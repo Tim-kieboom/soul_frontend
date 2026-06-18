@@ -110,7 +110,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             let start_span = self.token().span;
             if !self.current_is_ident(ELSE_STR) {
-                self.go_to(position);
+                self.goto(position);
                 break Ok(());
             }
 
@@ -245,7 +245,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             }));
         }
 
-        self.go_to(saved);
+        self.goto(saved);
         let bind_span = self.token().span;
         self.bump();
         Ok(MatchPattern::Binding(Binding {

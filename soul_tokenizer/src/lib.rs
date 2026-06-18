@@ -1,4 +1,4 @@
-use crate::lexer::{Lexer};
+use crate::lexer::Lexer;
 use crate::model::{Token, TokenKind};
 use soul_utils::error::SoulResult;
 use soul_utils::fault::Fault;

@@ -22,7 +22,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let begin = self.tokens.current_position();
         let result = self.inner_parse_type();
         if result.is_err() {
-            self.go_to(begin);
+            self.goto(begin);
         }
 
         result
@@ -137,7 +137,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                     variant,
                 });
             }
-            self.go_to(save);
+            self.goto(save);
         }
 
         Ok(ty)

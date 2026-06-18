@@ -10,6 +10,7 @@ pub trait Writer {
     fn push_fmt(&mut self, args: Arguments<'_>) -> Result<()>;
     fn push_str(&mut self, str: &str) -> Result<()>;
     fn push_char(&mut self, ch: char) -> Result<()>;
+    fn writer_flush(&mut self) -> Result<()>;
 }
 
 impl Writer for String {
@@ -29,6 +30,10 @@ impl Writer for String {
         self.push(ch);
         Ok(())
     }
+
+    fn writer_flush(&mut self) -> Result<()> {
+        Ok(())
+    }
 }
 
 impl Writer for Stdout {
@@ -46,6 +51,11 @@ impl Writer for Stdout {
         self.write_fmt(format_args!("{ch}"))?;
         Ok(())
     }
+
+    fn writer_flush(&mut self) -> Result<()> {
+        self.flush()?;
+        Ok(())
+    }
 }
 
 impl Writer for File {
@@ -61,6 +71,11 @@ impl Writer for File {
 
     fn push_char(&mut self, ch: char) -> Result<()> {
         self.write_fmt(format_args!("{ch}"))?;
+        Ok(())
+    }
+
+    fn writer_flush(&mut self) -> Result<()> {
+        self.flush()?;
         Ok(())
     }
 }

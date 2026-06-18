@@ -27,7 +27,7 @@ pub(crate) fn display_fault(
     if let Some(span) = span {
         get_source_snippet(writer, &span, source_file.lines(), &begin_space)?;
     }
-    Ok(())
+    writer.writer_flush()
 }
 
 fn fault_message(fault: &Fault, writer: &mut impl Writer, configs: &PrintConfigs) -> Result<()> {

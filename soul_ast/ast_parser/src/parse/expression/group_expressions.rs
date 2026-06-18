@@ -14,7 +14,9 @@ use soul_utils::{
 
 use crate::{
     parser::Parser,
-    utils::{ARRAY, COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, FOR, LAMBDA_ARROW, SQUARE_CLOSE, SQUARE_OPEN},
+    utils::{
+        ARRAY, COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, FOR, LAMBDA_ARROW, SQUARE_CLOSE, SQUARE_OPEN,
+    },
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
@@ -25,9 +27,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         let start_span = self.token().span;
         if self.current_is(&ARRAY) {
             self.bump();
-            return Ok(Spanned::new(AnyArray::Array(
-                Array::default()), 
-                self.span_combine(start_span)
+            return Ok(Spanned::new(
+                AnyArray::Array(Array::default()),
+                self.span_combine(start_span),
             ));
         }
 
@@ -41,7 +43,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 Some(ty)
             }
             Ok(_) => {
-                self.go_to(position);
+                self.goto(position);
                 None
             }
             Err(TryError::IsErr(err)) => return Err(err),

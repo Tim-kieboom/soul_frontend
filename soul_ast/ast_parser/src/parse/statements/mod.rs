@@ -14,10 +14,11 @@ use soul_utils::{
 };
 
 use crate::{
-    parser::Parser, utils::{
+    parser::Parser,
+    utils::{
         ARROW_LEFT, COLON, COLON_ASSIGN, CURLY_CLOSE, CURLY_OPEN, DOT, ROUND_OPEN, SEMI_COLON,
         STAMENT_END_TOKENS, STAMENT_SKIP_TOKENS, STAR,
-    }
+    },
 };
 
 mod assign;
@@ -165,7 +166,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 Ok(Statement::from_expression(self.store, val, semicolon))
             }
             Err(err) => {
-                self.go_to(begin_position);
+                self.goto(begin_position);
                 Err(err)
             }
         }
@@ -173,6 +174,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     fn try_parse_from_ident(&mut self, start_span: Span) -> TryResult<Statement, Fault> {
         let ident = self.try_token_as_ident_str().try_err()?;
+        let is_this = ident == "This";
         if let Some(keyword) = KeyWord::from_str(ident) {
             return self.try_parse_from_keyword(start_span, keyword);
         }
@@ -181,37 +183,26 @@ impl<'a, 'f> Parser<'a, 'f> {
         match &peek.kind {
             &ROUND_OPEN | &ARROW_LEFT => self.parse_any_function().try_err(),
             &COLON | &COLON_ASSIGN => self.parse_variable().try_err(),
-            _ => self.parse_from_unknown_ident(start_span).try_err(),
+            &DOT if is_this => self.parse_contructor(start_span).try_err(),
+            _ => self.parse_assign_or_expression(start_span).try_err(),
         }
     }
 
-    fn parse_from_unknown_ident(&mut self, start_span: Span) -> SoulResult<Statement> {
-        
-        if self.current_is(&DOT) {
-            let ident = self.try_bump_consume_ident()?;
-            if ident.as_str() != "This" {
-                return Err(Fault::error(
-                    format!("`{}` invalid", self.token().kind.display()),
-                    Some(self.span_combine(start_span)),
-                ));
-            }
-
-            let this = self.current.this_type.take();
-            let result = match &this {
-                Some(ty) => self.parse_function_contructor(ty, TypeModifier::Mut),
-                None => Err(Fault::error(
-                    "contructor function should habe methode type",
-                    Some(self.span_combine(start_span)),
-                )),
-            };
-            self.current.this_type = this;
-            return result
-                .map(|spanned| {
-                    spanned.map(|func| self.store.insert_function(FunctionKind::Normal(func)))
-                })
-                .map(Statement::from_function);
-        }
-        
-        self.parse_assign_or_expression(start_span)
+    fn parse_contructor(&mut self, start_span: Span) -> SoulResult<Statement> {
+        self.bump();
+        let this = self.current.this_type.take();
+        let result = match &this {
+            Some(ty) => self.parse_function_contructor(ty, TypeModifier::Mut),
+            None => Err(Fault::error(
+                "contructor function should have methode type",
+                Some(self.span_combine(start_span)),
+            )),
+        };
+        self.current.this_type = this;
+        result
+            .map(|spanned| {
+                spanned.map(|func| self.store.insert_function(FunctionKind::Normal(func)))
+            })
+            .map(Statement::from_function)
     }
 }

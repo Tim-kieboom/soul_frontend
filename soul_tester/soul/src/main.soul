@@ -2,9 +2,6 @@ pub sum(a: int, b: int): int {
     a + b
 }
 
-extern "C" malloc(size: uint): RawPtr
-extern "C" intPtr(ptr: RawPtr<int>)
-
 // pub trait Index {
 //     type Out
 //     index(&this, index: I): &Out
@@ -24,16 +21,16 @@ pub struct Map {
     list := List.[]
     pub mut field = 1
 
-    // This.() {
-    //     This{..}
-    // }
+    pub This.() {
+        This{..}
+    }
 
-    // pub This.[int](list) {
-    //     This{list, ..}
-    // }
+    pub This.[int](list) {
+        This{list, ..}
+    }
 
     sum(this, b: int): int {
-        this + b
+        this.field + b
     }
 }
 

@@ -1,8 +1,5 @@
-use ast_model::{
-    soul_type::SoulType,
-    statements::StatementKind,
-};
-use soul_utils::{fault::Severity};
+use ast_model::{soul_type::SoulType, statements::StatementKind};
+use soul_utils::fault::Severity;
 
 use crate::tests::{get_statement, parse};
 
@@ -47,14 +44,17 @@ fn struct_with_fields() {
     assert!(struct_.fields[0].is_public);
     assert_eq!(
         struct_.fields[0].value.ty,
-        Some(SoulType::Primitive(soul_utils::soul_names::PrimitiveTypes::Int))
+        Some(SoulType::Primitive(
+            soul_utils::soul_names::PrimitiveTypes::Int
+        ))
     );
     assert!(struct_.fields[0].value.initialize_value.is_some());
 }
 
 #[test]
 fn struct_with_multiple_fields() {
-    let (module, store, context) = parse("struct Foo { pub x: int = 1\npub y: string = \"hello\" }");
+    let (module, store, context) =
+        parse("struct Foo { pub x: int = 1\npub y: string = \"hello\" }");
     assert_eq!(
         context.faults.count_severity(Severity::Error),
         0,

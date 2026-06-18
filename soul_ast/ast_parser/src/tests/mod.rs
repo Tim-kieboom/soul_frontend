@@ -2,14 +2,18 @@ use std::path::PathBuf;
 
 use ast_model::{
     AstStore, Module,
-    expression::{AnyArray, Constructor, ExpressionKind, FunctionCall, MatchMethod, StructConstructor, TypeOf},
+    expression::{
+        AnyArray, Constructor, ExpressionKind, FunctionCall, MatchMethod, StructConstructor, TypeOf,
+    },
     literal::Literal,
     operators::BinaryOperatorKind,
     soul_type::{ArrayKind, ArrayType, ReferenceType, SoulType, Stub},
     statements::{Assignment, Import, ImportKind, Statement, StatementKind, Variable},
 };
 use soul_tokenizer::to_token_stream;
-use soul_utils::{CrateContext, fault::Severity, ids::IdAlloc, soul_names::PrimitiveTypes, span::ModuleId};
+use soul_utils::{
+    CrateContext, fault::Severity, ids::IdAlloc, soul_names::PrimitiveTypes, span::ModuleId,
+};
 
 use crate::{ParseInfo, parse_module};
 
@@ -588,12 +592,10 @@ fn reference_type_variable() {
     };
     assert_eq!(
         *ty,
-        Some(SoulType::Reference(
-            ReferenceType::new(
-                SoulType::Primitive(PrimitiveTypes::Int),
-                false
-            )
-        ))
+        Some(SoulType::Reference(ReferenceType::new(
+            SoulType::Primitive(PrimitiveTypes::Int),
+            false
+        )))
     );
 }
 
@@ -614,12 +616,10 @@ fn mut_reference_type_variable() {
     };
     assert_eq!(
         *ty,
-        Some(SoulType::Reference(
-            ReferenceType::new(
-                SoulType::Primitive(PrimitiveTypes::Int),
-                true
-            )
-        ))
+        Some(SoulType::Reference(ReferenceType::new(
+            SoulType::Primitive(PrimitiveTypes::Int),
+            true
+        )))
     );
 }
 
@@ -728,10 +728,76 @@ fn array_filler() {
                 ExpressionKind::Array(AnyArray::ArrayFiller(filler)) => {
                     let amount = &store.expressions[filler.amount];
                     let element = &store.expressions[filler.element];
-                    assert_eq!(amount.node, ExpressionKind::Literal((None, Literal::Uint(3))));
-                    assert_eq!(element.node, ExpressionKind::Literal((None, Literal::Uint(0))));
+                    assert_eq!(
+                        amount.node,
+                        ExpressionKind::Literal((None, Literal::Uint(3)))
+                    );
+                    assert_eq!(
+                        element.node,
+                        ExpressionKind::Literal((None, Literal::Uint(0)))
+                    );
                 }
                 other => panic!("expected ArrayFiller, got {:?}", other),
+            }
+        }
+        _ => panic!("expected Expression statement"),
+    }
+}
+
+#[test]
+fn array_contructor_literal() {
+    let (module, store, context) = parse("List.[1, 2, 3]");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    match &stmt.node {
+        StatementKind::Expression { expression, .. } => {
+            let expr = &store.expressions[*expression];
+            match &expr.node {
+                ExpressionKind::Array(AnyArray::Array(arr)) => {
+                    let collection = SoulType::Stub(Stub::new("List"));
+                    assert_eq!(arr.collection_type, Some(collection));
+                    assert_eq!(arr.element_type, None);
+                    assert_eq!(arr.values.len(), 3);
+                }
+                other => panic!("expected Array, got {:?}", other),
+            }
+        }
+        _ => panic!("expected Expression statement"),
+    }
+}
+
+#[test]
+fn array_contructor_generic_literal() {
+    let (module, store, context) = parse("List<int>.[1, 2, 3]");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults,
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    match &stmt.node {
+        StatementKind::Expression { expression, .. } => {
+            let expr = &store.expressions[*expression];
+            match &expr.node {
+                ExpressionKind::Array(AnyArray::Array(arr)) => {
+                    let int = SoulType::Primitive(PrimitiveTypes::Int);
+                    let collection = SoulType::Array(ArrayType {
+                        of_type: Box::new(int),
+                        kind: ArrayKind::HeapArray,
+                    });
+                    assert_eq!(arr.collection_type, Some(collection));
+                    assert_eq!(arr.element_type, None);
+                    assert_eq!(arr.values.len(), 3);
+                }
+                other => panic!("expected Array, got {:?}", other),
             }
         }
         _ => panic!("expected Expression statement"),
@@ -1141,12 +1207,14 @@ fn pointer_type_variable() {
         _ => panic!("expected Variable"),
     };
 
-    let inner = Box::new(SoulType::Primitive(
-        PrimitiveTypes::Int
-    ));
+    let inner = Box::new(SoulType::Primitive(PrimitiveTypes::Int));
     assert_eq!(
         *ty,
-        Some(SoulType::Pointer(ReferenceType { inner, lifetime: None, mutable: false }))
+        Some(SoulType::Pointer(ReferenceType {
+            inner,
+            lifetime: None,
+            mutable: false
+        }))
     );
 }
 
@@ -1166,12 +1234,14 @@ fn pointer_mut_type_variable() {
         _ => panic!("expected Variable"),
     };
 
-    let inner = Box::new(SoulType::Primitive(
-        PrimitiveTypes::Int
-    ));
+    let inner = Box::new(SoulType::Primitive(PrimitiveTypes::Int));
     assert_eq!(
         *ty,
-        Some(SoulType::Pointer(ReferenceType { inner, lifetime: None, mutable: true }))
+        Some(SoulType::Pointer(ReferenceType {
+            inner,
+            lifetime: None,
+            mutable: true
+        }))
     );
 }
 
@@ -1237,10 +1307,7 @@ fn raw_ptr_type_explicit_none() {
         StatementKind::Variable(v) => v,
         _ => panic!("expected Variable"),
     };
-    assert_eq!(
-        *ty,
-        Some(SoulType::RawPtr(Some(Box::new(SoulType::None))))
-    );
+    assert_eq!(*ty, Some(SoulType::RawPtr(Some(Box::new(SoulType::None)))));
 }
 
 #[test]

@@ -30,7 +30,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
 
             if !self.current_is(&COMMA) {
-                self.go_to(start_position);
+                self.goto(start_position);
                 return TryNotValue(self.get_expect_error(&COMMA));
             }
         }

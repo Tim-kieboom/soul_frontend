@@ -8,8 +8,9 @@ use crate::{
     declare_store::DeclareStore,
 };
 use soul_utils::{
-    FunctionId,
+    CrateContext, FunctionId,
     collections::{vec_map::VecMap, vec_set::VecSet},
+    fault::Fault,
     ids::IdGenerator,
     span::{ModuleId, Spanned},
 };
@@ -22,6 +23,8 @@ pub mod scope;
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AbstractSyntaxTree {
     pub root: ModuleId,
+    pub store: AstStore,
+    pub context: CrateContext,
     pub modules: AstModuleStore,
 }
 
@@ -75,8 +78,14 @@ impl AbstractSyntaxTree {
     pub fn new(root: ModuleId) -> Self {
         Self {
             root,
+            store: AstStore::default(),
+            context: CrateContext::default(),
             modules: AstModuleStore::default(),
         }
+    }
+
+    pub fn faults(&self) -> &[Fault] {
+        &self.context.faults.faults
     }
 }
 
