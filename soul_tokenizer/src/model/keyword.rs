@@ -37,6 +37,7 @@ define_str_enum!(
         Copy => "copy", 0,
 
         Null => "null", 0,
+        Undefined => "undefined", 0,
 
         As => "as", 0,
         New => "new", 0,

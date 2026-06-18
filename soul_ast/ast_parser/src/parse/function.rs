@@ -313,7 +313,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     pub(crate) fn parse_function_contructor(
         &mut self,
-        ty: &SoulType,
+        methode_type: &SoulType,
         modifier: TypeModifier,
     ) -> SoulResult<Spanned<Function>> {
         let start_span = self.token().span;
@@ -322,22 +322,22 @@ impl<'a, 'f> Parser<'a, 'f> {
             &ROUND_OPEN => {
                 let name = Ident::new(CONTRUCTOR_STR, start_span);
                 let mut methode = self
-                    .try_parse_function_declaration(start_span, modifier, &ty, name)
+                    .try_parse_function_declaration(start_span, modifier, &methode_type, name)
                     .map_try_not_value(|(_, err)| err)
                     .merge_to_result()?
                     .value;
 
                 let signature = &mut methode.signature.value;
-                signature.return_type = ty.clone();
+                signature.return_type = methode_type.clone();
 
                 Ok(Spanned::new(methode, self.span_combine(start_span)))
             }
             &SQUARE_OPEN => {
                 let name = Ident::new(ARRAY_CONTRUCTOR_STR, start_span);
                 self.bump();
-                let mut ty = self.try_parse_type().merge_to_result()?;
-                ty = SoulType::Array(ArrayType {
-                    of_type: Box::new(ty),
+                let mut array_type = self.try_parse_type().merge_to_result()?;
+                array_type = SoulType::Array(ArrayType {
+                    of_type: Box::new(array_type),
                     kind: ArrayKind::StackArrayWildcard,
                 });
                 self.expect(&SQUARE_CLOSE)?;
@@ -353,11 +353,11 @@ impl<'a, 'f> Parser<'a, 'f> {
                             id,
                             name,
                             modifier,
-                            method_type: ty.clone(),
-                            return_type: ty.clone(),
+                            method_type: methode_type.clone(),
+                            return_type: methode_type.clone(),
                             parameters: vec![Parameter {
                                 name: arg,
-                                ty,
+                                ty: array_type,
                                 modifier: TypeModifier::Const,
                                 node_id: None,
                                 default: None,

@@ -10,7 +10,7 @@ use crate::{
 use soul_utils::{
     CrateContext, FunctionId,
     collections::{vec_map::VecMap, vec_set::VecSet},
-    fault::Fault,
+    fault::{FaultCollector},
     ids::IdGenerator,
     span::{ModuleId, Spanned},
 };
@@ -84,8 +84,8 @@ impl AbstractSyntaxTree {
         }
     }
 
-    pub fn faults(&self) -> &[Fault] {
-        &self.context.faults.faults
+    pub fn faults(&self) -> &FaultCollector {
+        &self.context.faults
     }
 }
 

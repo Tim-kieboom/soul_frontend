@@ -28,7 +28,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         if self.current_is(&ARRAY) {
             self.bump();
             return Ok(Spanned::new(
-                AnyArray::Array(Array::default()),
+                AnyArray::Array(Array::new(collection_type)),
                 self.span_combine(start_span),
             ));
         }

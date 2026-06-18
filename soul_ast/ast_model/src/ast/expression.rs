@@ -21,6 +21,8 @@ pub struct Expression {
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ExpressionKind {
+    /// `undefined`
+    Undefined(Option<NodeId>),
     /// `null`
     Null(Option<NodeId>),
     /// A `default` literal or default value e.g., '()'.
@@ -259,7 +261,7 @@ pub enum AnyArray {
 }
 
 /// An array literal, e.g., `[1, 2, 3]`, `List.[1, 2, 3]`.
-#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Array {
     pub id: Option<NodeId>,
 
@@ -479,6 +481,16 @@ impl AnyArray {
         Spanned {
             value: AnyArray::ArrayFiller(value),
             span: span,
+        }
+    }
+}
+impl Array {
+    pub fn new(collection_type: Option<SoulType>) -> Self {
+        Self { 
+            id: None, 
+            values: vec![], 
+            element_type: None, 
+            collection_type 
         }
     }
 }

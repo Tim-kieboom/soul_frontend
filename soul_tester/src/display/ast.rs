@@ -402,6 +402,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
         match &expression.node {
             ExpressionKind::Null(_) => self.write_str("null"),
             ExpressionKind::Default(_) => self.write_str("()"),
+            ExpressionKind::Undefined(_) => self.write_str("undefined"),
             ExpressionKind::Literal((_, literal)) => self.write_fmt(format_args!("{literal:?}")),
             ExpressionKind::Index(index) => {
                 self.write_expression(index.collection)?;
@@ -452,9 +453,12 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 for (i, arg) in ctor.values.iter().enumerate() {
                     self.write_fmt(format_args!("{}: ", arg.0))?;
                     self.write_expression(arg.1)?;
-                    if i != last_index {
+                    if i != last_index || ctor.defaults {
                         self.write_str(", ")?;
                     }
+                }
+                if ctor.defaults {
+                    self.write_str("..")?;
                 }
                 self.write_char('}')
             }

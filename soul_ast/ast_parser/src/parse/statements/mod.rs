@@ -3,7 +3,7 @@ use ast_model::{
     block::{Block, BlockId},
     statements::{Statement, StatementId},
 };
-use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
+use soul_tokenizer::model::TokenKind;
 use soul_utils::{
     TypeModifier,
     collections::try_result::{ResultTryErr, TryErr, TryError, TryNotValue, TryOk, TryResult},
@@ -175,9 +175,6 @@ impl<'a, 'f> Parser<'a, 'f> {
     fn try_parse_from_ident(&mut self, start_span: Span) -> TryResult<Statement, Fault> {
         let ident = self.try_token_as_ident_str().try_err()?;
         let is_this = ident == "This";
-        if let Some(keyword) = KeyWord::from_str(ident) {
-            return self.try_parse_from_keyword(start_span, keyword);
-        }
 
         let peek = self.peek();
         match &peek.kind {

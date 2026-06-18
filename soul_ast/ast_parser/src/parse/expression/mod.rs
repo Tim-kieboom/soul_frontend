@@ -65,8 +65,8 @@ impl<'a, 'f> Parser<'a, 'f> {
     ) -> SoulResult<Expression> {
         let start_span = self.token().span;
 
-        let mut prefix_operators = vec![];
-        self.collect_prefix_operators(&mut prefix_operators, start_span);
+        let mut unary_operators = vec![];
+        self.collect_unary_operators(&mut unary_operators, start_span);
 
         let mut left = match primary {
             Some(value) => value,
@@ -106,7 +106,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
         }
 
-        left = self.apply_prefix_operators(left, prefix_operators);
+        left = self.apply_prefix_operators(left, unary_operators);
 
         loop {
             match self.check_for_end_tokens(end_tokens) {
@@ -662,6 +662,11 @@ impl<'a, 'f> Parser<'a, 'f> {
                 Expression::new(ExpressionKind::Null(None), self.token().span)
             }
 
+            KeyWord::Undefined => {
+                self.bump();
+                Expression::new(ExpressionKind::Undefined(None), self.token().span)
+            }
+
             KeyWord::Break | KeyWord::Return | KeyWord::Continue => {
                 return Err(Fault::error(
                     format!("can not have {} in expression", keyword.as_str()),
@@ -716,16 +721,16 @@ impl<'a, 'f> Parser<'a, 'f> {
     /// (`.`, `()`, `[]`) bind tighter — which is standard language semantics.
     /// `@*expr` → outer `@` wraps the result of inner `*`; we apply them in
     /// reverse order below so the outermost prefix wraps the innermost.
-    fn collect_prefix_operators(
+    fn collect_unary_operators(
         &mut self,
-        prefix_ops: &mut Vec<(Span, UnaryKinds)>,
+        unarys: &mut Vec<(Span, UnaryKinds)>,
         start_span: Span,
     ) {
         while let TokenKind::Symbol(symbol) = &self.token().kind {
             match self.expect_unary_kind(start_span, *symbol) {
                 Ok(unary_kind) => {
                     self.bump();
-                    prefix_ops.push((self.span_combine(start_span), unary_kind));
+                    unarys.push((self.span_combine(start_span), unary_kind));
                 }
                 Err(_) => break,
             }

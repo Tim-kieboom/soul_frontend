@@ -773,6 +773,62 @@ fn array_contructor_literal() {
 }
 
 #[test]
+fn array_contructor_element_type_literal() {
+    let (module, store, context) = parse("List.[int: 1, 2, 3]");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    match &stmt.node {
+        StatementKind::Expression { expression, .. } => {
+            let expr = &store.expressions[*expression];
+            match &expr.node {
+                ExpressionKind::Array(AnyArray::Array(arr)) => {
+                    let collection = SoulType::Stub(Stub::new("List"));
+                    assert_eq!(arr.collection_type, Some(collection));
+                    assert_eq!(arr.element_type, Some(SoulType::Primitive(PrimitiveTypes::Int)));
+                    assert_eq!(arr.values.len(), 3);
+                }
+                other => panic!("expected Array, got {:?}", other),
+            }
+        }
+        _ => panic!("expected Expression statement"),
+    }
+}
+
+#[test]
+fn array_contructor_empty_literal() {
+    let (module, store, context) = parse("List.[]");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    match &stmt.node {
+        StatementKind::Expression { expression, .. } => {
+            let expr = &store.expressions[*expression];
+            match &expr.node {
+                ExpressionKind::Array(AnyArray::Array(arr)) => {
+                    let collection = SoulType::Stub(Stub::new("List"));
+                    assert_eq!(arr.collection_type, Some(collection));
+                    assert_eq!(arr.element_type, None);
+                    assert_eq!(arr.values.len(), 0);
+                }
+                other => panic!("expected Array, got {:?}", other),
+            }
+        }
+        _ => panic!("expected Expression statement"),
+    }
+}
+
+#[test]
 fn array_contructor_generic_literal() {
     let (module, store, context) = parse("List<int>.[1, 2, 3]");
     assert_eq!(
@@ -789,10 +845,7 @@ fn array_contructor_generic_literal() {
             match &expr.node {
                 ExpressionKind::Array(AnyArray::Array(arr)) => {
                     let int = SoulType::Primitive(PrimitiveTypes::Int);
-                    let collection = SoulType::Array(ArrayType {
-                        of_type: Box::new(int),
-                        kind: ArrayKind::HeapArray,
-                    });
+                    let collection = SoulType::Stub(Stub{name: "List".to_string(), generics: vec![int]});
                     assert_eq!(arr.collection_type, Some(collection));
                     assert_eq!(arr.element_type, None);
                     assert_eq!(arr.values.len(), 3);

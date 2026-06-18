@@ -15,12 +15,13 @@ mod display;
 
 fn main() {
     match frontend() {
-        Ok(()) => println!("success"),
+        Ok(true) => println!("success"),
+        Ok(false) => println!("failed"),
         Err(err) => eprintln!("{err}"),
     }
 }
 
-fn frontend() -> Result<()> {
+fn frontend() -> Result<bool> {
     let source_folder = config::CONFIG.source_path().to_path_buf();
     let main_path = source_folder.join("main.soul");
     let mut module_store = ModuleStore::new();
@@ -38,13 +39,17 @@ fn frontend() -> Result<()> {
         source_folder,
         &config::COMPILER_OPTIONS,
     );
-    for fault in ast.faults() {
-        display_fault(fault, &file, &config::PRINT_CONFIGS, &mut stdout())?;
-    }
-
     display_ast(&ast).map_err(|err| anyhow::anyhow!("in display_ast: {err}"))?;
 
-    Ok(())
+    if ast.faults().fails(config::COMPILER_OPTIONS.fail_level) {
+        for fault in ast.faults().iter() {
+            display_fault(fault, &file, &config::PRINT_CONFIGS, &mut stdout())?;
+        }
+
+        return Ok(false)
+    }
+
+    Ok(true)
 }
 
 fn display_tokenizer<'a>(tokens: &TokenStream<'a>) -> Result<()> {

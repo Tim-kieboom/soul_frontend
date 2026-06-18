@@ -41,5 +41,6 @@ main() {
     obj.increment()
     obj.sum(1)
     println("hello world")
+    num := [int: for 10 => undefined]
 }
 

@@ -89,6 +89,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             | KeyWord::Typeof
             | KeyWord::Distinct
             | KeyWord::InForLoop
+            | KeyWord::Undefined
             | KeyWord::GenericWhere => {
                 return TryErr(soul_error_internal!(
                     format!(

@@ -42,25 +42,40 @@ reflect(value: &any) {
     }
 }
 
-enum CEnum: str {
-    One = "one"
-    Two = "two"   
+enum CEnum {
+    One,
+    Two,
 }
 
-enum Union {
-    String(str)
-    Object(field: int, condition: bool)
+enum SoulEnum: &str {
+    One = "one",
+    Two = "two",
+}
+
+enum RustEnum {
+    String(str),
+    Object(field: int, condition: bool),
 }
 
 enums() {
-    one := CEnum.One(number: 1, name: "")
-    valeu: str = one.toValue()
-    CEnum.fromValue("one")
+    cEnum := CEnum.One
+    match cEnum {
+        CEnum.One => ()
+        _ => ()
+    }
 
-    un := Union.String("test".copy)
+    soulEnum := SoulEnum.One
+    println(str.(soulEnum)) // "one"
+    option: ?SoulEnum = SoulEnum.("one") // CEnum.One
+    match cEnum {
+        SoulEnum.One => ()
+        _ => ()
+    }
+
+    un := RustEnum.String("test".copy)
     match un {
-        Union.String(text) => println(text),
-        Union.Object(field, condition) => println(f"{field} {condition}")
+        RustEnum.String(text) => println(text),
+        RustEnum.Object(field, condition) => println(f"{field} {condition}")
     }
 }
 
