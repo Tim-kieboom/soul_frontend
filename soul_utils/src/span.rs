@@ -144,7 +144,7 @@ impl Debug for Span {
             return Ok(());
         }
 
-        f.write_fmt(format_args!("-{}:{}", end.line, end.offset))?;
+        f.write_fmt(format_args!(" - {}:{}", end.line, end.offset))?;
         Ok(())
     }
 }

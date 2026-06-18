@@ -11,6 +11,10 @@ use soul_utils::{
 use crate::parser::Parser;
 
 pub const AS_STR: &str = KeyWord::As.as_str();
+pub const PUB: TokenKind = TokenKind::Keyword(KeyWord::Pub);
+pub const MUT: TokenKind = TokenKind::Keyword(KeyWord::Mut);
+pub const CONST: TokenKind = TokenKind::Keyword(KeyWord::Const);
+pub const LITERAL: TokenKind = TokenKind::Keyword(KeyWord::Literal);
 pub const DOT: TokenKind = TokenKind::Symbol(Symbol::Dot);
 pub const REF: TokenKind = TokenKind::Symbol(Symbol::And);
 pub const FOR: TokenKind = TokenKind::Keyword(KeyWord::For);

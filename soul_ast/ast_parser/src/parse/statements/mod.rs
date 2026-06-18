@@ -27,6 +27,7 @@ mod from_modfier;
 mod import;
 mod objects;
 mod variable;
+mod use_block;
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_global_statements(&mut self) -> Vec<StatementId> {

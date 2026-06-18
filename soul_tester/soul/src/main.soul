@@ -11,6 +11,12 @@ pub sum(a: int, b: int): int {
 //     indexMut(&mut this, index: :I): &mut This.Out
 // }
 
+// enum Numbers {
+//     One,
+//     Two,
+//     Three,
+// }
+
 pub struct Map {
 
     pub struct KeyValue {
@@ -18,7 +24,7 @@ pub struct Map {
         pub mut value: Value
     }
 
-    list := List.[]
+    list := List.[int: ]
     pub mut field = 1
 
     pub This.() {
@@ -34,11 +40,15 @@ pub struct Map {
     }
 }
 
+use Map at(&this, i: uint): int {
+    this.list[i]
+}
+
 main() {
     ch := 'a'
     cstring := c"cstr"
-    mut obj := Foo.(1)
-    obj.increment()
+    mut obj := Map.(1)
+    obj = Map.[1, 2, 3]
     obj.sum(1)
     println("hello world")
     num := [int: for 10 => undefined]

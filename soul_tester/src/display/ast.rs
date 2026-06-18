@@ -162,12 +162,25 @@ impl<'a, W: Writer> Displayer<'a, W> {
         self.write_generic_defines(&use_block.use_generics)?;
         self.write_char(' ')?;
         self.write_type(&use_block.ty)?;
-        self.write_generic_types(&use_block.type_generics)?;
         self.write_str(" {\n")?;
         self.push_depth();
+        for id in &use_block.statements {
+            self.write_depth()?;
+            if self.store.statements[*id].is_public() {
+                self.write_str("pub ")?;
+            }
+
+            self.write_statement(*id)?;
+            self.write_endln()?;
+        }
+
         for methode in &use_block.methodes {
             self.write_depth()?;
-            self.write_any_function(*methode)?;
+            if methode.is_public {
+                self.write_str("pub ")?;
+            }
+
+            self.write_any_function(methode.value)?;
             self.write_endln()?;
         }
         for impl_ in &use_block.impls {
@@ -184,10 +197,9 @@ impl<'a, W: Writer> Displayer<'a, W> {
         self.write_str(IMPL_STR)?;
         self.write_char(' ')?;
         self.write_type(&impl_.impl_trait)?;
-        self.write_generic_types(&impl_.type_generics)?;
         self.write_str(" {\n")?;
         self.push_depth();
-        for methode in &impl_.methodes {
+        for methode in &impl_.methods {
             self.write_depth()?;
             self.write_any_function(*methode)?;
             self.write_endln()?;

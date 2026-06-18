@@ -1,6 +1,5 @@
 use ast_model::{
-    expression::{Expression, ExpressionKind},
-    statements::{Statement, StatementKind, TypeDef},
+    expression::{Expression, ExpressionKind}, statements::{Statement, StatementKind, TypeDef}
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
@@ -100,7 +99,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 ));
             }
 
-            KeyWord::Use => todo!(),
+            KeyWord::Use => return self.parse_use_block(start_span).try_err(),
             KeyWord::Enum => todo!(),
             KeyWord::Trait => todo!(),
             KeyWord::Struct => return self.parse_struct().try_err(),

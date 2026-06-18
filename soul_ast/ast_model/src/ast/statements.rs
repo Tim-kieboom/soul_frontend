@@ -114,16 +114,15 @@ impl Methode {
 pub struct UseBlock {
     pub use_generics: Vec<Generic>,
     pub ty: SoulType,
-    pub type_generics: Vec<SoulType>,
     pub impls: Vec<ImplBlock>,
-    pub methodes: Vec<FunctionId>,
+    pub methodes: Vec<Methode>,
+    pub statements: Vec<StatementId>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ImplBlock {
     pub impl_trait: SoulType,
-    pub type_generics: Vec<SoulType>,
-    pub methodes: Vec<FunctionId>,
+    pub methods: Vec<FunctionId>,
 }
 
 /// Imported paths

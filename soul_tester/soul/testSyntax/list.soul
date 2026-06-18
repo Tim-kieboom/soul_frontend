@@ -1,0 +1,72 @@
+enum MaybeInit<T> {
+    Init(T),
+    Uninit,
+}
+
+pub struct List<T> {
+
+    len: uint
+    array: []MaybeInit<T>
+
+    pub This.(capacity: uint = 0) {
+        This{
+            len: 0,
+            array: new[for capacity => MaybeInit.Uninit], 
+        }
+    }
+
+    pub This.[T](array) {
+        mut self = This.(capacity: array.len())
+        for i, el in array {
+            self.array[i] = el
+        }
+
+        self
+    }
+
+    push(&mut this, value: T) {
+        if len+1 > cap() {
+            grow()
+        }
+
+        array[len] = value
+        len += 1
+    }
+
+    get(&this, index: uint) -> ?&T {
+        
+        if index+1 > len {
+            return null
+        }
+
+        &this.array[index]
+    }
+
+    len(&this): uint {
+        len
+    }
+
+    cap(&this): uint {
+        array.len()
+    }
+
+    grow(&mut this) {
+        grow := cap() * 2 + 1
+        array.growDefault(grow, MaybeInit.Uninit)
+    }
+
+    impl Index {
+        type IndexOut = T
+        index(&this, i: uint): &IndexOut {
+            &array[i]
+                .Uninit{panic(f"index out of bounds, index: {i}, len: {this.len}")}
+        }
+    }
+    
+    impl IndexMut {
+        indexMut(&mut this, i: uint): &mut This.IndexOut {
+            &mut array[i]
+                .Uninit{panic(f"index out of bounds, index: {i}, len: {this.len}")}
+        }
+    }
+}
