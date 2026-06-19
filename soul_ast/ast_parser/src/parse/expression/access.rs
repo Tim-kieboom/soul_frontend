@@ -1,7 +1,7 @@
 use std::mem::swap;
 
 use ast_model::expression::{
-    Constructor, Expression, ExpressionId, ExpressionKind, MatchMethod, MatchMethodArm, MatchMethodVariant, VariableExpression
+    Constructor, Deref, Expression, ExpressionId, ExpressionKind, MatchMethod, MatchMethodArm, MatchMethodVariant, Ref, VariableExpression
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
@@ -15,7 +15,7 @@ use soul_utils::{
 
 use crate::{
     parser::Parser,
-    utils::{ARRAY, ARROW_LEFT, CURLY_OPEN, ELSE, NOT, NULL, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN},
+    utils::{ARRAY, ARROW_LEFT, CURLY_OPEN, ELSE, MUT, NOT, NULL, PASS, POINTER, REF, ROUND_OPEN, SIZEOF, SQUARE_CLOSE, SQUARE_OPEN},
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
@@ -47,29 +47,94 @@ impl<'a, 'f> Parser<'a, 'f> {
             vec![]
         };
 
-        if self.current_is(&ROUND_OPEN) {
-            let mut value = Expression::error();
-            swap(left, &mut value);
+        match &self.current().kind {
+            &PASS => {
+                self.bump();
+                let mut value = Expression::error();
+                swap(left, &mut value);
 
-            let name = match value.node {
-                ExpressionKind::Variable(VariableExpression { name, .. }) => name,
-                _ => return Err(Fault::error("should be ident", Some(value.span))),
-            };
+                let id = self.store.insert_expression(value);
+                *left = Expression::new(
+                    ExpressionKind::Pass(id), 
+                    self.span_combine(start_span),
+                );
 
-            let arguments = self.parse_arguments()?;
-            let ty = self.type_from_ident(name, generics);
-            let ctor = Constructor {
-                id: None,
-                ty,
-                arguments,
-            };
-            *left = Expression::new(
-                ExpressionKind::Constructor(ctor),
-                self.span_combine(start_span),
-            );
+                return Ok(())
+            }
+            &SIZEOF => {
+                self.bump();
+                let mut value = Expression::error();
+                swap(left, &mut value);
 
-            return Ok(());
-        }
+                let id = self.store.insert_expression(value);
+                *left = Expression::new(
+                    ExpressionKind::Sizeof(id), 
+                    self.span_combine(start_span),
+                );
+
+                return Ok(())
+            }
+            &REF => {
+                self.bump();
+                let mut expression = Expression::error();
+                swap(left, &mut expression);
+
+                let is_mutable = self.current_is(&MUT);
+                if is_mutable {
+                    self.bump();
+                }
+
+                let value = self.store.insert_expression(expression);
+                *left = Expression::new(
+                    ExpressionKind::Ref(Ref{ id: None, is_mutable, value }), 
+                    self.span_combine(start_span),
+                );
+
+                return Ok(())
+            }
+            &POINTER => {
+                self.bump();
+                let mut expression = Expression::error();
+                swap(left, &mut expression);
+
+                let is_mutable = self.current_is(&MUT);
+                if is_mutable {
+                    self.bump();
+                }
+
+                let value = self.store.insert_expression(expression);
+                *left = Expression::new(
+                    ExpressionKind::Deref(Deref{ id: None, value }), 
+                    self.span_combine(start_span),
+                );
+
+                return Ok(())
+            }
+            &ROUND_OPEN => {
+                let mut value = Expression::error();
+                swap(left, &mut value);
+
+                let name = match value.node {
+                    ExpressionKind::Variable(VariableExpression { name, .. }) => name,
+                    _ => return Err(Fault::error("should be ident", Some(value.span))),
+                };
+
+                let arguments = self.parse_arguments()?;
+                let ty = self.type_from_ident(name, generics);
+                let ctor = Constructor {
+                    id: None,
+                    ty,
+                    arguments,
+                };
+                *left = Expression::new(
+                    ExpressionKind::Constructor(ctor),
+                    self.span_combine(start_span),
+                );
+
+                return Ok(())
+            }
+            _ => (),
+        };
 
         if self.current_is_any(&[SQUARE_OPEN, ARRAY]) {
             if !matches!(left.node, ExpressionKind::Variable(_)) {
@@ -173,7 +238,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     fn parse_field_access(&mut self, left: ExpressionId, ident: Ident) -> SoulResult<Expression> {
         match KeyWord::from_str(ident.as_str()) {
-            Some(KeyWord::Sizeof) => self.parse_sizeof(left, ident),
+            Some(KeyWord::Sizeof) => self.parse_sizeof(left),
             _ => Ok(Expression::new_field(self.store, left, ident)),
         }
     }

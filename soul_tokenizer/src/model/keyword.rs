@@ -47,6 +47,7 @@ define_str_enum!(
         As => "as", 0,
         New => "new", 0,
         Use => "use", 0,
+        Pass => "pass", 0,
         Copy => "copy", 0,
         Impl => "impl", 0,
         Crate => "crate", 0,

@@ -85,6 +85,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             KeyWord::As
             | KeyWord::Impl
             | KeyWord::Copy
+            | KeyWord::Pass
             | KeyWord::Crate
             | KeyWord::Typeof
             | KeyWord::Distinct

@@ -1,5 +1,5 @@
 use ast_model::{
-    expression::{Expression, ExpressionId, ExpressionKind, TypeOf, TypeofKind, VariableExpression},
+    expression::{Expression, ExpressionId, ExpressionKind, TypeOf, TypeofKind},
     operators::{BinaryOperator, BinaryOperatorKind, UnaryOperator, UnaryOperatorKind},
 };
 use soul_tokenizer::model::{Token, TokenKind, keyword::KeyWord};
@@ -216,23 +216,12 @@ impl<'a, 'f> Parser<'a, 'f> {
         left
     }
 
-    fn parse_sizeof(&mut self, left_id: ExpressionId, ident: Ident) -> SoulResult<Expression> {
-        let left = &self.store.expressions[left_id];
-        let left_span = left.span;
-        match &left.node {
-            ExpressionKind::Variable(VariableExpression { name, .. }) => {
-                let span = name.span();
-                let ty = self.type_from_ident(name.clone(), vec![]);
-                Ok(Expression::new(
-                    ExpressionKind::Sizeof(ty),
-                    span.combine(left_span),
-                ))
-            }
-            _ => Err(Fault::error(
-                "can only do '.sizeof' to types",
-                Some(ident.span()),
-            )),
-        }
+    fn parse_sizeof(&mut self, left_id: ExpressionId) -> SoulResult<Expression> {
+        let span = self.store.expressions[left_id].span;
+        Ok(Expression::new(
+            ExpressionKind::Sizeof(left_id),
+            self.span_combine(span),
+        ))
     }
 
     fn consume_expression_operator(&mut self, start_span: Span) -> SoulResult<ExpressionOperator> {

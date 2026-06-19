@@ -33,7 +33,7 @@ fn module_id() -> ModuleId {
 fn parse(source: &str) -> (Module, AstStore, CrateContext) {
     let mid = module_id();
     let stream = to_token_stream(source, mid).unwrap();
-    let mut store = AstStore::default();
+    let mut store = AstStore::new();
     let mut context = CrateContext::default();
     let info = ParseInfo {
         id: mid,

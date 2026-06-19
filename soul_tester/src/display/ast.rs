@@ -28,6 +28,7 @@ const ELSE_STR: &str = KeyWord::Else.as_str();
 const IMPL_STR: &str = KeyWord::Impl.as_str();
 const TYPE_STR: &str = KeyWord::Type.as_str();
 const ENUM_STR: &str = KeyWord::Enum.as_str();
+const PASS_STR: &str = KeyWord::Pass.as_str();
 const MATCH_STR: &str = KeyWord::Match.as_str();
 const TRAIT_STR: &str = KeyWord::Trait.as_str();
 const TYPEOF_STR: &str = KeyWord::Typeof.as_str();
@@ -522,8 +523,8 @@ impl<'a, W: Writer> Displayer<'a, W> {
             }
             ExpressionKind::Variable(variable) => self.write_str(variable.name.as_str()),
             ExpressionKind::Array(any_array) => self.write_any_array(any_array),
-            ExpressionKind::Sizeof(soul_type) => {
-                self.write_type(soul_type)?;
+            ExpressionKind::Sizeof(value) => {
+                self.write_expression(*value)?;
                 self.write_fmt(format_args!(".{SIZEOF_STR}"))
             }
             ExpressionKind::New(expression_id) => {
@@ -667,6 +668,10 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 }
                 Ok(())
             }
+            ExpressionKind::Pass(expression_id) => {
+                self.write_expression(*expression_id)?;
+                self.write_fmt(format_args!(".{PASS_STR}"))
+            },
         }
     }
 

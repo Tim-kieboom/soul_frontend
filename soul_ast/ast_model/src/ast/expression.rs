@@ -47,7 +47,10 @@ pub enum ExpressionKind {
     Array(AnyArray),
 
     /// `i32.sizeof // returns 4`
-    Sizeof(SoulType),
+    Sizeof(ExpressionId),
+
+    /// `i32.pass // returns is null or Err()`
+    Pass(ExpressionId),
 
     /// `new(expr)` — heap-allocate and initialize a single value, returns `*T`.
     New(ExpressionId),
