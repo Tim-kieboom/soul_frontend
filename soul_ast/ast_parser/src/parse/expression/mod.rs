@@ -1,40 +1,27 @@
-use std::mem::swap;
-
 use ast_model::{
-    block::{Block, BlockId},
-    expression::{
-        Array, Binding, Constructor, Expression, ExpressionId, ExpressionKind, MatchMethod,
-        MatchMethodArm, TypeOf, VariableExpression,
-    },
-    literal::Literal,
+    expression::{Expression, ExpressionId, ExpressionKind, TypeOf, VariableExpression},
     operators::{BinaryOperator, BinaryOperatorKind, UnaryOperator, UnaryOperatorKind},
-    statements::Statement,
 };
 use soul_tokenizer::model::{Token, TokenKind, keyword::KeyWord};
 use soul_utils::{
-    Ident, TypeModifier,
-    collections::try_result::{ToResult, TryError},
-    define_symbols,
+    Ident, define_symbols,
     error::SoulResult,
     fault::Fault,
-    literal::{Number, StringLiteral, TokenLiteral as tokenLiteral},
-    soul_error_internal,
     soul_names::{Operator, Symbol},
-    span::{Span, Spanned},
+    span::Span,
 };
 
 use crate::{
     parse::expression::precedence::Precedence,
     parser::Parser,
-    utils::{
-        ARRAY, ARROW_LEFT, COLON, CURLY_CLOSE, CURLY_OPEN, DOT, LAMBDA_ARROW, ROUND_CLOSE,
-        ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN,
-    },
+    utils::{ARRAY, DOT, ROUND_CLOSE, ROUND_OPEN, SQUARE_OPEN},
 };
 
+mod access;
 mod conditionals;
 mod group_expressions;
 mod precedence;
+mod primairy;
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_expression_id(
@@ -63,7 +50,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         end_tokens: &[TokenKind],
         primary: Option<Expression>,
     ) -> SoulResult<Expression> {
-        let start_span = self.token().span;
+        let start_span = self.current().span;
 
         let mut unary_operators = vec![];
         self.collect_unary_operators(&mut unary_operators, start_span);
@@ -87,7 +74,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 ));
             }
 
-            let token_kind = &self.token().kind;
+            let token_kind = &self.current().kind;
             match token_kind {
                 TokenKind::Symbol(Symbol::Dot) | TokenKind::Symbol(Symbol::SquareOpen) => (),
                 _ => break,
@@ -188,7 +175,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     fn current_precedence(&mut self) -> Precedence {
-        match &self.token().kind {
+        match &self.current().kind {
             TokenKind::Ident(ident) => {
                 if let Some(keyword) = KeyWord::from_str(ident) {
                     Precedence::new(keyword.precedence())
@@ -230,130 +217,6 @@ impl<'a, 'f> Parser<'a, 'f> {
         left
     }
 
-    fn access_index_expression(
-        &mut self,
-        left: &mut Expression,
-        start_span: Span,
-    ) -> SoulResult<()> {
-        let index =
-            self.parse_expression_id(&[SQUARE_CLOSE, TokenKind::EndLine, TokenKind::EndFile])?;
-        self.expect(&SQUARE_CLOSE)?;
-
-        let mut value = Expression::error();
-        swap(left, &mut value);
-
-        let id = self.store.insert_expression(value);
-        *left = Expression::new_index(id, index, self.span_combine(start_span));
-        Ok(())
-    }
-
-    fn access_this_expression(
-        &mut self,
-        left: &mut Expression,
-        start_span: Span,
-    ) -> SoulResult<()> {
-        let generics = if self.current_is(&ARROW_LEFT) {
-            self.parse_generic_define().merge_to_result()?
-        } else {
-            vec![]
-        };
-
-        if self.current_is(&ROUND_OPEN) {
-            let mut value = Expression::error();
-            swap(left, &mut value);
-
-            let name = match value.node {
-                ExpressionKind::Variable(VariableExpression { name, .. }) => name,
-                _ => return Err(Fault::error("should be ident", Some(value.span))),
-            };
-
-            let arguments = self.parse_arguments()?;
-            let ty = self.type_from_ident(name, generics);
-            let ctor = Constructor {
-                id: None,
-                ty,
-                arguments,
-            };
-            *left = Expression::new(
-                ExpressionKind::Constructor(ctor),
-                self.span_combine(start_span),
-            );
-
-            return Ok(());
-        }
-
-        if self.current_is_any(&[SQUARE_OPEN, ARRAY]) {
-            if !matches!(left.node, ExpressionKind::Variable(_)) {
-                return Err(Fault::error(
-                    format!("`{}` is invalid", Symbol::Dot.as_str()),
-                    Some(self.token().span),
-                ));
-            }
-
-            let mut value = Expression::error();
-            std::mem::swap(left, &mut value);
-            let name = match value.node {
-                ExpressionKind::Variable(variable) => variable.name,
-                _ => unreachable!(),
-            };
-            let collection_type = self.type_from_ident(name, generics);
-            *left = Expression::from_any_array(self.parse_array(Some(collection_type))?);
-            return Ok(());
-        }
-
-        let ident = self.try_bump_consume_ident()?;
-
-        if self.current_is(&CURLY_OPEN) {
-            let (binding, body) = self.parse_match_method_arm(start_span)?;
-
-            if let ExpressionKind::MatchMethod(ref mut method) = left.node {
-                method.arms.push(MatchMethodArm {
-                    variant_name: ident,
-                    binding,
-                    body,
-                });
-                left.span = self.span_combine(start_span);
-            } else {
-                let mut value = Expression::error();
-                swap(left, &mut value);
-
-                let method = MatchMethod {
-                    id: None,
-                    scrutinee: self.store.insert_expression(value),
-                    arms: vec![MatchMethodArm {
-                        variant_name: ident,
-                        binding,
-                        body,
-                    }],
-                };
-                *left = Expression::new(
-                    ExpressionKind::MatchMethod(method),
-                    self.span_combine(start_span),
-                );
-            }
-
-            return Ok(());
-        }
-
-        let mut value = Expression::error();
-        swap(left, &mut value);
-
-        let id = self.store.insert_expression(value);
-        *left = match self.try_parse_function_call_generic(start_span, Some(id), generics, &ident) {
-            Ok(call) => Expression::from_function_call(call),
-            Err(TryError::IsNotValue(_)) => self.parse_field_access(id, ident)?,
-            Err(TryError::IsErr(err)) => return Err(err),
-        };
-        Ok(())
-    }
-
-    fn parse_field_access(&mut self, left: ExpressionId, ident: Ident) -> SoulResult<Expression> {
-        match KeyWord::from_str(ident.as_str()) {
-            Some(KeyWord::Sizeof) => self.parse_sizeof(left, ident),
-            _ => Ok(Expression::new_field(self.store, left, ident)),
-        }
-    }
-
     fn parse_sizeof(&mut self, left_id: ExpressionId, ident: Ident) -> SoulResult<Expression> {
         let left = &self.store.expressions[left_id];
         let left_span = left.span;
@@ -373,45 +236,6 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
     }
 
-    fn parse_match_method_arm(
-        &mut self,
-        start_span: Span,
-    ) -> SoulResult<(Option<Binding>, BlockId)> {
-        let save_pos = self.tokens.current_position();
-
-        self.expect(&CURLY_OPEN)?;
-        self.skip_end_lines();
-
-        let Ok(ident) = self.try_bump_consume_ident() else {
-            self.goto(save_pos);
-            let body = self.parse_block(TypeModifier::Mut)?;
-            return Ok((None, body));
-        };
-
-        self.skip_end_lines();
-        if self.current_is(&LAMBDA_ARROW) {
-            self.bump();
-            let expression =
-                self.parse_expression_id(&[CURLY_CLOSE, TokenKind::EndLine, TokenKind::EndFile])?;
-            self.expect(&CURLY_CLOSE)?;
-            let statement = self
-                .store
-                .insert_statement(Statement::from_expression(self.store, expression, false));
-            let block = self.store.insert_block(Block {
-                modifier: TypeModifier::Mut,
-                statements: vec![statement],
-                scope_id: None,
-                node_id: None,
-                span: self.span_combine(start_span),
-            });
-            return Ok((Some(Binding::new(ident)), block));
-        }
-
-        self.goto(save_pos);
-        let body = self.parse_block(TypeModifier::Mut)?;
-        Ok((None, body))
-    }
-
     fn consume_expression_operator(&mut self, start_span: Span) -> SoulResult<ExpressionOperator> {
         fn get_invalid_error(token: &Token) -> SoulResult<ExpressionOperator> {
             Err(Fault::error(
@@ -420,12 +244,12 @@ impl<'a, 'f> Parser<'a, 'f> {
             ))
         }
 
-        match &self.token().kind {
+        match &self.current().kind {
             TokenKind::Ident(ident) => match KeyWord::from_str(ident.as_str()) {
                 Some(KeyWord::Typeof) => {
                     return self.parse_typeof_operator(start_span);
                 }
-                _ => get_invalid_error(self.token()),
+                _ => get_invalid_error(self.current()),
             },
             TokenKind::Keyword(KeyWord::Typeof) => {
                 return self.parse_typeof_operator(start_span);
@@ -444,14 +268,14 @@ impl<'a, 'f> Parser<'a, 'f> {
                     )));
                 }
 
-                get_invalid_error(self.token())
+                get_invalid_error(self.current())
             }
-            _ => get_invalid_error(self.token()),
+            _ => get_invalid_error(self.current()),
         }
     }
 
     fn try_consume_multi_binary(&mut self, binary: BinaryOperatorKind) -> BinaryOperatorKind {
-        let bin = self.try_multi_binary(self.token(), binary);
+        let bin = self.try_multi_binary(self.current(), binary);
         match bin {
             BinaryOperatorKind::Pow | BinaryOperatorKind::LogAnd => self.bump(),
             _ => (),
@@ -504,194 +328,6 @@ impl<'a, 'f> Parser<'a, 'f> {
         })
     }
 
-    fn parse_primary(&mut self, end_tokens: &[TokenKind]) -> SoulResult<Expression> {
-        let start_span = self.token().span;
-
-        let expression = match &self.token().kind {
-            &CURLY_OPEN => {
-                let block = self.parse_block(TypeModifier::Mut)?;
-                Expression::new_block(block, self.span_combine(start_span))
-            }
-            &SQUARE_OPEN => {
-                let array = self.parse_array(None)?;
-                Expression::from_any_array(array)
-            }
-            &ROUND_OPEN => {
-                self.bump();
-                let expr =
-                    self.parse_expression(&[ROUND_CLOSE, TokenKind::EndLine, TokenKind::EndFile])?;
-                self.expect(&ROUND_CLOSE)?;
-                expr
-            }
-            &ARRAY => {
-                self.bump();
-                let arr = Array {
-                    id: None,
-                    collection_type: None,
-                    element_type: None,
-                    values: vec![],
-                };
-                Expression::from_array(Spanned::new(arr, start_span))
-            }
-            TokenKind::Ident(_) => self.parse_primary_ident(end_tokens, start_span)?,
-            TokenKind::Keyword(keyword) => {
-                let kw = *keyword;
-                match self.parse_keyword_primary(start_span, kw)? {
-                    Some(expr) => expr,
-                    None => {
-                        return Err(Fault::error(
-                            format!("`{}` is invalid as start of expression", kw.as_str()),
-                            Some(start_span),
-                        ));
-                    }
-                }
-            }
-            TokenKind::Literal(tokenLiteral::Char(char)) => {
-                let char = *char;
-                self.bump();
-                Expression::new_literal(Literal::Char(char), start_span)
-            }
-            TokenKind::Literal(tokenLiteral::String(_)) => {
-                let token = self.bump_consume();
-                let string = match token.kind {
-                    TokenKind::Literal(tokenLiteral::String(val)) => val,
-                    _ => unreachable!(),
-                };
-                match string {
-                    StringLiteral::Cstr(string) => {
-                        Expression::new_literal(Literal::Cstr(string), token.span)
-                    }
-                    StringLiteral::Str(string) => {
-                        Expression::new_literal(Literal::Str(string), token.span)
-                    }
-                }
-            }
-            TokenKind::Literal(tokenLiteral::Number(num)) => {
-                let number = match num {
-                    Number::Int(val) => Literal::Int(*val as i128),
-                    Number::Uint(val) => Literal::Uint(*val as u128),
-                    Number::Float(val) => Literal::Float(*val),
-                };
-                self.bump();
-                Expression::new_literal(number, start_span)
-            }
-            other => {
-                return Err(Fault::error(
-                    format!("`{}` is invalid as start of expression", other.display(),),
-                    Some(start_span),
-                ));
-            }
-        };
-
-        Ok(expression)
-    }
-
-    fn parse_primary_ident(
-        &mut self,
-        end_tokens: &[TokenKind],
-        start_span: Span,
-    ) -> SoulResult<Expression> {
-        if let Some(primary) = self.parse_primary_keyword(start_span)? {
-            return Ok(primary);
-        }
-
-        let ident = self.try_bump_consume_ident()?;
-        let span = ident.span();
-
-        let peek = self.peek();
-        match &self.token().kind {
-            &COLON if peek.kind == SQUARE_OPEN => {
-                return Err(soul_error_internal!(
-                    "collectionType array not yet impl",
-                    Some(span)
-                ));
-            }
-            &ROUND_OPEN | &ARROW_LEFT => {
-                match self.try_parse_function_call(start_span, None, &ident) {
-                    Ok(val) => return Ok(val),
-                    Err(TryError::IsNotValue(_)) => (),
-                    Err(TryError::IsErr(err)) => return Err(err),
-                };
-
-                match self.parse_generic_define() {
-                    Ok(generics) => {
-                        return self
-                            .parse_struct_contructor(ident, generics, start_span)
-                            .map(Expression::from_struct_contructor);
-                    }
-                    Err(TryError::IsNotValue(_)) => (),
-                    Err(TryError::IsErr(err)) => return Err(err),
-                }
-            }
-            &CURLY_OPEN if !end_tokens.contains(&CURLY_OPEN) => {
-                return self
-                    .parse_struct_contructor(ident, vec![], start_span)
-                    .map(Expression::from_struct_contructor);
-            }
-            _ => (),
-        };
-
-        Ok(Expression::new_variable(ident))
-    }
-
-    fn parse_primary_keyword(&mut self, start_span: Span) -> SoulResult<Option<Expression>> {
-        let ident = self.try_token_as_ident_str()?;
-        match KeyWord::from_str(ident) {
-            Some(keyword) => self.parse_keyword_primary(start_span, keyword),
-            None => Ok(None),
-        }
-    }
-
-    fn parse_keyword_primary(
-        &mut self,
-        start_span: Span,
-        keyword: KeyWord,
-    ) -> SoulResult<Option<Expression>> {
-        Ok(Some(match keyword {
-            KeyWord::If => self.parse_if()?,
-            KeyWord::Match => self.parse_match()?,
-
-            KeyWord::True | KeyWord::False => {
-                let value = keyword == KeyWord::True;
-                self.bump();
-                Expression::new_literal(Literal::Bool(value), self.token().span)
-            }
-
-            KeyWord::Null => {
-                self.bump();
-                Expression::new(ExpressionKind::Null(None), self.token().span)
-            }
-
-            KeyWord::Undefined => {
-                self.bump();
-                Expression::new(ExpressionKind::Undefined(None), self.token().span)
-            }
-
-            KeyWord::Break | KeyWord::Return | KeyWord::Continue => {
-                return Err(Fault::error(
-                    format!("can not have {} in expression", keyword.as_str()),
-                    Some(self.token().span),
-                ));
-            }
-
-            KeyWord::New => {
-                self.bump();
-                match &self.token().kind {
-                    &ROUND_OPEN => self.parse_new_ptr(start_span)?,
-                    &SQUARE_OPEN | &ARRAY => self.parse_new_array(start_span)?,
-                    _ => {
-                        return Err(Fault::error(
-                            "expected '(' or ':[' after 'new'".to_string(),
-                            Some(self.token().span),
-                        ));
-                    }
-                }
-            }
-
-            _ => return Ok(None),
-        }))
-    }
-
     fn parse_new_ptr(&mut self, start_span: Span) -> SoulResult<Expression> {
         self.expect(&ROUND_OPEN)?;
         let inner =
@@ -722,7 +358,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     /// `@*expr` → outer `@` wraps the result of inner `*`; we apply them in
     /// reverse order below so the outermost prefix wraps the innermost.
     fn collect_unary_operators(&mut self, unarys: &mut Vec<(Span, UnaryKinds)>, start_span: Span) {
-        while let TokenKind::Symbol(symbol) = &self.token().kind {
+        while let TokenKind::Symbol(symbol) = &self.current().kind {
             match self.expect_unary_kind(start_span, *symbol) {
                 Ok(unary_kind) => {
                     self.bump();

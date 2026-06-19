@@ -54,7 +54,7 @@ impl<'a> Lexer<'a> {
         self.input.peek()
     }
 
-    pub(crate) fn next(&mut self) -> SoulResult<Token> {
+    pub fn next(&mut self) -> SoulResult<Token> {
         if self.current.is_none() {
             return Ok(Token::new(TokenKind::EndFile, self.span(self.line)));
         }

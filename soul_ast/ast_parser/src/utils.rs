@@ -12,18 +12,26 @@ use crate::parser::Parser;
 
 pub const AS_STR: &str = KeyWord::As.as_str();
 
+pub const IF: TokenKind = TokenKind::Keyword(KeyWord::If);
+pub const NOT: TokenKind = TokenKind::Symbol(Symbol::Not);
 pub const DOT: TokenKind = TokenKind::Symbol(Symbol::Dot);
 pub const REF: TokenKind = TokenKind::Symbol(Symbol::And);
 pub const FOR: TokenKind = TokenKind::Keyword(KeyWord::For);
 pub const STAR: TokenKind = TokenKind::Symbol(Symbol::Star);
 pub const PUB: TokenKind = TokenKind::Keyword(KeyWord::Pub);
 pub const MUT: TokenKind = TokenKind::Keyword(KeyWord::Mut);
+pub const ELSE: TokenKind = TokenKind::Keyword(KeyWord::Else);
+pub const IMPL: TokenKind = TokenKind::Keyword(KeyWord::Impl);
+pub const NULL: TokenKind = TokenKind::Keyword(KeyWord::Null);
 pub const COMMA: TokenKind = TokenKind::Symbol(Symbol::Comma);
 pub const ARRAY: TokenKind = TokenKind::Symbol(Symbol::Array);
 pub const COLON: TokenKind = TokenKind::Symbol(Symbol::Colon);
+pub const MATCH: TokenKind = TokenKind::Keyword(KeyWord::Match);
 pub const POINTER: TokenKind = TokenKind::Symbol(Symbol::Star);
 pub const ASSIGN: TokenKind = TokenKind::Symbol(Symbol::Assign);
 pub const CONST: TokenKind = TokenKind::Keyword(KeyWord::Const);
+pub const STRUCT: TokenKind = TokenKind::Keyword(KeyWord::Struct);
+pub const IMPORT: TokenKind = TokenKind::Keyword(KeyWord::Import);
 pub const LITERAL: TokenKind = TokenKind::Keyword(KeyWord::Literal);
 pub const OPTIONAL: TokenKind = TokenKind::Symbol(Symbol::Question);
 pub const CURLY_OPEN: TokenKind = TokenKind::Symbol(Symbol::CurlyOpen);
@@ -55,7 +63,7 @@ pub const STAMENT_SKIP_TOKENS: &[TokenKind] = &[
 
 impl<'a, 'f> Parser<'a, 'f> {
     /// Returns reference to current token.
-    pub(super) fn token(&self) -> &Token {
+    pub(super) fn current(&self) -> &Token {
         self.tokens.current()
     }
 
@@ -86,9 +94,14 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         #[cfg(debug_assertions)]
         {
-            self.debug.current = self.token().clone();
+            self.debug.current = self.current().clone();
             self.debug.current_index += 1;
         }
+    }
+
+    /// Peeks at next token without consuming.
+    pub(super) fn try_peek(&self) -> SoulResult<Token> {
+        self.tokens.peek()
     }
 
     /// Peeks at next token without consuming.
@@ -97,7 +110,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             Ok(val) => val,
             Err(err) => {
                 self.log_fault(err);
-                self.token().clone()
+                self.current().clone()
             }
         }
     }
@@ -114,7 +127,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         #[cfg(debug_assertions)]
         {
-            self.debug.current = self.token().clone();
+            self.debug.current = self.current().clone();
             self.debug.current_index += 1;
         }
 
@@ -127,18 +140,18 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         #[cfg(debug_assertions)]
         {
-            self.debug.current = self.token().clone();
+            self.debug.current = self.current().clone();
             self.debug.current_index = self.tokens.index();
         }
     }
 
     pub(crate) fn try_token_as_ident_str(&mut self) -> SoulResult<&str> {
-        let token = &self.token();
+        let token = &self.current();
         match &token.kind {
             TokenKind::Ident(val) => Ok(val),
             _ => Err(Fault::error(
-                format!("expected ident got `{}`", self.token().kind.display()),
-                Some(self.token().span),
+                format!("expected ident got `{}`", self.current().kind.display()),
+                Some(self.current().span),
             )),
         }
     }
@@ -167,9 +180,9 @@ impl<'a, 'f> Parser<'a, 'f> {
     pub(super) fn get_expect_ident_error(&self, string: &str) -> Fault {
         let message = format!(
             "expected: `{string}` but found: `{}`",
-            self.token().kind.display()
+            self.current().kind.display()
         );
-        Fault::error(message, Some(self.token().span))
+        Fault::error(message, Some(self.current().span))
     }
 
     /// Creates error for expected single token kind.
@@ -177,9 +190,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         let message = format!(
             "expected: `{}` but found: `{}`",
             expected.display(),
-            self.token().kind.display()
+            self.current().kind.display()
         );
-        Fault::error(message, Some(self.token().span))
+        Fault::error(message, Some(self.current().span))
     }
 
     /// Creates error for expected token from set.
@@ -199,14 +212,14 @@ impl<'a, 'f> Parser<'a, 'f> {
         let message = format!(
             "expected on of: [`{}`] but found: `{}`",
             tokens_string,
-            self.token().kind.display()
+            self.current().kind.display()
         );
 
-        Fault::error(message, Some(self.token().span))
+        Fault::error(message, Some(self.current().span))
     }
 
     pub(crate) fn try_bump_type_modiffier(&mut self) -> Option<TypeModifier> {
-        Some(match self.token().kind {
+        Some(match self.current().kind {
             TokenKind::Keyword(KeyWord::Mut) => {
                 self.bump();
                 TypeModifier::Mut
@@ -224,10 +237,10 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     pub(crate) fn try_bump_consume_ident(&mut self) -> SoulResult<Ident> {
-        if !matches!(self.token().kind, TokenKind::Ident(_)) {
+        if !matches!(self.current().kind, TokenKind::Ident(_)) {
             return Err(Fault::error(
-                format!("expected ident got {}", self.token().kind.display()),
-                Some(self.token().span),
+                format!("expected ident got {}", self.current().kind.display()),
+                Some(self.current().span),
             ));
         }
 
@@ -241,7 +254,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     pub(crate) fn current_is_keyword(&self, expected: KeyWord) -> bool {
-        match &self.token().kind {
+        match &self.current().kind {
             TokenKind::Ident(ident) => KeyWord::from_str(ident.as_str()) == Some(expected),
             TokenKind::Keyword(keyword) => *keyword == expected,
             _ => false,
@@ -254,26 +267,48 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     /// Checks if current token matches any of given kinds.
     pub(super) fn current_is_any(&self, kinds: &[TokenKind]) -> bool {
-        kinds.contains(&self.token().kind)
+        kinds.contains(&self.current().kind)
     }
 
     /// Checks if current token matches exact kind.
     pub(super) fn current_is(&self, kind: &TokenKind) -> bool {
-        &self.token().kind == kind
+        &self.current().kind == kind
+    }
+
+    /// Checks if next token matches exact kind.
+    pub(super) fn peek_is(&self, kind: &TokenKind) -> bool {
+        match self.try_peek() {
+            Ok(token) => &token.kind == kind,
+            Err(_) => return false,
+        }
+    }
+
+    pub(super) fn peek_is_multiple(&self, kinds: &[TokenKind]) -> bool {
+        let mut lexer = self.tokens.lexer().clone();
+        for kind in kinds {
+            let Ok(token) = lexer.next() else {
+                return false;
+            };
+
+            if &token.kind != kind {
+                return false;
+            }
+        }
+
+        true
     }
 
     /// Checks if current token matches exact kind (handles both `Ident` and `Keyword` tokens).
     pub(super) fn current_is_ident(&self, string: &str) -> bool {
-        match &self.token().kind {
+        match &self.current().kind {
             TokenKind::Ident(ident) => ident == string,
-            TokenKind::Keyword(keyword) => keyword.as_str() == string,
             _ => false,
         }
     }
 
     /// Combines start span with current token span.
     pub(super) fn span_combine(&self, start_span: Span) -> Span {
-        start_span.combine(self.token().span)
+        start_span.combine(self.current().span)
     }
 
     /// checked if node is end of line and ends with a semicolon

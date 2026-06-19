@@ -8,7 +8,7 @@ use soul_utils::{compiler_options::CompilerOptions, fault::Severity};
 const RAW_CONFIG: &str = include_str!("../config.json");
 pub const CONFIG: LazyLock<Configs> = LazyLock::new(parse_config);
 pub const COMPILER_OPTIONS: CompilerOptions = CompilerOptions {
-    fail_level: Severity::Error
+    fail_level: Severity::Error,
 };
 
 pub const PRINT_CONFIGS: PrintConfigs = PrintConfigs {

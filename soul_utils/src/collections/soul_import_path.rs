@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf, StripPrefixError};
+use std::path::{Path, PathBuf};
 
 /// A path to a Soul page/module.
 ///
@@ -48,16 +48,20 @@ impl SoulImportPath {
         this
     }
 
-    pub fn display(&self, root_dir: &Path) -> Result<String, StripPrefixError> {
+    pub fn display(&self, root_dir: &Path) -> String {
         let mut sb = String::new();
-        self.write_display(root_dir, &mut sb)?;
-        Ok(sb)
+        self.write_display(root_dir, &mut sb);
+        sb
     }
 
-    pub fn write_display(&self, root_dir: &Path, sb: &mut String) -> Result<(), StripPrefixError> {
+    pub fn write_display(&self, root_dir: &Path, sb: &mut String) {
         const SEPERATOR: &str = ".";
 
-        let relative = self.as_path().strip_prefix(root_dir)?;
+        let relative = self
+            .as_path()
+            .strip_prefix(root_dir)
+            .unwrap_or(self.as_path());
+
         sb.push_str("crate");
         for pat in relative {
             sb.push_str(SEPERATOR);
@@ -68,8 +72,6 @@ impl SoulImportPath {
 
             sb.push_str(text);
         }
-
-        Ok(())
     }
 
     pub fn to_string(self) -> String {

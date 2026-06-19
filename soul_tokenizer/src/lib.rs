@@ -62,8 +62,13 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Peeks at the next token without advancing the stream position.
-    pub fn peek(&mut self) -> SoulResult<Token> {
+    pub fn peek(&self) -> SoulResult<Token> {
         self.lexer.clone().next()
+    }
+
+    /// Peeks at the next token without advancing the stream position.
+    pub fn lexer(&self) -> &Lexer<'a> {
+        &self.lexer
     }
 
     /// Advances the stream to the next token, updating the current token.

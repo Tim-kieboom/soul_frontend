@@ -88,7 +88,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                     "`{}` at the end of a line can only be used for expressions at the end of a block", 
                     Symbol::SemiColon.as_str()
                 ),
-                Some(self.token().span),
+                Some(self.current().span),
             );
         }
 
@@ -97,7 +97,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     pub(crate) fn parse_block(&mut self, modifier: TypeModifier) -> SoulResult<BlockId> {
         const END_TOKENS: &[TokenKind] = &[CURLY_CLOSE, TokenKind::EndFile];
-        let start_span = self.token().span;
+        let start_span = self.current().span;
 
         let mut statements = vec![];
         self.expect(&CURLY_OPEN)?;
@@ -132,9 +132,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         let begin_position = self.tokens.current_position();
 
         self.skip_while_any(STAMENT_SKIP_TOKENS);
-        let start_span = self.token().span;
+        let start_span = self.current().span;
 
-        let possible_kind = match &self.token().kind {
+        let possible_kind = match &self.current().kind {
             TokenKind::Ident(_) => self.try_parse_from_ident(start_span),
             &CURLY_OPEN => {
                 let block = self.parse_block(TypeModifier::Mut)?;

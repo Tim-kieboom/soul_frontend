@@ -2,17 +2,20 @@ use ast_model::soul_type::{ArrayKind, ArrayType, ReferenceType, SoulType, Stub};
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord, types::Types};
 use soul_utils::{
     Ident,
-    collections::try_result::{ResultTryNotValue, TryErr, TryError, TryNotValue, TryOk, TryResult},
+    collections::try_result::{
+        ResultTryErr, ResultTryNotValue, ToResult, TryErr, TryError, TryNotValue, TryOk, TryResult,
+    },
+    error::SoulResult,
     fault::Fault,
     literal::{Number, TokenLiteral},
     soul_error_internal,
-    soul_names::{PrimitiveTypes, Symbol},
+    soul_names::PrimitiveTypes,
 };
 
 use crate::{
     parser::Parser,
     utils::{
-        ARRAY, ARROW_LEFT, CURLY_OPEN, OPTIONAL, POINTER, REF, ROUND_OPEN, SQUARE_CLOSE,
+        ARRAY, ARROW_LEFT, CURLY_OPEN, DOT, MUT, OPTIONAL, POINTER, REF, ROUND_OPEN, SQUARE_CLOSE,
         SQUARE_OPEN,
     },
 };
@@ -47,19 +50,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     fn parse_token_type(&mut self, type_val: Types) -> TryResult<SoulType, Fault> {
         self.bump();
         if type_val == Types::RawPtr {
-            let inner = if self.current_is(&ARROW_LEFT) {
-                let mut generics = self.parse_generic_define()?;
-                if generics.len() != 1 {
-                    return TryErr(Fault::error(
-                        "RawPtr expects exactly one generic type parameter, e.g. RawPtr<int>",
-                        Some(self.token().span),
-                    ));
-                }
-                Some(Box::new(generics.remove(0)))
-            } else {
-                None
-            };
-            return TryOk(SoulType::RawPtr(inner));
+            return self.parse_raw_ptr().try_err();
         }
 
         let prim = match type_val {
@@ -89,11 +80,31 @@ impl<'a, 'f> Parser<'a, 'f> {
             _ => {
                 return TryNotValue(Fault::error(
                     format!("type '{}' not yet supported", type_val.as_str()),
-                    Some(self.token().span),
+                    Some(self.current().span),
                 ));
             }
         };
         TryOk(SoulType::Primitive(prim))
+    }
+
+    fn parse_raw_ptr(&mut self) -> SoulResult<SoulType> {
+        let inner = if self.current_is(&ARROW_LEFT) {
+            let mut generics = self.parse_generic_define().merge_to_result()?;
+
+            if generics.len() != 1 {
+                return Err(Fault::error(
+                    "RawPtr expects exactly one generic type parameter, e.g. `RawPtr<int>`",
+                    Some(self.current().span),
+                ));
+            }
+
+            let inner = generics.pop().expect("just check if .len() is 1");
+            Some(Box::new(inner))
+        } else {
+            None
+        };
+
+        Ok(SoulType::RawPtr(inner))
     }
 
     fn inner_parse_type(&mut self) -> TryResult<SoulType, Fault> {
@@ -102,8 +113,8 @@ impl<'a, 'f> Parser<'a, 'f> {
             Ok(ty) => ty,
             Err(TryError::IsNotValue(_)) if !wrapper.is_empty() => {
                 return TryErr(Fault::error(
-                    "expected element type after array size, e.g. [64]char",
-                    Some(self.token().span),
+                    "expected element type after array size, e.g. `[64]char`",
+                    Some(self.current().span),
                 ));
             }
             Err(e) => return Err(e),
@@ -128,7 +139,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             };
         }
 
-        if self.current_is(&TokenKind::Symbol(Symbol::Dot)) {
+        if self.current_is(&DOT) {
             let save = self.tokens.current_position();
             self.bump();
             if let Ok(variant) = self.try_bump_consume_ident() {
@@ -146,7 +157,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     fn get_base_type(&mut self) -> TryResult<SoulType, Fault> {
         const NONE_STR: &str = PrimitiveTypes::None.as_str();
 
-        match &self.token().kind {
+        match &self.current().kind {
             TokenKind::Ident(val) if val == NONE_STR => {
                 self.bump();
                 return TryOk(SoulType::None);
@@ -157,13 +168,13 @@ impl<'a, 'f> Parser<'a, 'f> {
             &ROUND_OPEN => {
                 return TryNotValue(soul_error_internal!(
                     "tuple type not impl",
-                    Some(self.token().span)
+                    Some(self.current().span)
                 ));
             }
             &CURLY_OPEN => {
                 return TryNotValue(soul_error_internal!(
                     "nametuple type not impl",
-                    Some(self.token().span)
+                    Some(self.current().span)
                 ));
             }
             _ => (),
@@ -196,9 +207,9 @@ impl<'a, 'f> Parser<'a, 'f> {
     fn get_type_wrapper(&mut self) -> TryResult<Vec<ParseWrappers>, Fault> {
         let mut wrappers = vec![];
         loop {
-            let possible_wrap = match self.token().kind {
+            let possible_wrap = match self.current().kind {
                 REF => {
-                    if matches!(self.peek().kind, TokenKind::Keyword(KeyWord::Mut)) {
+                    if self.peek_is(&MUT) {
                         self.bump();
                         Some(ParseWrappers::MutRef)
                     } else {
@@ -206,7 +217,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                     }
                 }
                 POINTER => {
-                    if matches!(self.peek().kind, TokenKind::Keyword(KeyWord::Mut)) {
+                    if self.peek_is(&MUT) {
                         self.bump();
                         Some(ParseWrappers::MutPointer)
                     } else {
@@ -238,7 +249,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let kind = if self.current_is_ident("_") {
             ArrayKind::StackArrayWildcard
         } else {
-            match &self.token().kind {
+            match &self.current().kind {
                 &REF => {
                     if matches!(self.peek().kind, TokenKind::Keyword(KeyWord::Mut)) {
                         self.bump();
@@ -256,14 +267,14 @@ impl<'a, 'f> Parser<'a, 'f> {
                             "token '{}' not allowed in array typeWrapper",
                             other.display()
                         ),
-                        Some(self.token().span),
+                        Some(self.current().span),
                     ));
                 }
             }
         };
 
         self.bump();
-        if self.token().kind != SQUARE_CLOSE {
+        if self.current().kind != SQUARE_CLOSE {
             return TryNotValue(self.get_expect_error(&SQUARE_CLOSE));
         }
 

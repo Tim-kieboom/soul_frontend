@@ -1,28 +1,29 @@
 use crate::{
     parser::Parser,
     utils::{
-        COMMA, CURLY_CLOSE, CURLY_OPEN, DOT, ROUND_CLOSE, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN,
-        STAMENT_END_TOKENS,
+        COMMA, CURLY_CLOSE, CURLY_OPEN, DOT, ELSE, IF, LAMBDA_ARROW, MATCH, NOT, NULL, ROUND_CLOSE, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS
     },
 };
 use ast_model::{
-    block::Block,
+    block::{Block, BlockId},
     expression::{
         Binding, Expression, ExpressionKind, If, IfBranch, Match, MatchArm, MatchContructor,
         MatchPattern,
     },
+    statements::Statement,
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
-use soul_utils::{Ident, TypeModifier, error::SoulResult, fault::Fault, soul_names::Symbol};
+use soul_utils::{
+    Ident, TypeModifier, error::SoulResult, fault::Fault, soul_names::Symbol, span::Span,
+};
 
 const IF_STR: &str = KeyWord::If.as_str();
 const ELSE_STR: &str = KeyWord::Else.as_str();
-const MATCH_STR: &str = KeyWord::Match.as_str();
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_if(&mut self) -> SoulResult<Expression> {
-        let start_span = self.token().span;
-        self.expect_ident(IF_STR)?;
+        let start_span = self.current().span;
+        self.expect(&IF)?;
 
         let condition = self.parse_expression_id(&[CURLY_OPEN])?;
         let if_block = self.parse_block(TypeModifier::Mut)?;
@@ -42,8 +43,8 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     pub(crate) fn parse_match(&mut self) -> SoulResult<Expression> {
-        let start_span = self.token().span;
-        self.expect_ident(MATCH_STR)?;
+        let start_span = self.current().span;
+        self.expect(&MATCH)?;
 
         let scrutinee = self.parse_expression_id(&[CURLY_OPEN])?;
 
@@ -59,6 +60,45 @@ impl<'a, 'f> Parser<'a, 'f> {
         ))
     }
 
+    pub(crate) fn parse_match_method_arm(
+        &mut self,
+        start_span: Span,
+    ) -> SoulResult<(Option<Binding>, BlockId)> {
+        let save_pos = self.tokens.current_position();
+
+        self.expect(&CURLY_OPEN)?;
+        self.skip_end_lines();
+
+        let Ok(ident) = self.try_bump_consume_ident() else {
+            self.goto(save_pos);
+            let body = self.parse_block(TypeModifier::Mut)?;
+            return Ok((None, body));
+        };
+
+        self.skip_end_lines();
+        if self.current_is(&LAMBDA_ARROW) {
+            self.bump();
+            let expression =
+                self.parse_expression_id(&[CURLY_CLOSE, TokenKind::EndLine, TokenKind::EndFile])?;
+            self.expect(&CURLY_CLOSE)?;
+            let statement = self
+                .store
+                .insert_statement(Statement::from_expression(self.store, expression, false));
+            let block = self.store.insert_block(Block {
+                modifier: TypeModifier::Mut,
+                statements: vec![statement],
+                scope_id: None,
+                node_id: None,
+                span: self.span_combine(start_span),
+            });
+            return Ok((Some(Binding::new(ident)), block));
+        }
+
+        self.goto(save_pos);
+        let body = self.parse_block(TypeModifier::Mut)?;
+        Ok((None, body))
+    }
+
     fn parse_match_arms(&mut self) -> SoulResult<Vec<MatchArm>> {
         self.expect(&CURLY_OPEN)?;
         let mut arms = Vec::new();
@@ -70,13 +110,20 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            let pattern = self.parse_match_pattern()?;
+            let pattern = match self.parse_match_pattern() {
+                Ok(val) => val,
+                Err(err) => {
+                    self.log_fault(err);
+                    self.skip_match_pattern();
+                    continue
+                }
+            };
             self.skip_end_lines();
 
             if !self.current_is(&TokenKind::Symbol(Symbol::LambdaArrow)) {
                 return Err(Fault::error(
                     "expected '=>' in match arm",
-                    Some(self.token().span),
+                    Some(self.current().span),
                 ));
             }
             self.bump();
@@ -84,7 +131,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             let body = if self.current_is(&CURLY_OPEN) {
                 self.parse_block(TypeModifier::Mut)?
             } else {
-                let span = self.token().span;
+                let span = self.current().span;
                 let statement = self.parse_statement_id()?;
                 self.store.insert_block(Block {
                     span,
@@ -108,8 +155,8 @@ impl<'a, 'f> Parser<'a, 'f> {
             let position = self.tokens.current_position();
             self.skip_while_any(STAMENT_END_TOKENS);
 
-            let start_span = self.token().span;
-            if !self.current_is_ident(ELSE_STR) {
+            let start_span = self.current().span;
+            if !self.current_is(&ELSE) {
                 self.goto(position);
                 break Ok(());
             }
@@ -124,7 +171,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
 
             self.bump();
-            let else_kind = if self.current_is_ident(IF_STR) {
+            let else_kind = if self.current_is(&IF) {
                 self.bump();
                 let condition = self.parse_expression_id(&[CURLY_OPEN])?;
                 let block = self.parse_block(TypeModifier::Mut)?;
@@ -176,7 +223,33 @@ impl<'a, 'f> Parser<'a, 'f> {
             return Ok(MatchPattern::Wildcard);
         }
 
-        let ident_name = match &self.token().kind {
+        if self.current_is(&NOT) && self.peek_is(&NULL) {
+            let not_span = self.current().span;
+            self.bump();
+            let null_span = self.current().span;
+            self.bump();
+            
+            let type_name = Ident::new(KeyWord::Null.as_str(), null_span);
+            let variant_name = Ident::new(Symbol::Not.as_str(), not_span);
+            self.expect(&ROUND_OPEN)?;
+            let binding = Some(self.try_bump_consume_ident()?);
+            self.expect(&ROUND_CLOSE)?;
+            return Ok(MatchPattern::Constructor(MatchContructor {
+                binding,
+                type_name,
+                variant_name,
+                binding_id: None,
+            }))
+        } 
+        
+        if self.current_is(&NULL) {
+            let span = self.current().span;
+            self.bump();
+            let binding = Binding::from_text(KeyWord::Null.as_str(), span);
+            return Ok(MatchPattern::Binding(binding))
+        }
+
+        let ident_name = match &self.current().kind {
             TokenKind::Ident(name) => name.clone(),
             _ => {
                 let end_tokens = [TokenKind::Symbol(Symbol::LambdaArrow), COMMA, SQUARE_CLOSE];
@@ -204,28 +277,28 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         let saved = self.tokens.current_position();
-        let type_name_span = self.token().span;
+        let type_name_span = self.current().span;
         self.bump();
         if self.current_is(&DOT) {
             self.bump();
-            let variant_name = match &self.token().kind {
+            let variant_name = match &self.current().kind {
                 TokenKind::Ident(name) => name.clone(),
                 _ => {
                     return Err(Fault::error(
                         "expected variant name after '.' in constructor pattern",
-                        Some(self.token().span),
+                        Some(self.current().span),
                     ));
                 }
             };
-            let variant_span = self.token().span;
+            let variant_span = self.current().span;
             self.bump();
             let binding = if self.current_is(&ROUND_OPEN) {
                 self.bump();
                 let inner = if self.current_is_ident("_") {
                     self.bump();
                     None
-                } else if let TokenKind::Ident(bind_name) = &self.token().kind {
-                    let bind_span = self.token().span;
+                } else if let TokenKind::Ident(bind_name) = &self.current().kind {
+                    let bind_span = self.current().span;
                     let bind_name = bind_name.clone();
                     self.bump();
                     Some(Ident::new(bind_name, bind_span))
@@ -246,12 +319,36 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         self.goto(saved);
-        let bind_span = self.token().span;
+        let bind_span = self.current().span;
         self.bump();
         Ok(MatchPattern::Binding(Binding {
             id: None,
             ident: Ident::new(ident_name, bind_span),
         }))
+    }
+    
+    fn skip_match_pattern(&mut self) {
+        self.skip_till(&[CURLY_OPEN, TokenKind::EndLine]);
+        if !self.current_is(&CURLY_OPEN) {
+            return
+        }
+
+        let mut bracket_stack = 1;
+        loop {
+            self.bump();
+            if self.current_is(&CURLY_OPEN) {
+                bracket_stack += 1;
+            }
+
+            if self.current_is(&CURLY_CLOSE) {
+                bracket_stack -= 1;
+            }
+
+            if bracket_stack == 0 {
+                self.bump();
+                break
+            }
+        }
     }
 }
 

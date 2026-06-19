@@ -10,7 +10,7 @@ use crate::{
 use soul_utils::{
     CrateContext, FunctionId,
     collections::{vec_map::VecMap, vec_set::VecSet},
-    fault::{FaultCollector},
+    fault::FaultCollector,
     ids::IdGenerator,
     span::{ModuleId, Spanned},
 };

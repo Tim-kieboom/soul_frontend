@@ -12,12 +12,12 @@ use soul_utils::{
 
 use crate::{
     parser::Parser,
-    utils::{CONST, CURLY_CLOSE, CURLY_OPEN, LITERAL, MUT, PUB},
+    utils::{CONST, CURLY_CLOSE, CURLY_OPEN, IMPL, LITERAL, MUT, PUB},
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub(super) fn parse_use_block(&mut self) -> SoulResult<Statement> {
-        let start_span = self.token().span;
+        let start_span = self.current().span;
         self.expect(&TokenKind::Keyword(KeyWord::Use))?;
         let use_generics = self.parse_generic_declare()?.unwrap_or(vec![]);
 
@@ -28,14 +28,14 @@ impl<'a, 'f> Parser<'a, 'f> {
         let mut methodes = vec![];
         let mut statements = vec![];
         self.current.this_type = Some(method_type.clone());
-        match &self.token().kind {
+        match &self.current().kind {
             TokenKind::Keyword(KeyWord::Impl) => {
-                let impl_block = self.parse_impl_block(&method_type, self.token().span)?;
+                let impl_block = self.parse_impl_block(&method_type, self.current().span)?;
                 impls.push(impl_block);
             }
 
             &PUB | &MUT | &CONST | &LITERAL | TokenKind::Ident(_) => {
-                let methode = self.parse_use_method(&method_type, self.token().span)?;
+                let methode = self.parse_use_method(&method_type, self.current().span)?;
                 methodes.push(methode);
             }
             _ => (),
@@ -63,9 +63,9 @@ impl<'a, 'f> Parser<'a, 'f> {
             if self.current_is(&CURLY_CLOSE) {
                 break;
             }
-            let start_span = self.token().span;
+            let start_span = self.current().span;
 
-            if self.current_is(&TokenKind::Keyword(KeyWord::Impl)) {
+            if self.current_is(&IMPL) {
                 let impl_block = self.parse_impl_block(&method_type, start_span)?;
                 impls.push(impl_block);
                 continue;
@@ -132,7 +132,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         method_type: &SoulType,
         start_span: Span,
     ) -> SoulResult<ImplBlock> {
-        self.expect(&TokenKind::Keyword(KeyWord::Impl))?;
+        self.expect(&IMPL)?;
         let impl_trait = self.try_parse_type().merge_to_result()?;
 
         self.expect(&CURLY_OPEN)?;

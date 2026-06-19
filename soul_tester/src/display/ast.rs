@@ -12,7 +12,8 @@ use ast_model::{
     expression::{AnyArray, ExpressionId, ExpressionKind, ForCondition, IfBranch, MatchPattern},
     soul_type::{ArrayKind, Generic, SoulType},
     statements::{
-        Assignment, Enum, EnumVariant, ImplBlock, Import, ImportItem, ImportKind, Parameter, StatementId, StatementKind, Struct, Trait, TypeDef, UseBlock, Variable
+        Assignment, Enum, EnumVariant, ImplBlock, Import, ImportItem, ImportKind, Parameter,
+        StatementId, StatementKind, Struct, Trait, TypeDef, UseBlock, Variable,
     },
 };
 use soul_tokenizer::model::keyword::KeyWord;
@@ -282,7 +283,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
         self.push_depth();
         for path in &import.paths {
             self.write_depth()?;
-            self.write_str(&path.module.display(self.root_dir)?)?;
+            self.write_str(&path.module.display(self.root_dir))?;
             match &path.kind {
                 ImportKind::This => self.write_str("this")?,
                 ImportKind::Glob => self.write_char('*')?,

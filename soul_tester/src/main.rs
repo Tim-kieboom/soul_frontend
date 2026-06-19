@@ -1,5 +1,5 @@
 use crate::display::{ast::display_ast_tree, fault::display_fault, tokenizer::display_tokens};
-use anyhow::{Result};
+use anyhow::Result;
 use ast_model::AbstractSyntaxTree;
 use ast_run::to_ast;
 use soul_tokenizer::{TokenStream, to_token_stream};
@@ -46,7 +46,7 @@ fn frontend() -> Result<bool> {
             display_fault(fault, &file, &config::PRINT_CONFIGS, &mut stdout())?;
         }
 
-        return Ok(false)
+        return Ok(false);
     }
 
     Ok(true)

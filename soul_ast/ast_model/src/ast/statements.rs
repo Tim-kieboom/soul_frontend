@@ -90,7 +90,7 @@ pub enum EnumVariant {
     Union {
         name: Ident,
         parameters: Vec<Parameter>,
-    }
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

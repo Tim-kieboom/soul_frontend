@@ -19,6 +19,7 @@ use crate::{ParseInfo, parse_module};
 
 mod big_test;
 mod conditional;
+mod enums;
 mod functions;
 mod literals;
 mod structs;

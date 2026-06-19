@@ -1,3 +1,7 @@
+import (
+    std.fmt
+)
+
 pub sum(a: int, b: int): int {
     a + b
 }
@@ -39,6 +43,19 @@ use Map at(&this, i: uint): int {
 }
 
 main() {
+    option: ?int = null
+    // option.pass
+    num := option
+        .null{1}
+        .!null{val => val}
+
+    match option {
+        null => 1
+        !null(val) => {
+            val
+        }
+    }
+
     ch := 'a'
     cstring := c"cstr"
     mut obj := Map.(1)

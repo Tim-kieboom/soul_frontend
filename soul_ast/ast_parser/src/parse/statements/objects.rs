@@ -9,13 +9,13 @@ use soul_utils::{Ident, TypeModifier, collections::try_result::ToResult, error::
 
 use crate::{
     parser::Parser,
-    utils::{ASSIGN, COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, ROUND_CLOSE, ROUND_OPEN},
+    utils::{ASSIGN, COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, ROUND_CLOSE, ROUND_OPEN, STRUCT},
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub fn parse_struct(&mut self) -> SoulResult<Statement> {
-        let struct_span = self.token().span;
-        self.expect(&TokenKind::Keyword(KeyWord::Struct))?;
+        let struct_span = self.current().span;
+        self.expect(&STRUCT)?;
         let struct_name = self.try_bump_consume_ident()?;
         let generics = self.parse_generic_declare()?.unwrap_or(vec![]);
 
@@ -34,7 +34,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            let start_span = self.token().span;
+            let start_span = self.current().span;
             let statement = self.parse_statement()?;
             let is_public = statement.is_public();
             match statement.node {
@@ -86,7 +86,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     pub(crate) fn parse_enum(&mut self) -> SoulResult<Statement> {
-        let start_span = self.token().span;
+        let start_span = self.current().span;
         self.expect(&TokenKind::Keyword(KeyWord::Enum))?;
         let name = self.try_bump_consume_ident()?;
 
@@ -105,16 +105,15 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            let variant_span = self.token().span;
+            let variant_span = self.current().span;
             let ident = self.try_bump_consume_ident()?;
-            let variant = match &self.token().kind {
+            let variant = match &self.current().kind {
                 &ROUND_OPEN => self.parse_enum_union(ident)?,
                 &ASSIGN => self.parse_enum_assign(ident)?,
                 _ => EnumVariant::Normal(ident),
             };
 
             if let Some(last) = variants.last() {
-                
                 if discriminant(last) != discriminant(&variant) {
                     self.log_error(
                         format!(
@@ -124,9 +123,9 @@ impl<'a, 'f> Parser<'a, 'f> {
                         ),
                         Some(self.span_combine(variant_span)),
                     );
-                
+
                     self.skip_till(&[CURLY_CLOSE]);
-                    break
+                    break;
                 }
             }
 

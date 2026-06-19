@@ -7,22 +7,15 @@ use soul_utils::{
 
 use crate::{
     parser::Parser,
-    utils::{AS_STR, COMMA, CURLY_CLOSE, CURLY_OPEN, ROUND_CLOSE, ROUND_OPEN, STAR},
+    utils::{AS_STR, COMMA, CURLY_CLOSE, CURLY_OPEN, IMPORT, ROUND_CLOSE, ROUND_OPEN, STAR},
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub(super) fn parse_import(&mut self) -> SoulResult<Statement> {
-        let start_span = self.token().span;
+        let start_span = self.current().span;
 
         let mut paths = vec![];
-        match &self.token().kind {
-            TokenKind::Keyword(KeyWord::Import) => {
-                self.bump();
-            }
-            _ => {
-                self.expect_ident(KeyWord::Import.as_str())?;
-            }
-        }
+        self.expect(&IMPORT)?;
         if self.current_is(&ROUND_OPEN) {
             self.bump();
             self.skip_end_lines();
@@ -44,13 +37,13 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         Ok(Statement::new(
             StatementKind::Import(import),
-            start_span.combine(self.token().span),
+            start_span.combine(self.current().span),
         ))
     }
 
     fn inner_parse_import(&mut self) -> SoulResult<ImportPath> {
         let (path, lib_name) = self.parse_import_path()?;
-        let kind = match &self.token().kind {
+        let kind = match &self.current().kind {
             &CURLY_OPEN => {
                 self.bump();
                 let (this, this_alias, items) = self.parse_import_items()?;
@@ -104,7 +97,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 items.push(ImportItem::Normal(name))
             };
 
-            match self.token().kind {
+            match self.current().kind {
                 COMMA => {
                     self.bump();
                 }
@@ -114,7 +107,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 _ => {
                     return Err(Fault::error(
                         "expected ',' or '}' in import list".to_string(),
-                        Some(self.token().span),
+                        Some(self.current().span),
                     ));
                 }
             }
@@ -141,19 +134,22 @@ impl<'a, 'f> Parser<'a, 'f> {
             while self.current_is(&PREV_SUPER) {
                 self.bump();
                 if !current_path.pop() {
-                    return Err(Fault::error("could not pop path", Some(self.token().span)));
+                    return Err(Fault::error(
+                        "could not pop path",
+                        Some(self.current().span),
+                    ));
                 }
 
                 self.expect(&SEPARATOR)?;
             }
 
             path = SoulImportPath::from(current_path);
-        } else if let TokenKind::Ident(name) = &self.token().kind {
+        } else if let TokenKind::Ident(name) = &self.current().kind {
             lib_name = Some(name.clone());
         } else {
             self.log_error(
-                format!("'{}' not allowed in import", self.token().kind.display()),
-                Some(self.token().span),
+                format!("'{}' not allowed in import", self.current().kind.display()),
+                Some(self.current().span),
             );
         }
 

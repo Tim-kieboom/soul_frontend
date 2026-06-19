@@ -486,16 +486,20 @@ impl AnyArray {
 }
 impl Array {
     pub fn new(collection_type: Option<SoulType>) -> Self {
-        Self { 
-            id: None, 
-            values: vec![], 
-            element_type: None, 
-            collection_type 
+        Self {
+            id: None,
+            values: vec![],
+            element_type: None,
+            collection_type,
         }
     }
 }
 
 impl Binding {
+    pub fn from_text(text: impl Into<String>, span: Span) -> Self {
+        Self { ident: Ident::new(text, span), id: None }
+    }
+
     pub const fn new(ident: Ident) -> Self {
         Self { ident, id: None }
     }
