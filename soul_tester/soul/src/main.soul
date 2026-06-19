@@ -44,17 +44,37 @@ use Map at(&this, i: uint): int {
 
 main() {
     option: ?int = null
+    // size := option.sizeof
     // option.pass
     num := option
         .null{1}
-        .!null{val => val}
+        .!null{it}
 
-    match option {
+    num2 := match option {
         null => 1
-        !null(val) => {
-            val
-        }
+        !null(val) => val
     }
+    num3 := if option typeof !null(val) {
+        val
+    } else {
+        1
+    }
+
+    enum Union {
+        None,
+        Int{field: int, foo: bool},
+        Uint(int),
+    }
+
+    obj := Union.None
+    string := obj
+        .None{"none"}
+        .Int{"int"}
+        .Uint{"uint"}
+
+    num := obj
+        .Uint{it}
+        .else{return}
 
     ch := 'a'
     cstring := c"cstr"

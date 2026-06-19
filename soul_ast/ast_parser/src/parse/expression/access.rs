@@ -1,8 +1,7 @@
 use std::mem::swap;
 
 use ast_model::expression::{
-    Constructor, Expression, ExpressionId, ExpressionKind, MatchMethod, MatchMethodArm,
-    VariableExpression,
+    Constructor, Expression, ExpressionId, ExpressionKind, MatchMethod, MatchMethodArm, MatchMethodVariant, VariableExpression
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
@@ -16,7 +15,7 @@ use soul_utils::{
 
 use crate::{
     parser::Parser,
-    utils::{ARRAY, ARROW_LEFT, CURLY_OPEN, NOT, NULL, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN},
+    utils::{ARRAY, ARROW_LEFT, CURLY_OPEN, ELSE, NOT, NULL, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN},
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
@@ -115,22 +114,25 @@ impl<'a, 'f> Parser<'a, 'f> {
         left: &mut Expression,
         start_span: Span,
     ) -> SoulResult<bool> {
-        const NULL_STR: &str = KeyWord::Null.as_str();
 
         let ident = match &self.current().kind {
-            &NULL if self.peek_is(&CURLY_OPEN) => {
-                let span = self.current().span;
+            &ELSE if self.peek_is(&CURLY_OPEN) => {
                 self.bump();
-                Ident::new(NULL_STR, span)
+                MatchMethodVariant::Else
+            }
+            &NULL if self.peek_is(&CURLY_OPEN) => {
+                self.bump();
+                MatchMethodVariant::Null
             }
             &NOT if self.peek_is_multiple(&[NULL, CURLY_OPEN]) => {
-                let start = self.current().span;
                 self.bump();
-                let end = self.current().span;
                 self.bump();
-                Ident::new(format!("!{NULL_STR}"), start.combine(end))
+                MatchMethodVariant::NotNull
             }
-            TokenKind::Ident(_) if self.peek_is(&CURLY_OPEN) => self.try_bump_consume_ident()?,
+            TokenKind::Ident(_) if self.peek_is(&CURLY_OPEN) => {
+                let ident = self.try_bump_consume_ident()?;
+                MatchMethodVariant::Ident(ident)
+            }
             _ => return Ok(false),
         };
 
@@ -142,7 +144,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         if let ExpressionKind::MatchMethod(ref mut method) = left.node {
             method.arms.push(MatchMethodArm {
-                variant_name: ident,
+                variant: ident,
                 binding,
                 body,
             });
@@ -155,7 +157,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 id: None,
                 scrutinee: self.store.insert_expression(value),
                 arms: vec![MatchMethodArm {
-                    variant_name: ident,
+                    variant: ident,
                     binding,
                     body,
                 }],

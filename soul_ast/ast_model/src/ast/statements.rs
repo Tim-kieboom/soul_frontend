@@ -87,11 +87,21 @@ pub enum EnumVariant {
         name: Ident,
         value: ExpressionId,
     },
-    Union {
-        name: Ident,
-        parameters: Vec<Parameter>,
-    },
+    Union(UnionKind),
 }
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum UnionKind {
+    Tuple {
+        name: Ident,
+        parameters: Vec<SoulType>, 
+    },
+    NamedTuple {
+        name: Ident,
+        parameters: Vec<(Ident, SoulType)>, 
+    }
+}
+
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Struct {

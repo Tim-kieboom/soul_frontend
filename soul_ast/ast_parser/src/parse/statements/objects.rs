@@ -1,11 +1,9 @@
-use std::mem::discriminant;
-
 use ast_model::{
     soul_type::{SoulType, Stub},
-    statements::{Enum, EnumVariant, Field, Parameter, Statement, StatementKind, Struct},
+    statements::{Enum, EnumVariant, Field, Statement, StatementKind, Struct, UnionKind},
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
-use soul_utils::{Ident, TypeModifier, collections::try_result::ToResult, error::SoulResult};
+use soul_utils::{Ident, collections::try_result::ToResult, error::SoulResult};
 
 use crate::{
     parser::Parser,
@@ -105,29 +103,13 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            let variant_span = self.current().span;
             let ident = self.try_bump_consume_ident()?;
             let variant = match &self.current().kind {
-                &ROUND_OPEN => self.parse_enum_union(ident)?,
+                &ROUND_OPEN => self.parse_enum_tuple_union(ident)?,
+                &CURLY_OPEN => self.parse_enum_named_union(ident)?,
                 &ASSIGN => self.parse_enum_assign(ident)?,
                 _ => EnumVariant::Normal(ident),
             };
-
-            if let Some(last) = variants.last() {
-                if discriminant(last) != discriminant(&variant) {
-                    self.log_error(
-                        format!(
-                            "enum type {} and {} are not compatible",
-                            last.get_variant_name(),
-                            variant.get_variant_name()
-                        ),
-                        Some(self.span_combine(variant_span)),
-                    );
-
-                    self.skip_till(&[CURLY_CLOSE]);
-                    break;
-                }
-            }
 
             variants.push(variant);
             self.skip_end_lines();
@@ -158,7 +140,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok(EnumVariant::Assigned { name: ident, value })
     }
 
-    fn parse_enum_union(&mut self, ident: Ident) -> SoulResult<EnumVariant> {
+    fn parse_enum_tuple_union(&mut self, ident: Ident) -> SoulResult<EnumVariant> {
         let mut parameters = vec![];
         self.expect(&ROUND_OPEN)?;
         loop {
@@ -167,20 +149,8 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            let modifier = self
-                .try_bump_type_modiffier()
-                .unwrap_or(TypeModifier::Const);
-            let name = self.try_bump_consume_ident()?;
-
-            self.expect(&COLON)?;
             let ty = self.try_parse_type().merge_to_result()?;
-            parameters.push(Parameter {
-                ty,
-                name,
-                modifier,
-                node_id: None,
-                default: None,
-            });
+            parameters.push(ty);
 
             self.skip_end_lines();
             if !self.current_is(&COMMA) {
@@ -190,9 +160,34 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.bump();
         }
         self.expect(&ROUND_CLOSE)?;
-        Ok(EnumVariant::Union {
-            name: ident,
-            parameters,
-        })
+
+        Ok(EnumVariant::Union(UnionKind::Tuple { name: ident, parameters }))
+    }
+
+    fn parse_enum_named_union(&mut self, ident: Ident) -> SoulResult<EnumVariant> {
+        let mut parameters = vec![];
+        self.expect(&CURLY_OPEN)?;
+        loop {
+            self.skip_end_lines();
+            if self.current_is(&CURLY_CLOSE) {
+                break;
+            }
+
+            let name = self.try_bump_consume_ident()?;
+
+            self.expect(&COLON)?;
+            let ty = self.try_parse_type().merge_to_result()?;
+            parameters.push((name, ty));
+
+            self.skip_end_lines();
+            if !self.current_is(&COMMA) {
+                break;
+            }
+
+            self.bump();
+        }
+        self.expect(&CURLY_CLOSE)?;
+
+        Ok(EnumVariant::Union(UnionKind::NamedTuple { name: ident, parameters }))
     }
 }

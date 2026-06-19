@@ -39,7 +39,7 @@ pub enum FunctionKind {
     External(ExternalFunction),
 }
 
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AstStore {
     pub declares: DeclareStore,
     pub blocks: VecMap<BlockId, Block>,
@@ -78,7 +78,7 @@ impl AbstractSyntaxTree {
     pub fn new(root: ModuleId) -> Self {
         Self {
             root,
-            store: AstStore::default(),
+            store: AstStore::new(),
             context: CrateContext::default(),
             modules: AstModuleStore::default(),
         }
@@ -128,6 +128,20 @@ impl FunctionKind {
 }
 
 impl AstStore {
+    pub fn new() -> Self {
+        Self {
+            blocks: Default::default(),
+            declares: Default::default(),
+            functions: Default::default(),
+            statements: Default::default(),
+            expressions: Default::default(),
+            block_generator: Default::default(),
+            function_generator: Default::default(),
+            statement_generator: Default::default(),
+            expression_generator: Default::default(),
+        }
+    }
+    
     pub fn insert_block(&mut self, block: Block) -> BlockId {
         let id = self.block_generator.alloc();
         self.blocks.insert(id, block);

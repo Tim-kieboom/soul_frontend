@@ -92,10 +92,19 @@ pub enum ExpressionKind {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TypeOf {
     pub value: ExpressionId,
-    pub type_name: Ident,
-    pub variant_name: Ident,
+    pub kind: TypeofKind,
     pub binding: Option<Ident>,
     pub binding_id: Option<NodeId>,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum TypeofKind {
+    Null,
+    NotNull,
+    Union {
+        type_name: Ident,
+        variant_name: Ident,
+    },
 }
 
 /// A match-method expression `expr.Variant{body}` or chained `expr.V1{...}.V2{...}`.
@@ -112,11 +121,29 @@ pub struct MatchMethod {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct MatchMethodArm {
     /// The variant name (e.g., `Err` in `ok.Err{-1}`).
-    pub variant_name: Ident,
+    pub variant: MatchMethodVariant,
     /// Optional binding parameter (e.g., `msg` in `err.Err{msg => body}`).
     pub binding: Option<Binding>,
     /// The body block.
     pub body: BlockId,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum MatchMethodVariant {
+    Null,
+    Else,
+    NotNull,
+    Ident(Ident),
+}
+impl MatchMethodVariant {
+    pub fn as_str(&self) -> &str {
+        match self {
+            MatchMethodVariant::Null => "null",
+            MatchMethodVariant::Else => "else",
+            MatchMethodVariant::NotNull => "!null",
+            MatchMethodVariant::Ident(ident) => ident.as_str(),
+        }
+    }
 }
 
 /// An struct literal, e.g., `Struct{field: 1, field2: 2}`.
@@ -154,6 +181,10 @@ pub enum MatchPattern {
     Literal(Literal),
     /// A wildcard (default) pattern.
     Wildcard,
+    /// optional is null `null =>`.
+    Null,
+    /// optional is not null `!null(binding) => `.
+    NotNull(Binding),
     /// A binding pattern: `name` binds the scrutinee to a variable.
     Binding(Binding),
     /// An array pattern: [elem1, elem2, ...]

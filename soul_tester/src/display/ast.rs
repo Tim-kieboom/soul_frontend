@@ -9,19 +9,15 @@ use anyhow::Result;
 use ast_model::{
     AbstractSyntaxTree, AstStore, FunctionKind,
     block::BlockId,
-    expression::{AnyArray, ExpressionId, ExpressionKind, ForCondition, IfBranch, MatchPattern},
+    expression::{AnyArray, ExpressionId, ExpressionKind, ForCondition, IfBranch, MatchPattern, TypeofKind},
     soul_type::{ArrayKind, Generic, SoulType},
     statements::{
-        Assignment, Enum, EnumVariant, ImplBlock, Import, ImportItem, ImportKind, Parameter,
-        StatementId, StatementKind, Struct, Trait, TypeDef, UseBlock, Variable,
+        Assignment, Enum, EnumVariant, ImplBlock, Import, ImportItem, ImportKind, Parameter, StatementId, StatementKind, Struct, Trait, TypeDef, UnionKind, UseBlock, Variable
     },
 };
 use soul_tokenizer::model::keyword::KeyWord;
 use soul_utils::{
-    FunctionId, TypeModifier,
-    collections::vec_map::{VecMap, VecMapIndex},
-    soul_names::{PrimitiveTypes, Symbol},
-    span::ModuleId,
+    FunctionId, TypeModifier, collections::vec_map::{VecMap, VecMapIndex}, ids::IdAlloc, soul_names::{PrimitiveTypes, Symbol}, span::ModuleId
 };
 
 const IF_STR: &str = KeyWord::If.as_str();
@@ -336,7 +332,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
             self.write_type(ty)?;
         }
 
-        self.write_str(" {{\n")?;
+        self.write_str(" {\n")?;
         self.push_depth();
         let last_index = enum_.variants.len().saturating_sub(1);
         for (i, variant) in enum_.variants.iter().enumerate() {
@@ -347,9 +343,32 @@ impl<'a, W: Writer> Displayer<'a, W> {
                     self.write_fmt(format_args!("{} = ", name.as_str()))?;
                     self.write_expression(*value)?
                 }
-                EnumVariant::Union { name, parameters } => {
-                    self.write_fmt(format_args!("{}", name.as_str()))?;
-                    self.write_parameters(&parameters)?;
+                EnumVariant::Union(union) => match union {
+                    UnionKind::Tuple { name, parameters } => {
+                        self.write_str(name.as_str())?;
+                        self.write_char('(')?;
+                        let last_index = parameters.len().saturating_sub(1);
+                        for (i, ty) in parameters.iter().enumerate() {
+                            self.write_type(ty)?;
+                            if i != last_index {
+                                self.write_str(", ")?;
+                            }
+                        }
+                        self.write_char(')')?;
+                    }
+                    UnionKind::NamedTuple { name, parameters } => {
+                        self.write_str(name.as_str())?;
+                        self.write_char('{')?;
+                        let last_index = parameters.len().saturating_sub(1);
+                        for (i, (ident, ty)) in parameters.iter().enumerate() {
+                            self.write_fmt(format_args!("{}: ", ident.as_str()))?;
+                            self.write_type(ty)?;
+                            if i != last_index {
+                                self.write_str(", ")?;
+                            }
+                        }
+                        self.write_char('}')?;
+                    }
                 }
             }
             if i != last_index {
@@ -432,6 +451,11 @@ impl<'a, W: Writer> Displayer<'a, W> {
     }
 
     fn write_expression(&mut self, id: ExpressionId) -> Result<()> {
+        if id == ExpressionId::error() {
+            self.write_str("<error>")?;
+            return Ok(())
+        }
+        
         let expression = self.store.expressions.get_err(id)?;
         match &expression.node {
             ExpressionKind::Null(_) => self.write_str("null"),
@@ -516,11 +540,13 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 self.write_expression(unary.value)
             }
             ExpressionKind::Binary(binary) => {
+                self.write_char('(')?;
                 self.write_expression(binary.left)?;
                 self.write_char(' ')?;
                 self.write_str(binary.operator.value.as_str())?;
                 self.write_char(' ')?;
-                self.write_expression(binary.right)
+                self.write_expression(binary.right)?;
+                self.write_char(')')
             }
             ExpressionKind::Ref(ref_) => {
                 self.write_char('&')?;
@@ -564,15 +590,18 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 let last_index = match_methode.arms.len().saturating_sub(1);
                 for (i, arm) in match_methode.arms.iter().enumerate() {
                     self.write_depth()?;
-                    self.write_fmt(format_args!(".{}{{", arm.variant_name.as_str()))?;
+                    self.write_fmt(format_args!(".{}", arm.variant.as_str()))?;
                     if let Some(binding) = &arm.binding {
                         self.write_fmt(format_args!(
-                            "{} {LAMDA_ARROW_STR}",
+                            "{{{} {LAMDA_ARROW_STR} ",
                             binding.ident.as_str()
                         ))?;
+                        self.write_block(arm.body)?;
+                        self.write_char('}')?;
+                    } else {
+                        self.write_block(arm.body)?;
                     }
-                    self.write_block(arm.body)?;
-                    self.write_char('}')?;
+
                     if i != last_index {
                         self.write_endln()?;
                     }
@@ -604,11 +633,25 @@ impl<'a, W: Writer> Displayer<'a, W> {
             ExpressionKind::TypeOf(type_of) => {
                 self.write_expression(type_of.value)?;
                 self.write_fmt(format_args!(" {TYPEOF_STR} "))?;
-                self.write_fmt(format_args!(
-                    "{}.{}",
-                    type_of.type_name.as_str(),
-                    type_of.variant_name.as_str()
-                ))?;
+                match &type_of.kind {
+                    TypeofKind::Null => {
+                        self.write_str(KeyWord::Null.as_str())?
+                    }
+                    TypeofKind::NotNull => {
+                        self.write_fmt(format_args!(
+                            "{}{}", 
+                            Symbol::Not.as_str(), 
+                            KeyWord::Null.as_str(),
+                        ))?
+                    }
+                    TypeofKind::Union { type_name, variant_name } => {
+                        self.write_fmt(format_args!(
+                            "{}.{}", 
+                            type_name.as_str(), 
+                            variant_name.as_str(),
+                        ))?
+                    }
+                };
                 if let Some(binding) = &type_of.binding {
                     self.write_fmt(format_args!("({})", binding.as_str()))?;
                 }
@@ -629,6 +672,12 @@ impl<'a, W: Writer> Displayer<'a, W> {
 
     fn write_match_pattern(&mut self, arm: &MatchPattern) -> Result<()> {
         match &arm {
+            MatchPattern::Null => self.write_str(KeyWord::Null.as_str()),
+            MatchPattern::NotNull(binding) => {
+                self.write_fmt(format_args!("{}{}(", Symbol::Not.as_str(), KeyWord::Null.as_str()))?;
+                self.write_str(binding.ident.as_str())?;
+                self.write_char(')')
+            }
             MatchPattern::Wildcard => self.write_str("_"),
             MatchPattern::Literal(literal) => self.write_fmt(format_args!("{literal:?}")),
             MatchPattern::Binding(binding) => self.write_str(binding.ident.as_str()),
@@ -660,7 +709,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
     fn display_branch(&mut self, if_arm: &Option<Box<IfBranch>>) -> Result<()> {
         let mut current = if_arm.as_ref();
         while let Some(arm) = current {
-            self.write_depth()?;
+            self.write_char(' ')?;
             match arm.as_ref() {
                 IfBranch::If(elif) => {
                     self.write_fmt(format_args!("{ELSE_STR} {IF_STR} "))?;
@@ -849,7 +898,7 @@ trait GetErr<I, V> {
 impl<I: VecMapIndex + Debug + Clone, V> GetErr<I, V> for VecMap<I, V> {
     fn get_err(&self, index: I) -> Result<&V> {
         self.get(index.clone()).ok_or(anyhow::Error::msg(format!(
-            "{index:?} is not found; {}",
+            "{index:?} is not found; {}\n",
             Backtrace::force_capture().to_string()
         )))
     }

@@ -1,5 +1,5 @@
 use ast_model::{
-    expression::{Expression, ExpressionId, ExpressionKind, TypeOf, VariableExpression},
+    expression::{Expression, ExpressionId, ExpressionKind, TypeOf, TypeofKind, VariableExpression},
     operators::{BinaryOperator, BinaryOperatorKind, UnaryOperator, UnaryOperatorKind},
 };
 use soul_tokenizer::model::{Token, TokenKind, keyword::KeyWord};
@@ -14,7 +14,7 @@ use soul_utils::{
 use crate::{
     parse::expression::precedence::Precedence,
     parser::Parser,
-    utils::{ARRAY, DOT, ROUND_CLOSE, ROUND_OPEN, SQUARE_OPEN},
+    utils::{ARRAY, DOT, NOT, NULL, ROUND_CLOSE, ROUND_OPEN, SQUARE_OPEN},
 };
 
 mod access;
@@ -130,14 +130,13 @@ impl<'a, 'f> Parser<'a, 'f> {
                     );
                 }
                 ExpressionOperator::TypeOf {
-                    type_name,
-                    variant_name,
+                    kind,
                     binding,
                 } => {
+
                     let typeof_ = TypeOf {
-                        type_name,
+                        kind,
                         binding,
-                        variant_name,
                         binding_id: None,
                         value: self.store.insert_expression(left),
                     };
@@ -309,10 +308,34 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     fn parse_typeof_operator(&mut self, _start_span: Span) -> SoulResult<ExpressionOperator> {
-        self.bump();
-        let type_name = self.try_bump_consume_ident()?;
-        self.expect(&TokenKind::Symbol(Symbol::Dot))?;
-        let variant_name = self.try_bump_consume_ident()?;
+        self.expect(&TokenKind::Keyword(KeyWord::Typeof))?;
+
+        let kind = match &self.current().kind {
+            TokenKind::Ident(_) => {
+                let type_name = self.try_bump_consume_ident()?;
+                self.expect(&TokenKind::Symbol(Symbol::Dot))?;
+                let variant_name = self.try_bump_consume_ident()?;
+                TypeofKind::Union { type_name, variant_name }
+            }
+            &NULL => {
+                self.bump();
+                TypeofKind::Null
+            }
+            &NOT if self.peek_is(&NULL) => {
+                self.bump();
+                self.bump();
+                TypeofKind::NotNull
+            }
+            _ => return Err(Fault::error(
+                format!(
+                    "expected ident or `null` or `!null` but got {}", 
+                    self.current().kind.display(),
+                ),
+                Some(self.current().span)
+            )),
+        };
+        
+
         let binding = if self.current_is(&TokenKind::Symbol(Symbol::RoundOpen)) {
             self.bump();
             let name = self.try_bump_consume_ident()?;
@@ -321,9 +344,20 @@ impl<'a, 'f> Parser<'a, 'f> {
         } else {
             None
         };
+
+        if matches!(kind, TypeofKind::Null) && binding.is_some() {
+            
+            let span = binding.map(|b| b.span())
+                .unwrap_or(self.current().span);
+            
+            return Err(Fault::error(
+                format!("`{}` can not have binding", KeyWord::Null.as_str()),
+                Some(span)
+            ))
+        }
+
         Ok(ExpressionOperator::TypeOf {
-            type_name,
-            variant_name,
+            kind,
             binding,
         })
     }
@@ -428,8 +462,7 @@ enum ExpressionOperator {
     Binary(BinaryOperator),
     Access(AccessType),
     TypeOf {
-        type_name: Ident,
-        variant_name: Ident,
+        kind: TypeofKind,
         binding: Option<Ident>,
     },
 }

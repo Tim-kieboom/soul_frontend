@@ -7,14 +7,13 @@ use crate::{
 use ast_model::{
     block::{Block, BlockId},
     expression::{
-        Binding, Expression, ExpressionKind, If, IfBranch, Match, MatchArm, MatchContructor,
-        MatchPattern,
+        Binding, Expression, ExpressionId, ExpressionKind, If, IfBranch, Match, MatchArm, MatchContructor, MatchPattern
     },
     statements::Statement,
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
-    Ident, TypeModifier, error::SoulResult, fault::Fault, soul_names::Symbol, span::Span,
+    Ident, TypeModifier, error::SoulResult, fault::Fault, ids::IdAlloc, soul_names::Symbol, span::Span
 };
 
 const IF_STR: &str = KeyWord::If.as_str();
@@ -25,7 +24,14 @@ impl<'a, 'f> Parser<'a, 'f> {
         let start_span = self.current().span;
         self.expect(&IF)?;
 
-        let condition = self.parse_expression_id(&[CURLY_OPEN])?;
+        let condition = match self.parse_expression_id(&[CURLY_OPEN]) {
+            Ok(val) => val,
+            Err(err) => {
+                self.log_fault(err);
+                self.skip_till(&[CURLY_OPEN]);
+                ExpressionId::error()
+            }
+        };
         let if_block = self.parse_block(TypeModifier::Mut)?;
 
         let mut r#if = If {
@@ -224,29 +230,18 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         if self.current_is(&NOT) && self.peek_is(&NULL) {
-            let not_span = self.current().span;
             self.bump();
-            let null_span = self.current().span;
             self.bump();
             
-            let type_name = Ident::new(KeyWord::Null.as_str(), null_span);
-            let variant_name = Ident::new(Symbol::Not.as_str(), not_span);
             self.expect(&ROUND_OPEN)?;
-            let binding = Some(self.try_bump_consume_ident()?);
+            let binding = self.try_bump_consume_ident()?;
             self.expect(&ROUND_CLOSE)?;
-            return Ok(MatchPattern::Constructor(MatchContructor {
-                binding,
-                type_name,
-                variant_name,
-                binding_id: None,
-            }))
+            return Ok(MatchPattern::NotNull(Binding::new(binding)))
         } 
         
         if self.current_is(&NULL) {
-            let span = self.current().span;
             self.bump();
-            let binding = Binding::from_text(KeyWord::Null.as_str(), span);
-            return Ok(MatchPattern::Binding(binding))
+            return Ok(MatchPattern::Null)
         }
 
         let ident_name = match &self.current().kind {

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use ast_model::{
     AstStore, Module,
     expression::{
-        AnyArray, Constructor, ExpressionKind, FunctionCall, MatchMethod, StructConstructor, TypeOf,
+        AnyArray, Constructor, ExpressionKind, FunctionCall, MatchMethod, StructConstructor, TypeOf, TypeofKind,
     },
     literal::Literal,
     operators::BinaryOperatorKind,
@@ -944,8 +944,7 @@ fn typeof_expression() {
             let expr = &store.expressions[*expression];
             match &expr.node {
                 ExpressionKind::TypeOf(TypeOf {
-                    type_name,
-                    variant_name,
+                    kind: TypeofKind::Union { type_name, variant_name },
                     binding,
                     ..
                 }) => {
@@ -976,8 +975,7 @@ fn typeof_expression_with_binding() {
             let expr = &store.expressions[*expression];
             match &expr.node {
                 ExpressionKind::TypeOf(TypeOf {
-                    type_name,
-                    variant_name,
+                    kind: TypeofKind::Union { type_name, variant_name },
                     binding,
                     ..
                 }) => {
@@ -1019,7 +1017,7 @@ fn match_method_expression() {
                         _ => panic!("expected Variable scrutinee"),
                     }
                     assert_eq!(arms.len(), 1);
-                    assert_eq!(arms[0].variant_name.as_str(), "Variant");
+                    assert_eq!(arms[0].variant.as_str(), "Variant");
                 }
                 other => panic!("expected MatchMethod, got {:?}", other),
             }
