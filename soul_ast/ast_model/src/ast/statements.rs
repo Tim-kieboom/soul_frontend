@@ -82,7 +82,7 @@ pub struct Enum {
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum EnumVariant {
-    Ident(Ident),
+    Normal(Ident),
     Assigned {
         name: Ident,
         value: ExpressionId,
@@ -282,6 +282,16 @@ impl FunctionThisKind {
             FunctionThisKind::MutRef => Some("&mut this"),
             FunctionThisKind::Consume => Some("this"),
             FunctionThisKind::ConstRef => Some("&this"),
+        }
+    }
+}
+
+impl EnumVariant {
+    pub const fn get_variant_name(&self) -> &'static str {
+        match self {
+            EnumVariant::Normal(_) => "Normal",
+            EnumVariant::Union { .. } => "Union",
+            EnumVariant::Assigned { .. } => "Assign",
         }
     }
 }

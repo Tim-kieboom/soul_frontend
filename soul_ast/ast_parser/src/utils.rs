@@ -11,19 +11,20 @@ use soul_utils::{
 use crate::parser::Parser;
 
 pub const AS_STR: &str = KeyWord::As.as_str();
-pub const PUB: TokenKind = TokenKind::Keyword(KeyWord::Pub);
-pub const MUT: TokenKind = TokenKind::Keyword(KeyWord::Mut);
-pub const CONST: TokenKind = TokenKind::Keyword(KeyWord::Const);
-pub const LITERAL: TokenKind = TokenKind::Keyword(KeyWord::Literal);
+
 pub const DOT: TokenKind = TokenKind::Symbol(Symbol::Dot);
 pub const REF: TokenKind = TokenKind::Symbol(Symbol::And);
 pub const FOR: TokenKind = TokenKind::Keyword(KeyWord::For);
 pub const STAR: TokenKind = TokenKind::Symbol(Symbol::Star);
+pub const PUB: TokenKind = TokenKind::Keyword(KeyWord::Pub);
+pub const MUT: TokenKind = TokenKind::Keyword(KeyWord::Mut);
 pub const COMMA: TokenKind = TokenKind::Symbol(Symbol::Comma);
 pub const ARRAY: TokenKind = TokenKind::Symbol(Symbol::Array);
 pub const COLON: TokenKind = TokenKind::Symbol(Symbol::Colon);
-pub const ASSIGN: TokenKind = TokenKind::Symbol(Symbol::Assign);
 pub const POINTER: TokenKind = TokenKind::Symbol(Symbol::Star);
+pub const ASSIGN: TokenKind = TokenKind::Symbol(Symbol::Assign);
+pub const CONST: TokenKind = TokenKind::Keyword(KeyWord::Const);
+pub const LITERAL: TokenKind = TokenKind::Keyword(KeyWord::Literal);
 pub const OPTIONAL: TokenKind = TokenKind::Symbol(Symbol::Question);
 pub const CURLY_OPEN: TokenKind = TokenKind::Symbol(Symbol::CurlyOpen);
 pub const ROUND_OPEN: TokenKind = TokenKind::Symbol(Symbol::RoundOpen);
@@ -66,6 +67,13 @@ impl<'a, 'f> Parser<'a, 'f> {
     /// Skips tokens matching any of given kinds.
     pub(crate) fn skip_while_any(&mut self, kinds: &[TokenKind]) {
         while self.current_is_any(kinds) && !self.current_is(&TokenKind::EndFile) {
+            self.bump();
+        }
+    }
+
+    /// Skips tokens matching any of given kinds.
+    pub(crate) fn skip_till(&mut self, kinds: &[TokenKind]) {
+        while !self.current_is_any(kinds) && !self.current_is(&TokenKind::EndFile) {
             self.bump();
         }
     }

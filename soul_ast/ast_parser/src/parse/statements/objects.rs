@@ -1,3 +1,5 @@
+use std::mem::discriminant;
+
 use ast_model::{
     soul_type::{SoulType, Stub},
     statements::{Enum, EnumVariant, Field, Parameter, Statement, StatementKind, Struct},
@@ -31,7 +33,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             if self.current_is(&CURLY_CLOSE) {
                 break;
             }
-            
+
             let start_span = self.token().span;
             let statement = self.parse_statement()?;
             let is_public = statement.is_public();
@@ -103,17 +105,35 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
+            let variant_span = self.token().span;
             let ident = self.try_bump_consume_ident()?;
             let variant = match &self.token().kind {
                 &ROUND_OPEN => self.parse_enum_union(ident)?,
                 &ASSIGN => self.parse_enum_assign(ident)?,
-                _ => EnumVariant::Ident(ident),
+                _ => EnumVariant::Normal(ident),
             };
+
+            if let Some(last) = variants.last() {
+                
+                if discriminant(last) != discriminant(&variant) {
+                    self.log_error(
+                        format!(
+                            "enum type {} and {} are not compatible",
+                            last.get_variant_name(),
+                            variant.get_variant_name()
+                        ),
+                        Some(self.span_combine(variant_span)),
+                    );
+                
+                    self.skip_till(&[CURLY_CLOSE]);
+                    break
+                }
+            }
 
             variants.push(variant);
             self.skip_end_lines();
             if !self.current_is(&COMMA) {
-                break
+                break;
             }
 
             self.bump();
@@ -126,7 +146,10 @@ impl<'a, 'f> Parser<'a, 'f> {
             variants,
             impl_type,
         };
-        Ok(Statement::new(StatementKind::Enum(enum_), self.span_combine(start_span))) 
+        Ok(Statement::new(
+            StatementKind::Enum(enum_),
+            self.span_combine(start_span),
+        ))
     }
 
     fn parse_enum_assign(&mut self, ident: Ident) -> SoulResult<EnumVariant> {
@@ -137,7 +160,6 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     fn parse_enum_union(&mut self, ident: Ident) -> SoulResult<EnumVariant> {
-        
         let mut parameters = vec![];
         self.expect(&ROUND_OPEN)?;
         loop {
@@ -146,12 +168,14 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            let modifier = self.try_bump_type_modiffier().unwrap_or(TypeModifier::Const);
+            let modifier = self
+                .try_bump_type_modiffier()
+                .unwrap_or(TypeModifier::Const);
             let name = self.try_bump_consume_ident()?;
 
             self.expect(&COLON)?;
             let ty = self.try_parse_type().merge_to_result()?;
-            parameters.push(Parameter{
+            parameters.push(Parameter {
                 ty,
                 name,
                 modifier,
@@ -161,12 +185,15 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             self.skip_end_lines();
             if !self.current_is(&COMMA) {
-                break
+                break;
             }
 
             self.bump();
         }
         self.expect(&ROUND_CLOSE)?;
-        Ok(EnumVariant::Union { name: ident, parameters })
-    } 
+        Ok(EnumVariant::Union {
+            name: ident,
+            parameters,
+        })
+    }
 }

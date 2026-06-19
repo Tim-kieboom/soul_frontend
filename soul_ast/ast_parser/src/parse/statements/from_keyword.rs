@@ -1,5 +1,6 @@
 use ast_model::{
-    expression::{Expression, ExpressionKind}, statements::{Statement, StatementKind, TypeDef}
+    expression::{Expression, ExpressionKind},
+    statements::{Statement, StatementKind, TypeDef},
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{

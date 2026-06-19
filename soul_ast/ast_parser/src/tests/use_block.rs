@@ -273,8 +273,7 @@ fn use_block_inline_method() {
 
 #[test]
 fn use_block_mixed_methods_and_impl() {
-    let (module, store, context) =
-        parse("use Foo { bar() {}\nimpl Baz { qux() {} }\nbaz() {} }");
+    let (module, store, context) = parse("use Foo { bar() {}\nimpl Baz { qux() {} }\nbaz() {} }");
     assert_eq!(
         context.faults.count_severity(Severity::Error),
         0,

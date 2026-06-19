@@ -791,7 +791,10 @@ fn array_contructor_element_type_literal() {
                 ExpressionKind::Array(AnyArray::Array(arr)) => {
                     let collection = SoulType::Stub(Stub::new("List"));
                     assert_eq!(arr.collection_type, Some(collection));
-                    assert_eq!(arr.element_type, Some(SoulType::Primitive(PrimitiveTypes::Int)));
+                    assert_eq!(
+                        arr.element_type,
+                        Some(SoulType::Primitive(PrimitiveTypes::Int))
+                    );
                     assert_eq!(arr.values.len(), 3);
                 }
                 other => panic!("expected Array, got {:?}", other),
@@ -846,7 +849,10 @@ fn array_contructor_generic_literal() {
             match &expr.node {
                 ExpressionKind::Array(AnyArray::Array(arr)) => {
                     let int = SoulType::Primitive(PrimitiveTypes::Int);
-                    let collection = SoulType::Stub(Stub{name: "List".to_string(), generics: vec![int]});
+                    let collection = SoulType::Stub(Stub {
+                        name: "List".to_string(),
+                        generics: vec![int],
+                    });
                     assert_eq!(arr.collection_type, Some(collection));
                     assert_eq!(arr.element_type, None);
                     assert_eq!(arr.values.len(), 3);

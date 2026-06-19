@@ -341,7 +341,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
         for (i, variant) in enum_.variants.iter().enumerate() {
             self.write_depth()?;
             match variant {
-                EnumVariant::Ident(ident) => self.write_str(ident.as_str())?,
+                EnumVariant::Normal(ident) => self.write_str(ident.as_str())?,
                 EnumVariant::Assigned { name, value } => {
                     self.write_fmt(format_args!("{} = ", name.as_str()))?;
                     self.write_expression(*value)?

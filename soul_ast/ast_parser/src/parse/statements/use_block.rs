@@ -1,15 +1,25 @@
-use ast_model::{soul_type::SoulType, statements::{ImplBlock, Methode, Statement, StatementKind, UseBlock}};
+use ast_model::{
+    soul_type::SoulType,
+    statements::{ImplBlock, Methode, Statement, StatementKind, UseBlock},
+};
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
-use soul_utils::{TypeModifier, collections::try_result::{ResultMapNotValue, ToResult}, error::SoulResult, span::Span};
+use soul_utils::{
+    TypeModifier,
+    collections::try_result::{ResultMapNotValue, ToResult},
+    error::SoulResult,
+    span::Span,
+};
 
-use crate::{parser::Parser, utils::{CONST, CURLY_CLOSE, CURLY_OPEN, LITERAL, MUT, PUB}};
+use crate::{
+    parser::Parser,
+    utils::{CONST, CURLY_CLOSE, CURLY_OPEN, LITERAL, MUT, PUB},
+};
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub(super) fn parse_use_block(&mut self) -> SoulResult<Statement> {
         let start_span = self.token().span;
         self.expect(&TokenKind::Keyword(KeyWord::Use))?;
-        let use_generics = self.parse_generic_declare()?
-            .unwrap_or(vec![]);
+        let use_generics = self.parse_generic_declare()?.unwrap_or(vec![]);
 
         let method_type = self.try_parse_type().merge_to_result()?;
         let prev = self.current.this_type.take();
@@ -24,19 +34,14 @@ impl<'a, 'f> Parser<'a, 'f> {
                 impls.push(impl_block);
             }
 
-            &PUB
-            | &MUT
-            | &CONST
-            | &LITERAL
-            | TokenKind::Ident(_) => {
+            &PUB | &MUT | &CONST | &LITERAL | TokenKind::Ident(_) => {
                 let methode = self.parse_use_method(&method_type, self.token().span)?;
                 methodes.push(methode);
             }
-            _ =>(),
+            _ => (),
         }
 
         if !impls.is_empty() || !methodes.is_empty() {
-
             self.current.this_type = prev;
             let use_block = UseBlock {
                 ty: method_type,
@@ -47,9 +52,9 @@ impl<'a, 'f> Parser<'a, 'f> {
             };
 
             return Ok(Statement::new(
-                StatementKind::UseBlock(use_block), 
+                StatementKind::UseBlock(use_block),
                 self.span_combine(start_span),
-            ))
+            ));
         }
 
         self.expect(&CURLY_OPEN)?;
@@ -59,13 +64,13 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
             let start_span = self.token().span;
-            
+
             if self.current_is(&TokenKind::Keyword(KeyWord::Impl)) {
                 let impl_block = self.parse_impl_block(&method_type, start_span)?;
                 impls.push(impl_block);
                 continue;
             }
-            
+
             let statement = self.parse_statement()?;
             let is_public = statement.is_public();
             match statement.node {
@@ -74,10 +79,9 @@ impl<'a, 'f> Parser<'a, 'f> {
                         "Variable is not allowed in use block",
                         Some(self.span_combine(start_span)),
                     );
-                    continue
+                    continue;
                 }
-                
-                
+
                 StatementKind::Enum(_)
                 | StatementKind::Trait(_)
                 | StatementKind::Struct(_)
@@ -118,12 +122,16 @@ impl<'a, 'f> Parser<'a, 'f> {
         };
 
         Ok(Statement::new(
-            StatementKind::UseBlock(use_block), 
+            StatementKind::UseBlock(use_block),
             self.span_combine(start_span),
         ))
     }
 
-    fn parse_impl_block(&mut self, method_type: &SoulType, start_span: Span) -> SoulResult<ImplBlock> {
+    fn parse_impl_block(
+        &mut self,
+        method_type: &SoulType,
+        start_span: Span,
+    ) -> SoulResult<ImplBlock> {
         self.expect(&TokenKind::Keyword(KeyWord::Impl))?;
         let impl_trait = self.try_parse_type().merge_to_result()?;
 
@@ -141,16 +149,18 @@ impl<'a, 'f> Parser<'a, 'f> {
                 self.try_parse_function_declaration_id(start_span, modifier, method_type, name)
                     .map_try_not_value(|(_, err)| err)
                     .merge_to_result()?
-                    .value
+                    .value,
             );
         }
         self.expect(&CURLY_CLOSE)?;
 
-        Ok(ImplBlock { impl_trait, methods })
+        Ok(ImplBlock {
+            impl_trait,
+            methods,
+        })
     }
 
     fn parse_use_method(&mut self, ty: &SoulType, start_span: Span) -> SoulResult<Methode> {
-        
         let is_public = self.current_is(&PUB);
         if is_public {
             self.bump();

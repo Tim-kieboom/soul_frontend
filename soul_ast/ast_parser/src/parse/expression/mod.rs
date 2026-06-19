@@ -721,11 +721,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     /// (`.`, `()`, `[]`) bind tighter — which is standard language semantics.
     /// `@*expr` → outer `@` wraps the result of inner `*`; we apply them in
     /// reverse order below so the outermost prefix wraps the innermost.
-    fn collect_unary_operators(
-        &mut self,
-        unarys: &mut Vec<(Span, UnaryKinds)>,
-        start_span: Span,
-    ) {
+    fn collect_unary_operators(&mut self, unarys: &mut Vec<(Span, UnaryKinds)>, start_span: Span) {
         while let TokenKind::Symbol(symbol) = &self.token().kind {
             match self.expect_unary_kind(start_span, *symbol) {
                 Ok(unary_kind) => {
