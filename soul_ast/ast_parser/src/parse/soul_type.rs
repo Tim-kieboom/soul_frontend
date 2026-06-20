@@ -48,11 +48,12 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     fn parse_token_type(&mut self, type_val: Types) -> TryResult<SoulType, Fault> {
         self.bump();
-        if type_val == Types::RawPtr {
-            return self.parse_raw_ptr().try_err();
-        }
 
         let prim = match type_val {
+            Types::Res => return self.parse_res().try_err(),
+            Types::RawPtr => return self.parse_raw_ptr().try_err(),
+
+            Types::Any => return TryOk(SoulType::Any),
             Types::None => return TryOk(SoulType::None),
             Types::String => return TryOk(SoulType::String),
             Types::FormatString => return TryOk(SoulType::FormatString),
@@ -78,12 +79,6 @@ impl<'a, 'f> Parser<'a, 'f> {
             Types::CInt => PrimitiveTypes::CInt,
             Types::CUint => PrimitiveTypes::CUint,
             Types::CString => PrimitiveTypes::CStr,
-            _ => {
-                return TryNotValue(Fault::error(
-                    format!("type '{}' not yet supported", type_val.as_str()),
-                    Some(self.current().span),
-                ));
-            }
         };
         TryOk(SoulType::Primitive(prim))
     }
@@ -95,7 +90,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             if generics.len() != 1 {
                 return Err(Fault::error(
                     "RawPtr expects exactly one generic type parameter, e.g. `RawPtr<int>`",
-                    Some(self.current().span),
+                    Some(self.token().span),
                 ));
             }
 
@@ -108,6 +103,28 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok(SoulType::RawPtr(inner))
     }
 
+    fn parse_res(&mut self) -> SoulResult<SoulType> {
+        
+        if self.current_is(&ARROW_LEFT) {
+            let mut generics = self.parse_generic_define().merge_to_result()?;
+
+            if generics.len() > 2 {
+                return Err(Fault::error(
+                    "Res expects at most two generic type parameters, e.g. `Res<int, str>`",
+                    Some(self.token().span),
+                ));
+            }
+
+
+            let err = if generics.len() == 2 { Some(Box::new(generics.remove(1))) } else { None };
+            let ok = if generics.len() == 1 { Some(Box::new(generics.remove(0))) } else { None };
+
+            Ok(SoulType::Res { ok, err })
+        } else {
+            Ok(SoulType::Res { ok: None, err: None })
+        }
+    }
+
     fn inner_parse_type(&mut self) -> TryResult<SoulType, Fault> {
         let wrapper = self.get_type_wrapper()?;
         let mut ty = match self.get_base_type() {
@@ -115,7 +132,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             Err(TryError::IsNotValue(_)) if !wrapper.is_empty() => {
                 return TryErr(Fault::error(
                     "expected element type after array size, e.g. `[64]char`",
-                    Some(self.current().span),
+                    Some(self.token().span),
                 ));
             }
             Err(e) => return Err(e),
@@ -158,7 +175,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     fn get_base_type(&mut self) -> TryResult<SoulType, Fault> {
         const NONE_STR: &str = PrimitiveTypes::None.as_str();
 
-        match &self.current().kind {
+        match &self.token().kind {
             TokenKind::Ident(val) if val == NONE_STR => {
                 self.bump();
                 return TryOk(SoulType::None);
@@ -173,13 +190,13 @@ impl<'a, 'f> Parser<'a, 'f> {
             &ROUND_OPEN => {
                 return TryNotValue(soul_error_internal!(
                     "tuple type not impl",
-                    Some(self.current().span)
+                    Some(self.token().span)
                 ));
             }
             &CURLY_OPEN => {
                 return TryNotValue(soul_error_internal!(
                     "nametuple type not impl",
-                    Some(self.current().span)
+                    Some(self.token().span)
                 ));
             }
             _ => (),
@@ -212,7 +229,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     fn get_type_wrapper(&mut self) -> TryResult<Vec<ParseWrappers>, Fault> {
         let mut wrappers = vec![];
         loop {
-            let possible_wrap = match self.current().kind {
+            let possible_wrap = match self.token().kind {
                 REF => {
                     if self.peek_is(&MUT) {
                         self.bump();
@@ -254,7 +271,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let kind = if self.current_is_ident("_") {
             ArrayKind::StackArrayWildcard
         } else {
-            match &self.current().kind {
+            match &self.token().kind {
                 &REF => {
                     if matches!(self.peek().kind, TokenKind::Keyword(KeyWord::Mut)) {
                         self.bump();
@@ -272,14 +289,14 @@ impl<'a, 'f> Parser<'a, 'f> {
                             "token '{}' not allowed in array typeWrapper",
                             other.display()
                         ),
-                        Some(self.current().span),
+                        Some(self.token().span),
                     ));
                 }
             }
         };
 
         self.bump();
-        if self.current().kind != SQUARE_CLOSE {
+        if self.token().kind != SQUARE_CLOSE {
             return TryNotValue(self.get_expect_error(&SQUARE_CLOSE));
         }
 

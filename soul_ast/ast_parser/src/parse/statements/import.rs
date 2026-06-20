@@ -12,7 +12,7 @@ use crate::{
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub(super) fn parse_import(&mut self) -> SoulResult<Statement> {
-        let start_span = self.current().span;
+        let start_span = self.token().span;
 
         let mut paths = vec![];
         self.expect(&IMPORT)?;
@@ -37,13 +37,13 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         Ok(Statement::new(
             StatementKind::Import(import),
-            start_span.combine(self.current().span),
+            start_span.combine(self.token().span),
         ))
     }
 
     fn inner_parse_import(&mut self) -> SoulResult<ImportPath> {
         let (path, lib_name) = self.parse_import_path()?;
-        let kind = match &self.current().kind {
+        let kind = match &self.token().kind {
             &CURLY_OPEN => {
                 self.bump();
                 let (this, this_alias, items) = self.parse_import_items()?;
@@ -97,7 +97,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 items.push(ImportItem::Normal(name))
             };
 
-            match self.current().kind {
+            match self.token().kind {
                 COMMA => {
                     self.bump();
                 }
@@ -107,7 +107,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 _ => {
                     return Err(Fault::error(
                         "expected ',' or '}' in import list".to_string(),
-                        Some(self.current().span),
+                        Some(self.token().span),
                     ));
                 }
             }
@@ -136,7 +136,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 if !current_path.pop() {
                     return Err(Fault::error(
                         "could not pop path",
-                        Some(self.current().span),
+                        Some(self.token().span),
                     ));
                 }
 
@@ -144,12 +144,12 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
 
             path = SoulImportPath::from(current_path);
-        } else if let TokenKind::Ident(name) = &self.current().kind {
+        } else if let TokenKind::Ident(name) = &self.token().kind {
             lib_name = Some(name.clone());
         } else {
             self.log_error(
-                format!("'{}' not allowed in import", self.current().kind.display()),
-                Some(self.current().span),
+                format!("'{}' not allowed in import", self.token().kind.display()),
+                Some(self.token().span),
             );
         }
 

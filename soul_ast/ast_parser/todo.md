@@ -1,4 +1,1 @@
-- [ ] for `for {}`, `for condition {}`, `for i in 0..12 {}`
 - [ ] Res type `Res<int>`, `Ok(val)`, `Err(err)`
-- [ ] add format string `fstr` 
-- [ ] string formatter `s: str = f"hello{var}"`, `s: fstr = fstr"hello{var}"`

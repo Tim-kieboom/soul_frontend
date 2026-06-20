@@ -71,7 +71,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             KeyWord::Import => return self.parse_import().try_err(),
             KeyWord::Extern => return self.parse_extern_function().try_err(),
             KeyWord::Pub => {
-                let pub_span = self.current().span;
+                let pub_span = self.token().span;
 
                 self.bump();
                 let mut statement = self.parse_statement().try_err()?;
@@ -97,7 +97,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                         "keyword '{}' should be parsed in expression not statement",
                         keyword.as_str()
                     ),
-                    Some(self.current().span)
+                    Some(self.token().span)
                 ));
             }
 
@@ -110,7 +110,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     fn parse_type_statement(&mut self) -> SoulResult<Statement> {
-        let start_span = self.current().span;
+        let start_span = self.token().span;
         self.expect(&TokenKind::Keyword(KeyWord::Type))?;
 
         let new_type = self.try_parse_type().merge_to_result()?;

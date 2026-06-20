@@ -24,7 +24,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         &mut self,
         collection_type: Option<SoulType>,
     ) -> SoulResult<Spanned<AnyArray>> {
-        let start_span = self.current().span;
+        let start_span = self.token().span;
         if self.current_is(&ARRAY) {
             self.bump();
             return Ok(Spanned::new(
@@ -90,7 +90,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 if defaults {
                     return Err(Fault::error(
                         "StructConstructor already has '..'",
-                        Some(self.current().span),
+                        Some(self.token().span),
                     ));
                 }
 
@@ -100,7 +100,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 if !self.current_is(&CURLY_CLOSE) {
                     return Err(Fault::error(
                         "StructConstructor's '..' should only be used at the end expected '}'",
-                        Some(self.current().span),
+                        Some(self.token().span),
                     ));
                 }
                 break;

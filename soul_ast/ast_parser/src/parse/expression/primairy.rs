@@ -23,9 +23,9 @@ use crate::{
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub(super) fn parse_primary(&mut self, end_tokens: &[TokenKind]) -> SoulResult<Expression> {
-        let start_span = self.current().span;
+        let start_span = self.token().span;
 
-        let expression = match &self.current().kind {
+        let expression = match &self.token().kind {
             &CURLY_OPEN => {
                 let block = self.parse_block(TypeModifier::Mut)?;
                 Expression::new_block(block, self.span_combine(start_span))
@@ -128,12 +128,12 @@ impl<'a, 'f> Parser<'a, 'f> {
         let mut trailing = String::new();
 
         loop {
-            match &self.current().kind {
+            match &self.token().kind {
                 TokenKind::FStringPart(text) => {
                     let text = text.clone();
                     self.bump();
 
-                    match &self.current().kind {
+                    match &self.token().kind {
                         TokenKind::Symbol(Symbol::CurlyOpen) => {
                             self.bump();
                             let expr_id = self.parse_expression_id(&[
@@ -157,7 +157,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 _ => {
                     return Err(Fault::error(
                         "expected format string part or end of format string",
-                        Some(self.current().span),
+                        Some(self.token().span),
                     ));
                 }
             }
@@ -179,7 +179,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let span = ident.span();
 
         let peek = self.peek();
-        match &self.current().kind {
+        match &self.token().kind {
             &COLON if peek.kind == SQUARE_OPEN => {
                 return Err(soul_error_internal!(
                     "collectionType array not yet impl",
@@ -222,39 +222,40 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok(Some(match keyword {
             KeyWord::If => self.parse_if()?,
             KeyWord::Match => self.parse_match()?,
+            KeyWord::For => self.parse_for_loop().map(Expression::from_for)?,
 
             KeyWord::True | KeyWord::False => {
                 let value = keyword == KeyWord::True;
                 self.bump();
-                Expression::new_literal(Literal::Bool(value), self.current().span)
+                Expression::new_literal(Literal::Bool(value), self.token().span)
             }
 
             KeyWord::Null => {
                 self.bump();
-                Expression::new(ExpressionKind::Null(None), self.current().span)
+                Expression::new(ExpressionKind::Null(None), self.token().span)
             }
 
             KeyWord::Undefined => {
                 self.bump();
-                Expression::new(ExpressionKind::Undefined(None), self.current().span)
+                Expression::new(ExpressionKind::Undefined(None), self.token().span)
             }
 
             KeyWord::Break | KeyWord::Return | KeyWord::Continue => {
                 return Err(Fault::error(
                     format!("can not have {} in expression", keyword.as_str()),
-                    Some(self.current().span),
+                    Some(self.token().span),
                 ));
             }
 
             KeyWord::New => {
                 self.bump();
-                match &self.current().kind {
+                match &self.token().kind {
                     &ROUND_OPEN => self.parse_new_ptr(start_span)?,
                     &SQUARE_OPEN | &ARRAY => self.parse_new_array(start_span)?,
                     _ => {
                         return Err(Fault::error(
                             "expected '(' or ':[' after 'new'".to_string(),
-                            Some(self.current().span),
+                            Some(self.token().span),
                         ));
                     }
                 }

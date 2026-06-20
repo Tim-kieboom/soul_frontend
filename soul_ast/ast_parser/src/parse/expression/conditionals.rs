@@ -21,7 +21,7 @@ const ELSE_STR: &str = KeyWord::Else.as_str();
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_if(&mut self) -> SoulResult<Expression> {
-        let start_span = self.current().span;
+        let start_span = self.token().span;
         self.expect(&IF)?;
 
         let condition = match self.parse_expression_id(&[CURLY_OPEN]) {
@@ -49,7 +49,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     pub(crate) fn parse_match(&mut self) -> SoulResult<Expression> {
-        let start_span = self.current().span;
+        let start_span = self.token().span;
         self.expect(&MATCH)?;
 
         let scrutinee = self.parse_expression_id(&[CURLY_OPEN])?;
@@ -129,7 +129,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             if !self.current_is(&TokenKind::Symbol(Symbol::LambdaArrow)) {
                 return Err(Fault::error(
                     "expected '=>' in match arm",
-                    Some(self.current().span),
+                    Some(self.token().span),
                 ));
             }
             self.bump();
@@ -137,7 +137,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             let body = if self.current_is(&CURLY_OPEN) {
                 self.parse_block(TypeModifier::Mut)?
             } else {
-                let span = self.current().span;
+                let span = self.token().span;
                 let statement = self.parse_statement_id()?;
                 self.store.insert_block(Block {
                     span,
@@ -161,7 +161,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             let position = self.tokens.current_position();
             self.skip_while_any(STAMENT_END_TOKENS);
 
-            let start_span = self.current().span;
+            let start_span = self.token().span;
             if !self.current_is(&ELSE) {
                 self.goto(position);
                 break Ok(());
@@ -244,7 +244,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             return Ok(MatchPattern::Null)
         }
 
-        let ident_name = match &self.current().kind {
+        let ident_name = match &self.token().kind {
             TokenKind::Ident(name) => name.clone(),
             _ => {
                 let end_tokens = [TokenKind::Symbol(Symbol::LambdaArrow), COMMA, SQUARE_CLOSE];
@@ -272,28 +272,28 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         let saved = self.tokens.current_position();
-        let type_name_span = self.current().span;
+        let type_name_span = self.token().span;
         self.bump();
         if self.current_is(&DOT) {
             self.bump();
-            let variant_name = match &self.current().kind {
+            let variant_name = match &self.token().kind {
                 TokenKind::Ident(name) => name.clone(),
                 _ => {
                     return Err(Fault::error(
                         "expected variant name after '.' in constructor pattern",
-                        Some(self.current().span),
+                        Some(self.token().span),
                     ));
                 }
             };
-            let variant_span = self.current().span;
+            let variant_span = self.token().span;
             self.bump();
             let binding = if self.current_is(&ROUND_OPEN) {
                 self.bump();
                 let inner = if self.current_is_ident("_") {
                     self.bump();
                     None
-                } else if let TokenKind::Ident(bind_name) = &self.current().kind {
-                    let bind_span = self.current().span;
+                } else if let TokenKind::Ident(bind_name) = &self.token().kind {
+                    let bind_span = self.token().span;
                     let bind_name = bind_name.clone();
                     self.bump();
                     Some(Ident::new(bind_name, bind_span))
@@ -314,7 +314,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         self.goto(saved);
-        let bind_span = self.current().span;
+        let bind_span = self.token().span;
         self.bump();
         Ok(MatchPattern::Binding(Binding {
             id: None,

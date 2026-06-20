@@ -10,6 +10,8 @@ pub enum SoulType {
     String,
     /// `fstr`
     FormatString,
+    /// any type
+    Any,
     /// Primitive types like int, bool, float
     Primitive(PrimitiveTypes),
     /// array type: `[1]int` or `[&]int` or `[&mut]int` or `[]int`
@@ -21,6 +23,12 @@ pub enum SoulType {
     /// Raw pointer type: `RawPtr` or `RawPtr<int>`. Nullable by default.
     /// When no generic is specified, it's a void pointer (`RawPtr<none>`).
     RawPtr(Option<Box<SoulType>>),
+    /// result type: `Res` or `Res<int>` or Res<int, str>.
+    /// When no generic is specified, it's a void pointer with Error (`Res<none, Error>`).
+    Res {
+        ok: Option<Box<SoulType>>,
+        err: Option<Box<SoulType>>,
+    },
     /// Optional type: `?int`
     Optional(Box<SoulType>),
     /// unknown type

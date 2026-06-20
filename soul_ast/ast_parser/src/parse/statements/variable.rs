@@ -26,7 +26,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             false => None,
         };
 
-        let assign_type = match &self.current().kind {
+        let assign_type = match &self.token().kind {
             TokenKind::Symbol(kind) => AssignType::from_symbool(*kind),
             _ => None,
         };
@@ -57,7 +57,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                     "'{}' is not valid for variable declaration (can use ['=', ':='])",
                     assign_type.as_str()
                 ),
-                Some(self.current().span),
+                Some(self.token().span),
             ));
         }
 

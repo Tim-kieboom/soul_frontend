@@ -17,7 +17,7 @@ use crate::{
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub(super) fn parse_use_block(&mut self) -> SoulResult<Statement> {
-        let start_span = self.current().span;
+        let start_span = self.token().span;
         self.expect(&TokenKind::Keyword(KeyWord::Use))?;
         let use_generics = self.parse_generic_declare()?.unwrap_or(vec![]);
 
@@ -28,14 +28,14 @@ impl<'a, 'f> Parser<'a, 'f> {
         let mut methodes = vec![];
         let mut statements = vec![];
         self.current.this_type = Some(method_type.clone());
-        match &self.current().kind {
+        match &self.token().kind {
             TokenKind::Keyword(KeyWord::Impl) => {
-                let impl_block = self.parse_impl_block(&method_type, self.current().span)?;
+                let impl_block = self.parse_impl_block(&method_type, self.token().span)?;
                 impls.push(impl_block);
             }
 
             &PUB | &MUT | &CONST | &LITERAL | TokenKind::Ident(_) => {
-                let methode = self.parse_use_method(&method_type, self.current().span)?;
+                let methode = self.parse_use_method(&method_type, self.token().span)?;
                 methodes.push(methode);
             }
             _ => (),
@@ -63,7 +63,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             if self.current_is(&CURLY_CLOSE) {
                 break;
             }
-            let start_span = self.current().span;
+            let start_span = self.token().span;
 
             if self.current_is(&IMPL) {
                 let impl_block = self.parse_impl_block(&method_type, start_span)?;

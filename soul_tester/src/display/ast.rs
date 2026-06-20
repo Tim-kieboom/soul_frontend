@@ -624,7 +624,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
                         if let Some(index) = index {
                             self.write_fmt(format_args!("{}, ", index.as_str()))?;
                         }
-                        self.write_fmt(format_args!("{} {IN_FOR_LOOP_STR} ", element.as_str()))?;
+                        self.write_fmt(format_args!("{} {IN_FOR_LOOP_STR} ", element))?;
                         self.write_expression(*collection)?;
                     }
                 }
@@ -746,6 +746,25 @@ impl<'a, W: Writer> Displayer<'a, W> {
 
     fn write_type(&mut self, ty: &SoulType) -> Result<()> {
         match ty {
+            SoulType::Res { ok, err } => {
+                self.write_str("Res")?;
+                match (ok, err) {
+                    (Some(ok), Some(err)) => {
+                        self.write_char('<')?;
+                        self.write_type(ok)?;
+                        self.write_str(", ")?;
+                        self.write_type(err)?;
+                        self.write_char('>')?;
+                    }
+                    (Some(ok), None) => {
+                        self.write_char('<')?;
+                        self.write_type(ok)?;
+                        self.write_char('>')?;
+                    }
+                    _ => {}
+                }
+                Ok(())
+            }
             SoulType::None => self.write_str(PrimitiveTypes::None.as_str()),
             SoulType::Never => self.write_char('!'),
             SoulType::Primitive(primitive_types) => self.write_str(primitive_types.as_str()),
@@ -798,6 +817,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
             }
             SoulType::String => self.write_str(Types::String.as_str()),
             SoulType::FormatString => self.write_str(Types::FormatString.as_str()),
+            SoulType::Any => self.write_str(Types::Any.as_str()),
         }
     }
 

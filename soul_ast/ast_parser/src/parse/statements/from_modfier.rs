@@ -71,7 +71,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         if self.current_is_any(STAMENT_END_TOKENS) {
-            let span = self.current().span;
+            let span = self.token().span;
             let variable = Variable {
                 ty,
                 name,
@@ -82,7 +82,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             return TryOk(Statement::new_variable(variable, span));
         }
 
-        let assign = match &self.current().kind {
+        let assign = match &self.token().kind {
             TokenKind::Symbol(val) if AssignType::from_symbool(*val).is_some() => {
                 AssignType::from_symbool(*val).unwrap()
             }
@@ -129,16 +129,16 @@ impl<'a, 'f> Parser<'a, 'f> {
         Fault::error(
             format!(
                 "'{}' invalid after modifier (could be ['{{' or <name>])",
-                self.current().kind.display(),
+                self.token().kind.display(),
             ),
-            Some(self.current().span),
+            Some(self.token().span),
         )
     }
 
     fn invalid_assign(&self) -> Fault {
         Fault::error(
-            format!("'{}' should be '=' or ':='", self.current().kind.display(),),
-            Some(self.current().span),
+            format!("'{}' should be '=' or ':='", self.token().kind.display(),),
+            Some(self.token().span),
         )
     }
 }

@@ -37,7 +37,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let modifier = self.try_bump_type_modiffier();
         let ident = self.try_bump_consume_ident()?;
 
-        let span = self.current().span;
+        let span = self.token().span;
 
         let this_type = self.current.this_type.take().unwrap_or(SoulType::None);
         let result = self.try_parse_function_declaration_id(
@@ -94,12 +94,12 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             return TryErr(Fault::error(
                 "expected array literal after type constructor",
-                Some(self.current().span),
+                Some(self.token().span),
             ));
         }
 
         let call = self.try_parse_function_call_generic(start_span, callee, generics, name)?;
-        match &self.current().kind {
+        match &self.token().kind {
             &DOT | &DOUBLE_QUESTION | &SQUARE_OPEN => {
                 let primary = Expression::from_function_call(call);
                 self.parse_primary_expression(primary, STAMENT_END_TOKENS)
@@ -170,7 +170,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_extern_function(&mut self) -> SoulResult<Statement> {
         self.expect(&TokenKind::Keyword(KeyWord::Extern))?;
 
-        let string_literal = match &self.current().kind {
+        let string_literal = match &self.token().kind {
             TokenKind::Literal(TokenLiteral::String(val)) => val,
             other => {
                 return Err(Fault::error(
@@ -178,7 +178,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                         "expected string_literal of language name but got {}",
                         other.display()
                     ),
-                    Some(self.current().span),
+                    Some(self.token().span),
                 ));
             }
         };
@@ -191,7 +191,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                     format!(
                         "expected normal string_literal of language name but got {tag:?} string_literl",
                     ),
-                    Some(self.current().span),
+                    Some(self.token().span),
                 ));
             }
         };
@@ -201,7 +201,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             _ => {
                 return Err(Fault::error(
                     format!("language {normal_string} is not supported"),
-                    Some(self.current().span),
+                    Some(self.token().span),
                 ));
             }
         };
@@ -209,7 +209,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.bump();
         let name = self.try_bump_consume_ident()?;
 
-        let span = self.current().span;
+        let span = self.token().span;
         match self.try_parse_function_signature(
             span,
             TypeModifier::Mut,
@@ -321,9 +321,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         methode_type: &SoulType,
         modifier: TypeModifier,
     ) -> SoulResult<Spanned<Function>> {
-        let start_span = self.current().span;
+        let start_span = self.token().span;
         self.expect(&DOT)?;
-        match &self.current().kind {
+        match &self.token().kind {
             &ROUND_OPEN => {
                 let name = Ident::new(CONTRUCTOR_STR, start_span);
                 let mut methode = self
@@ -535,10 +535,10 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     fn inner_parameter_this(&mut self, kind: &mut FunctionThisKind) -> TryResult<Loop, Fault> {
-        let this = match &self.current().kind {
+        let this = match &self.token().kind {
             &REF => {
                 self.bump();
-                if matches!(self.current().kind, TokenKind::Keyword(KeyWord::Mut)) {
+                if matches!(self.token().kind, TokenKind::Keyword(KeyWord::Mut)) {
                     self.bump();
                     Some(FunctionThisKind::MutRef)
                 } else {
@@ -553,14 +553,14 @@ impl<'a, 'f> Parser<'a, 'f> {
             if *kind != FunctionThisKind::Static {
                 return TryErr(Fault::error(
                     "can not have more then one 'this' in methode",
-                    Some(self.current().span),
+                    Some(self.token().span),
                 ));
             }
 
             *kind = callee;
             self.expect_ident("this").try_not_value()?;
 
-            return match self.current().kind {
+            return match self.token().kind {
                 ROUND_CLOSE => TryOk(Loop::Break),
                 COMMA => {
                     self.bump();

@@ -47,7 +47,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         #[cfg(debug_assertions)]
         {
-            this.debug.current = this.current().clone();
+            this.debug.current = this.token().clone();
             this.debug.current_index = this.tokens.index();
         }
 
@@ -56,7 +56,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             statements,
             node_id: None,
             scope_id: None,
-            span: this.current().span,
+            span: this.token().span,
             modifier: TypeModifier::Mut,
         });
 

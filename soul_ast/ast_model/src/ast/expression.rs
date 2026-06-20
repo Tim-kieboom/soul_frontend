@@ -251,10 +251,33 @@ pub enum ForCondition {
     Loop,
     While(ExpressionId),
     Foreach {
-        element: Ident,
+        element: ForElementKind,
         index: Option<Ident>,
         collection: ExpressionId,
     },
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum ForElementKind {
+    Single((Option<NodeId>, Ident)),
+    Tuple(Vec<(Option<NodeId>, Ident)>),
+}
+
+impl std::fmt::Display for ForElementKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ForElementKind::Single((_, ident)) => write!(f, "{}", ident.as_str()),
+            ForElementKind::Tuple(idents) => {
+                for (i, (_, ident)) in idents.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", ident.as_str())?;
+                }
+                Ok(())
+            }
+        }
+    }
 }
 
 /// reference, e.g., `&x`(mut) or `@x`(const).
@@ -429,6 +452,11 @@ impl Expression {
             right,
         };
         Expression::new(ExpressionKind::Binary(binary), span)
+    }
+
+    pub fn from_for(array: Spanned<For>) -> Expression {
+        let Spanned { value, span } = array;
+        Expression::new(ExpressionKind::For(value), span)
     }
 
     pub fn from_array(array: Spanned<Array>) -> Expression {

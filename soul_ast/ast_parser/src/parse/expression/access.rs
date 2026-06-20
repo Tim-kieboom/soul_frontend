@@ -47,7 +47,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             vec![]
         };
 
-        match &self.current().kind {
+        match &self.token().kind {
             &PASS => {
                 self.bump();
                 let mut value = Expression::error();
@@ -140,7 +140,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             if !matches!(left.node, ExpressionKind::Variable(_)) {
                 return Err(Fault::error(
                     format!("`{}` is invalid", Symbol::Dot.as_str()),
-                    Some(self.current().span),
+                    Some(self.token().span),
                 ));
             }
 
@@ -180,7 +180,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         start_span: Span,
     ) -> SoulResult<bool> {
 
-        let ident = match &self.current().kind {
+        let ident = match &self.token().kind {
             &ELSE if self.peek_is(&CURLY_OPEN) => {
                 self.bump();
                 MatchMethodVariant::Else

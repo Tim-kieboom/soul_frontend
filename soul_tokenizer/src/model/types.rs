@@ -33,6 +33,7 @@ define_str_enum! {
         Char32 => "char32",
         Char64 => "char64",
 
+        Res => "Res",
         Any => "any",
         None => "none",
         RawPtr => "RawPtr",

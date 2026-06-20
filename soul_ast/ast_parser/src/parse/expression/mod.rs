@@ -18,6 +18,7 @@ use crate::{
 };
 
 mod access;
+mod for_loop;
 mod conditionals;
 mod group_expressions;
 mod precedence;
@@ -50,7 +51,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         end_tokens: &[TokenKind],
         primary: Option<Expression>,
     ) -> SoulResult<Expression> {
-        let start_span = self.current().span;
+        let start_span = self.token().span;
 
         let mut unary_operators = vec![];
         self.collect_unary_operators(&mut unary_operators, start_span);
@@ -74,7 +75,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 ));
             }
 
-            let token_kind = &self.current().kind;
+            let token_kind = &self.token().kind;
             match token_kind {
                 TokenKind::Symbol(Symbol::Dot) | TokenKind::Symbol(Symbol::SquareOpen) => (),
                 _ => break,
@@ -174,7 +175,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     fn current_precedence(&mut self) -> Precedence {
-        match &self.current().kind {
+        match &self.token().kind {
             TokenKind::Ident(ident) => {
                 if let Some(keyword) = KeyWord::from_str(ident) {
                     Precedence::new(keyword.precedence())
@@ -232,12 +233,12 @@ impl<'a, 'f> Parser<'a, 'f> {
             ))
         }
 
-        match &self.current().kind {
+        match &self.token().kind {
             TokenKind::Ident(ident) => match KeyWord::from_str(ident.as_str()) {
                 Some(KeyWord::Typeof) => {
                     return self.parse_typeof_operator(start_span);
                 }
-                _ => get_invalid_error(self.current()),
+                _ => get_invalid_error(self.token()),
             },
             TokenKind::Keyword(KeyWord::Typeof) => {
                 return self.parse_typeof_operator(start_span);
@@ -256,14 +257,14 @@ impl<'a, 'f> Parser<'a, 'f> {
                     )));
                 }
 
-                get_invalid_error(self.current())
+                get_invalid_error(self.token())
             }
-            _ => get_invalid_error(self.current()),
+            _ => get_invalid_error(self.token()),
         }
     }
 
     fn try_consume_multi_binary(&mut self, binary: BinaryOperatorKind) -> BinaryOperatorKind {
-        let bin = self.try_multi_binary(self.current(), binary);
+        let bin = self.try_multi_binary(self.token(), binary);
         match bin {
             BinaryOperatorKind::Pow | BinaryOperatorKind::LogAnd => self.bump(),
             _ => (),
@@ -299,7 +300,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     fn parse_typeof_operator(&mut self, _start_span: Span) -> SoulResult<ExpressionOperator> {
         self.expect(&TokenKind::Keyword(KeyWord::Typeof))?;
 
-        let kind = match &self.current().kind {
+        let kind = match &self.token().kind {
             TokenKind::Ident(_) => {
                 let type_name = self.try_bump_consume_ident()?;
                 self.expect(&TokenKind::Symbol(Symbol::Dot))?;
@@ -318,9 +319,9 @@ impl<'a, 'f> Parser<'a, 'f> {
             _ => return Err(Fault::error(
                 format!(
                     "expected ident or `null` or `!null` but got {}", 
-                    self.current().kind.display(),
+                    self.token().kind.display(),
                 ),
-                Some(self.current().span)
+                Some(self.token().span)
             )),
         };
         
@@ -337,7 +338,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         if matches!(kind, TypeofKind::Null) && binding.is_some() {
             
             let span = binding.map(|b| b.span())
-                .unwrap_or(self.current().span);
+                .unwrap_or(self.token().span);
             
             return Err(Fault::error(
                 format!("`{}` can not have binding", KeyWord::Null.as_str()),
@@ -381,7 +382,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     /// `@*expr` → outer `@` wraps the result of inner `*`; we apply them in
     /// reverse order below so the outermost prefix wraps the innermost.
     fn collect_unary_operators(&mut self, unarys: &mut Vec<(Span, UnaryKinds)>, start_span: Span) {
-        while let TokenKind::Symbol(symbol) = &self.current().kind {
+        while let TokenKind::Symbol(symbol) = &self.token().kind {
             match self.expect_unary_kind(start_span, *symbol) {
                 Ok(unary_kind) => {
                     self.bump();

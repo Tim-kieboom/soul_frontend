@@ -12,7 +12,7 @@ use crate::{
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub fn parse_struct(&mut self) -> SoulResult<Statement> {
-        let struct_span = self.current().span;
+        let struct_span = self.token().span;
         self.expect(&STRUCT)?;
         let struct_name = self.try_bump_consume_ident()?;
         let generics = self.parse_generic_declare()?.unwrap_or(vec![]);
@@ -32,7 +32,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            let start_span = self.current().span;
+            let start_span = self.token().span;
             let statement = self.parse_statement()?;
             let is_public = statement.is_public();
             match statement.node {
@@ -84,7 +84,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     pub(crate) fn parse_enum(&mut self) -> SoulResult<Statement> {
-        let start_span = self.current().span;
+        let start_span = self.token().span;
         self.expect(&TokenKind::Keyword(KeyWord::Enum))?;
         let name = self.try_bump_consume_ident()?;
 
@@ -104,7 +104,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
 
             let ident = self.try_bump_consume_ident()?;
-            let variant = match &self.current().kind {
+            let variant = match &self.token().kind {
                 &ROUND_OPEN => self.parse_enum_tuple_union(ident)?,
                 &CURLY_OPEN => self.parse_enum_named_union(ident)?,
                 &ASSIGN => self.parse_enum_assign(ident)?,

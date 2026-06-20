@@ -27,10 +27,11 @@ pub const COMMA: TokenKind = TokenKind::Symbol(Symbol::Comma);
 pub const ARRAY: TokenKind = TokenKind::Symbol(Symbol::Array);
 pub const COLON: TokenKind = TokenKind::Symbol(Symbol::Colon);
 pub const PASS: TokenKind = TokenKind::Keyword(KeyWord::Pass);
-pub const MATCH: TokenKind = TokenKind::Keyword(KeyWord::Match);
 pub const POINTER: TokenKind = TokenKind::Symbol(Symbol::Star);
+pub const MATCH: TokenKind = TokenKind::Keyword(KeyWord::Match);
 pub const ASSIGN: TokenKind = TokenKind::Symbol(Symbol::Assign);
 pub const CONST: TokenKind = TokenKind::Keyword(KeyWord::Const);
+pub const IN: TokenKind = TokenKind::Keyword(KeyWord::InForLoop);
 pub const STRUCT: TokenKind = TokenKind::Keyword(KeyWord::Struct);
 pub const IMPORT: TokenKind = TokenKind::Keyword(KeyWord::Import);
 pub const SIZEOF: TokenKind = TokenKind::Keyword(KeyWord::Sizeof);
@@ -65,7 +66,7 @@ pub const STAMENT_SKIP_TOKENS: &[TokenKind] = &[
 
 impl<'a, 'f> Parser<'a, 'f> {
     /// Returns reference to current token.
-    pub(super) fn current(&self) -> &Token {
+    pub(super) fn token(&self) -> &Token {
         self.tokens.current()
     }
 
@@ -96,7 +97,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         #[cfg(debug_assertions)]
         {
-            self.debug.current = self.current().clone();
+            self.debug.current = self.token().clone();
             self.debug.current_index += 1;
         }
     }
@@ -112,7 +113,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             Ok(val) => val,
             Err(err) => {
                 self.log_fault(err);
-                self.current().clone()
+                self.token().clone()
             }
         }
     }
@@ -129,7 +130,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         #[cfg(debug_assertions)]
         {
-            self.debug.current = self.current().clone();
+            self.debug.current = self.token().clone();
             self.debug.current_index += 1;
         }
 
@@ -142,18 +143,18 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         #[cfg(debug_assertions)]
         {
-            self.debug.current = self.current().clone();
+            self.debug.current = self.token().clone();
             self.debug.current_index = self.tokens.index();
         }
     }
 
     pub(crate) fn try_token_as_ident_str(&mut self) -> SoulResult<&str> {
-        let token = &self.current();
+        let token = &self.token();
         match &token.kind {
             TokenKind::Ident(val) => Ok(val),
             _ => Err(Fault::error(
-                format!("expected ident got `{}`", self.current().kind.display()),
-                Some(self.current().span),
+                format!("expected ident got `{}`", self.token().kind.display()),
+                Some(self.token().span),
             )),
         }
     }
@@ -182,9 +183,9 @@ impl<'a, 'f> Parser<'a, 'f> {
     pub(super) fn get_expect_ident_error(&self, string: &str) -> Fault {
         let message = format!(
             "expected: `{string}` but found: `{}`",
-            self.current().kind.display()
+            self.token().kind.display()
         );
-        Fault::error(message, Some(self.current().span))
+        Fault::error(message, Some(self.token().span))
     }
 
     /// Creates error for expected single token kind.
@@ -192,9 +193,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         let message = format!(
             "expected: `{}` but found: `{}`",
             expected.display(),
-            self.current().kind.display()
+            self.token().kind.display()
         );
-        Fault::error(message, Some(self.current().span))
+        Fault::error(message, Some(self.token().span))
     }
 
     /// Creates error for expected token from set.
@@ -214,14 +215,14 @@ impl<'a, 'f> Parser<'a, 'f> {
         let message = format!(
             "expected on of: [`{}`] but found: `{}`",
             tokens_string,
-            self.current().kind.display()
+            self.token().kind.display()
         );
 
-        Fault::error(message, Some(self.current().span))
+        Fault::error(message, Some(self.token().span))
     }
 
     pub(crate) fn try_bump_type_modiffier(&mut self) -> Option<TypeModifier> {
-        Some(match self.current().kind {
+        Some(match self.token().kind {
             TokenKind::Keyword(KeyWord::Mut) => {
                 self.bump();
                 TypeModifier::Mut
@@ -239,10 +240,10 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     pub(crate) fn try_bump_consume_ident(&mut self) -> SoulResult<Ident> {
-        if !matches!(self.current().kind, TokenKind::Ident(_)) {
+        if !matches!(self.token().kind, TokenKind::Ident(_)) {
             return Err(Fault::error(
-                format!("expected ident got {}", self.current().kind.display()),
-                Some(self.current().span),
+                format!("expected ident got {}", self.token().kind.display()),
+                Some(self.token().span),
             ));
         }
 
@@ -256,7 +257,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     pub(crate) fn current_is_keyword(&self, expected: KeyWord) -> bool {
-        match &self.current().kind {
+        match &self.token().kind {
             TokenKind::Ident(ident) => KeyWord::from_str(ident.as_str()) == Some(expected),
             TokenKind::Keyword(keyword) => *keyword == expected,
             _ => false,
@@ -269,12 +270,12 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     /// Checks if current token matches any of given kinds.
     pub(super) fn current_is_any(&self, kinds: &[TokenKind]) -> bool {
-        kinds.contains(&self.current().kind)
+        kinds.contains(&self.token().kind)
     }
 
     /// Checks if current token matches exact kind.
     pub(super) fn current_is(&self, kind: &TokenKind) -> bool {
-        &self.current().kind == kind
+        &self.token().kind == kind
     }
 
     /// Checks if next token matches exact kind.
@@ -302,7 +303,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     /// Checks if current token matches exact kind (handles both `Ident` and `Keyword` tokens).
     pub(super) fn current_is_ident(&self, string: &str) -> bool {
-        match &self.current().kind {
+        match &self.token().kind {
             TokenKind::Ident(ident) => ident == string,
             _ => false,
         }
@@ -310,7 +311,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     /// Combines start span with current token span.
     pub(super) fn span_combine(&self, start_span: Span) -> Span {
-        start_span.combine(self.current().span)
+        start_span.combine(self.token().span)
     }
 
     /// checked if node is end of line and ends with a semicolon
