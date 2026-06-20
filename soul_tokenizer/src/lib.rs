@@ -66,6 +66,14 @@ impl<'a> TokenStream<'a> {
         self.lexer.clone().next()
     }
 
+    pub fn set_fstr_mode(&mut self, active: bool) {
+        self.lexer.in_fstr = active;
+    }
+
+    pub fn fstr_mode(&self) -> bool {
+        self.lexer.in_fstr
+    }
+
     /// Peeks at the next token without advancing the stream position.
     pub fn lexer(&self) -> &Lexer<'a> {
         &self.lexer

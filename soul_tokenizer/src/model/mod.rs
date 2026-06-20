@@ -6,6 +6,9 @@ use soul_utils::{literal::TokenLiteral, soul_names::Symbol, span::Span};
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum TokenKind {
+    StringFormat(StringFormatTag),
+    FStringPart(String),
+    FStringEnd,
     Literal(TokenLiteral),
     Keyword(KeyWord),
     Symbol(Symbol),
@@ -13,6 +16,22 @@ pub enum TokenKind {
     Types(Types),
     EndLine,
     EndFile,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum StringFormatTag {
+    /// format to string
+    F,
+    /// get format string
+    Fstr,
+}
+impl StringFormatTag {
+    pub const fn as_str(&self) -> &str {
+        match self {
+            StringFormatTag::F => "f",
+            StringFormatTag::Fstr => "fstr",
+        }
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -48,6 +67,15 @@ impl TokenKind {
             TokenKind::Types(types) => sb.push_str(types.as_str()),
             TokenKind::Symbol(symbol) => sb.push_str(symbol.as_str()),
             TokenKind::Keyword(key_word) => sb.push_str(key_word.as_str()),
+            TokenKind::StringFormat(fmt) => {
+                sb.push_str(fmt.as_str());
+            }
+            TokenKind::FStringPart(text) => {
+                write!(sb, "fstring_part({text:?})")?;
+            }
+            TokenKind::FStringEnd => {
+                sb.push_str("fstring_end");
+            }
         };
         Ok(())
     }

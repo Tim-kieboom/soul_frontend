@@ -15,8 +15,7 @@ use soul_utils::{
 use crate::{
     parser::Parser,
     utils::{
-        ARRAY, ARROW_LEFT, CURLY_OPEN, DOT, MUT, OPTIONAL, POINTER, REF, ROUND_OPEN, SQUARE_CLOSE,
-        SQUARE_OPEN,
+        ARRAY, ARROW_LEFT, CURLY_OPEN, DOT, MUT, NOT, OPTIONAL, POINTER, REF, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN
     },
 };
 
@@ -55,6 +54,8 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let prim = match type_val {
             Types::None => return TryOk(SoulType::None),
+            Types::String => return TryOk(SoulType::String),
+            Types::FormatString => return TryOk(SoulType::FormatString),
             Types::Boolean => PrimitiveTypes::Boolean,
             Types::Int => PrimitiveTypes::Int,
             Types::Int8 => PrimitiveTypes::Int8,
@@ -164,6 +165,10 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
             TokenKind::Types(type_val) => {
                 return self.parse_token_type(*type_val);
+            }
+            &NOT => {
+                self.bump();
+                return TryOk(SoulType::Never);
             }
             &ROUND_OPEN => {
                 return TryNotValue(soul_error_internal!(

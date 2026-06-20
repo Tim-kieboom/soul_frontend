@@ -7,6 +7,7 @@ define_str_enum! {
 
         String => "str",
         CString => "cstr",
+        FormatString => "fstr",
 
         CInt => "cint",
         Int => "int",

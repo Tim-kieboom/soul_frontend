@@ -18,14 +18,10 @@ pub enum StringLiteral {
 pub enum StringTag {
     /// `c`
     CStr,
-}
-impl StringTag {
-    pub fn from_char(ch: char) -> Option<Self> {
-        match ch {
-            'c' => Some(Self::CStr),
-            _ => None,
-        }
-    }
+    /// `f`
+    F,
+    /// `fstr`
+    Fstr,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

@@ -64,6 +64,8 @@ main() {
         None,
         Int{field: int, foo: bool},
         Uint(int),
+        String(str),
+        Fmt(fstr),
     }
 
     obj := Union.None
@@ -78,6 +80,7 @@ main() {
 
     ch := 'a'
     cstring := c"cstr"
+    fstring = f"hello {1}{1 * 2 + 1} world{1}"
     mut obj := Map.(1)
     obj = Map.[1, 2, 3]
     obj.sum(1)

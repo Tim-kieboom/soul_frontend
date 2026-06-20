@@ -5,7 +5,11 @@ use soul_utils::{
     span::ModuleId,
 };
 
-use crate::{TokenKind, lexer::Lexer};
+use crate::{
+    TokenKind,
+    lexer::Lexer,
+    model::StringFormatTag,
+};
 
 fn module_id() -> ModuleId {
     ModuleId::error()
@@ -145,4 +149,72 @@ fn span_tracking_advances_lines() {
 
     assert_eq!(foo.span.start.line, 1);
     assert_eq!(bar.span.start.line, 2);
+}
+
+// ----------------------------------------------------------------
+//  F-string / format string tokenization
+// ----------------------------------------------------------------
+
+#[test]
+fn fstring_no_expressions() {
+    let tokens = lexer_to_vec(r#"f"hello world""#);
+
+    let expected = vec![
+        TokenKind::StringFormat(StringFormatTag::F),
+        TokenKind::FStringPart("hello world".to_string()),
+        TokenKind::FStringEnd,
+    ];
+
+    assert_eq!(tokens, expected);
+}
+
+#[test]
+fn fstring_empty() {
+    let tokens = lexer_to_vec(r#"f"""#);
+
+    let expected = vec![
+        TokenKind::StringFormat(StringFormatTag::F),
+        TokenKind::FStringEnd,
+    ];
+
+    assert_eq!(tokens, expected);
+}
+
+#[test]
+fn fstring_escaped_braces() {
+    let tokens = lexer_to_vec(r#"f"{{literal}}""#);
+
+    let expected = vec![
+        TokenKind::StringFormat(StringFormatTag::F),
+        TokenKind::FStringPart("{literal}".to_string()),
+        TokenKind::FStringEnd,
+    ];
+
+    assert_eq!(tokens, expected);
+}
+
+#[test]
+fn fstring_escaped_braces_mixed() {
+    let tokens = lexer_to_vec(r#"f"before {{ after""#);
+
+    let expected = vec![
+        TokenKind::StringFormat(StringFormatTag::F),
+        TokenKind::FStringPart("before { after".to_string()),
+        TokenKind::FStringEnd,
+    ];
+
+    assert_eq!(tokens, expected);
+}
+
+#[test]
+fn fstring_fstr_tag_no_expr() {
+    let tokens = lexer_to_vec(r#"fstr"hello world""#);
+
+    let expected = vec![
+        TokenKind::StringFormat(StringFormatTag::Fstr),
+        TokenKind::FStringPart("hello world".to_string()),
+        TokenKind::FStringEnd,
+    ];
+
+    assert_eq!(tokens, expected);
 }

@@ -1,4 +1,3 @@
-- [ ] never type `!`
 - [ ] for `for {}`, `for condition {}`, `for i in 0..12 {}`
 - [ ] Res type `Res<int>`, `Ok(val)`, `Err(err)`
 - [ ] add format string `fstr` 

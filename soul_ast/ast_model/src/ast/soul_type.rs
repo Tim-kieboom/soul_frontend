@@ -6,6 +6,10 @@ pub enum SoulType {
     None,
     /// type will never apear example for unreachable controlflows
     Never,
+    /// `str`
+    String,
+    /// `fstr`
+    FormatString,
     /// Primitive types like int, bool, float
     Primitive(PrimitiveTypes),
     /// array type: `[1]int` or `[&]int` or `[&mut]int` or `[]int`

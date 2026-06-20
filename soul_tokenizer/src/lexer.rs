@@ -2,7 +2,7 @@
 use std::sync::Once;
 
 use crate::{
-    model::{Token, TokenKind, keyword::KeyWord, types::Types},
+    model::{StringFormatTag, Token, TokenKind, keyword::KeyWord, types::Types},
     str_iter::StrIter,
 };
 use soul_utils::{
@@ -20,8 +20,10 @@ static TRY_GET_SYMBOL_INIT: Once = Once::new();
 pub struct Lexer<'a> {
     module: ModuleId,
     line: SpanLine,
-    current: Option<char>,
     input: StrIter<'a>,
+    current: Option<char>,
+    pub(crate) in_fstr: bool,
+    fstr_brace_depth: usize,
 }
 
 impl<'a> Lexer<'a> {
@@ -31,6 +33,8 @@ impl<'a> Lexer<'a> {
             line: SpanLine { line: 1, offset: 0 },
             current: None,
             input: StrIter::new(source),
+            in_fstr: false,
+            fstr_brace_depth: 0,
         };
         lexer.next_char();
         lexer
@@ -59,6 +63,10 @@ impl<'a> Lexer<'a> {
             return Ok(Token::new(TokenKind::EndFile, self.span(self.line)));
         }
 
+        if self.in_fstr {
+            return self.lex_fstring_part();
+        }
+
         self.skip_whitespace();
 
         let peek = self.peek_char();
@@ -80,6 +88,12 @@ impl<'a> Lexer<'a> {
                 TokenKind::Literal(TokenLiteral::Number(self.lex_number(line)?))
             } else {
                 self.next_char();
+                if symbol == Symbol::CurlyClose && self.fstr_brace_depth > 0 {
+                    self.fstr_brace_depth -= 1;
+                    if self.fstr_brace_depth == 0 {
+                        self.in_fstr = true;
+                    }
+                }
                 TokenKind::Symbol(symbol)
             };
 
@@ -99,10 +113,37 @@ impl<'a> Lexer<'a> {
     }
 
     fn get_token_kind(&mut self, char: char, line: SpanLine) -> SoulResult<TokenKind> {
-        if let Some(tag) = self.try_get_string_tag(char) {
-            let str = self.lex_string(line)?;
+        
+        let string_tag = match self.try_get_ident_or_tag(char) {
+            Ok(val) => val,
+            Err(ident_str) => {
+                if let Some(keyword) = KeyWord::from_str(&ident_str) {
+                    return Ok(TokenKind::Keyword(keyword))
+                } else if let Some(types) = Types::from_str(&ident_str) {
+                    return Ok(TokenKind::Types(types))
+                } else {
+                    return Ok(TokenKind::Ident(ident_str))
+                }
+            }
+        };
+
+        if let Some(tag) = string_tag {
             let string = match tag {
-                StringTag::CStr => StringLiteral::Cstr(str),
+                StringTag::CStr => {
+                    self.next_char();
+                    StringLiteral::Cstr(self.lex_string(line)?)
+                }
+                StringTag::F => {
+                    self.next_char();
+                    self.next_char();
+                    self.in_fstr = true;
+                    return Ok(TokenKind::StringFormat(StringFormatTag::F))
+                }
+                StringTag::Fstr => {
+                    self.next_char();
+                    self.in_fstr = true;
+                    return Ok(TokenKind::StringFormat(StringFormatTag::Fstr))
+                }
             };
 
             return Ok(TokenKind::Literal(TokenLiteral::String(string)));
@@ -121,16 +162,6 @@ impl<'a> Lexer<'a> {
                 TokenKind::Literal(TokenLiteral::String(string))
             }
             '\'' => TokenKind::Literal(TokenLiteral::Char(self.lex_char(line)?)),
-            ch if is_ident(ch) => {
-                let ident_str = self.lex_ident();
-                if let Some(keyword) = KeyWord::from_str(ident_str) {
-                    TokenKind::Keyword(keyword)
-                } else if let Some(types) = Types::from_str(ident_str) {
-                    TokenKind::Types(types)
-                } else {
-                    TokenKind::Ident(ident_str.to_string())
-                }
-            }
             ch if is_number(ch) => TokenKind::Literal(TokenLiteral::Number(self.lex_number(line)?)),
             _ => {
                 self.next_char();
@@ -142,7 +173,64 @@ impl<'a> Lexer<'a> {
         })
     }
 
-    fn lex_ident(&mut self) -> &str {
+    fn lex_format_string_part(&mut self) -> String {
+        let mut string = String::new();
+        while let Some(char) = self.current {
+            match char {
+                '"' => break,
+                '{' if self.peek_char() == Some('{') => {
+                    string.push('{');
+                    self.next_char();
+                    self.next_char();
+                }
+                '}' if self.peek_char() == Some('}') => {
+                    string.push('}');
+                    self.next_char();
+                    self.next_char();
+                }
+                '{' => break,
+                _ => {
+                    string.push(char);
+                    self.next_char();
+                }
+            }
+        }
+        string
+    }
+
+    fn lex_fstring_part(&mut self) -> SoulResult<Token> {
+        let line = self.line;
+        let text = self.lex_format_string_part();
+
+        match self.current {
+            Some('"') if text.is_empty() => {
+                self.next_char();
+                self.in_fstr = false;
+                Ok(Token::new(TokenKind::FStringEnd, self.span(line)))
+            }
+            Some('"') => {
+                Ok(Token::new(TokenKind::FStringPart(text), self.span(line)))
+            }
+            Some('{') => {
+                self.fstr_brace_depth += 1;
+                self.in_fstr = false;
+                Ok(Token::new(TokenKind::FStringPart(text), self.span(line)))
+            }
+            Some(ch) => {
+                self.next_char();
+                Err(Fault::error(
+                    format!("unexpected character {ch:?} in format string"),
+                    Some(self.span(line)),
+                ))
+            }
+            None => Err(Fault::error(
+                "unclosed format string literal".to_string(),
+                Some(self.span(line)),
+            )),
+        }
+    }
+
+    fn lex_ident(&mut self) -> (&str, Option<char>) {
         let start = self.input.position();
         while let Some(char) = self.current {
             if char.is_alphabetic() || char == '_' || is_number(char) {
@@ -152,7 +240,9 @@ impl<'a> Lexer<'a> {
             }
         }
 
-        &self.input.slice(start..self.input.position())
+        let peek = self.peek_char();
+        let slice = &self.input.slice(start..self.input.position());
+        (slice, peek)
     }
 
     fn lex_char(&mut self, line: SpanLine) -> SoulResult<char> {
@@ -226,14 +316,28 @@ impl<'a> Lexer<'a> {
         ))
     }
 
-    fn try_get_string_tag(&mut self, char: char) -> Option<StringTag> {
-        match StringTag::from_char(char) {
-            Some(tag) if self.peek_char() == Some('"') => {
-                self.next_char();
-                Some(tag)
+    fn try_get_ident_or_tag(&mut self, char: char) -> Result<Option<StringTag>, String> {
+
+        if self.peek_char() == Some('"') {
+
+            match char {
+                'f' => return Ok(Some(StringTag::F)),
+                'c' => return Ok(Some(StringTag::CStr)),
+                _ => (),
             }
-            _ => None,
         }
+
+        if !is_ident(char) {
+            return Ok(None)
+        }
+
+        let (string, _peek) = self.lex_ident();
+        let string_owned = string.to_string();
+        if string == "fstr" && self.current == Some('"') {
+            return Ok(Some(StringTag::Fstr))
+        }
+
+        Err(string_owned)
     }
 
     fn lex_number(&mut self, line: SpanLine) -> SoulResult<Number> {

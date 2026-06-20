@@ -1,8 +1,8 @@
 use ast_model::{
-    expression::{Array, Expression, ExpressionKind},
+    expression::{Array, Expression, ExpressionId, ExpressionKind, StringFormat},
     literal::Literal,
 };
-use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
+use soul_tokenizer::model::{StringFormatTag, TokenKind, keyword::KeyWord};
 use soul_utils::{
     TypeModifier,
     collections::try_result::TryError,
@@ -10,12 +10,15 @@ use soul_utils::{
     fault::Fault,
     literal::{Number, StringLiteral, TokenLiteral},
     soul_error_internal,
+    soul_names::Symbol,
     span::{Span, Spanned},
 };
 
 use crate::{
     parser::Parser,
-    utils::{ARRAY, ARROW_LEFT, COLON, CURLY_OPEN, ROUND_CLOSE, ROUND_OPEN, SQUARE_OPEN},
+    utils::{
+        ARRAY, ARROW_LEFT, COLON, CURLY_CLOSE, CURLY_OPEN, ROUND_CLOSE, ROUND_OPEN, SQUARE_OPEN,
+    },
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
@@ -90,6 +93,23 @@ impl<'a, 'f> Parser<'a, 'f> {
                 self.bump();
                 Expression::new_literal(number, start_span)
             }
+            TokenKind::StringFormat(fmt) => {
+                let to_string = match fmt {
+                    StringFormatTag::F => true,
+                    StringFormatTag::Fstr => false,
+                };
+
+                let string_format = self.parse_fstring_body()?;
+                Expression::new(
+                    ExpressionKind::StringFormat(StringFormat {
+                        id: None,
+                        to_string,
+                        parts: string_format.0,
+                        trailing: string_format.1,
+                    }),
+                    self.span_combine(start_span),
+                )
+            }
             other => {
                 return Err(Fault::error(
                     format!("`{}` is invalid as start of expression", other.display(),),
@@ -99,6 +119,51 @@ impl<'a, 'f> Parser<'a, 'f> {
         };
 
         Ok(expression)
+    }
+
+    fn parse_fstring_body(&mut self) -> SoulResult<(Vec<(String, ExpressionId)>, String)> {
+        self.bump(); // consume StringFormat tag
+
+        let mut parts = vec![];
+        let mut trailing = String::new();
+
+        loop {
+            match &self.current().kind {
+                TokenKind::FStringPart(text) => {
+                    let text = text.clone();
+                    self.bump();
+
+                    match &self.current().kind {
+                        TokenKind::Symbol(Symbol::CurlyOpen) => {
+                            self.bump();
+                            let expr_id = self.parse_expression_id(&[
+                                TokenKind::Symbol(Symbol::CurlyClose),
+                                TokenKind::EndLine,
+                                TokenKind::EndFile,
+                            ])?;
+                            self.tokens.set_fstr_mode(true);
+                            self.expect(&CURLY_CLOSE)?;
+                            parts.push((text, expr_id));
+                        }
+                        _ => {
+                            trailing = text;
+                        }
+                    }
+                }
+                TokenKind::FStringEnd => {
+                    self.bump();
+                    break;
+                }
+                _ => {
+                    return Err(Fault::error(
+                        "expected format string part or end of format string",
+                        Some(self.current().span),
+                    ));
+                }
+            }
+        }
+
+        Ok((parts, trailing))
     }
 
     pub(super) fn parse_primary_ident(

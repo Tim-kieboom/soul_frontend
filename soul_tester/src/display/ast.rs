@@ -15,7 +15,7 @@ use ast_model::{
         Assignment, Enum, EnumVariant, ImplBlock, Import, ImportItem, ImportKind, Parameter, StatementId, StatementKind, Struct, Trait, TypeDef, UnionKind, UseBlock, Variable
     },
 };
-use soul_tokenizer::model::keyword::KeyWord;
+use soul_tokenizer::model::{keyword::KeyWord, types::Types};
 use soul_utils::{
     FunctionId, TypeModifier, collections::vec_map::{VecMap, VecMapIndex}, ids::IdAlloc, soul_names::{PrimitiveTypes, Symbol}, span::ModuleId
 };
@@ -672,6 +672,17 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 self.write_expression(*expression_id)?;
                 self.write_fmt(format_args!(".{PASS_STR}"))
             },
+            ExpressionKind::StringFormat(fmt) => {
+                let tag = if fmt.to_string { "f" } else { "fstr" };
+                self.write_fmt(format_args!("{tag}"))?;
+                for (text, expr_id) in &fmt.parts {
+                    self.write_fmt(format_args!("\"{text}\""))?;
+                    self.write_char('{')?;
+                    self.write_expression(*expr_id)?;
+                    self.write_char('}')?;
+                }
+                self.write_fmt(format_args!("\"{}\"", fmt.trailing))
+            },
         }
     }
 
@@ -785,6 +796,8 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 self.write_type(base)?;
                 self.write_fmt(format_args!(".{}", variant.as_str()))
             }
+            SoulType::String => self.write_str(Types::String.as_str()),
+            SoulType::FormatString => self.write_str(Types::FormatString.as_str()),
         }
     }
 

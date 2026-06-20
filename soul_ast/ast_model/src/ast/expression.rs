@@ -29,6 +29,7 @@ pub enum ExpressionKind {
     Default(Option<NodeId>),
     /// A literal value (number, string, etc.).
     Literal((Option<NodeId>, Literal)),
+    StringFormat(StringFormat),
 
     /// Indexing into a collection, e.g., `arr[i]`.
     Index(Index),
@@ -87,6 +88,14 @@ pub enum ExpressionKind {
     Break,
     Continue,
     Return(Option<ExpressionId>),
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct StringFormat {
+    pub id: Option<NodeId>,
+    pub to_string: bool,
+    pub parts: Vec<(String, ExpressionId)>,
+    pub trailing: String,
 }
 
 /// `expr typeof Type.Variant` — type check a union value
