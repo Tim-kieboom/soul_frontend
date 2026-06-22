@@ -73,7 +73,6 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.bump();
 
             let ctor = StructConstructor {
-                id: None,
                 values: vec![],
                 defaults: false,
                 struct_type,
@@ -133,7 +132,6 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.expect(&CURLY_CLOSE)?;
 
         let ctor = StructConstructor {
-            id: None,
             values,
             defaults,
             struct_type,

@@ -402,11 +402,6 @@ pub enum ScopeValueKind<'a> {
     Variable(&'a mut Variable),
 }
 impl<'a> ScopeValueKind<'a> {
-    pub fn get_id_mut(&mut self) -> &mut Option<NodeId> {
-        match self {
-            ScopeValueKind::Variable(variable) => &mut variable.node_id,
-        }
-    }
 
     pub fn get_ident(&self) -> &Ident {
         match self {

@@ -1,4 +1,4 @@
-use ast_model::{NodeId, expression::{ExpressionId, For, ForCondition, ForElementKind}};
+use ast_model::{expression::{Expression, ExpressionId, For, ForCondition, ForElementKind}};
 use soul_tokenizer::model::TokenKind;
 use soul_utils::{
     Ident, TypeModifier, error::SoulResult, fault::Fault, soul_names::Symbol, span::Spanned,
@@ -35,7 +35,6 @@ impl<'a, 'f> Parser<'a, 'f> {
         let block = self.parse_block(TypeModifier::Mut)?;
         Ok(Spanned::new(
             For {
-                id: None,
                 block,
                 condition,
             },
@@ -44,14 +43,15 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     fn try_parse_foreach_elements(&mut self) -> SoulResult<Option<(ForElementKind, ExpressionId)>> {
-        let mut idents: Vec<(Option<NodeId>, Ident)> = Vec::new();
+        let mut args: Vec<ExpressionId> = Vec::new();
 
         match &self.token().kind {
             TokenKind::Ident(name) => {
                 let span = self.token().span;
-                let name = name.clone();
+                let ident = Ident::new(name, span);
                 self.bump();
-                idents.push((None, Ident::new(name, span)));
+                let id = self.store.insert_expression(Expression::new_variable(ident));
+                args.push(id);
             }
             _ => return Ok(None),
         }
@@ -62,10 +62,10 @@ impl<'a, 'f> Parser<'a, 'f> {
                 &IN => {
                     self.bump();
                     let collection = self.parse_expression_id(&[CURLY_OPEN])?;
-                    let element = if idents.len() == 1 {
-                        ForElementKind::Single(idents.remove(0))
+                    let element = if args.len() == 1 {
+                        ForElementKind::Single(args.remove(0))
                     } else {
-                        ForElementKind::Tuple(idents)
+                        ForElementKind::Tuple(args)
                     };
                     return Ok(Some((element, collection)));
                 }
@@ -75,9 +75,9 @@ impl<'a, 'f> Parser<'a, 'f> {
                     match &self.token().kind {
                         TokenKind::Ident(name) => {
                             let span = self.token().span;
-                            let name = name.clone();
+                            let ident = Ident::new(name, span);
                             self.bump();
-                            idents.push((None, Ident::new(name, span)));
+                            args.push(self.store.insert_expression(Expression::new_variable(ident)));
                         }
                         _ => {
                             return Err(Fault::error(

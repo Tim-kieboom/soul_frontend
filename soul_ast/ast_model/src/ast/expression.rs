@@ -92,7 +92,6 @@ pub enum ExpressionKind {
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StringFormat {
-    pub id: Option<NodeId>,
     pub to_string: bool,
     pub parts: Vec<(String, ExpressionId)>,
     pub trailing: String,
@@ -122,7 +121,6 @@ pub enum TypeofKind {
 /// A match-method expression `expr.Variant{body}` or chained `expr.V1{...}.V2{...}`.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct MatchMethod {
-    pub id: Option<NodeId>,
     /// The scrutinee expression (left side of the dot).
     pub scrutinee: ExpressionId,
     /// The match arms, one per `.Variant{...}` segment.
@@ -161,7 +159,6 @@ impl MatchMethodVariant {
 /// An struct literal, e.g., `Struct{field: 1, field2: 2}`.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StructConstructor {
-    pub id: Option<NodeId>,
     pub struct_type: SoulType,
     pub values: Vec<(Ident, ExpressionId)>,
     pub defaults: bool,
@@ -170,7 +167,6 @@ pub struct StructConstructor {
 /// A `match` expression.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Match {
-    pub id: Option<NodeId>,
     /// The expression to match on.
     pub scrutinee: ExpressionId,
     /// The match arms.
@@ -224,8 +220,6 @@ pub struct Binding {
 /// An `if` statement or expression.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct If {
-    pub id: Option<NodeId>,
-
     pub condition: ExpressionId,
     pub block: BlockId,
     pub branch: Option<Box<IfBranch>>,
@@ -240,8 +234,6 @@ pub enum IfBranch {
 /// A loop `for true {Println("loop")}` or conditional loop `for true {Println("loop")}` or iterator `for el in [1, 2, 3] {Println(el)}`.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct For {
-    pub id: Option<NodeId>,
-
     pub block: BlockId,
     pub condition: ForCondition,
 }
@@ -259,25 +251,8 @@ pub enum ForCondition {
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ForElementKind {
-    Single((Option<NodeId>, Ident)),
-    Tuple(Vec<(Option<NodeId>, Ident)>),
-}
-
-impl std::fmt::Display for ForElementKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ForElementKind::Single((_, ident)) => write!(f, "{}", ident.as_str()),
-            ForElementKind::Tuple(idents) => {
-                for (i, (_, ident)) in idents.iter().enumerate() {
-                    if i > 0 {
-                        write!(f, ", ")?;
-                    }
-                    write!(f, "{}", ident.as_str())?;
-                }
-                Ok(())
-            }
-        }
-    }
+    Single(ExpressionId),
+    Tuple(Vec<ExpressionId>),
 }
 
 /// reference, e.g., `&x`(mut) or `@x`(const).
@@ -568,7 +543,10 @@ impl Array {
 
 impl Binding {
     pub fn from_text(text: impl Into<String>, span: Span) -> Self {
-        Self { ident: Ident::new(text, span), id: None }
+        Self {
+            ident: Ident::new(text, span),
+            id: None,
+        }
     }
 
     pub const fn new(ident: Ident) -> Self {

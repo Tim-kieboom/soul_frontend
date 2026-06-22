@@ -364,7 +364,6 @@ impl<'a, 'f> Parser<'a, 'f> {
                                 name: arg,
                                 ty: array_type,
                                 modifier: TypeModifier::Const,
-                                node_id: None,
                                 default: None,
                             }],
                             generics: vec![],
@@ -518,7 +517,6 @@ impl<'a, 'f> Parser<'a, 'f> {
                 name,
                 default,
                 modifier,
-                node_id: None,
             });
 
             self.skip_end_lines();

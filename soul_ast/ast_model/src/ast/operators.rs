@@ -1,6 +1,6 @@
 use soul_utils::{define_str_enum, span::Spanned};
 
-use crate::{NodeId, expression::ExpressionId};
+use crate::{expression::ExpressionId};
 
 /// A unary operator wrapped with source location information.
 pub type UnaryOperator = Spanned<UnaryOperatorKind>;
@@ -10,7 +10,6 @@ pub type BinaryOperator = Spanned<BinaryOperatorKind>;
 /// A unary operation expression.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Unary {
-    pub id: Option<NodeId>,
     /// The unary operator.
     pub operator: UnaryOperator,
     /// The operand expression.
@@ -20,7 +19,6 @@ pub struct Unary {
 /// A binary operation expression.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Binary {
-    pub id: Option<NodeId>,
     /// The left-hand side expression.
     pub left: ExpressionId,
     /// The binary operator.

@@ -1,11 +1,13 @@
-use ast_model::{AstStore, Module, block::Block, soul_type::SoulType};
+use ast_model::{AstModuleStore, AstStore, Module, block::{Block, BlockId}, soul_type::SoulType};
 use soul_tokenizer::TokenStream;
 #[cfg(debug_assertions)]
 use soul_tokenizer::model::Token;
-use soul_utils::{CrateContext, TypeModifier, collections::vec_set::VecSet};
+#[cfg(debug_assertions)]
+use soul_utils::{collections::module_store::ModuleStore, span::ModuleId};
+use soul_utils::{CrateContext, TypeModifier, collections::vec_set::VecSet, ids::IdAlloc, soul_error_internal};
 use std::{collections::HashMap, path::PathBuf};
 
-use crate::ParseInfo;
+use crate::{ParseInfo};
 
 /// struct used to easily see debug info about current state of Parser can be ignored outside of debug
 #[cfg(debug_assertions)]
@@ -38,12 +40,29 @@ pub(crate) struct Parser<'a, 'f> {
     pub(crate) tokens: TokenStream<'a>,
     pub(crate) store: &'f mut AstStore,
     pub(crate) context: &'f mut CrateContext,
+    pub(crate) modules: &'f mut ModuleStore,
+    pub(crate) ast_modules: &'f mut AstModuleStore,
     pub(crate) source_path: PathBuf,
     pub(crate) current: Current,
+    pub(crate) id: ModuleId,
 }
 impl<'a, 'f> Parser<'a, 'f> {
-    pub fn parse(tokens: TokenStream<'a>, name: String, info: ParseInfo<'f>) -> Module {
-        let mut this = Self::new(tokens, info.store, info.context, info.source_folder);
+    pub fn parse(tokens: TokenStream<'a>, name: String, info: ParseInfo<'f>) {
+        let id = info.id;
+        let parent = info.parent;
+
+        let module = Module {
+            id,
+            name,
+            parent,
+            modules: VecSet::new(),
+            global: BlockId::error(),
+            header: HashMap::default(),
+        };
+        info.ast_modules.insert(id, module);
+        info.modules.insert(info.source_folder.clone());
+
+        let mut this = Self::new(tokens, info);
 
         #[cfg(debug_assertions)]
         {
@@ -54,34 +73,32 @@ impl<'a, 'f> Parser<'a, 'f> {
         let statements = this.parse_global_statements();
         let global = this.store.insert_block(Block {
             statements,
-            node_id: None,
-            scope_id: None,
             span: this.token().span,
             modifier: TypeModifier::Mut,
         });
 
-        Module {
-            name,
-            global,
-            id: info.id,
-            parent: info.parent,
-            modules: VecSet::new(),
-            header: HashMap::default(),
+        match this.ast_modules.get_mut(id) {
+            Some(module) => module.global = global,
+            None => this.log_fault(soul_error_internal!(
+                format!("{id:?} not found"), 
+                None
+            )),
         }
     }
 
     #[cfg(not(debug_assertions))]
     fn new(
         tokens: TokenStream<'a>,
-        store: &'f mut AstStore,
-        context: &'f mut CrateContext,
-        source_path: PathBuf,
+        info: ParseInfo<'f>,
     ) -> Self {
         Self {
             tokens,
-            store,
-            context,
-            source_path,
+            id: info.id,
+            store: info.store,
+            context: info.context,
+            modules: info.modules,
+            ast_modules: info.ast_modules,
+            source_path: info.source_folder,
             current: Current::default(),
         }
     }
@@ -89,9 +106,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     #[cfg(debug_assertions)]
     fn new(
         tokens: TokenStream<'a>,
-        store: &'f mut AstStore,
-        context: &'f mut CrateContext,
-        source_path: PathBuf,
+        info: ParseInfo<'f>,
     ) -> Self {
         use soul_tokenizer::model::TokenKind;
         use soul_utils::span::Span;
@@ -104,9 +119,12 @@ impl<'a, 'f> Parser<'a, 'f> {
         Self {
             debug,
             tokens,
-            store,
-            context,
-            source_path,
+            id: info.id,
+            store: info.store,
+            context: info.context,
+            modules: info.modules,
+            ast_modules: info.ast_modules,
+            source_path: info.source_folder,
             current: Current::default(),
         }
     }

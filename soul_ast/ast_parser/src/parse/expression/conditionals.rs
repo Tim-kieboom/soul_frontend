@@ -36,7 +36,6 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let mut r#if = If {
             condition,
-            id: None,
             block: if_block,
             branch: None,
         };
@@ -59,7 +58,6 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok(Expression::new(
             ExpressionKind::Match(Match {
                 arms,
-                id: None,
                 scrutinee,
             }),
             start_span,
@@ -93,8 +91,6 @@ impl<'a, 'f> Parser<'a, 'f> {
             let block = self.store.insert_block(Block {
                 modifier: TypeModifier::Mut,
                 statements: vec![statement],
-                scope_id: None,
-                node_id: None,
                 span: self.span_combine(start_span),
             });
             return Ok((Some(Binding::new(ident)), block));
@@ -141,8 +137,6 @@ impl<'a, 'f> Parser<'a, 'f> {
                 let statement = self.parse_statement_id()?;
                 self.store.insert_block(Block {
                     span,
-                    node_id: None,
-                    scope_id: None,
                     modifier: TypeModifier::Mut,
                     statements: vec![statement],
                 })
@@ -184,7 +178,6 @@ impl<'a, 'f> Parser<'a, 'f> {
                 IfBranch::If(If {
                     condition,
                     block,
-                    id: None,
                     branch: None,
                 })
             } else {

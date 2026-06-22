@@ -1,0 +1,7 @@
+import (
+    crate.inner.doubleInner
+)
+
+test(): bool {
+    true
+}

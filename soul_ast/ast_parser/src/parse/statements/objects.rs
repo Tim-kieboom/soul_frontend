@@ -70,7 +70,6 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.expect(&CURLY_CLOSE)?;
 
         let struct_ = Struct {
-            id: None,
             fields,
             generics,
             statements,
@@ -122,7 +121,6 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.expect(&CURLY_CLOSE)?;
 
         let enum_ = Enum {
-            id: None,
             name,
             variants,
             impl_type,

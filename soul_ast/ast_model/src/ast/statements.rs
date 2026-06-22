@@ -1,5 +1,5 @@
 use crate::{
-    AstStore, NodeId,
+    AstStore,
     block::BlockId,
     expression::{Expression, ExpressionId, ExpressionKind, FunctionCall},
     soul_type::{Generic, SoulType},
@@ -18,8 +18,8 @@ impl_soul_ids!(StatementId);
 /// A statement in the Soul language, wrapped with source location information.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Statement {
-    pub node: StatementKind,
     pub span: Span,
+    pub node: StatementKind,
     pub meta_data: ItemMetaData,
     is_public: bool,
 }
@@ -34,7 +34,6 @@ pub enum StatementKind {
     Import(Import),
     /// A standalone expression.
     Expression {
-        id: Option<NodeId>,
         expression: ExpressionId,
         ends_semicolon: bool,
     },
@@ -57,7 +56,6 @@ pub enum StatementKind {
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TypeDef {
-    pub id: Option<NodeId>,
     pub new_type: SoulType,
     pub old_type: SoulType,
     pub is_distinct: bool,
@@ -66,7 +64,6 @@ pub struct TypeDef {
 /// A trait definition.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Trait {
-    pub id: Option<NodeId>,
     pub name: Ident,
     pub generics: Vec<Generic>,
     pub methods: Vec<FunctionId>,
@@ -75,7 +72,6 @@ pub struct Trait {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Enum {
     pub name: Ident,
-    pub id: Option<NodeId>,
     pub variants: Vec<EnumVariant>,
     pub impl_type: Option<SoulType>,
 }
@@ -83,10 +79,7 @@ pub struct Enum {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum EnumVariant {
     Normal(Ident),
-    Assigned {
-        name: Ident,
-        value: ExpressionId,
-    },
+    Assigned { name: Ident, value: ExpressionId },
     Union(UnionKind),
 }
 
@@ -94,18 +87,16 @@ pub enum EnumVariant {
 pub enum UnionKind {
     Tuple {
         name: Ident,
-        parameters: Vec<SoulType>, 
+        parameters: Vec<SoulType>,
     },
     NamedTuple {
         name: Ident,
-        parameters: Vec<(Ident, SoulType)>, 
-    }
+        parameters: Vec<(Ident, SoulType)>,
+    },
 }
-
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Struct {
-    pub id: Option<NodeId>,
     pub name: Ident,
     pub fields: Vec<Field>,
     pub generics: Vec<Generic>,
@@ -152,7 +143,6 @@ pub struct ImplBlock {
 /// Imported paths
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Import {
-    pub id: Option<NodeId>,
     pub paths: Vec<ImportPath>,
 }
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -164,9 +154,9 @@ pub struct ImportPath {
 impl ImportPath {
     pub fn new() -> Self {
         Self {
-            module: SoulImportPath::new(),
-            kind: ImportKind::This,
             lib_name: None,
+            kind: ImportKind::This,
+            module: SoulImportPath::default(),
         }
     }
 }
@@ -198,7 +188,6 @@ pub enum ImportItem {
 /// A variable declaration.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Variable {
-    pub node_id: Option<NodeId>,
     /// The name of the variable.
     pub name: Ident,
     /// The modifier of the variable.
@@ -212,7 +201,6 @@ pub struct Variable {
 /// An assignment statement, e.g., `x = y + 1`.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Assignment {
-    pub node_id: Option<NodeId>,
     /// The left-hand side expression (the variable being assigned to).
     pub left: ExpressionId,
     /// The right-hand side expression (the value being assigned).
@@ -257,7 +245,6 @@ pub struct Parameter {
     pub name: Ident,
     pub ty: SoulType,
     pub modifier: TypeModifier,
-    pub node_id: Option<NodeId>,
     pub default: Option<ExpressionId>,
 }
 
@@ -311,6 +298,17 @@ impl Statement {
         matches!(self.node, StatementKind::Expression { .. })
     }
 
+    pub const fn error() -> Self {
+        Self {
+            node: StatementKind::Function(FunctionId::ERROR),
+            span: Span::error(),
+            meta_data: ItemMetaData {
+                attributes: Vec::new(),
+            },
+            is_public: false,
+        }
+    }
+
     pub const fn new(node: StatementKind, span: Span) -> Self {
         Self {
             node,
@@ -346,7 +344,6 @@ impl Statement {
         let span = store.expressions[expression].span;
         Self::new(
             StatementKind::Expression {
-                id: None,
                 expression,
                 ends_semicolon,
             },
@@ -383,7 +380,6 @@ impl Statement {
 
         Self::new(
             StatementKind::Expression {
-                id: None,
                 ends_semicolon,
                 expression: store.insert_expression(expression),
             },

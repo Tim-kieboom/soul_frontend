@@ -76,7 +76,6 @@ impl<'a, 'f> Parser<'a, 'f> {
                 ty,
                 name,
                 modifier,
-                node_id: None,
                 initialize_value: None,
             };
             return TryOk(Statement::new_variable(variable, span));
@@ -99,7 +98,6 @@ impl<'a, 'f> Parser<'a, 'f> {
             name,
             ty,
             modifier,
-            node_id: None,
             initialize_value: Some(value),
         };
 

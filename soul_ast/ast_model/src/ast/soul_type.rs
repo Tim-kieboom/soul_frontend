@@ -29,6 +29,9 @@ pub enum SoulType {
         ok: Option<Box<SoulType>>,
         err: Option<Box<SoulType>>,
     },
+    /// Built-in error wrapper type (like Rust's `anyhow::Error`).
+    /// Can wrap any error value — used as the default `E` in `Res<V>`.
+    Error,
     /// Optional type: `?int`
     Optional(Box<SoulType>),
     /// unknown type

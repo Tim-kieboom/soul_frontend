@@ -122,7 +122,6 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let old_type = self.try_parse_type().merge_to_result()?;
         let typedef = TypeDef {
-            id: None,
             new_type,
             old_type,
             is_distinct,

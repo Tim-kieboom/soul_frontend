@@ -265,7 +265,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     pub fn current_path(&self) -> &Path {
-        self.source_path.parent().expect("should have parent")
+        &self.source_path
     }
 
     /// Checks if current token matches any of given kinds.

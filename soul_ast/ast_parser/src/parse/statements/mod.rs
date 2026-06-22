@@ -122,8 +122,6 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok(self.store.insert_block(Block {
             modifier,
             statements,
-            node_id: None,
-            scope_id: None,
             span: self.span_combine(start_span),
         }))
     }

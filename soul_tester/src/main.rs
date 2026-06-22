@@ -1,6 +1,6 @@
 use crate::display::{ast::display_ast_tree, fault::display_fault, tokenizer::display_tokens};
 use anyhow::Result;
-use ast_model::AbstractSyntaxTree;
+use ast_model::AstTree;
 use ast_run::to_ast;
 use soul_tokenizer::{TokenStream, to_token_stream};
 use soul_utils::collections::module_store::ModuleStore;
@@ -35,7 +35,7 @@ fn frontend() -> Result<bool> {
 
     let ast = to_ast(
         tokens,
-        module_store,
+        &mut module_store,
         source_folder,
         &config::COMPILER_OPTIONS,
     );
@@ -61,7 +61,7 @@ fn display_tokenizer<'a>(tokens: &TokenStream<'a>) -> Result<()> {
     Ok(())
 }
 
-fn display_ast<'a>(tree: &AbstractSyntaxTree) -> Result<()> {
+fn display_ast<'a>(tree: &AstTree) -> Result<()> {
     let mut output_path = config::CONFIG.output_path().join("ast");
     output_path.push("tree.soulc");
 

@@ -1,8 +1,9 @@
+use std::path::PathBuf;
+
 use ast_model::statements::{Import, ImportItem, ImportKind, ImportPath, Statement, StatementKind};
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
-    Ident, collections::soul_import_path::SoulImportPath, error::SoulResult, fault::Fault,
-    soul_names::Symbol,
+    Ident, collections::soul_import_path::SoulImportPath, error::SoulResult, fault::Fault, soul_names::Symbol
 };
 
 use crate::{
@@ -14,6 +15,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     pub(super) fn parse_import(&mut self) -> SoulResult<Statement> {
         let start_span = self.token().span;
 
+        let mut spans = vec![];
         let mut paths = vec![];
         self.expect(&IMPORT)?;
         if self.current_is(&ROUND_OPEN) {
@@ -23,17 +25,30 @@ impl<'a, 'f> Parser<'a, 'f> {
                 if self.current_is(&ROUND_CLOSE) {
                     break;
                 }
+
+                let span = self.token().span;
                 paths.push(self.inner_parse_import()?);
+                spans.push(self.span_combine(span));
 
                 self.skip_end_lines();
             }
 
             self.expect(&ROUND_CLOSE)?;
         } else {
+            let span = self.token().span;
             paths.push(self.inner_parse_import()?);
+            spans.push(self.span_combine(span));
         }
 
-        let import = Import { id: None, paths };
+        for (i, path) in paths.iter().enumerate() {
+            if path.module.is_external() {
+                continue
+            }
+
+            self.parse_child_module(path, spans[i]);
+        }
+
+        let import = Import { paths };
 
         Ok(Statement::new(
             StatementKind::Import(import),
@@ -116,15 +131,17 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     fn parse_import_path(&mut self) -> SoulResult<(SoulImportPath, Option<String>)> {
-        const THIS_PORJECT: &str = KeyWord::Crate.as_str();
+        const IS_EXTERNAL: bool = true;
+        const IS_INTERNAL: bool = false;
+        const THIS_PORJECT: TokenKind = TokenKind::Keyword(KeyWord::Crate);
         const SEPARATOR: TokenKind = TokenKind::Symbol(Symbol::Dot);
         const PREV_SUPER: TokenKind = TokenKind::Symbol(Symbol::Slash);
 
         let mut lib_name = None;
-        let mut path = SoulImportPath::new();
-        if self.current_is_ident(THIS_PORJECT) {
+        let mut path = SoulImportPath::new(PathBuf::default(), IS_EXTERNAL);
+        if self.current_is(&THIS_PORJECT) {
             let current_path = self.source_path.clone();
-            path = SoulImportPath::from(current_path);
+            path = SoulImportPath::new(current_path, IS_INTERNAL);
             self.bump();
             self.expect(&SEPARATOR)?;
         } else if self.current_is(&SEPARATOR) {
@@ -143,7 +160,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 self.expect(&SEPARATOR)?;
             }
 
-            path = SoulImportPath::from(current_path);
+            path = SoulImportPath::new(current_path, IS_INTERNAL);
         } else if let TokenKind::Ident(name) = &self.token().kind {
             lib_name = Some(name.clone());
         } else {

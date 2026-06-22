@@ -102,7 +102,6 @@ impl<'a, 'f> Parser<'a, 'f> {
                 let string_format = self.parse_fstring_body()?;
                 Expression::new(
                     ExpressionKind::StringFormat(StringFormat {
-                        id: None,
                         to_string,
                         parts: string_format.0,
                         trailing: string_format.1,

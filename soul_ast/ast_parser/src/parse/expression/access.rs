@@ -219,7 +219,6 @@ impl<'a, 'f> Parser<'a, 'f> {
             swap(left, &mut value);
 
             let method = MatchMethod {
-                id: None,
                 scrutinee: self.store.insert_expression(value),
                 arms: vec![MatchMethodArm {
                     variant: ident,

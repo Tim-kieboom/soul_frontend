@@ -7,11 +7,7 @@ use std::{
 use crate::display::writer::Writer;
 use anyhow::Result;
 use ast_model::{
-    AbstractSyntaxTree, AstStore, FunctionKind,
-    block::BlockId,
-    expression::{AnyArray, ExpressionId, ExpressionKind, ForCondition, IfBranch, MatchPattern, TypeofKind},
-    soul_type::{ArrayKind, Generic, SoulType},
-    statements::{
+    AstTree, AstStore, FunctionKind, block::BlockId, expression::{AnyArray, ExpressionId, ExpressionKind, ForCondition, ForElementKind, IfBranch, MatchPattern, TypeofKind}, soul_type::{ArrayKind, Generic, SoulType}, statements::{
         Assignment, Enum, EnumVariant, ImplBlock, Import, ImportItem, ImportKind, Parameter, StatementId, StatementKind, Struct, Trait, TypeDef, UnionKind, UseBlock, Variable
     },
 };
@@ -44,11 +40,11 @@ struct Displayer<'a, W: Writer> {
 
     root_dir: &'a Path,
     store: &'a AstStore,
-    ast: &'a AbstractSyntaxTree,
+    ast: &'a AstTree,
 }
 
 pub(crate) fn display_ast_tree<'a>(
-    ast: &AbstractSyntaxTree,
+    ast: &AstTree,
     root_dir: &Path,
     writer: &mut impl Writer,
 ) -> Result<()> {
@@ -59,7 +55,7 @@ pub(crate) fn display_ast_tree<'a>(
 
 impl<'a, W: Writer> Displayer<'a, W> {
     fn new(
-        ast: &'a AbstractSyntaxTree,
+        ast: &'a AstTree,
         root_dir: &'a Path,
         store: &'a AstStore,
         writer: &'a mut W,
@@ -91,6 +87,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
             self.write_endln()?;
         }
         self.pop_depth();
+        self.write_depth()?;
         self.write_char('}')?;
         Ok(())
     }
@@ -475,6 +472,11 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 self.write_str(field_access.field.as_str())
             }
             ExpressionKind::FunctionCall(function_call) => {
+                if let Some(callee) = function_call.callee {
+                    self.write_expression(callee)?;
+                    self.write_char('.')?;    
+                }
+
                 self.write_str(function_call.name.as_str())?;
                 self.write_generic_types(&function_call.generics)?;
                 self.write_char('(')?;
@@ -624,7 +626,21 @@ impl<'a, W: Writer> Displayer<'a, W> {
                         if let Some(index) = index {
                             self.write_fmt(format_args!("{}, ", index.as_str()))?;
                         }
-                        self.write_fmt(format_args!("{} {IN_FOR_LOOP_STR} ", element))?;
+                        match element {
+                            ForElementKind::Single(id) => self.write_expression(*id)?,
+                            ForElementKind::Tuple(ids) => {
+                                self.write_char('(')?;
+                                let last_index = ids.len().saturating_sub(1);
+                                for (i, id) in ids.iter().enumerate() {
+                                    self.write_expression(*id)?;
+                                    if i != last_index {
+                                        self.write_str(", ")?;
+                                    }
+                                }
+                                self.write_char(')')?
+                            }
+                        }
+                        self.write_fmt(format_args!(" {IN_FOR_LOOP_STR} ", ))?;
                         self.write_expression(*collection)?;
                     }
                 }
@@ -746,25 +762,6 @@ impl<'a, W: Writer> Displayer<'a, W> {
 
     fn write_type(&mut self, ty: &SoulType) -> Result<()> {
         match ty {
-            SoulType::Res { ok, err } => {
-                self.write_str("Res")?;
-                match (ok, err) {
-                    (Some(ok), Some(err)) => {
-                        self.write_char('<')?;
-                        self.write_type(ok)?;
-                        self.write_str(", ")?;
-                        self.write_type(err)?;
-                        self.write_char('>')?;
-                    }
-                    (Some(ok), None) => {
-                        self.write_char('<')?;
-                        self.write_type(ok)?;
-                        self.write_char('>')?;
-                    }
-                    _ => {}
-                }
-                Ok(())
-            }
             SoulType::None => self.write_str(PrimitiveTypes::None.as_str()),
             SoulType::Never => self.write_char('!'),
             SoulType::Primitive(primitive_types) => self.write_str(primitive_types.as_str()),
@@ -802,6 +799,25 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 }
                 Ok(())
             }
+            SoulType::Res { ok, err } => {
+                self.write_str("Res")?;
+                match (ok, err) {
+                    (Some(ok), Some(err)) => {
+                        self.write_char('<')?;
+                        self.write_type(ok)?;
+                        self.write_str(", ")?;
+                        self.write_type(err)?;
+                        self.write_char('>')?;
+                    }
+                    (Some(ok), None) => {
+                        self.write_char('<')?;
+                        self.write_type(ok)?;
+                        self.write_char('>')?;
+                    }
+                    _ => {}
+                }
+                Ok(())
+            }
             SoulType::Optional(soul_type) => {
                 self.write_char('?')?;
                 self.write_type(&soul_type)
@@ -818,6 +834,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
             SoulType::String => self.write_str(Types::String.as_str()),
             SoulType::FormatString => self.write_str(Types::FormatString.as_str()),
             SoulType::Any => self.write_str(Types::Any.as_str()),
+            SoulType::Error => self.write_str(Types::Error.as_str()),
         }
     }
 

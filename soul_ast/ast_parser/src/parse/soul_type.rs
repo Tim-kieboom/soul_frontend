@@ -57,6 +57,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             Types::None => return TryOk(SoulType::None),
             Types::String => return TryOk(SoulType::String),
             Types::FormatString => return TryOk(SoulType::FormatString),
+            Types::Error => return TryOk(SoulType::Error),
             Types::Boolean => PrimitiveTypes::Boolean,
             Types::Int => PrimitiveTypes::Int,
             Types::Int8 => PrimitiveTypes::Int8,

@@ -5,46 +5,62 @@ use std::path::{Path, PathBuf};
 /// Represents a hierarchical path to a module or page in the Soul language,
 /// similar to a module path in other languages.
 #[derive(
-    Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+    Debug, Clone, Default, Hash, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
 )]
-pub struct SoulImportPath(PathBuf);
+pub struct SoulImportPath{
+    path: PathBuf,
+    is_external: bool,
+}
 
 impl SoulImportPath {
-    pub fn new() -> Self {
-        Self(PathBuf::new())
+
+    pub fn new(path: PathBuf, is_external: bool) -> Self {
+        Self { path, is_external }
+    }
+
+    pub fn set_external(&mut self) {
+        self.is_external = true;
+    }
+
+    pub fn set_internal(&mut self) {
+        self.is_external = false;
+    }
+
+    pub fn is_external(&self) -> bool {
+        self.is_external
     }
 
     pub fn push(&mut self, value: &str) {
-        self.0.push(value);
+        self.path.push(value);
     }
 
     pub fn pop(&mut self) -> bool {
-        self.0.pop()
+        self.path.pop()
     }
 
     pub fn get_module_name(&self) -> Option<&str> {
-        self.0.file_name()?.to_str()?.split('.').next()
+        self.path.file_name()?.to_str()?.split('.').next()
     }
 
     pub fn iter(&mut self) -> std::path::Iter<'_> {
-        self.0.iter()
+        self.path.iter()
     }
 
     pub fn as_path(&self) -> &Path {
-        &self.0
+        &self.path
     }
 
     pub fn as_pathbuf(&self) -> &PathBuf {
-        &self.0
+        &self.path
     }
 
     pub fn to_pathbuf(&self) -> PathBuf {
-        self.0.clone()
+        self.path.clone()
     }
 
     pub fn to_full_path(&self, dir_path: &PathBuf) -> PathBuf {
         let mut this = dir_path.clone();
-        this.push(&self.0);
+        this.push(&self.path);
         this
     }
 
@@ -75,11 +91,7 @@ impl SoulImportPath {
     }
 
     pub fn to_string(self) -> String {
-        self.0.to_string_lossy().to_string()
+        self.path.to_string_lossy().to_string()
     }
 }
-impl From<PathBuf> for SoulImportPath {
-    fn from(value: PathBuf) -> Self {
-        Self(value)
-    }
-}
+

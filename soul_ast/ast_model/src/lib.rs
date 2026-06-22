@@ -3,16 +3,16 @@ use crate::{
     ast::{
         block::{Block, BlockId},
         expression::{Expression, ExpressionId},
-        statements::{ExternalFunction, Function, FunctionSignature, Statement, StatementId},
+        statements::{Enum, ExternalFunction, Function, FunctionSignature, Statement, StatementId, Struct, Trait},
     },
     declare_store::DeclareStore,
+    scope::ScopeBuilder,
 };
 use soul_utils::{
-    CrateContext, FunctionId,
-    collections::{vec_map::VecMap, vec_set::VecSet},
-    fault::FaultCollector,
-    ids::IdGenerator,
-    span::{ModuleId, Spanned},
+    CrateContext, FunctionId, Ident, collections::{
+        vec_map::{VecMap, VecMapIndex},
+        vec_set::VecSet,
+    }, fault::{Fault, FaultCollector}, ids::IdGenerator, span::{ModuleId, Spanned}
 };
 use std::collections::HashMap;
 
@@ -21,11 +21,26 @@ pub mod declare_store;
 pub mod scope;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct AbstractSyntaxTree {
+pub struct AstTree {
     pub root: ModuleId,
     pub store: AstStore,
     pub context: CrateContext,
     pub modules: AstModuleStore,
+    pub scope_info: ScopeInfo,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ScopeInfo {
+    pub scopes: ScopeBuilder,
+    pub last_node_id: NodeId,
+}
+impl ScopeInfo {
+    pub fn new(module: ModuleId) -> Self {
+        Self {
+            scopes: ScopeBuilder::new(module),
+            last_node_id: NodeId::new_index(0),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
@@ -65,27 +80,49 @@ pub struct Module {
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct HeaderEntry {
     pub variable: Option<EntryKind<NodeId>>,
+    pub struct_type: Option<EntryKind<CustomType>>,
     pub function: Option<EntryKind<FunctionId>>,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum CustomType {
+    Struct(Struct),
+    Enum(Enum),
+    Trait(Trait),
+}
+impl CustomType {
+
+    pub fn name(&self) -> &Ident {
+        match self {
+            CustomType::Struct(obj) => &obj.name,
+            CustomType::Enum(obj) => &obj.name,
+            CustomType::Trait(obj) => &obj.name,
+        }
+    }
+}
 #[derive(Debug, Clone, Copy, Default, serde::Serialize, serde::Deserialize)]
 pub struct EntryKind<T> {
     pub value: T,
     pub is_public: bool,
 }
 
-impl AbstractSyntaxTree {
+impl AstTree {
     pub fn new(root: ModuleId) -> Self {
         Self {
             root,
             store: AstStore::new(),
             context: CrateContext::default(),
             modules: AstModuleStore::default(),
+            scope_info: ScopeInfo::new(root),
         }
     }
 
     pub fn faults(&self) -> &FaultCollector {
         &self.context.faults
+    }
+
+    pub fn log_fault(&mut self, fault: Fault) {
+        self.context.faults.push(fault);
     }
 }
 
@@ -96,6 +133,10 @@ impl AstModuleStore {
 
     pub fn as_vecmap(&self) -> &VecMap<ModuleId, Module> {
         &self.modules
+    }
+
+    pub fn as_vecmap_mut(&mut self) -> &mut VecMap<ModuleId, Module> {
+        &mut self.modules
     }
 
     pub fn contains(&self, id: ModuleId) -> bool {
@@ -141,7 +182,7 @@ impl AstStore {
             expression_generator: Default::default(),
         }
     }
-    
+
     pub fn insert_block(&mut self, block: Block) -> BlockId {
         let id = self.block_generator.alloc();
         self.blocks.insert(id, block);

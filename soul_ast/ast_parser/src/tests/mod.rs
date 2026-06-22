@@ -1,18 +1,13 @@
 use std::path::PathBuf;
 
 use ast_model::{
-    AstStore, Module,
-    expression::{
+    AstStore, AstTree, Module, expression::{
         AnyArray, Constructor, ExpressionKind, FunctionCall, MatchMethod, StructConstructor, TypeOf, TypeofKind,
-    },
-    literal::Literal,
-    operators::BinaryOperatorKind,
-    soul_type::{ArrayKind, ArrayType, ReferenceType, SoulType, Stub},
-    statements::{Assignment, Import, ImportKind, Statement, StatementKind, Variable},
+    }, literal::Literal, operators::BinaryOperatorKind, soul_type::{ArrayKind, ArrayType, ReferenceType, SoulType, Stub}, statements::{Assignment, Import, ImportKind, Statement, StatementKind, Variable}
 };
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
-    CrateContext, fault::Severity, ids::IdAlloc, soul_names::PrimitiveTypes, span::ModuleId,
+    CrateContext, collections::module_store::ModuleStore, fault::Severity, ids::IdAlloc, soul_names::PrimitiveTypes, span::ModuleId
 };
 
 use crate::{ParseInfo, parse_module};
@@ -31,19 +26,27 @@ fn module_id() -> ModuleId {
 }
 
 fn parse(source: &str) -> (Module, AstStore, CrateContext) {
-    let mid = module_id();
-    let stream = to_token_stream(source, mid).unwrap();
+    let module_id = module_id();
+    let stream = to_token_stream(source, module_id).unwrap();
     let mut store = AstStore::new();
-    let mut context = CrateContext::default();
+    let mut modules = ModuleStore::new();
+    let mut ast = AstTree::new(module_id);
     let info = ParseInfo {
-        id: mid,
+        id: module_id,
         parent: None,
         source_folder: PathBuf::from("test"),
         store: &mut store,
-        context: &mut context,
+        context: &mut ast.context,
+        modules: &mut modules,
+        ast_modules: &mut ast.modules,
     };
-    let module = parse_module(stream, "test".to_string(), info);
-    (module, store, context)
+    parse_module(stream, "test".to_string(), info);
+    let module = ast.modules
+        .as_vecmap_mut()
+        .remove(module_id)
+        .expect("should have module");
+    
+    (module, store, ast.context)
 }
 
 fn get_statement<'a>(store: &'a AstStore, module: &Module, index: usize) -> &'a Statement {
@@ -1367,6 +1370,93 @@ fn raw_ptr_type_explicit_none() {
         _ => panic!("expected Variable"),
     };
     assert_eq!(*ty, Some(SoulType::RawPtr(Some(Box::new(SoulType::None)))));
+}
+
+// ----------------------------------------------------------------
+//  Res type
+// ----------------------------------------------------------------
+#[test]
+fn res_type_void() {
+    let (module, store, context) = parse("mut x: Res");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let Variable { ty, .. } = match &stmt.node {
+        StatementKind::Variable(v) => v,
+        _ => panic!("expected Variable"),
+    };
+    assert_eq!(*ty, Some(SoulType::Res { ok: None, err: None }));
+}
+
+#[test]
+fn res_type_one_generic() {
+    let (module, store, context) = parse("mut x: Res<int>");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let Variable { ty, .. } = match &stmt.node {
+        StatementKind::Variable(v) => v,
+        _ => panic!("expected Variable"),
+    };
+    assert_eq!(
+        *ty,
+        Some(SoulType::Res {
+            ok: Some(Box::new(SoulType::Primitive(PrimitiveTypes::Int))),
+            err: None,
+        })
+    );
+}
+
+#[test]
+fn res_type_two_generics() {
+    let (module, store, context) = parse("mut x: Res<int, str>");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let Variable { ty, .. } = match &stmt.node {
+        StatementKind::Variable(v) => v,
+        _ => panic!("expected Variable"),
+    };
+    assert_eq!(
+        *ty,
+        Some(SoulType::Res {
+            ok: Some(Box::new(SoulType::Primitive(PrimitiveTypes::Int))),
+            err: Some(Box::new(SoulType::String)),
+        })
+    );
+}
+
+#[test]
+fn error_type() {
+    let (module, store, context) = parse("mut x: Error");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let Variable { ty, .. } = match &stmt.node {
+        StatementKind::Variable(v) => v,
+        _ => panic!("expected Variable"),
+    };
+    assert_eq!(*ty, Some(SoulType::Error));
 }
 
 #[test]
