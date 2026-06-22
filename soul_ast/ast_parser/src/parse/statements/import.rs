@@ -142,6 +142,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         if self.current_is(&THIS_PORJECT) {
             let current_path = self.source_path.clone();
             path = SoulImportPath::new(current_path, IS_INTERNAL);
+            path.set_absolute();
             self.bump();
             self.expect(&SEPARATOR)?;
         } else if self.current_is(&SEPARATOR) {

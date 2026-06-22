@@ -29,8 +29,9 @@ pub struct Map {
         This{..}
     }
 
-    pub This.[int](list) {
-        This{list, ..}
+    pub This.[int](array) {
+        
+        This{list: list.into(), ..}
     }
 
     sum(this, b: int): int {

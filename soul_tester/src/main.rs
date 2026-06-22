@@ -5,15 +5,14 @@ use ast_run::to_ast;
 use soul_tokenizer::{TokenStream, to_token_stream};
 use soul_utils::collections::module_store::ModuleStore;
 use std::{
-    fs::{File, OpenOptions},
-    io::stdout,
-    path::Path,
+    fs::{File, OpenOptions}, io::stdout, path::Path, time::Instant,
 };
 
 mod config;
 mod display;
 
 fn main() {
+
     match frontend() {
         Ok(true) => println!("success"),
         Ok(false) => println!("failed"),
@@ -26,19 +25,21 @@ fn frontend() -> Result<bool> {
     let main_path = source_folder.join("main.soul");
     let mut module_store = ModuleStore::new();
 
-    let file = std::fs::read_to_string(&main_path)?;
+    let file = std::fs::read_to_string(&main_path)?;    
     let tokens = to_token_stream(&file, module_store.get_root_id())
         .map_err(|err| anyhow::anyhow!("in tokenizer: {err:?}"))?;
 
     module_store.insert_root(main_path);
     display_tokenizer(&tokens).map_err(|err| anyhow::anyhow!("in display_tokenizer: {err}"))?;
-
+    
+    let ast_timer = Instant::now();
     let ast = to_ast(
         tokens,
         &mut module_store,
         source_folder,
         &config::COMPILER_OPTIONS,
     );
+    println!("{:?}", ast_timer.elapsed());
     display_ast(&ast).map_err(|err| anyhow::anyhow!("in display_ast: {err}"))?;
 
     if ast.faults().fails(config::COMPILER_OPTIONS.fail_level) {

@@ -10,12 +10,13 @@ use std::path::{Path, PathBuf};
 pub struct SoulImportPath{
     path: PathBuf,
     is_external: bool,
+    is_absolute: bool,
 }
 
 impl SoulImportPath {
 
     pub fn new(path: PathBuf, is_external: bool) -> Self {
-        Self { path, is_external }
+        Self { path, is_external, is_absolute: false }
     }
 
     pub fn set_external(&mut self) {
@@ -28,6 +29,14 @@ impl SoulImportPath {
 
     pub fn is_external(&self) -> bool {
         self.is_external
+    }
+
+    pub fn set_absolute(&mut self) {
+        self.is_absolute = true;
+    }
+
+    pub fn is_absolute(&self) -> bool {
+        self.is_absolute
     }
 
     pub fn push(&mut self, value: &str) {

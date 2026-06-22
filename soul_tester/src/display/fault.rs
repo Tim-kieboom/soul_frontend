@@ -18,6 +18,8 @@ pub(crate) fn display_fault(
 
     let red = if configs.color { RED } else { "" };
     let default = if configs.color { DEFAULT } else { "" };
+    
+    #[cfg(feature = "error_backtrace")]
     if configs.backtrace {
         writer.push_fmt(format_args!("{red}{}{default}\n", fault.backtract()))?;
     }

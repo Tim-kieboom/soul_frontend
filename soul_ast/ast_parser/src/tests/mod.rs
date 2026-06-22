@@ -35,6 +35,7 @@ fn parse(source: &str) -> (Module, AstStore, CrateContext) {
         id: module_id,
         parent: None,
         source_folder: PathBuf::from("test"),
+        crate_source_folder: PathBuf::from("test"),
         store: &mut store,
         context: &mut ast.context,
         modules: &mut modules,

@@ -21,6 +21,22 @@
             }
         },
         {
+            "name": "Release executable 'soul_tester'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "run",
+                    "--bin=soul_tester",
+                    "--release"
+                ]
+            },
+            "args": [],
+            "env": {
+                "RUST_BACKTRACE": "1"
+            }
+        },
+        {
             "name": "Debug unit tests in executable 'soul_tester'",
             "type": "lldb",
             "request": "launch",

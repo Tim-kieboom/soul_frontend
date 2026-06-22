@@ -9,21 +9,36 @@ use crate::parser::Parser;
 impl<'a, 'f> Parser<'a, 'f> {
 
     pub(crate) fn parse_child_module(&mut self, path: &ImportPath, span: Span) {
-        let module_name = match path.module.get_module_name() {
-            Some(val) => val,
-            None => {
-                self.log_fault(soul_error_internal!("could not get module name", None));
-                return;
-            }
-        };
-
-        let parent_module = self.id;
         let Some(module_file_path) = self.find_module_file(path.module.to_pathbuf(), span) else {
             return;
         };
 
-        self.insure_parents_are_loaded(&module_file_path, span);
-        let _module_id  = self.import_module(&module_file_path, module_name, parent_module, span);
+        let (starting_parent, base_path) = if path.module.is_absolute() {
+            (self.get_crate_root(), self.crate_source_path.clone())
+        } else {
+            (self.get_directory_owner(&self.source_path), self.source_path.clone())
+        };
+
+        self.insure_parents_are_loaded(&module_file_path, starting_parent, &base_path, span);
+    }
+
+    fn get_directory_owner(&self, dir: &Path) -> ModuleId {
+        let mod_path = dir.join("mod.soul");
+        if let Some(owner_id) = self.modules.get_id(&mod_path) {
+            return owner_id;
+        }
+        self.id
+    }
+
+    fn get_crate_root(&self) -> ModuleId {
+        let mut current = self.id;
+        while let Some(module) = self.ast_modules.get(current) {
+            match module.parent {
+                Some(parent) => current = parent,
+                None => return current,
+            }
+        }
+        current
     }
 
     fn import_module(
@@ -78,6 +93,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             id: module_id, 
             parent: Some(parent), 
             source_folder: path, 
+            crate_source_folder: self.crate_source_path.clone(),
             store: self.store, 
             context: self.context, 
             modules: self.modules, 
@@ -119,7 +135,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         Some(module_path)
     }
     
-    fn insure_parents_are_loaded(&mut self, module_file_path: &PathBuf, span: Span) {
+    fn insure_parents_are_loaded(&mut self, module_file_path: &PathBuf, starting_parent: ModuleId, base_path: &Path, span: Span) {
         fn get_module_name(current: &PathBuf) -> Option<String> {
             let osstr = current.file_name()?;
             osstr
@@ -129,8 +145,8 @@ impl<'a, 'f> Parser<'a, 'f> {
                 .map(|name| name.to_string())
         }
 
-        let mut current = self.source_path.clone();
-        let relative_path = match module_file_path.strip_prefix(&current) {
+        let mut current = base_path.to_path_buf();
+        let relative_path = match module_file_path.strip_prefix(base_path) {
             Ok(val) => val,
             Err(err) => {
                 self.log_fault(soul_error_internal!(format!("{}", err.to_string()), None));
@@ -138,7 +154,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
         };
 
-        let mut parent = self.id;
+        let mut parent = starting_parent;
         for component in relative_path.components() {
             current.push(component);
             let name = match get_module_name(&current) {

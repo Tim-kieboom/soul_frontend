@@ -2,7 +2,6 @@ use ast_model::{AstModuleStore, AstStore, Module, block::{Block, BlockId}, soul_
 use soul_tokenizer::TokenStream;
 #[cfg(debug_assertions)]
 use soul_tokenizer::model::Token;
-#[cfg(debug_assertions)]
 use soul_utils::{collections::module_store::ModuleStore, span::ModuleId};
 use soul_utils::{CrateContext, TypeModifier, collections::vec_set::VecSet, ids::IdAlloc, soul_error_internal};
 use std::{collections::HashMap, path::PathBuf};
@@ -43,6 +42,7 @@ pub(crate) struct Parser<'a, 'f> {
     pub(crate) modules: &'f mut ModuleStore,
     pub(crate) ast_modules: &'f mut AstModuleStore,
     pub(crate) source_path: PathBuf,
+    pub(crate) crate_source_path: PathBuf,
     pub(crate) current: Current,
     pub(crate) id: ModuleId,
 }
@@ -99,6 +99,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             modules: info.modules,
             ast_modules: info.ast_modules,
             source_path: info.source_folder,
+            crate_source_path: info.crate_source_folder,
             current: Current::default(),
         }
     }
@@ -125,6 +126,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             modules: info.modules,
             ast_modules: info.ast_modules,
             source_path: info.source_folder,
+            crate_source_path: info.crate_source_folder,
             current: Current::default(),
         }
     }

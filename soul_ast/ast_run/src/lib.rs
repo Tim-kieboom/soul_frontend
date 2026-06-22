@@ -19,7 +19,8 @@ pub fn to_ast<'a, 'f>(
     let name = ENTRY_MOD_NAME.to_string();
     let info = ParseInfo {
         parent: None,
-        source_folder,
+        source_folder: source_folder.clone(),
+        crate_source_folder: source_folder,
         store: &mut ast.store,
         context: &mut ast.context,
         id: module_store.get_root_id(),
