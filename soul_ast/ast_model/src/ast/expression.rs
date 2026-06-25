@@ -4,7 +4,7 @@ use soul_utils::{
 };
 
 use crate::{
-    AstStore, NodeId, block::BlockId, literal::Literal, operators::{BinaryOperator, UnaryOperator}, soul_type::SoulType,
+    AstStore, NodeId, block::BlockId, literal::Literal, operators::{BinaryOperator, UnaryOperator}, soul_type::SoulType, statements::VarPattern,
 };
 
 impl_soul_ids!(ExpressionId);
@@ -86,9 +86,22 @@ pub enum ExpressionKind {
     /// `binding_id` is the NodeId of the bound variable (set by name resolver).
     TypeOf(TypeOf),
 
+    /// A lambda expression: `params => body`.
+    Lambda(Lambda),
+
     Break,
     Continue,
     Return(Option<ExpressionId>),
+}
+
+/// A lambda expression: `params => body`.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Lambda {
+    pub id: NodeId,
+    /// The parameter patterns (one or more, from a tuple-like param list).
+    pub params: Vec<VarPattern>,
+    /// The body expression.
+    pub body: ExpressionId,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -470,6 +483,13 @@ impl Expression {
             }),
             span,
         )
+    }
+
+    pub fn from_lambda(lambda: Lambda, span: Span) -> Self {
+        Self {
+            node: ExpressionKind::Lambda(lambda),
+            span,
+        }
     }
 
     pub fn new_binary(

@@ -16,13 +16,21 @@ use soul_utils::{
 
 use crate::{
     parser::Parser, utils::{
-        ARRAY, ARROW_LEFT, COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, DOT, ROUND_CLOSE, ROUND_OPEN, SQUARE_OPEN,
+        ARRAY, ARROW_LEFT, COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, DOT, ROUND_CLOSE, ROUND_OPEN,
+        SQUARE_OPEN,
     },
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub(super) fn parse_primary(&mut self, end_tokens: &[TokenKind]) -> SoulResult<Expression> {
         let start_span = self.token().span;
+
+        // Try lambda first: `param => body`
+        let saved = self.tokens.current_position();
+        if let Ok(lambda) = self.try_parse_lambda(start_span) {
+            return Ok(lambda);
+        }
+        self.goto(saved);
 
         if self.current_is(&ROUND_OPEN) && self.peek_is(&ROUND_CLOSE) {
             self.bump();

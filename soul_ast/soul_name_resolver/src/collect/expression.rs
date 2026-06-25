@@ -1,7 +1,8 @@
 use ast_model::expression::{
     AnyArray, Constructor, ExpressionId, ExpressionKind, For, ForCondition, FunctionCall, If,
-    IfBranch, Match, MatchMethod, MatchPattern, StringFormat, StructConstructor, TypeOf,
+    IfBranch, Lambda, Match, MatchMethod, MatchPattern, StringFormat, StructConstructor, TypeOf,
 };
+use ast_model::statements::VarPattern;
 use soul_tokenizer::model::keyword::KeyWord;
 use soul_utils::fault::Fault;
 
@@ -77,6 +78,57 @@ impl<'a> NameResolver<'a> {
             }
             ExpressionKind::StructConstructor(struct_constructor) => {
                 self.collect_struct_constructor(struct_constructor)
+            }
+            ExpressionKind::Lambda(lambda) => self.collect_lambda(lambda),
+        }
+    }
+
+    fn collect_lambda(&mut self, lambda: &Lambda) {
+        for param in &lambda.params {
+            self.collect_lambda_param(param);
+        }
+        self.collect_expression(lambda.body);
+    }
+
+    fn collect_lambda_param(&mut self, pattern: &VarPattern) {
+        match pattern {
+            VarPattern::Discard => {}
+            VarPattern::Simple { binding, .. } => {
+                self.insert_value(
+                    binding.ident.as_str(),
+                    binding.id,
+                    binding.ident.span(),
+                    ast_model::scope::ScopeValue::Variable,
+                );
+            }
+            VarPattern::Tuple(tuple) => {
+                for element in &tuple.elements {
+                    self.collect_lambda_param(element);
+                }
+            }
+            VarPattern::NamedTuple(named) => {
+                for field in &named.fields {
+                    if let Some(binding) = &field.binding {
+                        self.insert_value(
+                            binding.ident.as_str(),
+                            binding.id,
+                            binding.ident.span(),
+                            ast_model::scope::ScopeValue::Variable,
+                        );
+                    }
+                }
+            }
+            VarPattern::Constructor(ctor) => {
+                for field in &ctor.fields {
+                    if let Some(binding) = &field.binding {
+                        self.insert_value(
+                            binding.ident.as_str(),
+                            binding.id,
+                            binding.ident.span(),
+                            ast_model::scope::ScopeValue::Variable,
+                        );
+                    }
+                }
             }
         }
     }

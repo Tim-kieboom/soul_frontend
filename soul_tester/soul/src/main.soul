@@ -57,18 +57,9 @@ main() {
     num := new[int: for 10 => undefined]
     tuple: (int, str) = .(1, "text".copy)
     named: (number: int, text: &str) = .{number: 1, text: "text"}
-
-    (var1, var2) := tuple()
-    {field, field2: text} := namedTuple()
-
-    // fn1 := arg => arg + 1
-    // fn2 := (arg1, arg1) => arg1 + arg2
-    // fn3 := arg => {
-    //     arg += 1
-    //     arg + 1
-    // }
     
-    *u8.()?.len()
+    // *u8.(rawptr)
+    // []u8.(rawptr, 0)
 }
 
 result(): Res<int> {

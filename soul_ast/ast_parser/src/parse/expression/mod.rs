@@ -18,6 +18,7 @@ mod access;
 mod conditionals;
 mod for_loop;
 mod group_expressions;
+mod lambda;
 mod precedence;
 mod primairy;
 

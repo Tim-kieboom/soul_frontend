@@ -49,6 +49,7 @@ impl<'a> NameResolver<'a> {
                 self.resolve_expression(*value);
             }
 
+            ExpressionKind::Lambda(lamdba) => todo!(),
             ExpressionKind::Block(block_id) => self.resolve_block(*block_id),
             ExpressionKind::TypeOf(type_of) => self.resolve_expression(type_of.value),
             ExpressionKind::Array(any_array) => self.resolve_any_array(any_array),

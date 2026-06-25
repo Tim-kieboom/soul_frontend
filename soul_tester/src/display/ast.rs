@@ -7,7 +7,7 @@ use std::{
 use crate::display::writer::Writer;
 use anyhow::Result;
 use ast_model::{
-    AstStore, AstTree, FunctionKind, block::BlockId, expression::{AnyArray, ExpressionId, ExpressionKind, ForCondition, ForElementKind, IfBranch, MatchPattern, TypeofKind}, soul_type::{ArrayKind, Generic, SoulType, TupleKind}, statements::{
+    AstStore, AstTree, FunctionKind, block::BlockId, expression::{AnyArray, ExpressionId, ExpressionKind, ForCondition, ForElementKind, IfBranch, Lambda, MatchPattern, TypeofKind}, soul_type::{ArrayKind, Generic, SoulType, TupleKind}, statements::{
         Assignment, Enum, EnumVariant, ImplBlock, Import, ImportItem, ImportKind, Parameter, StatementId, StatementKind, Struct, Trait, TypeDef, UnionKind, UseBlock, VarPattern, Variable
     },
 };
@@ -306,6 +306,23 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 self.write_char('}')
             }
         }
+    }
+
+    fn write_lambda(&mut self, lambda: &Lambda) -> Result<()> {
+        if lambda.params.len() == 1 {
+            self.write_var_pattern(&lambda.params[0])?;
+        } else {
+            self.write_char('(')?;
+            for (i, param) in lambda.params.iter().enumerate() {
+                if i > 0 {
+                    self.write_str(", ")?;
+                }
+                self.write_var_pattern(param)?;
+            }
+            self.write_char(')')?;
+        }
+        self.write_fmt(format_args!(" {} ", LAMDA_ARROW_STR))?;
+        self.write_expression(lambda.body)
     }
 
     fn write_typedef(&mut self, type_def: &TypeDef) -> Result<()> {
@@ -782,6 +799,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 }
                 Ok(())
             }
+            ExpressionKind::Lambda(lambda) => self.write_lambda(lambda),
             ExpressionKind::Break => self.write_str(KeyWord::Break.as_str()),
             ExpressionKind::Continue => self.write_str(KeyWord::Continue.as_str()),
             ExpressionKind::Return(value) => {

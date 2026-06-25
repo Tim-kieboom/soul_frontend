@@ -18,6 +18,7 @@ mod big_test;
 mod conditional;
 mod enums;
 mod functions;
+mod lambda;
 mod literals;
 mod structs;
 mod use_block;
