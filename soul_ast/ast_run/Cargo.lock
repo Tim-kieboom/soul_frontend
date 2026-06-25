@@ -26,6 +26,7 @@ version = "0.1.0"
 dependencies = [
  "ast_model",
  "ast_parser",
+ "soul_name_resolver",
  "soul_tokenizer",
  "soul_utils",
 ]
@@ -101,6 +102,16 @@ dependencies = [
  "serde",
  "serde_core",
  "zmij",
+]
+
+[[package]]
+name = "soul_name_resolver"
+version = "0.1.0"
+dependencies = [
+ "ast_model",
+ "ast_parser",
+ "soul_tokenizer",
+ "soul_utils",
 ]
 
 [[package]]

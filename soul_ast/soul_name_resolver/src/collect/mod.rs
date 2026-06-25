@@ -1,39 +1,52 @@
-
-use ast_model::{block::BlockId, scope::{Scope, ScopeTypeEntry, ScopeTypeEntryKind}, statements::{Enum, StatementId, Struct, Trait}};
-use soul_utils::{fault::Fault, soul_error_internal, span::ModuleId};
+use ast_model::{
+    NodeId,
+    block::BlockId,
+    scope::{Scope, ScopeBuilder, ScopeTypeEntry, ScopeTypeEntryKind},
+    statements::{Enum, Struct, Trait},
+};
+use soul_utils::{
+    Ident,
+    fault::Fault,
+    soul_error_internal,
+    span::{ModuleId, Span},
+};
 
 use crate::NameResolver;
 
-mod statement;
+mod expression;
 mod import;
+mod soul_type;
+mod statement;
 
 impl<'a> NameResolver<'a> {
-    pub(crate) fn collect_module(&mut self, id: ModuleId) {
+    pub(super) fn collect_module(&mut self, id: ModuleId) {
         let global = match self.ast_modules.get(id) {
             Some(module) => module.global,
             None => {
                 self.log_fault(soul_error_internal!(format!("{id:?} not found"), None));
-                return
+                return;
             }
         };
 
         let prev = self.current.module;
         self.current.module = id;
         self.current.in_global = true;
-        self.collect_block(global);
+        self.push_scope(global);
+        self.collect_scopeless_block(global);
+        self.pop_scope();
         self.current.module = prev;
     }
 
-    pub(super) fn collect_block(&mut self, id: BlockId) {
+    fn collect_block(&mut self, id: BlockId) {
         self.push_scope(id);
+        let prev = self.current.in_global;
+        self.current.in_global = false;
         self.collect_scopeless_block(id);
+        self.current.in_global = prev;
         self.pop_scope();
     }
 
-    pub(crate) fn collect_scopeless_block(&mut self, id: BlockId) {
-        let node_id = self.alloc_node();
-        self.nodes.blocks.insert(id, node_id);
-        
+    fn collect_scopeless_block(&mut self, id: BlockId) {
         for statement in &self.store.blocks[id].statements {
             self.collect_statement(*statement);
         }
@@ -57,9 +70,9 @@ impl<'a> NameResolver<'a> {
             .scopes
             .push_scope(parent, self.current.module)
             .expect("no err");
-        
+
         let Some(scope_id) = self.scope_info.scopes.current_scope_id(self.current.module) else {
-            return
+            return;
         };
         self.scope_ids.insert(id, scope_id);
     }
@@ -71,20 +84,18 @@ impl<'a> NameResolver<'a> {
             .expect("no err");
     }
 
-    fn declare_enum(&mut self, id: StatementId, enum_: &Enum) {
-        let node_id = self.alloc_node();
-        self.nodes.statements.insert(id, node_id);
-
+    fn declare_enum(&mut self, enum_: &Enum) {
         let name = &enum_.name;
         let entry = ScopeTypeEntry {
-            node_id,
             span: name.span(),
             trait_parent: None,
             kind: ScopeTypeEntryKind::Enum,
+            node_id: enum_.id,
         };
 
-        let old_entry = self.current_scope_mut()
-            .insert_types(name.as_str(), entry);
+        self.declares
+            .try_insert_enum(enum_.id, enum_, self.current.module);
+        let old_entry = self.current_scope_mut().insert_types(name.as_str(), entry);
 
         if old_entry.is_some() {
             self.log_fault(Fault::error(
@@ -94,18 +105,17 @@ impl<'a> NameResolver<'a> {
         }
     }
 
-    fn declare_trait(&mut self, id: StatementId, trait_: &Trait) {
-        let node_id = self.alloc_node();
-        self.nodes.statements.insert(id, node_id);
-
+    fn declare_trait(&mut self, trait_: &Trait) {
         let name = &trait_.name;
         let scope_type = ScopeTypeEntry {
-            node_id,
+            node_id: trait_.id,
             trait_parent: None,
             span: name.span(),
             kind: ScopeTypeEntryKind::Trait,
         };
 
+        self.declares
+            .try_insert_trait(trait_.id, trait_, self.current.module);
         let old_entry = self
             .current_scope_mut()
             .insert_types(name.as_str(), scope_type);
@@ -118,18 +128,17 @@ impl<'a> NameResolver<'a> {
         }
     }
 
-    fn declare_struct(&mut self, id: StatementId, struct_: &Struct) {
-        let node_id = self.alloc_node();
-        self.nodes.statements.insert(id, node_id);
-
+    fn declare_struct(&mut self, struct_: &Struct) {
         let name = &struct_.name;
         let scope_type = ScopeTypeEntry {
-            node_id,
+            node_id: struct_.id,
             trait_parent: None,
             span: name.span(),
             kind: ScopeTypeEntryKind::Struct,
         };
 
+        self.declares
+            .try_insert_struct(struct_.id, struct_, self.current.module);
         let old_entry = self
             .current_scope_mut()
             .insert_types(name.as_str(), scope_type);
@@ -142,7 +151,31 @@ impl<'a> NameResolver<'a> {
         }
     }
 
-    fn current_scope_mut(&mut self) -> &mut Scope {
+    fn insert_struct_alias(
+        scopes: &mut ScopeBuilder,
+        name: &Ident,
+        span: Span,
+        id: NodeId,
+        module: ModuleId,
+    ) -> bool {
+        if scopes.flat_lookup_type(name, module).is_some() {
+            return false;
+        }
+
+        Self::static_current_scope_mut(scopes, module).insert_types(
+            name.as_str(),
+            ScopeTypeEntry {
+                span,
+                node_id: id,
+                trait_parent: None,
+                kind: ScopeTypeEntryKind::Struct,
+            },
+        );
+
+        true
+    }
+
+    pub fn current_scope_mut(&mut self) -> &mut Scope {
         self.scope_info
             .scopes
             .current_scope_mut(self.current.module)

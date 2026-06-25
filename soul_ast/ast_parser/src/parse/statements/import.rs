@@ -3,7 +3,8 @@ use std::path::PathBuf;
 use ast_model::statements::{Import, ImportItem, ImportKind, ImportPath, Statement, StatementKind};
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
-    Ident, collections::soul_import_path::SoulImportPath, error::SoulResult, fault::Fault, soul_names::Symbol
+    Ident, collections::soul_import_path::SoulImportPath, error::SoulResult, fault::Fault,
+    soul_names::Symbol,
 };
 
 use crate::{
@@ -42,7 +43,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         for (i, path) in paths.iter().enumerate() {
             if path.module.is_external() {
-                continue
+                continue;
             }
 
             self.parse_child_module(path, spans[i]);
@@ -152,10 +153,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             while self.current_is(&PREV_SUPER) {
                 self.bump();
                 if !current_path.pop() {
-                    return Err(Fault::error(
-                        "could not pop path",
-                        Some(self.token().span),
-                    ));
+                    return Err(Fault::error("could not pop path", Some(self.token().span)));
                 }
 
                 self.expect(&SEPARATOR)?;

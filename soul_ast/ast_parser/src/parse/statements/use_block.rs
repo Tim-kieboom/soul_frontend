@@ -46,7 +46,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             let use_block = UseBlock {
                 ty: method_type,
                 impls,
-                methodes,
+                methods: methodes,
                 statements,
                 use_generics,
             };
@@ -116,7 +116,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let use_block = UseBlock {
             ty: method_type,
             impls,
-            methodes,
+            methods: methodes,
             statements,
             use_generics,
         };

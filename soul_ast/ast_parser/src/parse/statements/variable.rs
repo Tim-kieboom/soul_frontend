@@ -40,6 +40,9 @@ impl<'a, 'f> Parser<'a, 'f> {
             None => {
                 return Ok(Statement::new_variable(
                     Variable {
+                        id: self.alloc_node(),
+                        is_public: false,
+                        
                         ty,
                         name,
                         modifier,
@@ -63,6 +66,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.bump();
         Ok(Statement::new_variable(
             Variable {
+                id: self.alloc_node(),
+                is_public: false,
+
                 ty,
                 name,
                 modifier,

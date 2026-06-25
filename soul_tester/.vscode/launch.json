@@ -4,15 +4,15 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-    
         {
-            "name": "Debug executable 'soul_tester'",
+            "name": "Debug with backtrace executable 'soul_tester'",
             "type": "lldb",
             "request": "launch",
             "cargo": {
                 "args": [
                     "run",
-                    "--bin=soul_tester"
+                    "--bin=soul_tester",
+                    "--features", "error_backtrace"
                 ]
             },
             "args": [],
@@ -27,8 +27,8 @@
             "cargo": {
                 "args": [
                     "run",
-                    "--bin=soul_tester",
-                    "--release"
+                    "--release",
+                    "--bin=soul_tester"
                 ]
             },
             "args": [],
@@ -36,16 +36,5 @@
                 "RUST_BACKTRACE": "1"
             }
         },
-        {
-            "name": "Debug unit tests in executable 'soul_tester'",
-            "type": "lldb",
-            "request": "launch",
-            "cargo": {
-                "args": [
-                    "test",
-                    "--bin=soul_tester"
-                ]
-            }
-        }
     ]
 }

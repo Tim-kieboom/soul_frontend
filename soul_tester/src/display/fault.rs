@@ -1,13 +1,16 @@
 use crate::{config::PrintConfigs, display::writer::Writer};
 use anyhow::Result;
 use soul_utils::char_colors::*;
+use soul_utils::collections::module_store::ModuleStore;
 use soul_utils::fault::Severity;
 use soul_utils::{fault::Fault, span::Span};
+use std::path::PathBuf;
 use std::str::Lines;
 
 pub(crate) fn display_fault(
     fault: &Fault,
     source_file: &str,
+    modules: &ModuleStore,
     configs: &PrintConfigs,
     writer: &mut impl Writer,
 ) -> Result<()> {
@@ -16,15 +19,17 @@ pub(crate) fn display_fault(
     let number_len = start_line.to_string().len();
     let begin_space = " ".repeat(number_len + 2);
 
-    let red = if configs.color { RED } else { "" };
-    let default = if configs.color { DEFAULT } else { "" };
-    
     #[cfg(feature = "error_backtrace")]
-    if configs.backtrace {
-        writer.push_fmt(format_args!("{red}{}{default}\n", fault.backtract()))?;
+    {
+        let red = if configs.color { RED } else { "" };
+        let default = if configs.color { DEFAULT } else { "" };
+        
+        if configs.backtrace {
+            writer.push_fmt(format_args!("{red}{}{default}\n", fault.backtract()))?;
+        }
     }
 
-    fault_message(fault, writer, configs)?;
+    fault_message(fault, modules, writer, configs)?;
     writer.push_char('\n')?;
     if let Some(span) = span {
         get_source_snippet(writer, &span, source_file.lines(), &begin_space)?;
@@ -32,7 +37,7 @@ pub(crate) fn display_fault(
     writer.writer_flush()
 }
 
-fn fault_message(fault: &Fault, writer: &mut impl Writer, configs: &PrintConfigs) -> Result<()> {
+fn fault_message(fault: &Fault, modules: &ModuleStore, writer: &mut impl Writer, configs: &PrintConfigs) -> Result<()> {
     let cyan = if configs.color { CYAN } else { "" };
     let default = if configs.color { DEFAULT } else { "" };
     let severity_color = if configs.color {
@@ -42,14 +47,15 @@ fn fault_message(fault: &Fault, writer: &mut impl Writer, configs: &PrintConfigs
     };
 
     let severity = match fault.severity() {
-        Severity::Note => "!!note!!",
-        Severity::Error => "!!error!!",
-        Severity::Warning => "!!warning!!",
+        Severity::Note => "Note",
+        Severity::Error => "Error",
+        Severity::Warning => "Warning",
     };
 
     match fault.span() {
         Some(span) => writer.push_fmt(format_args!(
-            "{severity_color}{severity}{cyan} at {span:?}; {}{default}",
+            "{severity_color}{severity}:{cyan} at {}:{span:?}\n{}{default}",
+            modules.get_path(span.module).unwrap_or(&PathBuf::new()).to_string_lossy(),
             fault.message()
         )),
         None => writer.push_fmt(format_args!(

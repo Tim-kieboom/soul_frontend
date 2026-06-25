@@ -1,0 +1,267 @@
+use ast_model::expression::{
+    AnyArray, Constructor, ExpressionId, ExpressionKind, For, ForCondition, FunctionCall, If,
+    IfBranch, Match, MatchMethod, MatchPattern, StringFormat, StructConstructor, TypeOf,
+};
+use soul_tokenizer::model::keyword::KeyWord;
+use soul_utils::fault::Fault;
+
+use crate::NameResolver;
+
+impl<'a> NameResolver<'a> {
+    pub(super) fn collect_expression(&mut self, expression_id: ExpressionId) {
+        const IS_NOT_CONDITION: bool = true;
+
+        self.inner_collect_expression(expression_id, IS_NOT_CONDITION);
+    }
+
+    fn inner_collect_expression(&mut self, expression_id: ExpressionId, is_codition: bool) {
+        let Some(expression) = self.store.expressions.get(expression_id) else {
+            return;
+        };
+
+        match &expression.node {
+            ExpressionKind::Break
+            | ExpressionKind::Null(_)
+            | ExpressionKind::Continue
+            | ExpressionKind::None(_)
+            | ExpressionKind::Literal(_)
+            | ExpressionKind::Variable(_)
+            | ExpressionKind::Undefined(_) => (),
+
+            ExpressionKind::If(if_) => self.collect_if(if_),
+            ExpressionKind::New(value)
+            | ExpressionKind::Pass(value)
+            | ExpressionKind::Copy(value)
+            | ExpressionKind::Sizeof(value) => self.collect_expression(*value),
+            ExpressionKind::Return(value) => {
+                if let Some(value) = value {
+                    self.collect_expression(*value)
+                }
+            }
+            
+            ExpressionKind::Ref(ref_) => self.collect_expression(ref_.value),
+            ExpressionKind::For(for_) => self.collect_for(for_),
+            ExpressionKind::Unary(unary) => self.collect_expression(unary.value),
+            ExpressionKind::Deref(deref) => self.collect_expression(deref.value),
+            ExpressionKind::Index(index) => {
+                self.collect_expression(index.index);
+                self.collect_expression(index.collection);
+            }
+
+            ExpressionKind::Tuple(values) => for value in values {
+                self.collect_expression(*value);
+            }
+            ExpressionKind::NamedTuple(values) => for (_, value) in values {
+                self.collect_expression(*value);
+            }
+
+            ExpressionKind::Match(match_) => self.collect_match(match_),
+            ExpressionKind::Binary(binary) => {
+                self.collect_expression(binary.left);
+                self.collect_expression(binary.right);
+            }
+            ExpressionKind::Block(block_id) => self.collect_block(*block_id),
+            ExpressionKind::TypeOf(type_of) => self.collect_typeof(type_of, is_codition),
+            ExpressionKind::Array(any_array) => self.collect_any_array(any_array),
+            ExpressionKind::NewArray(any_array) => self.collect_any_array(any_array),
+            ExpressionKind::Constructor(constructor) => self.collect_constructor(constructor),
+            ExpressionKind::FieldAccess(field_access) => {
+                self.collect_expression(field_access.object)
+            }
+            ExpressionKind::MatchMethod(match_method) => self.collect_match_methode(match_method),
+            ExpressionKind::StringFormat(string_format) => {
+                self.collect_string_format(string_format)
+            }
+            ExpressionKind::FunctionCall(function_call) => {
+                self.collect_function_call(function_call)
+            }
+            ExpressionKind::StructConstructor(struct_constructor) => {
+                self.collect_struct_constructor(struct_constructor)
+            }
+        }
+    }
+
+    fn collect_struct_constructor(&mut self, ctor: &StructConstructor) {
+        self.collect_type(&ctor.struct_type);
+        for (_, value) in &ctor.values {
+            self.collect_expression(*value);
+        }
+    }
+
+    fn collect_function_call(&mut self, call: &FunctionCall) {
+        for ty in &call.generics {
+            self.collect_type(ty);
+        }
+
+        if let Some(callee) = call.callee {
+            self.collect_expression(callee.value);
+        }
+
+        for arg in &call.arguments {
+            self.collect_expression(arg.value);
+        }
+    }
+
+    fn collect_string_format(&mut self, fmt: &StringFormat) {
+        for (_, id) in &fmt.parts {
+            self.collect_expression(*id);
+        }
+    }
+
+    fn collect_match_methode(&mut self, match_methode: &MatchMethod) {
+        self.collect_expression(match_methode.scrutinee);
+        for arm in &match_methode.arms {
+            self.push_scope(arm.body);
+            self.collect_scopeless_block(arm.body);
+            if let Some(binding) = &arm.binding {
+                self.insert_binding(binding);
+            }
+            self.pop_scope();
+        }
+    }
+
+    fn collect_constructor(&mut self, constructor: &Constructor) {
+        self.collect_type(&constructor.ty);
+        for argument in &constructor.arguments {
+            self.collect_expression(argument.value);
+        }
+    }
+
+    fn collect_any_array(&mut self, any_array: &AnyArray) {
+        match any_array {
+            AnyArray::Array(array) => {
+                if let Some(ty) = &array.collection_type {
+                    self.collect_type(ty);
+                }
+
+                if let Some(ty) = &array.element_type {
+                    self.collect_type(ty);
+                }
+
+                for value in &array.values {
+                    self.collect_expression(*value);
+                }
+            }
+            AnyArray::ArrayFiller(array_filler) => {
+                if let Some(ty) = &array_filler.collection_type {
+                    self.collect_type(ty);
+                }
+
+                if let Some(ty) = &array_filler.element_type {
+                    self.collect_type(ty);
+                }
+
+                if let Some(index) = &array_filler.for_index {
+                    self.insert_binding(index);
+                }
+
+                self.collect_expression(array_filler.amount);
+                self.collect_expression(array_filler.element);
+            }
+        }
+    }
+
+    fn collect_typeof(&mut self, type_of: &TypeOf, in_if_codition: bool) {
+        self.collect_expression(type_of.value);
+        let Some(binding) = &type_of.binding else {
+            return;
+        };
+
+        if !in_if_codition {
+            self.log_fault(Fault::error(
+                format!(
+                    "`{}` with binding can only be used as an if condition",
+                    KeyWord::Typeof.as_str()
+                ),
+                Some(binding.ident.span()),
+            ));
+            return;
+        }
+
+        self.insert_binding(binding);
+    }
+
+    fn collect_match(&mut self, match_: &Match) {
+        self.collect_expression(match_.scrutinee);
+        for arm in &match_.arms {
+            self.push_scope(arm.body);
+            self.collect_match_arm_pattern(&arm.pattern);
+            self.collect_scopeless_block(arm.body);
+            self.pop_scope();
+        }
+    }
+
+    fn collect_match_arm_pattern(&mut self, arm: &MatchPattern) {
+        match arm {
+            MatchPattern::Null => (),
+            MatchPattern::Wildcard => (),
+            MatchPattern::Literal(_) => (),
+            MatchPattern::NotNull(binding) | MatchPattern::Binding(binding) => {
+                self.insert_binding(binding)
+            }
+            MatchPattern::Array(match_patterns) => {
+                for arm in match_patterns {
+                    self.collect_match_arm_pattern(arm);
+                }
+            }
+            MatchPattern::Constructor(match_contructor) => {
+                if let Some(binding) = &match_contructor.binding {
+                    self.insert_binding(binding);
+                }
+            }
+            MatchPattern::If { pattern, if_condition } => {
+                self.collect_expression(*if_condition);
+                self.collect_match_arm_pattern(&pattern);
+            }
+        }
+    }
+
+    fn collect_for(&mut self, for_: &For) {
+        self.push_scope(for_.block);
+        match &for_.condition {
+            ForCondition::Loop => (),
+            ForCondition::While(id) => self.collect_expression(*id),
+            ForCondition::Foreach {
+                element_kind,
+                index,
+                collection,
+            } => {
+                for binding in element_kind.iter() {
+                    self.insert_binding(binding);
+                }
+                self.collect_expression(*collection);
+                if let Some(binding) = index {
+                    self.insert_binding(binding);
+                }
+            }
+        }
+        self.collect_scopeless_block(for_.block);
+        self.pop_scope();
+    }
+
+    fn collect_if(&mut self, if_: &If) {
+        const IN_IF_CODITION: bool = true;
+
+        self.push_scope(if_.block);
+        self.inner_collect_expression(if_.condition, IN_IF_CODITION);
+        self.collect_scopeless_block(if_.block);
+        self.pop_scope();
+
+        let mut current = if_.branch.as_ref();
+        while let Some(branch) = current {
+            match branch.as_ref() {
+                IfBranch::If(elif) => {
+                    self.push_scope(elif.block);
+                    self.inner_collect_expression(elif.condition, IN_IF_CODITION);
+                    self.collect_scopeless_block(elif.block);
+                    self.pop_scope();
+                    current = elif.branch.as_ref();
+                }
+                IfBranch::Else(block_id) => {
+                    self.collect_block(*block_id);
+                    current = None;
+                }
+            }
+        }
+    }
+}

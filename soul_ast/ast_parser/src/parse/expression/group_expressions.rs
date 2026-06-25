@@ -28,7 +28,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         if self.current_is(&ARRAY) {
             self.bump();
             return Ok(Spanned::new(
-                AnyArray::Array(Array::new(collection_type)),
+                AnyArray::Array(Array::new(self.alloc_node(), collection_type)),
                 self.span_combine(start_span),
             ));
         }
@@ -107,8 +107,9 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             let ident = self.try_bump_consume_ident()?;
             let value = if self.current_is(&COMMA) || self.current_is(&CURLY_CLOSE) {
+                let id = self.alloc_node();
                 self.store
-                    .insert_expression(Expression::new_variable(ident.clone()))
+                    .insert_expression(Expression::new_variable(id, ident.clone()))
             } else {
                 self.expect(&COLON)?;
                 self.parse_expression_id(&[COMMA, CURLY_CLOSE])?
@@ -154,7 +155,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             ArrayFiller {
                 amount,
                 element,
-                id: None,
+                id: self.alloc_node(),
                 element_type,
                 collection_type,
                 for_index: None,
@@ -191,7 +192,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.expect(&SQUARE_CLOSE)?;
         Ok(Spanned::new(
             Array {
-                id: None,
+                id: self.alloc_node(),
                 collection_type,
                 element_type,
                 values,

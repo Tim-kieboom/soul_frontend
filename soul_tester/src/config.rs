@@ -12,7 +12,8 @@ pub const COMPILER_OPTIONS: CompilerOptions = CompilerOptions {
 };
 
 pub const PRINT_CONFIGS: PrintConfigs = PrintConfigs {
-    backtrace: true,
+    #[cfg(feature = "error_backtrace")]
+    backtrace: false,
     color: true,
 };
 
@@ -53,6 +54,7 @@ impl Configs {
 }
 
 pub struct PrintConfigs {
+    #[cfg(feature = "error_backtrace")]
     pub backtrace: bool,
     pub color: bool,
 }

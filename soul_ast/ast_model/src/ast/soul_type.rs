@@ -12,6 +12,8 @@ pub enum SoulType {
     FormatString,
     /// any type
     Any,
+    /// tuple `(int, str)` and named_tuple `(number: int, text: str)`
+    TupleKind(TupleKind),
     /// Primitive types like int, bool, float
     Primitive(PrimitiveTypes),
     /// array type: `[1]int` or `[&]int` or `[&mut]int` or `[]int`
@@ -41,6 +43,23 @@ pub enum SoulType {
         variant: Ident,
     },
 }
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum TupleKind {
+    Tuple(Tuple),
+    NamedTuple(NamedTuple)
+}
+impl TupleKind {
+    pub fn len(&self) -> usize {
+        match self {
+            TupleKind::Tuple(types) => types.len(),
+            TupleKind::NamedTuple(items) => items.len(),
+        }
+    }
+}
+
+pub type Tuple = Vec<SoulType>;
+pub type NamedTuple = Vec<(Ident, SoulType)>;
 
 /// Array type
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

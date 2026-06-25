@@ -1,12 +1,18 @@
-use ast_model::{AstModuleStore, AstStore, Module, block::{Block, BlockId}, soul_type::SoulType};
+use ast_model::{
+    AstModuleStore, AstStore, Module,
+    block::{Block, BlockId},
+    soul_type::SoulType,
+};
 use soul_tokenizer::TokenStream;
 #[cfg(debug_assertions)]
 use soul_tokenizer::model::Token;
+use soul_utils::{
+    CrateContext, TypeModifier, collections::vec_set::VecSet, ids::IdAlloc, soul_error_internal,
+};
 use soul_utils::{collections::module_store::ModuleStore, span::ModuleId};
-use soul_utils::{CrateContext, TypeModifier, collections::vec_set::VecSet, ids::IdAlloc, soul_error_internal};
 use std::{collections::HashMap, path::PathBuf};
 
-use crate::{ParseInfo};
+use crate::ParseInfo;
 
 /// struct used to easily see debug info about current state of Parser can be ignored outside of debug
 #[cfg(debug_assertions)]
@@ -36,15 +42,15 @@ pub(crate) struct Parser<'a, 'f> {
     #[cfg(debug_assertions)]
     pub(crate) debug: DebugViewer,
 
+    pub(crate) id: ModuleId,
+    pub(crate) current: Current,
+    pub(crate) source_path: PathBuf,
     pub(crate) tokens: TokenStream<'a>,
     pub(crate) store: &'f mut AstStore,
+    pub(crate) crate_source_path: PathBuf,
     pub(crate) context: &'f mut CrateContext,
     pub(crate) modules: &'f mut ModuleStore,
     pub(crate) ast_modules: &'f mut AstModuleStore,
-    pub(crate) source_path: PathBuf,
-    pub(crate) crate_source_path: PathBuf,
-    pub(crate) current: Current,
-    pub(crate) id: ModuleId,
 }
 impl<'a, 'f> Parser<'a, 'f> {
     pub fn parse(tokens: TokenStream<'a>, name: String, info: ParseInfo<'f>) {
@@ -79,18 +85,12 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         match this.ast_modules.get_mut(id) {
             Some(module) => module.global = global,
-            None => this.log_fault(soul_error_internal!(
-                format!("{id:?} not found"), 
-                None
-            )),
+            None => this.log_fault(soul_error_internal!(format!("{id:?} not found"), None)),
         }
     }
 
     #[cfg(not(debug_assertions))]
-    fn new(
-        tokens: TokenStream<'a>,
-        info: ParseInfo<'f>,
-    ) -> Self {
+    fn new(tokens: TokenStream<'a>, info: ParseInfo<'f>) -> Self {
         Self {
             tokens,
             id: info.id,
@@ -105,10 +105,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     #[cfg(debug_assertions)]
-    fn new(
-        tokens: TokenStream<'a>,
-        info: ParseInfo<'f>,
-    ) -> Self {
+    fn new(tokens: TokenStream<'a>, info: ParseInfo<'f>) -> Self {
         use soul_tokenizer::model::TokenKind;
         use soul_utils::span::Span;
 

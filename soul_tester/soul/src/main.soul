@@ -6,14 +6,14 @@ pub sum(a: int, b: int): int {
     a + b
 }
 
-// pub trait Index {
-//     type Out
-//     index(&this, index: I): &Out
-// }
+pub trait Index {
+    type Out
+    index(&this, index: I): &Out
+}
 
-// pub trait IndexMut: Index {
-//     indexMut(&mut this, index: :I): &mut This.Out
-// }
+pub trait IndexMut: Index {
+    indexMut(&mut this, index: I): &mut This.Out
+}
 
 pub struct Map {
 
@@ -31,7 +31,7 @@ pub struct Map {
 
     pub This.[int](array) {
         
-        This{list: list.into(), ..}
+        This{list: array.into(), ..}
     }
 
     sum(this, b: int): int {
@@ -44,49 +44,31 @@ use Map at(&this, i: uint): int {
 }
 
 main() {
-    option: ?int = null
-    size := option.sizeof
-    option.pass
-    num := option
-        .null{1}
-        .!null{it}
-
-    num2 := match option {
-        null => 1
-        !null(val) => val
-    }
-    num3 := if option typeof !null(val) {
-        val
-    } else {
-        1
-    }
-
-    enum Union {
-        None,
-        Int{field: int, foo: bool},
-        Uint(int),
-        String(str),
-        Fmt(fstr),
-    }
-
-    obj := Union.None
-    string := obj
-        .None{"none"}
-        .Int{"int"}
-        .Uint{"uint"}
-
-    num := obj
-        .Uint{it}
-        .else{return}
-
     ch := 'a'
+
     cstring := c"cstr"
     fstring = f"hello {1}{1 * 2 + 1} world{1}"
+    println("hello world")
+
     mut obj := Map.(1)
     obj = Map.[1, 2, 3]
     obj.sum(1)
-    println("hello world")
+
     num := new[int: for 10 => undefined]
+    tuple: (int, str) = .(1, "text".copy)
+    named: (number: int, text: &str) = .{number: 1, text: "text"}
+
+    (var1, var2) := tuple()
+    {field, field2: text} := namedTuple()
+
+    fn1 := arg => arg + 1
+    fn2 := (arg1, arg1) => arg1 + arg2
+    fn3 := arg => {
+        arg += 1
+        arg + 1
+    }
+    
+    *u8.()?.len()
 }
 
 result(): Res<int> {

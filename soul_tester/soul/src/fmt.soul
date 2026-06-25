@@ -1,5 +1,5 @@
 import (
-    crate.inner.doubleInner
+    crate.test.doubleInner
 )
 
 test(): bool {

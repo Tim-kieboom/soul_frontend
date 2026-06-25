@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use ast_model::NodeId;
 use soul_tokenizer::{
     TokenStreamPosition,
     model::{Token, TokenKind, keyword::KeyWord},
@@ -27,6 +28,7 @@ pub const COMMA: TokenKind = TokenKind::Symbol(Symbol::Comma);
 pub const ARRAY: TokenKind = TokenKind::Symbol(Symbol::Array);
 pub const COLON: TokenKind = TokenKind::Symbol(Symbol::Colon);
 pub const PASS: TokenKind = TokenKind::Keyword(KeyWord::Pass);
+pub const COPY: TokenKind = TokenKind::Keyword(KeyWord::Copy);
 pub const POINTER: TokenKind = TokenKind::Symbol(Symbol::Star);
 pub const MATCH: TokenKind = TokenKind::Keyword(KeyWord::Match);
 pub const ASSIGN: TokenKind = TokenKind::Symbol(Symbol::Assign);
@@ -317,6 +319,10 @@ impl<'a, 'f> Parser<'a, 'f> {
     /// checked if node is end of line and ends with a semicolon
     pub(crate) fn ends_semicolon(&mut self) -> bool {
         self.current_is(&SEMI_COLON) && self.peek().kind == TokenKind::EndLine
+    }
+
+    pub(crate) fn alloc_node(&mut self) -> NodeId {
+        self.store.alloc_node()
     }
 
     pub(crate) fn log_fault(&mut self, fault: Fault) {

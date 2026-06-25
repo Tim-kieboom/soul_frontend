@@ -1,13 +1,17 @@
 use std::collections::HashMap;
 
-use crate::{NodeId, soul_type::SoulType, statements::FunctionSignature};
+use crate::{CustomType, NodeId, soul_type::SoulType, statements::{Enum, FunctionSignature, Struct, Trait}};
 use soul_utils::{FunctionId, TypeModifier, collections::vec_map::VecMap, span::ModuleId};
 
 /// A store of all declarations in a module.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct DeclareStore {
     /// The main function (entry point), if defined.
-    main_function: Option<FunctionId>,
+    pub main_function: Option<FunctionId>,
+    /// All variable resolutions, indexed by their ID.
+    resolves: VecMap<NodeId, NodeId>,
+    /// All structs declarations, indexed by their ID.
+    custom_types: VecMap<NodeId, (CustomType, ModuleId)>,
     /// All function declarations, indexed by their ID.
     functions: VecMap<FunctionId, (FunctionSignature, ModuleId)>,
     /// All function declarations, indexed by their ID.
@@ -20,9 +24,11 @@ impl DeclareStore {
     pub fn new() -> Self {
         Self {
             main_function: None,
-            functions: VecMap::const_default(),
-            function_names: HashMap::default(),
-            variable_type: VecMap::const_default(),
+            resolves: VecMap::new(),
+            functions: VecMap::new(),
+            custom_types: VecMap::new(),
+            variable_type: VecMap::new(),
+            function_names: HashMap::new(),
         }
     }
 
@@ -52,6 +58,44 @@ impl DeclareStore {
         self.find_function_with_module(name, owner_kind)
             .map(|(id, _)| id)
     }
+
+    /// try Inserts a enum into the store.
+    pub fn try_insert_enum(&mut self, index: NodeId, obj: &Enum, module: ModuleId) {
+        if self.custom_types.contains(index) {
+            return;
+        }
+
+        self.custom_types
+            .insert(index, (CustomType::Enum(obj.clone()), module));
+    }
+
+    /// try Inserts a trait into the store.
+    pub fn try_insert_trait(&mut self, index: NodeId, obj: &Trait, module: ModuleId) {
+        if self.custom_types.contains(index) {
+            return;
+        }
+
+        self.custom_types
+            .insert(index, (CustomType::Trait(obj.clone()), module));
+    }
+
+    /// try Inserts a struct into the store.
+    pub fn try_insert_struct(&mut self, index: NodeId, obj: &Struct, module: ModuleId) {
+        if self.custom_types.contains(index) {
+            return;
+        }
+
+        self.custom_types
+            .insert(index, (CustomType::Struct(obj.clone()), module));
+    }
+
+    pub fn resolve(&mut self, node_id: NodeId, resolved: NodeId) -> Option<NodeId> {
+        self.resolves.insert(node_id, resolved)
+    }
+
+    pub fn get_resolve(&self, node_id: NodeId) -> Option<NodeId> {
+        self.resolves.get(node_id).copied()
+    } 
 
     pub fn find_function_with_module(
         &self,

@@ -1,0 +1,20 @@
+import .doubleInner
+
+options() {
+    option: ?int = null
+    size := option.sizeof
+    option.pass
+    num := option
+        .null{1}
+        .!null{it}
+
+    num2 := match option {
+        null => 1
+        !null(val) => val
+    }
+    num3 := if option typeof !null(val) {
+        val
+    } else {
+        1
+    }
+}

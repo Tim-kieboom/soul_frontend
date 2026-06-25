@@ -73,6 +73,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         if self.current_is_any(STAMENT_END_TOKENS) {
             let span = self.token().span;
             let variable = Variable {
+                id: self.alloc_node(),
+                is_public: false,
+
                 ty,
                 name,
                 modifier,
@@ -95,6 +98,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.bump();
         let value = self.parse_expression_id(STAMENT_END_TOKENS).try_err()?;
         let variable = Variable {
+            id: self.alloc_node(),
+            is_public: false,
+            
             name,
             ty,
             modifier,

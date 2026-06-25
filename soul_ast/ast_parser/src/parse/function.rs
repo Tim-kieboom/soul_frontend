@@ -1,9 +1,6 @@
 use ast_model::{
-    FunctionKind,
-    expression::{Argument, Expression, ExpressionId, FunctionCall},
-    soul_type::{ArrayKind, ArrayType, Generic, SoulType},
-    statements::{
-        ExternLanguage, ExternalFunction, Function, FunctionSignature, FunctionThisKind, Parameter,
+    FunctionKind, expression::{Argument, Expression, FunctionCall, FunctionCallee}, soul_type::{ArrayKind, ArrayType, Generic, SoulType}, statements::{
+        ExternLanguage, Function, FunctionSignature, FunctionThisKind, Parameter,
         Statement,
     },
 };
@@ -22,10 +19,8 @@ use soul_utils::{
 };
 
 use crate::{
-    parser::Parser,
-    utils::{
-        ARRAY, ARROW_LEFT, ARROW_RIGHT, ASSIGN, COLON, COMMA, CURLY_OPEN, DOT, DOUBLE_QUESTION,
-        REF, ROUND_CLOSE, ROUND_OPEN, SEMI_COLON, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS,
+    parser::Parser, utils::{
+        ARRAY, ARROW_LEFT, ARROW_RIGHT, ASSIGN, COLON, COMMA, CURLY_OPEN, DOT, DOUBLE_QUESTION, OPTIONAL, REF, ROUND_CLOSE, ROUND_OPEN, SEMI_COLON, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS,
     },
 };
 const CONTRUCTOR_STR: &str = "___ctor";
@@ -64,7 +59,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn try_parse_function_call(
         &mut self,
         start_span: Span,
-        callee: Option<ExpressionId>,
+        callee: Option<FunctionCallee>,
         name: &Ident,
     ) -> TryResult<Expression, Fault> {
         if !self.current_is_any(&[ROUND_OPEN, ARROW_LEFT]) {
@@ -112,7 +107,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn try_parse_function_call_generic(
         &mut self,
         start_span: Span,
-        callee: Option<ExpressionId>,
+        callee: Option<FunctionCallee>,
         generics: Vec<SoulType>,
         ident: &Ident,
     ) -> TryResult<Spanned<FunctionCall>, Fault> {
@@ -124,13 +119,20 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         let arguments = self.parse_arguments().try_err()?;
+        let optional_map = self.current_is(&OPTIONAL);
+        if optional_map {
+            self.bump();
+            if !self.current_is(&DOT) {
+                return TryErr(self.get_expect_error(&DOT))
+            }
+        }
         TryOk(Spanned::new(
             FunctionCall {
                 callee,
                 generics,
-                id: None,
+                id: self.alloc_node(),
                 arguments,
-                resolved: None,
+                optional_map,
                 name: ident.clone(),
             },
             self.span_combine(start_span),
@@ -221,7 +223,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 let span = signature.span;
                 let id = self
                     .store
-                    .insert_function(FunctionKind::External(ExternalFunction { signature }));
+                    .insert_function(FunctionKind::Signature(signature));
                 Ok(Statement::from_external_function(Spanned::new(id, span)))
             }
             Err(TryError::IsErr(err)) => Err(err),
@@ -358,17 +360,20 @@ impl<'a, 'f> Parser<'a, 'f> {
                             id,
                             name,
                             modifier,
+                            is_public: false,
                             method_type: methode_type.clone(),
                             return_type: methode_type.clone(),
                             parameters: vec![Parameter {
                                 name: arg,
-                                ty: array_type,
-                                modifier: TypeModifier::Const,
                                 default: None,
+                                ty: array_type,
+                                id: self.alloc_node(),
+                                modifier: TypeModifier::Const,
                             }],
                             generics: vec![],
                             function_kind: FunctionThisKind::Static,
                             external: None,
+                            node_id: self.alloc_node(),
                         },
                         self.span_combine(start_span),
                     ),
@@ -421,6 +426,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         };
 
         let signature = FunctionSignature {
+            node_id: self.alloc_node(),
             name,
             external,
             modifier,
@@ -428,6 +434,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             parameters,
             return_type,
             function_kind,
+            is_public: false,
             id: self.store.alloc_function(),
             method_type: method_type.clone(),
         };
@@ -513,6 +520,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
 
             types.push(Parameter {
+                id: self.alloc_node(),
                 ty,
                 name,
                 default,

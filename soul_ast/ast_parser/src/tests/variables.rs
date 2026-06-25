@@ -35,7 +35,7 @@ fn variable_declaration_with_init() {
     assert!(initialize_value.is_some());
 
     let init = &store.expressions[initialize_value.unwrap()];
-    assert_eq!(init.node, ExpressionKind::Literal((None, Literal::Uint(5))));
+    assert!(matches!(init.node, ExpressionKind::Literal((_, Literal::Uint(5)))));
 }
 
 #[test]

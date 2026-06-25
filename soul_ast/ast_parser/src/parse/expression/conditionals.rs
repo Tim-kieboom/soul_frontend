@@ -1,19 +1,22 @@
 use crate::{
     parser::Parser,
     utils::{
-        COMMA, CURLY_CLOSE, CURLY_OPEN, DOT, ELSE, IF, LAMBDA_ARROW, MATCH, NOT, NULL, ROUND_CLOSE, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS
+        COMMA, CURLY_CLOSE, CURLY_OPEN, DOT, ELSE, IF, LAMBDA_ARROW, MATCH, NOT, NULL, ROUND_CLOSE,
+        ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS,
     },
 };
 use ast_model::{
     block::{Block, BlockId},
     expression::{
-        Binding, Expression, ExpressionId, ExpressionKind, If, IfBranch, Match, MatchArm, MatchContructor, MatchPattern
+        Binding, Expression, ExpressionId, ExpressionKind, If, IfBranch, Match, MatchArm,
+        MatchContructor, MatchPattern,
     },
     statements::Statement,
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
-    Ident, TypeModifier, error::SoulResult, fault::Fault, ids::IdAlloc, soul_names::Symbol, span::Span
+    Ident, TypeModifier, error::SoulResult, fault::Fault, ids::IdAlloc,
+    span::Span,
 };
 
 const IF_STR: &str = KeyWord::If.as_str();
@@ -56,10 +59,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let arms = self.parse_match_arms()?;
 
         Ok(Expression::new(
-            ExpressionKind::Match(Match {
-                arms,
-                scrutinee,
-            }),
+            ExpressionKind::Match(Match { arms, scrutinee }),
             start_span,
         ))
     }
@@ -93,7 +93,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 statements: vec![statement],
                 span: self.span_combine(start_span),
             });
-            return Ok((Some(Binding::new(ident)), block));
+            return Ok((Some(Binding::new(self.alloc_node(), ident)), block));
         }
 
         self.goto(save_pos);
@@ -112,17 +112,23 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            let pattern = match self.parse_match_pattern() {
+            let mut pattern = match self.parse_match_pattern() {
                 Ok(val) => val,
                 Err(err) => {
                     self.log_fault(err);
                     self.skip_match_pattern();
-                    continue
+                    continue;
                 }
             };
+
+            if self.current_is(&IF) {
+                self.bump();
+                let if_condition = self.parse_expression_id(&[LAMBDA_ARROW])?;
+                pattern = MatchPattern::If { pattern: Box::new(pattern), if_condition };
+            }
             self.skip_end_lines();
 
-            if !self.current_is(&TokenKind::Symbol(Symbol::LambdaArrow)) {
+            if !self.current_is(&LAMBDA_ARROW) {
                 return Err(Fault::error(
                     "expected '=>' in match arm",
                     Some(self.token().span),
@@ -225,22 +231,22 @@ impl<'a, 'f> Parser<'a, 'f> {
         if self.current_is(&NOT) && self.peek_is(&NULL) {
             self.bump();
             self.bump();
-            
+
             self.expect(&ROUND_OPEN)?;
             let binding = self.try_bump_consume_ident()?;
             self.expect(&ROUND_CLOSE)?;
-            return Ok(MatchPattern::NotNull(Binding::new(binding)))
-        } 
-        
+            return Ok(MatchPattern::NotNull(Binding::new(self.alloc_node(), binding)));
+        }
+
         if self.current_is(&NULL) {
             self.bump();
-            return Ok(MatchPattern::Null)
+            return Ok(MatchPattern::Null);
         }
 
         let ident_name = match &self.token().kind {
             TokenKind::Ident(name) => name.clone(),
             _ => {
-                let end_tokens = [TokenKind::Symbol(Symbol::LambdaArrow), COMMA, SQUARE_CLOSE];
+                let end_tokens = [LAMBDA_ARROW, IF, COMMA, SQUARE_CLOSE];
                 let expr = self.parse_expression(&end_tokens)?;
                 return match expr.node {
                     ExpressionKind::Literal((_, lit)) => Ok(MatchPattern::Literal(lit)),
@@ -253,7 +259,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         };
 
         if KeyWord::from_str(&ident_name).is_some() {
-            let end_tokens = [TokenKind::Symbol(Symbol::LambdaArrow), COMMA, SQUARE_CLOSE];
+            let end_tokens = [LAMBDA_ARROW, IF, COMMA, SQUARE_CLOSE];
             let expr = self.parse_expression(&end_tokens)?;
             return match expr.node {
                 ExpressionKind::Literal((_, lit)) => Ok(MatchPattern::Literal(lit)),
@@ -289,7 +295,8 @@ impl<'a, 'f> Parser<'a, 'f> {
                     let bind_span = self.token().span;
                     let bind_name = bind_name.clone();
                     self.bump();
-                    Some(Ident::new(bind_name, bind_span))
+                    let ident = Ident::new(bind_name, bind_span);
+                    Some(Binding::new(self.store.alloc_node(), ident))
                 } else {
                     None
                 };
@@ -302,7 +309,6 @@ impl<'a, 'f> Parser<'a, 'f> {
                 type_name: Ident::new(ident_name, type_name_span),
                 variant_name: Ident::new(variant_name, variant_span),
                 binding,
-                binding_id: None,
             }));
         }
 
@@ -310,15 +316,15 @@ impl<'a, 'f> Parser<'a, 'f> {
         let bind_span = self.token().span;
         self.bump();
         Ok(MatchPattern::Binding(Binding {
-            id: None,
+            id: self.store.alloc_node(),
             ident: Ident::new(ident_name, bind_span),
         }))
     }
-    
+
     fn skip_match_pattern(&mut self) {
         self.skip_till(&[CURLY_OPEN, TokenKind::EndLine]);
         if !self.current_is(&CURLY_OPEN) {
-            return
+            return;
         }
 
         let mut bracket_stack = 1;
@@ -334,7 +340,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             if bracket_stack == 0 {
                 self.bump();
-                break
+                break;
             }
         }
     }

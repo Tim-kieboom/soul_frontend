@@ -1,5 +1,7 @@
 use ast_model::{
-    expression::ExpressionKind, soul_type::SoulType, statements::{EnumVariant, StatementKind, UnionKind}
+    expression::ExpressionKind,
+    soul_type::SoulType,
+    statements::{EnumVariant, StatementKind, UnionKind},
 };
 use soul_utils::{fault::Severity, soul_names::PrimitiveTypes};
 
@@ -177,8 +179,7 @@ fn enum_named_union_variants() {
 
 #[test]
 fn enum_tuple_union_variants() {
-    let (module, store, context) =
-        parse("enum Foo { Bar(int), Baz(int, bool) }");
+    let (module, store, context) = parse("enum Foo { Bar(int), Baz(int, bool) }");
     assert_eq!(
         context.faults.count_severity(Severity::Error),
         0,

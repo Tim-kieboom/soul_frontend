@@ -20,7 +20,7 @@ pub fn to_ast<'a, 'f>(
     let info = ParseInfo {
         parent: None,
         source_folder: source_folder.clone(),
-        crate_source_folder: source_folder,
+        crate_source_folder: source_folder.clone(),
         store: &mut ast.store,
         context: &mut ast.context,
         id: module_store.get_root_id(),
@@ -28,6 +28,7 @@ pub fn to_ast<'a, 'f>(
         ast_modules: &mut ast.modules,
     };
     parse_module(tokens, name, info);
+    // name_resolve(source_folder, module_store, &mut ast);
 
     ast
 }

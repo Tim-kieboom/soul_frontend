@@ -1,7 +1,7 @@
 use std::mem::swap;
 
 use ast_model::expression::{
-    Constructor, Deref, Expression, ExpressionId, ExpressionKind, MatchMethod, MatchMethodArm, MatchMethodVariant, Ref, VariableExpression
+    Constructor, Deref, Expression, ExpressionId, ExpressionKind, FunctionCallee, MatchMethod, MatchMethodArm, MatchMethodVariant, Ref, VariableExpression,
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
@@ -14,8 +14,9 @@ use soul_utils::{
 };
 
 use crate::{
-    parser::Parser,
-    utils::{ARRAY, ARROW_LEFT, CURLY_OPEN, ELSE, MUT, NOT, NULL, PASS, POINTER, REF, ROUND_OPEN, SIZEOF, SQUARE_CLOSE, SQUARE_OPEN},
+    parser::Parser, utils::{
+        ARRAY, ARROW_LEFT, COPY, CURLY_OPEN, ELSE, MUT, NOT, NULL, PASS, POINTER, REF, ROUND_OPEN, SIZEOF, SQUARE_CLOSE, SQUARE_OPEN,
+    },
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
@@ -23,6 +24,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         &mut self,
         left: &mut Expression,
         start_span: Span,
+        optional_map: bool,
     ) -> SoulResult<()> {
         let index =
             self.parse_expression_id(&[SQUARE_CLOSE, TokenKind::EndLine, TokenKind::EndFile])?;
@@ -31,8 +33,14 @@ impl<'a, 'f> Parser<'a, 'f> {
         let mut value = Expression::error();
         swap(left, &mut value);
 
-        let id = self.store.insert_expression(value);
-        *left = Expression::new_index(id, index, self.span_combine(start_span));
+        let collection = self.store.insert_expression(value);
+        *left = Expression::new_index(
+            self.alloc_node(),
+            collection,
+            index,
+            self.span_combine(start_span),
+            optional_map
+        );
         Ok(())
     }
 
@@ -40,6 +48,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         &mut self,
         left: &mut Expression,
         start_span: Span,
+        optional_map: bool,
     ) -> SoulResult<()> {
         let generics = if self.current_is(&ARROW_LEFT) {
             self.parse_generic_define().merge_to_result()?
@@ -54,12 +63,9 @@ impl<'a, 'f> Parser<'a, 'f> {
                 swap(left, &mut value);
 
                 let id = self.store.insert_expression(value);
-                *left = Expression::new(
-                    ExpressionKind::Pass(id), 
-                    self.span_combine(start_span),
-                );
+                *left = Expression::new(ExpressionKind::Pass(id), self.span_combine(start_span));
 
-                return Ok(())
+                return Ok(());
             }
             &SIZEOF => {
                 self.bump();
@@ -67,12 +73,19 @@ impl<'a, 'f> Parser<'a, 'f> {
                 swap(left, &mut value);
 
                 let id = self.store.insert_expression(value);
-                *left = Expression::new(
-                    ExpressionKind::Sizeof(id), 
-                    self.span_combine(start_span),
-                );
+                *left = Expression::new(ExpressionKind::Sizeof(id), self.span_combine(start_span));
 
-                return Ok(())
+                return Ok(());
+            }
+            &COPY => {
+                self.bump();
+                let mut value = Expression::error();
+                swap(left, &mut value);
+
+                let id = self.store.insert_expression(value);
+                *left = Expression::new(ExpressionKind::Copy(id), self.span_combine(start_span));
+
+                return Ok(());
             }
             &REF => {
                 self.bump();
@@ -86,11 +99,15 @@ impl<'a, 'f> Parser<'a, 'f> {
 
                 let value = self.store.insert_expression(expression);
                 *left = Expression::new(
-                    ExpressionKind::Ref(Ref{ id: None, is_mutable, value }), 
+                    ExpressionKind::Ref(Ref {
+                        id: self.store.alloc_node(),
+                        is_mutable,
+                        value,
+                    }),
                     self.span_combine(start_span),
                 );
 
-                return Ok(())
+                return Ok(());
             }
             &POINTER => {
                 self.bump();
@@ -104,11 +121,14 @@ impl<'a, 'f> Parser<'a, 'f> {
 
                 let value = self.store.insert_expression(expression);
                 *left = Expression::new(
-                    ExpressionKind::Deref(Deref{ id: None, value }), 
+                    ExpressionKind::Deref(Deref {
+                        id: self.store.alloc_node(),
+                        value,
+                    }),
                     self.span_combine(start_span),
                 );
 
-                return Ok(())
+                return Ok(());
             }
             &ROUND_OPEN => {
                 let mut value = Expression::error();
@@ -122,7 +142,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 let arguments = self.parse_arguments()?;
                 let ty = self.type_from_ident(name, generics);
                 let ctor = Constructor {
-                    id: None,
+                    id: self.alloc_node(),
                     ty,
                     arguments,
                 };
@@ -131,7 +151,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                     self.span_combine(start_span),
                 );
 
-                return Ok(())
+                return Ok(());
             }
             _ => (),
         };
@@ -155,7 +175,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             return Ok(());
         }
 
-        let success = self.try_parse_method_arm(left, start_span)?;
+        let success = self.try_parse_method_arm(left, start_span, optional_map)?;
         if success {
             return Ok(());
         }
@@ -165,10 +185,15 @@ impl<'a, 'f> Parser<'a, 'f> {
         let mut value = Expression::error();
         swap(left, &mut value);
 
-        let id = self.store.insert_expression(value);
-        *left = match self.try_parse_function_call_generic(start_span, Some(id), generics, &ident) {
+        let value = self.store.insert_expression(value);
+        let callee = FunctionCallee {
+            value,
+            optional_map,
+        };
+
+        *left = match self.try_parse_function_call_generic(start_span, Some(callee), generics, &ident) {
             Ok(call) => Expression::from_function_call(call),
-            Err(TryError::IsNotValue(_)) => self.parse_field_access(id, ident)?,
+            Err(TryError::IsNotValue(_)) => self.parse_field_access(value, ident, optional_map)?,
             Err(TryError::IsErr(err)) => return Err(err),
         };
         Ok(())
@@ -178,8 +203,8 @@ impl<'a, 'f> Parser<'a, 'f> {
         &mut self,
         left: &mut Expression,
         start_span: Span,
+        optional_map: bool,
     ) -> SoulResult<bool> {
-
         let ident = match &self.token().kind {
             &ELSE if self.peek_is(&CURLY_OPEN) => {
                 self.bump();
@@ -196,7 +221,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
             TokenKind::Ident(_) if self.peek_is(&CURLY_OPEN) => {
                 let ident = self.try_bump_consume_ident()?;
-                MatchMethodVariant::Ident(ident)
+                MatchMethodVariant::Name(ident)
             }
             _ => return Ok(false),
         };
@@ -219,6 +244,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             swap(left, &mut value);
 
             let method = MatchMethod {
+                optional_map,
                 scrutinee: self.store.insert_expression(value),
                 arms: vec![MatchMethodArm {
                     variant: ident,
@@ -235,10 +261,16 @@ impl<'a, 'f> Parser<'a, 'f> {
         return Ok(true);
     }
 
-    fn parse_field_access(&mut self, left: ExpressionId, ident: Ident) -> SoulResult<Expression> {
+    fn parse_field_access(&mut self, left: ExpressionId, ident: Ident, optional_map: bool) -> SoulResult<Expression> {
         match KeyWord::from_str(ident.as_str()) {
             Some(KeyWord::Sizeof) => self.parse_sizeof(left),
-            _ => Ok(Expression::new_field(self.store, left, ident)),
+            _ => Ok(Expression::new_field(
+                self.alloc_node(),
+                self.store,
+                left,
+                ident,
+                optional_map
+            )),
         }
     }
 }

@@ -32,10 +32,10 @@ fn if_statement() {
                     ..
                 }) => {
                     let cond = &store.expressions[*condition];
-                    assert_eq!(
+                    assert!(matches!(
                         cond.node,
-                        ExpressionKind::Literal((None, Literal::Bool(true)))
-                    );
+                        ExpressionKind::Literal((_, Literal::Bool(true)))
+                    ));
                     assert!(branch.is_none());
                     let body = &store.blocks[*block];
                     assert!(body.statements.is_empty());
@@ -152,10 +152,10 @@ fn return_with_value() {
             match &expr.node {
                 ExpressionKind::Return(Some(val)) => {
                     let val_expr = &store.expressions[*val];
-                    assert_eq!(
+                    assert!(matches!(
                         val_expr.node,
-                        ExpressionKind::Literal((None, Literal::Uint(42)))
-                    );
+                        ExpressionKind::Literal((_, Literal::Uint(42)))
+                    ));
                 }
                 _ => panic!("expected Return(Some)"),
             }

@@ -1,14 +1,10 @@
 use soul_utils::{
-    FunctionId, Ident, impl_soul_ids,
+    Ident, impl_soul_ids,
     span::{Span, Spanned},
 };
 
 use crate::{
-    AstStore, NodeId,
-    block::BlockId,
-    literal::Literal,
-    operators::{BinaryOperator, UnaryOperator},
-    soul_type::SoulType,
+    AstStore, NodeId, block::BlockId, literal::Literal, operators::{BinaryOperator, UnaryOperator}, soul_type::SoulType,
 };
 
 impl_soul_ids!(ExpressionId);
@@ -22,13 +18,13 @@ pub struct Expression {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ExpressionKind {
     /// `undefined`
-    Undefined(Option<NodeId>),
+    Undefined(NodeId),
     /// `null`
-    Null(Option<NodeId>),
-    /// A `default` literal or default value e.g., '()'.
-    Default(Option<NodeId>),
+    Null(NodeId),
+    /// none as expression e.g., '()'.
+    None(NodeId),
     /// A literal value (number, string, etc.).
-    Literal((Option<NodeId>, Literal)),
+    Literal((NodeId, Literal)),
     StringFormat(StringFormat),
 
     /// Indexing into a collection, e.g., `arr[i]`.
@@ -46,10 +42,15 @@ pub enum ExpressionKind {
     Variable(VariableExpression),
     /// An array, e.g., `[1, 2, 3]`, `[for 2 => 1]`.
     Array(AnyArray),
+    /// An tuple, e.g., `.(1, "text")`
+    Tuple(Vec<ExpressionId>),
+    /// An namedTuple, e.g., `.{number: 1, text: "text"}`.
+    NamedTuple(Vec<(Ident, ExpressionId)>),
 
     /// `i32.sizeof // returns 4`
     Sizeof(ExpressionId),
-
+    /// `"text".copy // copys &str into str`
+    Copy(ExpressionId),
     /// `i32.pass // returns is null or Err()`
     Pass(ExpressionId),
 
@@ -93,8 +94,8 @@ pub enum ExpressionKind {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StringFormat {
     pub to_string: bool,
-    pub parts: Vec<(String, ExpressionId)>,
     pub trailing: String,
+    pub parts: Vec<(String, ExpressionId)>,
 }
 
 /// `expr typeof Type.Variant` — type check a union value
@@ -104,8 +105,7 @@ pub struct StringFormat {
 pub struct TypeOf {
     pub value: ExpressionId,
     pub kind: TypeofKind,
-    pub binding: Option<Ident>,
-    pub binding_id: Option<NodeId>,
+    pub binding: Option<Binding>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -125,6 +125,7 @@ pub struct MatchMethod {
     pub scrutinee: ExpressionId,
     /// The match arms, one per `.Variant{...}` segment.
     pub arms: Vec<MatchMethodArm>,
+    pub optional_map: bool,
 }
 
 /// A single arm in a match-method expression.
@@ -143,7 +144,7 @@ pub enum MatchMethodVariant {
     Null,
     Else,
     NotNull,
-    Ident(Ident),
+    Name(Ident),
 }
 impl MatchMethodVariant {
     pub fn as_str(&self) -> &str {
@@ -151,7 +152,7 @@ impl MatchMethodVariant {
             MatchMethodVariant::Null => "null",
             MatchMethodVariant::Else => "else",
             MatchMethodVariant::NotNull => "!null",
-            MatchMethodVariant::Ident(ident) => ident.as_str(),
+            MatchMethodVariant::Name(name) => name.as_str(),
         }
     }
 }
@@ -189,12 +190,17 @@ pub enum MatchPattern {
     Literal(Literal),
     /// A wildcard (default) pattern.
     Wildcard,
-    /// optional is null `null =>`.
+    /// optional is null `null => ()`.
     Null,
-    /// optional is not null `!null(binding) => `.
+    /// optional is not null `!null(binding) => ()`.
     NotNull(Binding),
     /// A binding pattern: `name` binds the scrutinee to a variable.
     Binding(Binding),
+    /// `pattern if condition => ()`
+    If{
+        pattern: Box<MatchPattern>,
+        if_condition: ExpressionId,
+    },
     /// An array pattern: [elem1, elem2, ...]
     Array(Vec<MatchPattern>),
     /// A union constructor pattern: `Type.Variant(binding)`.
@@ -206,15 +212,14 @@ pub enum MatchPattern {
 pub struct MatchContructor {
     pub type_name: Ident,
     pub variant_name: Ident,
-    pub binding: Option<Ident>,
-    pub binding_id: Option<NodeId>,
+    pub binding: Option<Binding>,
 }
 
 /// A binding pattern: `name` binds the scrutinee to a variable.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Binding {
+    pub id: NodeId,
     pub ident: Ident,
-    pub id: Option<NodeId>,
 }
 
 /// An `if` statement or expression.
@@ -243,22 +248,22 @@ pub enum ForCondition {
     Loop,
     While(ExpressionId),
     Foreach {
-        element: ForElementKind,
-        index: Option<Ident>,
+        index: Option<Binding>,
+        element_kind: ForElementKind,
         collection: ExpressionId,
     },
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ForElementKind {
-    Single(ExpressionId),
-    Tuple(Vec<ExpressionId>),
+    Single([Binding; 1]), // Single is array to be able to use ForElementKind::iter
+    Tuple(Vec<Binding>),
 }
 
 /// reference, e.g., `&x`(mut) or `@x`(const).
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Ref {
-    pub id: Option<NodeId>,
+    pub id: NodeId,
 
     pub is_mutable: bool,
     pub value: ExpressionId,
@@ -267,14 +272,14 @@ pub struct Ref {
 /// A dereference, e.g., `*ptr`.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Deref {
-    pub id: Option<NodeId>,
+    pub id: NodeId,
     pub value: ExpressionId,
 }
 
 /// A unary operation expression.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Unary {
-    pub id: Option<NodeId>,
+    pub id: NodeId,
 
     /// The unary operator.
     pub operator: UnaryOperator,
@@ -285,7 +290,7 @@ pub struct Unary {
 /// A binary operation expression.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Binary {
-    pub id: Option<NodeId>,
+    pub id: NodeId,
 
     /// The left-hand side expression.
     pub left: ExpressionId,
@@ -304,7 +309,7 @@ pub enum AnyArray {
 /// An array literal, e.g., `[1, 2, 3]`, `List.[1, 2, 3]`.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Array {
-    pub id: Option<NodeId>,
+    pub id: NodeId,
 
     pub values: Vec<ExpressionId>,
     pub element_type: Option<SoulType>,
@@ -314,11 +319,11 @@ pub struct Array {
 /// An array filler, e.g., `[for 3 => 0] //creates [0, 0, 0]`, `int.[for 1 => 1]`.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ArrayFiller {
-    pub id: Option<NodeId>,
+    pub id: NodeId,
 
     pub amount: ExpressionId,
-    pub for_index: Option<Ident>,
     pub element: ExpressionId,
+    pub for_index: Option<Binding>,
     pub element_type: Option<SoulType>,
     pub collection_type: Option<SoulType>,
 }
@@ -326,7 +331,7 @@ pub struct ArrayFiller {
 /// a contructor/typeCast, e.g. `int.(1)`, `Struct.(1, 2, "foo")`
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Constructor {
-    pub id: Option<NodeId>,
+    pub id: NodeId,
 
     pub ty: SoulType,
     pub arguments: Vec<Argument>,
@@ -335,23 +340,23 @@ pub struct Constructor {
 /// Referring to a variable `var`.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct VariableExpression {
-    pub id: Option<NodeId>,
-    pub resolved: Option<NodeId>,
-
+    pub id: NodeId,
     pub name: Ident,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Index {
-    pub id: Option<NodeId>,
+    pub id: NodeId,
     pub index: ExpressionId,
     pub collection: ExpressionId,
+    pub optional_map: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FieldAccess {
-    pub id: Option<NodeId>,
+    pub id: NodeId,
     pub field: Ident,
+    pub optional_map: bool,
     pub object: ExpressionId,
     pub is_enum_variant: bool,
 }
@@ -359,16 +364,22 @@ pub struct FieldAccess {
 /// A function call expression.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FunctionCall {
-    pub id: Option<NodeId>,
-    pub resolved: Option<FunctionId>,
+    pub id: NodeId,
+    pub optional_map: bool,
 
     /// The name of the function being called.
     pub name: Ident,
     pub generics: Vec<SoulType>,
     /// Optional callee expression (for method calls).
-    pub callee: Option<ExpressionId>,
+    pub callee: Option<FunctionCallee>,
     /// Function arguments.
     pub arguments: Vec<Argument>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct FunctionCallee {
+    pub value: ExpressionId,
+    pub optional_map: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -377,10 +388,19 @@ pub struct Argument {
     pub value: ExpressionId,
 }
 
+impl ForElementKind {
+    pub fn iter(&self) -> impl Iterator<Item = &Binding> {
+        match self {
+            ForElementKind::Tuple(items) => items.iter(),
+            ForElementKind::Single(value) => value.iter(),
+        }
+    }
+}
+
 impl Expression {
     pub const fn error() -> Self {
         Self {
-            node: ExpressionKind::Null(None),
+            node: ExpressionKind::Null(NodeId::ERROR),
             span: Span::error(),
         }
     }
@@ -398,16 +418,15 @@ impl Expression {
         Expression::new(ExpressionKind::Block(block), span)
     }
 
-    pub const fn new_literal(literal: Literal, span: Span) -> Expression {
-        Expression::new(ExpressionKind::Literal((None, literal)), span)
+    pub const fn new_literal(id: NodeId, literal: Literal, span: Span) -> Expression {
+        Expression::new(ExpressionKind::Literal((id, literal)), span)
     }
 
-    pub fn new_variable(name: Ident) -> Expression {
+    pub fn new_variable(id: NodeId, name: Ident) -> Expression {
         let span = name.span();
         Expression::new(
             ExpressionKind::Variable(VariableExpression {
-                id: None,
-                resolved: None,
+                id,
                 name,
             }),
             span,
@@ -415,13 +434,14 @@ impl Expression {
     }
 
     pub fn new_binary(
+        id: NodeId,
         left: ExpressionId,
         operator: BinaryOperator,
         right: ExpressionId,
         span: Span,
     ) -> Expression {
         let binary = Binary {
-            id: None,
+            id,
             left,
             operator,
             right,
@@ -465,47 +485,49 @@ impl Expression {
         }
     }
 
-    pub fn new_unary(op: UnaryOperator, value: ExpressionId, span: Span) -> Expression {
+    pub fn new_unary(id: NodeId, op: UnaryOperator, value: ExpressionId, span: Span) -> Expression {
         let unary = Unary {
+            id,
             value,
-            id: None,
             operator: op,
         };
         Expression::new(ExpressionKind::Unary(unary), span)
     }
 
-    pub fn new_ref(is_mutable: bool, value: ExpressionId, new_span: Span) -> Expression {
+    pub fn new_ref(id: NodeId, is_mutable: bool, value: ExpressionId, new_span: Span) -> Expression {
         let new_ref = ExpressionKind::Ref(Ref {
+            id,
             value,
-            id: None,
             is_mutable,
         });
         Expression::new(new_ref, new_span)
     }
 
-    pub fn new_deref(value: ExpressionId, new_span: Span) -> Expression {
-        let deref = ExpressionKind::Deref(Deref { value, id: None });
+    pub fn new_deref(id: NodeId, value: ExpressionId, new_span: Span) -> Expression {
+        let deref = ExpressionKind::Deref(Deref { value, id });
         Expression::new(deref, new_span)
     }
 
-    pub fn new_index(collection: ExpressionId, index: ExpressionId, span: Span) -> Expression {
+    pub fn new_index(id: NodeId, collection: ExpressionId, index: ExpressionId, span: Span, optional_map: bool) -> Expression {
         Expression::new(
             ExpressionKind::Index(Index {
-                id: None,
+                id,
                 index,
                 collection,
+                optional_map,
             }),
             span,
         )
     }
 
-    pub fn new_field(store: &AstStore, object: ExpressionId, field: Ident) -> Expression {
+    pub fn new_field(id: NodeId, store: &AstStore, object: ExpressionId, field: Ident, optional_map: bool) -> Expression {
         let span = store.expressions[object].span.combine(field.span());
         Expression::new(
             ExpressionKind::FieldAccess(FieldAccess {
-                id: None,
+                id,
                 object,
                 field,
+                optional_map,
                 is_enum_variant: false,
             }),
             span,
@@ -531,9 +553,9 @@ impl AnyArray {
     }
 }
 impl Array {
-    pub fn new(collection_type: Option<SoulType>) -> Self {
+    pub fn new(id: NodeId, collection_type: Option<SoulType>) -> Self {
         Self {
-            id: None,
+            id,
             values: vec![],
             element_type: None,
             collection_type,
@@ -542,14 +564,14 @@ impl Array {
 }
 
 impl Binding {
-    pub fn from_text(text: impl Into<String>, span: Span) -> Self {
+    pub fn from_text(id: NodeId, text: impl Into<String>, span: Span) -> Self {
         Self {
+            id,
             ident: Ident::new(text, span),
-            id: None,
         }
     }
 
-    pub const fn new(ident: Ident) -> Self {
-        Self { ident, id: None }
+    pub fn new(id: NodeId, ident: Ident) -> Self {
+        Self { ident, id }
     }
 }

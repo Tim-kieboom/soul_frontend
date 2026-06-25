@@ -1,0 +1,6 @@
+import (
+    .unions
+    .options
+)
+
+inner() {}

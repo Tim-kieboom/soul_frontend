@@ -1,12 +1,8 @@
 pub use crate::ast::*;
 use crate::{
     ast::{
-        block::{Block, BlockId},
-        expression::{Expression, ExpressionId},
-        statements::{Enum, ExternalFunction, Function, FunctionSignature, Statement, StatementId, Struct, Trait},
-    },
-    declare_store::DeclareStore,
-    scope::ScopeBuilder,
+        block::{Block, BlockId}, expression::{Expression, ExpressionId}, statements::{Enum, Function, FunctionSignature, Statement, StatementId, Struct, Trait},
+    }, scope::ScopeBuilder,
 };
 use soul_utils::{
     CrateContext, FunctionId, Ident, collections::{
@@ -51,16 +47,16 @@ pub struct AstModuleStore {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum FunctionKind {
     Normal(Function),
-    External(ExternalFunction),
+    Signature(Spanned<FunctionSignature>),
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct AstStore {
-    pub declares: DeclareStore,
     pub blocks: VecMap<BlockId, Block>,
     pub statements: VecMap<StatementId, Statement>,
     pub functions: VecMap<FunctionId, FunctionKind>,
     pub expressions: VecMap<ExpressionId, Expression>,
+    node_generatore: IdGenerator<NodeId>,
     block_generator: IdGenerator<BlockId>,
     function_generator: IdGenerator<FunctionId>,
     statement_generator: IdGenerator<StatementId>,
@@ -80,23 +76,39 @@ pub struct Module {
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct HeaderEntry {
     pub variable: Option<EntryKind<NodeId>>,
-    pub struct_type: Option<EntryKind<CustomType>>,
+    pub custom_type: Option<EntryKind<CustomType>>,
     pub function: Option<EntryKind<FunctionId>>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum CustomType {
-    Struct(Struct),
     Enum(Enum),
     Trait(Trait),
+    Struct(Struct),
 }
 impl CustomType {
 
+    pub fn id(&self) -> NodeId {
+        match self {
+            CustomType::Enum(obj) => obj.id,
+            CustomType::Trait(obj) => obj.id,
+            CustomType::Struct(obj) => obj.id,
+        }
+    }
+
     pub fn name(&self) -> &Ident {
         match self {
-            CustomType::Struct(obj) => &obj.name,
             CustomType::Enum(obj) => &obj.name,
             CustomType::Trait(obj) => &obj.name,
+            CustomType::Struct(obj) => &obj.name,
+        }
+    }
+
+    pub fn variant_name(&self) -> &str {
+        match self {
+            CustomType::Enum(_) => "enum",
+            CustomType::Trait(_) => "trait",
+            CustomType::Struct(_) => "struct",
         }
     }
 }
@@ -104,6 +116,16 @@ impl CustomType {
 pub struct EntryKind<T> {
     pub value: T,
     pub is_public: bool,
+}
+
+impl AstStore {
+    pub fn alloc_node(&mut self) -> NodeId {
+        self.node_generatore.alloc()
+    }
+
+    pub fn clone_node_generator(&self) -> IdGenerator<NodeId> {
+        self.node_generatore.clone()
+    }
 }
 
 impl AstTree {
@@ -156,31 +178,25 @@ impl FunctionKind {
     pub fn signature(&self) -> &Spanned<FunctionSignature> {
         match self {
             FunctionKind::Normal(function) => &function.signature,
-            FunctionKind::External(external_function) => &external_function.signature,
+            FunctionKind::Signature(function_signature) => function_signature,
         }
     }
 
     pub fn signature_mut(&mut self) -> &mut Spanned<FunctionSignature> {
         match self {
             FunctionKind::Normal(function) => &mut function.signature,
-            FunctionKind::External(external_function) => &mut external_function.signature,
+            FunctionKind::Signature(function_signature) => function_signature,
         }
+    }
+
+    pub fn node_id(&self) -> NodeId {
+        self.signature().value.node_id
     }
 }
 
 impl AstStore {
     pub fn new() -> Self {
-        Self {
-            blocks: Default::default(),
-            declares: Default::default(),
-            functions: Default::default(),
-            statements: Default::default(),
-            expressions: Default::default(),
-            block_generator: Default::default(),
-            function_generator: Default::default(),
-            statement_generator: Default::default(),
-            expression_generator: Default::default(),
-        }
+        Self::default()
     }
 
     pub fn insert_block(&mut self, block: Block) -> BlockId {

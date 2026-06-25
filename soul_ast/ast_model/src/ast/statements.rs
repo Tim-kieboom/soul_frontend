@@ -1,16 +1,8 @@
 use crate::{
-    AstStore,
-    block::BlockId,
-    expression::{Expression, ExpressionId, ExpressionKind, FunctionCall},
-    soul_type::{Generic, SoulType},
+    AstStore, NodeId, block::BlockId, expression::{Expression, ExpressionId, ExpressionKind, FunctionCall}, soul_type::{Generic, SoulType},
 };
 use soul_utils::{
-    FunctionId, Ident, TypeModifier,
-    collections::soul_import_path::SoulImportPath,
-    error::SoulResult,
-    fault::Fault,
-    impl_soul_ids,
-    span::{ItemMetaData, Span, Spanned},
+    FunctionId, Ident, TypeModifier, collections::soul_import_path::SoulImportPath, error::SoulResult, fault::Fault, impl_soul_ids, soul_error_internal, span::{ItemMetaData, Span, Spanned},
 };
 
 impl_soul_ids!(StatementId);
@@ -64,13 +56,19 @@ pub struct TypeDef {
 /// A trait definition.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Trait {
+    pub id: NodeId,
+
     pub name: Ident,
     pub generics: Vec<Generic>,
+    pub trait_impls: Vec<Ident>,
+    pub typedefs: Vec<SoulType>,
     pub methods: Vec<FunctionId>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Enum {
+    pub id: NodeId,
+
     pub name: Ident,
     pub variants: Vec<EnumVariant>,
     pub impl_type: Option<SoulType>,
@@ -97,6 +95,8 @@ pub enum UnionKind {
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Struct {
+    pub id: NodeId,
+
     pub name: Ident,
     pub fields: Vec<Field>,
     pub generics: Vec<Generic>,
@@ -116,12 +116,12 @@ impl Field {
 
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Methode {
-    pub value: FunctionId,
+    pub id: FunctionId,
     pub is_public: bool,
 }
 impl Methode {
-    pub fn new(value: FunctionId, is_public: bool) -> Self {
-        Self { value, is_public }
+    pub fn new(id: FunctionId, is_public: bool) -> Self {
+        Self { id, is_public }
     }
 }
 
@@ -130,7 +130,7 @@ pub struct UseBlock {
     pub use_generics: Vec<Generic>,
     pub ty: SoulType,
     pub impls: Vec<ImplBlock>,
-    pub methodes: Vec<Methode>,
+    pub methods: Vec<Methode>,
     pub statements: Vec<StatementId>,
 }
 
@@ -188,6 +188,9 @@ pub enum ImportItem {
 /// A variable declaration.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Variable {
+    pub id: NodeId,
+    pub is_public: bool,
+
     /// The name of the variable.
     pub name: Ident,
     /// The modifier of the variable.
@@ -207,12 +210,6 @@ pub struct Assignment {
     pub right: ExpressionId,
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct ExternalFunction {
-    /// The function's signature (name, parameters, return type, etc.).
-    pub signature: Spanned<FunctionSignature>,
-}
-
 /// A function definition with a signature and body block.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Function {
@@ -225,6 +222,8 @@ pub struct Function {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FunctionSignature {
     pub id: FunctionId,
+    pub node_id: NodeId,
+    pub is_public: bool,
 
     pub modifier: TypeModifier,
     /// The name of the function.
@@ -242,6 +241,7 @@ pub struct FunctionSignature {
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Parameter {
+    pub id: NodeId,
     pub name: Ident,
     pub ty: SoulType,
     pub modifier: TypeModifier,
@@ -336,6 +336,16 @@ impl Statement {
         }
     }
 
+    pub fn from_typedef(
+        spanned: Spanned<TypeDef>
+    ) -> Self {
+        let Spanned { value, span } = spanned;
+        Self::new(
+            StatementKind::TypeDef(value),
+            span,
+        )
+    }
+
     pub fn from_expression(
         store: &AstStore,
         expression: ExpressionId,
@@ -391,15 +401,24 @@ impl Statement {
         self.is_public
     }
 
-    pub fn try_set_is_public(&mut self, is_public: bool, span: Span) -> SoulResult<()> {
-        match self.node {
+    pub fn try_set_is_public(&mut self, store: &mut AstStore, is_public: bool, span: Span) -> SoulResult<()> {
+        match &mut self.node {
             StatementKind::Enum(_)
             | StatementKind::Trait(_)
             | StatementKind::Struct(_)
-            | StatementKind::TypeDef(_)
-            | StatementKind::Variable(_)
-            | StatementKind::Function(_)
-            | StatementKind::ExternalFunction(_) => self.is_public = is_public,
+            | StatementKind::TypeDef(_) => self.is_public = is_public,
+            
+            StatementKind::Function(id)
+            | StatementKind::ExternalFunction(id) => {
+                let kind = store.functions.get_mut(*id).ok_or(soul_error_internal!(format!("{id:?} not found"), Some(span)))?;
+                kind.signature_mut().value.is_public = is_public;
+                self.is_public = is_public;
+            }
+            
+            StatementKind::Variable(variable) => {
+                self.is_public = is_public;
+                variable.is_public = is_public;
+            }
 
             StatementKind::Import(_)
             | StatementKind::UseBlock(_)

@@ -93,7 +93,9 @@ fn resolve_assign_type(
         AssignType::Assign | AssignType::Declaration => return rvalue,
     };
 
+    let id = store.alloc_node();
     store.insert_expression(Expression::new_binary(
+        id,
         lvalue.clone(),
         operator,
         rvalue,

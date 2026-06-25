@@ -11,9 +11,9 @@ use crate::{
 
 mod expression;
 mod function;
+mod parse_module;
 mod soul_type;
 mod statements;
-mod parse_module;
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_generic_define(&mut self) -> TryResult<Vec<SoulType>, Fault> {

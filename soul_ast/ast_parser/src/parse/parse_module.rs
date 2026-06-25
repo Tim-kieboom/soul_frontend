@@ -1,13 +1,17 @@
 use std::path::{Path, PathBuf};
 
-use ast_model::statements::{ImportPath};
+use ast_model::statements::ImportPath;
 use soul_tokenizer::to_token_stream;
-use soul_utils::{fault::Fault, ids::IdAlloc, soul_error_internal, span::{ModuleId, Span}};
+use soul_utils::{
+    fault::Fault,
+    ids::IdAlloc,
+    soul_error_internal,
+    span::{ModuleId, Span},
+};
 
 use crate::parser::Parser;
 
 impl<'a, 'f> Parser<'a, 'f> {
-
     pub(crate) fn parse_child_module(&mut self, path: &ImportPath, span: Span) {
         let Some(module_file_path) = self.find_module_file(path.module.to_pathbuf(), span) else {
             return;
@@ -16,7 +20,10 @@ impl<'a, 'f> Parser<'a, 'f> {
         let (starting_parent, base_path) = if path.module.is_absolute() {
             (self.get_crate_root(), self.crate_source_path.clone())
         } else {
-            (self.get_directory_owner(&self.source_path), self.source_path.clone())
+            (
+                self.get_directory_owner(&self.source_path),
+                self.source_path.clone(),
+            )
         };
 
         self.insure_parents_are_loaded(&module_file_path, starting_parent, &base_path, span);
@@ -50,18 +57,18 @@ impl<'a, 'f> Parser<'a, 'f> {
     ) -> ModuleId {
         let module_id = self.modules.get_or_insert(module_file_path);
         if self.ast_modules.get(module_id).is_some() {
-            return module_id
+            return module_id;
         }
 
         let Some(module_source) = self.read_module(module_file_path, module_name, span) else {
-            return ModuleId::error()
+            return ModuleId::error();
         };
 
         let folder_path = module_file_path
             .parent()
             .expect("should have parent")
             .to_path_buf();
-        
+
         self.parse_module(
             &module_source,
             folder_path,
@@ -85,21 +92,21 @@ impl<'a, 'f> Parser<'a, 'f> {
             Ok(val) => val,
             Err(err) => {
                 self.log_fault(err);
-                return
+                return;
             }
         };
-        
-        let info = crate::ParseInfo { 
-            id: module_id, 
-            parent: Some(parent), 
-            source_folder: path, 
+
+        let info = crate::ParseInfo {
+            id: module_id,
+            parent: Some(parent),
+            source_folder: path,
             crate_source_folder: self.crate_source_path.clone(),
-            store: self.store, 
-            context: self.context, 
-            modules: self.modules, 
+            store: self.store,
+            context: self.context,
+            modules: self.modules,
             ast_modules: self.ast_modules,
         };
-        
+
         Parser::parse(tokens, name, info);
         if let Some(module) = self.ast_modules.get_mut(parent) {
             module.modules.insert(module_id);
@@ -134,8 +141,14 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         Some(module_path)
     }
-    
-    fn insure_parents_are_loaded(&mut self, module_file_path: &PathBuf, starting_parent: ModuleId, base_path: &Path, span: Span) {
+
+    fn insure_parents_are_loaded(
+        &mut self,
+        module_file_path: &PathBuf,
+        starting_parent: ModuleId,
+        base_path: &Path,
+        span: Span,
+    ) {
         fn get_module_name(current: &PathBuf) -> Option<String> {
             let osstr = current.file_name()?;
             osstr

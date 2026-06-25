@@ -7,7 +7,7 @@ use ast_model::{
 };
 use soul_utils::{TypeModifier, fault::Severity, soul_names::PrimitiveTypes};
 
-use crate::tests::parse;
+use crate::tests::{NODE_ID, parse};
 
 const CODE: &str = r#"
 import soul.core
@@ -282,7 +282,7 @@ fn all_kinds() {
         _ => panic!("body[22]: expected Variable"),
     };
     let val22 = &store.expressions[expr22.unwrap()];
-    assert_eq!(val22.node, ExpressionKind::Null(None));
+    assert_eq!(val22.node, ExpressionKind::Null(NODE_ID));
 
     // 23: r := "hello"  — string literal
     let s23 = &store.statements[body.statements[23]];
@@ -379,7 +379,7 @@ fn all_kinds() {
         ExpressionKind::FunctionCall(FunctionCall { name, callee, .. }) => {
             assert_eq!(name.as_str(), "bar");
             assert!(callee.is_some());
-            let inner = &store.expressions[callee.unwrap()];
+            let inner = &store.expressions[callee.unwrap().value];
             match &inner.node {
                 ExpressionKind::FunctionCall(FunctionCall {
                     name: inner_name, ..
@@ -459,10 +459,10 @@ fn all_kinds() {
     };
 
     assert_eq!(if_.branch, None);
-    assert_eq!(
+    assert!(matches!(
         store.expressions[if_.condition].node,
-        ExpressionKind::Literal((None, Literal::Bool(true)))
-    );
+        ExpressionKind::Literal((_, Literal::Bool(true)))
+    ));
     let statement_id = store.blocks[if_.block].statements[0];
     match &store.statements[statement_id].node {
         StatementKind::Expression { expression: id, .. } => {

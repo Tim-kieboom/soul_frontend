@@ -1,1 +1,5 @@
-- [ ] Res type `Res<int>`, `Ok(val)`, `Err(err)`
+- [ ] pointer/array cotr
+- `*u8.(rawptr)`
+- `[]u8.(rawptr, 0)`
+- [ ] lambda
+- `pow := value => value * 2`

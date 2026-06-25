@@ -1,20 +1,24 @@
 use ast_model::{
+    FunctionKind,
     expression::{Expression, ExpressionKind},
-    statements::{Statement, StatementKind, TypeDef},
+    soul_type::{SoulType, Stub},
+    statements::{Statement, StatementKind, Trait, TypeDef},
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
     TypeModifier,
-    collections::try_result::{ResultTryErr, ToResult, TryErr, TryOk, TryResult},
+    collections::try_result::{
+        ResultMapNotValue, ResultTryErr, ToResult, TryErr, TryOk, TryResult,
+    },
     error::SoulResult,
     fault::Fault,
     soul_error_internal,
-    span::Span,
+    span::{Span, Spanned},
 };
 
 use crate::{
     parser::Parser,
-    utils::{ASSIGN, SEMI_COLON, STAMENT_END_TOKENS},
+    utils::{ASSIGN, COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, SEMI_COLON, STAMENT_END_TOKENS},
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
@@ -75,8 +79,10 @@ impl<'a, 'f> Parser<'a, 'f> {
 
                 self.bump();
                 let mut statement = self.parse_statement().try_err()?;
+                let is_public = true;
+                let span = pub_span.combine(start_span);
                 statement
-                    .try_set_is_public(true, pub_span.combine(start_span))
+                    .try_set_is_public(self.store, is_public, span)
                     .try_err()?;
 
                 statement
@@ -103,13 +109,76 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             KeyWord::Use => return self.parse_use_block().try_err(),
             KeyWord::Enum => return self.parse_enum().try_err(),
-            KeyWord::Trait => todo!(),
+            KeyWord::Trait => return self.parse_trait().try_err(),
             KeyWord::Struct => return self.parse_struct().try_err(),
-            KeyWord::Type => return self.parse_type_statement().try_err(),
+            KeyWord::Type => return self.parse_typedef().map(Statement::from_typedef).try_err(),
         })
     }
 
-    fn parse_type_statement(&mut self) -> SoulResult<Statement> {
+    fn parse_trait(&mut self) -> SoulResult<Statement> {
+        let start_span = self.token().span;
+        self.expect(&TokenKind::Keyword(KeyWord::Trait))?;
+        let name = self.try_bump_consume_ident()?;
+        let generics = self.parse_generic_declare()?.unwrap_or(vec![]);
+
+        let mut trait_impls = vec![];
+        if self.current_is(&COLON) {
+            self.bump();
+            loop {
+                trait_impls.push(self.try_bump_consume_ident()?);
+                if !self.current_is(&COMMA) {
+                    break;
+                }
+            }
+        }
+
+        self.expect(&CURLY_OPEN)?;
+
+        let mut methods = vec![];
+        let mut typedefs = vec![];
+        let this_type = SoulType::Stub(Stub::new(name.as_str()));
+        loop {
+            self.skip_end_lines();
+            if self.current_is(&CURLY_CLOSE) {
+                break;
+            }
+
+            if self.current_is(&TokenKind::Keyword(KeyWord::Type)) {
+                self.bump();
+                let ty = self.try_parse_type().merge_to_result()?;
+                typedefs.push(ty);
+                continue;
+            }
+
+            let start_span = self.token().span;
+            let modifier = self.try_bump_type_modiffier().unwrap_or(TypeModifier::Mut);
+            let name = self.try_bump_consume_ident()?;
+            let signature = self
+                .try_parse_function_signature(start_span, modifier, &this_type, name, None)
+                .map_try_not_value(|(_, err)| err)
+                .merge_to_result()?
+                .value;
+
+            let spanned =
+                FunctionKind::Signature(Spanned::new(signature, self.span_combine(start_span)));
+            let id = self.store.insert_function(spanned);
+            methods.push(id);
+        }
+        self.expect(&CURLY_CLOSE)?;
+        Ok(Statement::new(
+            StatementKind::Trait(Trait {
+                id: self.alloc_node(),
+                name,
+                generics,
+                methods,
+                typedefs,
+                trait_impls,
+            }),
+            self.span_combine(start_span),
+        ))
+    }
+
+    fn parse_typedef(&mut self) -> SoulResult<Spanned<TypeDef>> {
         let start_span = self.token().span;
         self.expect(&TokenKind::Keyword(KeyWord::Type))?;
 
@@ -127,9 +196,6 @@ impl<'a, 'f> Parser<'a, 'f> {
             is_distinct,
         };
 
-        Ok(Statement::new(
-            StatementKind::TypeDef(typedef),
-            self.span_combine(start_span),
-        ))
+        Ok(Spanned::new(typedef, self.span_combine(start_span)))
     }
 }

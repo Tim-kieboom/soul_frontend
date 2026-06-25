@@ -70,6 +70,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.expect(&CURLY_CLOSE)?;
 
         let struct_ = Struct {
+            id: self.alloc_node(),
             fields,
             generics,
             statements,
@@ -121,6 +122,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.expect(&CURLY_CLOSE)?;
 
         let enum_ = Enum {
+            id: self.alloc_node(),
             name,
             variants,
             impl_type,
@@ -159,7 +161,10 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
         self.expect(&ROUND_CLOSE)?;
 
-        Ok(EnumVariant::Union(UnionKind::Tuple { name: ident, parameters }))
+        Ok(EnumVariant::Union(UnionKind::Tuple {
+            name: ident,
+            parameters,
+        }))
     }
 
     fn parse_enum_named_union(&mut self, ident: Ident) -> SoulResult<EnumVariant> {
@@ -186,6 +191,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
         self.expect(&CURLY_CLOSE)?;
 
-        Ok(EnumVariant::Union(UnionKind::NamedTuple { name: ident, parameters }))
+        Ok(EnumVariant::Union(UnionKind::NamedTuple {
+            name: ident,
+            parameters,
+        }))
     }
 }

@@ -7,7 +7,7 @@ use std::{
 use crate::display::writer::Writer;
 use anyhow::Result;
 use ast_model::{
-    AstTree, AstStore, FunctionKind, block::BlockId, expression::{AnyArray, ExpressionId, ExpressionKind, ForCondition, ForElementKind, IfBranch, MatchPattern, TypeofKind}, soul_type::{ArrayKind, Generic, SoulType}, statements::{
+    AstStore, AstTree, FunctionKind, block::BlockId, expression::{AnyArray, ExpressionId, ExpressionKind, ForCondition, ForElementKind, IfBranch, MatchPattern, TypeofKind}, soul_type::{ArrayKind, Generic, SoulType, TupleKind}, statements::{
         Assignment, Enum, EnumVariant, ImplBlock, Import, ImportItem, ImportKind, Parameter, StatementId, StatementKind, Struct, Trait, TypeDef, UnionKind, UseBlock, Variable
     },
 };
@@ -168,13 +168,13 @@ impl<'a, W: Writer> Displayer<'a, W> {
             self.write_endln()?;
         }
 
-        for methode in &use_block.methodes {
+        for method in &use_block.methods {
             self.write_depth()?;
-            if methode.is_public {
+            if method.is_public {
                 self.write_str("pub ")?;
             }
 
-            self.write_any_function(methode.value)?;
+            self.write_any_function(method.id)?;
             self.write_endln()?;
         }
         for impl_ in &use_block.impls {
@@ -382,6 +382,12 @@ impl<'a, W: Writer> Displayer<'a, W> {
     fn write_trait(&mut self, trait_: &Trait) -> Result<()> {
         self.write_fmt(format_args!("{TRAIT_STR} {} {{\n", trait_.name.as_str()))?;
         self.push_depth();
+        for ty in &trait_.typedefs {
+            self.write_depth()?;
+            self.write_fmt(format_args!("{} ", KeyWord::Type.as_str()))?;
+            self.write_type(ty)?;
+            self.write_endln()?;
+        }
 
         for methode in &trait_.methods {
             self.write_depth()?;
@@ -422,7 +428,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
         self.write_type(&signature.return_type)?;
         let block = match function {
             FunctionKind::Normal(function) => function.block,
-            FunctionKind::External(_) => return Ok(()),
+            FunctionKind::Signature(_) => return Ok(()),
         };
         self.write_char(' ')?;
         self.write_block(block)
@@ -456,24 +462,38 @@ impl<'a, W: Writer> Displayer<'a, W> {
         
         let expression = self.store.expressions.get_err(id)?;
         match &expression.node {
+            
             ExpressionKind::Null(_) => self.write_str("null"),
-            ExpressionKind::Default(_) => self.write_str("()"),
+            ExpressionKind::None(_) => self.write_str("()"),
             ExpressionKind::Undefined(_) => self.write_str("undefined"),
             ExpressionKind::Literal((_, literal)) => self.write_fmt(format_args!("{literal:?}")),
+            ExpressionKind::Copy(value) => {
+                self.write_expression(*value)?;
+                self.write_fmt(format_args!(".{}", KeyWord::Copy.as_str()))
+            }
             ExpressionKind::Index(index) => {
                 self.write_expression(index.collection)?;
+                if index.optional_map {
+                    self.write_char('?')?;
+                }
                 self.write_char('[')?;
                 self.write_expression(index.index)?;
                 self.write_char(']')
             }
             ExpressionKind::FieldAccess(field_access) => {
                 self.write_expression(field_access.object)?;
+                if field_access.optional_map {
+                    self.write_char('?')?;
+                }
                 self.write_char('.')?;
                 self.write_str(field_access.field.as_str())
             }
             ExpressionKind::FunctionCall(function_call) => {
                 if let Some(callee) = function_call.callee {
-                    self.write_expression(callee)?;
+                    self.write_expression(callee.value)?;
+                    if callee.optional_map {
+                        self.write_char('?')?;
+                    }
                     self.write_char('.')?;    
                 }
 
@@ -586,14 +606,18 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 self.write_char('}')?;
                 Ok(())
             }
-            ExpressionKind::MatchMethod(match_methode) => {
-                self.write_expression(match_methode.scrutinee)?;
+            ExpressionKind::MatchMethod(match_method) => {
+                self.write_expression(match_method.scrutinee)?;
                 self.push_depth();
                 self.write_endln()?;
-                let last_index = match_methode.arms.len().saturating_sub(1);
-                for (i, arm) in match_methode.arms.iter().enumerate() {
+                let last_index = match_method.arms.len().saturating_sub(1);
+                for (i, arm) in match_method.arms.iter().enumerate() {
                     self.write_depth()?;
-                    self.write_fmt(format_args!(".{}", arm.variant.as_str()))?;
+                    if match_method.optional_map {
+                        self.write_char('?')?;
+                    }
+                    self.write_char('.')?;
+                    self.write_str(arm.variant.as_str())?;
                     if let Some(binding) = &arm.binding {
                         self.write_fmt(format_args!(
                             "{{{} {LAMDA_ARROW_STR} ",
@@ -619,20 +643,20 @@ impl<'a, W: Writer> Displayer<'a, W> {
                     ForCondition::Loop => (),
                     ForCondition::While(condition) => self.write_expression(*condition)?,
                     ForCondition::Foreach {
-                        element,
                         index,
                         collection,
+                        element_kind,
                     } => {
                         if let Some(index) = index {
-                            self.write_fmt(format_args!("{}, ", index.as_str()))?;
+                            self.write_fmt(format_args!("{}, ", index.ident.as_str()))?;
                         }
-                        match element {
-                            ForElementKind::Single(id) => self.write_expression(*id)?,
-                            ForElementKind::Tuple(ids) => {
+                        match element_kind {
+                            ForElementKind::Single([binding]) => self.write_str(binding.ident.as_str())?,
+                            ForElementKind::Tuple(bindings) => {
                                 self.write_char('(')?;
-                                let last_index = ids.len().saturating_sub(1);
-                                for (i, id) in ids.iter().enumerate() {
-                                    self.write_expression(*id)?;
+                                let last_index = bindings.len().saturating_sub(1);
+                                for (i, binding) in bindings.iter().enumerate() {
+                                    self.write_str(binding.ident.as_str())?;
                                     if i != last_index {
                                         self.write_str(", ")?;
                                     }
@@ -670,7 +694,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
                     }
                 };
                 if let Some(binding) = &type_of.binding {
-                    self.write_fmt(format_args!("({})", binding.as_str()))?;
+                    self.write_fmt(format_args!("({})", binding.ident.as_str()))?;
                 }
                 Ok(())
             }
@@ -699,11 +723,40 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 }
                 self.write_fmt(format_args!("\"{}\"", fmt.trailing))
             },
+            ExpressionKind::Tuple(values) => {
+                self.write_str(".(")?;
+                let last_index = values.len().saturating_sub(1);
+                for (i, value) in values.iter().enumerate() {
+                    self.write_expression(*value)?;
+                    if i != last_index {
+                        self.write_str(", ")?;
+                    }
+                } 
+                self.write_char(')')
+            }
+            ExpressionKind::NamedTuple(values) => {
+                self.write_str(".{")?;
+                let last_index = values.len().saturating_sub(1);
+                for (i, (name, value)) in values.iter().enumerate() {
+                    self.write_fmt(format_args!("{}: ", name.as_str()))?;
+                    self.write_expression(*value)?;
+                    if i != last_index {
+                        self.write_str(", ")?;
+                    }
+                } 
+                self.write_char('}')
+            }
         }
     }
 
     fn write_match_pattern(&mut self, arm: &MatchPattern) -> Result<()> {
         match &arm {
+            MatchPattern::If { pattern, if_condition } => {
+                self.write_match_pattern(pattern)?;
+                self.write_fmt(format_args!(" {} ", KeyWord::If.as_str()))?;
+                self.write_expression(*if_condition)?;
+                self.write_fmt(format_args!(" {}", Symbol::LambdaArrow.as_str()))
+            }
             MatchPattern::Null => self.write_str(KeyWord::Null.as_str()),
             MatchPattern::NotNull(binding) => {
                 self.write_fmt(format_args!("{}{}(", Symbol::Not.as_str(), KeyWord::Null.as_str()))?;
@@ -731,7 +784,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
                     ctor.variant_name.as_str()
                 ))?;
                 if let Some(binding) = &ctor.binding {
-                    self.write_fmt(format_args!("({})", binding.as_str()))?;
+                    self.write_fmt(format_args!("({})", binding.ident.as_str()))?;
                 }
                 Ok(())
             }
@@ -762,6 +815,26 @@ impl<'a, W: Writer> Displayer<'a, W> {
 
     fn write_type(&mut self, ty: &SoulType) -> Result<()> {
         match ty {
+            SoulType::TupleKind(kind) => {
+                self.write_char('(')?;
+                let last_index = kind.len().saturating_sub(1);
+                match kind {
+                    TupleKind::Tuple(types) => for (i, ty) in types.iter().enumerate() {
+                        self.write_type(ty)?;
+                        if i != last_index {
+                            self.write_str(", ")?;
+                        }
+                    }
+                    TupleKind::NamedTuple(items) => for (i, (name, ty)) in items.iter().enumerate() {
+                        self.write_fmt(format_args!("{}: ", name.as_str()))?;
+                        self.write_type(ty)?;
+                        if i != last_index {
+                            self.write_str(", ")?;
+                        }
+                    }
+                }
+                self.write_char(')')
+            }
             SoulType::None => self.write_str(PrimitiveTypes::None.as_str()),
             SoulType::Never => self.write_char('!'),
             SoulType::Primitive(primitive_types) => self.write_str(primitive_types.as_str()),
@@ -786,7 +859,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
                     self.write_fmt(format_args!("'{} ", lifetime.as_str()))?;
                 }
                 if reference.mutable {
-                    self.write_str("mut")?;
+                    self.write_str("mut ")?;
                 }
                 self.write_type(&reference.inner)
             }
@@ -870,8 +943,8 @@ impl<'a, W: Writer> Displayer<'a, W> {
                     self.write_str(": ")?;
                 }
                 self.write_fmt(format_args!("{FOR_STR} "))?;
-                if let Some(name) = &array.for_index {
-                    self.write_fmt(format_args!("{} {IN_FOR_LOOP_STR} ", name.as_str()))?;
+                if let Some(binding) = &array.for_index {
+                    self.write_fmt(format_args!("{} {IN_FOR_LOOP_STR} ", binding.ident.as_str()))?;
                 }
                 self.write_expression(array.amount)?;
                 self.write_fmt(format_args!(" {LAMDA_ARROW_STR} "))?;

@@ -1,10 +1,15 @@
-use ast_model::{expression::{Expression, ExpressionId, For, ForCondition, ForElementKind}};
+use ast_model::{
+    expression::{Binding, ExpressionId, For, ForCondition, ForElementKind},
+};
 use soul_tokenizer::model::TokenKind;
 use soul_utils::{
     Ident, TypeModifier, error::SoulResult, fault::Fault, soul_names::Symbol, span::Spanned,
 };
 
-use crate::{parser::Parser, utils::{CURLY_OPEN, FOR, IN}};
+use crate::{
+    parser::Parser,
+    utils::{CURLY_OPEN, FOR, IN},
+};
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub fn parse_for_loop(&mut self) -> SoulResult<Spanned<For>> {
@@ -18,7 +23,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
                 match self.try_parse_foreach_elements() {
                     Ok(Some((element, collection))) => ForCondition::Foreach {
-                        element,
+                        element_kind: element,
                         index: None,
                         collection,
                     },
@@ -34,24 +39,20 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let block = self.parse_block(TypeModifier::Mut)?;
         Ok(Spanned::new(
-            For {
-                block,
-                condition,
-            },
+            For { block, condition },
             self.span_combine(start_span),
         ))
     }
 
     fn try_parse_foreach_elements(&mut self) -> SoulResult<Option<(ForElementKind, ExpressionId)>> {
-        let mut args: Vec<ExpressionId> = Vec::new();
+        let mut args: Vec<Binding> = Vec::new();
 
         match &self.token().kind {
             TokenKind::Ident(name) => {
                 let span = self.token().span;
                 let ident = Ident::new(name, span);
                 self.bump();
-                let id = self.store.insert_expression(Expression::new_variable(ident));
-                args.push(id);
+                args.push(Binding::new(self.store.alloc_node(), ident));
             }
             _ => return Ok(None),
         }
@@ -63,7 +64,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                     self.bump();
                     let collection = self.parse_expression_id(&[CURLY_OPEN])?;
                     let element = if args.len() == 1 {
-                        ForElementKind::Single(args.remove(0))
+                        ForElementKind::Single([args.remove(0)])
                     } else {
                         ForElementKind::Tuple(args)
                     };
@@ -77,7 +78,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                             let span = self.token().span;
                             let ident = Ident::new(name, span);
                             self.bump();
-                            args.push(self.store.insert_expression(Expression::new_variable(ident)));
+                            args.push(Binding::new(self.store.alloc_node(), ident));
                         }
                         _ => {
                             return Err(Fault::error(

@@ -24,7 +24,7 @@ fn use_block_empty() {
     };
     assert_eq!(use_block.ty, SoulType::Stub(Stub::new("Foo")));
     assert!(use_block.use_generics.is_empty());
-    assert!(use_block.methodes.is_empty());
+    assert!(use_block.methods.is_empty());
     assert!(use_block.impls.is_empty());
     assert!(use_block.statements.is_empty());
 }
@@ -45,9 +45,9 @@ fn use_block_method() {
         _ => panic!("expected UseBlock"),
     };
     assert_eq!(use_block.ty, SoulType::Stub(Stub::new("Foo")));
-    assert_eq!(use_block.methodes.len(), 1);
-    assert!(!use_block.methodes[0].is_public);
-    let func = &store.functions[use_block.methodes[0].value];
+    assert_eq!(use_block.methods.len(), 1);
+    assert!(!use_block.methods[0].is_public);
+    let func = &store.functions[use_block.methods[0].id];
     let FunctionKind::Normal(f) = func else {
         panic!("expected Normal function");
     };
@@ -71,9 +71,9 @@ fn use_block_pub_method() {
         StatementKind::UseBlock(b) => b,
         _ => panic!("expected UseBlock"),
     };
-    assert_eq!(use_block.methodes.len(), 1);
-    assert!(use_block.methodes[0].is_public);
-    let func = &store.functions[use_block.methodes[0].value];
+    assert_eq!(use_block.methods.len(), 1);
+    assert!(use_block.methods[0].is_public);
+    let func = &store.functions[use_block.methods[0].id];
     let FunctionKind::Normal(f) = func else {
         panic!("expected Normal function");
     };
@@ -95,13 +95,13 @@ fn use_block_multiple_methods() {
         StatementKind::UseBlock(b) => b,
         _ => panic!("expected UseBlock"),
     };
-    assert_eq!(use_block.methodes.len(), 2);
-    let func0 = &store.functions[use_block.methodes[0].value];
+    assert_eq!(use_block.methods.len(), 2);
+    let func0 = &store.functions[use_block.methods[0].id];
     let FunctionKind::Normal(f0) = func0 else {
         panic!("expected Normal function");
     };
     assert_eq!(f0.signature.value.name.as_str(), "bar");
-    let func1 = &store.functions[use_block.methodes[1].value];
+    let func1 = &store.functions[use_block.methods[1].id];
     let FunctionKind::Normal(f1) = func1 else {
         panic!("expected Normal function");
     };
@@ -134,7 +134,7 @@ fn use_block_impl_block() {
         panic!("expected Normal function");
     };
     assert_eq!(f.signature.value.name.as_str(), "baz");
-    assert!(use_block.methodes.is_empty());
+    assert!(use_block.methods.is_empty());
     assert!(use_block.statements.is_empty());
 }
 
@@ -161,7 +161,7 @@ fn use_block_with_generic_type() {
         })
     );
     assert!(use_block.use_generics.is_empty());
-    assert_eq!(use_block.methodes.len(), 1);
+    assert_eq!(use_block.methods.len(), 1);
 }
 
 #[test]
@@ -187,7 +187,7 @@ fn use_block_struct_inside() {
         }
         _ => panic!("expected Struct inside use block"),
     }
-    assert!(use_block.methodes.is_empty());
+    assert!(use_block.methods.is_empty());
     assert!(use_block.impls.is_empty());
 }
 
@@ -215,7 +215,7 @@ fn use_block_import_inside() {
         }
         _ => panic!("expected Import inside use block"),
     }
-    assert!(use_block.methodes.is_empty());
+    assert!(use_block.methods.is_empty());
     assert!(use_block.impls.is_empty());
 }
 
@@ -240,7 +240,7 @@ fn use_block_type_alias_inside() {
         StatementKind::TypeDef(_) => (),
         other => panic!("expected TypeDef inside use block, got {:?}", other),
     }
-    assert!(use_block.methodes.is_empty());
+    assert!(use_block.methods.is_empty());
     assert!(use_block.impls.is_empty());
 }
 
@@ -260,9 +260,9 @@ fn use_block_inline_method() {
         _ => panic!("expected UseBlock"),
     };
     assert_eq!(use_block.ty, SoulType::Stub(Stub::new("Foo")));
-    assert_eq!(use_block.methodes.len(), 1);
-    assert!(!use_block.methodes[0].is_public);
-    let func = &store.functions[use_block.methodes[0].value];
+    assert_eq!(use_block.methods.len(), 1);
+    assert!(!use_block.methods[0].is_public);
+    let func = &store.functions[use_block.methods[0].id];
     let FunctionKind::Normal(f) = func else {
         panic!("expected Normal function");
     };
@@ -286,7 +286,7 @@ fn use_block_mixed_methods_and_impl() {
         StatementKind::UseBlock(b) => b,
         _ => panic!("expected UseBlock"),
     };
-    assert_eq!(use_block.methodes.len(), 2);
+    assert_eq!(use_block.methods.len(), 2);
     assert_eq!(use_block.impls.len(), 1);
     assert_eq!(
         use_block.impls[0].impl_trait,
@@ -315,8 +315,8 @@ fn use_block_method_with_return_type() {
         StatementKind::UseBlock(b) => b,
         _ => panic!("expected UseBlock"),
     };
-    assert_eq!(use_block.methodes.len(), 1);
-    let func = &store.functions[use_block.methodes[0].value];
+    assert_eq!(use_block.methods.len(), 1);
+    let func = &store.functions[use_block.methods[0].id];
     let FunctionKind::Normal(f) = func else {
         panic!("expected Normal function");
     };
@@ -341,8 +341,8 @@ fn use_block_method_with_params() {
         StatementKind::UseBlock(b) => b,
         _ => panic!("expected UseBlock"),
     };
-    assert_eq!(use_block.methodes.len(), 1);
-    let func = &store.functions[use_block.methodes[0].value];
+    assert_eq!(use_block.methods.len(), 1);
+    let func = &store.functions[use_block.methods[0].id];
     let FunctionKind::Normal(f) = func else {
         panic!("expected Normal function");
     };

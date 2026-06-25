@@ -1,4 +1,4 @@
-use ast_model::soul_type::{ArrayKind, ArrayType, ReferenceType, SoulType, Stub};
+use ast_model::soul_type::{ArrayKind, ArrayType, NamedTuple, ReferenceType, SoulType, Stub, Tuple, TupleKind};
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord, types::Types};
 use soul_utils::{
     Ident,
@@ -8,14 +8,12 @@ use soul_utils::{
     error::SoulResult,
     fault::Fault,
     literal::{Number, TokenLiteral},
-    soul_error_internal,
     soul_names::PrimitiveTypes,
 };
 
 use crate::{
-    parser::Parser,
-    utils::{
-        ARRAY, ARROW_LEFT, CURLY_OPEN, DOT, MUT, NOT, OPTIONAL, POINTER, REF, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN
+    parser::Parser, utils::{
+        ARRAY, ARROW_LEFT, COLON, COMMA, DOT, MUT, NOT, OPTIONAL, POINTER, REF, ROUND_CLOSE, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN,
     },
 };
 
@@ -105,7 +103,6 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     fn parse_res(&mut self) -> SoulResult<SoulType> {
-        
         if self.current_is(&ARROW_LEFT) {
             let mut generics = self.parse_generic_define().merge_to_result()?;
 
@@ -116,13 +113,23 @@ impl<'a, 'f> Parser<'a, 'f> {
                 ));
             }
 
-
-            let err = if generics.len() == 2 { Some(Box::new(generics.remove(1))) } else { None };
-            let ok = if generics.len() == 1 { Some(Box::new(generics.remove(0))) } else { None };
+            let err = if generics.len() == 2 {
+                Some(Box::new(generics.remove(1)))
+            } else {
+                None
+            };
+            let ok = if generics.len() == 1 {
+                Some(Box::new(generics.remove(0)))
+            } else {
+                None
+            };
 
             Ok(SoulType::Res { ok, err })
         } else {
-            Ok(SoulType::Res { ok: None, err: None })
+            Ok(SoulType::Res {
+                ok: None,
+                err: None,
+            })
         }
     }
 
@@ -189,16 +196,9 @@ impl<'a, 'f> Parser<'a, 'f> {
                 return TryOk(SoulType::Never);
             }
             &ROUND_OPEN => {
-                return TryNotValue(soul_error_internal!(
-                    "tuple type not impl",
-                    Some(self.token().span)
-                ));
-            }
-            &CURLY_OPEN => {
-                return TryNotValue(soul_error_internal!(
-                    "nametuple type not impl",
-                    Some(self.token().span)
-                ));
+                return self.parse_tuple_kind()
+                    .map(SoulType::TupleKind)
+                    .try_err();
             }
             _ => (),
         };
@@ -302,6 +302,52 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         Ok(kind)
+    }
+    
+    fn parse_tuple_kind(&mut self) -> SoulResult<TupleKind> {
+        self.expect(&ROUND_OPEN)?;
+        self.skip_end_lines();
+        if self.peek_is(&COLON) {
+            return self.parse_named_tuple().map(TupleKind::NamedTuple);
+        }
+
+        self.parse_tuple().map(TupleKind::Tuple)
+    }
+
+    fn parse_named_tuple(&mut self) -> SoulResult<NamedTuple> {
+        let mut values = NamedTuple::new();
+        loop {
+            let ident = self.try_bump_consume_ident()?;
+            self.expect(&COLON)?;
+            let ty = self.try_parse_type().merge_to_result()?;
+            values.push((ident, ty));
+
+            self.skip_end_lines(); 
+            if !self.current_is(&COMMA) {
+                break
+            }
+            self.bump();
+        }
+
+        self.expect(&ROUND_CLOSE)?;
+        Ok(values)
+    }
+    
+    fn parse_tuple(&mut self) -> SoulResult<Tuple> {
+        let mut values = Tuple::new();
+        loop {
+            let ty = self.try_parse_type().merge_to_result()?;
+            values.push(ty);
+
+            self.skip_end_lines(); 
+            if !self.current_is(&COMMA) {
+                break
+            }
+            self.bump();
+        }
+
+        self.expect(&ROUND_CLOSE)?;
+        Ok(values)
     }
 }
 

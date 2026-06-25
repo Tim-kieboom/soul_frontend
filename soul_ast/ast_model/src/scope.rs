@@ -9,8 +9,7 @@ use soul_utils::{
 };
 
 use crate::{
-    NodeId,
-    statements::{ImportItem, ImportKind, Variable},
+    NodeId, statements::{ImportItem, ImportKind, Variable},
 };
 
 impl_soul_ids!(ScopeId);
@@ -399,9 +398,15 @@ pub enum ScopeTypeEntryKind {
 }
 
 pub enum ScopeValueKind<'a> {
-    Variable(&'a mut Variable),
+    Variable(&'a Variable),
 }
 impl<'a> ScopeValueKind<'a> {
+
+    pub fn get_id(&self) -> NodeId {
+        match self {
+            ScopeValueKind::Variable(variable) => variable.id,
+        }
+    }
 
     pub fn get_ident(&self) -> &Ident {
         match self {

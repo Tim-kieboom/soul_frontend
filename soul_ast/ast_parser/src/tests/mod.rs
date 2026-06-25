@@ -1,13 +1,15 @@
 use std::path::PathBuf;
 
 use ast_model::{
-    AstStore, AstTree, Module, expression::{
-        AnyArray, Constructor, ExpressionKind, FunctionCall, MatchMethod, StructConstructor, TypeOf, TypeofKind,
-    }, literal::Literal, operators::BinaryOperatorKind, soul_type::{ArrayKind, ArrayType, ReferenceType, SoulType, Stub}, statements::{Assignment, Import, ImportKind, Statement, StatementKind, Variable}
+    AstStore, AstTree, Module, NodeId, expression::{
+        AnyArray, Constructor, ExpressionKind, FunctionCall, MatchMethod, StructConstructor,
+        TypeOf, TypeofKind,
+    }, literal::Literal, operators::BinaryOperatorKind, soul_type::{ArrayKind, ArrayType, ReferenceType, SoulType, Stub}, statements::{Assignment, Import, ImportKind, Statement, StatementKind, Variable},
 };
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
-    CrateContext, collections::module_store::ModuleStore, fault::Severity, ids::IdAlloc, soul_names::PrimitiveTypes, span::ModuleId
+    CrateContext, collections::module_store::ModuleStore, fault::Severity, ids::IdAlloc,
+    soul_names::PrimitiveTypes, span::ModuleId,
 };
 
 use crate::{ParseInfo, parse_module};
@@ -20,6 +22,8 @@ mod literals;
 mod structs;
 mod use_block;
 mod variables;
+
+pub const NODE_ID: NodeId = NodeId::ERROR;
 
 fn module_id() -> ModuleId {
     ModuleId::begin()
@@ -42,11 +46,12 @@ fn parse(source: &str) -> (Module, AstStore, CrateContext) {
         ast_modules: &mut ast.modules,
     };
     parse_module(stream, "test".to_string(), info);
-    let module = ast.modules
+    let module = ast
+        .modules
         .as_vecmap_mut()
         .remove(module_id)
         .expect("should have module");
-    
+
     (module, store, ast.context)
 }
 
@@ -108,11 +113,11 @@ fn binary_addition() {
                     assert_eq!(bin.operator.value, BinaryOperatorKind::Add);
                     let left = &store.expressions[bin.left];
                     let right = &store.expressions[bin.right];
-                    assert_eq!(left.node, ExpressionKind::Literal((None, Literal::Uint(1))));
-                    assert_eq!(
+                    assert!(matches!(left.node, ExpressionKind::Literal((_, Literal::Uint(1)))));
+                    assert!(matches!(
                         right.node,
-                        ExpressionKind::Literal((None, Literal::Uint(2)))
-                    );
+                        ExpressionKind::Literal((_, Literal::Uint(2)))
+                    ));
                 }
                 _ => panic!("expected Binary expression"),
             }
@@ -147,16 +152,16 @@ fn parenthesized_expression() {
                             assert_eq!(inner.operator.value, BinaryOperatorKind::Add);
                             let a = &store.expressions[inner.left];
                             let b = &store.expressions[inner.right];
-                            assert_eq!(a.node, ExpressionKind::Literal((None, Literal::Uint(1))));
-                            assert_eq!(b.node, ExpressionKind::Literal((None, Literal::Uint(2))));
+                            assert!(matches!(a.node, ExpressionKind::Literal((_, Literal::Uint(1)))));
+                            assert!(matches!(b.node, ExpressionKind::Literal((_, Literal::Uint(2)))));
                         }
                         other => panic!("expected inner Binary(Add), got {:?}", other),
                     }
                     let right = &store.expressions[outer.right];
-                    assert_eq!(
+                    assert!(matches!(
                         right.node,
-                        ExpressionKind::Literal((None, Literal::Uint(3)))
-                    );
+                        ExpressionKind::Literal((_, Literal::Uint(3)))
+                    ));
                 }
                 other => panic!("expected outer Binary(Mul), got {:?}", other),
             }
@@ -179,10 +184,10 @@ fn simple_parens() {
     match &stmt.node {
         StatementKind::Expression { expression, .. } => {
             let expr = &store.expressions[*expression];
-            assert_eq!(
+            assert!(matches!(
                 expr.node,
-                ExpressionKind::Literal((None, Literal::Uint(42)))
-            );
+                ExpressionKind::Literal((_, Literal::Uint(42)))
+            ));
         }
         other => panic!("expected Expression statement, got {:?}", other),
     }
@@ -235,7 +240,7 @@ fn simple_assignment() {
                 _ => panic!("expected Variable on LHS"),
             }
             let r = &store.expressions[*right];
-            assert_eq!(r.node, ExpressionKind::Literal((None, Literal::Uint(5))));
+            assert!(matches!(r.node, ExpressionKind::Literal((_, Literal::Uint(5)))));
         }
         _ => panic!("expected Assignment statement"),
     }
@@ -399,10 +404,10 @@ fn new_ptr() {
             match &expr.node {
                 ExpressionKind::New(inner) => {
                     let inner_expr = &store.expressions[*inner];
-                    assert_eq!(
+                    assert!(matches!(
                         inner_expr.node,
-                        ExpressionKind::Literal((None, Literal::Uint(42)))
-                    );
+                        ExpressionKind::Literal((_, Literal::Uint(42)))
+                    ));
                 }
                 _ => panic!("expected New expression"),
             }
@@ -535,7 +540,7 @@ fn chained_function_calls() {
                 ExpressionKind::FunctionCall(FunctionCall { name, callee, .. }) => {
                     assert_eq!(name.as_str(), "bar");
                     assert!(callee.is_some());
-                    let inner = &store.expressions[callee.unwrap()];
+                    let inner = &store.expressions[callee.unwrap().value];
                     match &inner.node {
                         ExpressionKind::FunctionCall(FunctionCall {
                             name: inner_name, ..
@@ -734,14 +739,14 @@ fn array_filler() {
                 ExpressionKind::Array(AnyArray::ArrayFiller(filler)) => {
                     let amount = &store.expressions[filler.amount];
                     let element = &store.expressions[filler.element];
-                    assert_eq!(
+                    assert!(matches!(
                         amount.node,
-                        ExpressionKind::Literal((None, Literal::Uint(3)))
-                    );
-                    assert_eq!(
+                        ExpressionKind::Literal((_, Literal::Uint(3)))
+                    ));
+                    assert!(matches!(
                         element.node,
-                        ExpressionKind::Literal((None, Literal::Uint(0)))
-                    );
+                        ExpressionKind::Literal((_, Literal::Uint(0)))
+                    ));
                 }
                 other => panic!("expected ArrayFiller, got {:?}", other),
             }
@@ -948,7 +953,11 @@ fn typeof_expression() {
             let expr = &store.expressions[*expression];
             match &expr.node {
                 ExpressionKind::TypeOf(TypeOf {
-                    kind: TypeofKind::Union { type_name, variant_name },
+                    kind:
+                        TypeofKind::Union {
+                            type_name,
+                            variant_name,
+                        },
                     binding,
                     ..
                 }) => {
@@ -979,13 +988,17 @@ fn typeof_expression_with_binding() {
             let expr = &store.expressions[*expression];
             match &expr.node {
                 ExpressionKind::TypeOf(TypeOf {
-                    kind: TypeofKind::Union { type_name, variant_name },
+                    kind:
+                        TypeofKind::Union {
+                            type_name,
+                            variant_name,
+                        },
                     binding,
                     ..
                 }) => {
                     assert_eq!(type_name.as_str(), "Foo");
                     assert_eq!(variant_name.as_str(), "Bar");
-                    assert_eq!(binding.as_ref().map(|b| b.as_str()), Some("baz"));
+                    assert_eq!(binding.as_ref().map(|b| b.ident.as_str()), Some("baz"));
                 }
                 other => panic!("expected TypeOf, got {:?}", other),
             }
@@ -1391,7 +1404,13 @@ fn res_type_void() {
         StatementKind::Variable(v) => v,
         _ => panic!("expected Variable"),
     };
-    assert_eq!(*ty, Some(SoulType::Res { ok: None, err: None }));
+    assert_eq!(
+        *ty,
+        Some(SoulType::Res {
+            ok: None,
+            err: None
+        })
+    );
 }
 
 #[test]

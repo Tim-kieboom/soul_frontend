@@ -1,7 +1,5 @@
 use ast_model::{
-    expression::ExpressionKind,
-    literal::Literal,
-    operators::BinaryOperatorKind,
+    expression::ExpressionKind, literal::Literal, operators::BinaryOperatorKind,
     statements::StatementKind,
 };
 use soul_utils::fault::Severity;
@@ -22,10 +20,10 @@ fn expression_literal_int() {
     match &stmt.node {
         StatementKind::Expression { expression, .. } => {
             let expr = &store.expressions[*expression];
-            assert_eq!(
+            assert!(matches!(
                 expr.node,
-                ExpressionKind::Literal((None, Literal::Uint(42)))
-            );
+                ExpressionKind::Literal((_, Literal::Uint(42)))
+            ));
         }
         _ => panic!("expected Expression statement"),
     }
@@ -45,10 +43,10 @@ fn expression_literal_float() {
     match &stmt.node {
         StatementKind::Expression { expression, .. } => {
             let expr = &store.expressions[*expression];
-            assert_eq!(
+            assert!(matches!(
                 expr.node,
-                ExpressionKind::Literal((None, Literal::Float(3.14)))
-            );
+                ExpressionKind::Literal((_, Literal::Float(3.14)))
+            ));
         }
         _ => panic!("expected Expression statement"),
     }
@@ -68,10 +66,12 @@ fn expression_literal_string() {
     match &stmt.node {
         StatementKind::Expression { expression, .. } => {
             let expr = &store.expressions[*expression];
-            assert_eq!(
-                expr.node,
-                ExpressionKind::Literal((None, Literal::Str("hello".into())))
-            );
+            
+            if let ExpressionKind::Literal((_, Literal::Str(string))) = &expr.node {
+                assert_eq!(string, "hello")
+            } else {
+                panic!("should be ExpressionKind::Literal")
+            }
         }
         _ => panic!("expected Expression statement"),
     }
@@ -91,10 +91,10 @@ fn expression_literal_bool() {
     match &stmt.node {
         StatementKind::Expression { expression, .. } => {
             let expr = &store.expressions[*expression];
-            assert_eq!(
+            assert!(matches!(
                 expr.node,
-                ExpressionKind::Literal((None, Literal::Bool(true)))
-            );
+                ExpressionKind::Literal((_, Literal::Bool(true)))
+            ));
         }
         _ => panic!("expected Expression statement"),
     }
@@ -126,8 +126,14 @@ fn expression_fstring() {
                             assert_eq!(bin.operator.value, BinaryOperatorKind::Add);
                             let left = &store.expressions[bin.left];
                             let right = &store.expressions[bin.right];
-                            assert_eq!(left.node, ExpressionKind::Literal((None, Literal::Uint(1))));
-                            assert_eq!(right.node, ExpressionKind::Literal((None, Literal::Uint(2))));
+                            assert!(matches!(
+                                left.node,
+                                ExpressionKind::Literal((_, Literal::Uint(1)))
+                            ));
+                            assert!(matches!(
+                                right.node,
+                                ExpressionKind::Literal((_, Literal::Uint(2)))
+                            ));
                         }
                         other => panic!("expected Binary expression, got {other:?}"),
                     }
@@ -160,7 +166,10 @@ fn expression_fstring_fstr_tag() {
                     let (text, expr_id) = &fmt.parts[0];
                     assert_eq!(text, "hello ");
                     let inner = &store.expressions[*expr_id];
-                    assert_eq!(inner.node, ExpressionKind::Literal((None, Literal::Uint(42))));
+                    assert!(matches!(
+                        inner.node,
+                        ExpressionKind::Literal((_, Literal::Uint(42)))
+                    ));
                 }
                 other => panic!("expected StringFormat expression, got {other:?}"),
             }
@@ -189,16 +198,16 @@ fn expression_fstring_multiple() {
                     assert_eq!(fmt.trailing, " c");
                     let (t0, e0) = &fmt.parts[0];
                     assert_eq!(t0, "a ");
-                    assert_eq!(
+                    assert!(matches!(
                         store.expressions[*e0].node,
-                        ExpressionKind::Literal((None, Literal::Uint(1)))
-                    );
+                        ExpressionKind::Literal((_, Literal::Uint(1)))
+                    ));
                     let (t1, e1) = &fmt.parts[1];
                     assert_eq!(t1, " b ");
-                    assert_eq!(
+                    assert!(matches!(
                         store.expressions[*e1].node,
-                        ExpressionKind::Literal((None, Literal::Uint(2)))
-                    );
+                        ExpressionKind::Literal((_, Literal::Uint(2)))
+                    ));
                 }
                 other => panic!("expected StringFormat expression, got {other:?}"),
             }
@@ -227,10 +236,10 @@ fn expression_fstring_expression_at_start() {
                     assert_eq!(fmt.trailing, " world");
                     let (text, eid) = &fmt.parts[0];
                     assert_eq!(text, "");
-                    assert_eq!(
+                    assert!(matches!(
                         store.expressions[*eid].node,
-                        ExpressionKind::Literal((None, Literal::Uint(42)))
-                    );
+                        ExpressionKind::Literal((_, Literal::Uint(42)))
+                    ));
                 }
                 other => panic!("expected StringFormat expression, got {other:?}"),
             }
@@ -259,16 +268,16 @@ fn expression_fstring_adjacent_expressions() {
                     assert_eq!(fmt.trailing, "");
                     let (t0, e0) = &fmt.parts[0];
                     assert_eq!(t0, "");
-                    assert_eq!(
+                    assert!(matches!(
                         store.expressions[*e0].node,
-                        ExpressionKind::Literal((None, Literal::Uint(1)))
-                    );
+                        ExpressionKind::Literal((_, Literal::Uint(1)))
+                    ));
                     let (t1, e1) = &fmt.parts[1];
                     assert_eq!(t1, "");
-                    assert_eq!(
+                    assert!(matches!(
                         store.expressions[*e1].node,
-                        ExpressionKind::Literal((None, Literal::Uint(2)))
-                    );
+                        ExpressionKind::Literal((_, Literal::Uint(2)))
+                    ));
                 }
                 other => panic!("expected StringFormat expression, got {other:?}"),
             }
@@ -297,10 +306,10 @@ fn expression_fstring_fstr_tag_with_trailing() {
                     assert_eq!(fmt.trailing, " world");
                     let (text, eid) = &fmt.parts[0];
                     assert_eq!(text, "hello ");
-                    assert_eq!(
+                    assert!(matches!(
                         store.expressions[*eid].node,
-                        ExpressionKind::Literal((None, Literal::Uint(1)))
-                    );
+                        ExpressionKind::Literal((_, Literal::Uint(1)))
+                    ));
                 }
                 other => panic!("expected StringFormat expression, got {other:?}"),
             }
@@ -335,18 +344,21 @@ fn expression_fstring_complex_expression() {
                             assert_eq!(bin.operator.value, BinaryOperatorKind::Add);
                             let left = &store.expressions[bin.left];
                             let right = &store.expressions[bin.right];
-                            assert_eq!(left.node, ExpressionKind::Literal((None, Literal::Uint(1))));
+                            assert!(matches!(
+                                left.node,
+                                ExpressionKind::Literal((_, Literal::Uint(1)))
+                            ));
                             match &right.node {
                                 ExpressionKind::Binary(bin) => {
                                     assert_eq!(bin.operator.value, BinaryOperatorKind::Mul);
-                                    assert_eq!(
+                                    assert!(matches!(
                                         store.expressions[bin.left].node,
-                                        ExpressionKind::Literal((None, Literal::Uint(2)))
-                                    );
-                                    assert_eq!(
+                                        ExpressionKind::Literal((_, Literal::Uint(2)))
+                                    ));
+                                    assert!(matches!(
                                         store.expressions[bin.right].node,
-                                        ExpressionKind::Literal((None, Literal::Uint(3)))
-                                    );
+                                        ExpressionKind::Literal((_, Literal::Uint(3)))
+                                    ));
                                 }
                                 other => panic!("expected Binary expression, got {other:?}"),
                             }
@@ -375,7 +387,7 @@ fn expression_null() {
     match &stmt.node {
         StatementKind::Expression { expression, .. } => {
             let expr = &store.expressions[*expression];
-            assert_eq!(expr.node, ExpressionKind::Null(None));
+            assert!(matches!(expr.node, ExpressionKind::Null(_)));
         }
         _ => panic!("expected Expression statement"),
     }

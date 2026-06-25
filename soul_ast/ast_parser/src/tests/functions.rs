@@ -188,9 +188,9 @@ fn extern_function_c() {
         StatementKind::ExternalFunction(id) => {
             let func = &store.functions[*id];
             match func {
-                ast_model::FunctionKind::External(e) => {
-                    assert_eq!(e.signature.value.name.as_str(), "printf");
-                    assert_eq!(e.signature.value.parameters.len(), 1);
+                ast_model::FunctionKind::Signature(signature) => {
+                    assert_eq!(signature.value.name.as_str(), "printf");
+                    assert_eq!(signature.value.parameters.len(), 1);
                 }
                 _ => panic!("expected External function"),
             }
