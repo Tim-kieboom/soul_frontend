@@ -3,11 +3,11 @@ use ast_model::{
     literal::Literal,
     operators::{BinaryOperatorKind, UnaryOperatorKind},
     soul_type::{SoulType, Stub},
-    statements::{Import, ImportItem, ImportKind, StatementKind, TypeDef, Variable},
+    statements::{Import, ImportItem, ImportKind, StatementKind, TypeDef, VarPattern, Variable},
 };
 use soul_utils::{TypeModifier, fault::Severity, soul_names::PrimitiveTypes};
 
-use crate::tests::{NODE_ID, parse};
+use crate::tests::parse;
 
 const CODE: &str = r#"
 import soul.core
@@ -137,7 +137,7 @@ fn all_kinds() {
     // 0: x := 42  — variable declaration with init
     let s0 = &store.statements[body.statements[0]];
     let Variable {
-        name: v0_name,
+        pattern: v0_pat,
         modifier: v0_mod,
         initialize_value: v0_init,
         ..
@@ -145,14 +145,14 @@ fn all_kinds() {
         StatementKind::Variable(v) => v,
         _ => panic!("body[0]: expected Variable"),
     };
-    assert_eq!(v0_name.as_str(), "x");
+    assert!(matches!(v0_pat, VarPattern::Simple { binding, .. } if binding.ident.as_str() == "x"));
     assert_eq!(*v0_mod, TypeModifier::Const);
     assert!(v0_init.is_some());
 
     // 3: mut w: int  — typed variable with no init
     let s3 = &store.statements[body.statements[3]];
     let Variable {
-        name: v3_name,
+        pattern: v3_pat,
         modifier: v3_mod,
         ty: v3_ty,
         initialize_value: v3_init,
@@ -161,7 +161,7 @@ fn all_kinds() {
         StatementKind::Variable(v) => v,
         _ => panic!("body[3]: expected Variable"),
     };
-    assert_eq!(v3_name.as_str(), "w");
+    assert!(matches!(v3_pat, VarPattern::Simple { binding, .. } if binding.ident.as_str() == "w"));
     assert_eq!(*v3_mod, TypeModifier::Mut);
     assert_eq!(
         *v3_ty,
@@ -282,7 +282,7 @@ fn all_kinds() {
         _ => panic!("body[22]: expected Variable"),
     };
     let val22 = &store.expressions[expr22.unwrap()];
-    assert_eq!(val22.node, ExpressionKind::Null(NODE_ID));
+    assert!(matches!(val22.node, ExpressionKind::Null(_)));
 
     // 23: r := "hello"  — string literal
     let s23 = &store.statements[body.statements[23]];
@@ -572,13 +572,13 @@ fn all_kinds() {
     // --- statement 5: pub const ----------------------------------------------
     let stmt5 = &store.statements[block.statements[5]];
     let Variable {
-        name: v_pub,
+        pattern: v_pub_pat,
         modifier: v_pub_mod,
         ..
     } = match &stmt5.node {
         StatementKind::Variable(v) => v,
         other => panic!("statement 5: expected Variable, got {:?}", other),
     };
-    assert_eq!(v_pub.as_str(), "GLOBAL");
+    assert!(matches!(v_pub_pat, VarPattern::Simple { binding, .. } if binding.ident.as_str() == "GLOBAL"));
     assert_eq!(*v_pub_mod, TypeModifier::Const);
 }

@@ -51,6 +51,7 @@ pub const LAMBDA_ARROW: TokenKind = TokenKind::Symbol(Symbol::LambdaArrow);
 pub const SQUARE_CLOSE: TokenKind = TokenKind::Symbol(Symbol::SquareClose);
 pub const COLON_ASSIGN: TokenKind = TokenKind::Symbol(Symbol::ColonAssign);
 pub const DOUBLE_QUESTION: TokenKind = TokenKind::Symbol(Symbol::DoubleQuestion);
+pub const DOUBLE_DOT: TokenKind = TokenKind::Symbol(Symbol::DoubleDot);
 pub const STAMENT_END_TOKENS: &[TokenKind] = &[
     CURLY_CLOSE,
     TokenKind::EndFile,

@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use ast_model::{
-    AstStore, AstTree, Module, NodeId, expression::{
+    AstStore, AstTree, Module, expression::{
         AnyArray, Constructor, ExpressionKind, FunctionCall, MatchMethod, StructConstructor,
         TypeOf, TypeofKind,
     }, literal::Literal, operators::BinaryOperatorKind, soul_type::{ArrayKind, ArrayType, ReferenceType, SoulType, Stub}, statements::{Assignment, Import, ImportKind, Statement, StatementKind, Variable},
@@ -22,8 +22,6 @@ mod literals;
 mod structs;
 mod use_block;
 mod variables;
-
-pub const NODE_ID: NodeId = NodeId::ERROR;
 
 fn module_id() -> ModuleId {
     ModuleId::begin()

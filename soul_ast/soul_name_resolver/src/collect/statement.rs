@@ -1,10 +1,10 @@
 use ast_model::{
     CustomType, FunctionKind,
-    scope::{ScopeValue, ScopeValueKind},
+    scope::ScopeValue,
     soul_type::SoulType,
     statements::{
         Function, FunctionSignature, FunctionThisKind, StatementId, StatementKind, UseBlock,
-        Variable,
+        VarPattern, Variable,
     },
 };
 use soul_utils::{FunctionId, Ident, error::SoulResult, fault::Fault, soul_error_internal};
@@ -159,15 +159,11 @@ impl<'a> NameResolver<'a> {
     }
 
     fn collect_variable(&mut self, variable: &Variable) {
-        if let Err(err) = check_variable_name(&variable.name) {
-            self.log_fault(err);
-        }
+        self.collect_var_pattern(&variable.pattern, variable);
 
-        self.declare_value(ScopeValueKind::Variable(variable));
-
-        let id = variable.id;
+        // Only register the Variable's own NodeId for type storage
         self.declares.insert_variable_type(
-            id,
+            variable.id,
             variable.modifier,
             variable.ty.clone(),
             self.current.module,
@@ -183,6 +179,58 @@ impl<'a> NameResolver<'a> {
 
         if self.current.in_global {
             self.header_insert_variable(variable);
+        }
+    }
+
+    fn collect_var_pattern(&mut self, pattern: &VarPattern, variable: &Variable) {
+        match pattern {
+            VarPattern::Discard => {}
+            VarPattern::Simple { binding, .. } => {
+                if let Err(err) = check_variable_name(&binding.ident) {
+                    self.log_fault(err);
+                }
+                self.insert_value(
+                    binding.ident.as_str(),
+                    binding.id,
+                    binding.ident.span(),
+                    ScopeValue::Variable,
+                );
+            }
+            VarPattern::Tuple(tuple) => {
+                for element in &tuple.elements {
+                    self.collect_var_pattern(element, variable);
+                }
+            }
+            VarPattern::NamedTuple(named) => {
+                for field in &named.fields {
+                    if let Some(binding) = &field.binding {
+                        if let Err(err) = check_variable_name(&binding.ident) {
+                            self.log_fault(err);
+                        }
+                        self.insert_value(
+                            binding.ident.as_str(),
+                            binding.id,
+                            binding.ident.span(),
+                            ScopeValue::Variable,
+                        );
+                    }
+                }
+            }
+            VarPattern::Constructor(ctor) => {
+                for field in &ctor.fields {
+                    if let Some(binding) = &field.binding {
+                        if let Err(err) = check_variable_name(&binding.ident) {
+                            self.log_fault(err);
+                        }
+                        self.insert_value(
+                            binding.ident.as_str(),
+                            binding.id,
+                            binding.ident.span(),
+                            ScopeValue::Variable,
+                        );
+                    }
+                }
+            }
         }
     }
 

@@ -1,11 +1,7 @@
 use std::collections::HashMap;
 
 use soul_utils::{
-    FunctionId, Ident,
-    collections::vec_map::VecMap,
-    ids::IdGenerator,
-    impl_soul_ids,
-    span::{ModuleId, Span},
+    FunctionId, Ident, collections::vec_map::VecMap, ids::IdGenerator, impl_soul_ids, span::{ModuleId, Span},
 };
 
 use crate::{
@@ -408,9 +404,9 @@ impl<'a> ScopeValueKind<'a> {
         }
     }
 
-    pub fn get_ident(&self) -> &Ident {
+    pub fn get_ident(&self) -> Result<&Ident, &str> {
         match self {
-            ScopeValueKind::Variable(variable) => &variable.name,
+            ScopeValueKind::Variable(variable) => variable.name().ok_or("expected simple variable pattern"),
         }
     }
 

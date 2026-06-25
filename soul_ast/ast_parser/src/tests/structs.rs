@@ -40,7 +40,7 @@ fn struct_with_fields() {
         _ => panic!("expected Struct"),
     };
     assert_eq!(struct_.fields.len(), 1);
-    assert_eq!(struct_.fields[0].value.name.as_str(), "x");
+    assert_eq!(struct_.fields[0].value.name().unwrap().as_str(), "x");
     assert!(struct_.fields[0].is_public);
     assert_eq!(
         struct_.fields[0].value.ty,
@@ -68,8 +68,8 @@ fn struct_with_multiple_fields() {
         _ => panic!("expected Struct"),
     };
     assert_eq!(struct_.fields.len(), 2);
-    assert_eq!(struct_.fields[0].value.name.as_str(), "x");
-    assert_eq!(struct_.fields[1].value.name.as_str(), "y");
+    assert_eq!(struct_.fields[0].value.name().unwrap().as_str(), "x");
+    assert_eq!(struct_.fields[1].value.name().unwrap().as_str(), "y");
 }
 
 #[test]
@@ -89,7 +89,7 @@ fn struct_with_public_field() {
     };
     assert_eq!(struct_.fields.len(), 1);
     assert!(struct_.fields[0].is_public);
-    assert_eq!(struct_.fields[0].value.name.as_str(), "x");
+    assert_eq!(struct_.fields[0].value.name().unwrap().as_str(), "x");
     assert_eq!(
         struct_.fields[0].value.modifier,
         soul_utils::TypeModifier::Mut

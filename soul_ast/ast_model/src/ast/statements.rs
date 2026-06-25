@@ -1,5 +1,5 @@
 use crate::{
-    AstStore, NodeId, block::BlockId, expression::{Expression, ExpressionId, ExpressionKind, FunctionCall}, soul_type::{Generic, SoulType},
+    AstStore, NodeId, block::BlockId, expression::{Binding, Expression, ExpressionId, ExpressionKind, FunctionCall}, soul_type::{Generic, SoulType},
 };
 use soul_utils::{
     FunctionId, Ident, TypeModifier, collections::soul_import_path::SoulImportPath, error::SoulResult, fault::Fault, impl_soul_ids, soul_error_internal, span::{ItemMetaData, Span, Spanned},
@@ -185,20 +185,79 @@ pub enum ImportItem {
     Alias { name: Ident, alias: Ident },
 }
 
+/// A destructuring pattern for variable declarations.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum VarPattern {
+    /// Discard: `_` binds nothing.
+    Discard,
+    /// Simple binding: `name` or `mut name`.
+    Simple {
+        binding: Binding,
+        modifier: TypeModifier,
+    },
+    /// Tuple destructuring: `(a, b, ..)`.
+    Tuple(TuplePattern),
+    /// Named tuple / record destructuring: `{field1, field2: alias, ..}`.
+    NamedTuple(NamedTuplePattern),
+    /// Constructor destructuring: `Struct{a, b: alias, ..}`.
+    Constructor(VarConstructorPattern),
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct TuplePattern {
+    pub elements: Vec<VarPattern>,
+    /// Whether `..` (rest) is present at the end.
+    pub rest: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct NamedTuplePattern {
+    pub fields: Vec<VarNamedPattern>,
+    pub rest: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct VarNamedPattern {
+    /// The variable to bind (name = alias if `field: alias`, else field name).
+    /// `None` when the field is discarded (`{field: _}`).
+    pub binding: Option<Binding>,
+    /// The field name being destructured.
+    pub field: Ident,
+    /// The modifier of the binding (mut or const).
+    pub modifier: TypeModifier,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct VarConstructorPattern {
+    pub type_name: Ident,
+    pub fields: Vec<VarNamedPattern>,
+    pub rest: bool,
+}
+
 /// A variable declaration.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Variable {
     pub id: NodeId,
     pub is_public: bool,
 
-    /// The name of the variable.
-    pub name: Ident,
+    /// The destructuring pattern.
+    pub pattern: VarPattern,
     /// The modifier of the variable.
     pub modifier: TypeModifier,
     /// The type of the variable.
     pub ty: Option<SoulType>,
     /// Optional initial value expression.
     pub initialize_value: Option<ExpressionId>,
+}
+
+impl Variable {
+    /// If this is a simple pattern, returns the variable name.
+    pub fn name(&self) -> Option<&Ident> {
+        match &self.pattern {
+            VarPattern::Simple { binding, .. } => Some(&binding.ident),
+            _ => None,
+        }
+    }
 }
 
 /// An assignment statement, e.g., `x = y + 1`.

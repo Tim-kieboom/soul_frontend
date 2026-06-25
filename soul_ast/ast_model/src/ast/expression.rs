@@ -205,6 +205,45 @@ pub enum MatchPattern {
     Array(Vec<MatchPattern>),
     /// A union constructor pattern: `Type.Variant(binding)`.
     Constructor(MatchContructor),
+    /// A tuple pattern: `(a, b, ..)`.
+    Tuple(TupleMatchPattern),
+    /// A named tuple / record pattern: `{field1, field2: alias, ..}`.
+    NamedTuple(NamedTupleMatchPattern),
+    /// A struct constructor pattern: `Struct{a, b: alias, ..}`.
+    ConstructorStruct(ConstructorStructPattern),
+    /// A rest pattern: `..` matches remaining elements/fields.
+    Rest,
+}
+
+/// A tuple pattern: `(a, b, ..)`.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct TupleMatchPattern {
+    pub elements: Vec<MatchPattern>,
+    pub rest: bool,
+}
+
+/// A named tuple / record pattern: `{field1, field2: alias, ..}`.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct NamedTupleMatchPattern {
+    pub fields: Vec<NamedMatchPattern>,
+    pub rest: bool,
+}
+
+/// A single field in a named tuple / constructor pattern.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct NamedMatchPattern {
+    /// The field name being matched.
+    pub field: Ident,
+    /// Optional binding: `None` = wildcard/ignore, `Some` = bind value to this name.
+    pub binding: Option<Binding>,
+}
+
+/// A struct constructor pattern: `Struct{a, b: alias, ..}`.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ConstructorStructPattern {
+    pub type_name: Ident,
+    pub fields: Vec<NamedMatchPattern>,
+    pub rest: bool,
 }
 
 /// A union constructor pattern: `Type.Variant(binding)`.

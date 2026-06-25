@@ -1,22 +1,39 @@
-use ast_model::statements::{Statement, Variable};
+use ast_model::{
+    expression::Binding,
+    statements::{
+        NamedTuplePattern, Statement, TuplePattern, VarConstructorPattern, VarNamedPattern,
+        VarPattern, Variable,
+    },
+};
 use soul_tokenizer::model::TokenKind;
 use soul_utils::{
-    TypeModifier, collections::try_result::ToResult, define_symbols, error::SoulResult,
+    Ident, TypeModifier, collections::try_result::ToResult, define_symbols, error::SoulResult,
     fault::Fault, soul_names::Symbol,
 };
 
 use crate::{
     parser::Parser,
-    utils::{ASSIGN, COLON, COLON_ASSIGN, STAMENT_END_TOKENS},
+    utils::{
+        ASSIGN, COLON, COLON_ASSIGN, COMMA, CURLY_CLOSE, CURLY_OPEN, DOUBLE_DOT, ROUND_CLOSE,
+        ROUND_OPEN, STAMENT_END_TOKENS,
+    },
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_variable(&mut self) -> SoulResult<Statement> {
         const DEFAULT_MODIFIER: TypeModifier = TypeModifier::Const;
         let modifier = self.try_bump_type_modiffier().unwrap_or(DEFAULT_MODIFIER);
+        let pattern_start = self.token().span;
 
-        let name = self.try_bump_consume_ident()?;
-        let name_span = name.span();
+        let pattern = self.parse_var_pattern(modifier)?;
+
+        // Error: `mut` is not allowed on compound patterns
+        if modifier != TypeModifier::Const && !matches!(pattern, VarPattern::Simple { .. }) {
+            return Err(Fault::error(
+                "'mut' modifier cannot be applied to compound patterns; use per-binding 'mut' instead (e.g., (mut a, b))".to_string(),
+                Some(pattern_start),
+            ));
+        }
 
         let ty = match self.current_is(&COLON) {
             true => {
@@ -42,13 +59,12 @@ impl<'a, 'f> Parser<'a, 'f> {
                     Variable {
                         id: self.alloc_node(),
                         is_public: false,
-                        
+                        pattern,
                         ty,
-                        name,
                         modifier,
                         initialize_value: None,
                     },
-                    self.span_combine(name_span),
+                    self.span_combine(pattern_start),
                 ));
             }
         };
@@ -68,14 +84,206 @@ impl<'a, 'f> Parser<'a, 'f> {
             Variable {
                 id: self.alloc_node(),
                 is_public: false,
-
+                pattern,
                 ty,
-                name,
                 modifier,
                 initialize_value: Some(self.parse_expression_id(STAMENT_END_TOKENS)?),
             },
-            self.span_combine(name_span),
+            self.span_combine(pattern_start),
         ))
+    }
+
+    /// Parse a pattern element, with an optional `mut` prefix.
+    /// `default_modifier` is used when no explicit `mut` is found.
+    pub(crate) fn parse_var_pattern(&mut self, default_modifier: TypeModifier) -> SoulResult<VarPattern> {
+        let explicit_mod = self.try_bump_type_modiffier();
+        let modifier = explicit_mod.unwrap_or(default_modifier);
+
+        if self.current_is_ident("_") {
+            self.bump();
+            return Ok(VarPattern::Discard);
+        }
+
+        match &self.token().kind {
+            TokenKind::Ident(_) => {
+                let ident = self.try_bump_consume_ident()?;
+                if self.current_is(&CURLY_OPEN) {
+                    if explicit_mod.is_some() {
+                        return Err(Fault::error(
+                            "'mut' cannot be applied to constructor patterns; use per-field 'mut' instead".to_string(),
+                            Some(ident.span()),
+                        ));
+                    }
+                    return self.parse_constructor_pattern(ident);
+                }
+                Ok(VarPattern::Simple {
+                    binding: Binding::new(self.alloc_node(), ident),
+                    modifier,
+                })
+            }
+            &ROUND_OPEN => {
+                if explicit_mod.is_some() {
+                    return Err(Fault::error(
+                        "'mut' cannot be applied to tuple patterns; use per-element 'mut' instead (e.g., (mut a, b))"
+                            .to_string(),
+                        Some(self.token().span),
+                    ));
+                }
+                self.parse_tuple_pattern()
+            }
+            &CURLY_OPEN => {
+                if explicit_mod.is_some() {
+                    return Err(Fault::error(
+                        "'mut' cannot be applied to named-tuple patterns; use per-field 'mut' instead".to_string(),
+                        Some(self.token().span),
+                    ));
+                }
+                self.parse_named_tuple_pattern()
+            }
+            _ => Err(Fault::error(
+                format!(
+                    "expected variable name, `_`, `(`, or `{{` but found `{}`",
+                    self.token().kind.display()
+                ),
+                Some(self.token().span),
+            )),
+        }
+    }
+
+    pub(crate) fn parse_tuple_pattern(&mut self) -> SoulResult<VarPattern> {
+        self.expect(&ROUND_OPEN)?;
+        let mut elements = Vec::new();
+        let mut rest = false;
+
+        let mut first = true;
+        loop {
+            self.skip_end_lines();
+            if self.current_is(&ROUND_CLOSE) {
+                break;
+            }
+
+            if !first {
+                self.expect(&COMMA)?;
+                self.skip_end_lines();
+                if self.current_is(&ROUND_CLOSE) {
+                    break;
+                }
+            }
+            first = false;
+
+            if self.current_is(&DOUBLE_DOT) {
+                rest = true;
+                self.bump();
+                break;
+            }
+
+            elements.push(self.parse_var_pattern(TypeModifier::Const)?);
+        }
+
+        self.expect(&ROUND_CLOSE)?;
+        Ok(VarPattern::Tuple(TuplePattern { elements, rest }))
+    }
+
+    pub(crate) fn parse_named_tuple_pattern(&mut self) -> SoulResult<VarPattern> {
+        self.expect(&CURLY_OPEN)?;
+        let mut fields = Vec::new();
+        let mut rest = false;
+
+        let mut first = true;
+        loop {
+            self.skip_end_lines();
+            if self.current_is(&CURLY_CLOSE) {
+                break;
+            }
+
+            if !first {
+                self.expect(&COMMA)?;
+                self.skip_end_lines();
+                if self.current_is(&CURLY_CLOSE) {
+                    break;
+                }
+            }
+            first = false;
+
+            if self.current_is(&DOUBLE_DOT) {
+                rest = true;
+                self.bump();
+                break;
+            }
+
+            let modifier = self.try_bump_type_modiffier().unwrap_or(TypeModifier::Const);
+            let field = self.try_bump_consume_ident()?;
+
+            let binding = if self.current_is(&COLON) {
+                self.bump();
+                let alias = self.try_bump_consume_ident()?;
+                if alias.as_str() == "_" {
+                    None
+                } else {
+                    Some(Binding::new(self.alloc_node(), alias))
+                }
+            } else {
+                Some(Binding::new(self.alloc_node(), field.clone()))
+            };
+
+            fields.push(VarNamedPattern { binding, field, modifier });
+        }
+
+        self.expect(&CURLY_CLOSE)?;
+        Ok(VarPattern::NamedTuple(NamedTuplePattern { fields, rest }))
+    }
+
+    pub(crate) fn parse_constructor_pattern(&mut self, type_name: Ident) -> SoulResult<VarPattern> {
+        self.expect(&CURLY_OPEN)?;
+        let mut fields = Vec::new();
+        let mut rest = false;
+
+        let mut first = true;
+        loop {
+            self.skip_end_lines();
+            if self.current_is(&CURLY_CLOSE) {
+                break;
+            }
+
+            if !first {
+                self.expect(&COMMA)?;
+                self.skip_end_lines();
+                if self.current_is(&CURLY_CLOSE) {
+                    break;
+                }
+            }
+            first = false;
+
+            if self.current_is(&DOUBLE_DOT) {
+                rest = true;
+                self.bump();
+                break;
+            }
+
+            let modifier = self.try_bump_type_modiffier().unwrap_or(TypeModifier::Const);
+            let field = self.try_bump_consume_ident()?;
+
+            let binding = if self.current_is(&COLON) {
+                self.bump();
+                let alias = self.try_bump_consume_ident()?;
+                if alias.as_str() == "_" {
+                    None
+                } else {
+                    Some(Binding::new(self.alloc_node(), alias))
+                }
+            } else {
+                Some(Binding::new(self.alloc_node(), field.clone()))
+            };
+
+            fields.push(VarNamedPattern { binding, field, modifier });
+        }
+
+        self.expect(&CURLY_CLOSE)?;
+        Ok(VarPattern::Constructor(VarConstructorPattern {
+            type_name,
+            fields,
+            rest,
+        }))
     }
 }
 

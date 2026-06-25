@@ -1,15 +1,16 @@
 use crate::{
     parser::Parser,
     utils::{
-        COMMA, CURLY_CLOSE, CURLY_OPEN, DOT, ELSE, IF, LAMBDA_ARROW, MATCH, NOT, NULL, ROUND_CLOSE,
-        ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS,
+        COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, DOT, DOUBLE_DOT, ELSE, IF, LAMBDA_ARROW, MATCH, NOT,
+        NULL, ROUND_CLOSE, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS,
     },
 };
 use ast_model::{
     block::{Block, BlockId},
     expression::{
-        Binding, Expression, ExpressionId, ExpressionKind, If, IfBranch, Match, MatchArm,
-        MatchContructor, MatchPattern,
+        Binding, ConstructorStructPattern, Expression, ExpressionId, ExpressionKind, If, IfBranch,
+        Match, MatchArm, MatchContructor, MatchPattern, NamedMatchPattern,
+        NamedTupleMatchPattern, TupleMatchPattern,
     },
     statements::Statement,
 };
@@ -204,13 +205,14 @@ impl<'a, 'f> Parser<'a, 'f> {
         if self.current_is(&SQUARE_OPEN) {
             self.bump();
             let mut elements = Vec::new();
+            let mut first = true;
             loop {
                 self.skip_end_lines();
                 if self.current_is(&SQUARE_CLOSE) {
                     self.bump();
                     break;
                 }
-                if !elements.is_empty() {
+                if !first {
                     self.expect(&COMMA)?;
                     self.skip_end_lines();
                     if self.current_is(&SQUARE_CLOSE) {
@@ -218,9 +220,25 @@ impl<'a, 'f> Parser<'a, 'f> {
                         break;
                     }
                 }
+                first = false;
+
+                if self.current_is(&DOUBLE_DOT) {
+                    self.bump();
+                    elements.push(MatchPattern::Rest);
+                    break;
+                }
+
                 elements.push(self.parse_match_pattern()?);
             }
             return Ok(MatchPattern::Array(elements));
+        }
+
+        if self.current_is(&ROUND_OPEN) {
+            return self.parse_match_tuple_pattern();
+        }
+
+        if self.current_is(&CURLY_OPEN) {
+            return self.parse_match_named_tuple_pattern();
         }
 
         if self.current_is_ident("_") {
@@ -246,7 +264,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let ident_name = match &self.token().kind {
             TokenKind::Ident(name) => name.clone(),
             _ => {
-                let end_tokens = [LAMBDA_ARROW, IF, COMMA, SQUARE_CLOSE];
+                let end_tokens = [LAMBDA_ARROW, IF, COMMA, SQUARE_CLOSE, CURLY_CLOSE, ROUND_CLOSE];
                 let expr = self.parse_expression(&end_tokens)?;
                 return match expr.node {
                     ExpressionKind::Literal((_, lit)) => Ok(MatchPattern::Literal(lit)),
@@ -259,7 +277,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         };
 
         if KeyWord::from_str(&ident_name).is_some() {
-            let end_tokens = [LAMBDA_ARROW, IF, COMMA, SQUARE_CLOSE];
+            let end_tokens = [LAMBDA_ARROW, IF, COMMA, SQUARE_CLOSE, CURLY_CLOSE, ROUND_CLOSE];
             let expr = self.parse_expression(&end_tokens)?;
             return match expr.node {
                 ExpressionKind::Literal((_, lit)) => Ok(MatchPattern::Literal(lit)),
@@ -273,6 +291,12 @@ impl<'a, 'f> Parser<'a, 'f> {
         let saved = self.tokens.current_position();
         let type_name_span = self.token().span;
         self.bump();
+
+        // Try constructor struct pattern: TypeName{field, ...}
+        if self.current_is(&CURLY_OPEN) {
+            return self.parse_match_constructor_struct_pattern(Ident::new(ident_name, type_name_span));
+        }
+
         if self.current_is(&DOT) {
             self.bump();
             let variant_name = match &self.token().kind {
@@ -319,6 +343,138 @@ impl<'a, 'f> Parser<'a, 'f> {
             id: self.store.alloc_node(),
             ident: Ident::new(ident_name, bind_span),
         }))
+    }
+
+    fn parse_match_tuple_pattern(&mut self) -> SoulResult<MatchPattern> {
+        self.expect(&ROUND_OPEN)?;
+        let mut elements = Vec::new();
+        let mut rest = false;
+
+        let mut first = true;
+        loop {
+            self.skip_end_lines();
+            if self.current_is(&ROUND_CLOSE) {
+                break;
+            }
+
+            if !first {
+                self.expect(&COMMA)?;
+                self.skip_end_lines();
+                if self.current_is(&ROUND_CLOSE) {
+                    break;
+                }
+            }
+            first = false;
+
+            if self.current_is(&DOUBLE_DOT) {
+                rest = true;
+                self.bump();
+                break;
+            }
+
+            elements.push(self.parse_match_pattern()?);
+        }
+
+        self.expect(&ROUND_CLOSE)?;
+        Ok(MatchPattern::Tuple(TupleMatchPattern { elements, rest }))
+    }
+
+    fn parse_match_named_tuple_pattern(&mut self) -> SoulResult<MatchPattern> {
+        self.expect(&CURLY_OPEN)?;
+        let mut fields = Vec::new();
+        let mut rest = false;
+
+        let mut first = true;
+        loop {
+            self.skip_end_lines();
+            if self.current_is(&CURLY_CLOSE) {
+                break;
+            }
+
+            if !first {
+                self.expect(&COMMA)?;
+                self.skip_end_lines();
+                if self.current_is(&CURLY_CLOSE) {
+                    break;
+                }
+            }
+            first = false;
+
+            if self.current_is(&DOUBLE_DOT) {
+                rest = true;
+                self.bump();
+                break;
+            }
+
+            let field = self.try_bump_consume_ident()?;
+
+            let binding = if self.current_is(&COLON) {
+                self.bump();
+                if self.current_is_ident("_") {
+                    self.bump();
+                    None
+                } else {
+                    let alias = self.try_bump_consume_ident()?;
+                    Some(Binding::new(self.alloc_node(), alias))
+                }
+            } else {
+                Some(Binding::new(self.alloc_node(), field.clone()))
+            };
+
+            fields.push(NamedMatchPattern { field, binding });
+        }
+
+        self.expect(&CURLY_CLOSE)?;
+        Ok(MatchPattern::NamedTuple(NamedTupleMatchPattern { fields, rest }))
+    }
+
+    fn parse_match_constructor_struct_pattern(&mut self, type_name: Ident) -> SoulResult<MatchPattern> {
+        self.expect(&CURLY_OPEN)?;
+        let mut fields = Vec::new();
+        let mut rest = false;
+
+        let mut first = true;
+        loop {
+            self.skip_end_lines();
+            if self.current_is(&CURLY_CLOSE) {
+                break;
+            }
+
+            if !first {
+                self.expect(&COMMA)?;
+                self.skip_end_lines();
+                if self.current_is(&CURLY_CLOSE) {
+                    break;
+                }
+            }
+            first = false;
+
+            if self.current_is(&DOUBLE_DOT) {
+                rest = true;
+                self.bump();
+                break;
+            }
+
+            let field = self.try_bump_consume_ident()?;
+
+            let binding = if self.current_is(&COLON) {
+                self.bump();
+                if self.current_is_ident("_") {
+                    self.bump();
+                    None
+                } else {
+                    let alias = self.try_bump_consume_ident()?;
+                    Some(Binding::new(self.alloc_node(), alias))
+                }
+            } else {
+                Some(Binding::new(self.alloc_node(), field.clone()))
+            };
+
+            fields.push(NamedMatchPattern { field, binding });
+        }
+
+        self.expect(&CURLY_CLOSE)?;
+        Ok(MatchPattern::ConstructorStruct(ConstructorStructPattern { type_name, fields, rest }))
     }
 
     fn skip_match_pattern(&mut self) {

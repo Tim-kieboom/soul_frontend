@@ -1,7 +1,7 @@
 use ast_model::{
     FunctionKind,
     block::{Block, BlockId},
-    statements::{Statement, StatementId},
+    statements::{Statement, StatementId, Variable},
 };
 use soul_tokenizer::model::TokenKind;
 use soul_utils::{
@@ -14,6 +14,7 @@ use soul_utils::{
 };
 
 use crate::{
+    parse::statements::variable::AssignType,
     parser::Parser,
     utils::{
         ARROW_LEFT, COLON, COLON_ASSIGN, CURLY_CLOSE, CURLY_OPEN, DOT, ROUND_OPEN, SEMI_COLON,
@@ -134,12 +135,70 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let possible_kind = match &self.token().kind {
             TokenKind::Ident(_) => self.try_parse_from_ident(start_span),
+            &ROUND_OPEN => {
+                let saved = self.tokens.current_position();
+                match self.parse_tuple_pattern() {
+                    Ok(pattern) => {
+                        match try_assign_type(&self.token()) {
+                            Some(AssignType::Assign) | 
+                            Some(AssignType::Declaration) => {
+                                self.bump();
+                                let statement = self.parse_expression_id(STAMENT_END_TOKENS)?;
+                                return Ok(Statement::new_variable(
+                                    Variable {
+                                        id: self.alloc_node(),
+                                        is_public: false,
+                                        pattern,
+                                        ty: None,
+                                        modifier: TypeModifier::Const,
+                                        initialize_value: Some(statement),
+                                    },
+                                    self.span_combine(start_span),
+                                ));
+                            }
+                            _ => {
+                                self.goto(saved);
+                                TryNotValue(Fault::empty())
+                            },
+                        }
+                    }
+                    Err(_) => {
+                        self.goto(saved);
+                        TryNotValue(Fault::empty())
+                    }
+                }
+            }
             &CURLY_OPEN => {
-                let block = self.parse_block(TypeModifier::Mut)?;
-                let span = self.span_combine(start_span);
-                let semicolon = self.ends_semicolon();
-
-                TryOk(Statement::new_block(self.store, block, span, semicolon))
+                let saved = self.tokens.current_position();
+                match (self.parse_named_tuple_pattern(), try_assign_type(&self.token())) {
+                    (Ok(pattern), Some(AssignType::Assign)) | 
+                    (Ok(pattern), Some(AssignType::Declaration)) => {
+                        self.bump();
+                        match self.parse_expression_id(STAMENT_END_TOKENS) {
+                            Ok(value) => {
+                                return Ok(Statement::new_variable(
+                                    Variable {
+                                        id: self.alloc_node(),
+                                        is_public: false,
+                                        pattern,
+                                        ty: None,
+                                        modifier: TypeModifier::Const,
+                                        initialize_value: Some(value),
+                                    },
+                                    self.span_combine(start_span),
+                                ));
+                            }
+                            Err(err) => return Err(err),
+                        }
+                    }
+                    _ => {
+                        self.goto(saved);
+                        let block = self.parse_block(TypeModifier::Mut)?;
+                        let span = self.span_combine(start_span);
+                        let semicolon = self.ends_semicolon();
+                        TryOk(Statement::new_block(self.store, block, span, semicolon))
+                    }
+                }
             }
             &STAR => return self.parse_assign_or_expression(start_span),
             TokenKind::Keyword(keyword) => {
@@ -180,6 +239,43 @@ impl<'a, 'f> Parser<'a, 'f> {
             &ROUND_OPEN | &ARROW_LEFT => self.parse_any_function().try_err(),
             &COLON | &COLON_ASSIGN => self.parse_variable().try_err(),
             &DOT if is_this => self.parse_contructor(start_span).try_err(),
+            &CURLY_OPEN => {
+                let saved = self.tokens.current_position();
+                let type_name = match self.try_bump_consume_ident() {
+                    Ok(name) => name,
+                    Err(_) => {
+                        self.goto(saved);
+                        return self.parse_assign_or_expression(start_span).try_err();
+                    }
+                };
+
+                match (self.parse_constructor_pattern(type_name), try_assign_type(&self.token())) {
+                    (Ok(pattern), Some(AssignType::Assign)) | 
+                    (Ok(pattern), Some(AssignType::Declaration)) => {
+                        self.bump();
+                        return self
+                            .parse_expression_id(STAMENT_END_TOKENS)
+                            .map(|value| {
+                                Statement::new_variable(
+                                    Variable {
+                                        id: self.alloc_node(),
+                                        is_public: false,
+                                        pattern,
+                                        ty: None,
+                                        modifier: TypeModifier::Const,
+                                        initialize_value: Some(value),
+                                    },
+                                    self.span_combine(start_span),
+                                )
+                            })
+                            .try_err();
+                    }
+                    _ => {}
+                }
+
+                self.goto(saved);
+                self.parse_assign_or_expression(start_span).try_err()
+            }
             _ => self.parse_assign_or_expression(start_span).try_err(),
         }
     }
@@ -200,5 +296,12 @@ impl<'a, 'f> Parser<'a, 'f> {
                 spanned.map(|func| self.store.insert_function(FunctionKind::Normal(func)))
             })
             .map(Statement::from_function)
+    }
+}
+
+pub(super) fn try_assign_type(token: &soul_tokenizer::model::Token) -> Option<AssignType> {
+    match &token.kind {
+        TokenKind::Symbol(val) => AssignType::from_symbool(*val),
+        _ => None,
     }
 }

@@ -3,7 +3,8 @@ use ast_model::{
     block::BlockId,
     declare_store::DeclareStore,
     scope::{ScopeId, ScopeValue},
-    statements::{StatementId, Variable},
+    statements::{StatementId, VarPattern, Variable},
+    Module,
 };
 use soul_utils::{
     CrateContext, FunctionId, Ident,
@@ -87,16 +88,55 @@ impl<'a> NameResolver<'a> {
 
     fn header_insert_variable(&mut self, variable: &Variable) -> Option<EntryKind<NodeId>> {
         let is_public = variable.is_public;
-        let header = &mut self.ast_modules.get_mut(self.current.module)?.header;
-        let entry = match header.get_mut(variable.name.as_str()) {
-            Some(val) => val,
-            None => header.entry(variable.name.to_string()).or_default(),
-        };
+        self.header_insert_var_pattern(&variable.pattern, is_public)
+    }
 
-        entry.variable.replace(EntryKind {
-            value: variable.id,
+    fn header_insert_var_pattern(&mut self, pattern: &VarPattern, is_public: bool) -> Option<EntryKind<NodeId>> {
+        match pattern {
+            VarPattern::Discard => {}
+            VarPattern::Simple { binding, .. } => {
+                let module = self.ast_modules.get_mut(self.current.module)?;
+                Self::header_insert_binding(module, binding.ident.as_str(), binding.id, is_public);
+            }
+            VarPattern::Tuple(tuple) => {
+                for element in &tuple.elements {
+                    self.header_insert_var_pattern(element, is_public)?;
+                }
+            }
+            VarPattern::NamedTuple(named) => {
+                let module = self.ast_modules.get_mut(self.current.module)?;
+                for field in &named.fields {
+                    if let Some(binding) = &field.binding {
+                        Self::header_insert_binding(module, binding.ident.as_str(), binding.id, is_public);
+                    }
+                }
+            }
+            VarPattern::Constructor(ctor) => {
+                let module = self.ast_modules.get_mut(self.current.module)?;
+                for field in &ctor.fields {
+                    if let Some(binding) = &field.binding {
+                        Self::header_insert_binding(module, binding.ident.as_str(), binding.id, is_public);
+                    }
+                }
+            }
+        }
+        Some(EntryKind {
+            value: NodeId::ERROR,
             is_public,
         })
+    }
+
+    fn header_insert_binding(
+        module: &mut Module,
+        name: &str,
+        id: NodeId,
+        is_public: bool,
+    ) {
+        let entry = match module.header.get_mut(name) {
+            Some(val) => val,
+            None => module.header.entry(name.to_string()).or_default(),
+        };
+        entry.variable.replace(EntryKind { value: id, is_public });
     }
 
     fn header_insert_function_id(

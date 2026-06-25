@@ -1,7 +1,7 @@
 use ast_model::{
     NodeId,
     expression::Binding,
-    scope::{Scope, ScopeBuilder, ScopeValue, ScopeValueKind},
+    scope::{Scope, ScopeBuilder, ScopeValue},
     statements::FunctionSignature,
 };
 use soul_utils::{
@@ -19,16 +19,6 @@ impl<'a> NameResolver<'a> {
 
     pub(crate) fn static_log_fault(context: &mut CrateContext, fault: Fault) {
         context.faults.push(fault);
-    }
-
-    pub(crate) fn declare_value(&mut self, value: ScopeValueKind) {
-        let name = value.get_ident();
-        self.insert_value(
-            name.as_str(),
-            value.get_id(),
-            name.span(),
-            value.to_entry_kind(),
-        );
     }
 
     pub(crate) fn declare_function(

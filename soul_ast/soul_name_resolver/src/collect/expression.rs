@@ -213,6 +213,26 @@ impl<'a> NameResolver<'a> {
                 self.collect_expression(*if_condition);
                 self.collect_match_arm_pattern(&pattern);
             }
+            MatchPattern::Tuple(tuple) => {
+                for element in &tuple.elements {
+                    self.collect_match_arm_pattern(element);
+                }
+            }
+            MatchPattern::NamedTuple(named) => {
+                for field in &named.fields {
+                    if let Some(binding) = &field.binding {
+                        self.insert_binding(binding);
+                    }
+                }
+            }
+            MatchPattern::ConstructorStruct(struct_pat) => {
+                for field in &struct_pat.fields {
+                    if let Some(binding) = &field.binding {
+                        self.insert_binding(binding);
+                    }
+                }
+            }
+            MatchPattern::Rest => (),
         }
     }
 

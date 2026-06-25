@@ -8,7 +8,7 @@ use crate::display::writer::Writer;
 use anyhow::Result;
 use ast_model::{
     AstStore, AstTree, FunctionKind, block::BlockId, expression::{AnyArray, ExpressionId, ExpressionKind, ForCondition, ForElementKind, IfBranch, MatchPattern, TypeofKind}, soul_type::{ArrayKind, Generic, SoulType, TupleKind}, statements::{
-        Assignment, Enum, EnumVariant, ImplBlock, Import, ImportItem, ImportKind, Parameter, StatementId, StatementKind, Struct, Trait, TypeDef, UnionKind, UseBlock, Variable
+        Assignment, Enum, EnumVariant, ImplBlock, Import, ImportItem, ImportKind, Parameter, StatementId, StatementKind, Struct, Trait, TypeDef, UnionKind, UseBlock, VarPattern, Variable
     },
 };
 use soul_tokenizer::model::{keyword::KeyWord, types::Types};
@@ -204,11 +204,10 @@ impl<'a, W: Writer> Displayer<'a, W> {
     }
 
     fn write_variable(&mut self, variable: &Variable) -> Result<()> {
-        self.write_fmt(format_args!(
-            "{} {}",
-            variable.modifier.as_str(),
-            variable.name.as_str()
-        ))?;
+        self.write_str(variable.modifier.as_str())?;
+        self.write_char(' ')?;
+        self.write_var_pattern(&variable.pattern)?;
+
         if let Some(ty) = &variable.ty {
             self.write_str(": ")?;
             self.write_type(ty)?;
@@ -220,6 +219,93 @@ impl<'a, W: Writer> Displayer<'a, W> {
         }
 
         Ok(())
+    }
+
+    fn write_var_pattern(&mut self, pattern: &VarPattern) -> Result<()> {
+        match pattern {
+            VarPattern::Discard => self.write_str("_"),
+            VarPattern::Simple { binding, modifier } => {
+                if *modifier == TypeModifier::Mut {
+                    self.write_str("mut ")?;
+                }
+                self.write_str(binding.ident.as_str())
+            }
+            VarPattern::Tuple(tuple) => {
+                self.write_char('(')?;
+                for (i, element) in tuple.elements.iter().enumerate() {
+                    if i > 0 {
+                        self.write_str(", ")?;
+                    }
+                    self.write_var_pattern(element)?;
+                }
+                if tuple.rest {
+                    if !tuple.elements.is_empty() {
+                        self.write_str(", ")?;
+                    }
+                    self.write_str("..")?;
+                }
+                self.write_char(')')
+            }
+            VarPattern::NamedTuple(named) => {
+                self.write_char('{')?;
+                for (i, field) in named.fields.iter().enumerate() {
+                    if i > 0 {
+                        self.write_str(", ")?;
+                    }
+                    if field.modifier == TypeModifier::Mut {
+                        self.write_str("mut ")?;
+                    }
+                    self.write_str(field.field.as_str())?;
+                    match &field.binding {
+                        Some(binding) if binding.ident != field.field => {
+                            self.write_str(": ")?;
+                            self.write_str(binding.ident.as_str())?;
+                        }
+                        None => {
+                            self.write_str(": _")?;
+                        }
+                        _ => {}
+                    }
+                }
+                if named.rest {
+                    if !named.fields.is_empty() {
+                        self.write_str(", ")?;
+                    }
+                    self.write_str("..")?;
+                }
+                self.write_char('}')
+            }
+            VarPattern::Constructor(constructor) => {
+                self.write_str(constructor.type_name.as_str())?;
+                self.write_char('{')?;
+                for (i, field) in constructor.fields.iter().enumerate() {
+                    if i > 0 {
+                        self.write_str(", ")?;
+                    }
+                    if field.modifier == TypeModifier::Mut {
+                        self.write_str("mut ")?;
+                    }
+                    self.write_str(field.field.as_str())?;
+                    match &field.binding {
+                        Some(binding) if binding.ident != field.field => {
+                            self.write_str(": ")?;
+                            self.write_str(binding.ident.as_str())?;
+                        }
+                        None => {
+                            self.write_str(": _")?;
+                        }
+                        _ => {}
+                    }
+                }
+                if constructor.rest {
+                    if !constructor.fields.is_empty() {
+                        self.write_str(", ")?;
+                    }
+                    self.write_str("..")?;
+                }
+                self.write_char('}')
+            }
+        }
     }
 
     fn write_typedef(&mut self, type_def: &TypeDef) -> Result<()> {
@@ -245,11 +331,9 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 self.write_str("pub ")?;
             }
 
-            self.write_fmt(format_args!(
-                "{} {}",
-                field.value.modifier.as_str(),
-                field.value.name.as_str()
-            ))?;
+            self.write_str(field.value.modifier.as_str())?;
+            self.write_char(' ')?;
+            self.write_var_pattern(&field.value.pattern)?;
             if let Some(ty) = &field.value.ty {
                 self.write_str(": ")?;
                 self.write_type(ty)?;
@@ -788,6 +872,64 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 }
                 Ok(())
             }
+            MatchPattern::Tuple(tuple) => {
+                self.write_char('(')?;
+                for (i, element) in tuple.elements.iter().enumerate() {
+                    if i > 0 {
+                        self.write_str(", ")?;
+                    }
+                    self.write_match_pattern(element)?;
+                }
+                if tuple.rest {
+                    if !tuple.elements.is_empty() {
+                        self.write_str(", ")?;
+                    }
+                    self.write_str("..")?;
+                }
+                self.write_char(')')
+            }
+            MatchPattern::NamedTuple(named) => {
+                self.write_char('{')?;
+                for (i, field) in named.fields.iter().enumerate() {
+                    if i > 0 {
+                        self.write_str(", ")?;
+                    }
+                    self.write_str(field.field.as_str())?;
+                    if let Some(binding) = &field.binding {
+                        self.write_str(": ")?;
+                        self.write_str(binding.ident.as_str())?;
+                    }
+                }
+                if named.rest {
+                    if !named.fields.is_empty() {
+                        self.write_str(", ")?;
+                    }
+                    self.write_str("..")?;
+                }
+                self.write_char('}')
+            }
+            MatchPattern::ConstructorStruct(struct_pat) => {
+                self.write_str(struct_pat.type_name.as_str())?;
+                self.write_char('{')?;
+                for (i, field) in struct_pat.fields.iter().enumerate() {
+                    if i > 0 {
+                        self.write_str(", ")?;
+                    }
+                    self.write_str(field.field.as_str())?;
+                    if let Some(binding) = &field.binding {
+                        self.write_str(": ")?;
+                        self.write_str(binding.ident.as_str())?;
+                    }
+                }
+                if struct_pat.rest {
+                    if !struct_pat.fields.is_empty() {
+                        self.write_str(", ")?;
+                    }
+                    self.write_str("..")?;
+                }
+                self.write_char('}')
+            }
+            MatchPattern::Rest => self.write_str(".."),
         }
     }
 
