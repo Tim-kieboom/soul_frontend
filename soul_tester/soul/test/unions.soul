@@ -1,17 +1,19 @@
 unions() {
     enum Union {
         None,
-        Int{field: int, foo: bool},
         Uint(int),
-        String(str),
         Fmt(fstr),
+        String(str),
+        Int{field: int, foo: bool},
     }
 
     obj := Union.None
     string := obj
-        .None{"none"}
         .Int{"int"}
+        .Fmt{"fmt"}
+        .None{"none"}
         .Uint{"uint"}
+        .String{"string"}
 
     num := obj
         .Uint{it}

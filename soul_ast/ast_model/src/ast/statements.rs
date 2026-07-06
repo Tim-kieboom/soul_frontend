@@ -173,7 +173,7 @@ pub enum ImportKind {
     Alias(Ident),
     Module,
     Items {
-        this: bool,
+        has_this: bool,
         this_alias: Option<Ident>,
         items: Vec<ImportItem>,
     },

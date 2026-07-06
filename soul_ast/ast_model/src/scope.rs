@@ -16,12 +16,10 @@ pub struct ScopeBuilder {
     alloc: IdGenerator<ScopeId>,
 }
 impl ScopeBuilder {
-    pub fn new(root: ModuleId) -> Self {
-        let mut alloc = IdGenerator::new();
-        let module = ModuleScopes::new(&mut alloc);
+    pub fn new() -> Self {
         Self {
-            alloc,
-            scopes: VecMap::from_vec(vec![(root, module)]),
+            scopes: VecMap::new(),
+            alloc: IdGenerator::new(),
         }
     }
 
@@ -67,26 +65,26 @@ impl ScopeBuilder {
         self.scopes.get_mut(module)?.current_scope_mut()
     }
 
-    pub fn lookup_type(&self, ident: &Ident, module: ModuleId) -> Option<ScopeTypeEntry> {
+    pub fn lookup_type(&self, ident: &str, module: ModuleId) -> Option<ScopeTypeEntry> {
         self.scopes.get(module)?.lookup_type(ident)
     }
 
     pub fn lookup_value(
         &self,
-        ident: &Ident,
+        ident: &str,
         kind: ScopeValue,
         module: ModuleId,
     ) -> Option<NodeId> {
         self.scopes.get(module)?.lookup_value(ident, kind)
     }
 
-    pub fn flat_lookup_type(&self, ident: &Ident, module: ModuleId) -> Option<ScopeTypeEntry> {
+    pub fn flat_lookup_type(&self, ident: &str, module: ModuleId) -> Option<ScopeTypeEntry> {
         self.scopes.get(module)?.flat_lookup_type(ident)
     }
 
     pub fn flat_lookup_value(
         &self,
-        ident: &Ident,
+        ident: &str,
         kind: ScopeValue,
         module: ModuleId,
     ) -> Option<NodeId> {
@@ -103,6 +101,10 @@ impl ScopeBuilder {
 
     pub fn lookup_module(&self, name: &str, module: ModuleId) -> Option<ScopeModuleEntry> {
         self.scopes.get(module)?.lookup_module(name)
+    }
+
+    pub fn as_vecmap(&self) -> &VecMap<ModuleId, ModuleScopes> {
+        &self.scopes
     }
 
     pub fn iter_modules(
@@ -153,18 +155,18 @@ impl ModuleScopes {
         self.scopes.get_mut(self.current)
     }
 
-    pub fn lookup_type(&self, ident: &Ident) -> Option<ScopeTypeEntry> {
+    pub fn lookup_type(&self, ident: &str) -> Option<ScopeTypeEntry> {
         for scope in self.scope_iter() {
-            if let Some(ScopeEntry { types, .. }) = scope.entries.get(ident.as_str()) {
+            if let Some(ScopeEntry { types, .. }) = scope.entries.get(ident) {
                 return *types;
             }
         }
         None
     }
 
-    pub fn lookup_value(&self, ident: &Ident, kind: ScopeValue) -> Option<NodeId> {
+    pub fn lookup_value(&self, ident: &str, kind: ScopeValue) -> Option<NodeId> {
         for scope in self.scope_iter() {
-            let ids = match scope.entries.get(ident.as_str()) {
+            let ids = match scope.entries.get(ident) {
                 Some(ScopeEntry {
                     values: Some(val), ..
                 }) => val,
@@ -179,14 +181,14 @@ impl ModuleScopes {
         None
     }
 
-    fn flat_lookup_type(&self, ident: &Ident) -> Option<ScopeTypeEntry> {
+    fn flat_lookup_type(&self, ident: &str) -> Option<ScopeTypeEntry> {
         let scope = self.scopes.get(self.current)?;
-        scope.entries.get(ident.as_str())?.types
+        scope.entries.get(ident)?.types
     }
 
-    fn flat_lookup_value(&self, ident: &Ident, kind: ScopeValue) -> Option<NodeId> {
+    fn flat_lookup_value(&self, ident: &str, kind: ScopeValue) -> Option<NodeId> {
         let scope = self.scopes.get(self.current)?;
-        let ids = scope.entries.get(ident.as_str())?.values.as_ref()?;
+        let ids = scope.entries.get(ident)?.values.as_ref()?;
 
         ids.get(kind)
     }

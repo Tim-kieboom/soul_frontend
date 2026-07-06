@@ -34,6 +34,7 @@ pub(crate) fn display_fault(
     if let Some(span) = span {
         get_source_snippet(writer, &span, source_file.lines(), &begin_space)?;
     }
+
     writer.writer_flush()
 }
 

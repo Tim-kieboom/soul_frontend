@@ -19,6 +19,10 @@ impl SoulImportPath {
         Self { path, is_external, is_absolute: false }
     }
 
+    pub fn set_extension(&mut self, extension: &str) -> bool {
+        self.path.set_extension(extension)
+    }
+
     pub fn set_external(&mut self) {
         self.is_external = true;
     }

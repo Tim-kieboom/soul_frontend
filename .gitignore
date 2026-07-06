@@ -2,3 +2,4 @@
 *.VSCodeCounter
 *.soulc
 *.ll
+/docs

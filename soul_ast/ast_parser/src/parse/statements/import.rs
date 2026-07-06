@@ -8,8 +8,7 @@ use soul_utils::{
 };
 
 use crate::{
-    parser::Parser,
-    utils::{AS_STR, COMMA, CURLY_CLOSE, CURLY_OPEN, IMPORT, ROUND_CLOSE, ROUND_OPEN, STAR},
+    parser::Parser, utils::{AS, AS_STR, COMMA, CURLY_CLOSE, CURLY_OPEN, IMPORT, ROUND_CLOSE, ROUND_OPEN, STAR},
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
@@ -65,7 +64,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 let (this, this_alias, items) = self.parse_import_items()?;
                 self.expect(&CURLY_CLOSE)?;
                 ImportKind::Items {
-                    this,
+                    has_this: this,
                     this_alias,
                     items,
                 }
@@ -100,12 +99,12 @@ impl<'a, 'f> Parser<'a, 'f> {
             let name = self.try_bump_consume_ident()?;
             if name.as_str() == "this" {
                 this = true;
-                if self.current_is_ident(KeyWord::As.as_str()) {
+                if self.current_is(&AS) {
                     self.bump();
                     let alias = self.try_bump_consume_ident()?;
                     this_alias = Some(alias);
                 }
-            } else if self.current_is_ident(KeyWord::As.as_str()) {
+            } else if self.current_is(&AS) {
                 self.bump();
                 let alias = self.try_bump_consume_ident()?;
                 items.push(ImportItem::Alias { name, alias })
@@ -134,39 +133,45 @@ impl<'a, 'f> Parser<'a, 'f> {
     fn parse_import_path(&mut self) -> SoulResult<(SoulImportPath, Option<String>)> {
         const IS_EXTERNAL: bool = true;
         const IS_INTERNAL: bool = false;
-        const THIS_PORJECT: TokenKind = TokenKind::Keyword(KeyWord::Crate);
+        const CRATE: TokenKind = TokenKind::Keyword(KeyWord::Crate);
         const SEPARATOR: TokenKind = TokenKind::Symbol(Symbol::Dot);
         const PREV_SUPER: TokenKind = TokenKind::Symbol(Symbol::Slash);
 
         let mut lib_name = None;
         let mut path = SoulImportPath::new(PathBuf::default(), IS_EXTERNAL);
-        if self.current_is(&THIS_PORJECT) {
-            let current_path = self.source_path.clone();
-            path = SoulImportPath::new(current_path, IS_INTERNAL);
-            path.set_absolute();
-            self.bump();
-            self.expect(&SEPARATOR)?;
-        } else if self.current_is(&SEPARATOR) {
-            let mut current_path = self.current_path().to_path_buf();
-            self.bump();
 
-            while self.current_is(&PREV_SUPER) {
+        match &self.token().kind {
+            &CRATE => {
+                let current_path = self.source_path.clone();
+                path = SoulImportPath::new(current_path, IS_INTERNAL);
+                path.set_absolute();
                 self.bump();
-                if !current_path.pop() {
-                    return Err(Fault::error("could not pop path", Some(self.token().span)));
-                }
-
                 self.expect(&SEPARATOR)?;
             }
+            &SEPARATOR => {
+                let mut current_path = self.current_path().to_path_buf();
+                self.bump();
 
-            path = SoulImportPath::new(current_path, IS_INTERNAL);
-        } else if let TokenKind::Ident(name) = &self.token().kind {
-            lib_name = Some(name.clone());
-        } else {
-            self.log_error(
-                format!("'{}' not allowed in import", self.token().kind.display()),
-                Some(self.token().span),
-            );
+                while self.current_is(&PREV_SUPER) {
+                    self.bump();
+                    if !current_path.pop() {
+                        return Err(Fault::error("could not pop path", Some(self.token().span)));
+                    }
+
+                    self.expect(&SEPARATOR)?;
+                }
+
+                path = SoulImportPath::new(current_path, IS_INTERNAL);
+            }
+            TokenKind::Ident(name) => {
+                lib_name = Some(name.clone());
+            }
+            _ => {
+                self.log_error(
+                    format!("'{}' not allowed in import", self.token().kind.display()),
+                    Some(self.token().span),
+                );
+            }
         }
 
         loop {
@@ -187,12 +192,11 @@ impl<'a, 'f> Parser<'a, 'f> {
         if !self.current_is(&TokenKind::EndFile) {
             self.expect(&TokenKind::EndLine)?;
         }
+
         Ok((path, lib_name))
     }
 
     fn is_non_path_import_symbool(&self) -> bool {
-        const TOKENS: &[TokenKind] = &[CURLY_OPEN, STAR];
-
-        self.current_is_ident(KeyWord::As.as_str()) || self.current_is_any(TOKENS)
+        self.current_is_any(&[CURLY_OPEN, STAR, AS])
     }
 }

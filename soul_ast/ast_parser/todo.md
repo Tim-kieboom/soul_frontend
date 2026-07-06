@@ -1,5 +1,5 @@
 - [ ] pointer/array cotr
 - `*u8.(rawptr)`
 - `[]u8.(rawptr, 0)`
-- [ ] lambda
-- `pow := value => value * 2`
+- [ ] type in methode
+- `int.maxValue()`

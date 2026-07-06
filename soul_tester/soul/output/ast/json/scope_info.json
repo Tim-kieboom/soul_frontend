@@ -1,0 +1,527 @@
+[
+  {
+    "id": "ModuleId(1)",
+    "value": {
+      "scopes": {
+        "1": {
+          "id": 1,
+          "parent": null,
+          "entries": {}
+        },
+        "2": {
+          "id": 2,
+          "parent": 1,
+          "entries": {
+            "i": {
+              "function": null,
+              "values": {
+                "kinds": [
+                  null,
+                  117
+                ]
+              },
+              "types": null,
+              "module": null
+            },
+            "main": {
+              "function": 14,
+              "values": null,
+              "types": null,
+              "module": null
+            },
+            "KeyValue": {
+              "function": null,
+              "values": null,
+              "types": {
+                "span": {
+                  "module": 1,
+                  "start": {
+                    "line": 22,
+                    "offset": 16
+                  },
+                  "end": {
+                    "line": 22,
+                    "offset": 24
+                  }
+                },
+                "node_id": 87,
+                "kind": "Struct",
+                "trait_parent": null
+              },
+              "module": null
+            },
+            "array": {
+              "function": null,
+              "values": {
+                "kinds": [
+                  null,
+                  106
+                ]
+              },
+              "types": null,
+              "module": null
+            },
+            "IndexMut": {
+              "function": null,
+              "values": null,
+              "types": {
+                "span": {
+                  "module": 1,
+                  "start": {
+                    "line": 14,
+                    "offset": 11
+                  },
+                  "end": {
+                    "line": 14,
+                    "offset": 19
+                  }
+                },
+                "node_id": 73,
+                "kind": "Trait",
+                "trait_parent": null
+              },
+              "module": null
+            },
+            "sum": {
+              "function": 12,
+              "values": null,
+              "types": null,
+              "module": null
+            },
+            "___ctor": {
+              "function": 10,
+              "values": null,
+              "types": null,
+              "module": null
+            },
+            "___arrayCtor": {
+              "function": 11,
+              "values": null,
+              "types": null,
+              "module": null
+            },
+            "at": {
+              "function": 13,
+              "values": null,
+              "types": null,
+              "module": null
+            },
+            "a": {
+              "function": null,
+              "values": {
+                "kinds": [
+                  null,
+                  60
+                ]
+              },
+              "types": null,
+              "module": null
+            },
+            "Map": {
+              "function": null,
+              "values": null,
+              "types": {
+                "span": {
+                  "module": 1,
+                  "start": {
+                    "line": 18,
+                    "offset": 12
+                  },
+                  "end": {
+                    "line": 18,
+                    "offset": 15
+                  }
+                },
+                "node_id": 116,
+                "kind": "Struct",
+                "trait_parent": null
+              },
+              "module": null
+            },
+            "field": {
+              "function": null,
+              "values": {
+                "kinds": [
+                  null,
+                  96
+                ]
+              },
+              "types": null,
+              "module": null
+            },
+            "list": {
+              "function": null,
+              "values": {
+                "kinds": [
+                  null,
+                  88
+                ]
+              },
+              "types": null,
+              "module": null
+            },
+            "key": {
+              "function": null,
+              "values": {
+                "kinds": [
+                  null,
+                  78
+                ]
+              },
+              "types": null,
+              "module": null
+            },
+            "value": {
+              "function": null,
+              "values": {
+                "kinds": [
+                  null,
+                  79
+                ]
+              },
+              "types": null,
+              "module": null
+            },
+            "Index": {
+              "function": null,
+              "values": null,
+              "types": {
+                "span": {
+                  "module": 1,
+                  "start": {
+                    "line": 9,
+                    "offset": 11
+                  },
+                  "end": {
+                    "line": 9,
+                    "offset": 16
+                  }
+                },
+                "node_id": 70,
+                "kind": "Trait",
+                "trait_parent": null
+              },
+              "module": null
+            },
+            "b": {
+              "function": null,
+              "values": {
+                "kinds": [
+                  null,
+                  108
+                ]
+              },
+              "types": null,
+              "module": null
+            },
+            "fmt": {
+              "function": null,
+              "values": null,
+              "types": null,
+              "module": {
+                "module_name": "fmt",
+                "module_id": 2,
+                "crate_name": null,
+                "import_kind": "Module",
+                "imported_items": []
+              }
+            }
+          }
+        },
+        "9": {
+          "id": 9,
+          "parent": 2,
+          "entries": {}
+        },
+        "10": {
+          "id": 10,
+          "parent": 2,
+          "entries": {}
+        },
+        "11": {
+          "id": 11,
+          "parent": 2,
+          "entries": {}
+        },
+        "12": {
+          "id": 12,
+          "parent": 2,
+          "entries": {}
+        },
+        "13": {
+          "id": 13,
+          "parent": 2,
+          "entries": {
+            "this": {
+              "function": null,
+              "values": {
+                "kinds": [
+                  null,
+                  211
+                ]
+              },
+              "types": null,
+              "module": null
+            }
+          }
+        },
+        "14": {
+          "id": 14,
+          "parent": 2,
+          "entries": {
+            "this": {
+              "function": null,
+              "values": {
+                "kinds": [
+                  null,
+                  212
+                ]
+              },
+              "types": null,
+              "module": null
+            }
+          }
+        },
+        "15": {
+          "id": 15,
+          "parent": 2,
+          "entries": {
+            "this": {
+              "function": null,
+              "values": {
+                "kinds": [
+                  null,
+                  213
+                ]
+              },
+              "types": null,
+              "module": null
+            }
+          }
+        },
+        "16": {
+          "id": 16,
+          "parent": 2,
+          "entries": {
+            "named": {
+              "function": null,
+              "values": {
+                "kinds": [
+                  null,
+                  187
+                ]
+              },
+              "types": null,
+              "module": null
+            },
+            "pow": {
+              "function": null,
+              "values": {
+                "kinds": [
+                  null,
+                  203
+                ]
+              },
+              "types": null,
+              "module": null
+            },
+            "json": {
+              "function": null,
+              "values": {
+                "kinds": [
+                  null,
+                  191
+                ]
+              },
+              "types": null,
+              "module": null
+            },
+            "object": {
+              "function": null,
+              "values": {
+                "kinds": [
+                  null,
+                  198
+                ]
+              },
+              "types": null,
+              "module": null
+            },
+            "fstring": {
+              "function": null,
+              "values": {
+                "kinds": [
+                  null,
+                  132
+                ]
+              },
+              "types": null,
+              "module": null
+            },
+            "cstring": {
+              "function": null,
+              "values": {
+                "kinds": [
+                  null,
+                  129
+                ]
+              },
+              "types": null,
+              "module": null
+            },
+            "value": {
+              "function": null,
+              "values": {
+                "kinds": [
+                  null,
+                  205
+                ]
+              },
+              "types": null,
+              "module": null
+            },
+            "fmtstring": {
+              "function": null,
+              "values": {
+                "kinds": [
+                  null,
+                  140
+                ]
+              },
+              "types": null,
+              "module": null
+            },
+            "ch": {
+              "function": null,
+              "values": {
+                "kinds": [
+                  null,
+                  126
+                ]
+              },
+              "types": null,
+              "module": null
+            },
+            "obj": {
+              "function": null,
+              "values": {
+                "kinds": [
+                  null,
+                  150
+                ]
+              },
+              "types": null,
+              "module": null
+            },
+            "kv": {
+              "function": null,
+              "values": {
+                "kinds": [
+                  null,
+                  156
+                ]
+              },
+              "types": null,
+              "module": null
+            },
+            "num": {
+              "function": null,
+              "values": {
+                "kinds": [
+                  null,
+                  178
+                ]
+              },
+              "types": null,
+              "module": null
+            },
+            "tuple": {
+              "function": null,
+              "values": {
+                "kinds": [
+                  null,
+                  183
+                ]
+              },
+              "types": null,
+              "module": null
+            }
+          }
+        }
+      },
+      "current": 16
+    }
+  },
+  {
+    "id": "ModuleId(2)",
+    "value": {
+      "scopes": {
+        "3": {
+          "id": 3,
+          "parent": null,
+          "entries": {}
+        },
+        "4": {
+          "id": 4,
+          "parent": 3,
+          "entries": {
+            "doubleInner": {
+              "function": null,
+              "values": null,
+              "types": null,
+              "module": {
+                "module_name": "doubleInner",
+                "module_id": 6,
+                "crate_name": null,
+                "import_kind": "Module",
+                "imported_items": []
+              }
+            },
+            "test": {
+              "function": 5,
+              "values": null,
+              "types": null,
+              "module": null
+            }
+          }
+        },
+        "8": {
+          "id": 8,
+          "parent": 4,
+          "entries": {}
+        }
+      },
+      "current": 8
+    }
+  },
+  {
+    "id": "ModuleId(6)",
+    "value": {
+      "scopes": {
+        "5": {
+          "id": 5,
+          "parent": null,
+          "entries": {}
+        },
+        "6": {
+          "id": 6,
+          "parent": 5,
+          "entries": {
+            "double": {
+              "function": 2,
+              "values": null,
+              "types": null,
+              "module": null
+            }
+          }
+        },
+        "7": {
+          "id": 7,
+          "parent": 6,
+          "entries": {}
+        }
+      },
+      "current": 7
+    }
+  }
+]

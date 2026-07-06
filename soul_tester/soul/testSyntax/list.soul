@@ -1,6 +1,6 @@
 enum MaybeInit<T> {
-    Init(T),
     Uninit,
+    Init(T),
 }
 
 pub struct List<T> {
@@ -11,7 +11,7 @@ pub struct List<T> {
     pub This.(capacity: uint = 0) {
         This{
             len: 0,
-            array: new[for capacity => MaybeInit.Uninit], 
+            array: new[for capacity => undefined], 
         }
     }
 
@@ -52,7 +52,7 @@ pub struct List<T> {
 
     grow(&mut this) {
         grow := cap() * 2 + 1
-        array.growDefault(grow, MaybeInit.Uninit)
+        array.growUndefined(grow)
     }
 
     impl Index {

@@ -2,9 +2,22 @@ use anyhow::Result;
 use soul_tokenizer::{TokenStream, model::TokenKind};
 use soul_utils::literal::{Number, StringLiteral, TokenLiteral};
 
-use crate::display::writer::Writer;
+use crate::{config, display::{write_create_file, writer::Writer}};
 
-pub(crate) fn display_tokens<'a>(tokens: TokenStream<'a>, writer: &mut impl Writer) -> Result<()> {
+pub(crate) fn display_tokenizer<'a>(tokens: &TokenStream<'a>) -> Result<()> {
+    inner_display_tokenizer(tokens).map_err(|err| anyhow::anyhow!("in display_tokenizer: {err}"))
+}
+
+fn inner_display_tokenizer<'a>(tokens: &TokenStream<'a>) -> Result<()> {
+    let mut output_path = config::CONFIG.output_path().join("tokenizer");
+    output_path.push("tokens.soulc");
+
+    let mut writer = write_create_file(&output_path)?;
+    display_tokens(tokens.clone(), &mut writer)?;
+    Ok(())
+}
+
+fn display_tokens<'a>(tokens: TokenStream<'a>, writer: &mut impl Writer) -> Result<()> {
     for token in tokens {
         let token = token.map_err(|err| anyhow::Error::msg(format!("{err:?}")))?;
         let span_str = format!("{:?}", token.span);
@@ -42,13 +55,13 @@ fn display_tokenkind(token: &TokenKind, writer: &mut impl Writer) -> Result<()> 
         TokenKind::EndLine => _ = writer.push_str("'\\n'")?,
         TokenKind::EndFile => _ = writer.push_str("<end-file>")?,
         TokenKind::StringFormat(tag) => {
-            writer.push_str(tag.as_str())?;
+            writer.push_fmt(format_args!("fstring_start({})", tag.as_str()))?;
         }
         TokenKind::FStringPart(text) => {
             writer.push_fmt(format_args!("fstring_part({text:?})"))?;
         }
         TokenKind::FStringEnd => {
-            writer.push_str("fstring_end")?;
+            writer.push_str("fstring_end()")?;
         }
     };
 

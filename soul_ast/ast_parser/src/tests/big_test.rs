@@ -1,9 +1,5 @@
 use ast_model::{
-    expression::{ExpressionKind, FunctionCall, MatchPattern, StructConstructor},
-    literal::Literal,
-    operators::{BinaryOperatorKind, UnaryOperatorKind},
-    soul_type::{SoulType, Stub},
-    statements::{Import, ImportItem, ImportKind, StatementKind, TypeDef, VarPattern, Variable},
+    expression::{ExpressionKind, FunctionCall, FunctionCalleeKind, MatchPattern, StructConstructor}, literal::Literal, operators::{BinaryOperatorKind, UnaryOperatorKind}, soul_type::{SoulType, Stub}, statements::{Import, ImportItem, ImportKind, StatementKind, TypeDef, VarPattern, Variable},
 };
 use soul_utils::{TypeModifier, fault::Severity, soul_names::PrimitiveTypes};
 
@@ -103,7 +99,7 @@ fn all_kinds() {
     assert_eq!(paths1[0].kind, ImportKind::Glob);
     let item = match &paths1[1].kind {
         ImportKind::Items {
-            this: false,
+            has_this: false,
             this_alias: None,
             items,
         } => &items[0],
@@ -379,7 +375,12 @@ fn all_kinds() {
         ExpressionKind::FunctionCall(FunctionCall { name, callee, .. }) => {
             assert_eq!(name.as_str(), "bar");
             assert!(callee.is_some());
-            let inner = &store.expressions[callee.unwrap().value];
+            let value = match callee.as_ref().unwrap().kind {
+                FunctionCalleeKind::Type(_) => panic!("should be FunctionCalleeKind::Expression"),
+                FunctionCalleeKind::Expression(val) => val,
+            };
+
+            let inner = &store.expressions[value];
             match &inner.node {
                 ExpressionKind::FunctionCall(FunctionCall {
                     name: inner_name, ..

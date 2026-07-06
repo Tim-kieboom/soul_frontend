@@ -30,7 +30,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             Ok(Expression::from_lambda(
                 Lambda {
                     id: self.alloc_node(),
-                    params,
+                    parameters: params,
                     body,
                 },
                 self.span_combine(start_span),

@@ -25,9 +25,9 @@ fn simple_lambda() {
         ExpressionKind::Lambda(l) => l,
         other => panic!("expected Lambda, got {:?}", other),
     };
-    assert_eq!(lambda.params.len(), 1);
+    assert_eq!(lambda.parameters.len(), 1);
     assert!(matches!(
-        &lambda.params[0],
+        &lambda.parameters[0],
         VarPattern::Simple {
             binding,
             modifier: TypeModifier::Const,
@@ -54,13 +54,13 @@ fn multi_param_lambda() {
         ExpressionKind::Lambda(l) => l,
         other => panic!("expected Lambda, got {:?}", other),
     };
-    assert_eq!(lambda.params.len(), 2);
+    assert_eq!(lambda.parameters.len(), 2);
     assert!(matches!(
-        &lambda.params[0],
+        &lambda.parameters[0],
         VarPattern::Simple { binding, .. } if binding.ident.as_str() == "a"
     ));
     assert!(matches!(
-        &lambda.params[1],
+        &lambda.parameters[1],
         VarPattern::Simple { binding, .. } if binding.ident.as_str() == "b"
     ));
 }
@@ -84,8 +84,8 @@ fn discard_param_lambda() {
         ExpressionKind::Lambda(l) => l,
         other => panic!("expected Lambda, got {:?}", other),
     };
-    assert_eq!(lambda.params.len(), 1);
-    assert!(matches!(&lambda.params[0], VarPattern::Discard));
+    assert_eq!(lambda.parameters.len(), 1);
+    assert!(matches!(&lambda.parameters[0], VarPattern::Discard));
 }
 
 #[test]
@@ -113,7 +113,7 @@ fn lambda_in_function_call() {
         ExpressionKind::Lambda(l) => l,
         other => panic!("expected Lambda argument, got {:?}", other),
     };
-    assert_eq!(lambda.params.len(), 1);
+    assert_eq!(lambda.parameters.len(), 1);
 }
 
 #[test]
@@ -137,5 +137,5 @@ fn lambda_in_variable() {
         ExpressionKind::Lambda(l) => l,
         other => panic!("expected Lambda initializer, got {:?}", other),
     };
-    assert_eq!(lambda.params.len(), 1);
+    assert_eq!(lambda.parameters.len(), 1);
 }

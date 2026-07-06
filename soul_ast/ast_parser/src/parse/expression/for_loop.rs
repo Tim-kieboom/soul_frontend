@@ -1,14 +1,12 @@
 use ast_model::{
-    expression::{Binding, ExpressionId, For, ForCondition, ForElementKind},
+    expression::{Binding, ExpressionId, For, ForCondition}, statements::VarPattern,
 };
-use soul_tokenizer::model::TokenKind;
 use soul_utils::{
-    Ident, TypeModifier, error::SoulResult, fault::Fault, soul_names::Symbol, span::Spanned,
+    TypeModifier, collections::try_result::{ResultTryErr, ResultTryNotValue, TryError, TryOk, TryResult}, error::SoulResult, fault::Fault, soul_names::Symbol, span::Spanned,
 };
 
 use crate::{
-    parser::Parser,
-    utils::{CURLY_OPEN, FOR, IN},
+    parser::Parser, utils::{COMMA, CURLY_OPEN, FOR, IN},
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
@@ -21,18 +19,33 @@ impl<'a, 'f> Parser<'a, 'f> {
             _ => {
                 let saved = self.tokens.current_position();
 
+                let index = if self.peek_is(&COMMA) {
+                    let ident = self.try_bump_consume_ident()?;
+                    self.bump(); 
+                    Some(Binding::new(self.alloc_node(), ident))
+                } else {
+                    None
+                };
+
                 match self.try_parse_foreach_elements() {
-                    Ok(Some((element, collection))) => ForCondition::Foreach {
-                        element_kind: element,
-                        index: None,
+                    Ok((element, collection)) => ForCondition::Foreach {
+                        index,
                         collection,
+                        element_kind: element,
                     },
-                    Ok(None) => {
+                    Err(TryError::IsNotValue(())) => {
+                        if index.is_some() {
+                            return Err(Fault::error(
+                                format!("`{}` is invalid", Symbol::Comma.as_str()),
+                                Some(self.span_combine(start_span)),
+                            ))
+                        }
+
                         self.goto(saved);
                         let value = self.parse_expression_id(&[CURLY_OPEN])?;
                         ForCondition::While(value)
                     }
-                    Err(err) => return Err(err),
+                    Err(TryError::IsErr(err)) => return Err(err),
                 }
             }
         };
@@ -44,52 +57,10 @@ impl<'a, 'f> Parser<'a, 'f> {
         ))
     }
 
-    fn try_parse_foreach_elements(&mut self) -> SoulResult<Option<(ForElementKind, ExpressionId)>> {
-        let mut args: Vec<Binding> = Vec::new();
-
-        match &self.token().kind {
-            TokenKind::Ident(name) => {
-                let span = self.token().span;
-                let ident = Ident::new(name, span);
-                self.bump();
-                args.push(Binding::new(self.store.alloc_node(), ident));
-            }
-            _ => return Ok(None),
-        }
-
-        loop {
-            self.skip_end_lines();
-            match &self.token().kind {
-                &IN => {
-                    self.bump();
-                    let collection = self.parse_expression_id(&[CURLY_OPEN])?;
-                    let element = if args.len() == 1 {
-                        ForElementKind::Single([args.remove(0)])
-                    } else {
-                        ForElementKind::Tuple(args)
-                    };
-                    return Ok(Some((element, collection)));
-                }
-                TokenKind::Symbol(Symbol::Comma) => {
-                    self.bump();
-                    self.skip_end_lines();
-                    match &self.token().kind {
-                        TokenKind::Ident(name) => {
-                            let span = self.token().span;
-                            let ident = Ident::new(name, span);
-                            self.bump();
-                            args.push(Binding::new(self.store.alloc_node(), ident));
-                        }
-                        _ => {
-                            return Err(Fault::error(
-                                "expected identifier after ',' in foreach element",
-                                Some(self.token().span),
-                            ));
-                        }
-                    }
-                }
-                _ => return Ok(None),
-            }
-        }
+    fn try_parse_foreach_elements(&mut self) -> TryResult<(VarPattern, ExpressionId), ()> {
+        let var_pattern = self.parse_var_pattern(TypeModifier::Const).try_not_value()?;
+        self.expect(&IN).try_not_value()?;
+        let collection = self.parse_expression_id(&[CURLY_OPEN]).try_err()?;
+        TryOk((var_pattern, collection))
     }
 }

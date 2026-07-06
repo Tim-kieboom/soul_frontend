@@ -1,8 +1,6 @@
 use crate::{
-    parser::Parser,
-    utils::{
-        COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, DOT, DOUBLE_DOT, ELSE, IF, LAMBDA_ARROW, MATCH, NOT,
-        NULL, ROUND_CLOSE, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS,
+    parser::Parser, utils::{
+        COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, DOT, DOUBLE_DOT, ELSE, IF, LAMBDA_ARROW, MATCH, NOT, NULL, OR, ROUND_CLOSE, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS,
     },
 };
 use ast_model::{
@@ -16,8 +14,7 @@ use ast_model::{
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
-    Ident, TypeModifier, error::SoulResult, fault::Fault, ids::IdAlloc,
-    span::Span,
+    Ident, TypeModifier, error::SoulResult, fault::Fault, ids::IdAlloc, span::Span,
 };
 
 const IF_STR: &str = KeyWord::If.as_str();
@@ -113,7 +110,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            let mut pattern = match self.parse_match_pattern() {
+            let pattern = match self.parse_match_pattern() {
                 Ok(val) => val,
                 Err(err) => {
                     self.log_fault(err);
@@ -122,11 +119,6 @@ impl<'a, 'f> Parser<'a, 'f> {
                 }
             };
 
-            if self.current_is(&IF) {
-                self.bump();
-                let if_condition = self.parse_expression_id(&[LAMBDA_ARROW])?;
-                pattern = MatchPattern::If { pattern: Box::new(pattern), if_condition };
-            }
             self.skip_end_lines();
 
             if !self.current_is(&LAMBDA_ARROW) {
@@ -202,6 +194,34 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     fn parse_match_pattern(&mut self) -> SoulResult<MatchPattern> {
+        let pattern = self.inner_parse_match_pattern()?;
+        self.skip_end_lines();
+        Ok(match &self.token().kind {
+            &OR => {
+                self.bump();
+
+                let mut chain = vec![pattern];
+                loop {
+                    chain.push(self.inner_parse_match_pattern()?);
+                    self.skip_end_lines();
+                    if !self.current_is(&OR) {
+                        break
+                    }
+                    
+                    self.bump();
+                }
+                MatchPattern::Fallthrough(chain)
+            } 
+            &IF => {
+                self.bump();
+                let if_condition = self.parse_expression_id(&[LAMBDA_ARROW])?;
+                MatchPattern::If { pattern: Box::new(pattern), if_condition }
+            }
+            _ => pattern,
+        })
+    }
+
+    fn inner_parse_match_pattern(&mut self) -> SoulResult<MatchPattern> {
         if self.current_is(&SQUARE_OPEN) {
             self.bump();
             let mut elements = Vec::new();

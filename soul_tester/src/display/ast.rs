@@ -1,17 +1,15 @@
 use std::{
-    backtrace::Backtrace,
-    fmt::{Arguments, Debug},
-    path::Path,
+    backtrace::Backtrace, fmt::{Arguments, Debug}, path::Path,
 };
 
-use crate::display::writer::Writer;
+use crate::{config, display::{vec_map_to_pretty_vec, write_create_file, write_to_file, writer::Writer}};
 use anyhow::Result;
 use ast_model::{
-    AstStore, AstTree, FunctionKind, block::BlockId, expression::{AnyArray, ExpressionId, ExpressionKind, ForCondition, ForElementKind, IfBranch, Lambda, MatchPattern, TypeofKind}, soul_type::{ArrayKind, Generic, SoulType, TupleKind}, statements::{
+    AstStore, AstTree, FunctionKind, block::BlockId, expression::{AnyArray, ExpressionId, ExpressionKind, ForCondition, FunctionCalleeKind, IfBranch, Lambda, MatchPattern, TypeofKind}, soul_type::{ArrayKind, Generic, SoulType, TupleKind}, statements::{
         Assignment, Enum, EnumVariant, ImplBlock, Import, ImportItem, ImportKind, Parameter, StatementId, StatementKind, Struct, Trait, TypeDef, UnionKind, UseBlock, VarPattern, Variable
     },
 };
-use soul_tokenizer::model::{keyword::KeyWord, types::Types};
+use soul_tokenizer::model::{keyword::KeyWord::{self}, types::Types};
 use soul_utils::{
     FunctionId, TypeModifier, collections::vec_map::{VecMap, VecMapIndex}, ids::IdAlloc, soul_names::{PrimitiveTypes, Symbol}, span::ModuleId
 };
@@ -43,7 +41,41 @@ struct Displayer<'a, W: Writer> {
     ast: &'a AstTree,
 }
 
-pub(crate) fn display_ast_tree<'a>(
+pub(crate) fn display_ast(tree: &AstTree) -> Result<()> {
+    inner_display_ast(tree).map_err(|err| anyhow::anyhow!("in display_ast: {err}"))
+}
+
+fn inner_display_ast(tree: &AstTree) -> Result<()> {
+    let mut output_path = config::CONFIG.output_path().join("ast");
+    output_path.push("tree.soulc");
+
+    let mut writer = write_create_file(&output_path)?;
+    display_ast_tree(tree, config::CONFIG.source_path(), &mut writer)?;
+    
+    output_path.pop();
+    output_path.push("json");
+    
+    let blocks = serde_json::to_string_pretty(&vec_map_to_pretty_vec(&tree.store.blocks))?;
+    let functions = serde_json::to_string_pretty(&vec_map_to_pretty_vec(&tree.store.functions))?;
+    let statements = serde_json::to_string_pretty(&vec_map_to_pretty_vec(&tree.store.statements))?;
+    let expressions = serde_json::to_string_pretty(&vec_map_to_pretty_vec(&tree.store.expressions))?;
+
+    let modules = serde_json::to_string_pretty(&vec_map_to_pretty_vec(tree.modules.as_vecmap()))?;
+    let scope_info = serde_json::to_string_pretty(&vec_map_to_pretty_vec(&tree.scope_info.scopes.as_vecmap()))?;
+    
+    write_to_file(&output_path.join("modules.json"), &modules)?;
+    write_to_file(&output_path.join("scope_info.json"), &scope_info)?;
+
+    output_path.push("store");
+    write_to_file(&output_path.join("blocks.json"), &blocks)?;
+    write_to_file(&output_path.join("functions.json"), &functions)?;
+    write_to_file(&output_path.join("statements.json"), &statements)?;
+    write_to_file(&output_path.join("expressions.json"), &expressions)?;
+    
+    Ok(())
+}
+
+fn display_ast_tree<'a>(
     ast: &AstTree,
     root_dir: &Path,
     writer: &mut impl Writer,
@@ -71,6 +103,8 @@ impl<'a, W: Writer> Displayer<'a, W> {
 
     fn write_module(&mut self, id: ModuleId) -> Result<()> {
         let module = self.ast.modules.as_vecmap().get_err(id)?;
+        self.write_fmt(format_args!("// {id:?}\n"))?;
+        self.write_depth()?;
         self.write_fmt(format_args!("mod {} {{\n", module.name))?;
         let block = self.store.blocks.get_err(module.global)?;
 
@@ -113,11 +147,19 @@ impl<'a, W: Writer> Displayer<'a, W> {
     }
 
     fn write_statement(&mut self, id: StatementId) -> Result<()> {
+        
         let statement = self.store.statements.get_err(id)?;
+        self.write_fmt(format_args!("// {}", statement.node.variant_name()))?;
+        if let Some(id_string) = statement.node.get_any_id_string() {
+            self.write_fmt(format_args!(": {id_string}"))?;
+        }
+        self.write_endln()?;
+        self.write_depth()?;
+
         if statement.is_public() {
             self.write_str("pub ")?;
         }
-
+        
         match &statement.node {
             StatementKind::Enum(enum_) => self.write_enum(enum_),
             StatementKind::Trait(trait_) => self.write_trait(trait_),
@@ -309,11 +351,11 @@ impl<'a, W: Writer> Displayer<'a, W> {
     }
 
     fn write_lambda(&mut self, lambda: &Lambda) -> Result<()> {
-        if lambda.params.len() == 1 {
-            self.write_var_pattern(&lambda.params[0])?;
+        if lambda.parameters.len() == 1 {
+            self.write_var_pattern(&lambda.parameters[0])?;
         } else {
             self.write_char('(')?;
-            for (i, param) in lambda.params.iter().enumerate() {
+            for (i, param) in lambda.parameters.iter().enumerate() {
                 if i > 0 {
                     self.write_str(", ")?;
                 }
@@ -348,8 +390,6 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 self.write_str("pub ")?;
             }
 
-            self.write_str(field.value.modifier.as_str())?;
-            self.write_char(' ')?;
             self.write_var_pattern(&field.value.pattern)?;
             if let Some(ty) = &field.value.ty {
                 self.write_str(": ")?;
@@ -387,12 +427,12 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 }
                 ImportKind::Module => (),
                 ImportKind::Items {
-                    this,
+                    has_this,
                     this_alias,
                     items,
                 } => {
                     self.write_char('{')?;
-                    if *this {
+                    if *has_this {
                         self.write_str("this")?;
                         if let Some(alias) = &this_alias {
                             self.write_fmt(format_args!(" as {}", alias.as_str()))?;
@@ -590,8 +630,12 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 self.write_str(field_access.field.as_str())
             }
             ExpressionKind::FunctionCall(function_call) => {
-                if let Some(callee) = function_call.callee {
-                    self.write_expression(callee.value)?;
+                if let Some(callee) = &function_call.callee {
+                    match &callee.kind {
+                        FunctionCalleeKind::Type(soul_type) => self.write_type(soul_type)?,
+                        FunctionCalleeKind::Expression(expression_id) => self.write_expression(*expression_id)?,
+                    }
+                    
                     if callee.optional_map {
                         self.write_char('?')?;
                     }
@@ -751,20 +795,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
                         if let Some(index) = index {
                             self.write_fmt(format_args!("{}, ", index.ident.as_str()))?;
                         }
-                        match element_kind {
-                            ForElementKind::Single([binding]) => self.write_str(binding.ident.as_str())?,
-                            ForElementKind::Tuple(bindings) => {
-                                self.write_char('(')?;
-                                let last_index = bindings.len().saturating_sub(1);
-                                for (i, binding) in bindings.iter().enumerate() {
-                                    self.write_str(binding.ident.as_str())?;
-                                    if i != last_index {
-                                        self.write_str(", ")?;
-                                    }
-                                }
-                                self.write_char(')')?
-                            }
-                        }
+                        self.write_var_pattern(element_kind)?;
                         self.write_fmt(format_args!(" {IN_FOR_LOOP_STR} ", ))?;
                         self.write_expression(*collection)?;
                     }
@@ -853,6 +884,18 @@ impl<'a, W: Writer> Displayer<'a, W> {
 
     fn write_match_pattern(&mut self, arm: &MatchPattern) -> Result<()> {
         match &arm {
+            MatchPattern::Fallthrough(chain) => {
+                let last_index = chain.len().saturating_sub(1);
+                for (i, pattern) in chain.iter().enumerate() {
+                    self.write_match_pattern(pattern)?;
+                    if i != last_index {
+                        self.write_endln()?;
+                        self.write_depth()?;
+                        self.write_str("| ")?;
+                    }
+                }
+                Ok(())
+            }
             MatchPattern::If { pattern, if_condition } => {
                 self.write_match_pattern(pattern)?;
                 self.write_fmt(format_args!(" {} ", KeyWord::If.as_str()))?;
@@ -1189,5 +1232,24 @@ impl<I: VecMapIndex + Debug + Clone, V> GetErr<I, V> for VecMap<I, V> {
             "{index:?} is not found; {}\n",
             Backtrace::force_capture().to_string()
         )))
+    }
+}
+
+trait AnyIdString {
+    fn get_any_id_string(&self) -> Option<String>;
+}
+
+impl AnyIdString for StatementKind {
+    fn get_any_id_string(&self) -> Option<String> {
+        Some(match self {
+            StatementKind::Variable(variable) => format!("{:?}", variable.id),
+            StatementKind::Expression { expression, .. } => format!("{:?}", expression),
+            StatementKind::Function(function_id) |
+            StatementKind::ExternalFunction(function_id) => format!("{:?}", function_id),
+            StatementKind::Enum(enum_) => format!("{:?}", enum_.id),
+            StatementKind::Trait(trait_) => format!("{:?}", trait_.id),
+            StatementKind::Struct(struct_) => format!("{:?}", struct_.id),
+            _ => return None
+        })
     }
 }

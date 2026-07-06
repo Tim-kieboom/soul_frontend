@@ -4,10 +4,7 @@ use ast_model::{
     statements::{ImportItem, ImportKind, ImportPath},
 };
 use soul_utils::{
-    FunctionId, Ident,
-    fault::Fault,
-    soul_error_internal,
-    span::{ModuleId, Span},
+    FunctionId, Ident, fault::Fault, dbg_println, soul_error_internal, span::{ModuleId, Span},
 };
 
 use crate::NameResolver;
@@ -35,13 +32,22 @@ impl<'a> NameResolver<'a> {
         let module_id = if path.module.is_external() {
             todo!()
         } else {
-            match self.modules.get_id(path.module.as_pathbuf()) {
+            let pathbuf = path.module.as_pathbuf();
+            let res = match self.modules.get_id(pathbuf) {
+                Some(val) => Some(val),
+                None => match self.modules.get_id(&pathbuf.join("mod.soul")) {
+                    Some(val) => Some(val),
+                    None => self.modules.get_id(&pathbuf.with_extension("soul")),
+                },
+            };
+
+            match res {
                 Some(val) => val,
                 None => {
                     self.log_fault(soul_error_internal!(
                         format!(
                             "module: {:?} not found in ModuleStore",
-                            path.module.as_pathbuf()
+                            pathbuf
                         ),
                         Some(span)
                     ));

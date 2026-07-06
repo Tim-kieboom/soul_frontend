@@ -98,13 +98,13 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let info = crate::ParseInfo {
             id: module_id,
-            parent: Some(parent),
-            source_folder: path,
-            crate_source_folder: self.crate_source_path.clone(),
             store: self.store,
+            source_folder: path,
+            parent: Some(parent),
             context: self.context,
             modules: self.modules,
             ast_modules: self.ast_modules,
+            crate_source_folder: self.crate_source_path.clone(),
         };
 
         Parser::parse(tokens, name, info);

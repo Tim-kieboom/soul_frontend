@@ -13,6 +13,8 @@ use crate::parser::Parser;
 
 pub const AS_STR: &str = KeyWord::As.as_str();
 
+pub const OR: TokenKind = TokenKind::Symbol(Symbol::Or);
+pub const AS: TokenKind = TokenKind::Keyword(KeyWord::As);
 pub const IF: TokenKind = TokenKind::Keyword(KeyWord::If);
 pub const NOT: TokenKind = TokenKind::Symbol(Symbol::Not);
 pub const DOT: TokenKind = TokenKind::Symbol(Symbol::Dot);

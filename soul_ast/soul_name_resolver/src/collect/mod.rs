@@ -28,6 +28,8 @@ impl<'a> NameResolver<'a> {
             }
         };
 
+        self.scope_info.add_module(id);
+
         let prev = self.current.module;
         self.current.module = id;
         self.current.in_global = true;
@@ -158,7 +160,7 @@ impl<'a> NameResolver<'a> {
         id: NodeId,
         module: ModuleId,
     ) -> bool {
-        if scopes.flat_lookup_type(name, module).is_some() {
+        if scopes.flat_lookup_type(name.as_str(), module).is_some() {
             return false;
         }
 
@@ -179,6 +181,6 @@ impl<'a> NameResolver<'a> {
         self.scope_info
             .scopes
             .current_scope_mut(self.current.module)
-            .expect("resolver has no scope")
+            .expect(&format!("{:?} has no scope", self.current.module))
     }
 }

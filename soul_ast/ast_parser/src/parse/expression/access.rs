@@ -1,7 +1,7 @@
 use std::mem::swap;
 
 use ast_model::expression::{
-    Constructor, Deref, Expression, ExpressionId, ExpressionKind, FunctionCallee, MatchMethod, MatchMethodArm, MatchMethodVariant, Ref, VariableExpression,
+    Constructor, Deref, Expression, ExpressionId, ExpressionKind, FunctionCallee, FunctionCalleeKind, MatchMethod, MatchMethodArm, MatchMethodVariant, Ref, VariableExpression,
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
@@ -187,7 +187,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let value = self.store.insert_expression(value);
         let callee = FunctionCallee {
-            value,
+            kind: FunctionCalleeKind::Expression(value),
             optional_map,
         };
 

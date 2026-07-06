@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use ast_model::{AstTree};
 use ast_parser::{ParseInfo, parse_module};
+use soul_name_resolver::name_resolve;
 use soul_tokenizer::TokenStream;
 use soul_utils::{collections::module_store::ModuleStore, compiler_options::CompilerOptions};
 
@@ -28,7 +29,7 @@ pub fn to_ast<'a, 'f>(
         ast_modules: &mut ast.modules,
     };
     parse_module(tokens, name, info);
-    // name_resolve(source_folder, module_store, &mut ast);
-
+    name_resolve(module_store, &mut ast);
+    
     ast
 }

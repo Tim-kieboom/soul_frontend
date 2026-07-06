@@ -31,11 +31,15 @@ pub struct ScopeInfo {
     pub last_node_id: NodeId,
 }
 impl ScopeInfo {
-    pub fn new(module: ModuleId) -> Self {
+    pub fn new() -> Self {
         Self {
-            scopes: ScopeBuilder::new(module),
+            scopes: ScopeBuilder::new(),
             last_node_id: NodeId::new_index(0),
         }
+    }
+
+    pub fn add_module(&mut self, module: ModuleId) -> Option<scope::ModuleScopes> {
+        self.scopes.add_module(module)
     }
 }
 
@@ -133,9 +137,9 @@ impl AstTree {
         Self {
             root,
             store: AstStore::new(),
+            scope_info: ScopeInfo::new(),
             context: CrateContext::default(),
             modules: AstModuleStore::default(),
-            scope_info: ScopeInfo::new(root),
         }
     }
 

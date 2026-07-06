@@ -1,5 +1,5 @@
-use ast_model::expression::{AnyArray, Constructor, ExpressionId, ExpressionKind, FieldAccess, For, ForCondition, If, IfBranch, Match, MatchMethod};
-use soul_utils::soul_error_internal;
+use ast_model::{expression::{AnyArray, Constructor, ExpressionId, ExpressionKind, FieldAccess, For, ForCondition, If, IfBranch, Lambda, Match, MatchMethod, StringFormat, StructConstructor, VariableExpression}, scope::ScopeValue};
+use soul_utils::{fault::Fault, soul_error_internal};
 
 use crate::NameResolver;
 
@@ -17,15 +17,15 @@ impl<'a> NameResolver<'a> {
         match &expression.node {
             ExpressionKind::Break
             | ExpressionKind::Null(_)
-            | ExpressionKind::Continue
             | ExpressionKind::None(_)
+            | ExpressionKind::Continue
             | ExpressionKind::Literal(_)
             | ExpressionKind::Undefined(_) => (),
 
-            ExpressionKind::New(value) |
-            ExpressionKind::Pass(value) |
-            ExpressionKind::Copy(value) |
-            ExpressionKind::Sizeof(value) => self.resolve_expression(*value),
+            ExpressionKind::New(value) 
+            | ExpressionKind::Pass(value) 
+            | ExpressionKind::Copy(value) 
+            | ExpressionKind::Sizeof(value) => self.resolve_expression(*value),
 
             ExpressionKind::If(if_) => self.resolve_if(if_),
             ExpressionKind::Ref(ref_) => self.resolve_expression(ref_.value),
@@ -49,11 +49,14 @@ impl<'a> NameResolver<'a> {
                 self.resolve_expression(*value);
             }
 
-            ExpressionKind::Lambda(lamdba) => todo!(),
+            ExpressionKind::Lambda(lambda) => self.resolve_lambda(lambda),
             ExpressionKind::Block(block_id) => self.resolve_block(*block_id),
             ExpressionKind::TypeOf(type_of) => self.resolve_expression(type_of.value),
             ExpressionKind::Array(any_array) => self.resolve_any_array(any_array),
-            ExpressionKind::Variable(variable) => todo!(),
+            ExpressionKind::Variable(variable) => {
+                self.resolve_variable_expression(&variable);
+                
+            }
             ExpressionKind::NewArray(any_array) => self.resolve_any_array(any_array),
             ExpressionKind::Return(expression_id) => {
                 if let Some(value) = expression_id {
@@ -63,10 +66,40 @@ impl<'a> NameResolver<'a> {
             ExpressionKind::Constructor(constructor) => self.resolve_contructor(constructor),
             ExpressionKind::FieldAccess(field_access) => self.resolve_field_access(field_access),
             ExpressionKind::MatchMethod(match_method) => self.resolve_match_method(match_method),
-            ExpressionKind::StringFormat(string_format) => todo!(),
-            ExpressionKind::FunctionCall(function_call) => todo!(),
-            ExpressionKind::StructConstructor(struct_constructor) => todo!(),
+            ExpressionKind::StringFormat(string_format) => self.resolve_string_format(string_format),
+            ExpressionKind::FunctionCall(function_call) => self.resolve_function_call(function_call),
+            ExpressionKind::StructConstructor(struct_constructor) => self.resolve_struct_contructor(struct_constructor),
         }
+    }
+
+    fn resolve_struct_contructor(&mut self, struct_constructor: &StructConstructor) {
+        for (_, value) in &struct_constructor.values {
+            self.resolve_expression(*value);
+        }
+    }
+
+    fn resolve_string_format(&mut self, string_format: &StringFormat) {
+        for (_, value) in &string_format.parts {
+            self.resolve_expression(*value);
+        }
+    }
+
+    fn resolve_variable_expression(
+        &mut self,
+        variable: &VariableExpression,
+    ) {
+        let name = &variable.name;
+        match self.scope_info.scopes.lookup_value(name.as_str(), ScopeValue::Variable, self.current.module) {
+            Some(resolved) => _ = self.declares.insert_variable_resolve(variable.id, resolved),
+            None => self.log_fault(Fault::error(
+                format!("variable '{}' is undefined in scope", name.as_str()),
+                Some(name.span())
+            )),
+        }
+    }
+
+    fn resolve_lambda(&mut self, lambda: &Lambda) {
+        self.resolve_expression(lambda.body);
     }
 
     fn resolve_match_method(&mut self, match_method: &MatchMethod) {

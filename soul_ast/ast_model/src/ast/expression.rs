@@ -51,7 +51,7 @@ pub enum ExpressionKind {
     Sizeof(ExpressionId),
     /// `"text".copy // copys &str into str`
     Copy(ExpressionId),
-    /// `i32.pass // returns is null or Err()`
+    /// `expr.pass // returns is null or Err()`
     Pass(ExpressionId),
 
     /// `new(expr)` — heap-allocate and initialize a single value, returns `*T`.
@@ -99,7 +99,7 @@ pub enum ExpressionKind {
 pub struct Lambda {
     pub id: NodeId,
     /// The parameter patterns (one or more, from a tuple-like param list).
-    pub params: Vec<VarPattern>,
+    pub parameters: Vec<VarPattern>,
     /// The body expression.
     pub body: ExpressionId,
 }
@@ -199,6 +199,8 @@ pub struct MatchArm {
 /// A pattern in a match arm.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum MatchPattern {
+    /// `1 | 2 | 3 => ()`
+    Fallthrough(Vec<MatchPattern>),
     /// A literal value pattern.
     Literal(Literal),
     /// A wildcard (default) pattern.
@@ -301,15 +303,9 @@ pub enum ForCondition {
     While(ExpressionId),
     Foreach {
         index: Option<Binding>,
-        element_kind: ForElementKind,
+        element_kind: VarPattern,
         collection: ExpressionId,
     },
-}
-
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum ForElementKind {
-    Single([Binding; 1]), // Single is array to be able to use ForElementKind::iter
-    Tuple(Vec<Binding>),
 }
 
 /// reference, e.g., `&x`(mut) or `@x`(const).
@@ -428,25 +424,23 @@ pub struct FunctionCall {
     pub arguments: Vec<Argument>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FunctionCallee {
-    pub value: ExpressionId,
+    pub kind: FunctionCalleeKind,
     pub optional_map: bool,
 }
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum FunctionCalleeKind {
+    Type(SoulType),
+    Expression(ExpressionId),
+}
+
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Argument {
     pub name: Option<Ident>,
     pub value: ExpressionId,
-}
-
-impl ForElementKind {
-    pub fn iter(&self) -> impl Iterator<Item = &Binding> {
-        match self {
-            ForElementKind::Tuple(items) => items.iter(),
-            ForElementKind::Single(value) => value.iter(),
-        }
-    }
 }
 
 impl Expression {

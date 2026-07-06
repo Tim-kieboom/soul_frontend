@@ -1,8 +1,6 @@
 use ast_model::expression::{
-    AnyArray, Constructor, ExpressionId, ExpressionKind, For, ForCondition, FunctionCall, If,
-    IfBranch, Lambda, Match, MatchMethod, MatchPattern, StringFormat, StructConstructor, TypeOf,
+    AnyArray, Constructor, ExpressionId, ExpressionKind, For, ForCondition, FunctionCall, FunctionCalleeKind, If, IfBranch, Lambda, Match, MatchMethod, MatchPattern, StringFormat, StructConstructor, TypeOf,
 };
-use ast_model::statements::VarPattern;
 use soul_tokenizer::model::keyword::KeyWord;
 use soul_utils::fault::Fault;
 
@@ -84,53 +82,10 @@ impl<'a> NameResolver<'a> {
     }
 
     fn collect_lambda(&mut self, lambda: &Lambda) {
-        for param in &lambda.params {
-            self.collect_lambda_param(param);
+        for param in &lambda.parameters {
+            self.collect_var_pattern(param);
         }
         self.collect_expression(lambda.body);
-    }
-
-    fn collect_lambda_param(&mut self, pattern: &VarPattern) {
-        match pattern {
-            VarPattern::Discard => {}
-            VarPattern::Simple { binding, .. } => {
-                self.insert_value(
-                    binding.ident.as_str(),
-                    binding.id,
-                    binding.ident.span(),
-                    ast_model::scope::ScopeValue::Variable,
-                );
-            }
-            VarPattern::Tuple(tuple) => {
-                for element in &tuple.elements {
-                    self.collect_lambda_param(element);
-                }
-            }
-            VarPattern::NamedTuple(named) => {
-                for field in &named.fields {
-                    if let Some(binding) = &field.binding {
-                        self.insert_value(
-                            binding.ident.as_str(),
-                            binding.id,
-                            binding.ident.span(),
-                            ast_model::scope::ScopeValue::Variable,
-                        );
-                    }
-                }
-            }
-            VarPattern::Constructor(ctor) => {
-                for field in &ctor.fields {
-                    if let Some(binding) = &field.binding {
-                        self.insert_value(
-                            binding.ident.as_str(),
-                            binding.id,
-                            binding.ident.span(),
-                            ast_model::scope::ScopeValue::Variable,
-                        );
-                    }
-                }
-            }
-        }
     }
 
     fn collect_struct_constructor(&mut self, ctor: &StructConstructor) {
@@ -145,8 +100,11 @@ impl<'a> NameResolver<'a> {
             self.collect_type(ty);
         }
 
-        if let Some(callee) = call.callee {
-            self.collect_expression(callee.value);
+        if let Some(callee) = &call.callee {
+            match &callee.kind {
+                FunctionCalleeKind::Type(soul_type) => self.collect_type(soul_type),
+                FunctionCalleeKind::Expression(expression_id) => self.collect_expression(*expression_id),
+            }
         }
 
         for arg in &call.arguments {
@@ -256,6 +214,9 @@ impl<'a> NameResolver<'a> {
                     self.collect_match_arm_pattern(arm);
                 }
             }
+            MatchPattern::Fallthrough(_) => {
+                todo!()
+            }
             MatchPattern::Constructor(match_contructor) => {
                 if let Some(binding) = &match_contructor.binding {
                     self.insert_binding(binding);
@@ -298,9 +259,7 @@ impl<'a> NameResolver<'a> {
                 index,
                 collection,
             } => {
-                for binding in element_kind.iter() {
-                    self.insert_binding(binding);
-                }
+                self.collect_var_pattern(element_kind);
                 self.collect_expression(*collection);
                 if let Some(binding) = index {
                     self.insert_binding(binding);

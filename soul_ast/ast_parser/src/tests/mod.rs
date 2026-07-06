@@ -2,8 +2,7 @@ use std::path::PathBuf;
 
 use ast_model::{
     AstStore, AstTree, Module, expression::{
-        AnyArray, Constructor, ExpressionKind, FunctionCall, MatchMethod, StructConstructor,
-        TypeOf, TypeofKind,
+        AnyArray, Constructor, ExpressionKind, FunctionCall, FunctionCalleeKind, MatchMethod, StructConstructor, TypeOf, TypeofKind,
     }, literal::Literal, operators::BinaryOperatorKind, soul_type::{ArrayKind, ArrayType, ReferenceType, SoulType, Stub}, statements::{Assignment, Import, ImportKind, Statement, StatementKind, Variable},
 };
 use soul_tokenizer::to_token_stream;
@@ -539,7 +538,11 @@ fn chained_function_calls() {
                 ExpressionKind::FunctionCall(FunctionCall { name, callee, .. }) => {
                     assert_eq!(name.as_str(), "bar");
                     assert!(callee.is_some());
-                    let inner = &store.expressions[callee.unwrap().value];
+                    let value = match callee.as_ref().unwrap().kind {
+                        FunctionCalleeKind::Type(_) => panic!("should be FunctionCalleeKind::Expression"),
+                        FunctionCalleeKind::Expression(val) => val,
+                    };
+                    let inner = &store.expressions[value];
                     match &inner.node {
                         ExpressionKind::FunctionCall(FunctionCall {
                             name: inner_name, ..

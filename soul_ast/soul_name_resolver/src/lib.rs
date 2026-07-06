@@ -176,7 +176,7 @@ impl<'a> NameResolver<'a> {
         if self
             .scope_info
             .scopes
-            .flat_lookup_value(name, ScopeValue::Variable, self.current.module)
+            .flat_lookup_value(name.as_str(), ScopeValue::Variable, self.current.module)
             .is_some()
         {
             return false;

@@ -48,8 +48,8 @@ pub(crate) struct Parser<'a, 'f> {
     pub(crate) tokens: TokenStream<'a>,
     pub(crate) store: &'f mut AstStore,
     pub(crate) crate_source_path: PathBuf,
-    pub(crate) context: &'f mut CrateContext,
     pub(crate) modules: &'f mut ModuleStore,
+    pub(crate) context: &'f mut CrateContext,
     pub(crate) ast_modules: &'f mut AstModuleStore,
 }
 impl<'a, 'f> Parser<'a, 'f> {
@@ -66,7 +66,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             header: HashMap::default(),
         };
         info.ast_modules.insert(id, module);
-        info.modules.insert(info.source_folder.clone());
+        // info.modules.insert(info.source_folder.clone());
 
         let mut this = Self::new(tokens, info);
 

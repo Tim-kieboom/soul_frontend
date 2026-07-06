@@ -3,13 +3,16 @@ use std::collections::HashMap;
 use crate::{CustomType, NodeId, soul_type::SoulType, statements::{Enum, FunctionSignature, Struct, Trait}};
 use soul_utils::{FunctionId, TypeModifier, collections::vec_map::VecMap, span::ModuleId};
 
+
 /// A store of all declarations in a module.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct DeclareStore {
     /// The main function (entry point), if defined.
     pub main_function: Option<FunctionId>,
     /// All variable resolutions, indexed by their ID.
-    resolves: VecMap<NodeId, NodeId>,
+    variable_resolves: VecMap<NodeId, NodeId>,
+    /// All functionCall resolutions, indexed by their ID.
+    function_resolves: VecMap<NodeId, FunctionResolve>,
     /// All structs declarations, indexed by their ID.
     custom_types: VecMap<NodeId, (CustomType, ModuleId)>,
     /// All function declarations, indexed by their ID.
@@ -24,11 +27,12 @@ impl DeclareStore {
     pub fn new() -> Self {
         Self {
             main_function: None,
-            resolves: VecMap::new(),
+            variable_resolves: VecMap::new(),
             functions: VecMap::new(),
             custom_types: VecMap::new(),
             variable_type: VecMap::new(),
             function_names: HashMap::new(),
+            function_resolves: VecMap::new(),
         }
     }
 
@@ -54,8 +58,8 @@ impl DeclareStore {
     }
 
     /// Finds a function by name and optional owner type (for method resolution).
-    pub fn find_function(&self, name: &str, owner_kind: Option<&SoulType>) -> Option<FunctionId> {
-        self.find_function_with_module(name, owner_kind)
+    pub fn find_function(&self, name: &str, owner_type: Option<&SoulType>) -> Option<FunctionId> {
+        self.find_function_with_module(name, owner_type)
             .map(|(id, _)| id)
     }
 
@@ -89,12 +93,20 @@ impl DeclareStore {
             .insert(index, (CustomType::Struct(obj.clone()), module));
     }
 
-    pub fn resolve(&mut self, node_id: NodeId, resolved: NodeId) -> Option<NodeId> {
-        self.resolves.insert(node_id, resolved)
+    pub fn insert_variable_resolve(&mut self, node_id: NodeId, resolved: NodeId) -> Option<NodeId> {
+        self.variable_resolves.insert(node_id, resolved)
     }
 
-    pub fn get_resolve(&self, node_id: NodeId) -> Option<NodeId> {
-        self.resolves.get(node_id).copied()
+    pub fn get_variable_resolve(&self, node_id: NodeId) -> Option<NodeId> {
+        self.variable_resolves.get(node_id).copied()
+    } 
+
+    pub fn insert_function_resolve(&mut self, node_id: NodeId, function: FunctionResolve) -> Option<FunctionResolve> {
+        self.function_resolves.insert(node_id, function)
+    }
+
+    pub fn get_function_resolve(&self, node_id: NodeId) -> Option<FunctionResolve> {
+        self.function_resolves.get(node_id).copied()
     } 
 
     pub fn find_function_with_module(
@@ -152,3 +164,11 @@ impl DeclareStore {
         self.variable_type.insert(index, (modifier, ty, module));
     }
 }
+
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+pub struct FunctionResolve {
+    pub id: FunctionId,
+    pub is_defer: bool,
+    pub ignore_callee: bool,
+}
+

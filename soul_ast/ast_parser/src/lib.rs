@@ -15,12 +15,13 @@ mod tests;
 
 pub struct ParseInfo<'f> {
     pub id: ModuleId,
-    pub parent: Option<ModuleId>,
     pub source_folder: PathBuf,
+    pub parent: Option<ModuleId>,
     pub crate_source_folder: PathBuf,
+    
     pub store: &'f mut AstStore,
-    pub context: &'f mut CrateContext,
     pub modules: &'f mut ModuleStore,
+    pub context: &'f mut CrateContext,
     pub ast_modules: &'f mut AstModuleStore,
 }
 

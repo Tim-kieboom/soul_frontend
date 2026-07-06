@@ -1,8 +1,6 @@
 use ast_model::{
-    FunctionKind,
-    statements::{
-        Assignment, Enum, EnumVariant, StatementId, StatementKind, Struct, Trait, UseBlock,
-        Variable,
+    FunctionKind, statements::{
+        Assignment, Enum, EnumVariant, StatementId, StatementKind, Struct, Trait, UseBlock, Variable,
     },
 };
 use soul_utils::{FunctionId, soul_error_internal};

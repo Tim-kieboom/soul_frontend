@@ -1,0 +1,78 @@
+import (
+    crate.fmt
+)
+
+pub sum(a: int, mut b: int): int {
+    a + b
+}
+
+pub trait Index {
+    type Out
+    index(&this, index: uint): &Out
+}
+
+pub trait IndexMut: Index {
+    indexMut(&mut this, index: uint): &mut This.Out
+}
+
+pub struct Map {
+    pub type Key = str
+    pub type Value = int
+
+    pub struct KeyValue {
+        pub mut key: Key
+        pub mut value: Value
+
+        pub This.(key: Key, value: Value) {
+            This{key, value}
+        }
+    }
+
+    list := List.[KeyValue: ]
+    pub mut field = 1
+
+    pub This.(field: int) {
+        This{field, ..}
+    }
+
+    pub This.[KeyValue](array) {
+        
+        This{list: array.into(), ..}
+    }
+
+    sum(this, b: int): int {
+        this.field + b
+    }
+}
+
+use Map at(&this, i: uint): int {
+    this.list[i]
+}
+
+main() {
+    ch := 'a'
+
+    cstring := c"cstr"
+    fstring := f"hello {{1}}{1 * 2 + 1} world{1}"
+    fmtstring := fstr"hello {{1}}{1 * 2 + 1} world{1}"
+    println("hello world")
+
+    mut obj := Map.(1)
+    kv := KeyValue{key: "key".copy, value: 1}
+    obj = Map.[
+        kv.copy, 
+        kv, 
+        KeyValue.("jim".copy, 2),
+    ]
+    obj.sum(1)
+
+    num := new[int: for 10 => undefined]
+    
+    tuple := .(1, "text".copy)
+    named := .{number: 1, text: "text".copy}
+    
+    json := JsonStr(&.{number: 1, text: "hello".copy})
+    object: str = json.into()
+    pow := value => value * 2
+    // int.len()
+}

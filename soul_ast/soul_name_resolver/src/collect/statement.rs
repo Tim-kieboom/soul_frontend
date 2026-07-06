@@ -1,10 +1,6 @@
 use ast_model::{
-    CustomType, FunctionKind,
-    scope::ScopeValue,
-    soul_type::SoulType,
-    statements::{
-        Function, FunctionSignature, FunctionThisKind, StatementId, StatementKind, UseBlock,
-        VarPattern, Variable,
+    CustomType, FunctionKind, scope::ScopeValue, soul_type::SoulType, statements::{
+        EnumVariant, Function, FunctionSignature, FunctionThisKind, StatementId, StatementKind, UseBlock, VarPattern, Variable,
     },
 };
 use soul_utils::{FunctionId, Ident, error::SoulResult, fault::Fault, soul_error_internal};
@@ -25,6 +21,16 @@ impl<'a> NameResolver<'a> {
                     let ty = CustomType::Enum(enum_.clone());
                     self.header_insert_custom_type(id, ty);
                 }
+
+                for variant in &enum_.variants {
+
+                    match variant {
+                        EnumVariant::Assigned { value, .. } => {
+                            self.collect_expression(*value);
+                        }
+                        _ => (),
+                    }
+                }
             }
             StatementKind::Trait(trait_) => {
                 self.declare_trait(trait_);
@@ -32,12 +38,23 @@ impl<'a> NameResolver<'a> {
                     let ty = CustomType::Trait(trait_.clone());
                     self.header_insert_custom_type(id, ty);
                 }
+
+                for method in &trait_.methods {
+                    self.collect_function_id(*method);
+                }
             }
             StatementKind::Struct(struct_) => {
                 self.declare_struct(struct_);
                 if self.current.in_global {
                     let ty = CustomType::Struct(struct_.clone());
                     self.header_insert_custom_type(id, ty);
+                }
+
+                for field in &struct_.fields {
+                    self.collect_variable(&field.value);
+                }
+                for statement in &struct_.statements {
+                    self.collect_statement(*statement);
                 }
             }
             StatementKind::Import(import) => {
@@ -104,8 +121,10 @@ impl<'a> NameResolver<'a> {
 
     fn collect_function_id(&mut self, function_id: FunctionId) {
         let Some(function_kind) = self.store.functions.get(function_id) else {
+            self.log_fault(soul_error_internal!(format!("{function_id:?} not found"), None));
             return;
         };
+
         let signature = &function_kind.signature().value;
         self.check_function_name(&signature.name);
 
@@ -159,7 +178,7 @@ impl<'a> NameResolver<'a> {
     }
 
     fn collect_variable(&mut self, variable: &Variable) {
-        self.collect_var_pattern(&variable.pattern, variable);
+        self.collect_var_pattern(&variable.pattern);
 
         // Only register the Variable's own NodeId for type storage
         self.declares.insert_variable_type(
@@ -182,7 +201,7 @@ impl<'a> NameResolver<'a> {
         }
     }
 
-    fn collect_var_pattern(&mut self, pattern: &VarPattern, variable: &Variable) {
+    pub(crate) fn collect_var_pattern(&mut self, pattern: &VarPattern) {
         match pattern {
             VarPattern::Discard => {}
             VarPattern::Simple { binding, .. } => {
@@ -198,7 +217,7 @@ impl<'a> NameResolver<'a> {
             }
             VarPattern::Tuple(tuple) => {
                 for element in &tuple.elements {
-                    self.collect_var_pattern(element, variable);
+                    self.collect_var_pattern(element);
                 }
             }
             VarPattern::NamedTuple(named) => {
