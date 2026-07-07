@@ -1,8 +1,11 @@
 use std::collections::HashMap;
 
-use crate::{CustomType, NodeId, soul_type::SoulType, statements::{Enum, FunctionSignature, Struct, Trait}};
+use crate::{
+    CustomType, NodeId,
+    soul_type::SoulType,
+    statements::{Enum, FunctionSignature, Struct, Trait},
+};
 use soul_utils::{FunctionId, TypeModifier, collections::vec_map::VecMap, span::ModuleId};
-
 
 /// A store of all declarations in a module.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
@@ -99,15 +102,19 @@ impl DeclareStore {
 
     pub fn get_variable_resolve(&self, node_id: NodeId) -> Option<NodeId> {
         self.variable_resolves.get(node_id).copied()
-    } 
+    }
 
-    pub fn insert_function_resolve(&mut self, node_id: NodeId, function: FunctionResolve) -> Option<FunctionResolve> {
+    pub fn insert_function_resolve(
+        &mut self,
+        node_id: NodeId,
+        function: FunctionResolve,
+    ) -> Option<FunctionResolve> {
         self.function_resolves.insert(node_id, function)
     }
 
     pub fn get_function_resolve(&self, node_id: NodeId) -> Option<FunctionResolve> {
         self.function_resolves.get(node_id).copied()
-    } 
+    }
 
     pub fn find_function_with_module(
         &self,
@@ -171,4 +178,3 @@ pub struct FunctionResolve {
     pub is_defer: bool,
     pub ignore_callee: bool,
 }
-

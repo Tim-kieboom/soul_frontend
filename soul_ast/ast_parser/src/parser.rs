@@ -66,7 +66,6 @@ impl<'a, 'f> Parser<'a, 'f> {
             header: HashMap::default(),
         };
         info.ast_modules.insert(id, module);
-        // info.modules.insert(info.source_folder.clone());
 
         let mut this = Self::new(tokens, info);
 

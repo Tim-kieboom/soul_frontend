@@ -1,10 +1,9 @@
 use ast_model::{
-    AstModuleStore, AstStore, AstTree, CustomType, EntryKind, NodeId, ScopeInfo,
+    AstModuleStore, AstStore, AstTree, CustomType, EntryKind, Module, NodeId, ScopeInfo,
     block::BlockId,
     declare_store::DeclareStore,
     scope::{ScopeId, ScopeValue},
     statements::{StatementId, VarPattern, Variable},
-    Module,
 };
 use soul_utils::{
     CrateContext, FunctionId, Ident,
@@ -91,7 +90,11 @@ impl<'a> NameResolver<'a> {
         self.header_insert_var_pattern(&variable.pattern, is_public)
     }
 
-    fn header_insert_var_pattern(&mut self, pattern: &VarPattern, is_public: bool) -> Option<EntryKind<NodeId>> {
+    fn header_insert_var_pattern(
+        &mut self,
+        pattern: &VarPattern,
+        is_public: bool,
+    ) -> Option<EntryKind<NodeId>> {
         match pattern {
             VarPattern::Discard => {}
             VarPattern::Simple { binding, .. } => {
@@ -107,7 +110,12 @@ impl<'a> NameResolver<'a> {
                 let module = self.ast_modules.get_mut(self.current.module)?;
                 for field in &named.fields {
                     if let Some(binding) = &field.binding {
-                        Self::header_insert_binding(module, binding.ident.as_str(), binding.id, is_public);
+                        Self::header_insert_binding(
+                            module,
+                            binding.ident.as_str(),
+                            binding.id,
+                            is_public,
+                        );
                     }
                 }
             }
@@ -115,7 +123,12 @@ impl<'a> NameResolver<'a> {
                 let module = self.ast_modules.get_mut(self.current.module)?;
                 for field in &ctor.fields {
                     if let Some(binding) = &field.binding {
-                        Self::header_insert_binding(module, binding.ident.as_str(), binding.id, is_public);
+                        Self::header_insert_binding(
+                            module,
+                            binding.ident.as_str(),
+                            binding.id,
+                            is_public,
+                        );
                     }
                 }
             }
@@ -126,17 +139,15 @@ impl<'a> NameResolver<'a> {
         })
     }
 
-    fn header_insert_binding(
-        module: &mut Module,
-        name: &str,
-        id: NodeId,
-        is_public: bool,
-    ) {
+    fn header_insert_binding(module: &mut Module, name: &str, id: NodeId, is_public: bool) {
         let entry = match module.header.get_mut(name) {
             Some(val) => val,
             None => module.header.entry(name.to_string()).or_default(),
         };
-        entry.variable.replace(EntryKind { value: id, is_public });
+        entry.variable.replace(EntryKind {
+            value: id,
+            is_public,
+        });
     }
 
     fn header_insert_function_id(

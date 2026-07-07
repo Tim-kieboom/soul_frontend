@@ -1,6 +1,6 @@
 use soul_utils::{TypeModifier, impl_soul_ids, span::Span};
 
-use crate::{statements::StatementId};
+use crate::statements::StatementId;
 
 impl_soul_ids!(BlockId);
 

@@ -1,6 +1,10 @@
 use ast_model::{
-    CustomType, FunctionKind, scope::ScopeValue, soul_type::SoulType, statements::{
-        EnumVariant, Function, FunctionSignature, FunctionThisKind, StatementId, StatementKind, UseBlock, VarPattern, Variable,
+    CustomType, FunctionKind,
+    scope::ScopeValue,
+    soul_type::SoulType,
+    statements::{
+        EnumVariant, Function, FunctionSignature, FunctionThisKind, StatementId, StatementKind,
+        UseBlock, VarPattern, Variable,
     },
 };
 use soul_utils::{FunctionId, Ident, error::SoulResult, fault::Fault, soul_error_internal};
@@ -23,7 +27,6 @@ impl<'a> NameResolver<'a> {
                 }
 
                 for variant in &enum_.variants {
-
                     match variant {
                         EnumVariant::Assigned { value, .. } => {
                             self.collect_expression(*value);
@@ -121,7 +124,10 @@ impl<'a> NameResolver<'a> {
 
     fn collect_function_id(&mut self, function_id: FunctionId) {
         let Some(function_kind) = self.store.functions.get(function_id) else {
-            self.log_fault(soul_error_internal!(format!("{function_id:?} not found"), None));
+            self.log_fault(soul_error_internal!(
+                format!("{function_id:?} not found"),
+                None
+            ));
             return;
         };
 
@@ -155,6 +161,12 @@ impl<'a> NameResolver<'a> {
         self.declares
             .insert_functions(id, signature.clone(), self.current.module);
 
+        self.push_scope(function.block);
+        if signature.function_kind != FunctionThisKind::Static {
+            let id = self.node_generator.alloc();
+            self.insert_value("this", id, signature.name.span(), ScopeValue::Variable);
+        }
+
         for parameter in signature.parameters.iter() {
             self.collect_type(&parameter.ty);
             let span = parameter.name.span();
@@ -165,11 +177,6 @@ impl<'a> NameResolver<'a> {
             }
         }
 
-        self.push_scope(function.block);
-        if signature.function_kind != FunctionThisKind::Static {
-            let id = self.node_generator.alloc();
-            self.insert_value("this", id, signature.name.span(), ScopeValue::Variable);
-        }
         self.collect_scopeless_block(function.block);
         self.pop_scope();
 

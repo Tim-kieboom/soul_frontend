@@ -95,7 +95,10 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     /// Parse a pattern element, with an optional `mut` prefix.
     /// `default_modifier` is used when no explicit `mut` is found.
-    pub(crate) fn parse_var_pattern(&mut self, default_modifier: TypeModifier) -> SoulResult<VarPattern> {
+    pub(crate) fn parse_var_pattern(
+        &mut self,
+        default_modifier: TypeModifier,
+    ) -> SoulResult<VarPattern> {
         let explicit_mod = self.try_bump_type_modiffier();
         let modifier = explicit_mod.unwrap_or(default_modifier);
 
@@ -211,7 +214,9 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            let modifier = self.try_bump_type_modiffier().unwrap_or(TypeModifier::Const);
+            let modifier = self
+                .try_bump_type_modiffier()
+                .unwrap_or(TypeModifier::Const);
             let field = self.try_bump_consume_ident()?;
 
             let binding = if self.current_is(&COLON) {
@@ -226,7 +231,11 @@ impl<'a, 'f> Parser<'a, 'f> {
                 Some(Binding::new(self.alloc_node(), field.clone()))
             };
 
-            fields.push(VarNamedPattern { binding, field, modifier });
+            fields.push(VarNamedPattern {
+                binding,
+                field,
+                modifier,
+            });
         }
 
         self.expect(&CURLY_CLOSE)?;
@@ -260,7 +269,9 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            let modifier = self.try_bump_type_modiffier().unwrap_or(TypeModifier::Const);
+            let modifier = self
+                .try_bump_type_modiffier()
+                .unwrap_or(TypeModifier::Const);
             let field = self.try_bump_consume_ident()?;
 
             let binding = if self.current_is(&COLON) {
@@ -275,7 +286,11 @@ impl<'a, 'f> Parser<'a, 'f> {
                 Some(Binding::new(self.alloc_node(), field.clone()))
             };
 
-            fields.push(VarNamedPattern { binding, field, modifier });
+            fields.push(VarNamedPattern {
+                binding,
+                field,
+                modifier,
+            });
         }
 
         self.expect(&CURLY_CLOSE)?;

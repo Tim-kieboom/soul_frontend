@@ -1,3 +1,4 @@
+pub mod benchmark;
 pub mod bimap;
 pub mod define_enum;
 pub mod module_store;

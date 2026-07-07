@@ -1,8 +1,16 @@
 use crate::{
-    AstStore, NodeId, block::BlockId, expression::{Binding, Expression, ExpressionId, ExpressionKind, FunctionCall}, soul_type::{Generic, SoulType},
+    AstStore, NodeId,
+    block::BlockId,
+    expression::{Binding, Expression, ExpressionId, ExpressionKind, FunctionCall},
+    soul_type::{Generic, SoulType},
 };
 use soul_utils::{
-    FunctionId, Ident, TypeModifier, collections::soul_import_path::SoulImportPath, error::SoulResult, fault::Fault, impl_soul_ids, soul_error_internal, span::{ItemMetaData, Span, Spanned},
+    FunctionId, Ident, TypeModifier,
+    collections::soul_import_path::SoulImportPath,
+    error::SoulResult,
+    fault::Fault,
+    impl_soul_ids, soul_error_internal,
+    span::{ItemMetaData, Span, Spanned},
 };
 
 impl_soul_ids!(StatementId);
@@ -322,19 +330,23 @@ impl ExternLanguage {
 /// Optional `this` parameter type.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum FunctionThisKind {
-    /// `&this`
-    MutRef,
-    /// ``
+    /// `This.(..)`
+    Ctor,
+    /// `This.[T](array)`
+    ArrayCtor,
+    /// `func(..)`
     Static,
-    /// `this`
+    /// `func(&mut this, ..)`
+    MutRef,
+    /// `func(this, ..)`
     Consume,
-    /// `@this`
+    /// `func(&this, ..)`
     ConstRef,
 }
 impl FunctionThisKind {
     pub fn display(&self) -> Option<&'static str> {
         match self {
-            FunctionThisKind::Static => None,
+            FunctionThisKind::Ctor | FunctionThisKind::Static | FunctionThisKind::ArrayCtor => None,
             FunctionThisKind::MutRef => Some("&mut this"),
             FunctionThisKind::Consume => Some("this"),
             FunctionThisKind::ConstRef => Some("&this"),
@@ -395,14 +407,9 @@ impl Statement {
         }
     }
 
-    pub fn from_typedef(
-        spanned: Spanned<TypeDef>
-    ) -> Self {
+    pub fn from_typedef(spanned: Spanned<TypeDef>) -> Self {
         let Spanned { value, span } = spanned;
-        Self::new(
-            StatementKind::TypeDef(value),
-            span,
-        )
+        Self::new(StatementKind::TypeDef(value), span)
     }
 
     pub fn from_expression(
@@ -460,20 +467,27 @@ impl Statement {
         self.is_public
     }
 
-    pub fn try_set_is_public(&mut self, store: &mut AstStore, is_public: bool, span: Span) -> SoulResult<()> {
+    pub fn try_set_is_public(
+        &mut self,
+        store: &mut AstStore,
+        is_public: bool,
+        span: Span,
+    ) -> SoulResult<()> {
         match &mut self.node {
             StatementKind::Enum(_)
             | StatementKind::Trait(_)
             | StatementKind::Struct(_)
             | StatementKind::TypeDef(_) => self.is_public = is_public,
-            
-            StatementKind::Function(id)
-            | StatementKind::ExternalFunction(id) => {
-                let kind = store.functions.get_mut(*id).ok_or(soul_error_internal!(format!("{id:?} not found"), Some(span)))?;
+
+            StatementKind::Function(id) | StatementKind::ExternalFunction(id) => {
+                let kind = store.functions.get_mut(*id).ok_or(soul_error_internal!(
+                    format!("{id:?} not found"),
+                    Some(span)
+                ))?;
                 kind.signature_mut().value.is_public = is_public;
                 self.is_public = is_public;
             }
-            
+
             StatementKind::Variable(variable) => {
                 self.is_public = is_public;
                 variable.is_public = is_public;

@@ -1,7 +1,20 @@
-use ast_model::{declare_store::FunctionResolve, expression::{ExpressionKind, FunctionCall, FunctionCallee, FunctionCalleeKind, VariableExpression}, scope::{ScopeModuleEntry, ScopeTypeEntryKind}, soul_type::{SoulType, Stub}, statements::{ImportItem, ImportKind}};
-use soul_utils::{FunctionId, fault::Fault, soul_error_internal, span::{ModuleId, Span}};
+use ast_model::{
+    declare_store::FunctionResolve,
+    expression::{
+        ExpressionKind, FunctionCall, FunctionCallee, FunctionCalleeKind, VariableExpression,
+    },
+    scope::{ScopeModuleEntry, ScopeTypeEntryKind},
+    soul_type::{SoulType, Stub},
+    statements::{ImportItem, ImportKind},
+};
+use soul_utils::{
+    FunctionId,
+    fault::Fault,
+    soul_error_internal,
+    span::{ModuleId, Span},
+};
 
-use crate::{NameResolver};
+use crate::NameResolver;
 
 impl<'a> NameResolver<'a> {
     pub(super) fn resolve_function_call(&mut self, call: &FunctionCall) {
@@ -20,16 +33,17 @@ impl<'a> NameResolver<'a> {
         }
 
         if !self.is_function_imported(call) {
-            let id = self.lookup_function(call.name.as_str())
+            let id = self
+                .lookup_function(call.name.as_str())
                 .unwrap_or(FunctionId::ERROR);
 
             self.declares.insert_function_resolve(
-                call.id, 
+                call.id,
                 FunctionResolve {
-                    id, 
-                    is_defer: false, 
+                    id,
+                    is_defer: false,
                     ignore_callee: false,
-                }
+                },
             );
             return;
         }
@@ -37,19 +51,17 @@ impl<'a> NameResolver<'a> {
         let type_qualifier = self.parse_owner_type(call.callee.as_ref());
         let ignore_callee = type_qualifier.is_some();
         if let Some(callee) = &call.callee {
-
             let is_union = self.is_callee_union(callee).unwrap_or(false);
             if type_qualifier.is_some() && is_union {
-                
                 self.declares.insert_function_resolve(
-                    call.id, 
-                    FunctionResolve { 
-                        id: FunctionId::ERROR, 
-                        is_defer: false, 
+                    call.id,
+                    FunctionResolve {
+                        id: FunctionId::ERROR,
+                        is_defer: false,
                         ignore_callee,
-                    }
+                    },
                 );
-                return
+                return;
             }
 
             match &callee.kind {
@@ -66,26 +78,24 @@ impl<'a> NameResolver<'a> {
             self.lookup_function(name)
         };
 
-        let Some(id) = resolved else {
-            return
-        };
+        let Some(id) = resolved else { return };
         self.declares.insert_function_resolve(
-            call.id, 
+            call.id,
             FunctionResolve {
-                id, 
-                is_defer: false, 
+                id,
+                is_defer: false,
                 ignore_callee: false,
-            }
+            },
         );
     }
 
     fn get_owner_kind(
-        &'a self, 
+        &'a self,
         type_qualifier: Option<&'a SoulType>,
         call: &'a FunctionCall,
     ) -> Option<&'a SoulType> {
         if let Some(ty) = type_qualifier {
-            return Some(ty)
+            return Some(ty);
         }
 
         let callee = call.callee.as_ref()?;
@@ -96,14 +106,13 @@ impl<'a> NameResolver<'a> {
 
         match &value.node {
             ExpressionKind::Variable(VariableExpression { id, .. }) => {
-
                 let resolved = self.declares.get_variable_resolve(*id)?;
                 match self.declares.get_variable_type(resolved)? {
                     (_, Some(ty), _) => Some(ty),
                     _ => None,
                 }
             }
-            _ => None
+            _ => None,
         }
     }
 
@@ -112,15 +121,18 @@ impl<'a> NameResolver<'a> {
             FunctionCalleeKind::Expression(id) => match &self.store.expressions.get(*id)?.node {
                 ExpressionKind::Variable(VariableExpression { name, .. }) => name.as_str(),
                 _ => return None,
-            }
+            },
             FunctionCalleeKind::Type(soul_type) => match soul_type {
                 SoulType::Stub(stub) => &stub.name,
                 SoulType::Res { .. } => return Some(true),
-                _ => return None
+                _ => return None,
             },
         };
 
-        let entry = self.scope_info.scopes.lookup_type(ident, self.current.module)?;
+        let entry = self
+            .scope_info
+            .scopes
+            .lookup_type(ident, self.current.module)?;
         Some(matches!(entry.kind, ScopeTypeEntryKind::Union))
     }
 
@@ -137,8 +149,7 @@ impl<'a> NameResolver<'a> {
             return false;
         };
 
-        for(_name, entry) in modules {
-
+        for (_name, entry) in modules {
             match &entry.import_kind {
                 ImportKind::Module => continue,
                 ImportKind::This => has_module_with_this = true,
@@ -174,23 +185,21 @@ impl<'a> NameResolver<'a> {
             FunctionCalleeKind::Expression(val) => *val,
         };
 
-        let ident = match self.store.expressions.get(value).map(|value| &value.node)  {
-            Some(ExpressionKind::Variable(VariableExpression{ name, .. })) => name,
+        let ident = match self.store.expressions.get(value).map(|value| &value.node) {
+            Some(ExpressionKind::Variable(VariableExpression { name, .. })) => name,
             _ => return None,
         };
 
         if self.contains_type(ident.as_str()) {
-            return Some(SoulType::Stub(Stub::new(
-                ident.as_str()
-            )))
+            return Some(SoulType::Stub(Stub::new(ident.as_str())));
         }
 
         None
     }
 
     fn resolve_module_call(&mut self, module_entry: ScopeModuleEntry, call: &FunctionCall) {
-
-        let resolve = self.lookup_module_function(&module_entry, call.name.as_str(), call.name.span());
+        let resolve =
+            self.lookup_module_function(&module_entry, call.name.as_str(), call.name.span());
         if resolve == Some(FunctionId::ERROR) {
             todo!("impl resolve_external_function")
         }
@@ -198,23 +207,22 @@ impl<'a> NameResolver<'a> {
         let id = resolve.unwrap_or(FunctionId::ERROR);
         let ignore_callee = id != FunctionId::ERROR;
         self.declares.insert_function_resolve(
-            call.id, 
+            call.id,
             FunctionResolve {
-                id, 
+                id,
                 ignore_callee,
-                is_defer: false, 
-            }
+                is_defer: false,
+            },
         );
         return;
     }
 
     fn lookup_module_function(
-        &mut self, 
-        module_entry: &ScopeModuleEntry, 
-        function_name: &str, 
+        &mut self,
+        module_entry: &ScopeModuleEntry,
+        function_name: &str,
         span: Span,
     ) -> Option<FunctionId> {
-
         if let Some(function_name) = self.lookup_function_import(module_entry, function_name) {
             return self.lookup_function(&function_name);
         }
@@ -239,19 +247,21 @@ impl<'a> NameResolver<'a> {
         Some(entry.value)
     }
 
-    fn lookup_function_import(&mut self, module_entry: &ScopeModuleEntry, function_name: &str) -> Option<String> {
-
+    fn lookup_function_import(
+        &mut self,
+        module_entry: &ScopeModuleEntry,
+        function_name: &str,
+    ) -> Option<String> {
         for item in &module_entry.imported_items {
-
             match item {
                 ast_model::statements::ImportItem::Normal(name) => {
                     if name.as_str() == function_name {
-                        return Some(name.to_string())
+                        return Some(name.to_string());
                     }
                 }
                 ast_model::statements::ImportItem::Alias { alias, name } => {
                     if alias.as_str() == function_name {
-                        return Some(name.to_string())
+                        return Some(name.to_string());
                     }
                 }
             }
@@ -268,25 +278,35 @@ impl<'a> NameResolver<'a> {
         };
 
         let Some(value) = self.store.expressions.get(value) else {
-            self.log_fault(soul_error_internal!(format!("{value:?} not found"), Some(call.name.span())));
-            return None
+            self.log_fault(soul_error_internal!(
+                format!("{value:?} not found"),
+                Some(call.name.span())
+            ));
+            return None;
         };
 
         match &value.node {
             ExpressionKind::Variable(var) => Some(var.name.to_string()),
-            _ => None
+            _ => None,
         }
     }
 
     fn contains_type(&mut self, ident: &str) -> bool {
-        self.scope_info.scopes.lookup_type(ident, self.current.module).is_some()
-    } 
+        self.scope_info
+            .scopes
+            .lookup_type(ident, self.current.module)
+            .is_some()
+    }
 
     fn lookup_module(&mut self, string: &str) -> Option<ScopeModuleEntry> {
-        self.scope_info.scopes.lookup_module(string, self.current.module)
+        self.scope_info
+            .scopes
+            .lookup_module(string, self.current.module)
     }
 
     fn lookup_function(&mut self, string: &str) -> Option<FunctionId> {
-        self.scope_info.scopes.lookup_function(string, self.current.module)
+        self.scope_info
+            .scopes
+            .lookup_function(string, self.current.module)
     }
 }

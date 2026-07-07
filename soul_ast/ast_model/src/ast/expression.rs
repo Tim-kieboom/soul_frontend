@@ -4,7 +4,12 @@ use soul_utils::{
 };
 
 use crate::{
-    AstStore, NodeId, block::BlockId, literal::Literal, operators::{BinaryOperator, UnaryOperator}, soul_type::SoulType, statements::VarPattern,
+    AstStore, NodeId,
+    block::BlockId,
+    literal::Literal,
+    operators::{BinaryOperator, UnaryOperator},
+    soul_type::SoulType,
+    statements::VarPattern,
 };
 
 impl_soul_ids!(ExpressionId);
@@ -212,7 +217,7 @@ pub enum MatchPattern {
     /// A binding pattern: `name` binds the scrutinee to a variable.
     Binding(Binding),
     /// `pattern if condition => ()`
-    If{
+    If {
         pattern: Box<MatchPattern>,
         if_condition: ExpressionId,
     },
@@ -436,7 +441,6 @@ pub enum FunctionCalleeKind {
     Expression(ExpressionId),
 }
 
-
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Argument {
     pub name: Option<Ident>,
@@ -471,10 +475,7 @@ impl Expression {
     pub fn new_variable(id: NodeId, name: Ident) -> Expression {
         let span = name.span();
         Expression::new(
-            ExpressionKind::Variable(VariableExpression {
-                id,
-                name,
-            }),
+            ExpressionKind::Variable(VariableExpression { id, name }),
             span,
         )
     }
@@ -547,7 +548,12 @@ impl Expression {
         Expression::new(ExpressionKind::Unary(unary), span)
     }
 
-    pub fn new_ref(id: NodeId, is_mutable: bool, value: ExpressionId, new_span: Span) -> Expression {
+    pub fn new_ref(
+        id: NodeId,
+        is_mutable: bool,
+        value: ExpressionId,
+        new_span: Span,
+    ) -> Expression {
         let new_ref = ExpressionKind::Ref(Ref {
             id,
             value,
@@ -561,7 +567,13 @@ impl Expression {
         Expression::new(deref, new_span)
     }
 
-    pub fn new_index(id: NodeId, collection: ExpressionId, index: ExpressionId, span: Span, optional_map: bool) -> Expression {
+    pub fn new_index(
+        id: NodeId,
+        collection: ExpressionId,
+        index: ExpressionId,
+        span: Span,
+        optional_map: bool,
+    ) -> Expression {
         Expression::new(
             ExpressionKind::Index(Index {
                 id,
@@ -573,7 +585,13 @@ impl Expression {
         )
     }
 
-    pub fn new_field(id: NodeId, store: &AstStore, object: ExpressionId, field: Ident, optional_map: bool) -> Expression {
+    pub fn new_field(
+        id: NodeId,
+        store: &AstStore,
+        object: ExpressionId,
+        field: Ident,
+        optional_map: bool,
+    ) -> Expression {
         let span = store.expressions[object].span.combine(field.span());
         Expression::new(
             ExpressionKind::FieldAccess(FieldAccess {
@@ -626,5 +644,45 @@ impl Binding {
 
     pub fn new(id: NodeId, ident: Ident) -> Self {
         Self { ident, id }
+    }
+}
+
+impl ExpressionKind {
+    pub const fn variant_name(&self) -> &'static str {
+        match self {
+            ExpressionKind::If(_) => "if",
+            ExpressionKind::New(_) => "new",
+            ExpressionKind::Ref(_) => "ref",
+            ExpressionKind::For(_) => "for",
+            ExpressionKind::Break => "break",
+            ExpressionKind::Null(_) => "null",
+            ExpressionKind::None(_) => "none",
+            ExpressionKind::Copy(_) => "copy",
+            ExpressionKind::Pass(_) => "pass",
+            ExpressionKind::Unary(_) => "unary",
+            ExpressionKind::Index(_) => "Index",
+            ExpressionKind::Deref(_) => "deref",
+            ExpressionKind::Match(_) => "match",
+            ExpressionKind::Tuple(_) => "tuple",
+            ExpressionKind::Block(_) => "block",
+            ExpressionKind::Sizeof(_) => "sizeof",
+            ExpressionKind::Binary(_) => "binary",
+            ExpressionKind::TypeOf(_) => "typeof",
+            ExpressionKind::Lambda(_) => "lamdba",
+            ExpressionKind::Return(_) => "return",
+            ExpressionKind::Continue => "continue",
+            ExpressionKind::Array(_) => "anyArray",
+            ExpressionKind::Literal(_) => "literal",
+            ExpressionKind::NewArray(_) => "newArray",
+            ExpressionKind::Variable(_) => "variable",
+            ExpressionKind::Undefined(_) => "undefined",
+            ExpressionKind::NamedTuple(_) => "namedTuple",
+            ExpressionKind::FieldAccess(_) => "fieldAccess",
+            ExpressionKind::Constructor(_) => "constructor",
+            ExpressionKind::MatchMethod(_) => "matchMethode",
+            ExpressionKind::StringFormat(_) => "stringFormat",
+            ExpressionKind::FunctionCall(_) => "functionCall",
+            ExpressionKind::StructConstructor(_) => "structContructor",
+        }
     }
 }

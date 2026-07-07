@@ -1,21 +1,21 @@
 use crate::{
-    parser::Parser, utils::{
-        COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, DOT, DOUBLE_DOT, ELSE, IF, LAMBDA_ARROW, MATCH, NOT, NULL, OR, ROUND_CLOSE, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS,
+    parser::Parser,
+    utils::{
+        COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, DOT, DOUBLE_DOT, ELSE, IF, LAMBDA_ARROW, MATCH, NOT,
+        NULL, OR, ROUND_CLOSE, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS,
     },
 };
 use ast_model::{
     block::{Block, BlockId},
     expression::{
         Binding, ConstructorStructPattern, Expression, ExpressionId, ExpressionKind, If, IfBranch,
-        Match, MatchArm, MatchContructor, MatchPattern, NamedMatchPattern,
-        NamedTupleMatchPattern, TupleMatchPattern,
+        Match, MatchArm, MatchContructor, MatchPattern, NamedMatchPattern, NamedTupleMatchPattern,
+        TupleMatchPattern,
     },
     statements::Statement,
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
-use soul_utils::{
-    Ident, TypeModifier, error::SoulResult, fault::Fault, ids::IdAlloc, span::Span,
-};
+use soul_utils::{Ident, TypeModifier, error::SoulResult, fault::Fault, ids::IdAlloc, span::Span};
 
 const IF_STR: &str = KeyWord::If.as_str();
 const ELSE_STR: &str = KeyWord::Else.as_str();
@@ -205,17 +205,20 @@ impl<'a, 'f> Parser<'a, 'f> {
                     chain.push(self.inner_parse_match_pattern()?);
                     self.skip_end_lines();
                     if !self.current_is(&OR) {
-                        break
+                        break;
                     }
-                    
+
                     self.bump();
                 }
                 MatchPattern::Fallthrough(chain)
-            } 
+            }
             &IF => {
                 self.bump();
                 let if_condition = self.parse_expression_id(&[LAMBDA_ARROW])?;
-                MatchPattern::If { pattern: Box::new(pattern), if_condition }
+                MatchPattern::If {
+                    pattern: Box::new(pattern),
+                    if_condition,
+                }
             }
             _ => pattern,
         })
@@ -273,7 +276,10 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.expect(&ROUND_OPEN)?;
             let binding = self.try_bump_consume_ident()?;
             self.expect(&ROUND_CLOSE)?;
-            return Ok(MatchPattern::NotNull(Binding::new(self.alloc_node(), binding)));
+            return Ok(MatchPattern::NotNull(Binding::new(
+                self.alloc_node(),
+                binding,
+            )));
         }
 
         if self.current_is(&NULL) {
@@ -284,7 +290,14 @@ impl<'a, 'f> Parser<'a, 'f> {
         let ident_name = match &self.token().kind {
             TokenKind::Ident(name) => name.clone(),
             _ => {
-                let end_tokens = [LAMBDA_ARROW, IF, COMMA, SQUARE_CLOSE, CURLY_CLOSE, ROUND_CLOSE];
+                let end_tokens = [
+                    LAMBDA_ARROW,
+                    IF,
+                    COMMA,
+                    SQUARE_CLOSE,
+                    CURLY_CLOSE,
+                    ROUND_CLOSE,
+                ];
                 let expr = self.parse_expression(&end_tokens)?;
                 return match expr.node {
                     ExpressionKind::Literal((_, lit)) => Ok(MatchPattern::Literal(lit)),
@@ -297,7 +310,14 @@ impl<'a, 'f> Parser<'a, 'f> {
         };
 
         if KeyWord::from_str(&ident_name).is_some() {
-            let end_tokens = [LAMBDA_ARROW, IF, COMMA, SQUARE_CLOSE, CURLY_CLOSE, ROUND_CLOSE];
+            let end_tokens = [
+                LAMBDA_ARROW,
+                IF,
+                COMMA,
+                SQUARE_CLOSE,
+                CURLY_CLOSE,
+                ROUND_CLOSE,
+            ];
             let expr = self.parse_expression(&end_tokens)?;
             return match expr.node {
                 ExpressionKind::Literal((_, lit)) => Ok(MatchPattern::Literal(lit)),
@@ -314,7 +334,8 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         // Try constructor struct pattern: TypeName{field, ...}
         if self.current_is(&CURLY_OPEN) {
-            return self.parse_match_constructor_struct_pattern(Ident::new(ident_name, type_name_span));
+            return self
+                .parse_match_constructor_struct_pattern(Ident::new(ident_name, type_name_span));
         }
 
         if self.current_is(&DOT) {
@@ -445,10 +466,16 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         self.expect(&CURLY_CLOSE)?;
-        Ok(MatchPattern::NamedTuple(NamedTupleMatchPattern { fields, rest }))
+        Ok(MatchPattern::NamedTuple(NamedTupleMatchPattern {
+            fields,
+            rest,
+        }))
     }
 
-    fn parse_match_constructor_struct_pattern(&mut self, type_name: Ident) -> SoulResult<MatchPattern> {
+    fn parse_match_constructor_struct_pattern(
+        &mut self,
+        type_name: Ident,
+    ) -> SoulResult<MatchPattern> {
         self.expect(&CURLY_OPEN)?;
         let mut fields = Vec::new();
         let mut rest = false;
@@ -494,7 +521,11 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         self.expect(&CURLY_CLOSE)?;
-        Ok(MatchPattern::ConstructorStruct(ConstructorStructPattern { type_name, fields, rest }))
+        Ok(MatchPattern::ConstructorStruct(ConstructorStructPattern {
+            type_name,
+            fields,
+            rest,
+        }))
     }
 
     fn skip_match_pattern(&mut self) {

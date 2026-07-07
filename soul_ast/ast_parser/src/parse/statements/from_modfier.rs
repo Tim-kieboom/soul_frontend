@@ -3,15 +3,21 @@ use std::sync::LazyLock;
 use ast_model::{
     expression::Binding,
     soul_type::SoulType,
-    statements::{Statement, Variable, VarPattern},
+    statements::{Statement, VarPattern, Variable},
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord, types::Types};
 use soul_utils::{
-    Ident, TypeModifier, collections::try_result::{ResultMapNotValue, ResultTryErr, TryErr, TryError, TryNotValue, TryOk, TryResult}, error::SoulResult, fault::Fault, span::Span,
+    Ident, TypeModifier,
+    collections::try_result::{
+        ResultMapNotValue, ResultTryErr, TryErr, TryError, TryNotValue, TryOk, TryResult,
+    },
+    error::SoulResult,
+    fault::Fault,
+    span::Span,
 };
 
 use crate::{
-    parse::statements::{variable::AssignType, try_assign_type},
+    parse::statements::{try_assign_type, variable::AssignType},
     parser::Parser,
     utils::{ARROW_LEFT, COLON, CURLY_OPEN, ROUND_OPEN, SEMI_COLON, STAMENT_END_TOKENS},
 };
@@ -48,11 +54,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
             let pattern = self.parse_tuple_pattern().try_err()?;
             return self
-                .parse_pattern_declaration(
-                    pattern,
-                    modifier,
-                    start_span,
-                )
+                .parse_pattern_declaration(pattern, modifier, start_span)
                 .try_err();
         }
 
@@ -68,7 +70,8 @@ impl<'a, 'f> Parser<'a, 'f> {
         if self.current_is(&CURLY_OPEN) {
             if modifier != TypeModifier::Const {
                 return TryErr(Fault::error(
-                    "'mut' cannot be applied to constructor patterns; use per-field 'mut' instead".to_string(),
+                    "'mut' cannot be applied to constructor patterns; use per-field 'mut' instead"
+                        .to_string(),
                     Some(start_span),
                 ));
             }
@@ -174,11 +177,11 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         let Ok(pattern) = self.parse_named_tuple_pattern() else {
-            return TryNotValue(())
+            return TryNotValue(());
         };
 
         let Some(assign) = try_assign_type(&self.token()) else {
-            return TryNotValue(())
+            return TryNotValue(());
         };
 
         if assign == AssignType::Assign || assign == AssignType::Declaration {
@@ -201,7 +204,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 .try_err();
         }
 
-        return TryNotValue(())
+        return TryNotValue(());
     }
 
     /// Try constructor destructuring: `TypeName{field1, field2} = expr`.
@@ -256,7 +259,6 @@ impl<'a, 'f> Parser<'a, 'f> {
         modifier: TypeModifier,
         start_span: Span,
     ) -> SoulResult<Statement> {
-
         let assign = match &self.token().kind {
             TokenKind::Symbol(val) if AssignType::from_symbool(*val).is_some() => {
                 AssignType::from_symbool(*val).unwrap()

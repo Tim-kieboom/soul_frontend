@@ -1,5 +1,6 @@
+use crate::source_file;
 use crate::{config::PrintConfigs, display::writer::Writer};
-use anyhow::Result;
+use anyhow::{Error, Result};
 use soul_utils::char_colors::*;
 use soul_utils::collections::module_store::ModuleStore;
 use soul_utils::fault::Severity;
@@ -9,7 +10,6 @@ use std::str::Lines;
 
 pub(crate) fn display_fault(
     fault: &Fault,
-    source_file: &str,
     modules: &ModuleStore,
     configs: &PrintConfigs,
     writer: &mut impl Writer,
@@ -23,7 +23,7 @@ pub(crate) fn display_fault(
     {
         let red = if configs.color { RED } else { "" };
         let default = if configs.color { DEFAULT } else { "" };
-        
+
         if configs.backtrace {
             writer.push_fmt(format_args!("{red}{}{default}\n", fault.backtract()))?;
         }
@@ -32,13 +32,23 @@ pub(crate) fn display_fault(
     fault_message(fault, modules, writer, configs)?;
     writer.push_char('\n')?;
     if let Some(span) = span {
+        let path = modules
+            .get_path(span.module)
+            .ok_or(Error::msg(format!("module {:?} not found", span.module)))?;
+
+        let source_file = source_file(path)?;
         get_source_snippet(writer, &span, source_file.lines(), &begin_space)?;
     }
 
     writer.writer_flush()
 }
 
-fn fault_message(fault: &Fault, modules: &ModuleStore, writer: &mut impl Writer, configs: &PrintConfigs) -> Result<()> {
+fn fault_message(
+    fault: &Fault,
+    modules: &ModuleStore,
+    writer: &mut impl Writer,
+    configs: &PrintConfigs,
+) -> Result<()> {
     let cyan = if configs.color { CYAN } else { "" };
     let default = if configs.color { DEFAULT } else { "" };
     let severity_color = if configs.color {
@@ -56,7 +66,10 @@ fn fault_message(fault: &Fault, modules: &ModuleStore, writer: &mut impl Writer,
     match fault.span() {
         Some(span) => writer.push_fmt(format_args!(
             "{severity_color}{severity}:{cyan} at {}:{span:?}\n{}{default}",
-            modules.get_path(span.module).unwrap_or(&PathBuf::new()).to_string_lossy(),
+            modules
+                .get_path(span.module)
+                .unwrap_or(&PathBuf::new())
+                .to_string_lossy(),
             fault.message()
         )),
         None => writer.push_fmt(format_args!(

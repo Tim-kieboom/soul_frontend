@@ -36,5 +36,19 @@
                 "RUST_BACKTRACE": "1"
             }
         },
+        {
+            "name": "Release -o3 executable 'soul_tester'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "run",
+                    "--profile", "release-performance",
+                    "--bin=soul_tester"
+                ]
+            },
+            "args": [],
+            "env": {}
+        },
     ]
 }

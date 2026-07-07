@@ -1,6 +1,6 @@
 use soul_utils::{define_str_enum, span::Spanned};
 
-use crate::{expression::ExpressionId};
+use crate::expression::ExpressionId;
 
 /// A unary operator wrapped with source location information.
 pub type UnaryOperator = Spanned<UnaryOperatorKind>;

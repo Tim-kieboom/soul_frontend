@@ -21,6 +21,10 @@ impl<'a> NameResolver<'a> {
         context.faults.push(fault);
     }
 
+    pub(crate) fn alloc_node(&mut self) -> NodeId {
+        self.node_generator.alloc()
+    }
+
     pub(crate) fn declare_function(
         &mut self,
         function_signature: &Spanned<FunctionSignature>,

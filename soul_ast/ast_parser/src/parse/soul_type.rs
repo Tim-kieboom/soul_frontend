@@ -1,4 +1,6 @@
-use ast_model::soul_type::{ArrayKind, ArrayType, NamedTuple, ReferenceType, SoulType, Stub, Tuple, TupleKind};
+use ast_model::soul_type::{
+    ArrayKind, ArrayType, NamedTuple, ReferenceType, SoulType, Stub, Tuple, TupleKind,
+};
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord, types::Types};
 use soul_utils::{
     Ident,
@@ -12,8 +14,10 @@ use soul_utils::{
 };
 
 use crate::{
-    parser::Parser, utils::{
-        ARRAY, ARROW_LEFT, COLON, COMMA, DOT, MUT, NOT, OPTIONAL, POINTER, REF, ROUND_CLOSE, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN,
+    parser::Parser,
+    utils::{
+        ARRAY, ARROW_LEFT, COLON, COMMA, DOT, MUT, NOT, OPTIONAL, POINTER, REF, ROUND_CLOSE,
+        ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN,
     },
 };
 
@@ -196,9 +200,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 return TryOk(SoulType::Never);
             }
             &ROUND_OPEN => {
-                return self.parse_tuple_kind()
-                    .map(SoulType::TupleKind)
-                    .try_err();
+                return self.parse_tuple_kind().map(SoulType::TupleKind).try_err();
             }
             _ => (),
         };
@@ -303,7 +305,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         Ok(kind)
     }
-    
+
     fn parse_tuple_kind(&mut self) -> SoulResult<TupleKind> {
         self.expect(&ROUND_OPEN)?;
         self.skip_end_lines();
@@ -322,9 +324,9 @@ impl<'a, 'f> Parser<'a, 'f> {
             let ty = self.try_parse_type().merge_to_result()?;
             values.push((ident, ty));
 
-            self.skip_end_lines(); 
+            self.skip_end_lines();
             if !self.current_is(&COMMA) {
-                break
+                break;
             }
             self.bump();
         }
@@ -332,16 +334,16 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.expect(&ROUND_CLOSE)?;
         Ok(values)
     }
-    
+
     fn parse_tuple(&mut self) -> SoulResult<Tuple> {
         let mut values = Tuple::new();
         loop {
             let ty = self.try_parse_type().merge_to_result()?;
             values.push(ty);
 
-            self.skip_end_lines(); 
+            self.skip_end_lines();
             if !self.current_is(&COMMA) {
-                break
+                break;
             }
             self.bump();
         }

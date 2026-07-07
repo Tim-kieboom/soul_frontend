@@ -16,7 +16,7 @@ impl_soul_ids!(FunctionId);
 
 #[cfg(debug_assertions)]
 #[macro_export]
-/// print msg for debugging prints file and line to be able to find it easily when trying to remove breakpoint 
+/// print msg for debugging prints file and line to be able to find it easily when trying to remove breakpoint
 macro_rules! dbg_println {
     () => {
         eprintln!("[DEBUG] at {}:{};", file!(), line!())

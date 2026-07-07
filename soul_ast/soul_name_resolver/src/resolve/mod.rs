@@ -4,8 +4,8 @@ use soul_utils::{soul_error_internal, span::ModuleId};
 use crate::NameResolver;
 
 mod expression;
-mod statement;
 mod function_call;
+mod statement;
 
 impl<'a> NameResolver<'a> {
     pub(crate) fn resolve_module(&mut self, id: ModuleId) {
@@ -41,7 +41,7 @@ impl<'a> NameResolver<'a> {
 
     fn try_go_to(&mut self, block_id: BlockId) {
         let scope_id = self.scope_ids.get(block_id).copied();
-        
+
         if !scope_id.is_some() {
             println!("breakpoint at: {}:{}", file!(), line!());
         }

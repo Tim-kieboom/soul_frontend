@@ -1,12 +1,19 @@
 use ast_model::{
-    expression::{Binding, ExpressionId, For, ForCondition}, statements::VarPattern,
+    expression::{Binding, ExpressionId, For, ForCondition},
+    statements::VarPattern,
 };
 use soul_utils::{
-    TypeModifier, collections::try_result::{ResultTryErr, ResultTryNotValue, TryError, TryOk, TryResult}, error::SoulResult, fault::Fault, soul_names::Symbol, span::Spanned,
+    TypeModifier,
+    collections::try_result::{ResultTryErr, ResultTryNotValue, TryError, TryOk, TryResult},
+    error::SoulResult,
+    fault::Fault,
+    soul_names::Symbol,
+    span::Spanned,
 };
 
 use crate::{
-    parser::Parser, utils::{COMMA, CURLY_OPEN, FOR, IN},
+    parser::Parser,
+    utils::{COMMA, CURLY_OPEN, FOR, IN},
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
@@ -21,7 +28,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
                 let index = if self.peek_is(&COMMA) {
                     let ident = self.try_bump_consume_ident()?;
-                    self.bump(); 
+                    self.bump();
                     Some(Binding::new(self.alloc_node(), ident))
                 } else {
                     None
@@ -38,7 +45,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                             return Err(Fault::error(
                                 format!("`{}` is invalid", Symbol::Comma.as_str()),
                                 Some(self.span_combine(start_span)),
-                            ))
+                            ));
                         }
 
                         self.goto(saved);
@@ -58,7 +65,9 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     fn try_parse_foreach_elements(&mut self) -> TryResult<(VarPattern, ExpressionId), ()> {
-        let var_pattern = self.parse_var_pattern(TypeModifier::Const).try_not_value()?;
+        let var_pattern = self
+            .parse_var_pattern(TypeModifier::Const)
+            .try_not_value()?;
         self.expect(&IN).try_not_value()?;
         let collection = self.parse_expression_id(&[CURLY_OPEN]).try_err()?;
         TryOk((var_pattern, collection))

@@ -1,17 +1,32 @@
 use std::{
-    backtrace::Backtrace, fmt::{Arguments, Debug}, path::Path,
+    backtrace::Backtrace,
+    fmt::{Arguments, Debug},
+    path::Path,
 };
 
-use crate::{config, display::{vec_map_to_pretty_vec, write_create_file, write_to_file, writer::Writer}};
+use crate::{
+    config,
+    display::{vecmap_to_pretty_vec, write_create_file, write_to_file, writer::Writer},
+};
 use anyhow::Result;
 use ast_model::{
-    AstStore, AstTree, FunctionKind, block::BlockId, expression::{AnyArray, ExpressionId, ExpressionKind, ForCondition, FunctionCalleeKind, IfBranch, Lambda, MatchPattern, TypeofKind}, soul_type::{ArrayKind, Generic, SoulType, TupleKind}, statements::{
-        Assignment, Enum, EnumVariant, ImplBlock, Import, ImportItem, ImportKind, Parameter, StatementId, StatementKind, Struct, Trait, TypeDef, UnionKind, UseBlock, VarPattern, Variable
+    AstStore, AstTree, FunctionKind, block::BlockId, expression::{
+        AnyArray, ExpressionId, ExpressionKind, ForCondition, FunctionCalleeKind, IfBranch, Lambda,
+        MatchPattern, TypeofKind,
+    }, soul_type::{ArrayKind, Generic, SoulType, TupleKind}, statements::{
+        Assignment, Enum, EnumVariant, FunctionThisKind, ImplBlock, Import, ImportItem, ImportKind, Parameter, Statement, StatementId, StatementKind, Struct, Trait, TypeDef, UnionKind, UseBlock, VarPattern, Variable,
     },
 };
-use soul_tokenizer::model::{keyword::KeyWord::{self}, types::Types};
+use soul_tokenizer::model::{
+    keyword::KeyWord::{self},
+    types::Types,
+};
 use soul_utils::{
-    FunctionId, TypeModifier, collections::vec_map::{VecMap, VecMapIndex}, ids::IdAlloc, soul_names::{PrimitiveTypes, Symbol}, span::ModuleId
+    FunctionId, TypeModifier,
+    collections::vec_map::{VecMap, VecMapIndex},
+    ids::IdAlloc,
+    soul_names::{PrimitiveTypes, Symbol},
+    span::ModuleId,
 };
 
 const IF_STR: &str = KeyWord::If.as_str();
@@ -39,6 +54,7 @@ struct Displayer<'a, W: Writer> {
     root_dir: &'a Path,
     store: &'a AstStore,
     ast: &'a AstTree,
+    add_tags: bool,
 }
 
 pub(crate) fn display_ast(tree: &AstTree) -> Result<()> {
@@ -51,18 +67,18 @@ fn inner_display_ast(tree: &AstTree) -> Result<()> {
 
     let mut writer = write_create_file(&output_path)?;
     display_ast_tree(tree, config::CONFIG.source_path(), &mut writer)?;
-    
+
     output_path.pop();
     output_path.push("json");
-    
-    let blocks = serde_json::to_string_pretty(&vec_map_to_pretty_vec(&tree.store.blocks))?;
-    let functions = serde_json::to_string_pretty(&vec_map_to_pretty_vec(&tree.store.functions))?;
-    let statements = serde_json::to_string_pretty(&vec_map_to_pretty_vec(&tree.store.statements))?;
-    let expressions = serde_json::to_string_pretty(&vec_map_to_pretty_vec(&tree.store.expressions))?;
 
-    let modules = serde_json::to_string_pretty(&vec_map_to_pretty_vec(tree.modules.as_vecmap()))?;
-    let scope_info = serde_json::to_string_pretty(&vec_map_to_pretty_vec(&tree.scope_info.scopes.as_vecmap()))?;
-    
+    let modules = vecmap_to_json_str(tree.modules.as_vecmap())?;
+    let scope_info = vecmap_to_json_str(&tree.scope_info.scopes.as_vecmap())?;
+
+    let blocks = vecmap_to_json_str(&tree.store.blocks)?;
+    let functions = vecmap_to_json_str(&tree.store.functions)?;
+    let statements = vecmap_to_json_str(&tree.store.statements)?;
+    let expressions = vecmap_to_json_str(&tree.store.expressions)?;
+
     write_to_file(&output_path.join("modules.json"), &modules)?;
     write_to_file(&output_path.join("scope_info.json"), &scope_info)?;
 
@@ -71,39 +87,44 @@ fn inner_display_ast(tree: &AstTree) -> Result<()> {
     write_to_file(&output_path.join("functions.json"), &functions)?;
     write_to_file(&output_path.join("statements.json"), &statements)?;
     write_to_file(&output_path.join("expressions.json"), &expressions)?;
-    
+
     Ok(())
 }
 
-fn display_ast_tree<'a>(
-    ast: &AstTree,
-    root_dir: &Path,
-    writer: &mut impl Writer,
-) -> Result<()> {
+fn vecmap_to_json_str<K, V>(map: &VecMap<K, V>) -> Result<String>
+where
+    K: VecMapIndex + Debug,
+    V: serde::Serialize,
+{
+    let vec = vecmap_to_pretty_vec(map);
+    let str = serde_json::to_string_pretty(&vec)?;
+    Ok(str)
+}
+
+fn display_ast_tree<'a>(ast: &AstTree, root_dir: &Path, writer: &mut impl Writer) -> Result<()> {
     let mut displayer = Displayer::new(ast, root_dir, &ast.store, writer);
     displayer.write_module(ast.root)?;
     writer.writer_flush()
 }
 
 impl<'a, W: Writer> Displayer<'a, W> {
-    fn new(
-        ast: &'a AstTree,
-        root_dir: &'a Path,
-        store: &'a AstStore,
-        writer: &'a mut W,
-    ) -> Self {
+    fn new(ast: &'a AstTree, root_dir: &'a Path, store: &'a AstStore, writer: &'a mut W) -> Self {
         Self {
+            ast,
+            store,
             writer,
             root_dir,
+            add_tags: true,
             depth: String::new(),
-            store,
-            ast,
         }
     }
 
     fn write_module(&mut self, id: ModuleId) -> Result<()> {
         let module = self.ast.modules.as_vecmap().get_err(id)?;
-        self.write_fmt(format_args!("// {id:?}\n"))?;
+        if self.add_tags {
+            self.write_fmt(format_args!("// {id:?}\n"))?;
+        }
+
         self.write_depth()?;
         self.write_fmt(format_args!("mod {} {{\n", module.name))?;
         let block = self.store.blocks.get_err(module.global)?;
@@ -147,19 +168,15 @@ impl<'a, W: Writer> Displayer<'a, W> {
     }
 
     fn write_statement(&mut self, id: StatementId) -> Result<()> {
-        
         let statement = self.store.statements.get_err(id)?;
-        self.write_fmt(format_args!("// {}", statement.node.variant_name()))?;
-        if let Some(id_string) = statement.node.get_any_id_string() {
-            self.write_fmt(format_args!(": {id_string}"))?;
+        if self.add_tags {
+            self.write_statement_tag(statement)?;
         }
-        self.write_endln()?;
-        self.write_depth()?;
 
         if statement.is_public() {
             self.write_str("pub ")?;
         }
-        
+
         match &statement.node {
             StatementKind::Enum(enum_) => self.write_enum(enum_),
             StatementKind::Trait(trait_) => self.write_trait(trait_),
@@ -185,6 +202,40 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 Ok(())
             }
         }
+    }
+
+    fn write_statement_tag(&mut self, statement: &Statement) -> Result<()> {
+        self.write_str("// ")?;
+        match &statement.node {
+            StatementKind::Expression { expression, .. } => self.write_expression_tag(*expression)?,
+            _ => self.write_str(statement.node.variant_name())?,
+        }
+
+        if let Some(id_string) = statement.node.get_any_id_string() {
+            self.write_fmt(format_args!(": {id_string} "))?;
+        }
+
+        match &statement.node {
+            StatementKind::Variable(variable) => if let Some(value) = variable.initialize_value {
+                self.write_str("= ")?;
+                self.write_expression_tag(value)?
+            }
+            StatementKind::Assignment(assignment) => {
+                self.write_expression_tag(assignment.left)?;
+                self.write_str(" = ")?;
+                self.write_expression_tag(assignment.right)?
+            }
+            _ => (),
+        }
+        
+
+        self.write_endln()?;
+        self.write_depth()
+    }
+
+    fn write_expression_tag(&mut self, id: ExpressionId) -> Result<()> {
+        let expression = self.store.expressions.get_err(id)?;
+        self.write_str(expression.node.variant_name())
     }
 
     fn write_assignment(&mut self, assignment: &Assignment) -> Result<()> {
@@ -508,7 +559,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
                         }
                         self.write_char('}')?;
                     }
-                }
+                },
             }
             if i != last_index {
                 self.write_char(',')?;
@@ -558,12 +609,20 @@ impl<'a, W: Writer> Displayer<'a, W> {
         self.write_str(signature.name.as_str())?;
         self.write_generic_defines(&signature.generics)?;
         self.write_char('(')?;
-        if let Some(kind) = signature.function_kind.display() {
-            self.write_str(kind)?;
-            if !signature.parameters.is_empty() {
-                self.write_str(", ")?;
+
+        match signature.function_kind {
+            FunctionThisKind::Ctor => self.write_str("/*ctor*/")?,
+            FunctionThisKind::ArrayCtor => self.write_str("/*arrayCtor*/")?,
+            _ => {
+                if let Some(kind) = signature.function_kind.display() {
+                    self.write_str(kind)?;
+                    if !signature.parameters.is_empty() {
+                        self.write_str(", ")?;
+                    }
+                }
             }
         }
+
         self.write_parameters(&signature.parameters)?;
         self.write_str("): ")?;
         self.write_type(&signature.return_type)?;
@@ -598,12 +657,11 @@ impl<'a, W: Writer> Displayer<'a, W> {
     fn write_expression(&mut self, id: ExpressionId) -> Result<()> {
         if id == ExpressionId::error() {
             self.write_str("<error>")?;
-            return Ok(())
+            return Ok(());
         }
-        
+
         let expression = self.store.expressions.get_err(id)?;
         match &expression.node {
-            
             ExpressionKind::Null(_) => self.write_str("null"),
             ExpressionKind::None(_) => self.write_str("()"),
             ExpressionKind::Undefined(_) => self.write_str("undefined"),
@@ -633,13 +691,15 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 if let Some(callee) = &function_call.callee {
                     match &callee.kind {
                         FunctionCalleeKind::Type(soul_type) => self.write_type(soul_type)?,
-                        FunctionCalleeKind::Expression(expression_id) => self.write_expression(*expression_id)?,
+                        FunctionCalleeKind::Expression(expression_id) => {
+                            self.write_expression(*expression_id)?
+                        }
                     }
-                    
+
                     if callee.optional_map {
                         self.write_char('?')?;
                     }
-                    self.write_char('.')?;    
+                    self.write_char('.')?;
                 }
 
                 self.write_str(function_call.name.as_str())?;
@@ -796,7 +856,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
                             self.write_fmt(format_args!("{}, ", index.ident.as_str()))?;
                         }
                         self.write_var_pattern(element_kind)?;
-                        self.write_fmt(format_args!(" {IN_FOR_LOOP_STR} ", ))?;
+                        self.write_fmt(format_args!(" {IN_FOR_LOOP_STR} ",))?;
                         self.write_expression(*collection)?;
                     }
                 }
@@ -807,23 +867,20 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 self.write_expression(type_of.value)?;
                 self.write_fmt(format_args!(" {TYPEOF_STR} "))?;
                 match &type_of.kind {
-                    TypeofKind::Null => {
-                        self.write_str(KeyWord::Null.as_str())?
-                    }
-                    TypeofKind::NotNull => {
-                        self.write_fmt(format_args!(
-                            "{}{}", 
-                            Symbol::Not.as_str(), 
-                            KeyWord::Null.as_str(),
-                        ))?
-                    }
-                    TypeofKind::Union { type_name, variant_name } => {
-                        self.write_fmt(format_args!(
-                            "{}.{}", 
-                            type_name.as_str(), 
-                            variant_name.as_str(),
-                        ))?
-                    }
+                    TypeofKind::Null => self.write_str(KeyWord::Null.as_str())?,
+                    TypeofKind::NotNull => self.write_fmt(format_args!(
+                        "{}{}",
+                        Symbol::Not.as_str(),
+                        KeyWord::Null.as_str(),
+                    ))?,
+                    TypeofKind::Union {
+                        type_name,
+                        variant_name,
+                    } => self.write_fmt(format_args!(
+                        "{}.{}",
+                        type_name.as_str(),
+                        variant_name.as_str(),
+                    ))?,
                 };
                 if let Some(binding) = &type_of.binding {
                     self.write_fmt(format_args!("({})", binding.ident.as_str()))?;
@@ -844,7 +901,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
             ExpressionKind::Pass(expression_id) => {
                 self.write_expression(*expression_id)?;
                 self.write_fmt(format_args!(".{PASS_STR}"))
-            },
+            }
             ExpressionKind::StringFormat(fmt) => {
                 let tag = if fmt.to_string { "f" } else { "fstr" };
                 self.write_fmt(format_args!("{tag}"))?;
@@ -855,7 +912,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
                     self.write_char('}')?;
                 }
                 self.write_fmt(format_args!("\"{}\"", fmt.trailing))
-            },
+            }
             ExpressionKind::Tuple(values) => {
                 self.write_str(".(")?;
                 let last_index = values.len().saturating_sub(1);
@@ -864,7 +921,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
                     if i != last_index {
                         self.write_str(", ")?;
                     }
-                } 
+                }
                 self.write_char(')')
             }
             ExpressionKind::NamedTuple(values) => {
@@ -876,7 +933,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
                     if i != last_index {
                         self.write_str(", ")?;
                     }
-                } 
+                }
                 self.write_char('}')
             }
         }
@@ -896,7 +953,10 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 }
                 Ok(())
             }
-            MatchPattern::If { pattern, if_condition } => {
+            MatchPattern::If {
+                pattern,
+                if_condition,
+            } => {
                 self.write_match_pattern(pattern)?;
                 self.write_fmt(format_args!(" {} ", KeyWord::If.as_str()))?;
                 self.write_expression(*if_condition)?;
@@ -904,7 +964,11 @@ impl<'a, W: Writer> Displayer<'a, W> {
             }
             MatchPattern::Null => self.write_str(KeyWord::Null.as_str()),
             MatchPattern::NotNull(binding) => {
-                self.write_fmt(format_args!("{}{}(", Symbol::Not.as_str(), KeyWord::Null.as_str()))?;
+                self.write_fmt(format_args!(
+                    "{}{}(",
+                    Symbol::Not.as_str(),
+                    KeyWord::Null.as_str()
+                ))?;
                 self.write_str(binding.ident.as_str())?;
                 self.write_char(')')
             }
@@ -1022,17 +1086,21 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 self.write_char('(')?;
                 let last_index = kind.len().saturating_sub(1);
                 match kind {
-                    TupleKind::Tuple(types) => for (i, ty) in types.iter().enumerate() {
-                        self.write_type(ty)?;
-                        if i != last_index {
-                            self.write_str(", ")?;
+                    TupleKind::Tuple(types) => {
+                        for (i, ty) in types.iter().enumerate() {
+                            self.write_type(ty)?;
+                            if i != last_index {
+                                self.write_str(", ")?;
+                            }
                         }
                     }
-                    TupleKind::NamedTuple(items) => for (i, (name, ty)) in items.iter().enumerate() {
-                        self.write_fmt(format_args!("{}: ", name.as_str()))?;
-                        self.write_type(ty)?;
-                        if i != last_index {
-                            self.write_str(", ")?;
+                    TupleKind::NamedTuple(items) => {
+                        for (i, (name, ty)) in items.iter().enumerate() {
+                            self.write_fmt(format_args!("{}: ", name.as_str()))?;
+                            self.write_type(ty)?;
+                            if i != last_index {
+                                self.write_str(", ")?;
+                            }
                         }
                     }
                 }
@@ -1147,7 +1215,10 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 }
                 self.write_fmt(format_args!("{FOR_STR} "))?;
                 if let Some(binding) = &array.for_index {
-                    self.write_fmt(format_args!("{} {IN_FOR_LOOP_STR} ", binding.ident.as_str()))?;
+                    self.write_fmt(format_args!(
+                        "{} {IN_FOR_LOOP_STR} ",
+                        binding.ident.as_str()
+                    ))?;
                 }
                 self.write_expression(array.amount)?;
                 self.write_fmt(format_args!(" {LAMDA_ARROW_STR} "))?;
@@ -1244,12 +1315,13 @@ impl AnyIdString for StatementKind {
         Some(match self {
             StatementKind::Variable(variable) => format!("{:?}", variable.id),
             StatementKind::Expression { expression, .. } => format!("{:?}", expression),
-            StatementKind::Function(function_id) |
-            StatementKind::ExternalFunction(function_id) => format!("{:?}", function_id),
+            StatementKind::Function(function_id) | StatementKind::ExternalFunction(function_id) => {
+                format!("{:?}", function_id)
+            }
             StatementKind::Enum(enum_) => format!("{:?}", enum_.id),
             StatementKind::Trait(trait_) => format!("{:?}", trait_.id),
             StatementKind::Struct(struct_) => format!("{:?}", struct_.id),
-            _ => return None
+            _ => return None,
         })
     }
 }

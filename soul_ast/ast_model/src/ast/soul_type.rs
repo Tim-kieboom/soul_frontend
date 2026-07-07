@@ -47,7 +47,7 @@ pub enum SoulType {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum TupleKind {
     Tuple(Tuple),
-    NamedTuple(NamedTuple)
+    NamedTuple(NamedTuple),
 }
 impl TupleKind {
     pub fn len(&self) -> usize {

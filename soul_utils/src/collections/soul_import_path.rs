@@ -5,18 +5,30 @@ use std::path::{Path, PathBuf};
 /// Represents a hierarchical path to a module or page in the Soul language,
 /// similar to a module path in other languages.
 #[derive(
-    Debug, Clone, Default, Hash, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+    Debug,
+    Clone,
+    Default,
+    Hash,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    serde::Serialize,
+    serde::Deserialize,
 )]
-pub struct SoulImportPath{
+pub struct SoulImportPath {
     path: PathBuf,
     is_external: bool,
     is_absolute: bool,
 }
 
 impl SoulImportPath {
-
     pub fn new(path: PathBuf, is_external: bool) -> Self {
-        Self { path, is_external, is_absolute: false }
+        Self {
+            path,
+            is_external,
+            is_absolute: false,
+        }
     }
 
     pub fn set_extension(&mut self, extension: &str) -> bool {
@@ -107,4 +119,3 @@ impl SoulImportPath {
         self.path.to_string_lossy().to_string()
     }
 }
-

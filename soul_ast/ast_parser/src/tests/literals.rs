@@ -66,7 +66,7 @@ fn expression_literal_string() {
     match &stmt.node {
         StatementKind::Expression { expression, .. } => {
             let expr = &store.expressions[*expression];
-            
+
             if let ExpressionKind::Literal((_, Literal::Str(string))) = &expr.node {
                 assert_eq!(string, "hello")
             } else {

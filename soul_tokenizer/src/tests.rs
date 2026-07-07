@@ -5,11 +5,7 @@ use soul_utils::{
     span::ModuleId,
 };
 
-use crate::{
-    TokenKind,
-    lexer::Lexer,
-    model::StringFormatTag,
-};
+use crate::{TokenKind, lexer::Lexer, model::StringFormatTag};
 
 fn module_id() -> ModuleId {
     ModuleId::error()

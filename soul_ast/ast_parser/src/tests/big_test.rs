@@ -1,5 +1,11 @@
 use ast_model::{
-    expression::{ExpressionKind, FunctionCall, FunctionCalleeKind, MatchPattern, StructConstructor}, literal::Literal, operators::{BinaryOperatorKind, UnaryOperatorKind}, soul_type::{SoulType, Stub}, statements::{Import, ImportItem, ImportKind, StatementKind, TypeDef, VarPattern, Variable},
+    expression::{
+        ExpressionKind, FunctionCall, FunctionCalleeKind, MatchPattern, StructConstructor,
+    },
+    literal::Literal,
+    operators::{BinaryOperatorKind, UnaryOperatorKind},
+    soul_type::{SoulType, Stub},
+    statements::{Import, ImportItem, ImportKind, StatementKind, TypeDef, VarPattern, Variable},
 };
 use soul_utils::{TypeModifier, fault::Severity, soul_names::PrimitiveTypes};
 
@@ -580,6 +586,8 @@ fn all_kinds() {
         StatementKind::Variable(v) => v,
         other => panic!("statement 5: expected Variable, got {:?}", other),
     };
-    assert!(matches!(v_pub_pat, VarPattern::Simple { binding, .. } if binding.ident.as_str() == "GLOBAL"));
+    assert!(
+        matches!(v_pub_pat, VarPattern::Simple { binding, .. } if binding.ident.as_str() == "GLOBAL")
+    );
     assert_eq!(*v_pub_mod, TypeModifier::Const);
 }

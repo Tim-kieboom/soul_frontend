@@ -2,7 +2,10 @@ use anyhow::Result;
 use soul_tokenizer::{TokenStream, model::TokenKind};
 use soul_utils::literal::{Number, StringLiteral, TokenLiteral};
 
-use crate::{config, display::{write_create_file, writer::Writer}};
+use crate::{
+    config,
+    display::{write_create_file, writer::Writer},
+};
 
 pub(crate) fn display_tokenizer<'a>(tokens: &TokenStream<'a>) -> Result<()> {
     inner_display_tokenizer(tokens).map_err(|err| anyhow::anyhow!("in display_tokenizer: {err}"))
@@ -32,23 +35,19 @@ fn display_tokens<'a>(tokens: TokenStream<'a>, writer: &mut impl Writer) -> Resu
 
 fn display_tokenkind(token: &TokenKind, writer: &mut impl Writer) -> Result<()> {
     match token {
-        TokenKind::Literal(literal) => {
-            match literal {
-                TokenLiteral::String(str) => match str {
-                    StringLiteral::Str(str) => writer.push_fmt(format_args!("str({str:?})"))?,
-                    StringLiteral::Cstr(str) => writer.push_fmt(format_args!("cstr({str:?})"))?,
-                },
-                TokenLiteral::Number(num) => match num {
-                    Number::Int(n) => writer.push_fmt(format_args!("{n}"))?,
-                    Number::Uint(n) => writer.push_fmt(format_args!("{n}"))?,
-                    Number::Float(n) => writer.push_fmt(format_args!("{n}"))?,
-                },
-                TokenLiteral::Char(ch) => writer.push_fmt(format_args!("{ch:?}"))?,
-            }
-        }
-        TokenKind::Keyword(key_word) => {
-            writer.push_fmt(format_args!("{}", key_word.as_str()))?
-        }
+        TokenKind::Literal(literal) => match literal {
+            TokenLiteral::String(str) => match str {
+                StringLiteral::Str(str) => writer.push_fmt(format_args!("str({str:?})"))?,
+                StringLiteral::Cstr(str) => writer.push_fmt(format_args!("cstr({str:?})"))?,
+            },
+            TokenLiteral::Number(num) => match num {
+                Number::Int(n) => writer.push_fmt(format_args!("{n}"))?,
+                Number::Uint(n) => writer.push_fmt(format_args!("{n}"))?,
+                Number::Float(n) => writer.push_fmt(format_args!("{n}"))?,
+            },
+            TokenLiteral::Char(ch) => writer.push_fmt(format_args!("{ch:?}"))?,
+        },
+        TokenKind::Keyword(key_word) => writer.push_fmt(format_args!("{}", key_word.as_str()))?,
         TokenKind::Symbol(symbol) => writer.push_fmt(format_args!("'{}'", symbol.as_str()))?,
         TokenKind::Types(types) => writer.push_fmt(format_args!("{}", types.as_str()))?,
         TokenKind::Ident(ident) => writer.push_fmt(format_args!("{ident:?}"))?,

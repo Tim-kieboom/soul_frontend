@@ -1,11 +1,16 @@
 use std::collections::HashMap;
 
 use soul_utils::{
-    FunctionId, Ident, collections::vec_map::VecMap, ids::IdGenerator, impl_soul_ids, span::{ModuleId, Span},
+    FunctionId, Ident,
+    collections::vec_map::VecMap,
+    ids::IdGenerator,
+    impl_soul_ids,
+    span::{ModuleId, Span},
 };
 
 use crate::{
-    NodeId, statements::{ImportItem, ImportKind, Variable},
+    NodeId,
+    statements::{ImportItem, ImportKind, Variable},
 };
 
 impl_soul_ids!(ScopeId);
@@ -69,12 +74,7 @@ impl ScopeBuilder {
         self.scopes.get(module)?.lookup_type(ident)
     }
 
-    pub fn lookup_value(
-        &self,
-        ident: &str,
-        kind: ScopeValue,
-        module: ModuleId,
-    ) -> Option<NodeId> {
+    pub fn lookup_value(&self, ident: &str, kind: ScopeValue, module: ModuleId) -> Option<NodeId> {
         self.scopes.get(module)?.lookup_value(ident, kind)
     }
 
@@ -399,7 +399,6 @@ pub enum ScopeValueKind<'a> {
     Variable(&'a Variable),
 }
 impl<'a> ScopeValueKind<'a> {
-
     pub fn get_id(&self) -> NodeId {
         match self {
             ScopeValueKind::Variable(variable) => variable.id,
@@ -408,7 +407,9 @@ impl<'a> ScopeValueKind<'a> {
 
     pub fn get_ident(&self) -> Result<&Ident, &str> {
         match self {
-            ScopeValueKind::Variable(variable) => variable.name().ok_or("expected simple variable pattern"),
+            ScopeValueKind::Variable(variable) => {
+                variable.name().ok_or("expected simple variable pattern")
+            }
         }
     }
 

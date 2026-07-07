@@ -15,7 +15,8 @@ use soul_utils::{
 };
 
 use crate::{
-    parser::Parser, utils::{
+    parser::Parser,
+    utils::{
         ARRAY, ARROW_LEFT, COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, DOT, ROUND_CLOSE, ROUND_OPEN,
         SQUARE_OPEN,
     },
@@ -36,9 +37,9 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.bump();
             self.bump();
             return Ok(Expression::new(
-                ExpressionKind::None(self.alloc_node()), 
-                self.span_combine(start_span)),
-            )
+                ExpressionKind::None(self.alloc_node()),
+                self.span_combine(start_span),
+            ));
         }
 
         let expression = match &self.token().kind {
@@ -92,9 +93,11 @@ impl<'a, 'f> Parser<'a, 'f> {
                     _ => unreachable!(),
                 };
                 match string {
-                    StringLiteral::Cstr(string) => {
-                        Expression::new_literal(self.alloc_node(), Literal::Cstr(string), token.span)
-                    }
+                    StringLiteral::Cstr(string) => Expression::new_literal(
+                        self.alloc_node(),
+                        Literal::Cstr(string),
+                        token.span,
+                    ),
                     StringLiteral::Str(string) => {
                         Expression::new_literal(self.alloc_node(), Literal::Str(string), token.span)
                     }
@@ -130,10 +133,15 @@ impl<'a, 'f> Parser<'a, 'f> {
                 match self.token().kind {
                     ROUND_OPEN => self.parse_tuple_expression()?,
                     CURLY_OPEN => self.parse_named_tuple_expression()?,
-                    _ => return Err(Fault::error(
-                        format!("`{}` is invalid as start of expression", Symbol::Dot.as_str()),
-                        Some(start_span),
-                    )),
+                    _ => {
+                        return Err(Fault::error(
+                            format!(
+                                "`{}` is invalid as start of expression",
+                                Symbol::Dot.as_str()
+                            ),
+                            Some(start_span),
+                        ));
+                    }
                 }
             }
             other => {
@@ -153,17 +161,18 @@ impl<'a, 'f> Parser<'a, 'f> {
         let mut values = vec![];
         loop {
             self.skip_end_lines();
-            values.push(
-                self.parse_expression_id(&[COMMA, ROUND_CLOSE])?
-            );
+            values.push(self.parse_expression_id(&[COMMA, ROUND_CLOSE])?);
             self.skip_end_lines();
             if !self.current_is(&COMMA) {
-                break
+                break;
             }
             self.bump();
         }
         self.expect(&ROUND_CLOSE)?;
-        Ok(Expression::new(ExpressionKind::Tuple(values), self.span_combine(start_span)))
+        Ok(Expression::new(
+            ExpressionKind::Tuple(values),
+            self.span_combine(start_span),
+        ))
     }
 
     fn parse_named_tuple_expression(&mut self) -> SoulResult<Expression> {
@@ -174,18 +183,18 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.skip_end_lines();
             let ident = self.try_bump_consume_ident()?;
             self.expect(&COLON)?;
-            values.push((
-                ident,
-                self.parse_expression_id(&[COMMA, CURLY_CLOSE])?
-            ));
+            values.push((ident, self.parse_expression_id(&[COMMA, CURLY_CLOSE])?));
             self.skip_end_lines();
             if !self.current_is(&COMMA) {
-                break
+                break;
             }
             self.bump();
         }
         self.expect(&CURLY_CLOSE)?;
-        Ok(Expression::new(ExpressionKind::NamedTuple(values), self.span_combine(start_span)))
+        Ok(Expression::new(
+            ExpressionKind::NamedTuple(values),
+            self.span_combine(start_span),
+        ))
     }
 
     fn parse_fstring_body(&mut self) -> SoulResult<(Vec<(String, ExpressionId)>, String)> {
@@ -304,7 +313,10 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             KeyWord::Undefined => {
                 self.bump();
-                Expression::new(ExpressionKind::Undefined(self.alloc_node()), self.token().span)
+                Expression::new(
+                    ExpressionKind::Undefined(self.alloc_node()),
+                    self.token().span,
+                )
             }
 
             KeyWord::Break | KeyWord::Return | KeyWord::Continue => {

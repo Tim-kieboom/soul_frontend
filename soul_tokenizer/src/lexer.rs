@@ -113,16 +113,15 @@ impl<'a> Lexer<'a> {
     }
 
     fn get_token_kind(&mut self, char: char, line: SpanLine) -> SoulResult<TokenKind> {
-        
         let string_tag = match self.try_get_ident_or_tag(char) {
             Ok(val) => val,
             Err(ident_str) => {
                 if let Some(keyword) = KeyWord::from_str(&ident_str) {
-                    return Ok(TokenKind::Keyword(keyword))
+                    return Ok(TokenKind::Keyword(keyword));
                 } else if let Some(types) = Types::from_str(&ident_str) {
-                    return Ok(TokenKind::Types(types))
+                    return Ok(TokenKind::Types(types));
                 } else {
-                    return Ok(TokenKind::Ident(ident_str))
+                    return Ok(TokenKind::Ident(ident_str));
                 }
             }
         };
@@ -137,12 +136,12 @@ impl<'a> Lexer<'a> {
                     self.next_char();
                     self.next_char();
                     self.in_fstr = true;
-                    return Ok(TokenKind::StringFormat(StringFormatTag::F))
+                    return Ok(TokenKind::StringFormat(StringFormatTag::F));
                 }
                 StringTag::Fstr => {
                     self.next_char();
                     self.in_fstr = true;
-                    return Ok(TokenKind::StringFormat(StringFormatTag::Fstr))
+                    return Ok(TokenKind::StringFormat(StringFormatTag::Fstr));
                 }
             };
 
@@ -208,9 +207,7 @@ impl<'a> Lexer<'a> {
                 self.in_fstr = false;
                 Ok(Token::new(TokenKind::FStringEnd, self.span(line)))
             }
-            Some('"') => {
-                Ok(Token::new(TokenKind::FStringPart(text), self.span(line)))
-            }
+            Some('"') => Ok(Token::new(TokenKind::FStringPart(text), self.span(line))),
             Some('{') => {
                 self.fstr_brace_depth += 1;
                 self.in_fstr = false;
@@ -317,9 +314,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn try_get_ident_or_tag(&mut self, char: char) -> Result<Option<StringTag>, String> {
-
         if self.peek_char() == Some('"') {
-
             match char {
                 'f' => return Ok(Some(StringTag::F)),
                 'c' => return Ok(Some(StringTag::CStr)),
@@ -328,13 +323,13 @@ impl<'a> Lexer<'a> {
         }
 
         if !is_ident(char) {
-            return Ok(None)
+            return Ok(None);
         }
 
         let (string, _peek) = self.lex_ident();
         let string_owned = string.to_string();
         if string == "fstr" && self.current == Some('"') {
-            return Ok(Some(StringTag::Fstr))
+            return Ok(Some(StringTag::Fstr));
         }
 
         Err(string_owned)

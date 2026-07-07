@@ -1,7 +1,8 @@
 use std::mem::swap;
 
 use ast_model::expression::{
-    Constructor, Deref, Expression, ExpressionId, ExpressionKind, FunctionCallee, FunctionCalleeKind, MatchMethod, MatchMethodArm, MatchMethodVariant, Ref, VariableExpression,
+    Constructor, Deref, Expression, ExpressionId, ExpressionKind, FunctionCallee,
+    FunctionCalleeKind, MatchMethod, MatchMethodArm, MatchMethodVariant, Ref, VariableExpression,
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
@@ -14,8 +15,10 @@ use soul_utils::{
 };
 
 use crate::{
-    parser::Parser, utils::{
-        ARRAY, ARROW_LEFT, COPY, CURLY_OPEN, ELSE, MUT, NOT, NULL, PASS, POINTER, REF, ROUND_OPEN, SIZEOF, SQUARE_CLOSE, SQUARE_OPEN,
+    parser::Parser,
+    utils::{
+        ARRAY, ARROW_LEFT, COPY, CURLY_OPEN, ELSE, MUT, NOT, NULL, PASS, POINTER, REF, ROUND_OPEN,
+        SIZEOF, SQUARE_CLOSE, SQUARE_OPEN,
     },
 };
 
@@ -39,7 +42,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             collection,
             index,
             self.span_combine(start_span),
-            optional_map
+            optional_map,
         );
         Ok(())
     }
@@ -191,7 +194,12 @@ impl<'a, 'f> Parser<'a, 'f> {
             optional_map,
         };
 
-        *left = match self.try_parse_function_call_generic(start_span, Some(callee), generics, &ident) {
+        *left = match self.try_parse_function_call_generic(
+            start_span,
+            Some(callee),
+            generics,
+            &ident,
+        ) {
             Ok(call) => Expression::from_function_call(call),
             Err(TryError::IsNotValue(_)) => self.parse_field_access(value, ident, optional_map)?,
             Err(TryError::IsErr(err)) => return Err(err),
@@ -261,7 +269,12 @@ impl<'a, 'f> Parser<'a, 'f> {
         return Ok(true);
     }
 
-    fn parse_field_access(&mut self, left: ExpressionId, ident: Ident, optional_map: bool) -> SoulResult<Expression> {
+    fn parse_field_access(
+        &mut self,
+        left: ExpressionId,
+        ident: Ident,
+        optional_map: bool,
+    ) -> SoulResult<Expression> {
         match KeyWord::from_str(ident.as_str()) {
             Some(KeyWord::Sizeof) => self.parse_sizeof(left),
             _ => Ok(Expression::new_field(
@@ -269,7 +282,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 self.store,
                 left,
                 ident,
-                optional_map
+                optional_map,
             )),
         }
     }

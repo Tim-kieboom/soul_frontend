@@ -1,5 +1,6 @@
 import (
     crate.fmt
+    crate.test
 )
 
 pub sum(a: int, mut b: int): int {
@@ -20,6 +21,7 @@ pub struct Map {
     pub type Value = int
 
     pub struct KeyValue {
+        
         pub mut key: Key
         pub mut value: Value
 

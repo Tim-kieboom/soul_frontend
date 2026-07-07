@@ -1,7 +1,9 @@
 use ast_model::{
-    FunctionKind, expression::{Argument, Expression, FunctionCall, FunctionCallee}, soul_type::{ArrayKind, ArrayType, Generic, SoulType}, statements::{
-        ExternLanguage, Function, FunctionSignature, FunctionThisKind, Parameter,
-        Statement,
+    FunctionKind,
+    expression::{Argument, Expression, FunctionCall, FunctionCallee},
+    soul_type::{ArrayKind, ArrayType, Generic, SoulType},
+    statements::{
+        ExternLanguage, Function, FunctionSignature, FunctionThisKind, Parameter, Statement,
     },
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
@@ -19,12 +21,15 @@ use soul_utils::{
 };
 
 use crate::{
-    parser::Parser, utils::{
-        ARRAY, ARROW_LEFT, ARROW_RIGHT, ASSIGN, COLON, COMMA, CURLY_OPEN, DOT, DOUBLE_QUESTION, OPTIONAL, REF, ROUND_CLOSE, ROUND_OPEN, SEMI_COLON, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS,
+    parser::Parser,
+    utils::{
+        ARRAY, ARROW_LEFT, ARROW_RIGHT, ASSIGN, COLON, COMMA, CURLY_OPEN, DOT, DOUBLE_QUESTION,
+        OPTIONAL, REF, ROUND_CLOSE, ROUND_OPEN, SEMI_COLON, SQUARE_CLOSE, SQUARE_OPEN,
+        STAMENT_END_TOKENS,
     },
 };
-const CONTRUCTOR_STR: &str = "___ctor";
-const ARRAY_CONTRUCTOR_STR: &str = "___arrayCtor";
+const CONTRUCTOR_STR: &str = "This__ctor";
+const ARRAY_CONTRUCTOR_STR: &str = "This__arrayCtor";
 
 type FuncResult<T> = TryResult<T, (Ident, Fault)>;
 impl<'a, 'f> Parser<'a, 'f> {
@@ -123,7 +128,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         if optional_map {
             self.bump();
             if !self.current_is(&DOT) {
-                return TryErr(self.get_expect_error(&DOT))
+                return TryErr(self.get_expect_error(&DOT));
             }
         }
         TryOk(Spanned::new(
@@ -335,6 +340,13 @@ impl<'a, 'f> Parser<'a, 'f> {
                     .value;
 
                 let signature = &mut methode.signature.value;
+                if signature.function_kind != FunctionThisKind::Static {
+                    self.log_error(
+                        "`This.(..)` has to be static function",
+                        Some(signature.name.span()),
+                    );
+                }
+                signature.function_kind = FunctionThisKind::Ctor;
                 signature.return_type = methode_type.clone();
 
                 Ok(Spanned::new(methode, self.span_combine(start_span)))
@@ -371,7 +383,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                                 modifier: TypeModifier::Const,
                             }],
                             generics: vec![],
-                            function_kind: FunctionThisKind::Static,
+                            function_kind: FunctionThisKind::ArrayCtor,
                             external: None,
                             node_id: self.alloc_node(),
                         },

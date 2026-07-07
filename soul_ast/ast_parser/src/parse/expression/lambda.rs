@@ -3,14 +3,9 @@ use ast_model::{
     statements::VarPattern,
 };
 use soul_tokenizer::model::TokenKind;
-use soul_utils::{
-    TypeModifier, soul_names::Symbol, span::Span,
-};
+use soul_utils::{TypeModifier, soul_names::Symbol, span::Span};
 
-use crate::{
-    parser::Parser,
-    utils::LAMBDA_ARROW,
-};
+use crate::{parser::Parser, utils::LAMBDA_ARROW};
 
 impl<'a, 'f> Parser<'a, 'f> {
     /// Try to parse a lambda expression: `params => body`.
@@ -18,7 +13,9 @@ impl<'a, 'f> Parser<'a, 'f> {
     pub(super) fn try_parse_lambda(&mut self, start_span: Span) -> Result<Expression, ()> {
         let saved = self.tokens.current_position();
 
-        let pattern = self.parse_var_pattern(TypeModifier::Const).map_err(|_| ())?;
+        let pattern = self
+            .parse_var_pattern(TypeModifier::Const)
+            .map_err(|_| ())?;
 
         if self.current_is(&LAMBDA_ARROW) {
             self.bump();
@@ -52,4 +49,3 @@ const LAMBDA_BODY_END: &[TokenKind] = &[
     TokenKind::Symbol(Symbol::Comma),
     TokenKind::Symbol(Symbol::Colon),
 ];
-

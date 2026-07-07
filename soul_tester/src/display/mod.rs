@@ -1,13 +1,18 @@
 use anyhow::Result;
 use soul_utils::collections::vec_map::{VecMap, VecMapIndex};
-use std::{fmt::Debug, fs::{File, OpenOptions}, io::Write, path::Path};
+use std::{
+    fmt::Debug,
+    fs::{File, OpenOptions},
+    io::Write,
+    path::Path,
+};
 
 use crate::display::writer::Writer;
 
 pub(crate) mod ast;
+pub(crate) mod benchmark;
 pub(crate) mod fault;
 pub(crate) mod tokenizer;
-pub(crate) mod benchmark;
 pub mod writer;
 
 fn write_to_file(path: &Path, str: &str) -> Result<()> {
@@ -36,6 +41,11 @@ struct VecMapEntry<V> {
     value: V,
 }
 
-fn vec_map_to_pretty_vec<K: VecMapIndex + Debug, V>(map: &VecMap<K, V>) -> Vec<VecMapEntry<&V>>{
-    map.entries().map(|(id, value)| VecMapEntry{id: format!("{id:?}"), value}).collect()
+fn vecmap_to_pretty_vec<K: VecMapIndex + Debug, V>(map: &VecMap<K, V>) -> Vec<VecMapEntry<&V>> {
+    map.entries()
+        .map(|(id, value)| VecMapEntry {
+            id: format!("{id:?}"),
+            value,
+        })
+        .collect()
 }

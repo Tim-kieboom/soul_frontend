@@ -8,7 +8,8 @@ use soul_utils::{
 };
 
 use crate::{
-    parser::Parser, utils::{AS, AS_STR, COMMA, CURLY_CLOSE, CURLY_OPEN, IMPORT, ROUND_CLOSE, ROUND_OPEN, STAR},
+    parser::Parser,
+    utils::{AS, AS_STR, COMMA, CURLY_CLOSE, CURLY_OPEN, IMPORT, ROUND_CLOSE, ROUND_OPEN, STAR},
 };
 
 impl<'a, 'f> Parser<'a, 'f> {

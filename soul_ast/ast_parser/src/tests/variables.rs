@@ -2,10 +2,7 @@ use ast_model::{
     expression::ExpressionKind,
     literal::Literal,
     soul_type::SoulType,
-    statements::{
-        StatementKind,
-        VarPattern, Variable,
-    },
+    statements::{StatementKind, VarPattern, Variable},
 };
 use soul_utils::{TypeModifier, fault::Severity};
 
@@ -38,7 +35,10 @@ fn variable_declaration_with_init() {
     assert!(initialize_value.is_some());
 
     let init = &store.expressions[initialize_value.unwrap()];
-    assert!(matches!(init.node, ExpressionKind::Literal((_, Literal::Uint(5)))));
+    assert!(matches!(
+        init.node,
+        ExpressionKind::Literal((_, Literal::Uint(5)))
+    ));
 }
 
 #[test]
@@ -100,7 +100,9 @@ fn mutable_variable() {
     );
 
     let stmt = get_statement(&store, &module, 0);
-    let Variable { pattern, modifier, .. } = match &stmt.node {
+    let Variable {
+        pattern, modifier, ..
+    } = match &stmt.node {
         StatementKind::Variable(v) => v,
         _ => panic!("expected Variable"),
     };
@@ -111,7 +113,12 @@ fn mutable_variable() {
 #[test]
 fn discard_variable() {
     let (module, store, context) = parse("_ := 5");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     let Variable { pattern, .. } = match &stmt.node {
@@ -124,7 +131,12 @@ fn discard_variable() {
 #[test]
 fn tuple_destructuring() {
     let (module, store, context) = parse("(a, b) := get_pair()");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     let Variable { pattern, .. } = match &stmt.node {
@@ -137,14 +149,23 @@ fn tuple_destructuring() {
     };
     assert_eq!(tuple.elements.len(), 2);
     assert!(!tuple.rest);
-    assert!(matches!(&tuple.elements[0], VarPattern::Simple { binding, .. } if binding.ident.as_str() == "a"));
-    assert!(matches!(&tuple.elements[1], VarPattern::Simple { binding, .. } if binding.ident.as_str() == "b"));
+    assert!(
+        matches!(&tuple.elements[0], VarPattern::Simple { binding, .. } if binding.ident.as_str() == "a")
+    );
+    assert!(
+        matches!(&tuple.elements[1], VarPattern::Simple { binding, .. } if binding.ident.as_str() == "b")
+    );
 }
 
 #[test]
 fn tuple_destructuring_with_rest() {
     let (module, store, context) = parse("(a, ..) := get_list()");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     let Variable { pattern, .. } = match &stmt.node {
@@ -157,13 +178,20 @@ fn tuple_destructuring_with_rest() {
     };
     assert_eq!(tuple.elements.len(), 1);
     assert!(tuple.rest);
-    assert!(matches!(&tuple.elements[0], VarPattern::Simple { binding, .. } if binding.ident.as_str() == "a"));
+    assert!(
+        matches!(&tuple.elements[0], VarPattern::Simple { binding, .. } if binding.ident.as_str() == "a")
+    );
 }
 
 #[test]
 fn tuple_destructuring_single_element() {
     let (module, store, context) = parse("(x) := expr()");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     let Variable { pattern, .. } = match &stmt.node {
@@ -176,13 +204,20 @@ fn tuple_destructuring_single_element() {
     };
     assert_eq!(tuple.elements.len(), 1);
     assert!(!tuple.rest);
-    assert!(matches!(&tuple.elements[0], VarPattern::Simple { binding, .. } if binding.ident.as_str() == "x"));
+    assert!(
+        matches!(&tuple.elements[0], VarPattern::Simple { binding, .. } if binding.ident.as_str() == "x")
+    );
 }
 
 #[test]
 fn named_tuple_destructuring() {
     let (module, store, context) = parse("{x, y} := get_point()");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     let Variable { pattern, .. } = match &stmt.node {
@@ -196,15 +231,26 @@ fn named_tuple_destructuring() {
     assert!(!named.rest);
     assert_eq!(named.fields.len(), 2);
     assert_eq!(named.fields[0].field.as_str(), "x");
-    assert_eq!(named.fields[0].binding.as_ref().unwrap().ident.as_str(), "x");
+    assert_eq!(
+        named.fields[0].binding.as_ref().unwrap().ident.as_str(),
+        "x"
+    );
     assert_eq!(named.fields[1].field.as_str(), "y");
-    assert_eq!(named.fields[1].binding.as_ref().unwrap().ident.as_str(), "y");
+    assert_eq!(
+        named.fields[1].binding.as_ref().unwrap().ident.as_str(),
+        "y"
+    );
 }
 
 #[test]
 fn named_tuple_destructuring_with_alias() {
     let (module, store, context) = parse("{x: a, y: b} := get_point()");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     let Variable { pattern, .. } = match &stmt.node {
@@ -218,15 +264,26 @@ fn named_tuple_destructuring_with_alias() {
     assert!(!named.rest);
     assert_eq!(named.fields.len(), 2);
     assert_eq!(named.fields[0].field.as_str(), "x");
-    assert_eq!(named.fields[0].binding.as_ref().unwrap().ident.as_str(), "a");
+    assert_eq!(
+        named.fields[0].binding.as_ref().unwrap().ident.as_str(),
+        "a"
+    );
     assert_eq!(named.fields[1].field.as_str(), "y");
-    assert_eq!(named.fields[1].binding.as_ref().unwrap().ident.as_str(), "b");
+    assert_eq!(
+        named.fields[1].binding.as_ref().unwrap().ident.as_str(),
+        "b"
+    );
 }
 
 #[test]
 fn named_tuple_destructuring_with_rest() {
     let (module, store, context) = parse("{x, ..} := get_record()");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     let Variable { pattern, .. } = match &stmt.node {
@@ -245,7 +302,12 @@ fn named_tuple_destructuring_with_rest() {
 #[test]
 fn constructor_destructuring() {
     let (module, store, context) = parse("Point{x, y} := get_point()");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     let Variable { pattern, .. } = match &stmt.node {
@@ -268,7 +330,12 @@ fn constructor_destructuring() {
 #[test]
 fn constructor_destructuring_with_alias() {
     let (module, store, context) = parse("Point{x: a, y: b} := get_point()");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     let Variable { pattern, .. } = match &stmt.node {
@@ -290,7 +357,12 @@ fn constructor_destructuring_with_alias() {
 #[test]
 fn constructor_destructuring_with_rest() {
     let (module, store, context) = parse("Point{x, ..} := get_point()");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     let Variable { pattern, .. } = match &stmt.node {
@@ -309,7 +381,12 @@ fn constructor_destructuring_with_rest() {
 #[test]
 fn nested_tuple_destructuring() {
     let (module, store, context) = parse("(a, (b, c)) := get_nested()");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     let Variable { pattern, .. } = match &stmt.node {
@@ -321,12 +398,18 @@ fn nested_tuple_destructuring() {
         _ => panic!("expected Tuple pattern"),
     };
     assert_eq!(outer.elements.len(), 2);
-    assert!(matches!(&outer.elements[0], VarPattern::Simple { binding, .. } if binding.ident.as_str() == "a"));
+    assert!(
+        matches!(&outer.elements[0], VarPattern::Simple { binding, .. } if binding.ident.as_str() == "a")
+    );
     match &outer.elements[1] {
         VarPattern::Tuple(inner) => {
             assert_eq!(inner.elements.len(), 2);
-            assert!(matches!(&inner.elements[0], VarPattern::Simple { binding, .. } if binding.ident.as_str() == "b"));
-            assert!(matches!(&inner.elements[1], VarPattern::Simple { binding, .. } if binding.ident.as_str() == "c"));
+            assert!(
+                matches!(&inner.elements[0], VarPattern::Simple { binding, .. } if binding.ident.as_str() == "b")
+            );
+            assert!(
+                matches!(&inner.elements[1], VarPattern::Simple { binding, .. } if binding.ident.as_str() == "c")
+            );
         }
         _ => panic!("expected nested Tuple"),
     }
@@ -335,25 +418,39 @@ fn nested_tuple_destructuring() {
 #[test]
 fn mut_on_compound_tuple_is_error() {
     let (_, _, context) = parse("mut (a, b) := get_pair()");
-    assert!(context.faults.count_severity(Severity::Error) > 0, "expected error for mut on compound tuple");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected error for mut on compound tuple"
+    );
 }
 
 #[test]
 fn mut_on_compound_named_tuple_is_error() {
     let (_, _, context) = parse("mut {x, y} := get_point()");
-    assert!(context.faults.count_severity(Severity::Error) > 0, "expected error for mut on compound named tuple");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected error for mut on compound named tuple"
+    );
 }
 
 #[test]
 fn mut_on_compound_constructor_is_error() {
     let (_, _, context) = parse("mut Point{x} := get_point()");
-    assert!(context.faults.count_severity(Severity::Error) > 0, "expected error for mut on compound constructor");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected error for mut on compound constructor"
+    );
 }
 
 #[test]
 fn tuple_with_discard_element() {
     let (module, store, context) = parse("(a, _) := get_pair()");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     let Variable { pattern, .. } = match &stmt.node {
@@ -371,7 +468,12 @@ fn tuple_with_discard_element() {
 #[test]
 fn named_tuple_with_discard_alias() {
     let (module, store, context) = parse("{x: _, y} := get_point()");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     let Variable { pattern, .. } = match &stmt.node {
@@ -390,7 +492,12 @@ fn named_tuple_with_discard_alias() {
 #[test]
 fn constructor_with_discard_alias() {
     let (module, store, context) = parse("Point{x: _, y} := get_point()");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     let Variable { pattern, .. } = match &stmt.node {
@@ -409,7 +516,12 @@ fn constructor_with_discard_alias() {
 #[test]
 fn tuple_with_per_binding_mut() {
     let (module, store, context) = parse("(mut a, b) := get_pair()");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     let Variable { pattern, .. } = match &stmt.node {
@@ -420,14 +532,23 @@ fn tuple_with_per_binding_mut() {
         VarPattern::Tuple(t) => t,
         _ => panic!("expected Tuple pattern"),
     };
-    assert!(matches!(&tuple.elements[0], VarPattern::Simple { binding, modifier } if binding.ident.as_str() == "a" && *modifier == TypeModifier::Mut));
-    assert!(matches!(&tuple.elements[1], VarPattern::Simple { binding, modifier } if binding.ident.as_str() == "b" && *modifier == TypeModifier::Const));
+    assert!(
+        matches!(&tuple.elements[0], VarPattern::Simple { binding, modifier } if binding.ident.as_str() == "a" && *modifier == TypeModifier::Mut)
+    );
+    assert!(
+        matches!(&tuple.elements[1], VarPattern::Simple { binding, modifier } if binding.ident.as_str() == "b" && *modifier == TypeModifier::Const)
+    );
 }
 
 #[test]
 fn tuple_with_all_mut() {
     let (module, store, context) = parse("(mut a, mut b) := get_pair()");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     let Variable { pattern, .. } = match &stmt.node {
@@ -438,8 +559,12 @@ fn tuple_with_all_mut() {
         VarPattern::Tuple(t) => t,
         _ => panic!("expected Tuple pattern"),
     };
-    assert!(matches!(&tuple.elements[0], VarPattern::Simple { modifier, .. } if *modifier == TypeModifier::Mut));
-    assert!(matches!(&tuple.elements[1], VarPattern::Simple { modifier, .. } if *modifier == TypeModifier::Mut));
+    assert!(
+        matches!(&tuple.elements[0], VarPattern::Simple { modifier, .. } if *modifier == TypeModifier::Mut)
+    );
+    assert!(
+        matches!(&tuple.elements[1], VarPattern::Simple { modifier, .. } if *modifier == TypeModifier::Mut)
+    );
 }
 
 #[test]
@@ -448,7 +573,12 @@ fn named_tuple_parsed_as_expression_in_expression_context() {
     // But `{x, y}` in expression context should still be parsed as a block.
     // This test verifies the parser can distinguish them.
     let (module, store, context) = parse("{x, y} := get_record()");
-    assert_eq!(context.faults.count_severity(Severity::Error), 0, "{:#?}", context.faults.faults);
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 
     let stmt = get_statement(&store, &module, 0);
     assert!(matches!(&stmt.node, StatementKind::Variable(_)));

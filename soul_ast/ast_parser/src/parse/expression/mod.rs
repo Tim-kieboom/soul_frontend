@@ -1,5 +1,6 @@
 use ast_model::{
-    expression::{Binding, Expression, ExpressionId, ExpressionKind, TypeOf, TypeofKind}, operators::{BinaryOperator, BinaryOperatorKind, UnaryOperator, UnaryOperatorKind},
+    expression::{Binding, Expression, ExpressionId, ExpressionKind, TypeOf, TypeofKind},
+    operators::{BinaryOperator, BinaryOperatorKind, UnaryOperator, UnaryOperatorKind},
 };
 use soul_tokenizer::model::{Token, TokenKind, keyword::KeyWord};
 use soul_utils::{
@@ -11,7 +12,9 @@ use soul_utils::{
 };
 
 use crate::{
-    parse::expression::precedence::Precedence, parser::Parser, utils::{ARRAY, DOT, NOT, NULL, OPTIONAL, ROUND_CLOSE, ROUND_OPEN, SQUARE_OPEN},
+    parse::expression::precedence::Precedence,
+    parser::Parser,
+    utils::{ARRAY, DOT, NOT, NULL, OPTIONAL, ROUND_CLOSE, ROUND_OPEN, SQUARE_OPEN},
 };
 
 mod access;
@@ -80,11 +83,17 @@ impl<'a, 'f> Parser<'a, 'f> {
             };
 
             match self.consume_expression_operator(start_span)? {
-                ExpressionOperator::Access{ty: AccessType::AccessThis, optional_map} => {
+                ExpressionOperator::Access {
+                    ty: AccessType::AccessThis,
+                    optional_map,
+                } => {
                     self.access_this_expression(&mut left, start_span, optional_map)?;
                     continue;
                 }
-                ExpressionOperator::Access{ty: AccessType::AccessIndex, optional_map} => {
+                ExpressionOperator::Access {
+                    ty: AccessType::AccessIndex,
+                    optional_map,
+                } => {
                     self.access_index_expression(&mut left, start_span, optional_map)?;
                     continue;
                 }
@@ -202,7 +211,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         for (span, unary) in prefix_operators.into_iter().rev() {
             let id = self.store.insert_expression(left);
             left = match unary {
-                UnaryKinds::UnaryOperator(unary) => Expression::new_unary(self.alloc_node(), unary, id, span),
+                UnaryKinds::UnaryOperator(unary) => {
+                    Expression::new_unary(self.alloc_node(), unary, id, span)
+                }
                 UnaryKinds::Ref { mutable } => {
                     Expression::new_ref(self.alloc_node(), mutable, id, span)
                 }
@@ -237,9 +248,12 @@ impl<'a, 'f> Parser<'a, 'f> {
         match &self.token().kind {
             TokenKind::Ident(ident) => {
                 if optional_map {
-                    return Err(Fault::error(format!("`{}` invalid", Symbol::Question.as_str()), Some(self.span_combine(start_span))))
+                    return Err(Fault::error(
+                        format!("`{}` invalid", Symbol::Question.as_str()),
+                        Some(self.span_combine(start_span)),
+                    ));
                 }
-                
+
                 match KeyWord::from_str(ident.as_str()) {
                     Some(KeyWord::Typeof) => {
                         return self.parse_typeof_operator(start_span);
@@ -249,7 +263,10 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
             TokenKind::Keyword(KeyWord::Typeof) => {
                 if optional_map {
-                    return Err(Fault::error(format!("`{}` invalid", Symbol::Question.as_str()), Some(self.span_combine(start_span))))
+                    return Err(Fault::error(
+                        format!("`{}` invalid", Symbol::Question.as_str()),
+                        Some(self.span_combine(start_span)),
+                    ));
                 }
 
                 return self.parse_typeof_operator(start_span);
@@ -257,7 +274,10 @@ impl<'a, 'f> Parser<'a, 'f> {
             TokenKind::Symbol(sym) => {
                 if let Some(access) = AccessType::from_symbool(*sym) {
                     self.bump();
-                    return Ok(ExpressionOperator::Access{ ty: access, optional_map });
+                    return Ok(ExpressionOperator::Access {
+                        ty: access,
+                        optional_map,
+                    });
                 } else if let Some(mut binary) = try_to_binary_operator(sym) {
                     self.bump();
                     binary = self.try_consume_multi_binary(binary);
@@ -460,7 +480,7 @@ enum UnaryKinds {
 
 enum ExpressionOperator {
     Binary(BinaryOperator),
-    Access{
+    Access {
         ty: AccessType,
         optional_map: bool,
     },

@@ -1,9 +1,15 @@
 use std::path::PathBuf;
 
 use ast_model::{
-    AstStore, AstTree, Module, expression::{
-        AnyArray, Constructor, ExpressionKind, FunctionCall, FunctionCalleeKind, MatchMethod, StructConstructor, TypeOf, TypeofKind,
-    }, literal::Literal, operators::BinaryOperatorKind, soul_type::{ArrayKind, ArrayType, ReferenceType, SoulType, Stub}, statements::{Assignment, Import, ImportKind, Statement, StatementKind, Variable},
+    AstStore, AstTree, Module,
+    expression::{
+        AnyArray, Constructor, ExpressionKind, FunctionCall, FunctionCalleeKind, MatchMethod,
+        StructConstructor, TypeOf, TypeofKind,
+    },
+    literal::Literal,
+    operators::BinaryOperatorKind,
+    soul_type::{ArrayKind, ArrayType, ReferenceType, SoulType, Stub},
+    statements::{Assignment, Import, ImportKind, Statement, StatementKind, Variable},
 };
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
@@ -111,7 +117,10 @@ fn binary_addition() {
                     assert_eq!(bin.operator.value, BinaryOperatorKind::Add);
                     let left = &store.expressions[bin.left];
                     let right = &store.expressions[bin.right];
-                    assert!(matches!(left.node, ExpressionKind::Literal((_, Literal::Uint(1)))));
+                    assert!(matches!(
+                        left.node,
+                        ExpressionKind::Literal((_, Literal::Uint(1)))
+                    ));
                     assert!(matches!(
                         right.node,
                         ExpressionKind::Literal((_, Literal::Uint(2)))
@@ -150,8 +159,14 @@ fn parenthesized_expression() {
                             assert_eq!(inner.operator.value, BinaryOperatorKind::Add);
                             let a = &store.expressions[inner.left];
                             let b = &store.expressions[inner.right];
-                            assert!(matches!(a.node, ExpressionKind::Literal((_, Literal::Uint(1)))));
-                            assert!(matches!(b.node, ExpressionKind::Literal((_, Literal::Uint(2)))));
+                            assert!(matches!(
+                                a.node,
+                                ExpressionKind::Literal((_, Literal::Uint(1)))
+                            ));
+                            assert!(matches!(
+                                b.node,
+                                ExpressionKind::Literal((_, Literal::Uint(2)))
+                            ));
                         }
                         other => panic!("expected inner Binary(Add), got {:?}", other),
                     }
@@ -238,7 +253,10 @@ fn simple_assignment() {
                 _ => panic!("expected Variable on LHS"),
             }
             let r = &store.expressions[*right];
-            assert!(matches!(r.node, ExpressionKind::Literal((_, Literal::Uint(5)))));
+            assert!(matches!(
+                r.node,
+                ExpressionKind::Literal((_, Literal::Uint(5)))
+            ));
         }
         _ => panic!("expected Assignment statement"),
     }
@@ -539,7 +557,9 @@ fn chained_function_calls() {
                     assert_eq!(name.as_str(), "bar");
                     assert!(callee.is_some());
                     let value = match callee.as_ref().unwrap().kind {
-                        FunctionCalleeKind::Type(_) => panic!("should be FunctionCalleeKind::Expression"),
+                        FunctionCalleeKind::Type(_) => {
+                            panic!("should be FunctionCalleeKind::Expression")
+                        }
                         FunctionCalleeKind::Expression(val) => val,
                     };
                     let inner = &store.expressions[value];

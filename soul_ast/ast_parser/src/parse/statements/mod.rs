@@ -138,30 +138,27 @@ impl<'a, 'f> Parser<'a, 'f> {
             &ROUND_OPEN => {
                 let saved = self.tokens.current_position();
                 match self.parse_tuple_pattern() {
-                    Ok(pattern) => {
-                        match try_assign_type(&self.token()) {
-                            Some(AssignType::Assign) | 
-                            Some(AssignType::Declaration) => {
-                                self.bump();
-                                let statement = self.parse_expression_id(STAMENT_END_TOKENS)?;
-                                return Ok(Statement::new_variable(
-                                    Variable {
-                                        id: self.alloc_node(),
-                                        is_public: false,
-                                        pattern,
-                                        ty: None,
-                                        modifier: TypeModifier::Const,
-                                        initialize_value: Some(statement),
-                                    },
-                                    self.span_combine(start_span),
-                                ));
-                            }
-                            _ => {
-                                self.goto(saved);
-                                TryNotValue(Fault::empty())
-                            },
+                    Ok(pattern) => match try_assign_type(&self.token()) {
+                        Some(AssignType::Assign) | Some(AssignType::Declaration) => {
+                            self.bump();
+                            let statement = self.parse_expression_id(STAMENT_END_TOKENS)?;
+                            return Ok(Statement::new_variable(
+                                Variable {
+                                    id: self.alloc_node(),
+                                    is_public: false,
+                                    pattern,
+                                    ty: None,
+                                    modifier: TypeModifier::Const,
+                                    initialize_value: Some(statement),
+                                },
+                                self.span_combine(start_span),
+                            ));
                         }
-                    }
+                        _ => {
+                            self.goto(saved);
+                            TryNotValue(Fault::empty())
+                        }
+                    },
                     Err(_) => {
                         self.goto(saved);
                         TryNotValue(Fault::empty())
@@ -170,9 +167,12 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
             &CURLY_OPEN => {
                 let saved = self.tokens.current_position();
-                match (self.parse_named_tuple_pattern(), try_assign_type(&self.token())) {
-                    (Ok(pattern), Some(AssignType::Assign)) | 
-                    (Ok(pattern), Some(AssignType::Declaration)) => {
+                match (
+                    self.parse_named_tuple_pattern(),
+                    try_assign_type(&self.token()),
+                ) {
+                    (Ok(pattern), Some(AssignType::Assign))
+                    | (Ok(pattern), Some(AssignType::Declaration)) => {
                         self.bump();
                         match self.parse_expression_id(STAMENT_END_TOKENS) {
                             Ok(value) => {
@@ -249,9 +249,12 @@ impl<'a, 'f> Parser<'a, 'f> {
                     }
                 };
 
-                match (self.parse_constructor_pattern(type_name), try_assign_type(&self.token())) {
-                    (Ok(pattern), Some(AssignType::Assign)) | 
-                    (Ok(pattern), Some(AssignType::Declaration)) => {
+                match (
+                    self.parse_constructor_pattern(type_name),
+                    try_assign_type(&self.token()),
+                ) {
+                    (Ok(pattern), Some(AssignType::Assign))
+                    | (Ok(pattern), Some(AssignType::Declaration)) => {
                         self.bump();
                         return self
                             .parse_expression_id(STAMENT_END_TOKENS)

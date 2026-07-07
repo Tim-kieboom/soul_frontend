@@ -18,7 +18,7 @@ pub struct ParseInfo<'f> {
     pub source_folder: PathBuf,
     pub parent: Option<ModuleId>,
     pub crate_source_folder: PathBuf,
-    
+
     pub store: &'f mut AstStore,
     pub modules: &'f mut ModuleStore,
     pub context: &'f mut CrateContext,

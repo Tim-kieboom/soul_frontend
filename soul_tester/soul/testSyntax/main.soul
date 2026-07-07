@@ -2,6 +2,26 @@ import (
     Std.Fmt
 )
 
+matchMethodes() {
+    result: Res<int> = ints.getRes(0)
+    
+    num := result.copy
+        .OK{it+1}
+        .Err{0}
+
+    assert(num.type == int)
+
+    res := result
+        ->Ok{f32.}
+        ->Err{str.}
+
+    assert(res.type == Res<f32, str>)
+
+    ints.get(0)
+        ->!null{Ok}
+        ->null{Err("value not found")}
+}
+
 pub sum(a: int, b: int): int {
     a + b
 }

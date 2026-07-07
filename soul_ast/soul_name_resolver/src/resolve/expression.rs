@@ -1,11 +1,16 @@
-use ast_model::{expression::{AnyArray, Constructor, ExpressionId, ExpressionKind, FieldAccess, For, ForCondition, If, IfBranch, Lambda, Match, MatchMethod, StringFormat, StructConstructor, VariableExpression}, scope::ScopeValue};
+use ast_model::{
+    expression::{
+        AnyArray, Constructor, ExpressionId, ExpressionKind, FieldAccess, For, ForCondition, If,
+        IfBranch, Lambda, Match, MatchMethod, StringFormat, StructConstructor, VariableExpression,
+    },
+    scope::ScopeValue,
+};
 use soul_utils::{fault::Fault, soul_error_internal};
 
 use crate::NameResolver;
 
 impl<'a> NameResolver<'a> {
     pub(super) fn resolve_expression(&mut self, expression_id: ExpressionId) {
-
         let Some(expression) = self.store.expressions.get(expression_id) else {
             self.log_fault(soul_error_internal!(
                 format!("{expression_id:?} not found"),
@@ -22,9 +27,9 @@ impl<'a> NameResolver<'a> {
             | ExpressionKind::Literal(_)
             | ExpressionKind::Undefined(_) => (),
 
-            ExpressionKind::New(value) 
-            | ExpressionKind::Pass(value) 
-            | ExpressionKind::Copy(value) 
+            ExpressionKind::New(value)
+            | ExpressionKind::Pass(value)
+            | ExpressionKind::Copy(value)
             | ExpressionKind::Sizeof(value) => self.resolve_expression(*value),
 
             ExpressionKind::If(if_) => self.resolve_if(if_),
@@ -42,11 +47,15 @@ impl<'a> NameResolver<'a> {
                 self.resolve_expression(binary.right);
             }
 
-            ExpressionKind::Tuple(values) => for value in values {
-                self.resolve_expression(*value);
+            ExpressionKind::Tuple(values) => {
+                for value in values {
+                    self.resolve_expression(*value);
+                }
             }
-            ExpressionKind::NamedTuple(values) => for (_, value) in values {
-                self.resolve_expression(*value);
+            ExpressionKind::NamedTuple(values) => {
+                for (_, value) in values {
+                    self.resolve_expression(*value);
+                }
             }
 
             ExpressionKind::Lambda(lambda) => self.resolve_lambda(lambda),
@@ -55,20 +64,25 @@ impl<'a> NameResolver<'a> {
             ExpressionKind::Array(any_array) => self.resolve_any_array(any_array),
             ExpressionKind::Variable(variable) => {
                 self.resolve_variable_expression(&variable);
-                
             }
             ExpressionKind::NewArray(any_array) => self.resolve_any_array(any_array),
             ExpressionKind::Return(expression_id) => {
                 if let Some(value) = expression_id {
                     self.resolve_expression(*value);
                 }
-            },
+            }
             ExpressionKind::Constructor(constructor) => self.resolve_contructor(constructor),
             ExpressionKind::FieldAccess(field_access) => self.resolve_field_access(field_access),
             ExpressionKind::MatchMethod(match_method) => self.resolve_match_method(match_method),
-            ExpressionKind::StringFormat(string_format) => self.resolve_string_format(string_format),
-            ExpressionKind::FunctionCall(function_call) => self.resolve_function_call(function_call),
-            ExpressionKind::StructConstructor(struct_constructor) => self.resolve_struct_contructor(struct_constructor),
+            ExpressionKind::StringFormat(string_format) => {
+                self.resolve_string_format(string_format)
+            }
+            ExpressionKind::FunctionCall(function_call) => {
+                self.resolve_function_call(function_call)
+            }
+            ExpressionKind::StructConstructor(struct_constructor) => {
+                self.resolve_struct_contructor(struct_constructor)
+            }
         }
     }
 
@@ -84,16 +98,17 @@ impl<'a> NameResolver<'a> {
         }
     }
 
-    fn resolve_variable_expression(
-        &mut self,
-        variable: &VariableExpression,
-    ) {
+    fn resolve_variable_expression(&mut self, variable: &VariableExpression) {
         let name = &variable.name;
-        match self.scope_info.scopes.lookup_value(name.as_str(), ScopeValue::Variable, self.current.module) {
+        match self.scope_info.scopes.lookup_value(
+            name.as_str(),
+            ScopeValue::Variable,
+            self.current.module,
+        ) {
             Some(resolved) => _ = self.declares.insert_variable_resolve(variable.id, resolved),
             None => self.log_fault(Fault::error(
                 format!("variable '{}' is undefined in scope", name.as_str()),
-                Some(name.span())
+                Some(name.span()),
             )),
         }
     }
@@ -137,7 +152,6 @@ impl<'a> NameResolver<'a> {
         self.resolve_expression(match_.scrutinee);
         for arm in &match_.arms {
             self.resolve_block(arm.body);
-            
         }
     }
 
@@ -159,7 +173,6 @@ impl<'a> NameResolver<'a> {
 
         let mut current = if_.branch.as_ref();
         while let Some(branch) = current {
-
             match branch.as_ref() {
                 IfBranch::Else(block_id) => {
                     self.resolve_block(*block_id);

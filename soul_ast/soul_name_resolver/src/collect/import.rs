@@ -4,7 +4,10 @@ use ast_model::{
     statements::{ImportItem, ImportKind, ImportPath},
 };
 use soul_utils::{
-    FunctionId, Ident, fault::Fault, dbg_println, soul_error_internal, span::{ModuleId, Span},
+    FunctionId, Ident,
+    fault::Fault,
+    soul_error_internal,
+    span::{ModuleId, Span},
 };
 
 use crate::NameResolver;
@@ -30,25 +33,24 @@ impl<'a> NameResolver<'a> {
         };
 
         let module_id = if path.module.is_external() {
-            todo!()
+            self.log_fault(soul_error_internal!(
+                "external module not yet implemented",
+                None
+            ));
+            return;
         } else {
             let pathbuf = path.module.as_pathbuf();
-            let res = match self.modules.get_id(pathbuf) {
-                Some(val) => Some(val),
-                None => match self.modules.get_id(&pathbuf.join("mod.soul")) {
-                    Some(val) => Some(val),
-                    None => self.modules.get_id(&pathbuf.with_extension("soul")),
-                },
-            };
+            let result = self
+                .modules
+                .get_id(pathbuf)
+                .or_else(|| self.modules.get_id(&pathbuf.with_extension("soul")))
+                .or_else(|| self.modules.get_id(&pathbuf.join("mod.soul")));
 
-            match res {
+            match result {
                 Some(val) => val,
                 None => {
                     self.log_fault(soul_error_internal!(
-                        format!(
-                            "module: {:?} not found in ModuleStore",
-                            pathbuf
-                        ),
+                        format!("module: {:?} not found in ModuleStore", pathbuf),
                         Some(span)
                     ));
                     return;
@@ -64,9 +66,9 @@ impl<'a> NameResolver<'a> {
             ScopeModuleEntry {
                 module_id,
                 import_kind: path.kind.clone(),
-                imported_items: imported_items.clone(),
                 crate_name: path.lib_name.clone(),
                 module_name: module_name.to_string(),
+                imported_items: imported_items.clone(),
             },
         );
 

@@ -1,14 +1,21 @@
 pub use crate::ast::*;
 use crate::{
     ast::{
-        block::{Block, BlockId}, expression::{Expression, ExpressionId}, statements::{Enum, Function, FunctionSignature, Statement, StatementId, Struct, Trait},
-    }, scope::ScopeBuilder,
+        block::{Block, BlockId},
+        expression::{Expression, ExpressionId},
+        statements::{Enum, Function, FunctionSignature, Statement, StatementId, Struct, Trait},
+    },
+    scope::ScopeBuilder,
 };
 use soul_utils::{
-    CrateContext, FunctionId, Ident, collections::{
+    CrateContext, FunctionId, Ident,
+    collections::{
         vec_map::{VecMap, VecMapIndex},
         vec_set::VecSet,
-    }, fault::{Fault, FaultCollector}, ids::IdGenerator, span::{ModuleId, Spanned}
+    },
+    fault::{Fault, FaultCollector},
+    ids::IdGenerator,
+    span::{ModuleId, Spanned},
 };
 use std::collections::HashMap;
 
@@ -91,7 +98,6 @@ pub enum CustomType {
     Struct(Struct),
 }
 impl CustomType {
-
     pub fn id(&self) -> NodeId {
         match self {
             CustomType::Enum(obj) => obj.id,

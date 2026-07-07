@@ -1,8 +1,14 @@
-use ast_model::expression::{
-    AnyArray, Constructor, ExpressionId, ExpressionKind, For, ForCondition, FunctionCall, FunctionCalleeKind, If, IfBranch, Lambda, Match, MatchMethod, MatchPattern, StringFormat, StructConstructor, TypeOf,
+use ast_model::{
+    AstStore,
+    block::BlockId,
+    expression::{
+        AnyArray, Binding, Constructor, ExpressionId, ExpressionKind, For, ForCondition,
+        FunctionCall, FunctionCalleeKind, If, IfBranch, Lambda, Match, MatchMethod, MatchPattern,
+        StringFormat, StructConstructor, TypeOf,
+    },
 };
 use soul_tokenizer::model::keyword::KeyWord;
-use soul_utils::fault::Fault;
+use soul_utils::{fault::Fault, span::Span};
 
 use crate::NameResolver;
 
@@ -37,7 +43,7 @@ impl<'a> NameResolver<'a> {
                     self.collect_expression(*value)
                 }
             }
-            
+
             ExpressionKind::Ref(ref_) => self.collect_expression(ref_.value),
             ExpressionKind::For(for_) => self.collect_for(for_),
             ExpressionKind::Unary(unary) => self.collect_expression(unary.value),
@@ -47,11 +53,15 @@ impl<'a> NameResolver<'a> {
                 self.collect_expression(index.collection);
             }
 
-            ExpressionKind::Tuple(values) => for value in values {
-                self.collect_expression(*value);
+            ExpressionKind::Tuple(values) => {
+                for value in values {
+                    self.collect_expression(*value);
+                }
             }
-            ExpressionKind::NamedTuple(values) => for (_, value) in values {
-                self.collect_expression(*value);
+            ExpressionKind::NamedTuple(values) => {
+                for (_, value) in values {
+                    self.collect_expression(*value);
+                }
             }
 
             ExpressionKind::Match(match_) => self.collect_match(match_),
@@ -64,10 +74,10 @@ impl<'a> NameResolver<'a> {
             ExpressionKind::Array(any_array) => self.collect_any_array(any_array),
             ExpressionKind::NewArray(any_array) => self.collect_any_array(any_array),
             ExpressionKind::Constructor(constructor) => self.collect_constructor(constructor),
+            ExpressionKind::MatchMethod(match_method) => self.collect_match_methode(match_method),
             ExpressionKind::FieldAccess(field_access) => {
                 self.collect_expression(field_access.object)
             }
-            ExpressionKind::MatchMethod(match_method) => self.collect_match_methode(match_method),
             ExpressionKind::StringFormat(string_format) => {
                 self.collect_string_format(string_format)
             }
@@ -103,7 +113,9 @@ impl<'a> NameResolver<'a> {
         if let Some(callee) = &call.callee {
             match &callee.kind {
                 FunctionCalleeKind::Type(soul_type) => self.collect_type(soul_type),
-                FunctionCalleeKind::Expression(expression_id) => self.collect_expression(*expression_id),
+                FunctionCalleeKind::Expression(expression_id) => {
+                    self.collect_expression(*expression_id)
+                }
             }
         }
 
@@ -119,12 +131,24 @@ impl<'a> NameResolver<'a> {
     }
 
     fn collect_match_methode(&mut self, match_methode: &MatchMethod) {
+        fn block_span(store: &AstStore, block_id: BlockId) -> Span {
+            store
+                .blocks
+                .get(block_id)
+                .map(|block| block.span)
+                .unwrap_or(Span::error())
+        }
+
         self.collect_expression(match_methode.scrutinee);
         for arm in &match_methode.arms {
             self.push_scope(arm.body);
             self.collect_scopeless_block(arm.body);
             if let Some(binding) = &arm.binding {
                 self.insert_binding(binding);
+            } else {
+                let id = self.alloc_node();
+                let span = block_span(self.store, arm.body);
+                self.insert_binding(&Binding::from_text(id, "it", span));
             }
             self.pop_scope();
         }
@@ -222,7 +246,10 @@ impl<'a> NameResolver<'a> {
                     self.insert_binding(binding);
                 }
             }
-            MatchPattern::If { pattern, if_condition } => {
+            MatchPattern::If {
+                pattern,
+                if_condition,
+            } => {
                 self.collect_expression(*if_condition);
                 self.collect_match_arm_pattern(&pattern);
             }
