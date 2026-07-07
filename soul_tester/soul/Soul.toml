@@ -1,7 +1,4 @@
-[package]
-name = "soul_tester"
-version = "0.1.0"
-edition = "2026"
+name = "soul_test"
 
 [dependencies]
-test = {path = "../test"}
+example_std = {path = "lib/example_std"}

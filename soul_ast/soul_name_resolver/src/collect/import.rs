@@ -1,13 +1,12 @@
+use std::path::PathBuf;
+
 use ast_model::{
     EntryKind, NodeId,
     scope::ScopeModuleEntry,
     statements::{ImportItem, ImportKind, ImportPath},
 };
 use soul_utils::{
-    FunctionId, Ident,
-    fault::Fault,
-    soul_error_internal,
-    span::{ModuleId, Span},
+    FunctionId, Ident, fault::Fault, ids::IdAlloc, soul_error_internal, span::{ModuleId, Span},
 };
 
 use crate::NameResolver;
@@ -33,30 +32,14 @@ impl<'a> NameResolver<'a> {
         };
 
         let module_id = if path.module.is_external() {
-            self.log_fault(soul_error_internal!(
-                "external module not yet implemented",
-                None
-            ));
-            return;
+            self.collect_external_module(path, span)
         } else {
-            let pathbuf = path.module.as_pathbuf();
-            let result = self
-                .modules
-                .get_id(pathbuf)
-                .or_else(|| self.modules.get_id(&pathbuf.with_extension("soul")))
-                .or_else(|| self.modules.get_id(&pathbuf.join("mod.soul")));
-
-            match result {
-                Some(val) => val,
-                None => {
-                    self.log_fault(soul_error_internal!(
-                        format!("module: {:?} not found in ModuleStore", pathbuf),
-                        Some(span)
-                    ));
-                    return;
-                }
-            }
+            self.collect_internal_module(path, span)
         };
+
+        if module_id == ModuleId::error() {
+            return;
+        }
 
         self.collect_module(module_id);
         self.resolve_module(module_id);
@@ -74,6 +57,79 @@ impl<'a> NameResolver<'a> {
 
         for imported_item in imported_items {
             self.collect_items(module_id, module_name, imported_item, span)
+        }
+    }
+
+    fn collect_internal_module(&mut self, path: &ImportPath, span: Span) -> ModuleId {
+        let pathbuf = path.module.as_pathbuf();
+        let result = self
+            .modules
+            .get_id(pathbuf)
+            .or_else(|| self.modules.get_id(&pathbuf.with_extension("soul")))
+            .or_else(|| self.modules.get_id(&pathbuf.join("mod.soul")));
+
+        match result {
+            Some(val) => val,
+            None => {
+                self.log_fault(soul_error_internal!(
+                    format!("module: {:?} not found in ModuleStore", pathbuf),
+                    Some(span)
+                ));
+                return ModuleId::error();
+            }
+        }
+    }
+
+    fn collect_external_module(&mut self, path: &ImportPath, span: Span) -> ModuleId {
+        let lib_name = match &path.lib_name {
+            Some(name) => name,
+            None => {
+                self.log_fault(Fault::error(
+                    "external import missing crate name".to_string(),
+                    Some(span),
+                ));
+                return ModuleId::error();
+            }
+        };
+
+        let Some(crate_entry) = self.crate_store.get(lib_name) else {
+            self.log_fault(Fault::error(
+                format!(
+                    "external crate '{}' not found in Soul.toml dependencies",
+                    lib_name
+                ),
+                Some(span),
+            ));
+            return ModuleId::error();
+        };
+
+        let module_path = to_crate_name(path.module.as_pathbuf());
+
+        let result = if module_path.as_os_str().is_empty() {
+            let root = &crate_entry.source_root;
+            self.modules.get_id(&root.join("lib.soul"))
+                .or_else(|| self.modules.get_id(&root.join("main.soul")))
+                .or_else(|| self.modules.get_id(&root.join("mod.soul")))
+        } else {
+            let full_path = crate_entry.source_root.join(&module_path);
+            self.modules
+                .get_id(&full_path)
+                .or_else(|| self.modules.get_id(&full_path.with_extension("soul")))
+                .or_else(|| self.modules.get_id(&full_path.join("mod.soul")))
+        };
+
+        match result {
+            Some(val) => val,
+            None => {
+                self.log_fault(soul_error_internal!(
+                    format!(
+                        "module '{:?}' not found in crate '{}'",
+                        module_path, lib_name
+                    ),
+                    Some(span)
+                ));
+                return ModuleId::error();
+            }
         }
     }
 
@@ -184,4 +240,11 @@ impl<'a> NameResolver<'a> {
             ));
         }
     }
+}
+
+fn to_crate_name(path: &PathBuf) -> PathBuf {
+    path
+        .components()
+        .skip(1)
+        .collect::<PathBuf>()
 }

@@ -1,54 +1,10 @@
 import (
-    crate.fmt
     crate.test
+    example_std
 )
 
 pub sum(a: int, mut b: int): int {
     a + b
-}
-
-pub trait Index {
-    type Out
-    index(&this, index: uint): &Out
-}
-
-pub trait IndexMut: Index {
-    indexMut(&mut this, index: uint): &mut This.Out
-}
-
-pub struct Map {
-    pub type Key = str
-    pub type Value = int
-
-    pub struct KeyValue {
-        
-        pub mut key: Key
-        pub mut value: Value
-
-        pub This.(key: Key, value: Value) {
-            This{key, value}
-        }
-    }
-
-    list := List.[KeyValue: ]
-    pub mut field = 1
-
-    pub This.(field: int) {
-        This{field, ..}
-    }
-
-    pub This.[KeyValue](array) {
-        
-        This{list: array.into(), ..}
-    }
-
-    sum(this, b: int): int {
-        this.field + b
-    }
-}
-
-use Map at(&this, i: uint): int {
-    this.list[i]
 }
 
 main() {
@@ -63,7 +19,7 @@ main() {
     kv := KeyValue{key: "key".copy, value: 1}
     obj = Map.[
         kv.copy, 
-        kv, 
+        kv.copy,
         KeyValue.("jim".copy, 2),
     ]
     obj.sum(1)

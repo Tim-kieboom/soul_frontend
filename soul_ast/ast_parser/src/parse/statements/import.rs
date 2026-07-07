@@ -42,10 +42,6 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         for (i, path) in paths.iter().enumerate() {
-            if path.module.is_external() {
-                continue;
-            }
-
             self.parse_child_module(path, spans[i]);
         }
 

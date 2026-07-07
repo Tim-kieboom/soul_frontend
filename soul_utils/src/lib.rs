@@ -9,6 +9,7 @@ pub mod error;
 pub mod fault;
 pub mod ids;
 pub mod literal;
+pub mod linkage;
 pub mod soul_names;
 pub mod span;
 

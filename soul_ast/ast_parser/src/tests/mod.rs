@@ -1,4 +1,8 @@
-use std::path::PathBuf;
+use std::{
+    fs,
+    path::PathBuf,
+    sync::LazyLock,
+};
 
 use ast_model::{
     AstStore, AstTree, Module,
@@ -13,8 +17,15 @@ use ast_model::{
 };
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
-    CrateContext, collections::module_store::ModuleStore, fault::Severity, ids::IdAlloc,
-    soul_names::PrimitiveTypes, span::ModuleId,
+    CrateContext,
+    collections::{
+        crate_store::{CrateEntry, CrateStore},
+        module_store::ModuleStore,
+    },
+    fault::Severity,
+    ids::IdAlloc,
+    soul_names::PrimitiveTypes,
+    span::ModuleId,
 };
 
 use crate::{ParseInfo, parse_module};
@@ -29,25 +40,62 @@ mod structs;
 mod use_block;
 mod variables;
 
+static TEST_ENV: LazyLock<TestEnv> = LazyLock::new(|| {
+    let base = std::env::temp_dir().join(format!("soul_test_modules_{}", std::process::id()));
+    let _ = fs::remove_dir_all(&base);
+    fs::create_dir_all(&base).expect("failed to create test dir");
+
+    for file in &["bar.soul", "core.soul", "io.soul", "fmt.soul", "baz.soul"] {
+        fs::write(base.join(file), "").ok();
+    }
+
+    TestEnv { base }
+});
+
+struct TestEnv {
+    base: PathBuf,
+}
+
+impl Drop for TestEnv {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.base);
+    }
+}
+
 fn module_id() -> ModuleId {
     ModuleId::begin()
 }
 
+fn create_test_crate_store(test_env: &TestEnv) -> CrateStore {
+    let mut store = CrateStore::new();
+    for name in &["foo", "soul", "bar"] {
+        store.insert(
+            name.to_string(),
+            CrateEntry::new(name.to_string(), test_env.base.clone()),
+        );
+    }
+    store
+}
+
 fn parse(source: &str) -> (Module, AstStore, CrateContext) {
+    let test_env = &*TEST_ENV;
     let module_id = module_id();
     let stream = to_token_stream(source, module_id).unwrap();
     let mut store = AstStore::new();
     let mut modules = ModuleStore::new();
     let mut ast = AstTree::new(module_id);
+    let crate_store = create_test_crate_store(test_env);
     let info = ParseInfo {
         id: module_id,
         parent: None,
-        source_folder: PathBuf::from("test"),
-        crate_source_folder: PathBuf::from("test"),
+        source_folder: test_env.base.clone(),
+        crate_source_folder: test_env.base.clone(),
         store: &mut store,
         context: &mut ast.context,
         modules: &mut modules,
         ast_modules: &mut ast.modules,
+        crate_boundaries: &mut ast.crate_boundaries,
+        crate_store: &crate_store,
     };
     parse_module(stream, "test".to_string(), info);
     let module = ast

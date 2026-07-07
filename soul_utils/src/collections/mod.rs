@@ -1,5 +1,6 @@
 pub mod benchmark;
 pub mod bimap;
+pub mod crate_store;
 pub mod define_enum;
 pub mod module_store;
 pub mod soul_import_path;

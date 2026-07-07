@@ -1,7 +1,0 @@
-import (
-    crate.test.doubleInner
-)
-
-test(): bool {
-    true
-}

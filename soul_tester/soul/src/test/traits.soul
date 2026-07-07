@@ -1,0 +1,8 @@
+pub trait Index {
+    type Out
+    index(&this, index: uint): &Out
+}
+
+pub trait IndexMut: Index {
+    indexMut(&mut this, index: uint): &mut This.Out
+}

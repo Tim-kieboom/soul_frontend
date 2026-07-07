@@ -5,7 +5,7 @@ use ast_parser::{ParseInfo, parse_module};
 use soul_name_resolver::name_resolve;
 use soul_tokenizer::TokenStream;
 use soul_utils::{
-    collections::{benchmark::Benchmark, module_store::ModuleStore},
+    collections::{benchmark::Benchmark, crate_store::CrateStore, module_store::ModuleStore},
     compiler_options::CompilerOptions,
 };
 
@@ -15,6 +15,7 @@ pub struct AstRequest<'a> {
     pub source_folder: PathBuf,
     pub benchmark: &'a mut Benchmark,
     pub module_store: &'a mut ModuleStore,
+    pub crate_store: &'a CrateStore,
 }
 
 pub fn to_ast<'a, 'f>(
@@ -26,6 +27,7 @@ pub fn to_ast<'a, 'f>(
         source_folder,
         benchmark,
         module_store,
+        crate_store,
     } = request;
     let root = module_store.get_root_id();
     let mut ast = AstTree::new(root);
@@ -40,6 +42,8 @@ pub fn to_ast<'a, 'f>(
         id: module_store.get_root_id(),
         modules: module_store,
         ast_modules: &mut ast.modules,
+        crate_boundaries: &mut ast.crate_boundaries,
+        crate_store,
     };
 
     let time = Instant::now();
@@ -47,7 +51,7 @@ pub fn to_ast<'a, 'f>(
     benchmark.add_benchmark("ast", time.elapsed());
 
     let time = Instant::now();
-    name_resolve(module_store, &mut ast);
+    name_resolve(module_store, &mut ast, crate_store);
     benchmark.add_benchmark("name_resolve", time.elapsed());
     ast
 }

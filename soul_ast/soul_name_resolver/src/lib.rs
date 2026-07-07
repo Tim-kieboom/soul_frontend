@@ -7,7 +7,7 @@ use ast_model::{
 };
 use soul_utils::{
     CrateContext, FunctionId, Ident,
-    collections::{module_store::ModuleStore, vec_map::VecMap},
+    collections::{crate_store::CrateStore, module_store::ModuleStore, vec_map::VecMap},
     ids::IdGenerator,
     span::ModuleId,
 };
@@ -16,9 +16,9 @@ mod collect;
 mod resolve;
 mod utils;
 
-pub fn name_resolve<'a>(module_store: &mut ModuleStore, ast: &mut AstTree) {
+pub fn name_resolve(module_store: &mut ModuleStore, ast: &mut AstTree, crate_store: &CrateStore) {
     let root = ast.root;
-    let mut resolver = NameResolver::new(ast.root, module_store, ast);
+    let mut resolver = NameResolver::new(ast.root, module_store, ast, crate_store);
     resolver.collect_module(root);
     resolver.resolve_module(root);
 }
@@ -29,6 +29,7 @@ struct NameResolver<'a> {
     context: &'a mut CrateContext,
     scope_info: &'a mut ScopeInfo,
     ast_modules: &'a mut AstModuleStore,
+    crate_store: &'a CrateStore,
 
     current: Current,
     declares: DeclareStore,
@@ -43,7 +44,12 @@ struct Current {
 }
 
 impl<'a> NameResolver<'a> {
-    pub fn new(module: ModuleId, modules: &'a mut ModuleStore, ast: &'a mut AstTree) -> Self {
+    pub fn new(
+        module: ModuleId,
+        modules: &'a mut ModuleStore,
+        ast: &'a mut AstTree,
+        crate_store: &'a CrateStore,
+    ) -> Self {
         Self {
             modules,
             store: &ast.store,
@@ -51,6 +57,7 @@ impl<'a> NameResolver<'a> {
             ast_modules: &mut ast.modules,
             declares: DeclareStore::new(),
             scope_info: &mut ast.scope_info,
+            crate_store,
             current: Current {
                 module,
                 in_global: true,

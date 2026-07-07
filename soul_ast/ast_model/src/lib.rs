@@ -15,13 +15,21 @@ use soul_utils::{
     },
     fault::{Fault, FaultCollector},
     ids::IdGenerator,
+    linkage::Linkage,
     span::{ModuleId, Spanned},
 };
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
 mod ast;
 pub mod declare_store;
 pub mod scope;
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CrateBoundary {
+    pub name: String,
+    pub source_root: PathBuf,
+    pub linkage: Linkage,
+}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AstTree {
@@ -30,6 +38,7 @@ pub struct AstTree {
     pub context: CrateContext,
     pub modules: AstModuleStore,
     pub scope_info: ScopeInfo,
+    pub crate_boundaries: HashMap<ModuleId, CrateBoundary>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -146,6 +155,7 @@ impl AstTree {
             scope_info: ScopeInfo::new(),
             context: CrateContext::default(),
             modules: AstModuleStore::default(),
+            crate_boundaries: HashMap::new(),
         }
     }
 

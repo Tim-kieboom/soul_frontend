@@ -1,5 +1,5 @@
 use ast_model::{
-    AstModuleStore, AstStore, Module,
+    AstModuleStore, AstStore, CrateBoundary, Module,
     block::{Block, BlockId},
     soul_type::SoulType,
 };
@@ -9,7 +9,10 @@ use soul_tokenizer::model::Token;
 use soul_utils::{
     CrateContext, TypeModifier, collections::vec_set::VecSet, ids::IdAlloc, soul_error_internal,
 };
-use soul_utils::{collections::module_store::ModuleStore, span::ModuleId};
+use soul_utils::{
+    collections::{crate_store::CrateStore, module_store::ModuleStore},
+    span::ModuleId,
+};
 use std::{collections::HashMap, path::PathBuf};
 
 use crate::ParseInfo;
@@ -51,6 +54,8 @@ pub(crate) struct Parser<'a, 'f> {
     pub(crate) modules: &'f mut ModuleStore,
     pub(crate) context: &'f mut CrateContext,
     pub(crate) ast_modules: &'f mut AstModuleStore,
+    pub(crate) crate_boundaries: &'f mut HashMap<ModuleId, CrateBoundary>,
+    pub(crate) crate_store: &'f CrateStore,
 }
 impl<'a, 'f> Parser<'a, 'f> {
     pub fn parse(tokens: TokenStream<'a>, name: String, info: ParseInfo<'f>) {
@@ -97,8 +102,10 @@ impl<'a, 'f> Parser<'a, 'f> {
             context: info.context,
             modules: info.modules,
             ast_modules: info.ast_modules,
+            crate_boundaries: info.crate_boundaries,
             source_path: info.source_folder,
             crate_source_path: info.crate_source_folder,
+            crate_store: info.crate_store,
             current: Current::default(),
         }
     }
@@ -121,8 +128,10 @@ impl<'a, 'f> Parser<'a, 'f> {
             context: info.context,
             modules: info.modules,
             ast_modules: info.ast_modules,
+            crate_boundaries: info.crate_boundaries,
             source_path: info.source_folder,
             crate_source_path: info.crate_source_folder,
+            crate_store: info.crate_store,
             current: Current::default(),
         }
     }

@@ -19,6 +19,10 @@ impl ModuleStore {
         }
     }
 
+    pub fn alloc(&mut self) -> ModuleId {
+        self.alloc.alloc()
+    }
+
     pub fn insert_root(&mut self, root_path: PathBuf) {
         self.map.force_insert(self.get_root_id(), root_path)
     }
