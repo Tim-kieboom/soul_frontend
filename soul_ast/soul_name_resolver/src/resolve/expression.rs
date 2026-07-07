@@ -114,7 +114,7 @@ impl<'a> NameResolver<'a> {
     }
 
     fn resolve_lambda(&mut self, lambda: &Lambda) {
-        self.resolve_expression(lambda.body);
+        self.resolve_block(lambda.body);
     }
 
     fn resolve_match_method(&mut self, match_method: &MatchMethod) {
@@ -125,6 +125,13 @@ impl<'a> NameResolver<'a> {
     }
 
     fn resolve_field_access(&mut self, field_access: &FieldAccess) {
+        if let Some(expr) = self.store.expressions.get(field_access.object) {
+            if let ExpressionKind::Variable(VariableExpression { name, .. }) = &expr.node {
+                if self.contains_type(name.as_str()) {
+                    return;
+                }
+            }
+        }
         self.resolve_expression(field_access.object);
     }
 

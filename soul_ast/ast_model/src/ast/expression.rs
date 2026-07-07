@@ -103,10 +103,9 @@ pub enum ExpressionKind {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Lambda {
     pub id: NodeId,
+    pub body: BlockId,
     /// The parameter patterns (one or more, from a tuple-like param list).
     pub parameters: Vec<VarPattern>,
-    /// The body expression.
-    pub body: ExpressionId,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

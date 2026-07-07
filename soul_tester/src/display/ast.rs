@@ -415,7 +415,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
             self.write_char(')')?;
         }
         self.write_fmt(format_args!(" {} ", LAMDA_ARROW_STR))?;
-        self.write_expression(lambda.body)
+        self.write_block(lambda.body)
     }
 
     fn write_typedef(&mut self, type_def: &TypeDef) -> Result<()> {

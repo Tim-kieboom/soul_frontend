@@ -291,7 +291,7 @@ impl<'a> NameResolver<'a> {
         }
     }
 
-    fn contains_type(&mut self, ident: &str) -> bool {
+    pub(super) fn contains_type(&mut self, ident: &str) -> bool {
         self.scope_info
             .scopes
             .lookup_type(ident, self.current.module)

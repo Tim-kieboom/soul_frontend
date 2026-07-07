@@ -4,7 +4,7 @@ use ast_model::{
     expression::{
         AnyArray, Binding, Constructor, ExpressionId, ExpressionKind, For, ForCondition,
         FunctionCall, FunctionCalleeKind, If, IfBranch, Lambda, Match, MatchMethod, MatchPattern,
-        StringFormat, StructConstructor, TypeOf,
+        StringFormat, StructConstructor, TypeOf, VariableExpression,
     },
 };
 use soul_tokenizer::model::keyword::KeyWord;
@@ -76,6 +76,18 @@ impl<'a> NameResolver<'a> {
             ExpressionKind::Constructor(constructor) => self.collect_constructor(constructor),
             ExpressionKind::MatchMethod(match_method) => self.collect_match_methode(match_method),
             ExpressionKind::FieldAccess(field_access) => {
+                if let Some(expr) = self.store.expressions.get(field_access.object) {
+                    if let ExpressionKind::Variable(VariableExpression { name, .. }) = &expr.node {
+                        if self
+                            .scope_info
+                            .scopes
+                            .flat_lookup_type(name.as_str(), self.current.module)
+                            .is_some()
+                        {
+                            return;
+                        }
+                    }
+                }
                 self.collect_expression(field_access.object)
             }
             ExpressionKind::StringFormat(string_format) => {
@@ -92,10 +104,12 @@ impl<'a> NameResolver<'a> {
     }
 
     fn collect_lambda(&mut self, lambda: &Lambda) {
+        self.push_scope(lambda.body);
         for param in &lambda.parameters {
             self.collect_var_pattern(param);
         }
-        self.collect_expression(lambda.body);
+        self.collect_scopeless_block(lambda.body);
+        self.pop_scope();
     }
 
     fn collect_struct_constructor(&mut self, ctor: &StructConstructor) {

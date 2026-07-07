@@ -1,6 +1,5 @@
 use ast_model::{
-    expression::{Expression, Lambda},
-    statements::VarPattern,
+    block::Block, expression::{Expression, Lambda}, statements::{Statement, VarPattern},
 };
 use soul_tokenizer::model::TokenKind;
 use soul_utils::{TypeModifier, soul_names::Symbol, span::Span};
@@ -19,11 +18,22 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         if self.current_is(&LAMBDA_ARROW) {
             self.bump();
-            let body = self.parse_expression_id(&LAMBDA_BODY_END).map_err(|_| ())?;
+            let body_expression = self.parse_expression_id(&LAMBDA_BODY_END).map_err(|_| ())?;
             let params = match pattern {
                 VarPattern::Tuple(tuple) => tuple.elements,
                 other => vec![other],
             };
+
+            let statement = self.store.insert_statement(
+                Statement::from_expression(self.store, body_expression, false)
+            );
+
+            let body = self.store.insert_block(Block {
+                statements: vec![statement],
+                modifier: TypeModifier::Mut,
+                span: self.span_combine(start_span),
+            });
+
             Ok(Expression::from_lambda(
                 Lambda {
                     id: self.alloc_node(),
