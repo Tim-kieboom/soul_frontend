@@ -42,8 +42,9 @@ impl<'a> NameResolver<'a> {
         self.collect_module(module_id);
         self.resolve_module(module_id);
 
+        let insert_name = alias.unwrap_or(module_name);
         self.current_scope_mut().insert_module(
-            alias.unwrap_or(module_name),
+            insert_name,
             ScopeModuleEntry {
                 module_id,
                 import_kind: path.kind.clone(),
@@ -186,7 +187,7 @@ impl<'a> NameResolver<'a> {
                 alias_name,
                 span,
                 id,
-                module_id,
+                self.current.module,
             ) {
                 Self::static_log_fault(
                     self.context,

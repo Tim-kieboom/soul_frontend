@@ -1,0 +1,7 @@
+pub struct Stdout {
+
+    pub printStr(value: str) {}
+    pub printFmt(value: fstr) {}
+    pub printChar(value: char) {}
+    pub printCStr(value: cstr) {}
+}

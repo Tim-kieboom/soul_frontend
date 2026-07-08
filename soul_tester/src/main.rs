@@ -11,9 +11,10 @@ use soul_utils::{
         benchmark::Benchmark, crate_store::{CrateEntry, CrateStore, Manifest, resolve_source_root}, module_store::ModuleStore,
     }, span::ModuleId,
 };
+
+
 use std::{
-    io::{self, stdout},
-    path::{Path, PathBuf},
+    io::{self, stdout}, path::{Path, PathBuf}
 };
 
 mod config;

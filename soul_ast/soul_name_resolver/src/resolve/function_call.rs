@@ -1,7 +1,8 @@
 use ast_model::{
     declare_store::FunctionResolve,
     expression::{
-        ExpressionKind, FunctionCall, FunctionCallee, FunctionCalleeKind, VariableExpression,
+        ExpressionKind, FieldAccess, FunctionCall, FunctionCallee, FunctionCalleeKind,
+        VariableExpression,
     },
     scope::{ScopeModuleEntry, ScopeTypeEntryKind},
     soul_type::{SoulType, Stub},
@@ -66,7 +67,11 @@ impl<'a> NameResolver<'a> {
 
             match &callee.kind {
                 FunctionCalleeKind::Type(_) => (),
-                FunctionCalleeKind::Expression(id) => self.resolve_expression(*id),
+                FunctionCalleeKind::Expression(id) => {
+                    if !ignore_callee {
+                        self.resolve_expression(*id);
+                    }
+                }
             }
         }
 
@@ -185,15 +190,72 @@ impl<'a> NameResolver<'a> {
             FunctionCalleeKind::Expression(val) => *val,
         };
 
-        let ident = match self.store.expressions.get(value).map(|value| &value.node) {
-            Some(ExpressionKind::Variable(VariableExpression { name, .. })) => name,
-            _ => return None,
-        };
-
-        if self.contains_type(ident.as_str()) {
-            return Some(SoulType::Stub(Stub::new(ident.as_str())));
+        let expr_node = &self.store.expressions.get(value)?.node;
+        match expr_node {
+            ExpressionKind::Variable(VariableExpression { name, .. }) => {
+                if self.contains_type(name.as_str()) {
+                    return Some(SoulType::Stub(Stub::new(name.as_str())));
+                }
+            }
+            ExpressionKind::FieldAccess(field_access) => {
+                return self.parse_owner_from_field_access(field_access);
+            }
+            _ => {}
         }
 
+        None
+    }
+
+    fn parse_owner_from_field_access(
+        &mut self,
+        field_access: &FieldAccess,
+    ) -> Option<SoulType> {
+        let (module_entry, field_name) = self.follow_field_access_to_module(field_access)?;
+        let ast_module = self.ast_modules.get(module_entry.module_id)?;
+        let header_entry = ast_module.header.get(&field_name)?;
+        let custom_type = header_entry.custom_type.as_ref()?;
+        Some(SoulType::Stub(Stub::new(
+            custom_type.value.name().as_str(),
+        )))
+    }
+
+    /// Walk a FieldAccess chain like `Std.Io.Stdout` to find the innermost
+    /// module entry and the final field name.
+    fn follow_field_access_to_module(
+        &mut self,
+        field_access: &FieldAccess,
+    ) -> Option<(ScopeModuleEntry, String)> {
+        let obj_expr = self.store.expressions.get(field_access.object)?;
+        match &obj_expr.node {
+            ExpressionKind::Variable(VariableExpression { name, .. }) => {
+                let name_str = name.as_str();
+                if let Some(module_entry) = self.lookup_module(name_str) {
+                    return Some((module_entry, field_access.field.to_string()));
+                }
+                let module_entry = self.find_module_by_crate_name(name_str)?;
+                Some((module_entry, field_access.field.to_string()))
+            }
+            ExpressionKind::FieldAccess(inner_fa) => {
+                let (module_entry, _) = self.follow_field_access_to_module(inner_fa)?;
+                let module_id = module_entry.module_id;
+                let field_name = field_access.field.to_string();
+                let inner_module = self.ast_modules.get(module_id)?;
+                let header_entry = inner_module.header.get(&field_name)?;
+                header_entry.custom_type.as_ref()?;
+                Some((module_entry, field_name))
+            }
+            _ => None,
+        }
+    }
+
+    fn find_module_by_crate_name(&mut self, name: &str) -> Option<ScopeModuleEntry> {
+        if let Some(modules) = self.scope_info.scopes.iter_modules(self.current.module) {
+            for (_, entry) in modules {
+                if entry.crate_name.as_deref() == Some(name) {
+                    return Some(entry.clone());
+                }
+            }
+        }
         None
     }
 
@@ -298,7 +360,7 @@ impl<'a> NameResolver<'a> {
             .is_some()
     }
 
-    fn lookup_module(&mut self, string: &str) -> Option<ScopeModuleEntry> {
+    pub(super) fn lookup_module(&mut self, string: &str) -> Option<ScopeModuleEntry> {
         self.scope_info
             .scopes
             .lookup_module(string, self.current.module)

@@ -1,15 +1,23 @@
 import (
     crate.test
-    example_std.math.{this, add}
+    Std.Io
+    Core.Time.{Duration}
 )
 
+struct Object {
+    methode() {}
+}
+
 pub sum(a: int, mut b: int): int {
-    _ := add(a, b)
-    math.add(a, b)
-    1 + b
+    a + b
 }
 
 main() {
+    Object.methode()
+    Io.Stdout.printStr("hello world")
+    Std.Io.Stdout.printStr("hello world")
+    stopwatch := Duration.fromSeconds(0)
+    time := stopwatch.elapsed()
     ch := 'a'
 
     cstring := c"cstr"

@@ -127,12 +127,27 @@ impl<'a> NameResolver<'a> {
     fn resolve_field_access(&mut self, field_access: &FieldAccess) {
         if let Some(expr) = self.store.expressions.get(field_access.object) {
             if let ExpressionKind::Variable(VariableExpression { name, .. }) = &expr.node {
-                if self.contains_type(name.as_str()) {
+                let name_str = name.as_str();
+                if self.contains_type(name_str)
+                    || self.lookup_module(name_str).is_some()
+                    || self.is_crate_name(name_str)
+                {
                     return;
                 }
             }
         }
         self.resolve_expression(field_access.object);
+    }
+
+    fn is_crate_name(&mut self, name: &str) -> bool {
+        if let Some(modules) = self.scope_info.scopes.iter_modules(self.current.module) {
+            for (_, entry) in modules {
+                if entry.crate_name.as_deref() == Some(name) {
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     fn resolve_contructor(&mut self, constructor: &Constructor) {
