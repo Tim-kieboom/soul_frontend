@@ -31,7 +31,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let lvalue = self.parse_expression_id(&ASSIGNMENT_TOKENS)?;
         if self.current_is_any(STAMENT_END_TOKENS) {
             return Ok(Statement::from_expression(
-                self.store,
+                &self.forest.store,
                 lvalue,
                 self.current_is(&SEMI_COLON),
             ));
@@ -55,7 +55,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let rvalue = self.parse_expression_id(STAMENT_END_TOKENS)?;
         let resolved_rvalue =
-            resolve_assign_type(self.store, lvalue, assign, rvalue, assign_token.span);
+            resolve_assign_type(&mut self.forest.store, lvalue, assign, rvalue, assign_token.span);
 
         self.bump();
 

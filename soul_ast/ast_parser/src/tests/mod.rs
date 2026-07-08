@@ -81,7 +81,6 @@ fn parse(source: &str) -> (Module, AstStore, CrateContext) {
     let test_env = &*TEST_ENV;
     let module_id = module_id();
     let stream = to_token_stream(source, module_id).unwrap();
-    let mut store = AstStore::new();
     let mut modules = ModuleStore::new();
     let mut ast = AstTree::new(module_id);
     let crate_store = create_test_crate_store(test_env);
@@ -90,21 +89,20 @@ fn parse(source: &str) -> (Module, AstStore, CrateContext) {
         parent: None,
         source_folder: test_env.base.clone(),
         crate_source_folder: test_env.base.clone(),
-        store: &mut store,
         context: &mut ast.context,
         modules: &mut modules,
-        ast_modules: &mut ast.modules,
-        crate_boundaries: &mut ast.crate_boundaries,
+        forest: &mut ast.crates,
         crate_store: &crate_store,
     };
     parse_module(stream, "test".to_string(), info);
     let module = ast
+        .crates
         .modules
         .as_vecmap_mut()
         .remove(module_id)
         .expect("should have module");
 
-    (module, store, ast.context)
+    (module, ast.crates.store, ast.context)
 }
 
 fn get_statement<'a>(store: &'a AstStore, module: &Module, index: usize) -> &'a Statement {
@@ -1028,47 +1026,10 @@ fn typeof_expression() {
                             type_name,
                             variant_name,
                         },
-                    binding,
                     ..
                 }) => {
                     assert_eq!(type_name.as_str(), "Foo");
                     assert_eq!(variant_name.as_str(), "Bar");
-                    assert!(binding.is_none());
-                }
-                other => panic!("expected TypeOf, got {:?}", other),
-            }
-        }
-        _ => panic!("expected Expression statement"),
-    }
-}
-
-#[test]
-fn typeof_expression_with_binding() {
-    let (module, store, context) = parse("x typeof Foo.Bar(baz)");
-    assert_eq!(
-        context.faults.count_severity(Severity::Error),
-        0,
-        "{:#?}",
-        context.faults.faults
-    );
-
-    let stmt = get_statement(&store, &module, 0);
-    match &stmt.node {
-        StatementKind::Expression { expression, .. } => {
-            let expr = &store.expressions[*expression];
-            match &expr.node {
-                ExpressionKind::TypeOf(TypeOf {
-                    kind:
-                        TypeofKind::Union {
-                            type_name,
-                            variant_name,
-                        },
-                    binding,
-                    ..
-                }) => {
-                    assert_eq!(type_name.as_str(), "Foo");
-                    assert_eq!(variant_name.as_str(), "Bar");
-                    assert_eq!(binding.as_ref().map(|b| b.ident.as_str()), Some("baz"));
                 }
                 other => panic!("expected TypeOf, got {:?}", other),
             }

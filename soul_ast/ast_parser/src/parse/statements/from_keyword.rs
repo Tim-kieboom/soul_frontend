@@ -49,7 +49,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             | KeyWord::Sizeof
             | KeyWord::Match => {
                 let value = self.parse_expression_id(STAMENT_END_TOKENS).try_err()?;
-                Statement::from_expression(self.store, value, self.current_is(&SEMI_COLON))
+                Statement::from_expression(&self.forest.store, value, self.current_is(&SEMI_COLON))
             }
 
             KeyWord::Break | KeyWord::Return | KeyWord::Continue => {
@@ -66,10 +66,11 @@ impl<'a, 'f> Parser<'a, 'f> {
                     _ => unreachable!(),
                 };
 
+                let span = self.span_combine(start_span);
                 let expression =
-                    Expression::new_id(self.store, kind, self.span_combine(start_span));
+                    Expression::new_id(&mut self.forest.store, kind, span);
 
-                Statement::from_expression(self.store, expression, self.current_is(&SEMI_COLON))
+                Statement::from_expression(&self.forest.store, expression, self.current_is(&SEMI_COLON))
             }
 
             KeyWord::Import => return self.parse_import().try_err(),
@@ -82,7 +83,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 let is_public = true;
                 let span = pub_span.combine(start_span);
                 statement
-                    .try_set_is_public(self.store, is_public, span)
+                    .try_set_is_public(&mut self.forest.store, is_public, span)
                     .try_err()?;
 
                 statement
@@ -161,7 +162,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             let spanned =
                 FunctionKind::Signature(Spanned::new(signature, self.span_combine(start_span)));
-            let id = self.store.insert_function(spanned);
+            let id = self.forest.store.insert_function(spanned);
             methods.push(id);
         }
         self.expect(&CURLY_CLOSE)?;

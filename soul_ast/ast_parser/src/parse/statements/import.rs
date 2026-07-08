@@ -186,6 +186,10 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.bump();
         }
 
+        if self.is_non_path_import_symbool() {
+            return Ok((path, lib_name));
+        }
+
         if !self.current_is(&TokenKind::EndFile) {
             self.expect(&TokenKind::EndLine)?;
         }

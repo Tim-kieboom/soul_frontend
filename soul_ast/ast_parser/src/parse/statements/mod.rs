@@ -78,7 +78,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     pub(crate) fn parse_statement_id(&mut self) -> SoulResult<StatementId> {
         let value = self.parse_statement()?;
-        Ok(self.store.insert_statement(value))
+        Ok(self.forest.store.insert_statement(value))
     }
 
     pub(crate) fn parse_statement(&mut self) -> SoulResult<Statement> {
@@ -120,7 +120,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         self.expect(&CURLY_CLOSE)?;
-        Ok(self.store.insert_block(Block {
+        Ok(self.forest.store.insert_block(Block {
             modifier,
             statements,
             span: self.span_combine(start_span),
@@ -196,7 +196,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                         let block = self.parse_block(TypeModifier::Mut)?;
                         let span = self.span_combine(start_span);
                         let semicolon = self.ends_semicolon();
-                        TryOk(Statement::new_block(self.store, block, span, semicolon))
+                        TryOk(Statement::new_block(&mut self.forest.store, block, span, semicolon))
                     }
                 }
             }
@@ -221,7 +221,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         match self.parse_expression_id(STAMENT_END_TOKENS) {
             Ok(val) => {
                 let semicolon = self.ends_semicolon();
-                Ok(Statement::from_expression(self.store, val, semicolon))
+                Ok(Statement::from_expression(&self.forest.store, val, semicolon))
             }
             Err(err) => {
                 self.goto(begin_position);
@@ -296,7 +296,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.current.this_type = this;
         result
             .map(|spanned| {
-                spanned.map(|func| self.store.insert_function(FunctionKind::Normal(func)))
+                spanned.map(|func| self.forest.store.insert_function(FunctionKind::Normal(func)))
             })
             .map(Statement::from_function)
     }

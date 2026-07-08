@@ -325,7 +325,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     pub(crate) fn alloc_node(&mut self) -> NodeId {
-        self.store.alloc_node()
+        self.forest.store.alloc_node()
     }
 
     pub(crate) fn log_fault(&mut self, fault: Fault) {

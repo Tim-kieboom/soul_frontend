@@ -55,8 +55,8 @@ impl<'a, 'f> Parser<'a, 'f> {
                 .try_parse_function_call(span, None, &ident)
                 .merge_to_result()
                 .map(|expression| {
-                    let id = self.store.insert_expression(expression);
-                    Statement::from_expression(self.store, id, self.current_is(&SEMI_COLON))
+                    let id = self.forest.store.insert_expression(expression);
+                    Statement::from_expression(&self.forest.store, id, self.current_is(&SEMI_COLON))
                 }),
         }
     }
@@ -153,7 +153,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     ) -> FuncResult<Spanned<FunctionId>> {
         self.try_parse_function_declaration(start_span, modifier, methode_type, name)
             .map(|spanned| {
-                spanned.map(|function| self.store.insert_function(FunctionKind::Normal(function)))
+                spanned.map(|function| self.forest.store.insert_function(FunctionKind::Normal(function)))
             })
     }
 
@@ -227,6 +227,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             Ok(signature) => {
                 let span = signature.span;
                 let id = self
+                    .forest
                     .store
                     .insert_function(FunctionKind::Signature(signature));
                 Ok(Statement::from_external_function(Spanned::new(id, span)))
@@ -365,7 +366,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 self.expect(&ROUND_CLOSE)?;
                 let block = self.parse_block(TypeModifier::Mut)?;
 
-                let id = self.store.alloc_function();
+                let id = self.forest.store.alloc_function();
                 let function = Function {
                     signature: Spanned::new(
                         FunctionSignature {
@@ -447,7 +448,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             return_type,
             function_kind,
             is_public: false,
-            id: self.store.alloc_function(),
+            id: self.forest.store.alloc_function(),
             method_type: method_type.clone(),
         };
 

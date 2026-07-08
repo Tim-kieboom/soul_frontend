@@ -122,7 +122,6 @@ pub struct StringFormat {
 pub struct TypeOf {
     pub value: ExpressionId,
     pub kind: TypeofKind,
-    pub binding: Option<Binding>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

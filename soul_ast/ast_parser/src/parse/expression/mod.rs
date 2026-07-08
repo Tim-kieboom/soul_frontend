@@ -1,5 +1,5 @@
 use ast_model::{
-    expression::{Binding, Expression, ExpressionId, ExpressionKind, TypeOf, TypeofKind},
+    expression::{Expression, ExpressionId, ExpressionKind, TypeOf, TypeofKind},
     operators::{BinaryOperator, BinaryOperatorKind, UnaryOperator, UnaryOperatorKind},
 };
 use soul_tokenizer::model::{Token, TokenKind, keyword::KeyWord};
@@ -31,7 +31,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         end_tokens: &[TokenKind],
     ) -> SoulResult<ExpressionId> {
         let value = self.pratt_parse_expression(Precedence::MIN, end_tokens, None)?;
-        Ok(self.store.insert_expression(value))
+        Ok(self.forest.store.insert_expression(value))
     }
 
     pub(crate) fn parse_expression(&mut self, end_tokens: &[TokenKind]) -> SoulResult<Expression> {
@@ -132,17 +132,16 @@ impl<'a, 'f> Parser<'a, 'f> {
                     let span = self.span_combine(start_span);
                     left = Expression::new_binary(
                         self.alloc_node(),
-                        self.store.insert_expression(left),
+                        self.forest.store.insert_expression(left),
                         operator,
-                        self.store.insert_expression(right),
+                        self.forest.store.insert_expression(right),
                         span,
                     );
                 }
-                ExpressionOperator::TypeOf { kind, binding } => {
+                ExpressionOperator::TypeOf(kind) => {
                     let typeof_ = TypeOf {
                         kind,
-                        binding,
-                        value: self.store.insert_expression(left),
+                        value: self.forest.store.insert_expression(left),
                     };
                     left = Expression::new(
                         ExpressionKind::TypeOf(typeof_),
@@ -209,7 +208,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         prefix_operators: Vec<(Span, UnaryKinds)>,
     ) -> Expression {
         for (span, unary) in prefix_operators.into_iter().rev() {
-            let id = self.store.insert_expression(left);
+            let id = self.forest.store.insert_expression(left);
             left = match unary {
                 UnaryKinds::UnaryOperator(unary) => {
                     Expression::new_unary(self.alloc_node(), unary, id, span)
@@ -225,7 +224,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     fn parse_sizeof(&mut self, left_id: ExpressionId) -> SoulResult<Expression> {
-        let span = self.store.expressions[left_id].span;
+        let span = self.forest.store.expressions[left_id].span;
         Ok(Expression::new(
             ExpressionKind::Sizeof(left_id),
             self.span_combine(span),
@@ -361,25 +360,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
         };
 
-        let binding = if self.current_is(&TokenKind::Symbol(Symbol::RoundOpen)) {
-            self.bump();
-            let name = self.try_bump_consume_ident()?;
-            self.expect(&TokenKind::Symbol(Symbol::RoundClose))?;
-            Some(Binding::new(self.alloc_node(), name))
-        } else {
-            None
-        };
-
-        if matches!(kind, TypeofKind::Null) && binding.is_some() {
-            let span = binding.map(|b| b.ident.span()).unwrap_or(self.token().span);
-
-            return Err(Fault::error(
-                format!("`{}` can not have binding", KeyWord::Null.as_str()),
-                Some(span),
-            ));
-        }
-
-        Ok(ExpressionOperator::TypeOf { kind, binding })
+        Ok(ExpressionOperator::TypeOf(kind))
     }
 
     fn parse_new_ptr(&mut self, start_span: Span) -> SoulResult<Expression> {
@@ -480,13 +461,10 @@ enum UnaryKinds {
 
 enum ExpressionOperator {
     Binary(BinaryOperator),
+    TypeOf(TypeofKind),
     Access {
         ty: AccessType,
         optional_map: bool,
-    },
-    TypeOf {
-        kind: TypeofKind,
-        binding: Option<Binding>,
     },
 }
 

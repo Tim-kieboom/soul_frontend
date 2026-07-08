@@ -84,9 +84,10 @@ impl<'a, 'f> Parser<'a, 'f> {
                 self.parse_expression_id(&[CURLY_CLOSE, TokenKind::EndLine, TokenKind::EndFile])?;
             self.expect(&CURLY_CLOSE)?;
             let statement = self
+                .forest
                 .store
-                .insert_statement(Statement::from_expression(self.store, expression, false));
-            let block = self.store.insert_block(Block {
+                .insert_statement(Statement::from_expression(&self.forest.store, expression, false));
+            let block = self.forest.store.insert_block(Block {
                 modifier: TypeModifier::Mut,
                 statements: vec![statement],
                 span: self.span_combine(start_span),
@@ -134,7 +135,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             } else {
                 let span = self.token().span;
                 let statement = self.parse_statement_id()?;
-                self.store.insert_block(Block {
+                self.forest.store.insert_block(Block {
                     span,
                     modifier: TypeModifier::Mut,
                     statements: vec![statement],
@@ -361,7 +362,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                     let bind_name = bind_name.clone();
                     self.bump();
                     let ident = Ident::new(bind_name, bind_span);
-                    Some(Binding::new(self.store.alloc_node(), ident))
+                    Some(Binding::new(self.forest.store.alloc_node(), ident))
                 } else {
                     None
                 };
@@ -381,7 +382,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let bind_span = self.token().span;
         self.bump();
         Ok(MatchPattern::Binding(Binding {
-            id: self.store.alloc_node(),
+            id: self.forest.store.alloc_node(),
             ident: Ident::new(ident_name, bind_span),
         }))
     }

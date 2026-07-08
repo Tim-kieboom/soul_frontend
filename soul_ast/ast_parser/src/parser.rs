@@ -1,5 +1,5 @@
 use ast_model::{
-    AstModuleStore, AstStore, CrateBoundary, Module,
+    AstModuleStore, CrateForest, Module,
     block::{Block, BlockId},
     soul_type::SoulType,
 };
@@ -49,12 +49,10 @@ pub(crate) struct Parser<'a, 'f> {
     pub(crate) current: Current,
     pub(crate) source_path: PathBuf,
     pub(crate) tokens: TokenStream<'a>,
-    pub(crate) store: &'f mut AstStore,
     pub(crate) crate_source_path: PathBuf,
     pub(crate) modules: &'f mut ModuleStore,
     pub(crate) context: &'f mut CrateContext,
-    pub(crate) ast_modules: &'f mut AstModuleStore,
-    pub(crate) crate_boundaries: &'f mut HashMap<ModuleId, CrateBoundary>,
+    pub(crate) forest: &'f mut CrateForest,
     pub(crate) crate_store: &'f CrateStore,
 }
 impl<'a, 'f> Parser<'a, 'f> {
@@ -70,7 +68,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             global: BlockId::error(),
             header: HashMap::default(),
         };
-        info.ast_modules.insert(id, module);
+        info.forest.modules_mut().insert(id, module);
 
         let mut this = Self::new(tokens, info);
 
@@ -81,16 +79,24 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         let statements = this.parse_global_statements();
-        let global = this.store.insert_block(Block {
+        let global = this.forest.store.insert_block(Block {
             statements,
             span: this.token().span,
             modifier: TypeModifier::Mut,
         });
 
-        match this.ast_modules.get_mut(id) {
+        match this.forest.modules_mut().get_mut(id) {
             Some(module) => module.global = global,
             None => this.log_fault(soul_error_internal!(format!("{id:?} not found"), None)),
         }
+    }
+
+    pub(crate) fn modules_mut(&mut self) -> &mut AstModuleStore {
+        self.forest.modules_mut()
+    }
+
+    pub(crate) fn modules(&self) -> &AstModuleStore {
+        self.forest.modules()
     }
 
     #[cfg(not(debug_assertions))]
@@ -98,11 +104,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         Self {
             tokens,
             id: info.id,
-            store: info.store,
             context: info.context,
             modules: info.modules,
-            ast_modules: info.ast_modules,
-            crate_boundaries: info.crate_boundaries,
+            forest: info.forest,
             source_path: info.source_folder,
             crate_source_path: info.crate_source_folder,
             crate_store: info.crate_store,
@@ -124,11 +128,9 @@ impl<'a, 'f> Parser<'a, 'f> {
             debug,
             tokens,
             id: info.id,
-            store: info.store,
             context: info.context,
             modules: info.modules,
-            ast_modules: info.ast_modules,
-            crate_boundaries: info.crate_boundaries,
+            forest: info.forest,
             source_path: info.source_folder,
             crate_source_path: info.crate_source_folder,
             crate_store: info.crate_store,

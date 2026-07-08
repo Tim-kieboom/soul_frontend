@@ -36,7 +36,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let mut value = Expression::error();
         swap(left, &mut value);
 
-        let collection = self.store.insert_expression(value);
+        let collection = self.forest.store.insert_expression(value);
         *left = Expression::new_index(
             self.alloc_node(),
             collection,
@@ -65,7 +65,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 let mut value = Expression::error();
                 swap(left, &mut value);
 
-                let id = self.store.insert_expression(value);
+                let id = self.forest.store.insert_expression(value);
                 *left = Expression::new(ExpressionKind::Pass(id), self.span_combine(start_span));
 
                 return Ok(());
@@ -75,7 +75,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 let mut value = Expression::error();
                 swap(left, &mut value);
 
-                let id = self.store.insert_expression(value);
+                let id = self.forest.store.insert_expression(value);
                 *left = Expression::new(ExpressionKind::Sizeof(id), self.span_combine(start_span));
 
                 return Ok(());
@@ -85,7 +85,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 let mut value = Expression::error();
                 swap(left, &mut value);
 
-                let id = self.store.insert_expression(value);
+                let id = self.forest.store.insert_expression(value);
                 *left = Expression::new(ExpressionKind::Copy(id), self.span_combine(start_span));
 
                 return Ok(());
@@ -100,10 +100,10 @@ impl<'a, 'f> Parser<'a, 'f> {
                     self.bump();
                 }
 
-                let value = self.store.insert_expression(expression);
+                let value = self.forest.store.insert_expression(expression);
                 *left = Expression::new(
                     ExpressionKind::Ref(Ref {
-                        id: self.store.alloc_node(),
+                        id: self.forest.store.alloc_node(),
                         is_mutable,
                         value,
                     }),
@@ -122,10 +122,10 @@ impl<'a, 'f> Parser<'a, 'f> {
                     self.bump();
                 }
 
-                let value = self.store.insert_expression(expression);
+                let value = self.forest.store.insert_expression(expression);
                 *left = Expression::new(
                     ExpressionKind::Deref(Deref {
-                        id: self.store.alloc_node(),
+                        id: self.forest.store.alloc_node(),
                         value,
                     }),
                     self.span_combine(start_span),
@@ -188,7 +188,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let mut value = Expression::error();
         swap(left, &mut value);
 
-        let value = self.store.insert_expression(value);
+        let value = self.forest.store.insert_expression(value);
         let callee = FunctionCallee {
             kind: FunctionCalleeKind::Expression(value),
             optional_map,
@@ -253,7 +253,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             let method = MatchMethod {
                 optional_map,
-                scrutinee: self.store.insert_expression(value),
+                scrutinee: self.forest.store.insert_expression(value),
                 arms: vec![MatchMethodArm {
                     variant: ident,
                     binding,
@@ -279,7 +279,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             Some(KeyWord::Sizeof) => self.parse_sizeof(left),
             _ => Ok(Expression::new_field(
                 self.alloc_node(),
-                self.store,
+                &self.forest.store,
                 left,
                 ident,
                 optional_map,

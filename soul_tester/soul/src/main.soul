@@ -1,10 +1,12 @@
 import (
     crate.test
-    example_std
+    example_std.math.{this, add}
 )
 
 pub sum(a: int, mut b: int): int {
-    a + b
+    _ := add(a, b)
+    math.add(a, b)
+    1 + b
 }
 
 main() {

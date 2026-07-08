@@ -25,14 +25,14 @@ pub fn name_resolve(module_store: &mut ModuleStore, ast: &mut AstTree, crate_sto
 
 struct NameResolver<'a> {
     store: &'a AstStore,
+    crate_store: &'a CrateStore,
     modules: &'a mut ModuleStore,
     context: &'a mut CrateContext,
     scope_info: &'a mut ScopeInfo,
+    declares: &'a mut DeclareStore,
     ast_modules: &'a mut AstModuleStore,
-    crate_store: &'a CrateStore,
 
     current: Current,
-    declares: DeclareStore,
     scope_ids: VecMap<BlockId, ScopeId>,
     node_generator: IdGenerator<NodeId>,
 }
@@ -52,10 +52,10 @@ impl<'a> NameResolver<'a> {
     ) -> Self {
         Self {
             modules,
-            store: &ast.store,
+            store: &ast.crates.store,
             context: &mut ast.context,
-            ast_modules: &mut ast.modules,
-            declares: DeclareStore::new(),
+            declares: &mut ast.declares,
+            ast_modules: &mut ast.crates.modules,
             scope_info: &mut ast.scope_info,
             crate_store,
             current: Current {
@@ -64,7 +64,7 @@ impl<'a> NameResolver<'a> {
                 function: None,
             },
             scope_ids: VecMap::new(),
-            node_generator: ast.store.clone_node_generator(),
+            node_generator: ast.crates.store.clone_node_generator(),
         }
     }
 

@@ -24,11 +24,11 @@ impl<'a, 'f> Parser<'a, 'f> {
                 other => vec![other],
             };
 
-            let statement = self.store.insert_statement(
-                Statement::from_expression(self.store, body_expression, false)
+            let statement = self.forest.store.insert_statement(
+                Statement::from_expression(&self.forest.store, body_expression, false)
             );
 
-            let body = self.store.insert_block(Block {
+            let body = self.forest.store.insert_block(Block {
                 statements: vec![statement],
                 modifier: TypeModifier::Mut,
                 span: self.span_combine(start_span),

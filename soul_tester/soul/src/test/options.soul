@@ -1,4 +1,6 @@
-import .doubleInner
+import (
+    .doubleInner
+)
 
 options() {
     option: ?int = null
@@ -12,9 +14,7 @@ options() {
         null => 1
         !null(val) => val
     }
-    num3 := if option typeof !null(val) {
-        val
-    } else {
-        1
-    }
+    
+    isNull := option typeof null
+    isNotNull := option typeof !null
 }

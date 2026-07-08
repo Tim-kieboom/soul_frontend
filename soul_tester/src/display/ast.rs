@@ -71,15 +71,17 @@ fn inner_display_ast(tree: &AstTree) -> Result<()> {
     output_path.pop();
     output_path.push("json");
 
-    let modules = vecmap_to_json_str(tree.modules.as_vecmap())?;
+    let modules = vecmap_to_json_str(tree.crates.modules.as_vecmap())?;
+    let externals = serde_json::to_string_pretty(&tree.crates.external)?;
     let scope_info = vecmap_to_json_str(&tree.scope_info.scopes.as_vecmap())?;
 
-    let blocks = vecmap_to_json_str(&tree.store.blocks)?;
-    let functions = vecmap_to_json_str(&tree.store.functions)?;
-    let statements = vecmap_to_json_str(&tree.store.statements)?;
-    let expressions = vecmap_to_json_str(&tree.store.expressions)?;
+    let blocks = vecmap_to_json_str(&tree.crates.store.blocks)?;
+    let functions = vecmap_to_json_str(&tree.crates.store.functions)?;
+    let statements = vecmap_to_json_str(&tree.crates.store.statements)?;
+    let expressions = vecmap_to_json_str(&tree.crates.store.expressions)?;
 
     write_to_file(&output_path.join("modules.json"), &modules)?;
+    write_to_file(&output_path.join("externals.json"), &externals)?;
     write_to_file(&output_path.join("scope_info.json"), &scope_info)?;
 
     output_path.push("store");
@@ -102,7 +104,7 @@ where
 }
 
 fn display_ast_tree<'a>(ast: &AstTree, root_dir: &Path, writer: &mut impl Writer) -> Result<()> {
-    let mut displayer = Displayer::new(ast, root_dir, &ast.store, writer);
+    let mut displayer = Displayer::new(ast, root_dir, &ast.crates.store, writer);
     displayer.write_module(ast.root)?;
     writer.writer_flush()
 }
@@ -120,9 +122,9 @@ impl<'a, W: Writer> Displayer<'a, W> {
     }
 
     fn write_module(&mut self, id: ModuleId) -> Result<()> {
-        let module = self.ast.modules.as_vecmap().get_err(id)?;
+        let module = self.ast.crates.modules.as_vecmap().get_err(id)?;
         if self.add_tags {
-            self.write_fmt(format_args!("// {id:?}\n"))?;
+            self.write_fmt(format_args!("// {id:?}\n"), )?;
         }
 
         self.write_depth()?;
@@ -224,6 +226,22 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 self.write_expression_tag(assignment.left)?;
                 self.write_str(" = ")?;
                 self.write_expression_tag(assignment.right)?
+            }
+            StatementKind::Expression { expression, .. } => {
+                let value = self.store.expressions.get_err(*expression)?;
+                match &value.node {
+                    ExpressionKind::FunctionCall(function_call) => if let Some(resolved) = self.ast.declares.get_call_resolve(function_call.id) {
+                        self.write_fmt(format_args!(" resolved = {resolved:?}"))?
+                    } else {
+                        self.write_str(" resolved = null")?
+                    }
+                    ExpressionKind::Variable(variable) => if let Some(resolved) = self.ast.declares.get_variable_resolve(variable.id) {
+                        self.write_fmt(format_args!(" resolved = {resolved:?}"))?
+                    } else {
+                        self.write_str(" resolved = null")?
+                    }
+                    _ => (),
+                }
             }
             _ => (),
         }
@@ -467,7 +485,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
     fn write_import(&mut self, import: &Import) -> Result<()> {
         self.write_fmt(format_args!("{IMPORT_STR} (\n"))?;
         self.push_depth();
-        for path in &import.paths {
+        for path in import.paths.iter() {
             self.write_depth()?;
             self.write_str(&path.module.display(self.root_dir))?;
             match &path.kind {
@@ -487,6 +505,10 @@ impl<'a, W: Writer> Displayer<'a, W> {
                         self.write_str("this")?;
                         if let Some(alias) = &this_alias {
                             self.write_fmt(format_args!(" as {}", alias.as_str()))?;
+                        }
+
+                        if !items.is_empty() {
+                            self.write_str(", ")?;
                         }
                     }
 
@@ -882,9 +904,6 @@ impl<'a, W: Writer> Displayer<'a, W> {
                         variant_name.as_str(),
                     ))?,
                 };
-                if let Some(binding) = &type_of.binding {
-                    self.write_fmt(format_args!("({})", binding.ident.as_str()))?;
-                }
                 Ok(())
             }
             ExpressionKind::Lambda(lambda) => self.write_lambda(lambda),

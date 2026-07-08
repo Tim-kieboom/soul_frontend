@@ -47,7 +47,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 | StatementKind::TypeDef(_)
                 | StatementKind::Function(_)
                 | StatementKind::ExternalFunction(_) => {
-                    let id = self.store.insert_statement(statement);
+                    let id = self.forest.store.insert_statement(statement);
                     statements.push(id)
                 }
 

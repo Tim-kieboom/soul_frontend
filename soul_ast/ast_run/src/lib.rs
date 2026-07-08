@@ -34,16 +34,14 @@ pub fn to_ast<'a, 'f>(
 
     let name = ENTRY_MOD_NAME.to_string();
     let info = ParseInfo {
+        id: root,
+        crate_store,
         parent: None,
+        modules: module_store,
+        context: &mut ast.context,
+        forest: &mut ast.crates,
         source_folder: source_folder.clone(),
         crate_source_folder: source_folder.clone(),
-        store: &mut ast.store,
-        context: &mut ast.context,
-        id: module_store.get_root_id(),
-        modules: module_store,
-        ast_modules: &mut ast.modules,
-        crate_boundaries: &mut ast.crate_boundaries,
-        crate_store,
     };
 
     let time = Instant::now();

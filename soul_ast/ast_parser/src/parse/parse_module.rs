@@ -1,13 +1,11 @@
 use std::path::{Path, PathBuf};
 
 use ast_model::{
-    CrateBoundary, Module,
-    block::Block,
+    ExternalCrateData,
     statements::ImportPath,
 };
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
-    TypeModifier,
     collections::vec_set::VecSet,
     fault::Fault,
     ids::IdAlloc,
@@ -79,63 +77,34 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
         };
 
-        let boundary_id = self.get_or_create_crate_boundary(&lib_name, crate_entry);
+        let root_id = self.modules.get_or_insert(&module_file_path);
+        if !self.forest.external.contains_key(&lib_name) {
+            self.forest.external.insert(
+                lib_name.clone(),
+                ExternalCrateData {
+                    module_ids: VecSet::new(),
+                    root_id,
+                    linkage: crate_entry.linkage,
+                    source_root: crate_entry.source_root.clone(),
+                },
+            );
+        }
+
+        if let Some(data) = self.forest.external.get_mut(&lib_name) {
+            data.module_ids.insert(root_id);
+        }
+
         let old_crate_source = self.crate_source_path.clone();
         self.crate_source_path = crate_entry.source_root.clone();
 
         self.insure_parents_are_loaded(
             &module_file_path,
-            boundary_id,
+            self.get_crate_root(),
             &crate_entry.source_root,
             span,
         );
 
         self.crate_source_path = old_crate_source;
-    }
-
-    fn get_or_create_crate_boundary(
-        &mut self,
-        name: &str,
-        entry: &soul_utils::collections::crate_store::CrateEntry,
-    ) -> ModuleId {
-        for (id, boundary) in self.crate_boundaries.iter() {
-            if boundary.name == name {
-                return *id;
-            }
-        }
-
-        let id = self.modules.alloc();
-        let global = self.store.insert_block(Block {
-            statements: vec![],
-            span: Span::error(),
-            modifier: TypeModifier::Mut,
-        });
-
-        let crate_root = self.get_crate_root();
-        let module = Module {
-            id,
-            name: name.to_string(),
-            parent: Some(crate_root),
-            modules: VecSet::new(),
-            global,
-            header: std::collections::HashMap::default(),
-        };
-        self.ast_modules.insert(id, module);
-
-        if let Some(parent_module) = self.ast_modules.get_mut(crate_root) {
-            parent_module.modules.insert(id);
-        }
-
-        self.crate_boundaries.insert(
-            id,
-            CrateBoundary {
-                name: name.to_string(),
-                source_root: entry.source_root.clone(),
-                linkage: entry.linkage,
-            },
-        );
-
-        id
     }
 
     fn get_directory_owner(&self, dir: &Path) -> ModuleId {
@@ -149,10 +118,12 @@ impl<'a, 'f> Parser<'a, 'f> {
     fn get_crate_root(&self) -> ModuleId {
         let mut current = self.id;
         loop {
-            if self.crate_boundaries.contains_key(&current) {
-                return current;
+            for data in self.forest.external.values() {
+                if data.root_id == current {
+                    return current;
+                }
             }
-            let Some(module) = self.ast_modules.get(current) else {
+            let Some(module) = self.modules().get(current) else {
                 return current;
             };
             match module.parent {
@@ -170,7 +141,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         span: Span,
     ) -> ModuleId {
         let module_id = self.modules.get_or_insert(module_file_path);
-        if self.ast_modules.get(module_id).is_some() {
+        if self.modules().get(module_id).is_some() {
             return module_id;
         }
 
@@ -212,19 +183,17 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let info = ParseInfo {
             id: module_id,
-            store: self.store,
             source_folder: path,
             parent: Some(parent),
             context: self.context,
             modules: self.modules,
-            ast_modules: self.ast_modules,
-            crate_boundaries: self.crate_boundaries,
+            forest: self.forest,
             crate_source_folder: self.crate_source_path.clone(),
             crate_store: self.crate_store,
         };
 
         Parser::parse(tokens, name, info);
-        if let Some(module) = self.ast_modules.get_mut(parent) {
+        if let Some(module) = self.modules_mut().get_mut(parent) {
             module.modules.insert(module_id);
         }
     }
@@ -348,7 +317,6 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
     }
 }
-
 fn to_crate_name(path: &PathBuf) -> PathBuf {
     path
         .components()

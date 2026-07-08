@@ -1,9 +1,7 @@
 use std::path::PathBuf;
 
 use ast_model::{
-    EntryKind, NodeId,
-    scope::ScopeModuleEntry,
-    statements::{ImportItem, ImportKind, ImportPath},
+    EntryKind, HeaderEntry, NodeId, scope::ScopeModuleEntry, statements::{ImportItem, ImportKind, ImportPath},
 };
 use soul_utils::{
     FunctionId, Ident, fault::Fault, ids::IdAlloc, soul_error_internal, span::{ModuleId, Span},
@@ -57,6 +55,10 @@ impl<'a> NameResolver<'a> {
 
         for imported_item in imported_items {
             self.collect_items(module_id, module_name, imported_item, span)
+        }
+
+        if matches!(&path.kind, ImportKind::Module) {
+            self.re_export_module_items(module_id);
         }
     }
 
@@ -238,6 +240,53 @@ impl<'a> NameResolver<'a> {
                 format!("function '{}' already exists", alias_name.as_str()),
                 Some(alias_name.span()),
             ));
+        }
+    }
+
+    fn re_export_module_items(&mut self, module_id: ModuleId) {
+        
+        fn is_entry_public(entry: &HeaderEntry) -> bool {
+            let var_public = entry.variable.map(|var| var.is_public).unwrap_or(false);
+            let func_public = entry.function.map(|func| func.is_public).unwrap_or(false);
+            let ty_public = entry.custom_type.as_ref().map(|ty| ty.is_public).unwrap_or(false);
+            func_public || ty_public  || var_public
+        }
+        
+        let mut to_re_export: Vec<(String, ast_model::HeaderEntry)> = vec![];
+        let target = match self.ast_modules.get(module_id) {
+            Some(module) => &module.header,
+            None => return,
+        };
+
+        for (name, entry) in target.iter() {
+            
+            if is_entry_public(entry) {
+                to_re_export.push((name.clone(), entry.clone()));
+            }
+        }
+
+        let current = match self.ast_modules.get_mut(self.current.module) {
+            Some(module) => &mut module.header,
+            None => return,
+        };
+
+        for (name, entry) in to_re_export {
+            let h = current.entry(name).or_default();
+            if let Some(func) = entry.function {
+                if func.is_public {
+                    h.function.get_or_insert(func);
+                }
+            }
+            if let Some(var) = entry.variable {
+                if var.is_public {
+                    h.variable.get_or_insert(var);
+                }
+            }
+            if let Some(ty) = entry.custom_type {
+                if ty.is_public {
+                    h.custom_type.get_or_insert(ty);
+                }
+            }
         }
     }
 }

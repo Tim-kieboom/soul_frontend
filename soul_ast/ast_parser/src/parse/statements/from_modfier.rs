@@ -159,11 +159,13 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         self.goto(saved);
         let block = self.parse_block(modifier).try_err()?;
+        let span = self.span_combine(start_span);
+        let semicolon = self.current_is(&SEMI_COLON);
         TryOk(Statement::new_block(
-            self.store,
+            &mut self.forest.store,
             block,
-            self.span_combine(start_span),
-            self.current_is(&SEMI_COLON),
+            span,
+            semicolon,
         ))
     }
 

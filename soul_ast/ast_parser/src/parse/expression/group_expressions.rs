@@ -108,7 +108,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             let ident = self.try_bump_consume_ident()?;
             let value = if self.current_is(&COMMA) || self.current_is(&CURLY_CLOSE) {
                 let id = self.alloc_node();
-                self.store
+                self.forest.store
                     .insert_expression(Expression::new_variable(id, ident.clone()))
             } else {
                 self.expect(&COLON)?;

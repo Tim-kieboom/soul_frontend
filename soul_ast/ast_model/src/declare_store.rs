@@ -60,6 +60,14 @@ impl DeclareStore {
         self.functions.get(index)
     }
 
+    pub fn get_call_resolve(&self, id: NodeId) -> Option<&FunctionResolve> {
+        self.function_resolves.get(id)
+    }
+
+    pub fn get_variable_resolve(&self, id: NodeId) -> Option<NodeId> {
+        self.variable_resolves.get(id).copied()
+    }
+
     /// Finds a function by name and optional owner type (for method resolution).
     pub fn find_function(&self, name: &str, owner_type: Option<&SoulType>) -> Option<FunctionId> {
         self.find_function_with_module(name, owner_type)
@@ -98,10 +106,6 @@ impl DeclareStore {
 
     pub fn insert_variable_resolve(&mut self, node_id: NodeId, resolved: NodeId) -> Option<NodeId> {
         self.variable_resolves.insert(node_id, resolved)
-    }
-
-    pub fn get_variable_resolve(&self, node_id: NodeId) -> Option<NodeId> {
-        self.variable_resolves.get(node_id).copied()
     }
 
     pub fn insert_function_resolve(

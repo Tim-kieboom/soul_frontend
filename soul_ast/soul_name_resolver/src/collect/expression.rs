@@ -7,19 +7,16 @@ use ast_model::{
         StringFormat, StructConstructor, TypeOf, VariableExpression,
     },
 };
-use soul_tokenizer::model::keyword::KeyWord;
-use soul_utils::{fault::Fault, span::Span};
+use soul_utils::span::Span;
 
 use crate::NameResolver;
 
 impl<'a> NameResolver<'a> {
     pub(super) fn collect_expression(&mut self, expression_id: ExpressionId) {
-        const IS_NOT_CONDITION: bool = true;
-
-        self.inner_collect_expression(expression_id, IS_NOT_CONDITION);
+        self.inner_collect_expression(expression_id);
     }
 
-    fn inner_collect_expression(&mut self, expression_id: ExpressionId, is_codition: bool) {
+    fn inner_collect_expression(&mut self, expression_id: ExpressionId) {
         let Some(expression) = self.store.expressions.get(expression_id) else {
             return;
         };
@@ -70,7 +67,7 @@ impl<'a> NameResolver<'a> {
                 self.collect_expression(binary.right);
             }
             ExpressionKind::Block(block_id) => self.collect_block(*block_id),
-            ExpressionKind::TypeOf(type_of) => self.collect_typeof(type_of, is_codition),
+            ExpressionKind::TypeOf(type_of) => self.collect_typeof(type_of),
             ExpressionKind::Array(any_array) => self.collect_any_array(any_array),
             ExpressionKind::NewArray(any_array) => self.collect_any_array(any_array),
             ExpressionKind::Constructor(constructor) => self.collect_constructor(constructor),
@@ -209,24 +206,8 @@ impl<'a> NameResolver<'a> {
         }
     }
 
-    fn collect_typeof(&mut self, type_of: &TypeOf, in_if_codition: bool) {
+    fn collect_typeof(&mut self, type_of: &TypeOf) {
         self.collect_expression(type_of.value);
-        let Some(binding) = &type_of.binding else {
-            return;
-        };
-
-        if !in_if_codition {
-            self.log_fault(Fault::error(
-                format!(
-                    "`{}` with binding can only be used as an if condition",
-                    KeyWord::Typeof.as_str()
-                ),
-                Some(binding.ident.span()),
-            ));
-            return;
-        }
-
-        self.insert_binding(binding);
     }
 
     fn collect_match(&mut self, match_: &Match) {
@@ -312,10 +293,9 @@ impl<'a> NameResolver<'a> {
     }
 
     fn collect_if(&mut self, if_: &If) {
-        const IN_IF_CODITION: bool = true;
 
         self.push_scope(if_.block);
-        self.inner_collect_expression(if_.condition, IN_IF_CODITION);
+        self.inner_collect_expression(if_.condition);
         self.collect_scopeless_block(if_.block);
         self.pop_scope();
 
@@ -324,7 +304,7 @@ impl<'a> NameResolver<'a> {
             match branch.as_ref() {
                 IfBranch::If(elif) => {
                     self.push_scope(elif.block);
-                    self.inner_collect_expression(elif.condition, IN_IF_CODITION);
+                    self.inner_collect_expression(elif.condition);
                     self.collect_scopeless_block(elif.block);
                     self.pop_scope();
                     current = elif.branch.as_ref();

@@ -5,6 +5,7 @@ use crate::{fault::FaultCollector, span::Span};
 pub mod char_colors;
 pub mod collections;
 pub mod compiler_options;
+pub mod crate_id;
 pub mod error;
 pub mod fault;
 pub mod ids;

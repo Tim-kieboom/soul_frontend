@@ -1,6 +1,6 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 
-use ast_model::{AstModuleStore, AstStore, CrateBoundary};
+use ast_model::{CrateForest};
 use soul_tokenizer::TokenStream;
 use soul_utils::{
     CrateContext,
@@ -23,11 +23,9 @@ pub struct ParseInfo<'f> {
     pub parent: Option<ModuleId>,
     pub crate_source_folder: PathBuf,
 
-    pub store: &'f mut AstStore,
     pub modules: &'f mut ModuleStore,
     pub context: &'f mut CrateContext,
-    pub ast_modules: &'f mut AstModuleStore,
-    pub crate_boundaries: &'f mut HashMap<ModuleId, CrateBoundary>,
+    pub forest: &'f mut CrateForest,
     pub crate_store: &'f CrateStore,
 }
 

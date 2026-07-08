@@ -4,8 +4,7 @@ use crate::{
         block::{Block, BlockId},
         expression::{Expression, ExpressionId},
         statements::{Enum, Function, FunctionSignature, Statement, StatementId, Struct, Trait},
-    },
-    scope::ScopeBuilder,
+    }, declare_store::DeclareStore, scope::ScopeBuilder,
 };
 use soul_utils::{
     CrateContext, FunctionId, Ident,
@@ -24,21 +23,31 @@ mod ast;
 pub mod declare_store;
 pub mod scope;
 
+/// Per-crate metadata. module_ids tracks which ModuleIds belong to this crate.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct CrateBoundary {
-    pub name: String,
-    pub source_root: PathBuf,
+pub struct ExternalCrateData {
+    pub module_ids: VecSet<ModuleId>,
+    pub root_id: ModuleId,
     pub linkage: Linkage,
+    pub source_root: PathBuf,
+}
+
+/// Holds all crate module trees. All modules live in `modules` (flat store).
+/// `external` tracks per-crate metadata for codegen separation.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CrateForest {
+    pub store: AstStore,
+    pub modules: AstModuleStore,
+    pub external: HashMap<String, ExternalCrateData>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AstTree {
     pub root: ModuleId,
-    pub store: AstStore,
     pub context: CrateContext,
-    pub modules: AstModuleStore,
     pub scope_info: ScopeInfo,
-    pub crate_boundaries: HashMap<ModuleId, CrateBoundary>,
+    pub declares: DeclareStore,
+    pub crates: CrateForest,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -151,11 +160,10 @@ impl AstTree {
     pub fn new(root: ModuleId) -> Self {
         Self {
             root,
-            store: AstStore::new(),
             scope_info: ScopeInfo::new(),
+            declares: DeclareStore::new(),
             context: CrateContext::default(),
-            modules: AstModuleStore::default(),
-            crate_boundaries: HashMap::new(),
+            crates: CrateForest::new(),
         }
     }
 
@@ -165,6 +173,24 @@ impl AstTree {
 
     pub fn log_fault(&mut self, fault: Fault) {
         self.context.faults.push(fault);
+    }
+}
+
+impl CrateForest {
+    pub fn new() -> Self {
+        Self {
+            store: AstStore::new(),
+            modules: AstModuleStore::default(),
+            external: HashMap::new(),
+        }
+    }
+
+    pub fn modules(&self) -> &AstModuleStore {
+        &self.modules
+    }
+
+    pub fn modules_mut(&mut self) -> &mut AstModuleStore {
+        &mut self.modules
     }
 }
 
