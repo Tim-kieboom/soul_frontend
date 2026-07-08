@@ -1,4 +1,4 @@
 name = "soul_test"
 
 [dependencies]
-example_std = {path = "lib/example_std"}
+example_std = {path = "lib/example_std", linkage = "static"}

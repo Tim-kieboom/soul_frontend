@@ -9,6 +9,7 @@ use soul_utils::{
     collections::vec_set::VecSet,
     fault::Fault,
     ids::IdAlloc,
+    linkage::Linkage,
     soul_error_internal,
     span::{ModuleId, Span},
 };
@@ -61,6 +62,17 @@ impl<'a, 'f> Parser<'a, 'f> {
             ));
             return;
         };
+
+        if crate_entry.linkage == Linkage::Dynamic {
+            self.log_fault(soul_error_internal!(
+                format!(
+                    "dynamic linking for crate '{lib_name}' is not yet implemented; \
+                     use linkage = \"static\" in Soul.toml"
+                ),
+                Some(span)
+            ));
+            return;
+        }
 
         let module_path = to_crate_name(path.module.as_pathbuf());
 

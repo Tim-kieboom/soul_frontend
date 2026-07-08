@@ -24,6 +24,7 @@ use soul_utils::{
     },
     fault::Severity,
     ids::IdAlloc,
+    linkage::Linkage,
     soul_names::PrimitiveTypes,
     span::ModuleId,
 };
@@ -71,7 +72,8 @@ fn create_test_crate_store(test_env: &TestEnv) -> CrateStore {
     for name in &["foo", "soul", "bar"] {
         store.insert(
             name.to_string(),
-            CrateEntry::new(name.to_string(), test_env.base.clone()),
+            CrateEntry::new(name.to_string(), test_env.base.clone())
+                .with_linkage(Linkage::Static),
         );
     }
     store

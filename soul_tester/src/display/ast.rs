@@ -10,7 +10,7 @@ use crate::{
 };
 use anyhow::Result;
 use ast_model::{
-    AstStore, AstTree, FunctionKind, block::BlockId, expression::{
+    AstStore, AstTree, ExternalCrateData, FunctionKind, block::BlockId, expression::{
         AnyArray, ExpressionId, ExpressionKind, ForCondition, FunctionCalleeKind, IfBranch, Lambda,
         MatchPattern, TypeofKind,
     }, soul_type::{ArrayKind, Generic, SoulType, TupleKind}, statements::{
@@ -22,11 +22,7 @@ use soul_tokenizer::model::{
     types::Types,
 };
 use soul_utils::{
-    FunctionId, TypeModifier,
-    collections::vec_map::{VecMap, VecMapIndex},
-    ids::IdAlloc,
-    soul_names::{PrimitiveTypes, Symbol},
-    span::ModuleId,
+    FunctionId, TypeModifier, collections::vec_map::{VecMap, VecMapIndex}, ids::IdAlloc, linkage::Linkage, soul_names::{PrimitiveTypes, Symbol}, span::ModuleId,
 };
 
 const IF_STR: &str = KeyWord::If.as_str();
@@ -105,8 +101,19 @@ where
 
 fn display_ast_tree<'a>(ast: &AstTree, root_dir: &Path, writer: &mut impl Writer) -> Result<()> {
     let mut displayer = Displayer::new(ast, root_dir, &ast.crates.store, writer);
-    displayer.write_module(ast.root)?;
+    displayer.write_crate_overview()?;
+    displayer.write_entry(ast.root)?;
+    for (name, data) in &ast.crates.external {
+        displayer.write_external(name, data)?        
+    }
     writer.writer_flush()
+}
+
+fn linkage_str(linkage: &soul_utils::linkage::Linkage) -> &'static str {
+    match linkage {
+        Linkage::Dynamic => "dynamic",
+        Linkage::Static => "static",
+    }
 }
 
 impl<'a, W: Writer> Displayer<'a, W> {
@@ -119,6 +126,65 @@ impl<'a, W: Writer> Displayer<'a, W> {
             add_tags: true,
             depth: String::new(),
         }
+    }
+
+    fn write_crate_overview(&mut self) -> Result<()> {
+        if self.ast.crates.external.is_empty() {
+            return Ok(());
+        }
+        self.write_fmt(format_args!("// === Crate Forest ===\n"))?;
+        for (name, data) in &self.ast.crates.external {
+            let dep_label = if data.root_id == self.ast.root {
+                " (self)"
+            } else {
+                ""
+            };
+            self.write_fmt(format_args!(
+                "//   {name}: root={:?} linkage={} modules={}{}\n",
+                data.root_id,
+                linkage_str(&data.linkage),
+                data.module_ids.len(),
+                dep_label,
+            ))?;
+        }
+        self.write_fmt(format_args!("// =====================\n\n"))?;
+        Ok(())
+    }
+
+    fn write_entry(&mut self, root: ModuleId) -> Result<()> {
+        self.write_depth()?;
+        self.write_fmt(format_args!("{} . {{", KeyWord::Crate.as_str()))?;
+
+        self.push_depth();
+
+        self.write_endln()?;
+        self.write_depth()?;
+        self.write_module(root)?;
+
+        self.pop_depth();
+
+        self.write_endln()?;
+        self.write_depth()?;
+        self.write_char('}')
+    }
+
+    fn write_external(&mut self, name: &str, data: &ExternalCrateData) -> Result<()> {
+        self.write_endln()?;
+        self.write_depth()?;
+        
+        self.write_fmt(format_args!("{} {name} {{", KeyWord::Crate.as_str()))?;
+
+        self.push_depth();
+        self.write_endln()?;
+        for module_id in data.module_ids.entries() {
+            self.write_module(module_id)?;
+            self.write_endln()?;
+        }
+        
+        self.pop_depth();
+        self.write_endln()?;
+        self.write_depth()?;
+        self.write_char('}')
     }
 
     fn write_module(&mut self, id: ModuleId) -> Result<()> {
