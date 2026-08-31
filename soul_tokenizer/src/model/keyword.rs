@@ -14,6 +14,7 @@ define_str_enum!(
         Const => "const", 0,
         Extern => "extern", 0,
         Literal => "literal", 0,
+        Async => "async", 0,
 
         // --- conditionals ---
         If => "if", 5,
@@ -23,6 +24,7 @@ define_str_enum!(
         // --- loops ---
         For => "for", 5,
         InForLoop => "in", 0,
+        Limit => "limit", 0,
 
         Break => "break", 0,
         Return => "return", 0,
@@ -31,6 +33,7 @@ define_str_enum!(
         Struct => "struct", 0,
         Trait => "trait", 0,
         Enum => "enum", 0,
+        Union => "union", 0,
 
 
         // --- types ---
@@ -51,6 +54,9 @@ define_str_enum!(
         Copy => "copy", 0,
         Impl => "impl", 0,
         Crate => "crate", 0,
+        Task => "task", 0,
+        Spawn => "spawn", 0,
+        Intrinsic => "intrinsic", 0,
         Sizeof => "sizeof", 0,
         Typeof => "typeof", 0,
     }

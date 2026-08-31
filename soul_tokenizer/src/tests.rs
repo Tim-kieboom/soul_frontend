@@ -5,7 +5,7 @@ use soul_utils::{
     span::ModuleId,
 };
 
-use crate::{TokenKind, lexer::Lexer, model::StringFormatTag};
+use crate::{TokenKind, lexer::Lexer, model::StringFormatTag, model::keyword::KeyWord};
 
 fn module_id() -> ModuleId {
     ModuleId::error()
@@ -210,6 +210,60 @@ fn fstring_fstr_tag_no_expr() {
         TokenKind::StringFormat(StringFormatTag::Fstr),
         TokenKind::FStringPart("hello world".to_string()),
         TokenKind::FStringEnd,
+    ];
+
+    assert_eq!(tokens, expected);
+}
+
+// ----------------------------------------------------------------
+//  New keywords (soul-lang.md): union / async / task / spawn / limit / intrinsic
+// ----------------------------------------------------------------
+#[test]
+fn lex_new_keywords() {
+    let tokens = lexer_to_vec("union async task spawn limit intrinsic");
+
+    let expected = vec![
+        TokenKind::Keyword(KeyWord::Union),
+        TokenKind::Keyword(KeyWord::Async),
+        TokenKind::Keyword(KeyWord::Task),
+        TokenKind::Keyword(KeyWord::Spawn),
+        TokenKind::Keyword(KeyWord::Limit),
+        TokenKind::Keyword(KeyWord::Intrinsic),
+    ];
+
+    assert_eq!(tokens, expected);
+}
+
+#[test]
+fn lex_capitalized_union_stays_identifier() {
+    let tokens = lexer_to_vec("Union");
+
+    let expected = vec![TokenKind::Ident("Union".to_string())];
+    assert_eq!(tokens, expected);
+}
+
+#[test]
+fn lex_right_arrow_symbol() {
+    let tokens = lexer_to_vec("a->b");
+
+    let expected = vec![
+        TokenKind::Ident("a".to_string()),
+        TokenKind::Symbol(Symbol::RightArrow),
+        TokenKind::Ident("b".to_string()),
+    ];
+
+    assert_eq!(tokens, expected);
+}
+
+#[test]
+fn lex_star_star_are_separate_symbols() {
+    let tokens = lexer_to_vec("2 ** 3");
+
+    let expected = vec![
+        TokenKind::Literal(TokenLiteral::Number(Number::Uint(2))),
+        TokenKind::Symbol(Symbol::Star),
+        TokenKind::Symbol(Symbol::Star),
+        TokenKind::Literal(TokenLiteral::Number(Number::Uint(3))),
     ];
 
     assert_eq!(tokens, expected);

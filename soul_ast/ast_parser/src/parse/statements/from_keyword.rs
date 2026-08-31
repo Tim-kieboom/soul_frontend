@@ -98,7 +98,13 @@ impl<'a, 'f> Parser<'a, 'f> {
             | KeyWord::Distinct
             | KeyWord::InForLoop
             | KeyWord::Undefined
-            | KeyWord::GenericWhere => {
+            | KeyWord::GenericWhere
+            | KeyWord::Union
+            | KeyWord::Async
+            | KeyWord::Task
+            | KeyWord::Spawn
+            | KeyWord::Limit
+            | KeyWord::Intrinsic => {
                 return TryErr(soul_error_internal!(
                     format!(
                         "keyword '{}' should be parsed in expression not statement",

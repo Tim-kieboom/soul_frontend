@@ -147,6 +147,41 @@ fn only_newlines() {
 //  Binary expressions
 // ----------------------------------------------------------------
 #[test]
+fn binary_power() {
+    let (module, store, context) = parse("2 ** 3");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    match &stmt.node {
+        StatementKind::Expression { expression, .. } => {
+            let expr = &store.expressions[*expression];
+            match &expr.node {
+                ExpressionKind::Binary(bin) => {
+                    assert_eq!(bin.operator.value, BinaryOperatorKind::Pow);
+                    let left = &store.expressions[bin.left];
+                    let right = &store.expressions[bin.right];
+                    assert!(matches!(
+                        left.node,
+                        ExpressionKind::Literal((_, Literal::Uint(2)))
+                    ));
+                    assert!(matches!(
+                        right.node,
+                        ExpressionKind::Literal((_, Literal::Uint(3)))
+                    ));
+                }
+                _ => panic!("expected Binary expression"),
+            }
+        }
+        _ => panic!("expected Expression statement"),
+    }
+}
+
+#[test]
 fn binary_addition() {
     let (module, store, context) = parse("1 + 2");
     assert_eq!(
