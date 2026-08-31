@@ -1,6 +1,8 @@
 pub mod keyword;
 pub mod types;
 
+use std::fmt::Display;
+
 use crate::model::{keyword::KeyWord, types::Types};
 use soul_utils::{literal::TokenLiteral, soul_names::Symbol, span::Span};
 
@@ -31,6 +33,11 @@ impl StringFormatTag {
             StringFormatTag::F => "f",
             StringFormatTag::Fstr => "fstr",
         }
+    }
+}
+impl Display for StringFormatTag {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.as_str().fmt(f)
     }
 }
 

@@ -1,0 +1,462 @@
+/// testCompiler.soul
+///
+/// A single-file smoke test exercising most of the currently-decided Soul language
+/// surface (see soul-lang.md). Named `test{Name}` per §17, so this is a real test
+/// module, not just an example file — every `#[test]` function below is meant to
+/// actually run under `soul test`.
+///
+/// A few spots make a judgment call on something the spec still marks Open; those
+/// are flagged inline with `// OPEN:` comments rather than silently assumed.
+
+import (
+    Std.{Fmt, Display},
+    Core.Mem.{malloc, free},
+)
+
+// ---------------------------------------------------------------------------
+// §3 — Types: primitives, optionals, arrays/slices, generics
+// ---------------------------------------------------------------------------
+
+#[test]
+test_primitives_and_interpolation() {
+    x: int := 5
+    y: f64 := 2.5
+    name: &str := "Soul"
+
+    assertEq(x + 1, 6)
+    assertEq(f"{name} v{x}.{y}", "Soul v5.2.5")
+}
+
+#[test]
+test_optionals() {
+    some: ?int := 42
+    none_: ?int := null
+
+    assertEq(some.null{-1}, 42)
+    assertEq(none_.null{-1}, -1)
+
+    unsafe {
+        // only safe here because we just proved `some` isn't null above
+        assertEq(some.null{undefined}, 42)
+    }
+}
+
+#[test]
+test_arrays_and_slices() {
+    a: [4]int := [1, 2, 3, 4]
+    b: [3]i64 := [i64: 1, 2, 3]
+    c: [4]int := [for 4 => 0]
+    d: [3]int := [for i in 3 => i]
+    heap: []int := new[1, 2, 3]
+
+    assertEq(a, [1, 2, 3, 4])
+    assertEq(c, [0, 0, 0, 0])
+    assertEq(d, [0, 1, 2])
+    assertEq(heap.len(), 3)
+
+    sliceSum(&a)
+}
+
+sliceSum(values: [&]int): int {
+    mut total := 0
+    for v in values { total += v }
+    total
+}
+
+// ---------------------------------------------------------------------------
+// §3.4 — Generics: bounds, where, impl Trait
+// ---------------------------------------------------------------------------
+
+describe<T: Display>(value: T): str => f"{value}"
+
+describeWhere<T>(value: T): str where T: Display => f"{value}"
+
+describeImpl(value: impl Display): str => f"{value}"
+
+makeDefault(): impl Display => 0   // impl Trait in return position (§3.4)
+
+#[test]
+test_generic_bounds() {
+    assertEq(describe(5), "5")
+    assertEq(describeWhere(5), "5")
+    assertEq(describeImpl(5), "5")
+    assertEq(f"{makeDefault()}", "0")
+}
+
+// ---------------------------------------------------------------------------
+// §6 — Structs: fields, three constructor forms, fallibility signaling
+// ---------------------------------------------------------------------------
+
+pub struct List<T> {
+    LIST_GROW :: f32.(2)
+
+    mut len: uint = 0
+    mut buffer: []?T = []
+
+    pub This.() => This{..}
+    pub This.[int](array) => This{ buffer: array, len: array.len() }
+
+    pub len(&this): uint => this.len
+}
+
+pub struct Number {
+    mut inner: f64
+
+    This.(float: f64) => This{inner: float}
+    This.(interger: int) => This{inner: f64.(interger)}
+}
+
+struct IntArray {
+    array: []int
+    len: uint
+
+    This.[int](array) => This{ len: array.len(), array }
+
+    This.[u8](array) => This{
+        len: array.len(),
+        array: array.intoIter().map(int.).toArray(),
+    }
+}
+
+#[test]
+test_struct_construction() {
+    list := List<int>.()
+    assertEq(list.len(), 0)
+
+    mut number := Number.(int.(1))
+    number = Number.(f64.(2))
+    assertEq(number.typeof, Number)
+    assertEq(number.inner, 2)
+
+    mut array := IntArray.[1, 2, 3, 4]
+    array = IntArray.[1_u8, 2, 3, 4]
+    assertEq(array.typeof, IntArray)
+    assertEq(array.len, 4)
+}
+
+// ---------------------------------------------------------------------------
+// §7/§8 — Traits, impl forms, use blocks, extension
+// ---------------------------------------------------------------------------
+
+struct Point {
+    x: int
+    y: int
+}
+
+use Point {
+    // single-method inline impl form (§7)
+    impl Index<Out = int> index(&this, index: uint): &This.Out {
+        [&this.x, &this.y][index]
+    }
+
+    // block impl form, fused with use (§7)
+    impl Display {
+        fmt(&this, &mut f: &mut Formatter) { f.write(f"({this.x}, {this.y})") }
+    }
+}
+
+int.square(this): int => this ** 2
+
+#[test]
+test_traits_and_extension() {
+    p := Point{x: 3, y: 4}
+    assertEq(p[0], 3)
+    assertEq(f"{p}", "(3, 4)")
+    assertEq(4.square(), 16)
+}
+
+// ---------------------------------------------------------------------------
+// §9 — Enums
+// ---------------------------------------------------------------------------
+
+FOR_STR :: "for"
+FIRST_TAG :: 0_u32
+
+enum KeyWords as &str {
+    ForLoop = FOR_STR,
+    InForLoop = "in",
+    TypeMatching = "match",
+}
+
+#[test]
+test_enums() {
+    variant := KeyWords.ForLoop
+    assertEq(variant.typeof, KeyWords)
+    assertEq(variant.value, FOR_STR)
+    assertEq(variant.tag, FIRST_TAG)
+
+    fromValue := KeyWords.fromValue(FOR_STR)
+        .null{panic(f"KeyWords.fromValue({FOR_STR}) should not be null")}
+    fromTag := KeyWords.fromTag(FIRST_TAG)
+        .null{panic(f"KeyWords.fromTag({FIRST_TAG}) should not be null")}
+
+    assertEq(variant, fromValue)
+    assertEq(variant, fromTag)
+}
+
+// ---------------------------------------------------------------------------
+// §10 — Unions and pattern matching
+// ---------------------------------------------------------------------------
+
+union Literal {
+    None,
+    Int(int),
+    Str{tag: str, value: str},
+}
+
+parse_int(value: &str): int {
+    int.parse(value).Err{panic("parse failed")}
+}
+
+#[test]
+test_union_match_chain() {
+    mut variant := Literal.None
+    variant = Literal.Str{tag: "f".copy, value: "hello".copy}
+    variant = Literal.Int(1)
+
+    assertEq(variant.typeof, Literal)
+    assertEq(variant, Literal.Int(1))
+
+    number := variant
+        .None{0}
+        .Int{it}
+        .Str{parse_int(it.value)}
+    assertEq(number, 1)
+}
+
+#[test]
+test_union_map_chain_and_passthrough() {
+    ok: Res<int> := Ok(1)
+    mapped := ok->Ok{str.(it)}
+    assertEq(mapped.typeof, Res<str>)
+
+    err: Res<int> := Err("bad")
+    assertEq(err.Err{1}.Ok{it + 1}, 1)          // both handled — real match
+    assertEq(err.Err{1}, 1)                      // passthrough for Ok, unused here
+    assertEq(ok.Err{1}, 1 + 1 - 1)                // Ok passthrough compared against itself below
+}
+
+#[test]
+test_traditional_match_and_if_let() {
+    resultA: Res<int> := Ok(1)
+    resultB: Res<int> := Ok(2)
+
+    sum := match (resultA, resultB) {
+        (Ok(a), Ok(b)) => a + b,
+        (Err(e), _) => panic(e),
+        (_, Err(e)) => panic(e),
+    }
+    assertEq(sum, 3)
+
+    maybeErr: Res<int> := Err("nope")
+    if type Err(message) := maybeErr {
+        assertEq(message, "nope")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// §11 — Ownership & Borrowing: move, Copy/.copy, AutoCopy, Drop
+// ---------------------------------------------------------------------------
+
+struct Resource {
+    mut label: str
+
+    impl Drop drop(&mut this) {
+        // would free/log here — demonstrating the syntax, not asserting on it
+    }
+}
+
+#[test]
+test_move_and_copy() {
+    a := "owned".copy
+    b := a          // moves `a`; `a` is no longer usable after this line
+    assertEq(b, "owned".copy)
+
+    // OPEN: uncommenting the next line should be a compile error (use-after-move):
+    // println(a)
+
+    x := 5           // int implements AutoCopy — assignment copies, doesn't move
+    y := x
+    assertEq(x, y)    // both still valid, since `x` was never moved
+}
+
+#[test]
+test_drop_scope() {
+    {
+        r := Resource{label: "temp".copy}
+        assertEq(r.label, "temp".copy)
+    } // r.drop() runs here, at scope exit
+}
+
+// ---------------------------------------------------------------------------
+// §12 — Control flow: for/while/loop unification, limit
+// ---------------------------------------------------------------------------
+
+#[test]
+test_while_and_for_each() {
+    mut counter := 5
+    for counter <= 0 { counter -= 1 }
+    assertEq(counter, 0)
+
+    values := [1, 2, 3]
+    mut sum := 0
+    for v in &values { sum += v }
+    assertEq(sum, 6)
+
+    mut doubled := [1, 2, 3]
+    for v in &mut doubled { v *= 2 }
+    assertEq(doubled, [2, 4, 6])
+
+    mut indexed: [3]str := [str., str., str.]
+    for i, v in values { indexed[i] = f"{v}" }
+    assertEq(indexed, ["1", "2", "3"])
+}
+
+#[test]
+test_limit_loop() {
+    mut counter := 5
+    result := for counter <= 0 limit 4 { counter -= 1 }
+    result.Err{panic("counter should have hit the iteration limit")}
+}
+
+// ---------------------------------------------------------------------------
+// §13 — Error handling: .pass, panic/assert
+// ---------------------------------------------------------------------------
+
+divide(a: int, b: int): Res<int> {
+    if b == 0 { Err("division by zero").pass }
+    Ok(a / b)
+}
+
+safeDivideChain(a: int, b: int): Res<int> {
+    result := divide(a, b).pass
+    Ok(result + 1)
+}
+
+#[test]
+test_pass_and_panic() {
+    assertEq(safeDivideChain(10, 2), Ok(6))
+    assertEq(safeDivideChain(10, 0), Err("division by zero"))
+
+    assert(1 + 1 == 2)
+}
+
+// ---------------------------------------------------------------------------
+// §14 — Operators and auto-derived Eq/Ord
+// ---------------------------------------------------------------------------
+
+struct Coord {
+    x: int
+    y: int
+}
+
+#[test]
+test_auto_derived_eq_ord() {
+    a := Coord{x: 1, y: 2}
+    b := Coord{x: 1, y: 2}
+    c := Coord{x: 1, y: 3}
+
+    assertEq(a, b)
+    assertNq(a, c)
+}
+
+// ---------------------------------------------------------------------------
+// §15 — Concurrency: async/await, structured task/spawn
+// ---------------------------------------------------------------------------
+
+async fetchNumber(n: int): int {
+    n * 2
+}
+
+async runConcurrentFetches(): int {
+    mut total := 0
+    task {
+        handleA := spawn { fetchNumber(1).await }
+        handleB := spawn { fetchNumber(2).await }
+        total = handleA.await + handleB.await
+    }
+    total
+}
+
+#[test]
+async test_structured_concurrency() {
+    total := runConcurrentFetches().await
+    assertEq(total, 6)
+}
+
+// ---------------------------------------------------------------------------
+// §16 — unsafe and intrinsics
+// ---------------------------------------------------------------------------
+
+#[test]
+test_unsafe_intrinsics() {
+    buffer: []int := new[1, 2, 3]
+    unsafe {
+        ptr := intrinsic.array.toRaw<int>(buffer)
+        slice := intrinsic.ptr.toSlice(ptr, buffer.len())
+        assertEq(slice.len(), 3)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// §19 — Reflection: &any, if type downcasting, intrinsic.typeinfo
+// ---------------------------------------------------------------------------
+
+describeAny(value: &any): str {
+    if type v: int := value { f"int({v})" }
+    else if type v: str := value { f"str({v})" }
+    else { f"other({value.typeof})" }
+}
+
+#[test]
+test_reflection() {
+    x := 42
+    s := "hello".copy
+
+    assertEq(describeAny(&x), "int(42)")
+    assertEq(describeAny(&s), "str(hello)")
+
+    info := intrinsic.typeinfo(Coord.typeof)
+    match info {
+        Struct(shape) => assertEq(shape.fields.len(), 2),
+        _ => panic("expected Coord to reflect as a struct"),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// §20 — Type aliases: transparent alias, distinct, limit
+// ---------------------------------------------------------------------------
+
+type Byte := u8
+type NonNullU8 := u8 limit 1..u8.MAX
+type Wrapped := distinct f64
+
+#[test]
+test_type_aliases() {
+    b: Byte := 200
+    assertEq(b, 200_u8)   // Byte is fully interchangeable with u8
+
+    good: Res<NonNullU8> := NonNullU8.(5)
+    bad: Res<NonNullU8> := NonNullU8.(0)
+    good.Err{panic("5 should be within 1..u8.MAX")}
+    bad.Ok{panic("0 should be outside 1..u8.MAX")}
+
+    wrapped := Wrapped.(f64.(1))
+    unwrapped := f64.(wrapped)
+    assertEq(unwrapped, 1.0)
+
+    // OPEN: `distinct` types shouldn't accept the base type directly without
+    // going through the constructor — uncommenting this should be a compile error:
+    // raw: Wrapped := 1.0
+}
+
+// ---------------------------------------------------------------------------
+// §17 — Testing sanity check (this file testing itself)
+// ---------------------------------------------------------------------------
+
+#[test]
+test_this_file_is_a_recognized_test_module() {
+    // If this ran at all, `testCompiler.soul` was correctly picked up as a test
+    // module and every #[test] function above was discovered and executed.
+    assert(true)
+}

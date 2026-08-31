@@ -1,4 +1,4 @@
-use crate::{config::PrintConfigs, display::writer::Writer};
+use crate::{config::PrintConfigs, display::writer::Writer, push_fmt};
 use anyhow::Result;
 use soul_utils::collections::benchmark::Benchmark;
 
@@ -8,7 +8,7 @@ pub(crate) fn display_benchmark(
     writer: &mut impl Writer,
 ) -> Result<()> {
     for (name, time) in benchmark.iter() {
-        writer.push_fmt(format_args!("{name}: {time:?}\n"))?;
+        push_fmt!(writer, "{name}: {time:?}\n")?;
     }
 
     writer.writer_flush()?;

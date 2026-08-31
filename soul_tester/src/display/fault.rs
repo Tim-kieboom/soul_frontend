@@ -1,4 +1,4 @@
-use crate::source_file;
+use crate::{push_fmt, source_file};
 use crate::{config::PrintConfigs, display::writer::Writer};
 use anyhow::{Error, Result};
 use soul_utils::char_colors::*;
@@ -40,7 +40,8 @@ pub(crate) fn display_fault(
         get_source_snippet(writer, &span, source_file.lines(), &begin_space)?;
     }
 
-    writer.writer_flush()
+    writer.writer_flush()?;
+    Ok(())
 }
 
 fn fault_message(
@@ -64,19 +65,21 @@ fn fault_message(
     };
 
     match fault.span() {
-        Some(span) => writer.push_fmt(format_args!(
+        Some(span) => push_fmt!(writer,
             "{severity_color}{severity}:{cyan} at {}:{span:?}\n{}{default}",
             modules
                 .get_path(span.module)
                 .unwrap_or(&PathBuf::new())
                 .to_string_lossy(),
             fault.message()
-        )),
-        None => writer.push_fmt(format_args!(
+        )?,
+        None => push_fmt!(writer,
             "{severity_color}{severity}{cyan} {}{default}",
             fault.message()
-        )),
+        )?,
     }
+
+    Ok(())
 }
 
 fn get_source_snippet(
@@ -127,7 +130,7 @@ fn get_source_snippet(
         let begin = format!("{}.", span.start.line.saturating_sub(1));
         let len = (begin.len() as i64 - begin_space.len() as i64).unsigned_abs() as usize;
         let spaces = " ".repeat(len);
-        writer.push_fmt(format_args!("{spaces}{begin}│ {}\n", line))?;
+        push_fmt!(writer, "{spaces}{begin}│ {}\n", line)?;
     }
 
     for (i, line) in span_lines.iter().enumerate() {
@@ -136,21 +139,21 @@ fn get_source_snippet(
         let len = (begin.len() as i64 - begin_space.len() as i64).unsigned_abs() as usize;
         let spaces = " ".repeat(len);
 
-        writer.push_fmt(format_args!("{spaces}{begin}│ {}\n", line))?;
+        push_fmt!(writer, "{spaces}{begin}│ {}\n", line)?;
 
         if i == 0 {
             let start_col = span.start.offset.max(1);
             let span_len = span.end.offset.max(1).saturating_sub(start_col);
             let spaces_before = " ".repeat(start_col.saturating_sub(1));
             let carets = "^".repeat(span_len);
-            writer.push_fmt(format_args!("{begin_space}│ {spaces_before}{carets}\n"))?;
+            push_fmt!(writer, "{begin_space}│ {spaces_before}{carets}\n")?;
         } else if i < span_lines.len().saturating_sub(1) {
             let carets = "^".repeat(line.len());
-            writer.push_fmt(format_args!("{begin_space}│ {carets}\n"))?;
+            push_fmt!(writer, "{begin_space}│ {carets}\n")?;
         } else {
             let end_col = span.end.offset.max(1);
             let carets = "^".repeat(end_col.saturating_sub(1).max(1));
-            writer.push_fmt(format_args!("{begin_space}│ {carets}\n"))?;
+            push_fmt!(writer, "{begin_space}│ {carets}\n")?;
         }
     }
 
@@ -158,9 +161,9 @@ fn get_source_snippet(
         let begin = format!("{}.", span.end.line + 1);
         let len = (begin.len() as i64 - begin_space.len() as i64).unsigned_abs() as usize;
         let spaces = " ".repeat(len);
-        writer.push_fmt(format_args!("{spaces}{begin}│ {}\n", line))?;
+        push_fmt!(writer, "{spaces}{begin}│ {}\n", line)?;
     }
 
-    writer.push_fmt(format_args!("{begin_space}└──{:─<1$}\n", "", max_len))?;
+    push_fmt!(writer, "{begin_space}└──{:─<1$}\n", "", max_len)?;
     Ok(())
 }

@@ -5,8 +5,7 @@ use std::{
 };
 
 use crate::{
-    config,
-    display::{vecmap_to_pretty_vec, write_create_file, write_to_file, writer::Writer},
+    config, display::{vecmap_to_pretty_vec, write_create_file, write_to_file, writer::Writer}, push_fmt,
 };
 use anyhow::Result;
 use ast_model::{
@@ -106,7 +105,8 @@ fn display_ast_tree<'a>(ast: &AstTree, root_dir: &Path, writer: &mut impl Writer
     for (name, data) in &ast.crates.external {
         displayer.write_external(name, data)?        
     }
-    writer.writer_flush()
+    writer.writer_flush()?;
+    Ok(())
 }
 
 fn linkage_str(linkage: &soul_utils::linkage::Linkage) -> &'static str {
@@ -132,14 +132,14 @@ impl<'a, W: Writer> Displayer<'a, W> {
         if self.ast.crates.external.is_empty() {
             return Ok(());
         }
-        self.write_fmt(format_args!("// === Crate Forest ===\n"))?;
+        self.push_fmt(format_args!("// === Crate Forest ===\n"))?;
         for (name, data) in &self.ast.crates.external {
             let dep_label = if data.root_id == self.ast.root {
                 " (self)"
             } else {
                 ""
             };
-            self.write_fmt(format_args!(
+            self.push_fmt(format_args!(
                 "//   {name}: root={:?} linkage={} modules={}{}\n",
                 data.root_id,
                 linkage_str(&data.linkage),
@@ -147,13 +147,13 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 dep_label,
             ))?;
         }
-        self.write_fmt(format_args!("// =====================\n\n"))?;
+        self.push_fmt(format_args!("// =====================\n\n"))?;
         Ok(())
     }
 
     fn write_entry(&mut self, root: ModuleId) -> Result<()> {
         self.write_depth()?;
-        self.write_fmt(format_args!("{} . {{", KeyWord::Crate.as_str()))?;
+        self.push_fmt(format_args!("{} . {{", KeyWord::Crate.as_str()))?;
 
         self.push_depth();
 
@@ -165,14 +165,14 @@ impl<'a, W: Writer> Displayer<'a, W> {
 
         self.write_endln()?;
         self.write_depth()?;
-        self.write_char('}')
+        self.push_char('}')
     }
 
     fn write_external(&mut self, name: &str, data: &ExternalCrateData) -> Result<()> {
         self.write_endln()?;
         self.write_depth()?;
         
-        self.write_fmt(format_args!("{} {name} {{", KeyWord::Crate.as_str()))?;
+        self.push_fmt(format_args!("{} {name} {{", KeyWord::Crate.as_str()))?;
 
         self.push_depth();
         self.write_endln()?;
@@ -184,17 +184,17 @@ impl<'a, W: Writer> Displayer<'a, W> {
         self.pop_depth();
         self.write_endln()?;
         self.write_depth()?;
-        self.write_char('}')
+        self.push_char('}')
     }
 
     fn write_module(&mut self, id: ModuleId) -> Result<()> {
         let module = self.ast.crates.modules.as_vecmap().get_err(id)?;
         if self.add_tags {
-            self.write_fmt(format_args!("// {id:?}\n"), )?;
+            self.push_fmt(format_args!("// {id:?}\n"), )?;
         }
 
         self.write_depth()?;
-        self.write_fmt(format_args!("mod {} {{\n", module.name))?;
+        self.push_fmt(format_args!("mod {} {{\n", module.name))?;
         let block = self.store.blocks.get_err(module.global)?;
 
         self.push_depth();
@@ -211,17 +211,17 @@ impl<'a, W: Writer> Displayer<'a, W> {
         }
         self.pop_depth();
         self.write_depth()?;
-        self.write_char('}')?;
+        self.push_char('}')?;
         Ok(())
     }
 
     fn write_block(&mut self, id: BlockId) -> Result<()> {
         let block = self.store.blocks.get_err(id)?;
         if block.modifier != TypeModifier::Mut {
-            self.write_str(block.modifier.as_str())?;
-            self.write_char(' ')?;
+            self.push_str(block.modifier.as_str())?;
+            self.push_char(' ')?;
         }
-        self.write_str("{\n")?;
+        self.push_str("{\n")?;
         self.push_depth();
         for id in &block.statements {
             self.write_depth()?;
@@ -231,7 +231,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
 
         self.pop_depth();
         self.write_depth()?;
-        self.write_char('}')?;
+        self.push_char('}')?;
         Ok(())
     }
 
@@ -242,7 +242,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
         }
 
         if statement.is_public() {
-            self.write_str("pub ")?;
+            self.push_str("pub ")?;
         }
 
         match &statement.node {
@@ -265,7 +265,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
             } => {
                 self.write_expression(*expression)?;
                 if *ends_semicolon {
-                    self.write_char(';')?;
+                    self.push_char(';')?;
                 }
                 Ok(())
             }
@@ -273,38 +273,38 @@ impl<'a, W: Writer> Displayer<'a, W> {
     }
 
     fn write_statement_tag(&mut self, statement: &Statement) -> Result<()> {
-        self.write_str("// ")?;
+        self.push_str("// ")?;
         match &statement.node {
             StatementKind::Expression { expression, .. } => self.write_expression_tag(*expression)?,
-            _ => self.write_str(statement.node.variant_name())?,
+            _ => self.push_str(statement.node.variant_name())?,
         }
 
         if let Some(id_string) = statement.node.get_any_id_string() {
-            self.write_fmt(format_args!(": {id_string} "))?;
+            self.push_fmt(format_args!(": {id_string} "))?;
         }
 
         match &statement.node {
             StatementKind::Variable(variable) => if let Some(value) = variable.initialize_value {
-                self.write_str("= ")?;
+                self.push_str("= ")?;
                 self.write_expression_tag(value)?
             }
             StatementKind::Assignment(assignment) => {
                 self.write_expression_tag(assignment.left)?;
-                self.write_str(" = ")?;
+                self.push_str(" = ")?;
                 self.write_expression_tag(assignment.right)?
             }
             StatementKind::Expression { expression, .. } => {
                 let value = self.store.expressions.get_err(*expression)?;
                 match &value.node {
                     ExpressionKind::FunctionCall(function_call) => if let Some(resolved) = self.ast.declares.get_call_resolve(function_call.id) {
-                        self.write_fmt(format_args!(" resolved = {resolved:?}"))?
+                        self.push_fmt(format_args!(" resolved = {resolved:?}"))?
                     } else {
-                        self.write_str(" resolved = null")?
+                        self.push_str(" resolved = null")?
                     }
                     ExpressionKind::Variable(variable) => if let Some(resolved) = self.ast.declares.get_variable_resolve(variable.id) {
-                        self.write_fmt(format_args!(" resolved = {resolved:?}"))?
+                        self.push_fmt(format_args!(" resolved = {resolved:?}"))?
                     } else {
-                        self.write_str(" resolved = null")?
+                        self.push_str(" resolved = null")?
                     }
                     _ => (),
                 }
@@ -319,26 +319,26 @@ impl<'a, W: Writer> Displayer<'a, W> {
 
     fn write_expression_tag(&mut self, id: ExpressionId) -> Result<()> {
         let expression = self.store.expressions.get_err(id)?;
-        self.write_str(expression.node.variant_name())
+        self.push_str(expression.node.variant_name())
     }
 
     fn write_assignment(&mut self, assignment: &Assignment) -> Result<()> {
         self.write_expression(assignment.left)?;
-        self.write_str(" = ")?;
+        self.push_str(" = ")?;
         self.write_expression(assignment.right)
     }
 
     fn write_use_block(&mut self, use_block: &UseBlock) -> Result<()> {
-        self.write_str(USE_STR)?;
+        self.push_str(USE_STR)?;
         self.write_generic_defines(&use_block.use_generics)?;
-        self.write_char(' ')?;
+        self.push_char(' ')?;
         self.write_type(&use_block.ty)?;
-        self.write_str(" {\n")?;
+        self.push_str(" {\n")?;
         self.push_depth();
         for id in &use_block.statements {
             self.write_depth()?;
             if self.store.statements[*id].is_public() {
-                self.write_str("pub ")?;
+                self.push_str("pub ")?;
             }
 
             self.write_statement(*id)?;
@@ -348,7 +348,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
         for method in &use_block.methods {
             self.write_depth()?;
             if method.is_public {
-                self.write_str("pub ")?;
+                self.push_str("pub ")?;
             }
 
             self.write_any_function(method.id)?;
@@ -361,14 +361,14 @@ impl<'a, W: Writer> Displayer<'a, W> {
         }
         self.pop_depth();
         self.write_depth()?;
-        self.write_char('}')
+        self.push_char('}')
     }
 
     fn write_impl(&mut self, impl_: &ImplBlock) -> Result<()> {
-        self.write_str(IMPL_STR)?;
-        self.write_char(' ')?;
+        self.push_str(IMPL_STR)?;
+        self.push_char(' ')?;
         self.write_type(&impl_.impl_trait)?;
-        self.write_str(" {\n")?;
+        self.push_str(" {\n")?;
         self.push_depth();
         for methode in &impl_.methods {
             self.write_depth()?;
@@ -377,21 +377,21 @@ impl<'a, W: Writer> Displayer<'a, W> {
         }
         self.pop_depth();
         self.write_depth()?;
-        self.write_char('}')
+        self.push_char('}')
     }
 
     fn write_variable(&mut self, variable: &Variable) -> Result<()> {
-        self.write_str(variable.modifier.as_str())?;
-        self.write_char(' ')?;
+        self.push_str(variable.modifier.as_str())?;
+        self.push_char(' ')?;
         self.write_var_pattern(&variable.pattern)?;
 
         if let Some(ty) = &variable.ty {
-            self.write_str(": ")?;
+            self.push_str(": ")?;
             self.write_type(ty)?;
         }
 
         if let Some(value) = variable.initialize_value {
-            self.write_str(" = ")?;
+            self.push_str(" = ")?;
             self.write_expression(value)?;
         }
 
@@ -400,87 +400,87 @@ impl<'a, W: Writer> Displayer<'a, W> {
 
     fn write_var_pattern(&mut self, pattern: &VarPattern) -> Result<()> {
         match pattern {
-            VarPattern::Discard => self.write_str("_"),
+            VarPattern::Discard => self.push_str("_"),
             VarPattern::Simple { binding, modifier } => {
                 if *modifier == TypeModifier::Mut {
-                    self.write_str("mut ")?;
+                    self.push_str("mut ")?;
                 }
-                self.write_str(binding.ident.as_str())
+                self.push_str(binding.ident.as_str())
             }
             VarPattern::Tuple(tuple) => {
-                self.write_char('(')?;
+                self.push_char('(')?;
                 for (i, element) in tuple.elements.iter().enumerate() {
                     if i > 0 {
-                        self.write_str(", ")?;
+                        self.push_str(", ")?;
                     }
                     self.write_var_pattern(element)?;
                 }
                 if tuple.rest {
                     if !tuple.elements.is_empty() {
-                        self.write_str(", ")?;
+                        self.push_str(", ")?;
                     }
-                    self.write_str("..")?;
+                    self.push_str("..")?;
                 }
-                self.write_char(')')
+                self.push_char(')')
             }
             VarPattern::NamedTuple(named) => {
-                self.write_char('{')?;
+                self.push_char('{')?;
                 for (i, field) in named.fields.iter().enumerate() {
                     if i > 0 {
-                        self.write_str(", ")?;
+                        self.push_str(", ")?;
                     }
                     if field.modifier == TypeModifier::Mut {
-                        self.write_str("mut ")?;
+                        self.push_str("mut ")?;
                     }
-                    self.write_str(field.field.as_str())?;
+                    self.push_str(field.field.as_str())?;
                     match &field.binding {
                         Some(binding) if binding.ident != field.field => {
-                            self.write_str(": ")?;
-                            self.write_str(binding.ident.as_str())?;
+                            self.push_str(": ")?;
+                            self.push_str(binding.ident.as_str())?;
                         }
                         None => {
-                            self.write_str(": _")?;
+                            self.push_str(": _")?;
                         }
                         _ => {}
                     }
                 }
                 if named.rest {
                     if !named.fields.is_empty() {
-                        self.write_str(", ")?;
+                        self.push_str(", ")?;
                     }
-                    self.write_str("..")?;
+                    self.push_str("..")?;
                 }
-                self.write_char('}')
+                self.push_char('}')
             }
             VarPattern::Constructor(constructor) => {
-                self.write_str(constructor.type_name.as_str())?;
-                self.write_char('{')?;
+                self.push_str(constructor.type_name.as_str())?;
+                self.push_char('{')?;
                 for (i, field) in constructor.fields.iter().enumerate() {
                     if i > 0 {
-                        self.write_str(", ")?;
+                        self.push_str(", ")?;
                     }
                     if field.modifier == TypeModifier::Mut {
-                        self.write_str("mut ")?;
+                        self.push_str("mut ")?;
                     }
-                    self.write_str(field.field.as_str())?;
+                    self.push_str(field.field.as_str())?;
                     match &field.binding {
                         Some(binding) if binding.ident != field.field => {
-                            self.write_str(": ")?;
-                            self.write_str(binding.ident.as_str())?;
+                            self.push_str(": ")?;
+                            self.push_str(binding.ident.as_str())?;
                         }
                         None => {
-                            self.write_str(": _")?;
+                            self.push_str(": _")?;
                         }
                         _ => {}
                     }
                 }
                 if constructor.rest {
                     if !constructor.fields.is_empty() {
-                        self.write_str(", ")?;
+                        self.push_str(", ")?;
                     }
-                    self.write_str("..")?;
+                    self.push_str("..")?;
                 }
-                self.write_char('}')
+                self.push_char('}')
             }
         }
     }
@@ -489,49 +489,49 @@ impl<'a, W: Writer> Displayer<'a, W> {
         if lambda.parameters.len() == 1 {
             self.write_var_pattern(&lambda.parameters[0])?;
         } else {
-            self.write_char('(')?;
+            self.push_char('(')?;
             for (i, param) in lambda.parameters.iter().enumerate() {
                 if i > 0 {
-                    self.write_str(", ")?;
+                    self.push_str(", ")?;
                 }
                 self.write_var_pattern(param)?;
             }
-            self.write_char(')')?;
+            self.push_char(')')?;
         }
-        self.write_fmt(format_args!(" {} ", LAMDA_ARROW_STR))?;
+        push_fmt!(self, " {} ", LAMDA_ARROW_STR)?;
         self.write_block(lambda.body)
     }
 
     fn write_typedef(&mut self, type_def: &TypeDef) -> Result<()> {
-        self.write_str(TYPE_STR)?;
-        self.write_char(' ')?;
+        self.push_str(TYPE_STR)?;
+        self.push_char(' ')?;
         self.write_type(&type_def.new_type)?;
-        self.write_str(" = ")?;
+        self.push_str(" = ")?;
         if type_def.is_distinct {
-            self.write_fmt(format_args!("{DISTINCT_STR} "))?;
+            push_fmt!(self, "{DISTINCT_STR} ")?;
         }
         self.write_type(&type_def.old_type)
     }
 
     fn write_struct(&mut self, struct_: &Struct) -> Result<()> {
-        self.write_fmt(format_args!("{STRUCT_STR} {}", struct_.name.as_str()))?;
+        push_fmt!(self, "{STRUCT_STR} {}", struct_.name)?;
         self.write_generic_defines(&struct_.generics)?;
-        self.write_str("{\n")?;
+        self.push_str("{\n")?;
         self.push_depth();
 
         for field in &struct_.fields {
             self.write_depth()?;
             if field.is_public {
-                self.write_str("pub ")?;
+                self.push_str("pub ")?;
             }
 
             self.write_var_pattern(&field.value.pattern)?;
             if let Some(ty) = &field.value.ty {
-                self.write_str(": ")?;
+                self.push_str(": ")?;
                 self.write_type(ty)?;
             }
             if let Some(value) = &field.value.initialize_value {
-                self.write_str(" = ")?;
+                self.push_str(" = ")?;
                 self.write_expression(*value)?;
             }
             self.write_endln()?;
@@ -544,21 +544,21 @@ impl<'a, W: Writer> Displayer<'a, W> {
         }
         self.pop_depth();
         self.write_depth()?;
-        self.write_char('}')?;
+        self.push_char('}')?;
         Ok(())
     }
 
     fn write_import(&mut self, import: &Import) -> Result<()> {
-        self.write_fmt(format_args!("{IMPORT_STR} (\n"))?;
+        push_fmt!(self, "{IMPORT_STR} (\n")?;
         self.push_depth();
         for path in import.paths.iter() {
             self.write_depth()?;
-            self.write_str(&path.module.display(self.root_dir))?;
+            self.push_str(&path.module.display(self.root_dir))?;
             match &path.kind {
-                ImportKind::This => self.write_str("this")?,
-                ImportKind::Glob => self.write_char('*')?,
+                ImportKind::This => self.push_str("this")?,
+                ImportKind::Glob => self.push_char('*')?,
                 ImportKind::Alias(ident) => {
-                    self.write_fmt(format_args!(" as {}", ident.as_str()))?
+                    push_fmt!(self, " as {ident}")?
                 }
                 ImportKind::Module => (),
                 ImportKind::Items {
@@ -566,105 +566,105 @@ impl<'a, W: Writer> Displayer<'a, W> {
                     this_alias,
                     items,
                 } => {
-                    self.write_char('{')?;
+                    self.push_char('{')?;
                     if *has_this {
-                        self.write_str("this")?;
+                        self.push_str("this")?;
                         if let Some(alias) = &this_alias {
-                            self.write_fmt(format_args!(" as {}", alias.as_str()))?;
+                            push_fmt!(self, " as {alias}")?;
                         }
 
                         if !items.is_empty() {
-                            self.write_str(", ")?;
+                            self.push_str(", ")?;
                         }
                     }
 
                     let last_index = items.len().saturating_sub(1);
                     for (i, item) in items.iter().enumerate() {
                         match item {
-                            ImportItem::Normal(ident) => self.write_str(ident.as_str())?,
-                            ImportItem::Alias { name, alias } => self.write_fmt(format_args!(
+                            ImportItem::Normal(ident) => self.push_str(ident.as_str())?,
+                            ImportItem::Alias { name, alias } => self.push_fmt(format_args!(
                                 "{} as {}",
                                 name.as_str(),
                                 alias.as_str()
                             ))?,
                         }
                         if i != last_index {
-                            self.write_str(", ")?;
+                            self.push_str(", ")?;
                         }
                     }
-                    self.write_char('}')?;
+                    self.push_char('}')?;
                 }
             }
             self.write_endln()?;
         }
         self.pop_depth();
         self.write_depth()?;
-        self.write_char(')')?;
+        self.push_char(')')?;
         Ok(())
     }
 
     fn write_enum(&mut self, enum_: &Enum) -> Result<()> {
-        self.write_fmt(format_args!("{ENUM_STR} {}", enum_.name.as_str()))?;
+        push_fmt!(self, "{ENUM_STR} {}", enum_.name)?;
         if let Some(ty) = &enum_.impl_type {
-            self.write_str(": ")?;
+            self.push_str(": ")?;
             self.write_type(ty)?;
         }
 
-        self.write_str(" {\n")?;
+        self.push_str(" {\n")?;
         self.push_depth();
         let last_index = enum_.variants.len().saturating_sub(1);
         for (i, variant) in enum_.variants.iter().enumerate() {
             self.write_depth()?;
             match variant {
-                EnumVariant::Normal(ident) => self.write_str(ident.as_str())?,
+                EnumVariant::Normal(ident) => self.push_str(ident.as_str())?,
                 EnumVariant::Assigned { name, value } => {
-                    self.write_fmt(format_args!("{} = ", name.as_str()))?;
+                    push_fmt!(self, "{name} = ")?;
                     self.write_expression(*value)?
                 }
                 EnumVariant::Union(union) => match union {
                     UnionKind::Tuple { name, parameters } => {
-                        self.write_str(name.as_str())?;
-                        self.write_char('(')?;
+                        self.push_str(name.as_str())?;
+                        self.push_char('(')?;
                         let last_index = parameters.len().saturating_sub(1);
                         for (i, ty) in parameters.iter().enumerate() {
                             self.write_type(ty)?;
                             if i != last_index {
-                                self.write_str(", ")?;
+                                self.push_str(", ")?;
                             }
                         }
-                        self.write_char(')')?;
+                        self.push_char(')')?;
                     }
                     UnionKind::NamedTuple { name, parameters } => {
-                        self.write_str(name.as_str())?;
-                        self.write_char('{')?;
+                        self.push_str(name.as_str())?;
+                        self.push_char('{')?;
                         let last_index = parameters.len().saturating_sub(1);
                         for (i, (ident, ty)) in parameters.iter().enumerate() {
-                            self.write_fmt(format_args!("{}: ", ident.as_str()))?;
+                            push_fmt!(self, "{ident}: ")?;
                             self.write_type(ty)?;
                             if i != last_index {
-                                self.write_str(", ")?;
+                                self.push_str(", ")?;
                             }
                         }
-                        self.write_char('}')?;
+                        self.push_char('}')?;
                     }
                 },
             }
             if i != last_index {
-                self.write_char(',')?;
+                self.push_char(',')?;
             }
             self.write_endln()?;
         }
         self.pop_depth();
         self.write_depth()?;
-        self.write_str("}\n")
+        self.push_str("}\n")
     }
 
     fn write_trait(&mut self, trait_: &Trait) -> Result<()> {
-        self.write_fmt(format_args!("{TRAIT_STR} {} {{\n", trait_.name.as_str()))?;
+        push_fmt!(self, "{TRAIT_STR} {} {{\n", trait_.name)?;
         self.push_depth();
         for ty in &trait_.typedefs {
             self.write_depth()?;
-            self.write_fmt(format_args!("{} ", KeyWord::Type.as_str()))?;
+            push_fmt!(self, "{} ", KeyWord::Type.as_str())?;
             self.write_type(ty)?;
             self.write_endln()?;
         }
@@ -676,7 +676,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
         }
         self.pop_depth();
         self.write_depth()?;
-        self.write_str("}\n")
+        self.push_str("}\n")
     }
 
     fn write_any_function(&mut self, id: FunctionId) -> Result<()> {
@@ -684,58 +684,58 @@ impl<'a, W: Writer> Displayer<'a, W> {
         let signature = &function.signature().value;
 
         if let Some(external) = signature.external {
-            self.write_fmt(format_args!(
+            push_fmt!(self, 
                 "{} \"{}\" ",
                 KeyWord::Extern.as_str(),
                 external.as_str()
-            ))?;
+            )?;
         }
 
         if signature.modifier != TypeModifier::Mut {
-            self.write_fmt(format_args!("{} ", signature.modifier.as_str()))?;
+            push_fmt!(self, "{} ", signature.modifier)?;
         }
-        self.write_str(signature.name.as_str())?;
+        self.push_str(signature.name.as_str())?;
         self.write_generic_defines(&signature.generics)?;
-        self.write_char('(')?;
+        self.push_char('(')?;
 
         match signature.function_kind {
-            FunctionThisKind::Ctor => self.write_str("/*ctor*/")?,
-            FunctionThisKind::ArrayCtor => self.write_str("/*arrayCtor*/")?,
+            FunctionThisKind::Ctor => self.push_str("/*ctor*/")?,
+            FunctionThisKind::ArrayCtor => self.push_str("/*arrayCtor*/")?,
             _ => {
                 if let Some(kind) = signature.function_kind.display() {
-                    self.write_str(kind)?;
+                    self.push_str(kind)?;
                     if !signature.parameters.is_empty() {
-                        self.write_str(", ")?;
+                        self.push_str(", ")?;
                     }
                 }
             }
         }
 
         self.write_parameters(&signature.parameters)?;
-        self.write_str("): ")?;
+        self.push_str("): ")?;
         self.write_type(&signature.return_type)?;
         let block = match function {
             FunctionKind::Normal(function) => function.block,
             FunctionKind::Signature(_) => return Ok(()),
         };
-        self.write_char(' ')?;
+        self.push_char(' ')?;
         self.write_block(block)
     }
 
     fn write_parameters(&mut self, parameters: &[Parameter]) -> Result<()> {
         let last_index = parameters.len().saturating_sub(1);
         for (i, parameter) in parameters.iter().enumerate() {
-            self.write_fmt(format_args!(
+            push_fmt!(self, 
                 "{} {}: ",
                 parameter.modifier.as_str(),
                 parameter.name.as_str()
-            ))?;
+            )?;
             self.write_type(&parameter.ty)?;
             if let Some(value) = parameter.default {
                 self.write_expression(value)?;
             }
             if i != last_index {
-                self.write_str(", ")?;
+                self.push_str(", ")?;
             }
         }
 
@@ -744,36 +744,36 @@ impl<'a, W: Writer> Displayer<'a, W> {
 
     fn write_expression(&mut self, id: ExpressionId) -> Result<()> {
         if id == ExpressionId::error() {
-            self.write_str("<error>")?;
+            self.push_str("<error>")?;
             return Ok(());
         }
 
         let expression = self.store.expressions.get_err(id)?;
         match &expression.node {
-            ExpressionKind::Null(_) => self.write_str("null"),
-            ExpressionKind::None(_) => self.write_str("()"),
-            ExpressionKind::Undefined(_) => self.write_str("undefined"),
-            ExpressionKind::Literal((_, literal)) => self.write_fmt(format_args!("{literal:?}")),
+            ExpressionKind::Null(_) => self.push_str("null"),
+            ExpressionKind::None(_) => self.push_str("()"),
+            ExpressionKind::Undefined(_) => self.push_str("undefined"),
+            ExpressionKind::Literal((_, literal)) => push_fmt!(self, "{literal:?}"),
             ExpressionKind::Copy(value) => {
                 self.write_expression(*value)?;
-                self.write_fmt(format_args!(".{}", KeyWord::Copy.as_str()))
+                push_fmt!(self, ".{}", KeyWord::Copy.as_str())
             }
             ExpressionKind::Index(index) => {
                 self.write_expression(index.collection)?;
                 if index.optional_map {
-                    self.write_char('?')?;
+                    self.push_char('?')?;
                 }
-                self.write_char('[')?;
+                self.push_char('[')?;
                 self.write_expression(index.index)?;
-                self.write_char(']')
+                self.push_char(']')
             }
             ExpressionKind::FieldAccess(field_access) => {
                 self.write_expression(field_access.object)?;
                 if field_access.optional_map {
-                    self.write_char('?')?;
+                    self.push_char('?')?;
                 }
-                self.write_char('.')?;
-                self.write_str(field_access.field.as_str())
+                self.push_char('.')?;
+                self.push_str(field_access.field.as_str())
             }
             ExpressionKind::FunctionCall(function_call) => {
                 if let Some(callee) = &function_call.callee {
@@ -785,118 +785,118 @@ impl<'a, W: Writer> Displayer<'a, W> {
                     }
 
                     if callee.optional_map {
-                        self.write_char('?')?;
+                        self.push_char('?')?;
                     }
-                    self.write_char('.')?;
+                    self.push_char('.')?;
                 }
 
-                self.write_str(function_call.name.as_str())?;
+                self.push_str(function_call.name.as_str())?;
                 self.write_generic_types(&function_call.generics)?;
-                self.write_char('(')?;
+                self.push_char('(')?;
                 let last_index = function_call.arguments.len().saturating_sub(1);
                 for (i, arg) in function_call.arguments.iter().enumerate() {
                     if let Some(name) = &arg.name {
-                        self.write_fmt(format_args!("{name}: "))?;
+                        push_fmt!(self, "{name}: ")?;
                     }
                     self.write_expression(arg.value)?;
                     if i != last_index {
-                        self.write_str(", ")?;
+                        self.push_str(", ")?;
                     }
                 }
-                self.write_char(')')
+                self.push_char(')')
             }
             ExpressionKind::Constructor(constructor) => {
                 self.write_type(&constructor.ty)?;
-                self.write_str(".(")?;
+                self.push_str(".(")?;
                 let last_index = constructor.arguments.len().saturating_sub(1);
                 for (i, arg) in constructor.arguments.iter().enumerate() {
                     if let Some(name) = &arg.name {
-                        self.write_fmt(format_args!("{name}: "))?;
+                        push_fmt!(self, "{name}: ")?;
                     }
                     self.write_expression(arg.value)?;
                     if i != last_index {
-                        self.write_str(", ")?;
+                        self.push_str(", ")?;
                     }
                 }
-                self.write_char(')')
+                self.push_char(')')
             }
             ExpressionKind::StructConstructor(ctor) => {
                 self.write_type(&ctor.struct_type)?;
                 let last_index = ctor.values.len().saturating_sub(1);
-                self.write_char('{')?;
+                self.push_char('{')?;
                 for (i, arg) in ctor.values.iter().enumerate() {
-                    self.write_fmt(format_args!("{}: ", arg.0))?;
+                    push_fmt!(self, "{}: ", arg.0)?;
                     self.write_expression(arg.1)?;
                     if i != last_index || ctor.defaults {
-                        self.write_str(", ")?;
+                        self.push_str(", ")?;
                     }
                 }
                 if ctor.defaults {
-                    self.write_str("..")?;
+                    self.push_str("..")?;
                 }
-                self.write_char('}')
+                self.push_char('}')
             }
-            ExpressionKind::Variable(variable) => self.write_str(variable.name.as_str()),
+            ExpressionKind::Variable(variable) => self.push_str(variable.name.as_str()),
             ExpressionKind::Array(any_array) => self.write_any_array(any_array),
             ExpressionKind::Sizeof(value) => {
                 self.write_expression(*value)?;
-                self.write_fmt(format_args!(".{SIZEOF_STR}"))
+                push_fmt!(self, ".{SIZEOF_STR}")
             }
             ExpressionKind::New(expression_id) => {
-                self.write_fmt(format_args!("{NEW_STR}("))?;
+                push_fmt!(self, "{NEW_STR}(")?;
                 self.write_expression(*expression_id)?;
-                self.write_char(')')
+                self.push_char(')')
             }
             ExpressionKind::NewArray(any_array) => {
-                self.write_str(NEW_STR)?;
+                self.push_str(NEW_STR)?;
                 self.write_any_array(any_array)
             }
             ExpressionKind::Unary(unary) => {
-                self.write_str(unary.operator.value.as_str())?;
+                self.push_str(unary.operator.value.as_str())?;
                 self.write_expression(unary.value)
             }
             ExpressionKind::Binary(binary) => {
-                self.write_char('(')?;
+                self.push_char('(')?;
                 self.write_expression(binary.left)?;
-                self.write_char(' ')?;
-                self.write_str(binary.operator.value.as_str())?;
-                self.write_char(' ')?;
+                self.push_char(' ')?;
+                self.push_str(binary.operator.value.as_str())?;
+                self.push_char(' ')?;
                 self.write_expression(binary.right)?;
-                self.write_char(')')
+                self.push_char(')')
             }
             ExpressionKind::Ref(ref_) => {
-                self.write_char('&')?;
+                self.push_char('&')?;
                 if ref_.is_mutable {
-                    self.write_str("mut ")?;
+                    self.push_str("mut ")?;
                 }
                 self.write_expression(ref_.value)
             }
             ExpressionKind::Deref(deref) => {
-                self.write_char('*')?;
+                self.push_char('*')?;
                 self.write_expression(deref.value)
             }
             ExpressionKind::If(if_) => {
-                self.write_str(IF_STR)?;
-                self.write_char(' ')?;
+                self.push_str(IF_STR)?;
+                self.push_char(' ')?;
                 self.write_expression(if_.condition)?;
                 self.write_block(if_.block)?;
                 self.display_branch(&if_.branch)
             }
             ExpressionKind::Match(match_) => {
-                self.write_fmt(format_args!("{MATCH_STR} "))?;
+                push_fmt!(self, "{MATCH_STR} ")?;
                 self.write_expression(match_.scrutinee)?;
-                self.write_str(" {\n")?;
+                self.push_str(" {\n")?;
                 self.push_depth();
                 for arm in &match_.arms {
                     self.write_depth()?;
                     self.write_match_pattern(&arm.pattern)?;
-                    self.write_fmt(format_args!(" {LAMDA_ARROW_STR} "))?;
+                    push_fmt!(self, " {LAMDA_ARROW_STR} ")?;
                     self.write_block(arm.body)?;
                     self.write_endln()?;
                 }
                 self.pop_depth();
                 self.write_depth()?;
-                self.write_char('}')?;
+                self.push_char('}')?;
                 Ok(())
             }
             ExpressionKind::MatchMethod(match_method) => {
@@ -907,17 +907,17 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 for (i, arm) in match_method.arms.iter().enumerate() {
                     self.write_depth()?;
                     if match_method.optional_map {
-                        self.write_char('?')?;
+                        self.push_char('?')?;
                     }
-                    self.write_char('.')?;
-                    self.write_str(arm.variant.as_str())?;
+                    self.push_char('.')?;
+                    self.push_str(arm.variant.as_str())?;
                     if let Some(binding) = &arm.binding {
-                        self.write_fmt(format_args!(
+                        push_fmt!(self, 
                             "{{{} {LAMDA_ARROW_STR} ",
                             binding.ident.as_str()
-                        ))?;
+                        )?;
                         self.write_block(arm.body)?;
-                        self.write_char('}')?;
+                        self.push_char('}')?;
                     } else {
                         self.write_block(arm.body)?;
                     }
@@ -931,7 +931,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 Ok(())
             }
             ExpressionKind::For(for_) => {
-                self.write_fmt(format_args!("{FOR_STR} "))?;
+                push_fmt!(self, "{FOR_STR} ")?;
                 match &for_.condition {
                     ForCondition::Loop => (),
                     ForCondition::While(condition) => self.write_expression(*condition)?,
@@ -941,10 +941,10 @@ impl<'a, W: Writer> Displayer<'a, W> {
                         element_kind,
                     } => {
                         if let Some(index) = index {
-                            self.write_fmt(format_args!("{}, ", index.ident.as_str()))?;
+                            push_fmt!(self, "{}, ", index.ident.as_str())?;
                         }
                         self.write_var_pattern(element_kind)?;
-                        self.write_fmt(format_args!(" {IN_FOR_LOOP_STR} ",))?;
+                        push_fmt!(self, " {IN_FOR_LOOP_STR} ",)?;
                         self.write_expression(*collection)?;
                     }
                 }
@@ -953,31 +953,31 @@ impl<'a, W: Writer> Displayer<'a, W> {
             ExpressionKind::Block(block_id) => self.write_block(*block_id),
             ExpressionKind::TypeOf(type_of) => {
                 self.write_expression(type_of.value)?;
-                self.write_fmt(format_args!(" {TYPEOF_STR} "))?;
+                push_fmt!(self, " {TYPEOF_STR} ")?;
                 match &type_of.kind {
-                    TypeofKind::Null => self.write_str(KeyWord::Null.as_str())?,
-                    TypeofKind::NotNull => self.write_fmt(format_args!(
+                    TypeofKind::Null => self.push_str(KeyWord::Null.as_str())?,
+                    TypeofKind::NotNull => push_fmt!(self, 
                         "{}{}",
                         Symbol::Not.as_str(),
                         KeyWord::Null.as_str(),
-                    ))?,
+                    )?,
                     TypeofKind::Union {
                         type_name,
                         variant_name,
-                    } => self.write_fmt(format_args!(
+                    } => push_fmt!(self, 
                         "{}.{}",
                         type_name.as_str(),
                         variant_name.as_str(),
-                    ))?,
+                    )?,
                 };
                 Ok(())
             }
             ExpressionKind::Lambda(lambda) => self.write_lambda(lambda),
-            ExpressionKind::Break => self.write_str(KeyWord::Break.as_str()),
-            ExpressionKind::Continue => self.write_str(KeyWord::Continue.as_str()),
+            ExpressionKind::Break => self.push_str(KeyWord::Break.as_str()),
+            ExpressionKind::Continue => self.push_str(KeyWord::Continue.as_str()),
             ExpressionKind::Return(value) => {
-                self.write_str(KeyWord::Return.as_str())?;
-                self.write_char(' ')?;
+                self.push_str(KeyWord::Return.as_str())?;
+                self.push_char(' ')?;
                 if let Some(value) = value {
                     self.write_expression(*value)?;
                 }
@@ -985,41 +985,41 @@ impl<'a, W: Writer> Displayer<'a, W> {
             }
             ExpressionKind::Pass(expression_id) => {
                 self.write_expression(*expression_id)?;
-                self.write_fmt(format_args!(".{PASS_STR}"))
+                push_fmt!(self, ".{PASS_STR}")
             }
             ExpressionKind::StringFormat(fmt) => {
                 let tag = if fmt.to_string { "f" } else { "fstr" };
-                self.write_fmt(format_args!("{tag}"))?;
+                push_fmt!(self, "{tag}")?;
                 for (text, expr_id) in &fmt.parts {
-                    self.write_fmt(format_args!("\"{text}\""))?;
-                    self.write_char('{')?;
+                    push_fmt!(self, "\"{text}\"")?;
+                    self.push_char('{')?;
                     self.write_expression(*expr_id)?;
-                    self.write_char('}')?;
+                    self.push_char('}')?;
                 }
-                self.write_fmt(format_args!("\"{}\"", fmt.trailing))
+                push_fmt!(self, "\"{}\"", fmt.trailing)
             }
             ExpressionKind::Tuple(values) => {
-                self.write_str(".(")?;
+                self.push_str(".(")?;
                 let last_index = values.len().saturating_sub(1);
                 for (i, value) in values.iter().enumerate() {
                     self.write_expression(*value)?;
                     if i != last_index {
-                        self.write_str(", ")?;
+                        self.push_str(", ")?;
                     }
                 }
-                self.write_char(')')
+                self.push_char(')')
             }
             ExpressionKind::NamedTuple(values) => {
-                self.write_str(".{")?;
+                self.push_str(".{")?;
                 let last_index = values.len().saturating_sub(1);
                 for (i, (name, value)) in values.iter().enumerate() {
-                    self.write_fmt(format_args!("{}: ", name.as_str()))?;
+                    push_fmt!(self, "{}: ", name.as_str())?;
                     self.write_expression(*value)?;
                     if i != last_index {
-                        self.write_str(", ")?;
+                        self.push_str(", ")?;
                     }
                 }
-                self.write_char('}')
+                self.push_char('}')
             }
         }
     }
@@ -1033,7 +1033,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
                     if i != last_index {
                         self.write_endln()?;
                         self.write_depth()?;
-                        self.write_str("| ")?;
+                        self.push_str("| ")?;
                     }
                 }
                 Ok(())
@@ -1043,119 +1043,119 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 if_condition,
             } => {
                 self.write_match_pattern(pattern)?;
-                self.write_fmt(format_args!(" {} ", KeyWord::If.as_str()))?;
+                push_fmt!(self, " {} ", KeyWord::If.as_str())?;
                 self.write_expression(*if_condition)?;
-                self.write_fmt(format_args!(" {}", Symbol::LambdaArrow.as_str()))
+                push_fmt!(self, " {}", Symbol::LambdaArrow.as_str())
             }
-            MatchPattern::Null => self.write_str(KeyWord::Null.as_str()),
+            MatchPattern::Null => self.push_str(KeyWord::Null.as_str()),
             MatchPattern::NotNull(binding) => {
-                self.write_fmt(format_args!(
+                push_fmt!(self, 
                     "{}{}(",
                     Symbol::Not.as_str(),
                     KeyWord::Null.as_str()
-                ))?;
-                self.write_str(binding.ident.as_str())?;
-                self.write_char(')')
+                )?;
+                self.push_str(binding.ident.as_str())?;
+                self.push_char(')')
             }
-            MatchPattern::Wildcard => self.write_str("_"),
-            MatchPattern::Literal(literal) => self.write_fmt(format_args!("{literal:?}")),
-            MatchPattern::Binding(binding) => self.write_str(binding.ident.as_str()),
+            MatchPattern::Wildcard => self.push_str("_"),
+            MatchPattern::Literal(literal) => push_fmt!(self, "{literal:?}"),
+            MatchPattern::Binding(binding) => self.push_str(binding.ident.as_str()),
             MatchPattern::Array(match_patterns) => {
-                self.write_char('[')?;
+                self.push_char('[')?;
                 let last_index = match_patterns.len().saturating_sub(1);
                 for (i, arm) in match_patterns.iter().enumerate() {
                     self.write_match_pattern(arm)?;
                     if i != last_index {
-                        self.write_str(", ")?;
+                        self.push_str(", ")?;
                     }
                 }
-                self.write_char(']')
+                self.push_char(']')
             }
             MatchPattern::Constructor(ctor) => {
-                self.write_fmt(format_args!(
+                push_fmt!(self, 
                     "{}.{}",
-                    ctor.type_name.as_str(),
-                    ctor.variant_name.as_str()
-                ))?;
+                    ctor.type_name,
+                    ctor.variant_name
+                )?;
                 if let Some(binding) = &ctor.binding {
-                    self.write_fmt(format_args!("({})", binding.ident.as_str()))?;
+                    push_fmt!(self, "({binding})")?;
                 }
                 Ok(())
             }
             MatchPattern::Tuple(tuple) => {
-                self.write_char('(')?;
+                self.push_char('(')?;
                 for (i, element) in tuple.elements.iter().enumerate() {
                     if i > 0 {
-                        self.write_str(", ")?;
+                        self.push_str(", ")?;
                     }
                     self.write_match_pattern(element)?;
                 }
                 if tuple.rest {
                     if !tuple.elements.is_empty() {
-                        self.write_str(", ")?;
+                        self.push_str(", ")?;
                     }
-                    self.write_str("..")?;
+                    self.push_str("..")?;
                 }
-                self.write_char(')')
+                self.push_char(')')
             }
             MatchPattern::NamedTuple(named) => {
-                self.write_char('{')?;
+                self.push_char('{')?;
                 for (i, field) in named.fields.iter().enumerate() {
                     if i > 0 {
-                        self.write_str(", ")?;
+                        self.push_str(", ")?;
                     }
-                    self.write_str(field.field.as_str())?;
+                    self.push_str(field.field.as_str())?;
                     if let Some(binding) = &field.binding {
-                        self.write_str(": ")?;
-                        self.write_str(binding.ident.as_str())?;
+                        self.push_str(": ")?;
+                        self.push_str(binding.ident.as_str())?;
                     }
                 }
                 if named.rest {
                     if !named.fields.is_empty() {
-                        self.write_str(", ")?;
+                        self.push_str(", ")?;
                     }
-                    self.write_str("..")?;
+                    self.push_str("..")?;
                 }
-                self.write_char('}')
+                self.push_char('}')
             }
             MatchPattern::ConstructorStruct(struct_pat) => {
-                self.write_str(struct_pat.type_name.as_str())?;
-                self.write_char('{')?;
+                self.push_str(struct_pat.type_name.as_str())?;
+                self.push_char('{')?;
                 for (i, field) in struct_pat.fields.iter().enumerate() {
                     if i > 0 {
-                        self.write_str(", ")?;
+                        self.push_str(", ")?;
                     }
-                    self.write_str(field.field.as_str())?;
+                    self.push_str(field.field.as_str())?;
                     if let Some(binding) = &field.binding {
-                        self.write_str(": ")?;
-                        self.write_str(binding.ident.as_str())?;
+                        self.push_str(": ")?;
+                        self.push_str(binding.ident.as_str())?;
                     }
                 }
                 if struct_pat.rest {
                     if !struct_pat.fields.is_empty() {
-                        self.write_str(", ")?;
+                        self.push_str(", ")?;
                     }
-                    self.write_str("..")?;
+                    self.push_str("..")?;
                 }
-                self.write_char('}')
+                self.push_char('}')
             }
-            MatchPattern::Rest => self.write_str(".."),
+            MatchPattern::Rest => self.push_str(".."),
         }
     }
 
     fn display_branch(&mut self, if_arm: &Option<Box<IfBranch>>) -> Result<()> {
         let mut current = if_arm.as_ref();
         while let Some(arm) = current {
-            self.write_char(' ')?;
+            self.push_char(' ')?;
             match arm.as_ref() {
                 IfBranch::If(elif) => {
-                    self.write_fmt(format_args!("{ELSE_STR} {IF_STR} "))?;
+                    push_fmt!(self, "{ELSE_STR} {IF_STR} ")?;
                     self.write_expression(elif.condition)?;
                     self.write_block(elif.block)?;
                     current = elif.branch.as_ref();
                 }
                 IfBranch::Else(el) => {
-                    self.write_fmt(format_args!("{ELSE_STR} "))?;
+                    push_fmt!(self, "{ELSE_STR} ")?;
                     self.write_block(*el)?;
                     current = None;
                 }
@@ -1168,102 +1168,102 @@ impl<'a, W: Writer> Displayer<'a, W> {
     fn write_type(&mut self, ty: &SoulType) -> Result<()> {
         match ty {
             SoulType::TupleKind(kind) => {
-                self.write_char('(')?;
+                self.push_char('(')?;
                 let last_index = kind.len().saturating_sub(1);
                 match kind {
                     TupleKind::Tuple(types) => {
                         for (i, ty) in types.iter().enumerate() {
                             self.write_type(ty)?;
                             if i != last_index {
-                                self.write_str(", ")?;
+                                self.push_str(", ")?;
                             }
                         }
                     }
                     TupleKind::NamedTuple(items) => {
                         for (i, (name, ty)) in items.iter().enumerate() {
-                            self.write_fmt(format_args!("{}: ", name.as_str()))?;
+                            push_fmt!(self, "{}: ", name.as_str())?;
                             self.write_type(ty)?;
                             if i != last_index {
-                                self.write_str(", ")?;
+                                self.push_str(", ")?;
                             }
                         }
                     }
                 }
-                self.write_char(')')
+                self.push_char(')')
             }
-            SoulType::None => self.write_str(PrimitiveTypes::None.as_str()),
-            SoulType::Never => self.write_char('!'),
-            SoulType::Primitive(primitive_types) => self.write_str(primitive_types.as_str()),
+            SoulType::None => self.push_str(PrimitiveTypes::None.as_str()),
+            SoulType::Never => self.push_char('!'),
+            SoulType::Primitive(primitive_types) => self.push_str(primitive_types.as_str()),
             SoulType::Array(array) => {
                 match array.kind {
-                    ArrayKind::StackArrayWildcard => self.write_str("[_]")?,
-                    ArrayKind::StackArray(num) => self.write_fmt(format_args!("[{num}]"))?,
-                    ArrayKind::HeapArray => self.write_str("[]")?,
-                    ArrayKind::MutSlice => self.write_str("[&mut]")?,
-                    ArrayKind::ConstSlice => self.write_str("[&]")?,
+                    ArrayKind::StackArrayWildcard => self.push_str("[_]")?,
+                    ArrayKind::StackArray(num) => push_fmt!(self, "[{num}]")?,
+                    ArrayKind::HeapArray => self.push_str("[]")?,
+                    ArrayKind::MutSlice => self.push_str("[&mut]")?,
+                    ArrayKind::ConstSlice => self.push_str("[&]")?,
                 }
                 self.write_type(&array.of_type)
             }
             SoulType::Reference(reference) | SoulType::Pointer(reference) => {
                 if matches!(ty, SoulType::Pointer(_)) {
-                    self.write_char('*')?;
+                    self.push_char('*')?;
                 } else {
-                    self.write_char('&')?;
+                    self.push_char('&')?;
                 }
 
                 if let Some(lifetime) = &reference.lifetime {
-                    self.write_fmt(format_args!("'{} ", lifetime.as_str()))?;
+                    push_fmt!(self, "'{} ", lifetime.as_str())?;
                 }
                 if reference.mutable {
-                    self.write_str("mut ")?;
+                    self.push_str("mut ")?;
                 }
                 self.write_type(&reference.inner)
             }
             SoulType::RawPtr(inner) => {
-                self.write_str("RawPtr")?;
+                self.push_str("RawPtr")?;
                 if let Some(inner) = inner {
-                    self.write_char('<')?;
+                    self.push_char('<')?;
                     self.write_type(inner)?;
-                    self.write_char('>')?;
+                    self.push_char('>')?;
                 }
                 Ok(())
             }
             SoulType::Res { ok, err } => {
-                self.write_str("Res")?;
+                self.push_str("Res")?;
                 match (ok, err) {
                     (Some(ok), Some(err)) => {
-                        self.write_char('<')?;
+                        self.push_char('<')?;
                         self.write_type(ok)?;
-                        self.write_str(", ")?;
+                        self.push_str(", ")?;
                         self.write_type(err)?;
-                        self.write_char('>')?;
+                        self.push_char('>')?;
                     }
                     (Some(ok), None) => {
-                        self.write_char('<')?;
+                        self.push_char('<')?;
                         self.write_type(ok)?;
-                        self.write_char('>')?;
+                        self.push_char('>')?;
                     }
                     _ => {}
                 }
                 Ok(())
             }
             SoulType::Optional(soul_type) => {
-                self.write_char('?')?;
+                self.push_char('?')?;
                 self.write_type(&soul_type)
             }
             SoulType::Stub(stub) => {
-                self.write_str(&stub.name)?;
+                self.push_str(&stub.name)?;
                 self.write_generic_types(&stub.generics)?;
                 Ok(())
             }
             SoulType::NamedVariant { base, variant } => {
                 self.write_type(base)?;
-                self.write_fmt(format_args!(".{}", variant.as_str()))
+                push_fmt!(self, ".{}", variant.as_str())
             }
-            SoulType::String => self.write_str(Types::String.as_str()),
-            SoulType::FormatString => self.write_str(Types::FormatString.as_str()),
-            SoulType::Any => self.write_str(Types::Any.as_str()),
-            SoulType::Error => self.write_str(Types::Error.as_str()),
+            SoulType::String => self.push_str(Types::String.as_str()),
+            SoulType::FormatString => self.push_str(Types::FormatString.as_str()),
+            SoulType::Any => self.push_str(Types::Any.as_str()),
+            SoulType::Error => self.push_str(Types::Error.as_str()),
         }
     }
 
@@ -1272,43 +1272,43 @@ impl<'a, W: Writer> Displayer<'a, W> {
             AnyArray::Array(array) => {
                 if let Some(ty) = &array.collection_type {
                     self.write_type(ty)?;
-                    self.write_char('.')?;
+                    self.push_char('.')?;
                 }
-                self.write_char('[')?;
+                self.push_char('[')?;
                 if let Some(ty) = &array.element_type {
                     self.write_type(ty)?;
-                    self.write_str(": ")?;
+                    self.push_str(": ")?;
                 }
                 let last_index = array.values.len().saturating_sub(1);
                 for (i, value) in array.values.iter().enumerate() {
                     self.write_expression(*value)?;
                     if i != last_index {
-                        self.write_str(", ")?;
+                        self.push_str(", ")?;
                     }
                 }
-                self.write_char(']')
+                self.push_char(']')
             }
             AnyArray::ArrayFiller(array) => {
                 if let Some(collection) = &array.collection_type {
                     self.write_type(collection)?;
-                    self.write_char('.')?;
+                    self.push_char('.')?;
                 }
-                self.write_char('[')?;
+                self.push_char('[')?;
                 if let Some(ty) = &array.element_type {
                     self.write_type(ty)?;
-                    self.write_str(": ")?;
+                    self.push_str(": ")?;
                 }
-                self.write_fmt(format_args!("{FOR_STR} "))?;
+                push_fmt!(self, "{FOR_STR} ")?;
                 if let Some(binding) = &array.for_index {
-                    self.write_fmt(format_args!(
+                    push_fmt!(self, 
                         "{} {IN_FOR_LOOP_STR} ",
                         binding.ident.as_str()
-                    ))?;
+                    )?;
                 }
                 self.write_expression(array.amount)?;
-                self.write_fmt(format_args!(" {LAMDA_ARROW_STR} "))?;
+                push_fmt!(self, " {LAMDA_ARROW_STR} ")?;
                 self.write_expression(array.element)?;
-                self.write_char(']')
+                self.push_char(']')
             }
         }
     }
@@ -1318,20 +1318,20 @@ impl<'a, W: Writer> Displayer<'a, W> {
             return Ok(());
         }
 
-        self.write_char('<')?;
+        self.push_char('<')?;
         let last_index = generics.len().saturating_sub(1);
         for (i, generic) in generics.iter().enumerate() {
-            self.write_str(generic.name.as_str())?;
+            self.push_str(generic.name.as_str())?;
             if let Some(bound) = &generic.bound {
-                self.write_str(": ")?;
+                self.push_str(": ")?;
                 self.write_type(bound)?;
             }
 
             if i != last_index {
-                self.write_str(", ")?;
+                self.push_str(", ")?;
             }
         }
-        self.write_char('>')
+        self.push_char('>')
     }
 
     fn write_generic_types(&mut self, generics: &Vec<SoulType>) -> Result<()> {
@@ -1339,23 +1339,25 @@ impl<'a, W: Writer> Displayer<'a, W> {
             return Ok(());
         }
 
-        self.write_char('<')?;
+        self.push_char('<')?;
         let last_index = generics.len().saturating_sub(1);
         for (i, generic) in generics.iter().enumerate() {
             self.write_type(generic)?;
             if i != last_index {
-                self.write_str(", ")?;
+                self.push_str(", ")?;
             }
         }
-        self.write_char('>')
+        self.push_char('>')
     }
 
     fn write_endln(&mut self) -> Result<()> {
-        self.writer.push_char('\n')
+        self.writer.push_char('\n')?;
+        Ok(())
     }
 
     fn write_depth(&mut self) -> Result<()> {
-        self.writer.push_str(&self.depth)
+        self.writer.push_str(&self.depth)?;
+        Ok(())
     }
 
     fn push_depth(&mut self) {
@@ -1366,16 +1368,19 @@ impl<'a, W: Writer> Displayer<'a, W> {
         self.depth.pop();
     }
 
-    fn write_fmt(&mut self, args: Arguments<'_>) -> Result<()> {
-        self.writer.push_fmt(args)
+    fn push_fmt(&mut self, args: Arguments<'_>) -> Result<()> {
+        self.writer.push_fmt(args)?;
+        Ok(())
     }
 
-    fn write_str(&mut self, str: &str) -> Result<()> {
-        self.writer.push_str(str)
+    fn push_str(&mut self, str: &str) -> Result<()> {
+        self.writer.push_str(str)?;
+        Ok(())
     }
 
-    fn write_char(&mut self, ch: char) -> Result<()> {
-        self.writer.push_char(ch)
+    fn push_char(&mut self, ch: char) -> Result<()> {
+        self.writer.push_char(ch)?;
+        Ok(())
     }
 }
 

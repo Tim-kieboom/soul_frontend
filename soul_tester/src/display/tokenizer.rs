@@ -3,8 +3,7 @@ use soul_tokenizer::{TokenStream, model::TokenKind};
 use soul_utils::literal::{Number, StringLiteral, TokenLiteral};
 
 use crate::{
-    config,
-    display::{write_create_file, writer::Writer},
+    config, display::{write_create_file, writer::Writer}, push_fmt,
 };
 
 pub(crate) fn display_tokenizer<'a>(tokens: &TokenStream<'a>) -> Result<()> {
@@ -30,34 +29,35 @@ fn display_tokens<'a>(tokens: TokenStream<'a>, writer: &mut impl Writer) -> Resu
         display_tokenkind(&token.kind, writer)?;
         writer.push_char('\n')?;
     }
-    writer.writer_flush()
+
+    Ok(writer.writer_flush()?)
 }
 
 fn display_tokenkind(token: &TokenKind, writer: &mut impl Writer) -> Result<()> {
     match token {
         TokenKind::Literal(literal) => match literal {
             TokenLiteral::String(str) => match str {
-                StringLiteral::Str(str) => writer.push_fmt(format_args!("str({str:?})"))?,
-                StringLiteral::Cstr(str) => writer.push_fmt(format_args!("cstr({str:?})"))?,
+                StringLiteral::Str(str) => push_fmt!(writer, "str({str:?})")?,
+                StringLiteral::Cstr(str) => push_fmt!(writer, "cstr({str:?})")?,
             },
             TokenLiteral::Number(num) => match num {
-                Number::Int(n) => writer.push_fmt(format_args!("{n}"))?,
-                Number::Uint(n) => writer.push_fmt(format_args!("{n}"))?,
-                Number::Float(n) => writer.push_fmt(format_args!("{n}"))?,
+                Number::Int(n) => push_fmt!(writer, "{n}")?,
+                Number::Uint(n) => push_fmt!(writer, "{n}")?,
+                Number::Float(n) => push_fmt!(writer, "{n}")?,
             },
-            TokenLiteral::Char(ch) => writer.push_fmt(format_args!("{ch:?}"))?,
+            TokenLiteral::Char(ch) => push_fmt!(writer, "{ch:?}")?,
         },
-        TokenKind::Keyword(key_word) => writer.push_fmt(format_args!("{}", key_word.as_str()))?,
-        TokenKind::Symbol(symbol) => writer.push_fmt(format_args!("'{}'", symbol.as_str()))?,
-        TokenKind::Types(types) => writer.push_fmt(format_args!("{}", types.as_str()))?,
-        TokenKind::Ident(ident) => writer.push_fmt(format_args!("{ident:?}"))?,
+        TokenKind::Keyword(key_word) => push_fmt!(writer, "{key_word}")?, 
+        TokenKind::Symbol(symbol) => push_fmt!(writer, "{symbol}")?,
+        TokenKind::Types(types) => push_fmt!(writer, "{types}")?,
+        TokenKind::Ident(ident) => push_fmt!(writer, "{ident:?}")?,
         TokenKind::EndLine => _ = writer.push_str("'\\n'")?,
         TokenKind::EndFile => _ = writer.push_str("<end-file>")?,
         TokenKind::StringFormat(tag) => {
-            writer.push_fmt(format_args!("fstring_start({})", tag.as_str()))?;
+            push_fmt!(writer, "fstring_start({tag})")?;
         }
         TokenKind::FStringPart(text) => {
-            writer.push_fmt(format_args!("fstring_part({text:?})"))?;
+            push_fmt!(writer, "fstring_part({text:?})")?;
         }
         TokenKind::FStringEnd => {
             writer.push_str("fstring_end()")?;

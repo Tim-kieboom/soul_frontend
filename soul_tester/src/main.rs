@@ -14,13 +14,14 @@ use soul_utils::{
 
 
 use std::{
-    io::{self, stdout}, path::{Path, PathBuf}
+    io::{self, stdout}, path::{Path, PathBuf}, process::ExitCode,
 };
 
 mod config;
 mod display;
 
 fn main() {
+
     match frontend(&mut Benchmark::new()) {
         Ok(true) => println!("{GREEN}success{DEFAULT}"),
         Ok(false) => eprintln!("{RED}failed{DEFAULT}"),
@@ -39,7 +40,13 @@ fn frontend(benchmark: &mut Benchmark) -> Result<bool> {
     let tokens = tokenize(&file, module_store.get_root_id())?;
     module_store.insert_root(main_path);
 
-    let ast = ast(tokens, source_folder, benchmark, &mut module_store, &crate_store)?;
+    let ast = ast(tokens, AstRequest {
+        benchmark,
+        source_folder,
+        crate_store: &crate_store,
+        module_store: &mut module_store,
+    })?;
+
     for fault in ast.faults().iter() {
         display_fault(fault, &module_store, &config::PRINT_CONFIGS, &mut stdout())?;
     }
@@ -108,19 +115,11 @@ fn tokenize<'a>(file: &'a str, root: ModuleId) -> Result<TokenStream<'a>> {
 
 fn ast<'a>(
     tokens: TokenStream<'a>,
-    source_folder: PathBuf,
-    benchmark: &'a mut Benchmark,
-    module_store: &'a mut ModuleStore,
-    crate_store: &'a CrateStore,
+    request: AstRequest<'a>
 ) -> Result<AstTree> {
     let ast = to_ast(
         tokens,
-        AstRequest {
-            benchmark,
-            module_store,
-            source_folder,
-            crate_store,
-        },
+        request,
         &config::COMPILER_OPTIONS,
     );
     display_ast(&ast)?;

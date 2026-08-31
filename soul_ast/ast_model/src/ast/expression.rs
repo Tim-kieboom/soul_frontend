@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use soul_utils::{
     Ident, impl_soul_ids,
     span::{Span, Spanned},
@@ -642,6 +644,11 @@ impl Binding {
 
     pub fn new(id: NodeId, ident: Ident) -> Self {
         Self { ident, id }
+    }
+}
+impl Display for Binding {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.ident.as_str().fmt(f)
     }
 }
 

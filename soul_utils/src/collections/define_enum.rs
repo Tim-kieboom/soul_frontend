@@ -92,7 +92,11 @@ macro_rules! define_str_enum {
             }
         }
 
-
+        impl std::fmt::Display for $enum_name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                self.as_str().fmt(f)
+            }
+        }
     };
     (
         $(#[$enum_doc:meta])*
@@ -139,7 +143,11 @@ macro_rules! define_str_enum {
             }
         }
 
-
+        impl std::fmt::Display for $enum_name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                self.as_str().fmt(f)
+            }
+        }
     }
 }
 
