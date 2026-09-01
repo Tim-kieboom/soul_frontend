@@ -4,7 +4,6 @@ use ast_model::{
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
-    TypeModifier,
     collections::try_result::{ResultMapNotValue, ToResult},
     error::SoulResult,
     span::Span,
@@ -12,7 +11,7 @@ use soul_utils::{
 
 use crate::{
     parser::Parser,
-    utils::{CONST, CURLY_CLOSE, CURLY_OPEN, IMPL, LITERAL, MUT, PUB},
+    utils::{CONST, CURLY_CLOSE, CURLY_OPEN, IMPL, MUT, PUB},
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
@@ -34,7 +33,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 impls.push(impl_block);
             }
 
-            &PUB | &MUT | &CONST | &LITERAL | TokenKind::Ident(_) => {
+            &PUB | &MUT | &CONST | TokenKind::Ident(_) => {
                 let methode = self.parse_use_method(&method_type, self.token().span)?;
                 methodes.push(methode);
             }
@@ -83,6 +82,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 }
 
                 StatementKind::Enum(_)
+                | StatementKind::Union(_)
                 | StatementKind::Trait(_)
                 | StatementKind::Struct(_)
                 | StatementKind::Import(_)
@@ -143,10 +143,10 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            let modifier = self.try_bump_type_modiffier().unwrap_or(TypeModifier::Mut);
+            let is_const = self.try_bump_const().is_some();
             let name = self.try_bump_consume_ident()?;
             methods.push(
-                self.try_parse_function_declaration_id(start_span, modifier, method_type, name)
+                self.try_parse_function_declaration_id(start_span, method_type, is_const, name)
                     .map_try_not_value(|(_, err)| err)
                     .merge_to_result()?
                     .value,
@@ -166,9 +166,9 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.bump();
         }
 
-        let modifier = self.try_bump_type_modiffier().unwrap_or(TypeModifier::Mut);
+        let is_const = self.try_bump_const().is_some();
         let name = self.try_bump_consume_ident()?;
-        self.try_parse_function_declaration_id(start_span, modifier, ty, name)
+        self.try_parse_function_declaration_id(start_span, ty, is_const, name)
             .map(|spanned| Methode::new(spanned.value, is_public))
             .map_try_not_value(|(_, err)| err)
             .merge_to_result()

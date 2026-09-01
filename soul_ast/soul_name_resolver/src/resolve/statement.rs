@@ -19,6 +19,7 @@ impl<'a> NameResolver<'a> {
         match &statement.node {
             StatementKind::Import(_) | StatementKind::TypeDef(_) => (),
             StatementKind::Enum(enum_) => self.resolve_enum(enum_),
+            StatementKind::Union(union_) => self.resolve_enum(union_),
             StatementKind::Function(id) => self.resolve_function(*id),
             StatementKind::Trait(trait_) => self.resolve_trait(trait_),
             StatementKind::Struct(struct_) => self.resolve_struct(struct_),

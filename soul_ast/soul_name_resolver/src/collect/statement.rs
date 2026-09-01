@@ -35,6 +35,22 @@ impl<'a> NameResolver<'a> {
                     }
                 }
             }
+            StatementKind::Union(union_) => {
+                self.declare_enum(union_);
+                if self.current.in_global {
+                    let ty = CustomType::Enum(union_.clone());
+                    self.header_insert_custom_type(id, ty);
+                }
+
+                for variant in &union_.variants {
+                    match variant {
+                        EnumVariant::Assigned { value, .. } => {
+                            self.collect_expression(*value);
+                        }
+                        _ => (),
+                    }
+                }
+            }
             StatementKind::Trait(trait_) => {
                 self.declare_trait(trait_);
                 if self.current.in_global {

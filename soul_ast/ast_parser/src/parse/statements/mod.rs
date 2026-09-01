@@ -1,24 +1,25 @@
 use ast_model::{
     FunctionKind,
     block::{Block, BlockId},
-    statements::{Statement, StatementId, Variable},
+    expression::Binding,
+    statements::{Statement, StatementId, VarPattern, Variable},
 };
 use soul_tokenizer::model::TokenKind;
 use soul_utils::{
-    TypeModifier,
+    Ident, TypeModifier,
     collections::try_result::{ResultTryErr, TryErr, TryError, TryNotValue, TryOk, TryResult},
     error::SoulResult,
     fault::Fault,
     soul_names::Symbol,
-    span::Span,
+    span::{Attribute, Span},
 };
 
 use crate::{
     parse::statements::variable::AssignType,
     parser::Parser,
     utils::{
-        ARROW_LEFT, COLON, COLON_ASSIGN, CURLY_CLOSE, CURLY_OPEN, DOT, ROUND_OPEN, SEMI_COLON,
-        STAMENT_END_TOKENS, STAMENT_SKIP_TOKENS, STAR,
+        ARROW_LEFT, COLON, COLON_ASSIGN, CURLY_CLOSE, CURLY_OPEN, DOT, HASH, NOT, ROUND_OPEN,
+        SEMI_COLON, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS, STAMENT_SKIP_TOKENS, STAR,
     },
 };
 
@@ -121,9 +122,9 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         self.expect(&CURLY_CLOSE)?;
         Ok(self.forest.store.insert_block(Block {
-            modifier,
             statements,
             span: self.span_combine(start_span),
+            is_const: modifier == TypeModifier::Const,
         }))
     }
 
@@ -132,6 +133,16 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         self.skip_while_any(STAMENT_SKIP_TOKENS);
         let start_span = self.token().span;
+
+        if self.current_is(&HASH) {
+            let (attributes, attributes_span) = self.parse_statement_attributes()?;
+            let mut statement = self.inner_parse_statement()?;
+            let mut combined = attributes;
+            combined.append(&mut statement.meta_data.attributes);
+            statement.meta_data.attributes = combined;
+            statement.span = attributes_span.combine(statement.span);
+            return Ok(statement);
+        }
 
         let possible_kind = match &self.token().kind {
             TokenKind::Ident(_) => self.try_parse_from_ident(start_span),
@@ -230,14 +241,61 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
     }
 
+    /// Parses one or more attribute groups `#[ ident]` / `#[ ! ident]` that precede an item.
+    ///
+    /// Negated markers (`#[!Trait]`) store their name with a `!` prefix.
+    pub(crate) fn parse_statement_attributes(&mut self) -> SoulResult<(Vec<Attribute>, Span)> {
+        let start_span = self.token().span;
+        let mut attributes = Vec::new();
+
+        while self.current_is(&HASH) {
+            self.bump();
+
+            if !self.current_is(&SQUARE_OPEN) {
+                return Err(self.get_expect_error(&SQUARE_OPEN));
+            }
+            self.bump();
+
+            let mut name = String::new();
+            if self.current_is(&NOT) {
+                self.bump();
+                name.push('!');
+            }
+
+            let token = self.bump_consume();
+            let name_text = match token.kind {
+                TokenKind::Ident(ident) => ident,
+                TokenKind::Keyword(keyword) => keyword.as_str().to_string(),
+                _ => return Err(self.get_expect_ident_error("attribute name")),
+            };
+            name.push_str(&name_text);
+
+            if !self.current_is(&SQUARE_CLOSE) {
+                return Err(self.get_expect_error(&SQUARE_CLOSE));
+            }
+            self.bump();
+
+            attributes.push(Attribute {
+                name: Ident::new(name, token.span),
+                values: Vec::new(),
+            });
+        }
+
+        Ok((attributes, self.span_combine(start_span)))
+    }
+
     fn try_parse_from_ident(&mut self, start_span: Span) -> TryResult<Statement, Fault> {
         let ident = self.try_token_as_ident_str().try_err()?;
         let is_this = ident == "This";
+        let ident_owned = ident.to_string();
 
         let peek = self.peek();
         match &peek.kind {
             &ROUND_OPEN | &ARROW_LEFT => self.parse_any_function().try_err(),
             &COLON | &COLON_ASSIGN => self.parse_variable().try_err(),
+            TokenKind::Symbol(Symbol::DoubleColon) => {
+                self.parse_associated_constant(ident_owned, start_span).try_err()
+            }
             &DOT if is_this => self.parse_contructor(start_span).try_err(),
             &CURLY_OPEN => {
                 let saved = self.tokens.current_position();
@@ -283,11 +341,31 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
     }
 
+    fn parse_associated_constant(&mut self, name: String, start_span: Span) -> SoulResult<Statement> {
+        self.bump();
+        self.bump();
+        let value = self.parse_expression_id(STAMENT_END_TOKENS)?;
+        Ok(Statement::new_variable(
+            Variable {
+                id: self.alloc_node(),
+                is_public: false,
+                pattern: VarPattern::Simple {
+                    binding: Binding::new(self.alloc_node(), Ident::new(name, start_span)),
+                    modifier: TypeModifier::Const,
+                },
+                ty: None,
+                modifier: TypeModifier::Const,
+                initialize_value: Some(value),
+            },
+            self.span_combine(start_span),
+        ))
+    }
+
     fn parse_contructor(&mut self, start_span: Span) -> SoulResult<Statement> {
         self.bump();
         let this = self.current.this_type.take();
         let result = match &this {
-            Some(ty) => self.parse_function_contructor(ty, TypeModifier::Mut),
+            Some(ty) => self.parse_function_contructor(ty, false),
             None => Err(Fault::error(
                 "contructor function should have methode type",
                 Some(self.span_combine(start_span)),

@@ -187,6 +187,12 @@ impl<'a, 'f> Parser<'a, 'f> {
     fn get_base_type(&mut self) -> TryResult<SoulType, Fault> {
         const NONE_STR: &str = PrimitiveTypes::None.as_str();
 
+        if self.current_is(&TokenKind::Keyword(KeyWord::Impl)) {
+            self.bump();
+            let inner = self.try_parse_type()?;
+            return TryOk(SoulType::ImplTrait(Box::new(inner)));
+        }
+
         match &self.token().kind {
             TokenKind::Ident(val) if val == NONE_STR => {
                 self.bump();

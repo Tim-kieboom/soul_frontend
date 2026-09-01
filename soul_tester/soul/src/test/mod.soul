@@ -1,7 +1,0 @@
-import (
-    .unions
-    .options
-    .structs
-)
-
-inner() {}

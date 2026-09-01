@@ -88,7 +88,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 .store
                 .insert_statement(Statement::from_expression(&self.forest.store, expression, false));
             let block = self.forest.store.insert_block(Block {
-                modifier: TypeModifier::Mut,
+                is_const: false,
                 statements: vec![statement],
                 span: self.span_combine(start_span),
             });
@@ -137,7 +137,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 let statement = self.parse_statement_id()?;
                 self.forest.store.insert_block(Block {
                     span,
-                    modifier: TypeModifier::Mut,
+                    is_const: false,
                     statements: vec![statement],
                 })
             };

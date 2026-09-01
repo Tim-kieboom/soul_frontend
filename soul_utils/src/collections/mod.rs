@@ -7,7 +7,7 @@ pub mod soul_import_path;
 pub mod try_result;
 pub mod vec_map;
 pub mod vec_set;
-
+pub mod bitflags;
 #[cfg(test)]
 pub mod vec_map_tests;
 #[cfg(test)]

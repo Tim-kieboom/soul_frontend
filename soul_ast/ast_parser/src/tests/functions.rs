@@ -1,7 +1,5 @@
 use ast_model::{
-    expression::{ExpressionKind, FunctionCall},
-    soul_type::SoulType,
-    statements::{Function, StatementKind},
+    expression::{ExpressionKind, FunctionCall}, soul_type::{Generic, SoulType, Stub}, statements::{Function, FunctionModifier, StatementKind},
 };
 use soul_utils::fault::Severity;
 
@@ -394,4 +392,179 @@ fn method_call() {
         }
         _ => panic!("expected Expression statement"),
     }
+}
+
+// ----------------------------------------------------------------
+//  async functions
+// ----------------------------------------------------------------
+#[test]
+fn async_function() {
+    let (module, store, context) = parse("async fetchUser(id: int): int {}");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let func_id = match &stmt.node {
+        StatementKind::Function(id) => *id,
+        _ => panic!("expected Function"),
+    };
+    let func = &store.functions[func_id];
+    let Function { signature, .. } = match func {
+        ast_model::FunctionKind::Normal(f) => f,
+        _ => panic!("expected Normal function"),
+    };
+    assert!(signature.value.modifier.contains(FunctionModifier::ASYNC));
+    assert_eq!(signature.value.name.as_str(), "fetchUser");
+    assert_eq!(signature.value.parameters.len(), 1);
+}
+
+#[test]
+fn non_async_function_is_not_async() {
+    let (module, store, context) = parse("fetchUser(id: int): int {}");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let func_id = match &stmt.node {
+        StatementKind::Function(id) => *id,
+        _ => panic!("expected Function"),
+    };
+    let func = &store.functions[func_id];
+    let Function { signature, .. } = match func {
+        ast_model::FunctionKind::Normal(f) => f,
+        _ => panic!("expected Normal function"),
+    };
+    assert!(!signature.value.modifier.contains(FunctionModifier::ASYNC));
+}
+
+// ----------------------------------------------------------------
+//  where clauses
+// ----------------------------------------------------------------
+#[test]
+fn function_with_where_clause() {
+    let (module, store, context) = parse("foo<T>(value: T) where T: Display {}");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let func_id = match &stmt.node {
+        StatementKind::Function(id) => *id,
+        _ => panic!("expected Function"),
+    };
+    let func = &store.functions[func_id];
+    let Function { signature, .. } = match func {
+        ast_model::FunctionKind::Normal(f) => f,
+        _ => panic!("expected Normal function"),
+    };
+    assert_eq!(signature.value.generics.len(), 1);
+    match &signature.value.generics[0] {
+        Generic { name, bound } => {
+            assert_eq!(name.as_str(), "T");
+            let bound = bound.as_ref().expect("expected a bound");
+            assert_eq!(*bound, SoulType::Stub(Stub::new("Display")));
+        }
+    }
+}
+
+#[test]
+fn function_with_multi_where_clause() {
+    let (module, store, context) = parse("foo<T, U>(a: T, b: U) where T: A, U: B {}");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let func_id = match &stmt.node {
+        StatementKind::Function(id) => *id,
+        _ => panic!("expected Function"),
+    };
+    let func = &store.functions[func_id];
+    let Function { signature, .. } = match func {
+        ast_model::FunctionKind::Normal(f) => f,
+        _ => panic!("expected Normal function"),
+    };
+    assert_eq!(signature.value.generics.len(), 2);
+    match &signature.value.generics[0] {
+        Generic { name, bound } => {
+            assert_eq!(name.as_str(), "T");
+            assert_eq!(*bound.as_ref().unwrap(), SoulType::Stub(Stub::new("A")));
+        }
+    }
+    match &signature.value.generics[1] {
+        Generic { name, bound } => {
+            assert_eq!(name.as_str(), "U");
+            assert_eq!(*bound.as_ref().unwrap(), SoulType::Stub(Stub::new("B")));
+        }
+    }
+}
+
+// ----------------------------------------------------------------
+//  impl Trait in type position
+// ----------------------------------------------------------------
+#[test]
+fn param_impl_trait() {
+    let (module, store, context) = parse("describeImpl(value: impl Display): str {}");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let func_id = match &stmt.node {
+        StatementKind::Function(id) => *id,
+        _ => panic!("expected Function"),
+    };
+    let func = &store.functions[func_id];
+    let Function { signature, .. } = match func {
+        ast_model::FunctionKind::Normal(f) => f,
+        _ => panic!("expected Normal function"),
+    };
+    assert_eq!(signature.value.parameters.len(), 1);
+    assert_eq!(
+        signature.value.parameters[0].ty,
+        SoulType::ImplTrait(Box::new(SoulType::Stub(Stub::new("Display"))))
+    );
+}
+
+#[test]
+fn return_impl_trait() {
+    let (module, store, context) = parse("makeDefault(): impl Display {}");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let func_id = match &stmt.node {
+        StatementKind::Function(id) => *id,
+        _ => panic!("expected Function"),
+    };
+    let func = &store.functions[func_id];
+    let Function { signature, .. } = match func {
+        ast_model::FunctionKind::Normal(f) => f,
+        _ => panic!("expected Normal function"),
+    };
+    assert_eq!(
+        signature.value.return_type,
+        SoulType::ImplTrait(Box::new(SoulType::Stub(Stub::new("Display"))))
+    );
 }

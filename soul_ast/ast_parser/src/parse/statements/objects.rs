@@ -41,6 +41,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 }
 
                 StatementKind::Enum(_)
+                | StatementKind::Union(_)
                 | StatementKind::Trait(_)
                 | StatementKind::Import(_)
                 | StatementKind::Struct(_)
@@ -95,6 +96,40 @@ impl<'a, 'f> Parser<'a, 'f> {
             None
         };
 
+        let variants = self.parse_union_variants()?;
+
+        let enum_ = Enum {
+            id: self.alloc_node(),
+            name,
+            variants,
+            impl_type,
+        };
+        Ok(Statement::new(
+            StatementKind::Enum(enum_),
+            self.span_combine(start_span),
+        ))
+    }
+
+    pub(crate) fn parse_union(&mut self) -> SoulResult<Statement> {
+        let start_span = self.token().span;
+        self.expect(&TokenKind::Keyword(KeyWord::Union))?;
+        let name = self.try_bump_consume_ident()?;
+
+        let variants = self.parse_union_variants()?;
+
+        let union_ = Enum {
+            id: self.alloc_node(),
+            name,
+            variants,
+            impl_type: None,
+        };
+        Ok(Statement::new(
+            StatementKind::Union(union_),
+            self.span_combine(start_span),
+        ))
+    }
+
+    fn parse_union_variants(&mut self) -> SoulResult<Vec<EnumVariant>> {
         let mut variants = vec![];
         self.expect(&CURLY_OPEN)?;
         loop {
@@ -120,17 +155,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.bump();
         }
         self.expect(&CURLY_CLOSE)?;
-
-        let enum_ = Enum {
-            id: self.alloc_node(),
-            name,
-            variants,
-            impl_type,
-        };
-        Ok(Statement::new(
-            StatementKind::Enum(enum_),
-            self.span_combine(start_span),
-        ))
+        Ok(variants)
     }
 
     fn parse_enum_assign(&mut self, ident: Ident) -> SoulResult<EnumVariant> {

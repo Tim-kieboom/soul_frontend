@@ -6,7 +6,6 @@ use ast_model::{
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
-    TypeModifier,
     collections::try_result::{
         ResultMapNotValue, ResultTryErr, ToResult, TryErr, TryOk, TryResult,
     },
@@ -28,16 +27,8 @@ impl<'a, 'f> Parser<'a, 'f> {
         keyword: KeyWord,
     ) -> TryResult<Statement, Fault> {
         TryOk(match keyword {
-            KeyWord::Mut | KeyWord::Const | KeyWord::Literal => {
-                let modifier = match keyword {
-                    KeyWord::Mut => TypeModifier::Mut,
-                    KeyWord::Const => TypeModifier::Const,
-                    KeyWord::Literal => TypeModifier::Literal,
-                    _ => unreachable!(),
-                };
-
-                return self.try_parse_from_modifier(start_span, modifier);
-            }
+            KeyWord::Mut => return self.try_parse_from_mut(start_span).try_err(),
+            KeyWord::Const => return self.try_parse_from_const(start_span).try_err(),
 
             KeyWord::If
             | KeyWord::New
@@ -83,7 +74,20 @@ impl<'a, 'f> Parser<'a, 'f> {
                 let is_public = true;
                 let span = pub_span.combine(start_span);
                 statement
-                    .try_set_is_public(&mut self.forest.store, is_public, span)
+                    .try_set_public(&mut self.forest.store, is_public, span)
+                    .try_err()?;
+
+                statement
+            }
+
+            KeyWord::Async => {
+                let async_span = self.token().span;
+
+                self.bump();
+                let mut statement = self.parse_statement().try_err()?;
+                let span = async_span.combine(start_span);
+                statement
+                    .try_set_async(&mut self.forest.store, span)
                     .try_err()?;
 
                 statement
@@ -99,8 +103,6 @@ impl<'a, 'f> Parser<'a, 'f> {
             | KeyWord::InForLoop
             | KeyWord::Undefined
             | KeyWord::GenericWhere
-            | KeyWord::Union
-            | KeyWord::Async
             | KeyWord::Task
             | KeyWord::Spawn
             | KeyWord::Limit
@@ -116,6 +118,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             KeyWord::Use => return self.parse_use_block().try_err(),
             KeyWord::Enum => return self.parse_enum().try_err(),
+            KeyWord::Union => return self.parse_union().try_err(),
             KeyWord::Trait => return self.parse_trait().try_err(),
             KeyWord::Struct => return self.parse_struct().try_err(),
             KeyWord::Type => return self.parse_typedef().map(Statement::from_typedef).try_err(),
@@ -158,10 +161,10 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
 
             let start_span = self.token().span;
-            let modifier = self.try_bump_type_modiffier().unwrap_or(TypeModifier::Mut);
+            let is_const = self.try_bump_const().is_some();
             let name = self.try_bump_consume_ident()?;
             let signature = self
-                .try_parse_function_signature(start_span, modifier, &this_type, name, None)
+                .try_parse_function_signature(start_span, &this_type, name, is_const, None)
                 .map_try_not_value(|(_, err)| err)
                 .merge_to_result()?
                 .value;

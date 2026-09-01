@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    CustomType, NodeId,
-    soul_type::SoulType,
-    statements::{Enum, FunctionSignature, Struct, Trait},
+    CustomType, NodeId, soul_type::SoulType, statements::{Enum, FunctionSignature, Struct, Trait},
 };
 use soul_utils::{FunctionId, TypeModifier, collections::vec_map::VecMap, span::ModuleId};
 

@@ -16,6 +16,16 @@ pub mod span;
 
 impl_soul_ids!(FunctionId);
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum TypeModifier {
+    /// is mutable
+    Mut,
+    /// is immutable
+    Immut,
+    /// is compiletime
+    Const,
+}
+
 #[cfg(debug_assertions)]
 #[macro_export]
 /// print msg for debugging prints file and line to be able to find it easily when trying to remove breakpoint
@@ -33,14 +43,6 @@ macro_rules! dbg_println {
 pub struct CrateContext {
     pub is_lib: bool,
     pub faults: FaultCollector,
-}
-
-define_str_enum! {
-    pub enum TypeModifier {
-        Mut => "mut",
-        Const => "const",
-        Literal => "literal",
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]

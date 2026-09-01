@@ -7,7 +7,7 @@ use soul_tokenizer::TokenStream;
 #[cfg(debug_assertions)]
 use soul_tokenizer::model::Token;
 use soul_utils::{
-    CrateContext, TypeModifier, collections::vec_set::VecSet, ids::IdAlloc, soul_error_internal,
+    CrateContext, collections::vec_set::VecSet, ids::IdAlloc, soul_error_internal,
 };
 use soul_utils::{
     collections::{crate_store::CrateStore, module_store::ModuleStore},
@@ -81,8 +81,8 @@ impl<'a, 'f> Parser<'a, 'f> {
         let statements = this.parse_global_statements();
         let global = this.forest.store.insert_block(Block {
             statements,
+            is_const: false,
             span: this.token().span,
-            modifier: TypeModifier::Mut,
         });
 
         match this.forest.modules_mut().get_mut(id) {

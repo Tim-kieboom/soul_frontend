@@ -25,6 +25,7 @@ fn parse_config() -> Configs {
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct JsonConfigs {
+    main_path: String,
     source_path: String,
     output_path: String,
     project_path: String,
@@ -34,14 +35,20 @@ pub struct JsonConfigs {
 pub struct Configs {
     source_path: PathBuf,
     output_path: PathBuf,
+    main_file_name: String,
 }
 
 impl Configs {
     pub fn new(json: JsonConfigs) -> Self {
         Self {
+            main_file_name: json.main_path,
             source_path: Path::new(&json.project_path).join(json.source_path),
             output_path: Path::new(&json.project_path).join(json.output_path),
         }
+    }
+
+    pub fn create_main_path(&self) -> PathBuf {
+        self.source_path.join(&self.main_file_name)
     }
 
     pub fn source_path(&self) -> &Path {

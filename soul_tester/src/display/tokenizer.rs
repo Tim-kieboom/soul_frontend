@@ -1,27 +1,27 @@
 use anyhow::Result;
 use soul_tokenizer::{TokenStream, model::TokenKind};
-use soul_utils::literal::{Number, StringLiteral, TokenLiteral};
+use soul_utils::{collections::module_store::ModuleStore, literal::{Number, StringLiteral, TokenLiteral}};
 
 use crate::{
-    config, display::{write_create_file, writer::Writer}, push_fmt,
+    config, display::{fault_to_anyhow_error, write_create_file, writer::Writer}, push_fmt,
 };
 
-pub(crate) fn display_tokenizer<'a>(tokens: &TokenStream<'a>) -> Result<()> {
-    inner_display_tokenizer(tokens).map_err(|err| anyhow::anyhow!("in display_tokenizer: {err}"))
+pub(crate) fn display_tokenizer<'a>(tokens: &TokenStream<'a>, modules: &ModuleStore) -> Result<()> {
+    inner_display_tokenizer(tokens, modules).map_err(|err| anyhow::anyhow!("in display_tokenizer: {err}"))
 }
 
-fn inner_display_tokenizer<'a>(tokens: &TokenStream<'a>) -> Result<()> {
+fn inner_display_tokenizer<'a>(tokens: &TokenStream<'a>, modules: &ModuleStore) -> Result<()> {
     let mut output_path = config::CONFIG.output_path().join("tokenizer");
     output_path.push("tokens.soulc");
 
     let mut writer = write_create_file(&output_path)?;
-    display_tokens(tokens.clone(), &mut writer)?;
+    display_tokens(tokens.clone(), modules, &mut writer)?;
     Ok(())
 }
 
-fn display_tokens<'a>(tokens: TokenStream<'a>, writer: &mut impl Writer) -> Result<()> {
+fn display_tokens<'a>(tokens: TokenStream<'a>, modules: &ModuleStore, writer: &mut impl Writer) -> Result<()> {
     for token in tokens {
-        let token = token.map_err(|err| anyhow::Error::msg(format!("{err:?}")))?;
+        let token = token.map_err(|f| fault_to_anyhow_error(&f, modules))?;
         let span_str = format!("{:?}", token.span);
         let tab = " ".repeat(30 - span_str.len());
 

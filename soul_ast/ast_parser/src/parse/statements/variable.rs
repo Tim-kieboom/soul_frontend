@@ -5,7 +5,7 @@ use ast_model::{
         VarPattern, Variable,
     },
 };
-use soul_tokenizer::model::TokenKind;
+use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
     Ident, TypeModifier, collections::try_result::ToResult, define_symbols, error::SoulResult,
     fault::Fault, soul_names::Symbol,
@@ -19,18 +19,20 @@ use crate::{
     },
 };
 
+const MUT_STR: &str = KeyWord::Mut.as_str();
+
 impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_variable(&mut self) -> SoulResult<Statement> {
-        const DEFAULT_MODIFIER: TypeModifier = TypeModifier::Const;
-        let modifier = self.try_bump_type_modiffier().unwrap_or(DEFAULT_MODIFIER);
+        const DEFAULT_MODIFIER: TypeModifier = TypeModifier::Immut;
+        let modifier = self.try_bump_mut().unwrap_or(DEFAULT_MODIFIER);
         let pattern_start = self.token().span;
 
         let pattern = self.parse_var_pattern(modifier)?;
 
         // Error: `mut` is not allowed on compound patterns
-        if modifier != TypeModifier::Const && !matches!(pattern, VarPattern::Simple { .. }) {
+        if modifier != TypeModifier::Immut && !matches!(pattern, VarPattern::Simple { .. }) {
             return Err(Fault::error(
-                "'mut' modifier cannot be applied to compound patterns; use per-binding 'mut' instead (e.g., (mut a, b))".to_string(),
+                format!("'{MUT_STR}' modifier cannot be applied to compound patterns; use per-binding '{MUT_STR}' instead (e.g., ({MUT_STR} a, b))", ),
                 Some(pattern_start),
             ));
         }
@@ -47,6 +49,22 @@ impl<'a, 'f> Parser<'a, 'f> {
             TokenKind::Symbol(kind) => AssignType::from_symbool(*kind),
             _ => None,
         };
+
+        if let TokenKind::Symbol(Symbol::DoubleColon) = self.token().kind {
+            self.bump();
+            let value = self.parse_expression_id(STAMENT_END_TOKENS)?;
+            return Ok(Statement::new_variable(
+                Variable {
+                    id: self.alloc_node(),
+                    is_public: false,
+                    pattern,
+                    ty,
+                    modifier: TypeModifier::Const,
+                    initialize_value: Some(value),
+                },
+                self.span_combine(pattern_start),
+            ));
+        }
 
         if ty.is_some() && assign_type.is_none() {
             return Err(self.get_expect_any_error(&[COLON_ASSIGN, ASSIGN]));
@@ -99,7 +117,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         &mut self,
         default_modifier: TypeModifier,
     ) -> SoulResult<VarPattern> {
-        let explicit_mod = self.try_bump_type_modiffier();
+        let explicit_mod = self.try_bump_mut();
         let modifier = explicit_mod.unwrap_or(default_modifier);
 
         if self.current_is_ident("_") {
@@ -215,8 +233,9 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
 
             let modifier = self
-                .try_bump_type_modiffier()
-                .unwrap_or(TypeModifier::Const);
+                .try_bump_mut()
+                .unwrap_or(TypeModifier::Immut);
+
             let field = self.try_bump_consume_ident()?;
 
             let binding = if self.current_is(&COLON) {
@@ -270,8 +289,9 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
 
             let modifier = self
-                .try_bump_type_modiffier()
-                .unwrap_or(TypeModifier::Const);
+                .try_bump_mut()
+                .unwrap_or(TypeModifier::Immut);
+
             let field = self.try_bump_consume_ident()?;
 
             let binding = if self.current_is(&COLON) {

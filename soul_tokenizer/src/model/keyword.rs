@@ -13,7 +13,6 @@ define_str_enum!(
         Mut => "mut", 0,
         Const => "const", 0,
         Extern => "extern", 0,
-        Literal => "literal", 0,
         Async => "async", 0,
 
         // --- conditionals ---
@@ -56,8 +55,8 @@ define_str_enum!(
         Crate => "crate", 0,
         Task => "task", 0,
         Spawn => "spawn", 0,
-        Intrinsic => "intrinsic", 0,
         Sizeof => "sizeof", 0,
         Typeof => "typeof", 0,
+        Intrinsic => "intrinsic", 0,
     }
 );

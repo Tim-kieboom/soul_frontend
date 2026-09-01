@@ -30,7 +30,7 @@ fn variable_declaration_with_init() {
         _ => panic!("expected Variable"),
     };
     assert!(matches!(pattern, VarPattern::Simple { binding, .. } if binding.ident.as_str() == "x"));
-    assert_eq!(*modifier, TypeModifier::Const);
+    assert_eq!(*modifier, TypeModifier::Immut);
     assert!(ty.is_none());
     assert!(initialize_value.is_some());
 

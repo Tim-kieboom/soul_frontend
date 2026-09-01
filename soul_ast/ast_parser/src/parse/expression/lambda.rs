@@ -29,8 +29,8 @@ impl<'a, 'f> Parser<'a, 'f> {
             );
 
             let body = self.forest.store.insert_block(Block {
+                is_const: false,
                 statements: vec![statement],
-                modifier: TypeModifier::Mut,
                 span: self.span_combine(start_span),
             });
 

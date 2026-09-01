@@ -17,10 +17,14 @@ import (
     soul.io.*
     soul.fmt.{Fmt}
 )
+GLOBAL :: "value"
 /*
     comment and stuff
 */
 test() {
+    CONST :: 1
+    CONST_TYPED: int :: 1
+
     x := 42 // foo
     mut y := 10
     z: int = 20
@@ -83,8 +87,8 @@ fn all_kinds() {
 
     let block = &store.blocks[module.global];
 
-    // 5 top-level statements: import, import glob, function, type alias, pub const
-    assert_eq!(block.statements.len(), 6, "expected 5 top-level statements");
+    // 7 top-level statements: import, import glob, GLOBAL const, function, type alias, distinct type alias, pub const
+    assert_eq!(block.statements.len(), 7, "expected 7 top-level statements");
 
     // --- statement 0: import -------------------------------------------------
     let stmt0 = &store.statements[block.statements[0]];
@@ -117,11 +121,28 @@ fn all_kinds() {
         _ => panic!("ImportItem 1: expected Normal"),
     }
 
-    // --- statement 2: function -----------------------------------------------
+    // --- statement 2: GLOBAL associated constant -------------------------------
     let stmt2 = &store.statements[block.statements[2]];
-    let func_id = match &stmt2.node {
+    let Variable {
+        pattern: v_global_pat,
+        modifier: v_global_mod,
+        initialize_value: v_global_init,
+        ..
+    } = match &stmt2.node {
+        StatementKind::Variable(v) => v,
+        other => panic!("statement 2: expected Variable, got {:?}", other),
+    };
+    assert!(
+        matches!(v_global_pat, VarPattern::Simple { binding, .. } if binding.ident.as_str() == "GLOBAL")
+    );
+    assert_eq!(*v_global_mod, TypeModifier::Const);
+    assert!(v_global_init.is_some());
+
+    // --- statement 3: function -----------------------------------------------
+    let stmt3 = &store.statements[block.statements[3]];
+    let func_id = match &stmt3.node {
         StatementKind::Function(id) => *id,
-        _ => panic!("statement 2: expected Function"),
+        _ => panic!("statement 3: expected Function"),
     };
     let func = &store.functions[func_id];
     let func_body = match func {
@@ -131,12 +152,12 @@ fn all_kinds() {
     let body = &store.blocks[func_body.block];
     assert_eq!(
         body.statements.len(),
-        40,
-        "expected 40 statements in function body"
+        42,
+        "expected 42 statements in function body"
     );
 
     // Spot-check a few body statements
-    // 0: x := 42  — variable declaration with init
+    // 0: CONST :: 1  — associated constant
     let s0 = &store.statements[body.statements[0]];
     let Variable {
         pattern: v0_pat,
@@ -147,123 +168,160 @@ fn all_kinds() {
         StatementKind::Variable(v) => v,
         _ => panic!("body[0]: expected Variable"),
     };
-    assert!(matches!(v0_pat, VarPattern::Simple { binding, .. } if binding.ident.as_str() == "x"));
+    assert!(matches!(v0_pat, VarPattern::Simple { binding, .. } if binding.ident.as_str() == "CONST"));
     assert_eq!(*v0_mod, TypeModifier::Const);
     assert!(v0_init.is_some());
 
-    // 3: mut w: int  — typed variable with no init
-    let s3 = &store.statements[body.statements[3]];
+    // 1: CONST_TYPED: int :: 1  — typed associated constant
+    let s1 = &store.statements[body.statements[1]];
     let Variable {
-        pattern: v3_pat,
-        modifier: v3_mod,
-        ty: v3_ty,
-        initialize_value: v3_init,
+        pattern: v1_pat,
+        modifier: v1_mod,
+        ty: v1_ty,
+        initialize_value: v1_init,
         ..
-    } = match &s3.node {
+    } = match &s1.node {
         StatementKind::Variable(v) => v,
-        _ => panic!("body[3]: expected Variable"),
+        _ => panic!("body[1]: expected Variable"),
     };
-    assert!(matches!(v3_pat, VarPattern::Simple { binding, .. } if binding.ident.as_str() == "w"));
-    assert_eq!(*v3_mod, TypeModifier::Mut);
+    assert!(matches!(v1_pat, VarPattern::Simple { binding, .. } if binding.ident.as_str() == "CONST_TYPED"));
+    assert_eq!(*v1_mod, TypeModifier::Const);
     assert_eq!(
-        *v3_ty,
+        *v1_ty,
         Some(SoulType::Primitive(
             soul_utils::soul_names::PrimitiveTypes::Int
         ))
     );
-    assert!(v3_init.is_none());
+    assert!(v1_init.is_some());
 
-    // 4: w = 5  — assignment
-    let s4 = &store.statements[body.statements[4]];
-    match &s4.node {
-        StatementKind::Assignment(_) => (),
-        other => panic!("body[4]: expected Assignment, got {:?}", other),
-    }
+    // 2: x := 42  — variable declaration with init
+    let s2 = &store.statements[body.statements[2]];
+    let Variable {
+        pattern: v2_pat,
+        modifier: v2_mod,
+        initialize_value: v2_init,
+        ..
+    } = match &s2.node {
+        StatementKind::Variable(v) => v,
+        _ => panic!("body[2]: expected Variable"),
+    };
+    assert!(matches!(v2_pat, VarPattern::Simple { binding, .. } if binding.ident.as_str() == "x"));
+    assert_eq!(*v2_mod, TypeModifier::Immut);
+    assert!(v2_init.is_some());
 
-    // 5: a := -x  — unary negation
+    // 5: mut w: int  — typed variable with no init
     let s5 = &store.statements[body.statements[5]];
-    let expr5 = match &s5.node {
-        StatementKind::Variable(v) => v.initialize_value,
+    let Variable {
+        pattern: v5_pat,
+        modifier: v5_mod,
+        ty: v5_ty,
+        initialize_value: v5_init,
+        ..
+    } = match &s5.node {
+        StatementKind::Variable(v) => v,
         _ => panic!("body[5]: expected Variable"),
     };
-    let val5 = &store.expressions[expr5.unwrap()];
-    match &val5.node {
-        ExpressionKind::Unary(unary) => {
-            assert_eq!(unary.operator.value, UnaryOperatorKind::Neg);
-        }
-        other => panic!("body[5]: expected Unary(Neg), got {:?}", other),
-    }
+    assert!(matches!(v5_pat, VarPattern::Simple { binding, .. } if binding.ident.as_str() == "w"));
+    assert_eq!(*v5_mod, TypeModifier::Mut);
+    assert_eq!(
+        *v5_ty,
+        Some(SoulType::Primitive(
+            soul_utils::soul_names::PrimitiveTypes::Int
+        ))
+    );
+    assert!(v5_init.is_none());
 
-    // 6: b := !false  — unary not
+    // 6: w = 5  — assignment
     let s6 = &store.statements[body.statements[6]];
-    let expr6 = match &s6.node {
-        StatementKind::Variable(v) => v.initialize_value,
-        _ => panic!("body[6]: expected Variable"),
-    };
-    let val6 = &store.expressions[expr6.unwrap()];
-    match &val6.node {
-        ExpressionKind::Unary(unary) => {
-            assert_eq!(unary.operator.value, UnaryOperatorKind::Not);
-        }
-        other => panic!("body[6]: expected Unary(Not), got {:?}", other),
+    match &s6.node {
+        StatementKind::Assignment(_) => (),
+        other => panic!("body[6]: expected Assignment, got {:?}", other),
     }
 
-    // 7: c := &x  — mut ref
+    // 7: a := -x  — unary negation
     let s7 = &store.statements[body.statements[7]];
     let expr7 = match &s7.node {
         StatementKind::Variable(v) => v.initialize_value,
         _ => panic!("body[7]: expected Variable"),
     };
-    match &store.expressions[expr7.unwrap()].node {
-        ExpressionKind::Ref(_) => (),
-        other => panic!("body[7]: expected Ref, got {:?}", other),
+    let val7 = &store.expressions[expr7.unwrap()];
+    match &val7.node {
+        ExpressionKind::Unary(unary) => {
+            assert_eq!(unary.operator.value, UnaryOperatorKind::Neg);
+        }
+        other => panic!("body[7]: expected Unary(Neg), got {:?}", other),
     }
 
-    // 8: d := @x  — const ref
+    // 8: b := !false  — unary not
     let s8 = &store.statements[body.statements[8]];
     let expr8 = match &s8.node {
         StatementKind::Variable(v) => v.initialize_value,
         _ => panic!("body[8]: expected Variable"),
     };
-    match &store.expressions[expr8.unwrap()].node {
-        ExpressionKind::Ref(_) => (),
-        other => panic!("body[8]: expected Ref, got {:?}", other),
+    let val8 = &store.expressions[expr8.unwrap()];
+    match &val8.node {
+        ExpressionKind::Unary(unary) => {
+            assert_eq!(unary.operator.value, UnaryOperatorKind::Not);
+        }
+        other => panic!("body[8]: expected Unary(Not), got {:?}", other),
     }
 
-    // 9: e := 1 + 2  — binary add
+    // 9: c := &x  — mut ref
     let s9 = &store.statements[body.statements[9]];
     let expr9 = match &s9.node {
         StatementKind::Variable(v) => v.initialize_value,
         _ => panic!("body[9]: expected Variable"),
     };
     match &store.expressions[expr9.unwrap()].node {
-        ExpressionKind::Binary(bin) => {
-            assert_eq!(bin.operator.value, BinaryOperatorKind::Add);
-        }
-        other => panic!("body[9]: expected Binary(Add), got {:?}", other),
+        ExpressionKind::Ref(_) => (),
+        other => panic!("body[9]: expected Ref, got {:?}", other),
     }
 
-    // 10: f := 3 * 4  — binary mul
+    // 10: d := @x  — const ref
     let s10 = &store.statements[body.statements[10]];
     let expr10 = match &s10.node {
         StatementKind::Variable(v) => v.initialize_value,
         _ => panic!("body[10]: expected Variable"),
     };
     match &store.expressions[expr10.unwrap()].node {
-        ExpressionKind::Binary(bin) => {
-            assert_eq!(bin.operator.value, BinaryOperatorKind::Mul);
-        }
-        other => panic!("body[10]: expected Binary(Mul), got {:?}", other),
+        ExpressionKind::Ref(_) => (),
+        other => panic!("body[10]: expected Ref, got {:?}", other),
     }
 
-    // 11: g := (1 + 2) * 3  — parens with binary mul
+    // 11: e := 1 + 2  — binary add
     let s11 = &store.statements[body.statements[11]];
     let expr11 = match &s11.node {
         StatementKind::Variable(v) => v.initialize_value,
         _ => panic!("body[11]: expected Variable"),
     };
-    let val11 = &store.expressions[expr11.unwrap()];
-    match &val11.node {
+    match &store.expressions[expr11.unwrap()].node {
+        ExpressionKind::Binary(bin) => {
+            assert_eq!(bin.operator.value, BinaryOperatorKind::Add);
+        }
+        other => panic!("body[11]: expected Binary(Add), got {:?}", other),
+    }
+
+    // 12: f := 3 * 4  — binary mul
+    let s12 = &store.statements[body.statements[12]];
+    let expr12 = match &s12.node {
+        StatementKind::Variable(v) => v.initialize_value,
+        _ => panic!("body[12]: expected Variable"),
+    };
+    match &store.expressions[expr12.unwrap()].node {
+        ExpressionKind::Binary(bin) => {
+            assert_eq!(bin.operator.value, BinaryOperatorKind::Mul);
+        }
+        other => panic!("body[12]: expected Binary(Mul), got {:?}", other),
+    }
+
+    // 13: g := (1 + 2) * 3  — parens with binary mul
+    let s13 = &store.statements[body.statements[13]];
+    let expr13 = match &s13.node {
+        StatementKind::Variable(v) => v.initialize_value,
+        _ => panic!("body[13]: expected Variable"),
+    };
+    let val13 = &store.expressions[expr13.unwrap()];
+    match &val13.node {
         ExpressionKind::Binary(bin) => {
             assert_eq!(bin.operator.value, BinaryOperatorKind::Mul);
             let left = &store.expressions[bin.left];
@@ -271,50 +329,50 @@ fn all_kinds() {
                 ExpressionKind::Binary(inner) => {
                     assert_eq!(inner.operator.value, BinaryOperatorKind::Add);
                 }
-                other => panic!("body[11].left: expected Binary(Add), got {:?}", other),
+                other => panic!("body[13].left: expected Binary(Add), got {:?}", other),
             }
         }
-        other => panic!("body[11]: expected Binary(Mul), got {:?}", other),
+        other => panic!("body[13]: expected Binary(Mul), got {:?}", other),
     }
 
-    // 22: q := null  — null literal
-    let s22 = &store.statements[body.statements[22]];
-    let expr22 = match &s22.node {
+    // 24: q := null  — null literal
+    let s24 = &store.statements[body.statements[24]];
+    let expr24 = match &s24.node {
         StatementKind::Variable(v) => v.initialize_value,
-        _ => panic!("body[22]: expected Variable"),
+        _ => panic!("body[24]: expected Variable"),
     };
-    let val22 = &store.expressions[expr22.unwrap()];
-    assert!(matches!(val22.node, ExpressionKind::Null(_)));
+    let val24 = &store.expressions[expr24.unwrap()];
+    assert!(matches!(val24.node, ExpressionKind::Null(_)));
 
-    // 23: r := "hello"  — string literal
-    let s23 = &store.statements[body.statements[23]];
-    let expr23 = match &s23.node {
-        StatementKind::Variable(v) => v.initialize_value,
-        _ => panic!("body[23]: expected Variable"),
-    };
-    match &store.expressions[expr23.unwrap()].node {
-        ExpressionKind::Literal((_, Literal::Str(s))) => assert_eq!(s.as_str(), "hello"),
-        other => panic!("body[23]: expected Literal(Str), got {:?}", other),
-    }
-
-    // 25: t := 'a'  — char literal
+    // 25: r := "hello"  — string literal
     let s25 = &store.statements[body.statements[25]];
     let expr25 = match &s25.node {
         StatementKind::Variable(v) => v.initialize_value,
         _ => panic!("body[25]: expected Variable"),
     };
     match &store.expressions[expr25.unwrap()].node {
-        ExpressionKind::Literal((_, Literal::Char(c))) => assert_eq!(*c, 'a'),
-        other => panic!("body[25]: expected Literal(Char), got {:?}", other),
+        ExpressionKind::Literal((_, Literal::Str(s))) => assert_eq!(s.as_str(), "hello"),
+        other => panic!("body[25]: expected Literal(Str), got {:?}", other),
     }
 
-    // 26: u := foo()  — function call no args
-    let s26 = &store.statements[body.statements[26]];
-    let expr26 = match &s26.node {
+    // 27: t := 'a'  — char literal
+    let s27 = &store.statements[body.statements[27]];
+    let expr27 = match &s27.node {
         StatementKind::Variable(v) => v.initialize_value,
-        _ => panic!("body[26]: expected Variable"),
+        _ => panic!("body[27]: expected Variable"),
     };
-    match &store.expressions[expr26.unwrap()].node {
+    match &store.expressions[expr27.unwrap()].node {
+        ExpressionKind::Literal((_, Literal::Char(c))) => assert_eq!(*c, 'a'),
+        other => panic!("body[27]: expected Literal(Char), got {:?}", other),
+    }
+
+    // 28: u := foo()  — function call no args
+    let s28 = &store.statements[body.statements[28]];
+    let expr28 = match &s28.node {
+        StatementKind::Variable(v) => v.initialize_value,
+        _ => panic!("body[28]: expected Variable"),
+    };
+    match &store.expressions[expr28.unwrap()].node {
         ExpressionKind::FunctionCall(FunctionCall {
             name,
             callee,
@@ -325,59 +383,59 @@ fn all_kinds() {
             assert!(callee.is_none());
             assert!(arguments.is_empty());
         }
-        other => panic!("body[26]: expected FunctionCall, got {:?}", other),
+        other => panic!("body[28]: expected FunctionCall, got {:?}", other),
     }
 
-    // 27: v := add(1, 2)  — function call with args
-    let s27 = &store.statements[body.statements[27]];
-    let expr27 = match &s27.node {
-        StatementKind::Variable(v) => v.initialize_value,
-        _ => panic!("body[27]: expected Variable"),
-    };
-    match &store.expressions[expr27.unwrap()].node {
-        ExpressionKind::FunctionCall(FunctionCall {
-            name, arguments, ..
-        }) => {
-            assert_eq!(name.as_str(), "add");
-            assert_eq!(arguments.len(), 2);
-        }
-        other => panic!("body[27]: expected FunctionCall, got {:?}", other),
-    }
-
-    // 28: field := obj.field  — field access
-    let s28 = &store.statements[body.statements[28]];
-    let expr28 = match &s28.node {
-        StatementKind::Variable(v) => v.initialize_value,
-        _ => panic!("body[28]: expected Variable"),
-    };
-    match &store.expressions[expr28.unwrap()].node {
-        ExpressionKind::FieldAccess(fa) => {
-            assert_eq!(fa.field.as_str(), "field");
-        }
-        other => panic!("body[28]: expected FieldAccess, got {:?}", other),
-    }
-
-    // 29: method := obj.method()  — method call
+    // 29: v := add(1, 2)  — function call with args
     let s29 = &store.statements[body.statements[29]];
     let expr29 = match &s29.node {
         StatementKind::Variable(v) => v.initialize_value,
         _ => panic!("body[29]: expected Variable"),
     };
     match &store.expressions[expr29.unwrap()].node {
-        ExpressionKind::FunctionCall(FunctionCall { name, callee, .. }) => {
-            assert_eq!(name.as_str(), "method");
-            assert!(callee.is_some());
+        ExpressionKind::FunctionCall(FunctionCall {
+            name, arguments, ..
+        }) => {
+            assert_eq!(name.as_str(), "add");
+            assert_eq!(arguments.len(), 2);
         }
-        other => panic!("body[29]: expected FunctionCall(method), got {:?}", other),
+        other => panic!("body[29]: expected FunctionCall, got {:?}", other),
     }
 
-    // 30: chain := foo().bar()  — chained call
+    // 30: field := obj.field  — field access
     let s30 = &store.statements[body.statements[30]];
     let expr30 = match &s30.node {
         StatementKind::Variable(v) => v.initialize_value,
         _ => panic!("body[30]: expected Variable"),
     };
     match &store.expressions[expr30.unwrap()].node {
+        ExpressionKind::FieldAccess(fa) => {
+            assert_eq!(fa.field.as_str(), "field");
+        }
+        other => panic!("body[30]: expected FieldAccess, got {:?}", other),
+    }
+
+    // 31: method := obj.method()  — method call
+    let s31 = &store.statements[body.statements[31]];
+    let expr31 = match &s31.node {
+        StatementKind::Variable(v) => v.initialize_value,
+        _ => panic!("body[31]: expected Variable"),
+    };
+    match &store.expressions[expr31.unwrap()].node {
+        ExpressionKind::FunctionCall(FunctionCall { name, callee, .. }) => {
+            assert_eq!(name.as_str(), "method");
+            assert!(callee.is_some());
+        }
+        other => panic!("body[31]: expected FunctionCall(method), got {:?}", other),
+    }
+
+    // 32: chain := foo().bar()  — chained call
+    let s32 = &store.statements[body.statements[32]];
+    let expr32 = match &s32.node {
+        StatementKind::Variable(v) => v.initialize_value,
+        _ => panic!("body[32]: expected Variable"),
+    };
+    match &store.expressions[expr32.unwrap()].node {
         ExpressionKind::FunctionCall(FunctionCall { name, callee, .. }) => {
             assert_eq!(name.as_str(), "bar");
             assert!(callee.is_some());
@@ -394,75 +452,75 @@ fn all_kinds() {
                     assert_eq!(inner_name.as_str(), "foo");
                 }
                 other => panic!(
-                    "body[30]: expected inner FunctionCall(foo), got {:?}",
+                    "body[32]: expected inner FunctionCall(foo), got {:?}",
                     other
                 ),
             }
         }
         other => panic!(
-            "body[30]: expected outer FunctionCall(bar), got {:?}",
+            "body[32]: expected outer FunctionCall(bar), got {:?}",
             other
         ),
     }
 
-    // 31: idx := arr[0]  — index
-    let s31 = &store.statements[body.statements[31]];
-    let expr31 = match &s31.node {
-        StatementKind::Variable(v) => v.initialize_value,
-        _ => panic!("body[31]: expected Variable"),
-    };
-    match &store.expressions[expr31.unwrap()].node {
-        ExpressionKind::Index(_) => (),
-        other => panic!("body[31]: expected Index, got {:?}", other),
-    }
-
-    // 32: block_expr := { inner := 99 }  — block expression
-    let s32 = &store.statements[body.statements[32]];
-    let expr32 = match &s32.node {
-        StatementKind::Variable(v) => v.initialize_value,
-        _ => panic!("body[32]: expected Variable"),
-    };
-    match &store.expressions[expr32.unwrap()].node {
-        ExpressionKind::Block(_) => (),
-        other => panic!("body[32]: expected Block, got {:?}", other),
-    }
-
-    // 33: point := Point { x: 1, y: 2 }  — struct constructor
+    // 33: idx := arr[0]  — index
     let s33 = &store.statements[body.statements[33]];
     let expr33 = match &s33.node {
         StatementKind::Variable(v) => v.initialize_value,
         _ => panic!("body[33]: expected Variable"),
     };
     match &store.expressions[expr33.unwrap()].node {
-        ExpressionKind::StructConstructor(StructConstructor { values, .. }) => {
-            assert_eq!(values.len(), 2);
-            assert_eq!(values[0].0.as_str(), "x");
-            assert_eq!(values[1].0.as_str(), "y");
-        }
-        other => panic!("body[33]: expected StructConstructor, got {:?}", other),
+        ExpressionKind::Index(_) => (),
+        other => panic!("body[33]: expected Index, got {:?}", other),
     }
 
-    // 34: heap := new(42)  — new ptr
+    // 34: block_expr := { inner := 99 }  — block expression
     let s34 = &store.statements[body.statements[34]];
     let expr34 = match &s34.node {
         StatementKind::Variable(v) => v.initialize_value,
         _ => panic!("body[34]: expected Variable"),
     };
     match &store.expressions[expr34.unwrap()].node {
-        ExpressionKind::New(_) => (),
-        other => panic!("body[34]: expected New, got {:?}", other),
+        ExpressionKind::Block(_) => (),
+        other => panic!("body[34]: expected Block, got {:?}", other),
     }
 
-    // 35: if true { return } — if
+    // 35: point := Point { x: 1, y: 2 }  — struct constructor
     let s35 = &store.statements[body.statements[35]];
-    let expression = match &s35.node {
+    let expr35 = match &s35.node {
+        StatementKind::Variable(v) => v.initialize_value,
+        _ => panic!("body[35]: expected Variable"),
+    };
+    match &store.expressions[expr35.unwrap()].node {
+        ExpressionKind::StructConstructor(StructConstructor { values, .. }) => {
+            assert_eq!(values.len(), 2);
+            assert_eq!(values[0].0.as_str(), "x");
+            assert_eq!(values[1].0.as_str(), "y");
+        }
+        other => panic!("body[35]: expected StructConstructor, got {:?}", other),
+    }
+
+    // 36: heap := new(42)  — new ptr
+    let s36 = &store.statements[body.statements[36]];
+    let expr36 = match &s36.node {
+        StatementKind::Variable(v) => v.initialize_value,
+        _ => panic!("body[36]: expected Variable"),
+    };
+    match &store.expressions[expr36.unwrap()].node {
+        ExpressionKind::New(_) => (),
+        other => panic!("body[36]: expected New, got {:?}", other),
+    }
+
+    // 37: if true { return } — if
+    let s37 = &store.statements[body.statements[37]];
+    let expression = match &s37.node {
         StatementKind::Expression { expression: id, .. } => &store.expressions[*id],
-        _ => panic!("body[35]: expected Expression(If)"),
+        _ => panic!("body[37]: expected Expression(If)"),
     };
 
     let if_ = match &expression.node {
         ExpressionKind::If(val) => val,
-        _ => panic!("body[35]: expected If"),
+        _ => panic!("body[37]: expected If"),
     };
 
     assert_eq!(if_.branch, None);
@@ -475,30 +533,30 @@ fn all_kinds() {
         StatementKind::Expression { expression: id, .. } => {
             assert_eq!(store.expressions[*id].node, ExpressionKind::Return(None))
         }
-        _ => panic!("body[35].body[0]: expected Expression(Return)"),
+        _ => panic!("body[37].body[0]: expected Expression(Return)"),
     };
 
     /*
-        36:
+        38:
         match x {
             1 => false
             _ => true
         } - match
     */
-    let s36 = &store.statements[body.statements[36]];
-    let match_ = match &s36.node {
+    let s38 = &store.statements[body.statements[38]];
+    let match_ = match &s38.node {
         StatementKind::Expression { expression, .. } => {
             match &store.expressions[*expression].node {
                 ExpressionKind::Match(val) => val,
-                other => panic!("body[36]: expected Match, got {:?}", other),
+                other => panic!("body[38]: expected Match, got {:?}", other),
             }
         }
-        other => panic!("body[36]: expected Expression(Match), got {:?}", other),
+        other => panic!("body[38]: expected Expression(Match), got {:?}", other),
     };
 
     match &store.expressions[match_.scrutinee].node {
         ExpressionKind::Variable(var) => assert_eq!(var.name.as_str(), "x"),
-        other => panic!("body[36].scrutinee: expected Variable, got {:?}", other),
+        other => panic!("body[38].scrutinee: expected Variable, got {:?}", other),
     }
 
     assert_eq!(match_.arms.len(), 2);
@@ -508,42 +566,42 @@ fn all_kinds() {
     );
     assert_eq!(match_.arms[1].pattern, MatchPattern::Wildcard);
 
-    // 37: return 42  — return with value
-    let s37 = &store.statements[body.statements[37]];
-    match &s37.node {
+    // 39: return 42  — return with value
+    let s39 = &store.statements[body.statements[39]];
+    match &s39.node {
         StatementKind::Expression { expression, .. } => {
             match &store.expressions[*expression].node {
                 ExpressionKind::Return(Some(_)) => (),
-                other => panic!("body[37]: expected Return(Some), got {:?}", other),
+                other => panic!("body[39]: expected Return(Some), got {:?}", other),
             }
         }
-        other => panic!("body[37]: expected Expression(Return), got {:?}", other),
+        other => panic!("body[39]: expected Expression(Return), got {:?}", other),
     }
 
-    // 38: break
-    let s38 = &store.statements[body.statements[38]];
-    match &s38.node {
+    // 40: break
+    let s40 = &store.statements[body.statements[40]];
+    match &s40.node {
         StatementKind::Expression { expression, .. } => {
             assert_eq!(store.expressions[*expression].node, ExpressionKind::Break);
         }
-        other => panic!("body[38]: expected Expression(Break), got {:?}", other),
+        other => panic!("body[40]: expected Expression(Break), got {:?}", other),
     }
 
-    // 39: continue
-    let s39 = &store.statements[body.statements[39]];
-    match &s39.node {
+    // 41: continue
+    let s41 = &store.statements[body.statements[41]];
+    match &s41.node {
         StatementKind::Expression { expression, .. } => {
             assert_eq!(
                 store.expressions[*expression].node,
                 ExpressionKind::Continue
             );
         }
-        other => panic!("body[39]: expected Expression(Continue), got {:?}", other),
+        other => panic!("body[41]: expected Expression(Continue), got {:?}", other),
     }
 
-    // --- statement 3: type alias --------------------------------------------
-    let stmt3 = &store.statements[block.statements[3]];
-    match &stmt3.node {
+    // --- statement 4: type alias --------------------------------------------
+    let stmt4 = &store.statements[block.statements[4]];
+    match &stmt4.node {
         StatementKind::TypeDef(TypeDef {
             new_type,
             old_type,
@@ -554,12 +612,12 @@ fn all_kinds() {
             assert_eq!(*new_type, SoulType::Stub(Stub::new("MyInt".to_string())));
             assert_eq!(*old_type, SoulType::Primitive(PrimitiveTypes::Int));
         }
-        other => panic!("statement 3: expected TypeDef, got {:?}", other),
+        other => panic!("statement 4: expected TypeDef, got {:?}", other),
     }
 
-    // --- statement 4: distinct type alias --------------------------------------------
-    let stmt4 = &store.statements[block.statements[4]];
-    match &stmt4.node {
+    // --- statement 5: distinct type alias --------------------------------------------
+    let stmt5 = &store.statements[block.statements[5]];
+    match &stmt5.node {
         StatementKind::TypeDef(TypeDef {
             new_type,
             old_type,
@@ -573,18 +631,18 @@ fn all_kinds() {
             );
             assert_eq!(*old_type, SoulType::Primitive(PrimitiveTypes::Int));
         }
-        other => panic!("statement 3: expected TypeDef, got {:?}", other),
+        other => panic!("statement 5: expected TypeDef, got {:?}", other),
     }
 
-    // --- statement 5: pub const ----------------------------------------------
-    let stmt5 = &store.statements[block.statements[5]];
+    // --- statement 6: pub const ----------------------------------------------
+    let stmt6 = &store.statements[block.statements[6]];
     let Variable {
         pattern: v_pub_pat,
         modifier: v_pub_mod,
         ..
-    } = match &stmt5.node {
+    } = match &stmt6.node {
         StatementKind::Variable(v) => v,
-        other => panic!("statement 5: expected Variable, got {:?}", other),
+        other => panic!("statement 6: expected Variable, got {:?}", other),
     };
     assert!(
         matches!(v_pub_pat, VarPattern::Simple { binding, .. } if binding.ident.as_str() == "GLOBAL")

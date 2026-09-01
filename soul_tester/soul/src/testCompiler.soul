@@ -1,4 +1,4 @@
-/// testCompiler.soul
+/// testCompiler
 ///
 /// A single-file smoke test exercising most of the currently-decided Soul language
 /// surface (see soul-lang.md). Named `test{Name}` per §17, so this is a real test
@@ -9,8 +9,7 @@
 /// are flagged inline with `// OPEN:` comments rather than silently assumed.
 
 import (
-    Std.{Fmt, Display},
-    Core.Mem.{malloc, free},
+    crate.sub
 )
 
 // ---------------------------------------------------------------------------

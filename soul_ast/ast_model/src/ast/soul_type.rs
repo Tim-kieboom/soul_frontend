@@ -36,6 +36,8 @@ pub enum SoulType {
     Error,
     /// Optional type: `?int`
     Optional(Box<SoulType>),
+    /// Anonymous `impl Trait` type: `impl Display`.
+    ImplTrait(Box<SoulType>),
     /// unknown type
     Stub(Stub),
     NamedVariant {

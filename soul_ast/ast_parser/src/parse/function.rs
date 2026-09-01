@@ -1,9 +1,6 @@
 use ast_model::{
-    FunctionKind,
-    expression::{Argument, Expression, FunctionCall, FunctionCallee},
-    soul_type::{ArrayKind, ArrayType, Generic, SoulType},
-    statements::{
-        ExternLanguage, Function, FunctionSignature, FunctionThisKind, Parameter, Statement,
+    FunctionKind, expression::{Argument, Expression, FunctionCall, FunctionCallee}, soul_type::{ArrayKind, ArrayType, Generic, SoulType}, statements::{
+        ExternLanguage, Function, FunctionModifier, FunctionSignature, FunctionThisKind, Parameter, Statement,
     },
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
@@ -21,11 +18,8 @@ use soul_utils::{
 };
 
 use crate::{
-    parser::Parser,
-    utils::{
-        ARRAY, ARROW_LEFT, ARROW_RIGHT, ASSIGN, COLON, COMMA, CURLY_OPEN, DOT, DOUBLE_QUESTION,
-        OPTIONAL, REF, ROUND_CLOSE, ROUND_OPEN, SEMI_COLON, SQUARE_CLOSE, SQUARE_OPEN,
-        STAMENT_END_TOKENS,
+    parser::Parser, utils::{
+        ARRAY, ARROW_LEFT, ARROW_RIGHT, ASSIGN, COLON, COMMA, CONST, CURLY_OPEN, DOT, DOUBLE_QUESTION, OPTIONAL, REF, ROUND_CLOSE, ROUND_OPEN, SEMI_COLON, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS,
     },
 };
 const CONTRUCTOR_STR: &str = "This__ctor";
@@ -34,7 +28,12 @@ const ARRAY_CONTRUCTOR_STR: &str = "This__arrayCtor";
 type FuncResult<T> = TryResult<T, (Ident, Fault)>;
 impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_any_function(&mut self) -> SoulResult<Statement> {
-        let modifier = self.try_bump_type_modiffier();
+        let is_const = self.current_is(&CONST);
+        if is_const {
+            self.bump();
+
+        }
+
         let ident = self.try_bump_consume_ident()?;
 
         let span = self.token().span;
@@ -42,8 +41,8 @@ impl<'a, 'f> Parser<'a, 'f> {
         let this_type = self.current.this_type.take().unwrap_or(SoulType::None);
         let result = self.try_parse_function_declaration_id(
             span,
-            modifier.unwrap_or(TypeModifier::Mut),
             &this_type,
+            is_const,
             ident,
         );
         self.current.this_type = Some(this_type);
@@ -147,11 +146,11 @@ impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn try_parse_function_declaration_id(
         &mut self,
         start_span: Span,
-        modifier: TypeModifier,
         methode_type: &SoulType,
+        is_const: bool,
         name: Ident,
     ) -> FuncResult<Spanned<FunctionId>> {
-        self.try_parse_function_declaration(start_span, modifier, methode_type, name)
+        self.try_parse_function_declaration(start_span, methode_type, is_const, name)
             .map(|spanned| {
                 spanned.map(|function| self.forest.store.insert_function(FunctionKind::Normal(function)))
             })
@@ -160,12 +159,12 @@ impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn try_parse_function_declaration(
         &mut self,
         start_span: Span,
-        modifier: TypeModifier,
         methode_type: &SoulType,
+        is_const: bool,
         name: Ident,
     ) -> FuncResult<Spanned<Function>> {
         let position = self.tokens.current_position();
-        match self.inner_function_declaration(start_span, modifier, methode_type, name, None) {
+        match self.inner_function_declaration(start_span, methode_type, name, is_const, None) {
             Ok(spanned) => Ok(spanned),
             Err(err) => {
                 self.goto(position);
@@ -219,9 +218,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         let span = self.token().span;
         match self.try_parse_function_signature(
             span,
-            TypeModifier::Mut,
             &SoulType::None,
             name,
+            false,
             Some(external),
         ) {
             Ok(signature) => {
@@ -240,14 +239,14 @@ impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn try_parse_function_signature(
         &mut self,
         start_span: Span,
-        modifier: TypeModifier,
         methode_type: &SoulType,
         name: Ident,
+        is_const: bool,
         external: Option<ExternLanguage>,
     ) -> FuncResult<Spanned<FunctionSignature>> {
         let begin_position = self.tokens.current_position();
         let result =
-            self.inner_parse_function_signature(start_span, modifier, methode_type, name, external);
+            self.inner_parse_function_signature(start_span, methode_type, name, is_const, external);
 
         if result.is_err() {
             self.goto(begin_position);
@@ -327,7 +326,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_function_contructor(
         &mut self,
         methode_type: &SoulType,
-        modifier: TypeModifier,
+        is_const: bool,
     ) -> SoulResult<Spanned<Function>> {
         let start_span = self.token().span;
         self.expect(&DOT)?;
@@ -335,7 +334,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             &ROUND_OPEN => {
                 let name = Ident::new(CONTRUCTOR_STR, start_span);
                 let mut methode = self
-                    .try_parse_function_declaration(start_span, modifier, &methode_type, name)
+                    .try_parse_function_declaration(start_span, &methode_type, is_const, name)
                     .map_try_not_value(|(_, err)| err)
                     .merge_to_result()?
                     .value;
@@ -372,8 +371,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                         FunctionSignature {
                             id,
                             name,
-                            modifier,
-                            is_public: false,
+                            modifier: FunctionModifier::empty(),
                             method_type: methode_type.clone(),
                             return_type: methode_type.clone(),
                             parameters: vec![Parameter {
@@ -381,7 +379,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                                 default: None,
                                 ty: array_type,
                                 id: self.alloc_node(),
-                                modifier: TypeModifier::Const,
+                                is_mut: false,
                             }],
                             generics: vec![],
                             function_kind: FunctionThisKind::ArrayCtor,
@@ -402,9 +400,9 @@ impl<'a, 'f> Parser<'a, 'f> {
     fn inner_parse_function_signature(
         &mut self,
         start_span: Span,
-        modifier: TypeModifier,
         method_type: &SoulType,
         name: Ident,
+        is_const: bool,
         external: Option<ExternLanguage>,
     ) -> FuncResult<Spanned<FunctionSignature>> {
         if !self.current_is_any(&[ROUND_OPEN, ARROW_LEFT]) {
@@ -438,6 +436,18 @@ impl<'a, 'f> Parser<'a, 'f> {
             false => SoulType::None,
         };
 
+        let generics = match self.parse_where_clause(generics) {
+            Ok(val) => val,
+            Err(err) => return TryNotValue((name, err)),
+        };
+
+        let modifier = if is_const {
+            FunctionModifier::CONST
+        }
+        else {
+            FunctionModifier::default()
+        };
+
         let signature = FunctionSignature {
             node_id: self.alloc_node(),
             name,
@@ -447,7 +457,6 @@ impl<'a, 'f> Parser<'a, 'f> {
             parameters,
             return_type,
             function_kind,
-            is_public: false,
             id: self.forest.store.alloc_function(),
             method_type: method_type.clone(),
         };
@@ -455,16 +464,51 @@ impl<'a, 'f> Parser<'a, 'f> {
         TryOk(Spanned::new(signature, self.span_combine(start_span)))
     }
 
+    fn parse_where_clause(&mut self, mut generics: Vec<Generic>) -> SoulResult<Vec<Generic>> {
+        if !self.current_is(&TokenKind::Keyword(KeyWord::GenericWhere)) {
+            return Ok(generics);
+        }
+        self.bump();
+
+        loop {
+            self.skip_end_lines();
+
+            let name = self.try_bump_consume_ident()?;
+            self.expect(&COLON)?;
+            let bound = self.try_parse_type().merge_to_result()?;
+
+            match generics.iter_mut().find(|g| g.name.as_str() == name.as_str()) {
+                Some(existing) => {
+                    if existing.bound.is_none() {
+                        existing.bound = Some(bound);
+                    }
+                }
+                None => generics.push(Generic {
+                    name,
+                    bound: Some(bound),
+                }),
+            }
+
+            self.skip_end_lines();
+            if !self.current_is(&COMMA) {
+                break;
+            }
+            self.bump();
+        }
+
+        Ok(generics)
+    }
+
     fn inner_function_declaration(
         &mut self,
         start_span: Span,
-        modifier: TypeModifier,
         methode_type: &SoulType,
         name: Ident,
+        is_const: bool,
         external: Option<ExternLanguage>,
     ) -> FuncResult<Spanned<Function>> {
         let signature =
-            self.try_parse_function_signature(start_span, modifier, methode_type, name, external)?;
+            self.try_parse_function_signature(start_span, methode_type, name, is_const, external)?;
 
         let block = match self.parse_block(TypeModifier::Mut) {
             Ok(val) => val,
@@ -503,10 +547,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 Loop::Continue => continue,
             }
 
-            let modifier = self
-                .try_bump_type_modiffier()
-                .unwrap_or(TypeModifier::Const);
-
+            let modifier = self.try_bump_mut().unwrap_or(TypeModifier::Const);
             let name = self.try_bump_consume_ident().try_not_value()?;
 
             if !self.current_is(&COLON) {
@@ -537,7 +578,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 ty,
                 name,
                 default,
-                modifier,
+                is_mut: modifier == TypeModifier::Mut,
             });
 
             self.skip_end_lines();

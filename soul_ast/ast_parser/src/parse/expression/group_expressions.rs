@@ -1,5 +1,5 @@
 use ast_model::{
-    expression::{AnyArray, Array, ArrayFiller, Expression, StructConstructor},
+    expression::{AnyArray, Array, ArrayFiller, Binding, Expression, StructConstructor},
     soul_type::SoulType,
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
@@ -15,7 +15,8 @@ use soul_utils::{
 use crate::{
     parser::Parser,
     utils::{
-        ARRAY, COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, FOR, LAMBDA_ARROW, SQUARE_CLOSE, SQUARE_OPEN,
+        ARRAY, COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, FOR, IN, LAMBDA_ARROW, SQUARE_CLOSE,
+        SQUARE_OPEN,
     },
 };
 
@@ -147,6 +148,16 @@ impl<'a, 'f> Parser<'a, 'f> {
         start_span: Span,
     ) -> SoulResult<Spanned<ArrayFiller>> {
         self.expect(&FOR)?;
+        let for_index = if matches!(self.token().kind, TokenKind::Ident(_)) && self.peek_is(&IN) {
+            let binding = self.try_bump_consume_ident()?;
+            self.expect(&IN)?;
+            Some(Binding {
+                id: self.alloc_node(),
+                ident: binding,
+            })
+        } else {
+            None
+        };
         let amount = self.parse_expression_id(&[LAMBDA_ARROW, SQUARE_CLOSE])?;
         self.expect(&LAMBDA_ARROW)?;
         let element = self.parse_expression_id(&[SQUARE_CLOSE])?;
@@ -158,7 +169,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 id: self.alloc_node(),
                 element_type,
                 collection_type,
-                for_index: None,
+                for_index,
             },
             self.span_combine(start_span),
         ))

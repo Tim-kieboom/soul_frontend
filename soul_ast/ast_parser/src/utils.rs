@@ -17,6 +17,7 @@ pub const OR: TokenKind = TokenKind::Symbol(Symbol::Or);
 pub const AS: TokenKind = TokenKind::Keyword(KeyWord::As);
 pub const IF: TokenKind = TokenKind::Keyword(KeyWord::If);
 pub const NOT: TokenKind = TokenKind::Symbol(Symbol::Not);
+pub const HASH: TokenKind = TokenKind::Symbol(Symbol::Hash);
 pub const DOT: TokenKind = TokenKind::Symbol(Symbol::Dot);
 pub const REF: TokenKind = TokenKind::Symbol(Symbol::And);
 pub const FOR: TokenKind = TokenKind::Keyword(KeyWord::For);
@@ -39,7 +40,6 @@ pub const IN: TokenKind = TokenKind::Keyword(KeyWord::InForLoop);
 pub const STRUCT: TokenKind = TokenKind::Keyword(KeyWord::Struct);
 pub const IMPORT: TokenKind = TokenKind::Keyword(KeyWord::Import);
 pub const SIZEOF: TokenKind = TokenKind::Keyword(KeyWord::Sizeof);
-pub const LITERAL: TokenKind = TokenKind::Keyword(KeyWord::Literal);
 pub const OPTIONAL: TokenKind = TokenKind::Symbol(Symbol::Question);
 pub const CURLY_OPEN: TokenKind = TokenKind::Symbol(Symbol::CurlyOpen);
 pub const ROUND_OPEN: TokenKind = TokenKind::Symbol(Symbol::RoundOpen);
@@ -226,19 +226,21 @@ impl<'a, 'f> Parser<'a, 'f> {
         Fault::error(message, Some(self.token().span))
     }
 
-    pub(crate) fn try_bump_type_modiffier(&mut self) -> Option<TypeModifier> {
+    pub(crate) fn try_bump_mut(&mut self) -> Option<TypeModifier> {
         Some(match self.token().kind {
             TokenKind::Keyword(KeyWord::Mut) => {
                 self.bump();
                 TypeModifier::Mut
             }
+            _ => return None,
+        })
+    }
+
+    pub(crate) fn try_bump_const(&mut self) -> Option<TypeModifier> {
+        Some(match self.token().kind {
             TokenKind::Keyword(KeyWord::Const) => {
                 self.bump();
                 TypeModifier::Const
-            }
-            TokenKind::Keyword(KeyWord::Literal) => {
-                self.bump();
-                TypeModifier::Literal
             }
             _ => return None,
         })

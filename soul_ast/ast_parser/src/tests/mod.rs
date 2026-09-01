@@ -35,9 +35,12 @@ mod big_test;
 mod conditional;
 mod enums;
 mod functions;
+mod associated_constants;
+mod attributes;
 mod lambda;
 mod literals;
 mod structs;
+mod union;
 mod use_block;
 mod variables;
 
@@ -852,6 +855,39 @@ fn array_filler() {
                         element.node,
                         ExpressionKind::Literal((_, Literal::Uint(0)))
                     ));
+                }
+                other => panic!("expected ArrayFiller, got {:?}", other),
+            }
+        }
+        _ => panic!("expected Expression statement"),
+    }
+}
+
+#[test]
+fn array_filler_with_index() {
+    let (module, store, context) = parse("[for i in 3 => i]");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    match &stmt.node {
+        StatementKind::Expression { expression, .. } => {
+            let expr = &store.expressions[*expression];
+            match &expr.node {
+                ExpressionKind::Array(AnyArray::ArrayFiller(filler)) => {
+                    let index = filler.for_index.as_ref().expect("expected for_index");
+                    assert_eq!(index.ident.as_str(), "i");
+                    assert!(filler.for_index.is_some());
+                    let amount = &store.expressions[filler.amount];
+                    assert!(matches!(
+                        amount.node,
+                        ExpressionKind::Literal((_, Literal::Uint(3)))
+                    ));
+                    assert!(filler.element != filler.amount);
                 }
                 other => panic!("expected ArrayFiller, got {:?}", other),
             }

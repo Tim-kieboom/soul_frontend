@@ -5,12 +5,7 @@ use crate::{
     soul_type::{Generic, SoulType},
 };
 use soul_utils::{
-    FunctionId, Ident, TypeModifier,
-    collections::soul_import_path::SoulImportPath,
-    error::SoulResult,
-    fault::Fault,
-    impl_soul_ids, soul_error_internal,
-    span::{ItemMetaData, Span, Spanned},
+    FunctionId, Ident, TypeModifier, bitflags, collections::soul_import_path::SoulImportPath, error::SoulResult, fault::Fault, impl_soul_ids, soul_error_internal, span::{ItemMetaData, Span, Spanned},
 };
 
 impl_soul_ids!(StatementId);
@@ -52,6 +47,9 @@ pub enum StatementKind {
     Trait(Trait),
     Struct(Struct),
     TypeDef(TypeDef),
+    /// A union declaration: `union Name { ... }`.
+    /// Same data model as an enum, but without a backing `as T` type.
+    Union(Enum),
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -286,13 +284,21 @@ pub struct Function {
     pub block: BlockId,
 }
 
+bitflags!{
+    #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+    pub struct FunctionModifier: u8 {
+        PUBLIC    = 1 << 0,
+        ASYNC     = 1 << 1,
+        CONST     = 1 << 2,
+    } 
+}
+
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FunctionSignature {
     pub id: FunctionId,
     pub node_id: NodeId,
-    pub is_public: bool,
+    pub modifier: FunctionModifier,
 
-    pub modifier: TypeModifier,
     /// The name of the function.
     pub name: Ident,
     /// Method type, if specified.
@@ -311,7 +317,7 @@ pub struct Parameter {
     pub id: NodeId,
     pub name: Ident,
     pub ty: SoulType,
-    pub modifier: TypeModifier,
+    pub is_mut: bool,
     pub default: Option<ExpressionId>,
 }
 
@@ -467,7 +473,28 @@ impl Statement {
         self.is_public
     }
 
-    pub fn try_set_is_public(
+    pub fn try_set_async(
+        &mut self,
+        store: &mut AstStore,
+        span: Span,
+    ) -> SoulResult<()> {
+        match &mut self.node {
+            StatementKind::Function(id) | StatementKind::ExternalFunction(id) => {
+                let kind = store.functions.get_mut(*id).ok_or(soul_error_internal!(
+                    format!("{id:?} not found"),
+                    Some(span)
+                ))?;
+                kind.signature_mut().value.modifier |= FunctionModifier::ASYNC;
+                Ok(())
+            }
+            _ => Err(Fault::error(
+                "only functions can be declared `async`",
+                Some(span),
+            )),
+        }
+    }
+
+    pub fn try_set_public(
         &mut self,
         store: &mut AstStore,
         is_public: bool,
@@ -477,14 +504,15 @@ impl Statement {
             StatementKind::Enum(_)
             | StatementKind::Trait(_)
             | StatementKind::Struct(_)
-            | StatementKind::TypeDef(_) => self.is_public = is_public,
+            | StatementKind::TypeDef(_)
+            | StatementKind::Union(_) => self.is_public = is_public,
 
             StatementKind::Function(id) | StatementKind::ExternalFunction(id) => {
                 let kind = store.functions.get_mut(*id).ok_or(soul_error_internal!(
                     format!("{id:?} not found"),
                     Some(span)
                 ))?;
-                kind.signature_mut().value.is_public = is_public;
+                kind.signature_mut().value.modifier |= FunctionModifier::PUBLIC;
                 self.is_public = is_public;
             }
 
@@ -511,6 +539,7 @@ impl StatementKind {
     pub const fn variant_name(&self) -> &'static str {
         match self {
             StatementKind::Enum(_) => "enum",
+            StatementKind::Union(_) => "union",
             StatementKind::Trait(_) => "trait",
             StatementKind::Struct(_) => "struct",
             StatementKind::Import(_) => "import",

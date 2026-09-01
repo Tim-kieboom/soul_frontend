@@ -13,7 +13,7 @@ use ast_model::{
         AnyArray, ExpressionId, ExpressionKind, ForCondition, FunctionCalleeKind, IfBranch, Lambda,
         MatchPattern, TypeofKind,
     }, soul_type::{ArrayKind, Generic, SoulType, TupleKind}, statements::{
-        Assignment, Enum, EnumVariant, FunctionThisKind, ImplBlock, Import, ImportItem, ImportKind, Parameter, Statement, StatementId, StatementKind, Struct, Trait, TypeDef, UnionKind, UseBlock, VarPattern, Variable,
+        Assignment, Enum, EnumVariant, FunctionModifier, FunctionThisKind, ImplBlock, Import, ImportItem, ImportKind, Parameter, Statement, StatementId, StatementKind, Struct, Trait, TypeDef, UnionKind, UseBlock, VarPattern, Variable,
     },
 };
 use soul_tokenizer::model::{
@@ -217,8 +217,8 @@ impl<'a, W: Writer> Displayer<'a, W> {
 
     fn write_block(&mut self, id: BlockId) -> Result<()> {
         let block = self.store.blocks.get_err(id)?;
-        if block.modifier != TypeModifier::Mut {
-            self.push_str(block.modifier.as_str())?;
+        if block.is_const {
+            self.push_str(KeyWord::Const.as_str())?;
             self.push_char(' ')?;
         }
         self.push_str("{\n")?;
@@ -247,6 +247,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
 
         match &statement.node {
             StatementKind::Enum(enum_) => self.write_enum(enum_),
+            StatementKind::Union(union_) => self.write_enum(union_),
             StatementKind::Trait(trait_) => self.write_trait(trait_),
             StatementKind::Import(import) => self.write_import(import),
             StatementKind::Struct(struct_) => self.write_struct(struct_),
@@ -381,8 +382,11 @@ impl<'a, W: Writer> Displayer<'a, W> {
     }
 
     fn write_variable(&mut self, variable: &Variable) -> Result<()> {
-        self.push_str(variable.modifier.as_str())?;
-        self.push_char(' ')?;
+        
+        if variable.modifier == TypeModifier::Mut {
+            self.push_str(KeyWord::Mut.as_str())?;
+            self.push_char(' ')?;
+        }
         self.write_var_pattern(&variable.pattern)?;
 
         if let Some(ty) = &variable.ty {
@@ -391,7 +395,16 @@ impl<'a, W: Writer> Displayer<'a, W> {
         }
 
         if let Some(value) = variable.initialize_value {
-            self.push_str(" = ")?;
+            let assign_str = if variable.modifier == TypeModifier::Const {
+                " :: "
+            } 
+            else if variable.ty.is_some() {
+                " = "
+            } else {
+                " := "
+            };
+
+            self.push_str(assign_str)?;
             self.write_expression(value)?;
         }
 
@@ -691,8 +704,8 @@ impl<'a, W: Writer> Displayer<'a, W> {
             )?;
         }
 
-        if signature.modifier != TypeModifier::Mut {
-            push_fmt!(self, "{} ", signature.modifier)?;
+        if signature.modifier.contains(FunctionModifier::CONST) {
+            push_fmt!(self, "{} ", KeyWord::Const.as_str())?;
         }
         self.push_str(signature.name.as_str())?;
         self.write_generic_defines(&signature.generics)?;
@@ -726,8 +739,8 @@ impl<'a, W: Writer> Displayer<'a, W> {
         let last_index = parameters.len().saturating_sub(1);
         for (i, parameter) in parameters.iter().enumerate() {
             push_fmt!(self, 
-                "{} {}: ",
-                parameter.modifier.as_str(),
+                "{}{}: ",
+                if parameter.is_mut {"mut "} else {""},
                 parameter.name.as_str()
             )?;
             self.write_type(&parameter.ty)?;
@@ -1250,6 +1263,10 @@ impl<'a, W: Writer> Displayer<'a, W> {
             SoulType::Optional(soul_type) => {
                 self.push_char('?')?;
                 self.write_type(&soul_type)
+            }
+            SoulType::ImplTrait(inner) => {
+                self.push_str("impl ")?;
+                self.write_type(inner)
             }
             SoulType::Stub(stub) => {
                 self.push_str(&stub.name)?;

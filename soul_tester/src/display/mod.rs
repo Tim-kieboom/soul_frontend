@@ -1,5 +1,5 @@
 use anyhow::Result;
-use soul_utils::collections::vec_map::{VecMap, VecMapIndex};
+use soul_utils::{collections::{module_store::ModuleStore, vec_map::{VecMap, VecMapIndex}}, fault::Fault};
 use std::{
     fmt::Debug,
     fs::{File, OpenOptions},
@@ -7,7 +7,7 @@ use std::{
     path::Path,
 };
 
-use crate::display::writer::Writer;
+use crate::{config, display::{fault::display_fault, writer::Writer}};
 
 pub(crate) mod ast;
 pub(crate) mod benchmark;
@@ -48,4 +48,13 @@ fn vecmap_to_pretty_vec<K: VecMapIndex + Debug, V>(map: &VecMap<K, V>) -> Vec<Ve
             value,
         })
         .collect()
+}
+
+pub(crate) fn fault_to_anyhow_error(fault: &Fault, module_store: &ModuleStore) -> anyhow::Error {
+    let mut message = String::new();
+    if let Err(err) = display_fault(fault, module_store, &config::PRINT_CONFIGS, &mut message) {
+        err
+    } else  {
+        anyhow::Error::msg(message)
+    }
 }
