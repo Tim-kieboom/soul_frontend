@@ -1,7 +1,8 @@
 use ast_model::{
     expression::{
         AnyArray, Constructor, ExpressionId, ExpressionKind, FieldAccess, For, ForCondition, If,
-        IfBranch, Lambda, Match, MatchMethod, StringFormat, StructConstructor, VariableExpression,
+        IfBranch, IfCondition, Lambda, Match, MatchMethod, StringFormat, StructConstructor,
+        VariableExpression,
     },
     scope::ScopeValue,
 };
@@ -127,7 +128,7 @@ impl<'a> NameResolver<'a> {
     fn resolve_field_access(&mut self, field_access: &FieldAccess) {
         let Some(expr) = self.store.expressions.get(field_access.object) else {
             self.resolve_expression(field_access.object);
-            return
+            return;
         };
 
         if let ExpressionKind::Variable(VariableExpression { name, .. }) = &expr.node {
@@ -194,7 +195,7 @@ impl<'a> NameResolver<'a> {
     }
 
     fn resolve_if(&mut self, if_: &If) {
-        self.resolve_expression(if_.condition);
+        self.resolve_if_condition(&if_.condition);
         self.resolve_block(if_.block);
 
         let mut current = if_.branch.as_ref();
@@ -205,10 +206,19 @@ impl<'a> NameResolver<'a> {
                     current = None;
                 }
                 IfBranch::If(elif) => {
-                    self.resolve_expression(if_.condition);
+                    self.resolve_if_condition(&if_.condition);
                     self.resolve_block(elif.block);
                     current = elif.branch.as_ref();
                 }
+            }
+        }
+    }
+
+    fn resolve_if_condition(&mut self, condition: &IfCondition) {
+        match condition {
+            IfCondition::Expression(value) => self.resolve_expression(*value),
+            IfCondition::CastType { scrutinee, .. } | IfCondition::MatchType { scrutinee, .. } => {
+                self.resolve_expression(*scrutinee);
             }
         }
     }

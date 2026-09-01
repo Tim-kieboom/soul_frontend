@@ -27,7 +27,6 @@ impl<'a> NameResolver<'a> {
                 }
 
                 for variant in &enum_.variants {
-
                     if let EnumVariant::Assigned { value, .. } = variant {
                         self.collect_expression(*value);
                     }
@@ -41,7 +40,6 @@ impl<'a> NameResolver<'a> {
                 }
 
                 for variant in &union_.variants {
-
                     if let EnumVariant::Assigned { value, .. } = variant {
                         self.collect_expression(*value);
                     }
@@ -65,12 +63,14 @@ impl<'a> NameResolver<'a> {
                     self.header_insert_custom_type(id, ty);
                 }
 
+                self.push_struct_scope();
                 for field in &struct_.fields {
                     self.collect_variable(&field.value);
                 }
                 for statement in &struct_.statements {
                     self.collect_statement(*statement);
                 }
+                self.pop_struct_scope();
             }
             StatementKind::Import(import) => {
                 let span = statement.span;

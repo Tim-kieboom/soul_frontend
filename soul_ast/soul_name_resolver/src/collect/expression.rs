@@ -1,6 +1,10 @@
 use ast_model::{
-    AstStore, block::BlockId, expression::{
-        AnyArray, Binding, Constructor, ExpressionId, ExpressionKind, FieldAccess, For, ForCondition, FunctionCall, FunctionCalleeKind, If, IfBranch, Lambda, Match, MatchMethod, MatchPattern, StringFormat, StructConstructor, TypeOf, VariableExpression,
+    AstStore,
+    block::BlockId,
+    expression::{
+        AnyArray, Binding, Constructor, ExpressionId, ExpressionKind, FieldAccess, For,
+        ForCondition, FunctionCall, FunctionCalleeKind, If, IfBranch, IfCondition, Lambda, Match,
+        MatchMethod, MatchPattern, StringFormat, StructConstructor, TypeOf, VariableExpression,
     },
 };
 use soul_utils::span::Span;
@@ -72,7 +76,7 @@ impl<'a> NameResolver<'a> {
                 if self.field_access_aleady_collected(field_access) {
                     return;
                 }
-  
+
                 self.collect_expression(field_access.object)
             }
             ExpressionKind::StringFormat(string_format) => {
@@ -90,14 +94,17 @@ impl<'a> NameResolver<'a> {
 
     fn field_access_aleady_collected(&self, field_access: &FieldAccess) -> bool {
         let Some(value) = self.store.expressions.get(field_access.object) else {
-            return false
+            return false;
         };
 
-        let ExpressionKind::Variable(VariableExpression { name,.. }) = &value.node else {
-            return false
+        let ExpressionKind::Variable(VariableExpression { name, .. }) = &value.node else {
+            return false;
         };
 
-        self.scope_info.scopes.flat_lookup_type(name.as_str(), self.current.module).is_some()
+        self.scope_info
+            .scopes
+            .flat_lookup_type(name.as_str(), self.current.module)
+            .is_some()
     }
 
     fn collect_lambda(&mut self, lambda: &Lambda) {
@@ -293,8 +300,11 @@ impl<'a> NameResolver<'a> {
     }
 
     fn collect_if(&mut self, if_: &If) {
+        self.collect_if_condition(&if_.condition);
+
         self.push_scope(if_.block);
-        self.inner_collect_expression(if_.condition);
+        self.collect_if_condition_bindings(&if_.condition);
+
         self.collect_scopeless_block(if_.block);
         self.pop_scope();
 
@@ -302,8 +312,10 @@ impl<'a> NameResolver<'a> {
         while let Some(branch) = current {
             match branch.as_ref() {
                 IfBranch::If(elif) => {
+                    self.collect_if_condition(&elif.condition);
                     self.push_scope(elif.block);
-                    self.inner_collect_expression(elif.condition);
+
+                    self.collect_if_condition_bindings(&elif.condition);
                     self.collect_scopeless_block(elif.block);
                     self.pop_scope();
                     current = elif.branch.as_ref();
@@ -313,6 +325,23 @@ impl<'a> NameResolver<'a> {
                     current = None;
                 }
             }
+        }
+    }
+
+    fn collect_if_condition(&mut self, condition: &IfCondition) {
+        match condition {
+            IfCondition::Expression(value) => self.inner_collect_expression(*value),
+            IfCondition::CastType { scrutinee, .. } | IfCondition::MatchType { scrutinee, .. } => {
+                self.collect_expression(*scrutinee)
+            }
+        }
+    }
+
+    fn collect_if_condition_bindings(&mut self, condition: &IfCondition) {
+        match condition {
+            IfCondition::Expression(_) => (),
+            IfCondition::CastType { binding, .. } => self.insert_binding(binding),
+            IfCondition::MatchType { pattern, .. } => self.collect_match_arm_pattern(pattern),
         }
     }
 }

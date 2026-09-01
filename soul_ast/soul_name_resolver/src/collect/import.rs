@@ -97,7 +97,7 @@ impl<'a> NameResolver<'a> {
                     "external import missing crate name".to_string(),
                     Some(span),
                 ));
-                return ModuleId::ERROR
+                return ModuleId::ERROR;
             }
         };
 
@@ -109,7 +109,7 @@ impl<'a> NameResolver<'a> {
                 ),
                 Some(span),
             ));
-            return ModuleId::ERROR
+            return ModuleId::ERROR;
         };
 
         let module_path = to_crate_name(path.module.as_pathbuf());
@@ -282,18 +282,19 @@ impl<'a> NameResolver<'a> {
 
         for (name, entry) in to_re_export {
             let h = current.entry(name).or_default();
-            if let Some(func) = entry.function && func.is_public {
-                    h.function.get_or_insert(func);
-                }
-            
-            if let Some(var) = entry.variable 
-                && var.is_public 
+            if let Some(func) = entry.function
+                && func.is_public
+            {
+                h.function.get_or_insert(func);
+            }
+
+            if let Some(var) = entry.variable
+                && var.is_public
             {
                 h.variable.get_or_insert(var);
-                
             }
             if let Some(ty) = entry.custom_type
-                && ty.is_public 
+                && ty.is_public
             {
                 h.custom_type.get_or_insert(ty);
             }

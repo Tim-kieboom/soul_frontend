@@ -135,8 +135,23 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.expect(&IMPL)?;
         let impl_trait = self.try_parse_type().merge_to_result()?;
 
-        self.expect(&CURLY_OPEN)?;
         let mut methods = vec![];
+        if !self.current_is(&CURLY_OPEN) {
+            let is_const = self.try_bump_const().is_some();
+            let name = self.try_bump_consume_ident()?;
+            methods.push(
+                self.try_parse_function_declaration_id(start_span, method_type, is_const, name)
+                    .map_try_not_value(|err| err.fault)
+                    .merge_to_result()?
+                    .value,
+            );
+            return Ok(ImplBlock {
+                impl_trait,
+                methods,
+            });
+        }
+
+        self.expect(&CURLY_OPEN)?;
         loop {
             self.skip_end_lines();
             if self.current_is(&CURLY_CLOSE) {
@@ -158,6 +173,24 @@ impl<'a, 'f> Parser<'a, 'f> {
             impl_trait,
             methods,
         })
+    }
+
+    pub(crate) fn parse_impl_statement(&mut self, start_span: Span) -> SoulResult<Statement> {
+        let method_type = self.current.this_type.clone().unwrap_or(SoulType::None);
+        let impls = vec![self.parse_impl_block(&method_type, start_span)?];
+
+        let use_block = UseBlock {
+            ty: method_type,
+            impls,
+            methods: vec![],
+            statements: vec![],
+            use_generics: vec![],
+        };
+
+        Ok(Statement::new(
+            StatementKind::UseBlock(use_block),
+            self.span_combine(start_span),
+        ))
     }
 
     fn parse_use_method(&mut self, ty: &SoulType, start_span: Span) -> SoulResult<Methode> {

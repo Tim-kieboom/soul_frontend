@@ -3,21 +3,25 @@ use std::str::FromStr;
 use crate::{
     parser::Parser,
     utils::{
-        COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, DOT, DOUBLE_DOT, ELSE, IF, LAMBDA_ARROW, MATCH, NOT,
-        NULL, OR, ROUND_CLOSE, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS,
+        COLON, COLON_ASSIGN, COMMA, CURLY_CLOSE, CURLY_OPEN, DOT, DOUBLE_DOT, ELSE, IF,
+        LAMBDA_ARROW, MATCH, NOT, NULL, OR, ROUND_CLOSE, ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN,
+        STAMENT_END_TOKENS,
     },
 };
 use ast_model::{
     block::{Block, BlockId},
     expression::{
         Binding, ConstructorStructPattern, Expression, ExpressionId, ExpressionKind, If, IfBranch,
-        Match, MatchArm, MatchContructor, MatchPattern, NamedMatchPattern, NamedTupleMatchPattern,
-        TupleMatchPattern,
+        IfCondition, Match, MatchArm, MatchContructor, MatchPattern, NamedMatchPattern,
+        NamedTupleMatchPattern, TupleMatchPattern,
     },
     statements::Statement,
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
-use soul_utils::{Ident, TypeModifier, error::SoulResult, fault::Fault, ids::IdAlloc, span::Span};
+use soul_utils::{
+    Ident, TypeModifier, collections::try_result::ToResult, error::SoulResult, fault::Fault,
+    ids::IdAlloc, span::Span,
+};
 
 const IF_STR: &str = KeyWord::If.as_str();
 const ELSE_STR: &str = KeyWord::Else.as_str();
@@ -27,18 +31,34 @@ impl<'a, 'f> Parser<'a, 'f> {
         let start_span = self.token().span;
         self.expect(&IF)?;
 
-        let condition = match self.parse_expression_id(&[CURLY_OPEN]) {
-            Ok(val) => val,
-            Err(err) => {
-                self.log_fault(err);
-                self.skip_till(&[CURLY_OPEN]);
-                ExpressionId::error()
+        let condition = if self.current_is_keyword(KeyWord::Type) {
+            self.bump();
+            let condition = self.parse_type_assert()?;
+            let block = self.parse_block(TypeModifier::Mut)?;
+            let mut r#if = If {
+                condition,
+                block,
+                branch: None,
+            };
+            self.parse_if_arms(&mut r#if.branch)?;
+            return Ok(Expression::new(
+                ExpressionKind::If(r#if),
+                self.span_combine(start_span),
+            ));
+        } else {
+            match self.parse_expression_id(&[CURLY_OPEN]) {
+                Ok(val) => val,
+                Err(err) => {
+                    self.log_fault(err);
+                    self.skip_till(&[CURLY_OPEN]);
+                    ExpressionId::error()
+                }
             }
         };
         let if_block = self.parse_block(TypeModifier::Mut)?;
 
         let mut r#if = If {
-            condition,
+            condition: IfCondition::Expression(condition),
             block: if_block,
             branch: None,
         };
@@ -48,6 +68,33 @@ impl<'a, 'f> Parser<'a, 'f> {
             ExpressionKind::If(r#if),
             self.span_combine(start_span),
         ))
+    }
+
+    pub(crate) fn parse_type_assert(&mut self) -> SoulResult<IfCondition> {
+        let pattern = self.inner_parse_match_pattern()?;
+        self.skip_end_lines();
+        if self.current_is(&COLON) {
+            self.bump();
+            let ty = self.try_parse_type().merge_to_result()?;
+            let binding = match pattern {
+                MatchPattern::Binding(binding) => binding,
+                MatchPattern::NotNull(binding) => binding,
+                _ => return Err(Fault::error("expected ident", Some(self.token().span))),
+            };
+            self.skip_end_lines();
+            self.expect(&COLON_ASSIGN)?;
+            let scrutinee = self.parse_expression_id(&[CURLY_OPEN])?;
+            return Ok(IfCondition::CastType {
+                binding,
+                ty,
+                scrutinee,
+            });
+        }
+
+        self.skip_end_lines();
+        self.expect(&COLON_ASSIGN)?;
+        let scrutinee = self.parse_expression_id(&[CURLY_OPEN])?;
+        Ok(IfCondition::MatchType { pattern, scrutinee })
     }
 
     pub(crate) fn parse_match(&mut self) -> SoulResult<Expression> {
@@ -140,7 +187,16 @@ impl<'a, 'f> Parser<'a, 'f> {
                 self.parse_block(TypeModifier::Mut)?
             } else {
                 let span = self.token().span;
-                let statement = self.parse_statement_id()?;
+                let expr = self.parse_expression_id(&[
+                    COMMA,
+                    CURLY_CLOSE,
+                    TokenKind::EndFile,
+                    TokenKind::EndLine,
+                ])?;
+                let statement = self
+                    .forest
+                    .store
+                    .insert_statement(Statement::from_expression(&self.forest.store, expr, false));
                 self.forest.store.insert_block(Block {
                     span,
                     is_const: false,
@@ -148,6 +204,12 @@ impl<'a, 'f> Parser<'a, 'f> {
                 })
             };
             arms.push(MatchArm { pattern, body });
+
+            self.skip_end_lines();
+            if !self.current_is(&COMMA) {
+                continue;
+            }
+            self.bump();
         }
 
         Ok(arms)
@@ -179,13 +241,24 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.bump();
             let else_kind = if self.current_is(&IF) {
                 self.bump();
-                let condition = self.parse_expression_id(&[CURLY_OPEN])?;
-                let block = self.parse_block(TypeModifier::Mut)?;
-                IfBranch::If(If {
-                    condition,
-                    block,
-                    branch: None,
-                })
+                if self.current_is_keyword(KeyWord::Type) {
+                    self.bump();
+                    let condition = self.parse_type_assert()?;
+                    let block = self.parse_block(TypeModifier::Mut)?;
+                    IfBranch::If(If {
+                        condition,
+                        block,
+                        branch: None,
+                    })
+                } else {
+                    let condition = self.parse_expression_id(&[CURLY_OPEN])?;
+                    let block = self.parse_block(TypeModifier::Mut)?;
+                    IfBranch::If(If {
+                        condition: IfCondition::Expression(condition),
+                        block,
+                        branch: None,
+                    })
+                }
             } else {
                 has_else = true;
                 let block = self.parse_block(TypeModifier::Mut)?;
@@ -343,6 +416,28 @@ impl<'a, 'f> Parser<'a, 'f> {
         if self.current_is(&CURLY_OPEN) {
             return self
                 .parse_match_constructor_struct_pattern(Ident::new(ident_name, type_name_span));
+        }
+
+        if self.current_is(&ROUND_OPEN) {
+            self.bump();
+            let binding = if self.current_is_ident("_") {
+                self.bump();
+                None
+            } else if let TokenKind::Ident(bind_name) = &self.token().kind {
+                let bind_span = self.token().span;
+                let bind_name = bind_name.clone();
+                self.bump();
+                let ident = Ident::new(bind_name, bind_span);
+                Some(Binding::new(self.forest.store.alloc_node(), ident))
+            } else {
+                None
+            };
+            self.expect(&ROUND_CLOSE)?;
+            return Ok(MatchPattern::Constructor(MatchContructor {
+                type_name: Ident::new(ident_name.clone(), type_name_span),
+                variant_name: Ident::new(ident_name, type_name_span),
+                binding,
+            }));
         }
 
         if self.current_is(&DOT) {

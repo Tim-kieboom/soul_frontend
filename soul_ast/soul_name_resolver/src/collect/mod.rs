@@ -183,4 +183,27 @@ impl<'a> NameResolver<'a> {
             .current_scope_mut(self.current.module)
             .unwrap_or_else(|| panic!("{:?} has no scope", self.current.module))
     }
+
+    /// Pushes an anonymous child scope for collecting struct members so that
+    /// fields and methods of distinct structs do not collide in the module scope.
+    pub(super) fn push_struct_scope(&mut self) {
+        let parent = match self.scope_info.scopes.current_scope_id(self.current.module) {
+            Some(val) => val,
+            None => return,
+        };
+        if let Err(err) = self
+            .scope_info
+            .scopes
+            .push_scope(parent, self.current.module)
+        {
+            self.log_fault(soul_error_internal!(err, None));
+        }
+    }
+
+    /// Pops the scope pushed by [`Self::push_struct_scope`].
+    pub(super) fn pop_struct_scope(&mut self) {
+        if let Err(err) = self.scope_info.scopes.pop_scope(self.current.module) {
+            self.log_fault(soul_error_internal!(err, None));
+        }
+    }
 }

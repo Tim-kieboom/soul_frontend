@@ -3,7 +3,7 @@ use ast_model::{
     soul_type::{SoulType, Stub},
     statements::{Import, ImportKind, StatementKind, Struct},
 };
-use soul_utils::{fault::Severity, soul_names::PrimitiveTypes};
+use soul_utils::{SharedStr, fault::Severity, soul_names::PrimitiveTypes};
 
 use crate::tests::{get_statement, parse};
 
@@ -156,7 +156,7 @@ fn use_block_with_generic_type() {
     assert_eq!(
         use_block.ty,
         SoulType::Stub(Stub {
-            name: Box::from("Foo"),
+            name: SharedStr::new("Foo"),
             generics: vec![SoulType::Primitive(PrimitiveTypes::Int)]
         })
     );

@@ -1,5 +1,5 @@
 use ast_model::{
-    expression::{ExpressionKind, If, IfBranch, Match, MatchPattern},
+    expression::{ExpressionKind, If, IfBranch, IfCondition, Match, MatchPattern},
     literal::Literal,
     statements::StatementKind,
 };
@@ -31,7 +31,11 @@ fn if_statement() {
                     branch,
                     ..
                 }) => {
-                    let cond = &store.expressions[*condition];
+                    let IfCondition::Expression(expression_id) = condition else {
+                        panic!("condition is wrongtype");
+                    };
+
+                    let cond = &store.expressions[*expression_id];
                     assert!(matches!(
                         cond.node,
                         ExpressionKind::Literal((_, Literal::Bool(true)))

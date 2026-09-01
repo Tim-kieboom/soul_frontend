@@ -21,24 +21,24 @@ pub struct Fault {
     backtrace: Box<str>,
 }
 impl Fault {
-    pub fn error(message: impl Into<String>, span: Option<Span>) -> Self {
-        Fault::new(Severity::Error, message.into().into_boxed_str(), span)
+    pub fn error(message: impl Into<Box<str>>, span: Option<Span>) -> Self {
+        Fault::new(Severity::Error, message.into(), span)
     }
 
-    pub fn warning(message: impl Into<String>, span: Option<Span>) -> Self {
-        Fault::new(Severity::Warning, message.into().into_boxed_str(), span)
+    pub fn warning(message: impl Into<Box<str>>, span: Option<Span>) -> Self {
+        Fault::new(Severity::Warning, message.into(), span)
     }
 
-    pub fn note(message: impl Into<String>, span: Option<Span>) -> Self {
-        Fault::new(Severity::Note, message.into().into_boxed_str(), span)
+    pub fn note(message: impl Into<Box<str>>, span: Option<Span>) -> Self {
+        Fault::new(Severity::Note, message.into(), span)
     }
 
     #[cfg(feature = "error_backtrace")]
     pub fn empty() -> Self {
         Fault {
-            backtrace: String::new(),
+            backtrace: Box::from(""),
             severity: Severity::Error,
-            message: String::new(),
+            message: Box::from(""),
             span: None,
         }
     }
@@ -53,11 +53,11 @@ impl Fault {
     }
 
     #[cfg(feature = "error_backtrace")]
-    fn new(severity: Severity, message: String, span: Option<Span>) -> Self {
+    fn new(severity: Severity, message: Box<str>, span: Option<Span>) -> Self {
         use std::backtrace::Backtrace;
 
         Fault {
-            backtrace: Backtrace::force_capture().to_string(),
+            backtrace: Backtrace::force_capture().to_string().into_boxed_str(),
             severity,
             message,
             span,
@@ -100,15 +100,15 @@ impl FaultCollector {
         self.faults.push(fault);
     }
 
-    pub fn push_error(&mut self, message: impl Into<String>, span: Option<Span>) {
+    pub fn push_error(&mut self, message: impl Into<Box<str>>, span: Option<Span>) {
         self.faults.push(Fault::error(message, span));
     }
 
-    pub fn push_warning(&mut self, message: impl Into<String>, span: Option<Span>) {
+    pub fn push_warning(&mut self, message: impl Into<Box<str>>, span: Option<Span>) {
         self.faults.push(Fault::warning(message, span));
     }
 
-    pub fn push_note(&mut self, message: impl Into<String>, span: Option<Span>) {
+    pub fn push_note(&mut self, message: impl Into<Box<str>>, span: Option<Span>) {
         self.faults.push(Fault::note(message, span));
     }
 

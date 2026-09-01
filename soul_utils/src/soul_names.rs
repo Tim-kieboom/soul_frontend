@@ -243,5 +243,7 @@ define_symbols!(
 
         /// logical or `||`
         LogOr => "||", Symbol::DoubleOr, 0,
+        /// safe-call / chaining `->`
+        Arrow => "->", Symbol::RightArrow, 9,
     }
 );

@@ -610,7 +610,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            match self.inner_parameter_this(&mut function_kind)? {
+            match self.inner_parameter_this(&mut function_kind, &mut types)? {
                 Loop::None => (),
                 Loop::Break => break,
                 Loop::Continue => continue,
@@ -663,9 +663,15 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok((types, function_kind))
     }
 
-    fn inner_parameter_this(&mut self, kind: &mut FunctionThisKind) -> TryResult<Loop, Fault> {
+    fn inner_parameter_this(
+        &mut self,
+        kind: &mut FunctionThisKind,
+        types: &mut Vec<Parameter>,
+    ) -> TryResult<Loop, Fault> {
+        let mut is_ref_prefix = false;
         let this = match &self.token().kind {
             &REF => {
+                is_ref_prefix = true;
                 self.bump();
                 if matches!(self.token().kind, TokenKind::Keyword(KeyWord::Mut)) {
                     self.bump();
@@ -677,6 +683,31 @@ impl<'a, 'f> Parser<'a, 'f> {
             TokenKind::Ident(val) if val == "this" => Some(FunctionThisKind::Consume),
             _ => None,
         };
+
+        if is_ref_prefix && !self.current_is_ident("this") {
+            let is_mut = matches!(this, Some(FunctionThisKind::MutRef));
+            let name = self.try_bump_consume_ident().try_not_value()?;
+            if !self.current_is(&COLON) {
+                return Err(TryError::IsNotValue(self.get_expect_error(&COLON)));
+            }
+            self.bump();
+            let ty = self.try_parse_type()?;
+            types.push(Parameter {
+                id: self.alloc_node(),
+                ty,
+                name,
+                default: None,
+                is_mut,
+            });
+
+            self.skip_end_lines();
+            return if self.current_is(&ROUND_CLOSE) {
+                TryOk(Loop::Break)
+            } else {
+                self.expect(&COMMA).try_err()?;
+                TryOk(Loop::Continue)
+            };
+        }
 
         if let Some(callee) = this {
             if *kind != FunctionThisKind::Static {

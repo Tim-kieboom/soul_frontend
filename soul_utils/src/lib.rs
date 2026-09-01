@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{borrow::Borrow, fmt::{Display, Formatter}, ops::Deref, rc::Rc};
 
 use crate::{fault::FaultCollector, span::Span};
 
@@ -46,11 +46,10 @@ pub struct CrateContext {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct Ident(Box<str>, Span);
+pub struct Ident(SharedStr, Span);
 impl Ident {
-    pub fn new(value: impl AsRef<str>, span: Span) -> Self {
-        let str = value.as_ref();
-        Self(Box::from(str), span)
+    pub fn new(value: impl Into<Rc<str>>, span: Span) -> Self {
+        Self(SharedStr::new(value), span)
     }
 
     pub fn from_str_slice(slice: &[&str], span: Span) -> Self {
@@ -59,7 +58,7 @@ impl Ident {
         for str in slice {
             value.push_str(str);
         }
-        Self(value.into_boxed_str(), span)
+        Self(SharedStr::new(value), span)
     }
 
     pub fn as_str(&self) -> &str {
@@ -70,12 +69,75 @@ impl Ident {
         self.1
     }
 
-    pub fn into_boxstr(self) -> Box<str> {
+    pub fn into_shared_str(self) -> SharedStr {
         self.0
     }
 }
 impl Display for Ident {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+/// an refcounted string with serde Serialization
+pub struct SharedStr(Rc<str>);
+impl SharedStr {
+    pub fn new(s: impl Into<Rc<str>>) -> Self {
+        Self(s.into())
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+impl Deref for SharedStr {
+    type Target = str;
+
+    fn deref(&self) -> &str {
+        &self.0
+    }
+}
+impl AsRef<str> for SharedStr {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+impl Borrow<str> for SharedStr {
+    fn borrow(&self) -> &str {
+        &self.0
+    }
+}
+impl Display for SharedStr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &self.0)
+    }
+}
+impl From<Rc<str>> for SharedStr {
+    fn from(value: Rc<str>) -> Self {
+        Self(value)
+    }
+}
+impl From<&str> for SharedStr {
+    fn from(value: &str) -> Self {
+        Self(value.into())
+    }
+}
+impl serde::Serialize for SharedStr {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.0.as_ref().serialize(serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SharedStr {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Ok(Self(s.into()))
     }
 }

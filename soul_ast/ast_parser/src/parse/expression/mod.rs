@@ -121,12 +121,28 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             let precedence = self.current_precedence();
 
-            // If precedence is lower than the minimum required, stop parsing more operators here
-            if precedence < min_precedence {
+            // If precedence is lower than the minimum required, or there's no operator, stop
+            if precedence.is_none() || precedence < min_precedence {
                 break;
             }
 
             match self.consume_expression_operator(start_span)? {
+                ExpressionOperator::Binary(operator)
+                    if operator.value == BinaryOperatorKind::Arrow =>
+                {
+                    if self.try_parse_method_arm(&mut left, start_span, false)? {
+                        continue;
+                    }
+                    let right = self.pratt_parse_expression(precedence.next(), end_tokens, None)?;
+                    let span = self.span_combine(start_span);
+                    left = Expression::new_binary(
+                        self.alloc_node(),
+                        self.forest.store.insert_expression(left),
+                        operator,
+                        self.forest.store.insert_expression(right),
+                        span,
+                    );
+                }
                 ExpressionOperator::Binary(operator) => {
                     let next_min_precedence = precedence.next();
                     let right =
@@ -197,10 +213,10 @@ impl<'a, 'f> Parser<'a, 'f> {
                 } else if let Some(unary) = try_to_unary_operator(symbool_kind) {
                     Precedence::new(unary.precedence())
                 } else {
-                    Precedence::MIN
+                    Precedence::NONE
                 }
             }
-            _ => Precedence::MIN,
+            _ => Precedence::NONE,
         }
     }
 
@@ -516,6 +532,7 @@ impl ConvertOperator for Operator {
             Operator::GreatThen => BinaryOperatorKind::Gt,
             Operator::BitAnd => BinaryOperatorKind::BitAnd,
             Operator::BitXor => BinaryOperatorKind::BitXor,
+            Operator::Arrow => BinaryOperatorKind::Arrow,
 
             Operator::Not | Operator::AtSign => return None,
         })

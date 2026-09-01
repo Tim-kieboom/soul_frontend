@@ -13,16 +13,10 @@ use ast_model::{
 };
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
-    CrateContext,
-    collections::{
+    CrateContext, SharedStr, collections::{
         crate_store::{CrateEntry, CrateStore},
         module_store::ModuleStore,
-    },
-    fault::Severity,
-    ids::IdAlloc,
-    linkage::Linkage,
-    soul_names::PrimitiveTypes,
-    span::ModuleId,
+    }, fault::Severity, ids::IdAlloc, linkage::Linkage, soul_names::PrimitiveTypes, span::ModuleId,
 };
 
 use crate::{ParseInfo, parse_module};
@@ -35,6 +29,7 @@ mod enums;
 mod functions;
 mod lambda;
 mod literals;
+mod regressions;
 mod structs;
 mod union;
 mod use_block;
@@ -996,7 +991,7 @@ fn array_contructor_generic_literal() {
                 ExpressionKind::Array(AnyArray::Array(arr)) => {
                     let int = SoulType::Primitive(PrimitiveTypes::Int);
                     let collection = SoulType::Stub(Stub {
-                        name: Box::from("List"),
+                        name: SharedStr::new("List"),
                         generics: vec![int],
                     });
                     assert_eq!(arr.collection_type, Some(collection));

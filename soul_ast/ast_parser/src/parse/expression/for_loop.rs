@@ -15,6 +15,7 @@ use crate::{
     parser::Parser,
     utils::{COMMA, CURLY_OPEN, FOR, IN},
 };
+use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub fn parse_for_loop(&mut self) -> SoulResult<Spanned<For>> {
@@ -49,7 +50,21 @@ impl<'a, 'f> Parser<'a, 'f> {
                         }
 
                         self.goto(saved);
-                        let value = self.parse_expression_id(&[CURLY_OPEN])?;
+                        let value = self.parse_expression_id(&[
+                            CURLY_OPEN,
+                            TokenKind::Keyword(KeyWord::Limit),
+                        ])?;
+                        if self.current_is_keyword(KeyWord::Limit) {
+                            self.bump();
+                            let saved = self.tokens.current_position();
+                            match self.parse_expression_id(&[CURLY_OPEN]) {
+                                Ok(_) => (),
+                                Err(err) => {
+                                    self.goto(saved);
+                                    self.log_fault(err);
+                                }
+                            }
+                        }
                         ForCondition::While(value)
                     }
                     Err(TryError::IsErr(err)) => return Err(err),

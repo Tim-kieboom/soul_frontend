@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, rc::Rc};
 
 use soul_utils::{
     Ident, impl_soul_ids,
@@ -286,9 +286,26 @@ pub struct Binding {
 /// An `if` statement or expression.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct If {
-    pub condition: ExpressionId,
+    pub condition: IfCondition,
     pub block: BlockId,
     pub branch: Option<Box<IfBranch>>,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum IfCondition {
+    /// `if <ExpressionId> { .. }`
+    Expression(ExpressionId),
+    /// `if type <pattern> := <scrutinee> { ... }`
+    MatchType {
+        pattern: MatchPattern,
+        scrutinee: ExpressionId,
+    },
+    /// `if type <name>: <ty> := <scrutinee> { ... }`
+    CastType {
+        binding: Binding,
+        ty: SoulType,
+        scrutinee: ExpressionId,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -637,7 +654,7 @@ impl Array {
 }
 
 impl Binding {
-    pub fn from_text(id: NodeId, text: impl AsRef<str>, span: Span) -> Self {
+    pub fn from_text(id: NodeId, text: impl Into<Rc<str>>, span: Span) -> Self {
         Self {
             id,
             ident: Ident::new(text, span),

@@ -87,5 +87,7 @@ define_str_enum! {
         Range => "..", 1,
         /// Type check operator (`typeof`).
         TypeOf => "typeof", 1,
+        /// Safe-call / chaining operator (`->`).
+        Arrow => "->", 9,
     }
 }

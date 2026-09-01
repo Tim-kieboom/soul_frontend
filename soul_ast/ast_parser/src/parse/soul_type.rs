@@ -45,7 +45,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         SoulType::Stub(Stub {
-            name: ident.into_boxstr(),
+            name: ident.into_shared_str(),
             generics,
         })
     }
@@ -232,7 +232,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         };
 
         TryOk(SoulType::Stub(Stub {
-            name: ident.into_boxstr(),
+            name: ident.into_shared_str(),
             generics,
         }))
     }

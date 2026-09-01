@@ -14,8 +14,8 @@ use ast_model::{
     AstStore, AstTree, ExternalCrateData, FunctionKind,
     block::BlockId,
     expression::{
-        AnyArray, ExpressionId, ExpressionKind, ForCondition, FunctionCalleeKind, IfBranch, Lambda,
-        MatchPattern, TypeofKind,
+        AnyArray, ExpressionId, ExpressionKind, ForCondition, FunctionCalleeKind, IfBranch,
+        IfCondition, Lambda, MatchPattern, TypeofKind,
     },
     soul_type::{ArrayKind, Generic, SoulType, TupleKind},
     statements::{
@@ -911,7 +911,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
             ExpressionKind::If(if_) => {
                 self.push_str(IF_STR)?;
                 self.push_char(' ')?;
-                self.write_expression(if_.condition)?;
+                self.write_if_condition(&if_.condition)?;
                 self.write_block(if_.block)?;
                 self.display_branch(&if_.branch)
             }
@@ -1055,6 +1055,28 @@ impl<'a, W: Writer> Displayer<'a, W> {
         }
     }
 
+    fn write_if_condition(&mut self, condition: &IfCondition) -> Result<()> {
+        match condition {
+            IfCondition::Expression(value) => self.write_expression(*value),
+            IfCondition::CastType {
+                binding,
+                ty,
+                scrutinee,
+            } => {
+                push_fmt!(self, "type {binding}: ")?;
+                self.write_type(ty)?;
+                self.push_str(" := ")?;
+                self.write_expression(*scrutinee)
+            }
+            IfCondition::MatchType { pattern, scrutinee } => {
+                self.push_str("type ")?;
+                self.write_match_pattern(pattern)?;
+                self.push_str(" := ")?;
+                self.write_expression(*scrutinee)
+            }
+        }
+    }
+
     fn write_match_pattern(&mut self, arm: &MatchPattern) -> Result<()> {
         match &arm {
             MatchPattern::Fallthrough(chain) => {
@@ -1173,7 +1195,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
             match arm.as_ref() {
                 IfBranch::If(elif) => {
                     push_fmt!(self, "{ELSE_STR} {IF_STR} ")?;
-                    self.write_expression(elif.condition)?;
+                    self.write_if_condition(&elif.condition)?;
                     self.write_block(elif.block)?;
                     current = elif.branch.as_ref();
                 }

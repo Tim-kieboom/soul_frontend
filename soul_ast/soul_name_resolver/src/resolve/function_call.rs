@@ -8,12 +8,14 @@ use ast_model::{
     soul_type::{SoulType, Stub},
     statements::{ImportItem, ImportKind},
 };
+use soul_utils::soul_names::PrimitiveTypes;
 use soul_utils::{
     FunctionId,
     fault::Fault,
     soul_error_internal,
     span::{ModuleId, Span},
 };
+use std::str::FromStr;
 
 use crate::NameResolver;
 
@@ -195,6 +197,9 @@ impl<'a> NameResolver<'a> {
             ExpressionKind::Variable(VariableExpression { name, .. }) => {
                 if self.contains_type(name.as_str()) {
                     return Some(SoulType::Stub(Stub::new(name.as_str())));
+                }
+                if let Ok(prim) = PrimitiveTypes::from_str(name.as_str()) {
+                    return Some(SoulType::Primitive(prim));
                 }
             }
             ExpressionKind::FieldAccess(field_access) => {

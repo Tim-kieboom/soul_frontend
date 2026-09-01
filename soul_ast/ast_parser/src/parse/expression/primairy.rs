@@ -55,10 +55,25 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
             &ROUND_OPEN => {
                 self.bump();
-                let expr =
-                    self.parse_expression(&[ROUND_CLOSE, TokenKind::EndLine, TokenKind::EndFile])?;
-                self.expect(&ROUND_CLOSE)?;
-                expr
+                let expr = self.parse_expression(&[COMMA, ROUND_CLOSE])?;
+                if self.current_is(&COMMA) && !matches!(expr.node, ExpressionKind::Tuple(_)) {
+                    let mut values = vec![self.forest.store.insert_expression(expr)];
+                    loop {
+                        self.skip_end_lines();
+                        if !self.current_is(&COMMA) {
+                            break;
+                        }
+                        self.bump();
+                        self.skip_end_lines();
+                        let expr = self.parse_expression(&[COMMA, ROUND_CLOSE])?;
+                        values.push(self.forest.store.insert_expression(expr));
+                    }
+                    self.expect(&ROUND_CLOSE)?;
+                    Expression::new(ExpressionKind::Tuple(values), self.span_combine(start_span))
+                } else {
+                    self.expect(&ROUND_CLOSE)?;
+                    expr
+                }
             }
             &ARRAY => {
                 self.bump();
@@ -71,9 +86,16 @@ impl<'a, 'f> Parser<'a, 'f> {
                 Expression::from_array(Spanned::new(arr, start_span))
             }
             TokenKind::Ident(_) => self.parse_primary_ident(end_tokens, start_span)?,
-            TokenKind::Types(types) => {
-                let name = types.as_str().to_string();
+            TokenKind::Types(_types) => {
+                let name = _types.as_str().to_string();
                 self.bump();
+                if self.current_is(&ARROW_LEFT) {
+                    match self.parse_generic_define() {
+                        Ok(_generics) => (),
+                        Err(TryError::IsNotValue(_)) => (),
+                        Err(TryError::IsErr(err)) => return Err(err),
+                    }
+                }
                 Expression::new_variable(self.alloc_node(), Ident::new(name, start_span))
             }
             TokenKind::Keyword(keyword) => {
@@ -278,9 +300,12 @@ impl<'a, 'f> Parser<'a, 'f> {
 
                 match self.parse_generic_define() {
                     Ok(generics) => {
-                        return self
-                            .parse_struct_contructor(ident, generics, start_span)
-                            .map(Expression::from_struct_contructor);
+                        if self.current_is(&CURLY_OPEN) {
+                            return self
+                                .parse_struct_contructor(ident, generics, start_span)
+                                .map(Expression::from_struct_contructor);
+                        }
+                        return Ok(Expression::new_variable(self.alloc_node(), ident));
                     }
                     Err(TryError::IsNotValue(_)) => (),
                     Err(TryError::IsErr(err)) => return Err(err),
@@ -347,8 +372,34 @@ impl<'a, 'f> Parser<'a, 'f> {
                 }
             }
 
+            KeyWord::Intrinsic | KeyWord::Task | KeyWord::Spawn => {
+                let is_block = keyword == KeyWord::Task || keyword == KeyWord::Spawn;
+                let name = keyword.as_str();
+                self.bump();
+                if is_block {
+                    if let Ok(primary) = self.try_parse_keyword_block(start_span) {
+                        return Ok(Some(primary));
+                    }
+                }
+                Expression::new_variable(
+                    self.alloc_node(),
+                    Ident::new(name.to_string(), start_span),
+                )
+            }
+
             _ => return Ok(None),
         }))
+    }
+
+    fn try_parse_keyword_block(&mut self, start_span: Span) -> SoulResult<Expression> {
+        if !self.current_is(&CURLY_OPEN) {
+            return Err(Fault::error(
+                "expected block after keyword".to_string(),
+                Some(self.token().span),
+            ));
+        }
+        let block = self.parse_block(TypeModifier::Mut)?;
+        Ok(Expression::new_block(block, self.span_combine(start_span)))
     }
 
     fn parse_primary_keyword(&mut self, start_span: Span) -> SoulResult<Option<Expression>> {

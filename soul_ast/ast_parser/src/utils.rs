@@ -157,6 +157,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let token = &self.token();
         match &token.kind {
             TokenKind::Ident(val) => Ok(val),
+            TokenKind::Types(val) => Ok(val.as_str()),
             _ => Err(Fault::error(
                 format!("expected ident got `{}`", self.token().kind.display()),
                 Some(self.token().span),
@@ -334,7 +335,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.context.faults.push(fault);
     }
 
-    pub(super) fn log_error(&mut self, message: impl Into<String>, span: Option<Span>) {
+    pub(super) fn log_error(&mut self, message: impl Into<Box<str>>, span: Option<Span>) {
         self.context.faults.push_error(message, span);
     }
 }

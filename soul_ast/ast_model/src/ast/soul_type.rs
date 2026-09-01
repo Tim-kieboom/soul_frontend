@@ -1,4 +1,6 @@
-use soul_utils::{Ident, soul_names::PrimitiveTypes};
+use std::rc::Rc;
+
+use soul_utils::{Ident, SharedStr, soul_names::PrimitiveTypes};
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum SoulType {
@@ -101,7 +103,7 @@ pub struct ReferenceType {
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Stub {
-    pub name: Box<str>,
+    pub name: SharedStr,
     pub generics: Vec<SoulType>,
 }
 
@@ -113,10 +115,10 @@ pub struct Generic {
 }
 
 impl Stub {
-    pub fn new(name: impl AsRef<str>) -> Self {
+    pub fn new(name: impl Into<Rc<str>>) -> Self {
         Self {
             generics: vec![],
-            name: name.as_ref().into(),
+            name: SharedStr::new(name),
         }
     }
 }

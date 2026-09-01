@@ -47,14 +47,13 @@ impl<'a, 'f> Parser<'a, 'f> {
                 | StatementKind::Struct(_)
                 | StatementKind::TypeDef(_)
                 | StatementKind::Function(_)
-                | StatementKind::ExternalFunction(_) => {
+                | StatementKind::ExternalFunction(_)
+                | StatementKind::UseBlock(_) => {
                     let id = self.forest.store.insert_statement(statement);
                     statements.push(id)
                 }
 
-                StatementKind::UseBlock(_)
-                | StatementKind::Assignment(_)
-                | StatementKind::Expression { .. } => {
+                StatementKind::Assignment(_) | StatementKind::Expression { .. } => {
                     self.log_error(
                         format!(
                             "{} can not be used in struct body",
@@ -89,7 +88,10 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.expect(&TokenKind::Keyword(KeyWord::Enum))?;
         let name = self.try_bump_consume_ident()?;
 
-        let impl_type = if self.current_is(&COLON) {
+        let impl_type = if self.current_is(&TokenKind::Keyword(KeyWord::As)) {
+            self.bump();
+            Some(self.try_parse_type().merge_to_result()?)
+        } else if self.current_is(&COLON) {
             self.bump();
             Some(self.try_parse_type().merge_to_result()?)
         } else {

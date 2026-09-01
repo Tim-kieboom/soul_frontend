@@ -1,4 +1,5 @@
 use ast_model::soul_type::SoulType;
+use soul_tokenizer::model::TokenKind;
 use soul_utils::{
     collections::try_result::{ResultTryErr, TryNotValue, TryOk, TryResult},
     fault::Fault,
@@ -6,7 +7,7 @@ use soul_utils::{
 
 use crate::{
     parser::Parser,
-    utils::{ARROW_LEFT, ARROW_RIGHT, COMMA},
+    utils::{ARROW_LEFT, ARROW_RIGHT, ASSIGN, COMMA},
 };
 
 mod expression;
@@ -22,6 +23,25 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.expect(&ARROW_LEFT).try_err()?;
         let mut types = vec![];
         loop {
+            if let TokenKind::Ident(_) = self.token().kind {
+                if self.peek_is(&ASSIGN) {
+                    self.bump();
+                    self.bump();
+                    let value = self.try_parse_type()?;
+                    types.push(value);
+                    if self.current_is(&ARROW_RIGHT) {
+                        self.bump();
+                        break;
+                    }
+                    if !self.current_is(&COMMA) {
+                        self.goto(start_position);
+                        return TryNotValue(self.get_expect_error(&COMMA));
+                    }
+                    self.bump();
+                    continue;
+                }
+            }
+
             let ty = self.try_parse_type()?;
             types.push(ty);
 

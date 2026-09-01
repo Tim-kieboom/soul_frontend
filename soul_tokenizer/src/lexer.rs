@@ -354,7 +354,10 @@ impl<'a> Lexer<'a> {
             self.next_char();
         }
 
-        if self.current == Some('.') && self.peek_char() != Some('.') {
+        if self.current == Some('.')
+            && self.peek_char() != Some('.')
+            && self.peek_char().is_some_and(is_number)
+        {
             is_float = self.lex_float(&mut string);
         }
 

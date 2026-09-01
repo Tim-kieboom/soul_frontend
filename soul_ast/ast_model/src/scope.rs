@@ -224,15 +224,12 @@ impl ModuleScopes {
     }
 
     fn modules(&self) -> impl Iterator<Item = (&std::string::String, &ScopeModuleEntry)> {
-        self.scope_iter()
-            .flat_map(|scope| {
-                scope
-                    .entries
-                    .iter()
-                    .filter_map(|(name, entry)| 
-                        entry.module.as_ref().map(|module| (name, module))
-                    )
-            })
+        self.scope_iter().flat_map(|scope| {
+            scope
+                .entries
+                .iter()
+                .filter_map(|(name, entry)| entry.module.as_ref().map(|module| (name, module)))
+        })
     }
 
     fn scope_iter<'a>(&'a self) -> ScopeIterator<'a> {

@@ -1,6 +1,7 @@
 use ast_model::{
     expression::{
-        ExpressionKind, FunctionCall, FunctionCalleeKind, MatchPattern, StructConstructor,
+        ExpressionKind, FunctionCall, FunctionCalleeKind, IfCondition, MatchPattern,
+        StructConstructor,
     },
     literal::Literal,
     operators::{BinaryOperatorKind, UnaryOperatorKind},
@@ -528,8 +529,12 @@ fn all_kinds() {
     };
 
     assert_eq!(if_.branch, None);
+    let IfCondition::Expression(expression_id) = if_.condition else {
+        panic!("condition is wrongtype");
+    };
+
     assert!(matches!(
-        store.expressions[if_.condition].node,
+        store.expressions[expression_id].node,
         ExpressionKind::Literal((_, Literal::Bool(true)))
     ));
     let statement_id = store.blocks[if_.block].statements[0];

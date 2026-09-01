@@ -8,6 +8,7 @@ use ast_model::{
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
+    TypeModifier,
     collections::try_result::{
         ResultMapNotValue, ResultTryErr, ToResult, TryErr, TryOk, TryResult,
     },
@@ -19,7 +20,9 @@ use soul_utils::{
 
 use crate::{
     parser::Parser,
-    utils::{ASSIGN, COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, SEMI_COLON, STAMENT_END_TOKENS},
+    utils::{
+        ASSIGN, COLON, COLON_ASSIGN, COMMA, CURLY_CLOSE, CURLY_OPEN, SEMI_COLON, STAMENT_END_TOKENS,
+    },
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
@@ -40,7 +43,9 @@ impl<'a, 'f> Parser<'a, 'f> {
             | KeyWord::Else
             | KeyWord::False
             | KeyWord::Sizeof
-            | KeyWord::Match => {
+            | KeyWord::Match
+            | KeyWord::Undefined
+            | KeyWord::Intrinsic => {
                 let value = self.parse_expression_id(STAMENT_END_TOKENS).try_err()?;
                 Statement::from_expression(&self.forest.store, value, self.current_is(&SEMI_COLON))
             }
@@ -98,20 +103,24 @@ impl<'a, 'f> Parser<'a, 'f> {
                 statement
             }
 
+            KeyWord::Impl => return self.parse_impl_statement(start_span).try_err(),
+            KeyWord::Task => {
+                self.bump();
+                let block = self.parse_block(TypeModifier::Mut).try_err()?;
+                let span = self.span_combine(start_span);
+                let semicolon = self.current_is(&SEMI_COLON);
+                Statement::new_block(&mut self.forest.store, block, span, semicolon)
+            }
             KeyWord::As
-            | KeyWord::Impl
             | KeyWord::Copy
             | KeyWord::Pass
             | KeyWord::Crate
             | KeyWord::Typeof
             | KeyWord::Distinct
             | KeyWord::InForLoop
-            | KeyWord::Undefined
             | KeyWord::GenericWhere
-            | KeyWord::Task
             | KeyWord::Spawn
-            | KeyWord::Limit
-            | KeyWord::Intrinsic => {
+            | KeyWord::Limit => {
                 return TryErr(soul_error_internal!(
                     format!(
                         "keyword '{}' should be parsed in expression not statement",
@@ -200,13 +209,21 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.expect(&TokenKind::Keyword(KeyWord::Type))?;
 
         let new_type = self.try_parse_type().merge_to_result()?;
-        self.expect(&ASSIGN)?;
+        if !self.current_is_any(&[ASSIGN, COLON_ASSIGN]) {
+            return Err(self.get_expect_any_error(&[ASSIGN, COLON_ASSIGN]));
+        }
+        self.bump();
         let is_distinct = self.current_is(&TokenKind::Keyword(KeyWord::Distinct));
         if is_distinct {
             self.bump();
         }
 
         let old_type = self.try_parse_type().merge_to_result()?;
+
+        if self.current_is(&TokenKind::Keyword(KeyWord::Limit)) {
+            self.bump();
+            self.skip_till(&[TokenKind::EndLine, TokenKind::EndFile]);
+        }
         let typedef = TypeDef {
             new_type,
             old_type,

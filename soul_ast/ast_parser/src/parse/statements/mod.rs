@@ -172,7 +172,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     fn parse_possible_statement(&mut self, start_span: Span) -> TryResult<Statement, Fault> {
         match &self.token().kind {
-            TokenKind::Ident(_) => self.try_parse_from_ident(start_span),
+            TokenKind::Ident(_) | TokenKind::Types(_) => self.try_parse_from_ident(start_span),
             &ROUND_OPEN => {
                 let saved = self.tokens.current_position();
 
@@ -300,6 +300,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     fn try_parse_from_ident(&mut self, start_span: Span) -> TryResult<Statement, Fault> {
         let ident = self.try_token_as_ident_str().try_err()?;
         let is_this = ident == "This";
+        let is_unsafe = ident == "unsafe";
         let ident_owned = ident.to_string();
 
         let peek = self.peek();
@@ -310,6 +311,19 @@ impl<'a, 'f> Parser<'a, 'f> {
                 .parse_associated_constant(ident_owned, start_span)
                 .try_err(),
             &DOT if is_this => self.parse_contructor(start_span).try_err(),
+            &DOT => self.parse_extension_function(start_span).try_err(),
+            &CURLY_OPEN if is_unsafe => {
+                self.bump();
+                let block = self.parse_block(TypeModifier::Mut).try_err()?;
+                let span = self.span_combine(start_span);
+                let semicolon = self.ends_semicolon();
+                Ok(Statement::new_block(
+                    &mut self.forest.store,
+                    block,
+                    span,
+                    semicolon,
+                ))
+            }
             &CURLY_OPEN => {
                 let saved = self.tokens.current_position();
                 let type_name = match self.try_bump_consume_ident() {
@@ -398,6 +412,45 @@ impl<'a, 'f> Parser<'a, 'f> {
                 })
             })
             .map(Statement::from_function)
+    }
+
+    fn parse_extension_function(&mut self, start_span: Span) -> SoulResult<Statement> {
+        let position = self.tokens.current_position();
+        match self.inner_parse_extension_function(start_span) {
+            Ok(stmt) => Ok(stmt),
+            Err(_) => {
+                self.goto(position);
+                self.parse_assign_or_expression(start_span)
+            }
+        }
+    }
+
+    fn inner_parse_extension_function(&mut self, start_span: Span) -> SoulResult<Statement> {
+        let receiver_ident = match &self.token().kind {
+            TokenKind::Ident(val) => Ident::new(val.clone(), self.token().span),
+            TokenKind::Types(val) => Ident::new(val.as_str(), self.token().span),
+            other => {
+                return Err(Fault::error(
+                    format!("expected ident got `{}`", other.display()),
+                    Some(self.token().span),
+                ));
+            }
+        };
+        self.bump();
+        self.expect(&DOT)?;
+        let method_ident = self.try_bump_consume_ident()?;
+
+        let recv_type = self.type_from_ident(receiver_ident, vec![]);
+        let saved = self.current.this_type.take();
+        self.current.this_type = Some(recv_type.clone());
+        let result =
+            self.try_parse_function_declaration_id(start_span, &recv_type, false, method_ident);
+        self.current.this_type = saved;
+        match result {
+            Ok(spanned) => Ok(Statement::from_function(spanned)),
+            Err(TryError::IsErr(fault)) => Err(fault),
+            Err(TryError::IsNotValue(err)) => Err(err.fault),
+        }
     }
 }
 

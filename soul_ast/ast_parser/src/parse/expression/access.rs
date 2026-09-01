@@ -18,8 +18,8 @@ use soul_utils::{
 use crate::{
     parser::Parser,
     utils::{
-        ARRAY, ARROW_LEFT, COPY, CURLY_OPEN, ELSE, MUT, NOT, NULL, PASS, POINTER, REF, ROUND_OPEN,
-        SIZEOF, SQUARE_CLOSE, SQUARE_OPEN,
+        ARRAY, ARROW_LEFT, COLON, COPY, CURLY_OPEN, ELSE, MUT, NOT, NULL, PASS, POINTER, REF,
+        ROUND_OPEN, SIZEOF, SQUARE_CLOSE, SQUARE_OPEN,
     },
 };
 
@@ -232,6 +232,13 @@ impl<'a, 'f> Parser<'a, 'f> {
         swap(left, &mut value);
 
         let value = self.forest.store.insert_expression(value);
+        if self.current_is(&CURLY_OPEN) {
+            *left = Expression::from_struct_contructor(
+                self.parse_struct_contructor(ident, generics, start_span)?,
+            );
+            return Ok(());
+        }
+
         let callee = FunctionCallee {
             kind: FunctionCalleeKind::Expression(value),
             optional_map,
@@ -250,7 +257,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok(())
     }
 
-    fn try_parse_method_arm(
+    pub(super) fn try_parse_method_arm(
         &mut self,
         left: &mut Expression,
         start_span: Span,
@@ -271,6 +278,15 @@ impl<'a, 'f> Parser<'a, 'f> {
                 MatchMethodVariant::NotNull
             }
             TokenKind::Ident(_) if self.peek_is(&CURLY_OPEN) => {
+                let save = self.tokens.current_position();
+                let _ident = self.try_bump_consume_ident()?;
+                self.bump();
+                self.skip_end_lines();
+                if matches!(self.token().kind, TokenKind::Ident(_)) && self.peek_is(&COLON) {
+                    self.goto(save);
+                    return Ok(false);
+                }
+                self.goto(save);
                 let ident = self.try_bump_consume_ident()?;
                 MatchMethodVariant::Name(ident)
             }

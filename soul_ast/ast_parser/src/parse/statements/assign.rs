@@ -62,7 +62,9 @@ impl<'a, 'f> Parser<'a, 'f> {
             assign_token.span,
         );
 
-        self.bump();
+        if self.current_is(&SEMI_COLON) {
+            self.bump();
+        }
 
         let assignment = Assignment {
             left: lvalue,
