@@ -2,13 +2,13 @@ import os
 import subprocess
 import sys
 
-def main(root_dir: str = "."):
+def run_all(command: str, root_dir: str = "."):
     for dirpath, dirnames, filenames in os.walk(root_dir):
         if "Cargo.toml" in filenames:
-            print(f"Running 'cargo fmt' in: {dirpath}")
+            print(f"Running 'cargo {command}' in: {dirpath}")
             try:
                 result = subprocess.run(
-                    ["cargo", "fmt"],
+                    ["cargo", command],
                     cwd=dirpath,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
@@ -17,7 +17,7 @@ def main(root_dir: str = "."):
                 print(result.stdout, end="")
                 if result.returncode != 0:
                     print(
-                        f"cargo fmt failed in {dirpath} with exit code {result.returncode}",
+                        f"cargo {command} failed in {dirpath} with exit code {result.returncode}",
                         file=sys.stderr,
                     )
             except FileNotFoundError:
@@ -32,8 +32,9 @@ def main(root_dir: str = "."):
     return 0
 
 if __name__ == "__main__":
-    # If a directory is given, use it; otherwise use current directory
     if len(sys.argv) == 2:
-        sys.exit(main(sys.argv[1]))
+        sys.exit(run_all(sys.argv[1]))
+    elif len(sys.argv) == 3:
+        sys.exit(run_all(sys.argv[1], sys.argv[2]))
     else:
-        sys.exit(main("."))
+        print("error: not arguments should be `python run_all.py {cmd} {optional root_dir}`")

@@ -82,19 +82,22 @@ macro_rules! define_str_enum {
                     $( $enum_name::$name => $symbol, )*
                 }
             }
-
-            /// tries to converts a string into a variant.
-            pub fn from_str(s: &str) -> Option<Self> {
-                match s {
-                    $( $symbol => Some($enum_name::$name), )*
-                    _ => None,
-                }
-            }
         }
 
         impl std::fmt::Display for $enum_name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 self.as_str().fmt(f)
+            }
+        }
+
+        impl std::str::FromStr for $enum_name {
+            type Err = ();
+
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                match s {
+                    $( $symbol => Ok($enum_name::$name), )*
+                    _ => Err(()),
+                }
             }
         }
     };
@@ -127,14 +130,6 @@ macro_rules! define_str_enum {
                 }
             }
 
-            /// tries to converts a string into a variant.
-            pub fn from_str(s: &str) -> Option<Self> {
-                match s {
-                    $( $symbol => Some($enum_name::$name), )*
-                    _ => None,
-                }
-            }
-
             /// Returns the precedence value of this variant.
             pub const fn precedence(&self) -> u8 {
                 match self {
@@ -146,6 +141,17 @@ macro_rules! define_str_enum {
         impl std::fmt::Display for $enum_name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 self.as_str().fmt(f)
+            }
+        }
+
+        impl std::str::FromStr for $enum_name {
+            type Err = ();
+
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                match s {
+                    $( $symbol => Ok($enum_name::$name), )*
+                    _ => Err(()),
+                }
             }
         }
     }
@@ -305,13 +311,6 @@ macro_rules! define_symbols {
                 }
             }
 
-            pub fn from_str(s: &str) -> Option<Self> {
-                match s {
-                    $( $symbol => Some($enum_name::$name), )*
-                    _ => None,
-                }
-            }
-
             pub const fn from_symbool(k: Symbol) -> Option<Self> {
                 match k {
                     $( $symkind => Some($enum_name::$name), )*
@@ -322,6 +321,17 @@ macro_rules! define_symbols {
             pub const fn precedence(&self) -> u8 {
                 match self {
                     $( $enum_name::$name => $precedence, )*
+                }
+            }
+        }
+
+        impl std::str::FromStr for $enum_name {
+            type Err = ();
+
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                match s {
+                    $( $symbol => Ok($enum_name::$name), )*
+                    _ => Err(()),
                 }
             }
         }

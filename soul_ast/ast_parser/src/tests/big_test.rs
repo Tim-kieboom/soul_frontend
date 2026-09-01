@@ -168,7 +168,9 @@ fn all_kinds() {
         StatementKind::Variable(v) => v,
         _ => panic!("body[0]: expected Variable"),
     };
-    assert!(matches!(v0_pat, VarPattern::Simple { binding, .. } if binding.ident.as_str() == "CONST"));
+    assert!(
+        matches!(v0_pat, VarPattern::Simple { binding, .. } if binding.ident.as_str() == "CONST")
+    );
     assert_eq!(*v0_mod, TypeModifier::Const);
     assert!(v0_init.is_some());
 
@@ -184,7 +186,9 @@ fn all_kinds() {
         StatementKind::Variable(v) => v,
         _ => panic!("body[1]: expected Variable"),
     };
-    assert!(matches!(v1_pat, VarPattern::Simple { binding, .. } if binding.ident.as_str() == "CONST_TYPED"));
+    assert!(
+        matches!(v1_pat, VarPattern::Simple { binding, .. } if binding.ident.as_str() == "CONST_TYPED")
+    );
     assert_eq!(*v1_mod, TypeModifier::Const);
     assert_eq!(
         *v1_ty,

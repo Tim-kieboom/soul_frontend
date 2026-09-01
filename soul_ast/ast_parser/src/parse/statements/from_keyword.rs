@@ -2,7 +2,9 @@ use ast_model::{
     FunctionKind,
     expression::{Expression, ExpressionKind},
     soul_type::{SoulType, Stub},
-    statements::{Statement, StatementKind, Trait, TypeDef},
+    statements::{
+        FunctionSignature, FunctionSignatureHelper, Statement, StatementKind, Trait, TypeDef,
+    },
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
@@ -58,10 +60,13 @@ impl<'a, 'f> Parser<'a, 'f> {
                 };
 
                 let span = self.span_combine(start_span);
-                let expression =
-                    Expression::new_id(&mut self.forest.store, kind, span);
+                let expression = Expression::new_id(&mut self.forest.store, kind, span);
 
-                Statement::from_expression(&self.forest.store, expression, self.current_is(&SEMI_COLON))
+                Statement::from_expression(
+                    &self.forest.store,
+                    expression,
+                    self.current_is(&SEMI_COLON),
+                )
             }
 
             KeyWord::Import => return self.parse_import().try_err(),
@@ -165,12 +170,14 @@ impl<'a, 'f> Parser<'a, 'f> {
             let name = self.try_bump_consume_ident()?;
             let signature = self
                 .try_parse_function_signature(start_span, &this_type, name, is_const, None)
-                .map_try_not_value(|(_, err)| err)
+                .map_try_not_value(|err| err.fault)
                 .merge_to_result()?
                 .value;
 
-            let spanned =
-                FunctionKind::Signature(Spanned::new(signature, self.span_combine(start_span)));
+            let spanned = FunctionKind::Signature(FunctionSignature::with_span(
+                signature,
+                self.span_combine(start_span),
+            ));
             let id = self.forest.store.insert_function(spanned);
             methods.push(id);
         }

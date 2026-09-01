@@ -130,6 +130,8 @@ pub struct TypeOf {
 pub enum TypeofKind {
     Null,
     NotNull,
+    /// `expr.typeof` — runtime type of an expression.
+    Value,
     Union {
         type_name: Ident,
         variant_name: Ident,
@@ -611,7 +613,7 @@ impl AnyArray {
         let Spanned { value, span } = arr;
         Spanned {
             value: AnyArray::Array(value),
-            span: span,
+            span,
         }
     }
 
@@ -619,7 +621,7 @@ impl AnyArray {
         let Spanned { value, span } = arr;
         Spanned {
             value: AnyArray::ArrayFiller(value),
-            span: span,
+            span,
         }
     }
 }
@@ -635,7 +637,7 @@ impl Array {
 }
 
 impl Binding {
-    pub fn from_text(id: NodeId, text: impl Into<String>, span: Span) -> Self {
+    pub fn from_text(id: NodeId, text: impl AsRef<str>, span: Span) -> Self {
         Self {
             id,
             ident: Ident::new(text, span),

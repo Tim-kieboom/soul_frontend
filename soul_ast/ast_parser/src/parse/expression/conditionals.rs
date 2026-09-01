@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::{
     parser::Parser,
     utils::{
@@ -86,7 +88,11 @@ impl<'a, 'f> Parser<'a, 'f> {
             let statement = self
                 .forest
                 .store
-                .insert_statement(Statement::from_expression(&self.forest.store, expression, false));
+                .insert_statement(Statement::from_expression(
+                    &self.forest.store,
+                    expression,
+                    false,
+                ));
             let block = self.forest.store.insert_block(Block {
                 is_const: false,
                 statements: vec![statement],
@@ -197,8 +203,8 @@ impl<'a, 'f> Parser<'a, 'f> {
     fn parse_match_pattern(&mut self) -> SoulResult<MatchPattern> {
         let pattern = self.inner_parse_match_pattern()?;
         self.skip_end_lines();
-        Ok(match &self.token().kind {
-            &OR => {
+        Ok(match self.token().kind {
+            OR => {
                 self.bump();
 
                 let mut chain = vec![pattern];
@@ -213,7 +219,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 }
                 MatchPattern::Fallthrough(chain)
             }
-            &IF => {
+            IF => {
                 self.bump();
                 let if_condition = self.parse_expression_id(&[LAMBDA_ARROW])?;
                 MatchPattern::If {
@@ -310,7 +316,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
         };
 
-        if KeyWord::from_str(&ident_name).is_some() {
+        if KeyWord::from_str(&ident_name).is_ok() {
             let end_tokens = [
                 LAMBDA_ARROW,
                 IF,

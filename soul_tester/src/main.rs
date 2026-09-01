@@ -1,26 +1,29 @@
 use crate::display::{
-    ast::display_ast, benchmark::display_benchmark, fault::display_fault, fault_to_anyhow_error, tokenizer::display_tokenizer,
+    ast::display_ast, benchmark::display_benchmark, fault::display_fault, fault_to_anyhow_error,
+    tokenizer::display_tokenizer,
 };
 use anyhow::Result;
 use ast_model::AstTree;
 use ast_run::{AstRequest, to_ast};
 use soul_tokenizer::{TokenStream, to_token_stream};
 use soul_utils::{
-    char_colors::{DEFAULT, GREEN, RED}, collections::{
-        benchmark::Benchmark, crate_store::{CrateEntry, CrateStore, Manifest, resolve_source_root}, module_store::ModuleStore,
+    char_colors::{DEFAULT, GREEN, RED},
+    collections::{
+        benchmark::Benchmark,
+        crate_store::{CrateEntry, CrateStore, Manifest, resolve_source_root},
+        module_store::ModuleStore,
     },
 };
 
-
 use std::{
-    io::{self, stdout}, path::{Path, PathBuf},
+    io::{self, stdout},
+    path::{Path, PathBuf},
 };
 
 mod config;
 mod display;
 
 fn main() {
-
     match frontend(&mut Benchmark::new()) {
         Ok(true) => println!("{GREEN}success{DEFAULT}"),
         Ok(false) => eprintln!("{RED}failed{DEFAULT}"),
@@ -39,19 +42,22 @@ fn frontend(benchmark: &mut Benchmark) -> Result<bool> {
     module_store.insert_root(main_path);
     let tokens = tokenize(&file, &module_store)?;
 
-    let ast = ast(tokens, AstRequest {
-        benchmark,
-        source_folder,
-        crate_store: &crate_store,
-        module_store: &mut module_store,
-    })?;
+    let ast = ast(
+        tokens,
+        AstRequest {
+            benchmark,
+            source_folder,
+            crate_store: &crate_store,
+            module_store: &mut module_store,
+        },
+    )?;
 
     for fault in ast.faults().iter() {
         display_fault(fault, &module_store, &config::PRINT_CONFIGS, &mut stdout())?;
     }
 
     let fail = ast.faults().fails(config::COMPILER_OPTIONS.fail_level);
-    display_benchmark(&benchmark, &config::PRINT_CONFIGS, &mut stdout())?;
+    display_benchmark(benchmark, &config::PRINT_CONFIGS, &mut stdout())?;
     Ok(!fail)
 }
 
@@ -80,7 +86,7 @@ fn build_crate_store(source_folder: &Path) -> CrateStore {
         } else {
             manifest_dir.join(path_str)
         };
-        
+
         let canonical = dep_path.canonicalize().unwrap_or(dep_path);
         let source_root = resolve_source_root(&canonical);
         store.insert(
@@ -103,22 +109,15 @@ fn find_manifest_dir(start: &Path) -> Option<PathBuf> {
 }
 
 fn tokenize<'a>(file: &'a str, modules: &ModuleStore) -> Result<TokenStream<'a>> {
-    let tokens = to_token_stream(&file, modules.get_root_id())
+    let tokens = to_token_stream(file, modules.get_root_id())
         .map_err(|f| fault_to_anyhow_error(&f, modules))?;
 
     display_tokenizer(&tokens, modules)?;
     Ok(tokens)
 }
 
-fn ast<'a>(
-    tokens: TokenStream<'a>,
-    request: AstRequest<'a>
-) -> Result<AstTree> {
-    let ast = to_ast(
-        tokens,
-        request,
-        &config::COMPILER_OPTIONS,
-    );
+fn ast<'a>(tokens: TokenStream<'a>, request: AstRequest<'a>) -> Result<AstTree> {
+    let ast = to_ast(tokens, request, &config::COMPILER_OPTIONS);
     display_ast(&ast)?;
     Ok(ast)
 }

@@ -14,7 +14,7 @@ macro_rules! push_fmt {
     };
 }
 
-pub trait Writer { 
+pub trait Writer {
     type Error: std::error::Error + Send + Sync + 'static;
     fn push_fmt(&mut self, args: Arguments<'_>) -> Result<(), Self::Error>;
     fn writer_flush(&mut self) -> Result<(), Self::Error>;
@@ -29,7 +29,7 @@ pub trait Writer {
 
 impl Writer for String {
     type Error = std::fmt::Error;
-    
+
     fn push_fmt(&mut self, args: Arguments<'_>) -> Result<(), Self::Error> {
         std::fmt::write(self, args)?;
         Ok(())
@@ -48,7 +48,6 @@ impl Writer for String {
     fn writer_flush(&mut self) -> Result<(), Self::Error> {
         Ok(())
     }
-    
 }
 
 impl Writer for Stdout {
@@ -63,7 +62,6 @@ impl Writer for Stdout {
         self.flush()?;
         Ok(())
     }
-    
 }
 
 impl Writer for File {

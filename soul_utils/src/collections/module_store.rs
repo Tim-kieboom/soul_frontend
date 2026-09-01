@@ -28,7 +28,7 @@ impl ModuleStore {
     }
 
     pub fn get_or_insert(&mut self, path: &PathBuf) -> ModuleId {
-        if let Some(id) = self.get_id(&path) {
+        if let Some(id) = self.get_id(path) {
             return id;
         }
         self.insert(path.clone())
@@ -52,5 +52,11 @@ impl ModuleStore {
 
     pub fn get_path(&self, id: ModuleId) -> Option<&PathBuf> {
         self.map.get_value(id)
+    }
+}
+
+impl Default for ModuleStore {
+    fn default() -> Self {
+        Self::new()
     }
 }

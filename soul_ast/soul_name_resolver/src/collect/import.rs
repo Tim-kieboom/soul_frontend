@@ -1,10 +1,16 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use ast_model::{
-    EntryKind, HeaderEntry, NodeId, scope::ScopeModuleEntry, statements::{ImportItem, ImportKind, ImportPath},
+    EntryKind, HeaderEntry, NodeId,
+    scope::ScopeModuleEntry,
+    statements::{ImportItem, ImportKind, ImportPath},
 };
 use soul_utils::{
-    FunctionId, Ident, fault::Fault, ids::IdAlloc, soul_error_internal, span::{ModuleId, Span},
+    FunctionId, Ident,
+    fault::Fault,
+    ids::IdAlloc,
+    soul_error_internal,
+    span::{ModuleId, Span},
 };
 
 use crate::NameResolver;
@@ -78,7 +84,7 @@ impl<'a> NameResolver<'a> {
                     format!("module: {:?} not found in ModuleStore", pathbuf),
                     Some(span)
                 ));
-                return ModuleId::error();
+                ModuleId::ERROR
             }
         }
     }
@@ -91,7 +97,7 @@ impl<'a> NameResolver<'a> {
                     "external import missing crate name".to_string(),
                     Some(span),
                 ));
-                return ModuleId::error();
+                return ModuleId::ERROR
             }
         };
 
@@ -103,14 +109,15 @@ impl<'a> NameResolver<'a> {
                 ),
                 Some(span),
             ));
-            return ModuleId::error();
+            return ModuleId::ERROR
         };
 
         let module_path = to_crate_name(path.module.as_pathbuf());
 
         let result = if module_path.as_os_str().is_empty() {
             let root = &crate_entry.source_root;
-            self.modules.get_id(&root.join("lib.soul"))
+            self.modules
+                .get_id(&root.join("lib.soul"))
                 .or_else(|| self.modules.get_id(&root.join("main.soul")))
                 .or_else(|| self.modules.get_id(&root.join("mod.soul")))
         } else {
@@ -131,7 +138,7 @@ impl<'a> NameResolver<'a> {
                     ),
                     Some(span)
                 ));
-                return ModuleId::error();
+                ModuleId::ERROR
             }
         }
     }
@@ -245,14 +252,17 @@ impl<'a> NameResolver<'a> {
     }
 
     fn re_export_module_items(&mut self, module_id: ModuleId) {
-        
         fn is_entry_public(entry: &HeaderEntry) -> bool {
             let var_public = entry.variable.map(|var| var.is_public).unwrap_or(false);
             let func_public = entry.function.map(|func| func.is_public).unwrap_or(false);
-            let ty_public = entry.custom_type.as_ref().map(|ty| ty.is_public).unwrap_or(false);
-            func_public || ty_public  || var_public
+            let ty_public = entry
+                .custom_type
+                .as_ref()
+                .map(|ty| ty.is_public)
+                .unwrap_or(false);
+            func_public || ty_public || var_public
         }
-        
+
         let mut to_re_export: Vec<(String, ast_model::HeaderEntry)> = vec![];
         let target = match self.ast_modules.get(module_id) {
             Some(module) => &module.header,
@@ -260,7 +270,6 @@ impl<'a> NameResolver<'a> {
         };
 
         for (name, entry) in target.iter() {
-            
             if is_entry_public(entry) {
                 to_re_export.push((name.clone(), entry.clone()));
             }
@@ -273,28 +282,25 @@ impl<'a> NameResolver<'a> {
 
         for (name, entry) in to_re_export {
             let h = current.entry(name).or_default();
-            if let Some(func) = entry.function {
-                if func.is_public {
+            if let Some(func) = entry.function && func.is_public {
                     h.function.get_or_insert(func);
                 }
+            
+            if let Some(var) = entry.variable 
+                && var.is_public 
+            {
+                h.variable.get_or_insert(var);
+                
             }
-            if let Some(var) = entry.variable {
-                if var.is_public {
-                    h.variable.get_or_insert(var);
-                }
-            }
-            if let Some(ty) = entry.custom_type {
-                if ty.is_public {
-                    h.custom_type.get_or_insert(ty);
-                }
+            if let Some(ty) = entry.custom_type
+                && ty.is_public 
+            {
+                h.custom_type.get_or_insert(ty);
             }
         }
     }
 }
 
-fn to_crate_name(path: &PathBuf) -> PathBuf {
-    path
-        .components()
-        .skip(1)
-        .collect::<PathBuf>()
+fn to_crate_name(path: &Path) -> PathBuf {
+    path.components().skip(1).collect::<PathBuf>()
 }

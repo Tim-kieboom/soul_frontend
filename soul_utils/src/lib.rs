@@ -9,8 +9,8 @@ pub mod crate_id;
 pub mod error;
 pub mod fault;
 pub mod ids;
-pub mod literal;
 pub mod linkage;
+pub mod literal;
 pub mod soul_names;
 pub mod span;
 
@@ -46,10 +46,11 @@ pub struct CrateContext {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct Ident(String, Span);
+pub struct Ident(Box<str>, Span);
 impl Ident {
-    pub fn new(value: impl Into<String>, span: Span) -> Self {
-        Self(value.into(), span)
+    pub fn new(value: impl AsRef<str>, span: Span) -> Self {
+        let str = value.as_ref();
+        Self(Box::from(str), span)
     }
 
     pub fn from_str_slice(slice: &[&str], span: Span) -> Self {
@@ -58,7 +59,7 @@ impl Ident {
         for str in slice {
             value.push_str(str);
         }
-        Self(value, span)
+        Self(value.into_boxed_str(), span)
     }
 
     pub fn as_str(&self) -> &str {
@@ -69,7 +70,7 @@ impl Ident {
         self.1
     }
 
-    pub fn into_string(self) -> String {
+    pub fn into_boxstr(self) -> Box<str> {
         self.0
     }
 }

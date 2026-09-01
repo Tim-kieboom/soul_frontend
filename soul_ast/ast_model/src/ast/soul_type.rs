@@ -52,6 +52,10 @@ pub enum TupleKind {
     NamedTuple(NamedTuple),
 }
 impl TupleKind {
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     pub fn len(&self) -> usize {
         match self {
             TupleKind::Tuple(types) => types.len(),
@@ -97,7 +101,7 @@ pub struct ReferenceType {
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Stub {
-    pub name: String,
+    pub name: Box<str>,
     pub generics: Vec<SoulType>,
 }
 
@@ -109,10 +113,10 @@ pub struct Generic {
 }
 
 impl Stub {
-    pub fn new(name: impl Into<String>) -> Self {
+    pub fn new(name: impl AsRef<str>) -> Self {
         Self {
-            name: name.into(),
             generics: vec![],
+            name: name.as_ref().into(),
         }
     }
 }

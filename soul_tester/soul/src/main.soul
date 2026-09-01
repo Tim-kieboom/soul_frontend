@@ -2,7 +2,5 @@ GLOBAL :: 1
 GLOBAL_INT: int :: 2
 
 main() {
-    // unsafe {
-        assertEq(some, 42)
-    // }
+    TEST :: 1
 }

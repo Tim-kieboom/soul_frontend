@@ -144,86 +144,11 @@ impl<'a, 'f> Parser<'a, 'f> {
             return Ok(statement);
         }
 
-        let possible_kind = match &self.token().kind {
-            TokenKind::Ident(_) => self.try_parse_from_ident(start_span),
-            &ROUND_OPEN => {
-                let saved = self.tokens.current_position();
-                match self.parse_tuple_pattern() {
-                    Ok(pattern) => match try_assign_type(&self.token()) {
-                        Some(AssignType::Assign) | Some(AssignType::Declaration) => {
-                            self.bump();
-                            let statement = self.parse_expression_id(STAMENT_END_TOKENS)?;
-                            return Ok(Statement::new_variable(
-                                Variable {
-                                    id: self.alloc_node(),
-                                    is_public: false,
-                                    pattern,
-                                    ty: None,
-                                    modifier: TypeModifier::Const,
-                                    initialize_value: Some(statement),
-                                },
-                                self.span_combine(start_span),
-                            ));
-                        }
-                        _ => {
-                            self.goto(saved);
-                            TryNotValue(Fault::empty())
-                        }
-                    },
-                    Err(_) => {
-                        self.goto(saved);
-                        TryNotValue(Fault::empty())
-                    }
-                }
-            }
-            &CURLY_OPEN => {
-                let saved = self.tokens.current_position();
-                match (
-                    self.parse_named_tuple_pattern(),
-                    try_assign_type(&self.token()),
-                ) {
-                    (Ok(pattern), Some(AssignType::Assign))
-                    | (Ok(pattern), Some(AssignType::Declaration)) => {
-                        self.bump();
-                        match self.parse_expression_id(STAMENT_END_TOKENS) {
-                            Ok(value) => {
-                                return Ok(Statement::new_variable(
-                                    Variable {
-                                        id: self.alloc_node(),
-                                        is_public: false,
-                                        pattern,
-                                        ty: None,
-                                        modifier: TypeModifier::Const,
-                                        initialize_value: Some(value),
-                                    },
-                                    self.span_combine(start_span),
-                                ));
-                            }
-                            Err(err) => return Err(err),
-                        }
-                    }
-                    _ => {
-                        self.goto(saved);
-                        let block = self.parse_block(TypeModifier::Mut)?;
-                        let span = self.span_combine(start_span);
-                        let semicolon = self.ends_semicolon();
-                        TryOk(Statement::new_block(&mut self.forest.store, block, span, semicolon))
-                    }
-                }
-            }
-            &STAR => return self.parse_assign_or_expression(start_span),
-            TokenKind::Keyword(keyword) => {
-                let kw = *keyword;
-                match self.try_parse_from_keyword(start_span, kw) {
-                    Ok(val) => TryOk(val),
-                    Err(TryError::IsErr(err)) => TryErr(err),
-                    Err(TryError::IsNotValue(err)) => TryNotValue(err),
-                }
-            }
-            _ => TryNotValue(Fault::empty()),
-        };
+        if let STAR = self.token().kind {
+            return self.parse_assign_or_expression(start_span);
+        }
 
-        match possible_kind {
+        match self.parse_possible_statement(start_span) {
             Ok(val) => return Ok(val),
             Err(TryError::IsErr(err)) => return Err(err),
             Err(TryError::IsNotValue(_)) => (),
@@ -232,12 +157,100 @@ impl<'a, 'f> Parser<'a, 'f> {
         match self.parse_expression_id(STAMENT_END_TOKENS) {
             Ok(val) => {
                 let semicolon = self.ends_semicolon();
-                Ok(Statement::from_expression(&self.forest.store, val, semicolon))
+                Ok(Statement::from_expression(
+                    &self.forest.store,
+                    val,
+                    semicolon,
+                ))
             }
             Err(err) => {
                 self.goto(begin_position);
                 Err(err)
             }
+        }
+    }
+
+    fn parse_possible_statement(&mut self, start_span: Span) -> TryResult<Statement, Fault> {
+        match &self.token().kind {
+            TokenKind::Ident(_) => self.try_parse_from_ident(start_span),
+            &ROUND_OPEN => {
+                let saved = self.tokens.current_position();
+
+                let Ok(pattern) = self.parse_tuple_pattern() else {
+                    self.goto(saved);
+                    return TryNotValue(Fault::empty());
+                };
+
+                let assign = try_assign_type(self.token());
+                if !matches!(
+                    assign,
+                    Some(AssignType::Assign) | Some(AssignType::Declaration)
+                ) {
+                    self.goto(saved);
+                    return TryNotValue(Fault::empty());
+                }
+
+                self.bump();
+                let statement = self.parse_expression_id(STAMENT_END_TOKENS).try_err()?;
+                Ok(Statement::new_variable(
+                    Variable {
+                        id: self.alloc_node(),
+                        is_public: false,
+                        pattern,
+                        ty: None,
+                        modifier: TypeModifier::Const,
+                        initialize_value: Some(statement),
+                    },
+                    self.span_combine(start_span),
+                ))
+            }
+            &CURLY_OPEN => {
+                let saved = self.tokens.current_position();
+                match (
+                    self.parse_named_tuple_pattern(),
+                    try_assign_type(self.token()),
+                ) {
+                    (Ok(pattern), Some(AssignType::Assign))
+                    | (Ok(pattern), Some(AssignType::Declaration)) => {
+                        self.bump();
+                        let value = self.parse_expression_id(STAMENT_END_TOKENS).try_err()?;
+
+                        Ok(Statement::new_variable(
+                            Variable {
+                                id: self.alloc_node(),
+                                is_public: false,
+                                pattern,
+                                ty: None,
+                                modifier: TypeModifier::Const,
+                                initialize_value: Some(value),
+                            },
+                            self.span_combine(start_span),
+                        ))
+                    }
+                    _ => {
+                        self.goto(saved);
+                        let block = self.parse_block(TypeModifier::Mut).try_err()?;
+                        let span = self.span_combine(start_span);
+                        let semicolon = self.ends_semicolon();
+                        TryOk(Statement::new_block(
+                            &mut self.forest.store,
+                            block,
+                            span,
+                            semicolon,
+                        ))
+                    }
+                }
+            }
+            TokenKind::Keyword(keyword) => {
+                let kw = *keyword;
+                match self.try_parse_from_keyword(start_span, kw) {
+                    Ok(val) => TryOk(val),
+                    Err(TryError::IsErr(err)) => TryErr(err),
+                    Err(TryError::IsNotValue(err)) => TryNotValue(err),
+                }
+            }
+            &STAR => unreachable!(),
+            _ => TryNotValue(Fault::empty()),
         }
     }
 
@@ -293,9 +306,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         match &peek.kind {
             &ROUND_OPEN | &ARROW_LEFT => self.parse_any_function().try_err(),
             &COLON | &COLON_ASSIGN => self.parse_variable().try_err(),
-            TokenKind::Symbol(Symbol::DoubleColon) => {
-                self.parse_associated_constant(ident_owned, start_span).try_err()
-            }
+            TokenKind::Symbol(Symbol::DoubleColon) => self
+                .parse_associated_constant(ident_owned, start_span)
+                .try_err(),
             &DOT if is_this => self.parse_contructor(start_span).try_err(),
             &CURLY_OPEN => {
                 let saved = self.tokens.current_position();
@@ -309,7 +322,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
                 match (
                     self.parse_constructor_pattern(type_name),
-                    try_assign_type(&self.token()),
+                    try_assign_type(self.token()),
                 ) {
                     (Ok(pattern), Some(AssignType::Assign))
                     | (Ok(pattern), Some(AssignType::Declaration)) => {
@@ -341,7 +354,11 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
     }
 
-    fn parse_associated_constant(&mut self, name: String, start_span: Span) -> SoulResult<Statement> {
+    fn parse_associated_constant(
+        &mut self,
+        name: String,
+        start_span: Span,
+    ) -> SoulResult<Statement> {
         self.bump();
         self.bump();
         let value = self.parse_expression_id(STAMENT_END_TOKENS)?;
@@ -374,7 +391,11 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.current.this_type = this;
         result
             .map(|spanned| {
-                spanned.map(|func| self.forest.store.insert_function(FunctionKind::Normal(func)))
+                spanned.map(|func| {
+                    self.forest
+                        .store
+                        .insert_function(FunctionKind::Normal(func))
+                })
             })
             .map(Statement::from_function)
     }

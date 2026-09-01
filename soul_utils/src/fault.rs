@@ -14,23 +14,23 @@ pub enum Severity {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Fault {
     severity: Severity,
-    message: String,
+    message: Box<str>,
     span: Option<Span>,
 
     #[cfg(feature = "error_backtrace")]
-    backtrace: String,
+    backtrace: Box<str>,
 }
 impl Fault {
     pub fn error(message: impl Into<String>, span: Option<Span>) -> Self {
-        Fault::new(Severity::Error, message.into(), span)
+        Fault::new(Severity::Error, message.into().into_boxed_str(), span)
     }
 
     pub fn warning(message: impl Into<String>, span: Option<Span>) -> Self {
-        Fault::new(Severity::Warning, message.into(), span)
+        Fault::new(Severity::Warning, message.into().into_boxed_str(), span)
     }
 
     pub fn note(message: impl Into<String>, span: Option<Span>) -> Self {
-        Fault::new(Severity::Note, message.into(), span)
+        Fault::new(Severity::Note, message.into().into_boxed_str(), span)
     }
 
     #[cfg(feature = "error_backtrace")]
@@ -47,7 +47,7 @@ impl Fault {
     pub fn empty() -> Self {
         Fault {
             severity: Severity::Error,
-            message: String::new(),
+            message: String::new().into(),
             span: None,
         }
     }
@@ -65,7 +65,7 @@ impl Fault {
     }
 
     #[cfg(not(feature = "error_backtrace"))]
-    fn new(severity: Severity, message: String, span: Option<Span>) -> Self {
+    fn new(severity: Severity, message: Box<str>, span: Option<Span>) -> Self {
         Fault {
             severity,
             message,
@@ -81,12 +81,12 @@ impl Fault {
         self.span
     }
 
-    pub fn message(&self) -> &String {
+    pub fn message(&self) -> &str {
         &self.message
     }
 
     #[cfg(feature = "error_backtrace")]
-    pub fn backtract(&self) -> &String {
+    pub fn backtract(&self) -> &Box<str> {
         &self.backtrace
     }
 }
@@ -116,10 +116,6 @@ impl FaultCollector {
         self.faults.iter()
     }
 
-    pub fn into_iter(self) -> impl Iterator<Item = Fault> {
-        self.faults.into_iter()
-    }
-
     pub fn count_severity(&self, severity: Severity) -> usize {
         self.faults
             .iter()
@@ -129,5 +125,14 @@ impl FaultCollector {
 
     pub fn fails(&self, fail_level: Severity) -> bool {
         self.faults.iter().any(|d| d.severity == fail_level)
+    }
+}
+
+impl IntoIterator for FaultCollector {
+    type Item = Fault;
+    type IntoIter = std::vec::IntoIter<Fault>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.faults.into_iter()
     }
 }

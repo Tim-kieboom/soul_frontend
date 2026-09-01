@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+    fmt::Display,
+    path::{Path, PathBuf},
+};
 
 /// A path to a Soul page/module.
 ///
@@ -83,8 +86,8 @@ impl SoulImportPath {
         self.path.clone()
     }
 
-    pub fn to_full_path(&self, dir_path: &PathBuf) -> PathBuf {
-        let mut this = dir_path.clone();
+    pub fn to_full_path(&self, dir_path: &Path) -> PathBuf {
+        let mut this = dir_path.to_path_buf();
         this.push(&self.path);
         this
     }
@@ -114,8 +117,10 @@ impl SoulImportPath {
             sb.push_str(text);
         }
     }
+}
 
-    pub fn to_string(self) -> String {
-        self.path.to_string_lossy().to_string()
+impl Display for SoulImportPath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.path.to_string_lossy().fmt(f)
     }
 }

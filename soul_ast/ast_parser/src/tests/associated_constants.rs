@@ -28,7 +28,9 @@ fn associated_constant_at_module_level() {
         StatementKind::Variable(v) => v,
         _ => panic!("expected Variable, got {:?}", stmt.node.variant_name()),
     };
-    assert!(matches!(pattern, VarPattern::Simple { binding, .. } if binding.ident.as_str() == "MAX"));
+    assert!(
+        matches!(pattern, VarPattern::Simple { binding, .. } if binding.ident.as_str() == "MAX")
+    );
     assert_eq!(*modifier, TypeModifier::Const);
     assert!(ty.is_none());
     assert!(initialize_value.is_some());
@@ -63,7 +65,9 @@ struct List {
             let fields = &s.fields;
             assert_eq!(fields.len(), 2, "{:#?}", fields);
             let var = &fields[0].value;
-            assert!(matches!(&var.pattern, VarPattern::Simple { binding, .. } if binding.ident.as_str() == "LIST_GROW"));
+            assert!(
+                matches!(&var.pattern, VarPattern::Simple { binding, .. } if binding.ident.as_str() == "LIST_GROW")
+            );
         }
         _ => panic!("expected Struct, got {:?}", stmt.node.variant_name()),
     }

@@ -1,3 +1,4 @@
+use std::str::FromStr;
 #[cfg(debug_assertions)]
 use std::sync::Once;
 
@@ -116,9 +117,9 @@ impl<'a> Lexer<'a> {
         let string_tag = match self.try_get_ident_or_tag(char) {
             Ok(val) => val,
             Err(ident_str) => {
-                if let Some(keyword) = KeyWord::from_str(&ident_str) {
+                if let Ok(keyword) = KeyWord::from_str(&ident_str) {
                     return Ok(TokenKind::Keyword(keyword));
-                } else if let Some(types) = Types::from_str(&ident_str) {
+                } else if let Ok(types) = Types::from_str(&ident_str) {
                     return Ok(TokenKind::Types(types));
                 } else {
                     return Ok(TokenKind::Ident(ident_str));
@@ -357,6 +358,17 @@ impl<'a> Lexer<'a> {
             is_float = self.lex_float(&mut string);
         }
 
+        if self.current == Some('_') {
+            if let Some(suffix) = self.lex_number_suffix() {
+                let _ = suffix;
+            } else {
+                return Err(Fault::error(
+                    "invalid suffix after number literal",
+                    Some(self.span(line)),
+                ));
+            }
+        }
+
         if is_float {
             string
                 .parse::<f64>()
@@ -373,6 +385,30 @@ impl<'a> Lexer<'a> {
                 .map(Number::Uint)
                 .map_err(|err| Fault::error(err.to_string(), Some(self.span(line))))
         }
+    }
+
+    fn lex_number_suffix(&mut self) -> Option<&'static str> {
+        const SUFFIXES: &[&str] = &[
+            "i8", "i16", "i32", "i64", "i128", "u8", "u16", "u32", "u64", "u128", "f16", "f32",
+            "f64",
+        ];
+
+        let mut candidate = String::new();
+        while let Some(ch) = self.peek_char()
+            && ch.is_ascii_alphanumeric()
+            && candidate.len() < 5
+        {
+            candidate.push(ch);
+            self.next_char();
+        }
+
+        let matched = SUFFIXES
+            .iter()
+            .find(|suffix| **suffix == candidate)
+            .copied()?;
+
+        self.next_char();
+        Some(matched)
     }
 
     fn lex_float(&mut self, string: &mut String) -> bool {
@@ -399,13 +435,13 @@ impl<'a> Lexer<'a> {
         if let Some(peek) = self.peek_char() {
             let two_str = [current, peek].iter().collect::<String>();
 
-            if let Some(symbol) = Symbol::from_str(&two_str) {
+            if let Ok(symbol) = Symbol::from_str(&two_str) {
                 self.next_char();
                 return Some(symbol);
             }
         }
 
-        Symbol::from_str(&current.to_string())
+        Symbol::from_str(&current.to_string()).ok()
     }
 
     fn is_negative_number(&mut self, symbol: Symbol) -> bool {

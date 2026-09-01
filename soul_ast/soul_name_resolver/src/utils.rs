@@ -7,7 +7,7 @@ use ast_model::{
 use soul_utils::{
     CrateContext, FunctionId,
     fault::Fault,
-    span::{ModuleId, Span, Spanned},
+    span::{ModuleId, Span},
 };
 
 use crate::NameResolver;
@@ -27,7 +27,7 @@ impl<'a> NameResolver<'a> {
 
     pub(crate) fn declare_function(
         &mut self,
-        function_signature: &Spanned<FunctionSignature>,
+        function_signature: &FunctionSignature,
     ) -> FunctionId {
         let id = function_signature.value.id;
         let name = function_signature.value.name.as_str();
@@ -35,10 +35,10 @@ impl<'a> NameResolver<'a> {
         id
     }
 
-    pub(crate) fn static_current_scope_mut<'b>(
-        scopes: &'b mut ScopeBuilder,
+    pub(crate) fn static_current_scope_mut(
+        scopes: &mut ScopeBuilder,
         module: ModuleId,
-    ) -> &'b mut Scope {
+    ) -> &mut Scope {
         scopes
             .current_scope_mut(module)
             .expect("resolver has no scope")

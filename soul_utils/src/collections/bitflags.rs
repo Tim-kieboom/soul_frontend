@@ -132,7 +132,7 @@ macro_rules! bitflags {
     };
 }
 
-#[cfg(test)] 
+#[cfg(test)]
 mod tests {
     bitflags! {
         pub struct Permissions: u8 {

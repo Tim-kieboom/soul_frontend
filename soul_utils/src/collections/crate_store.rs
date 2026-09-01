@@ -5,7 +5,7 @@ use std::{
 
 use crate::linkage::Linkage;
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CrateStore {
     crates: HashMap<String, CrateEntry>,
 }
@@ -32,11 +32,8 @@ pub struct DependencySpec {
 
 impl CrateStore {
     pub fn new() -> Self {
-        Self {
-            crates: HashMap::new(),
-        }
+        Self::default()
     }
-
     pub fn insert(&mut self, name: String, entry: CrateEntry) {
         self.crates.insert(name, entry);
     }

@@ -1,5 +1,5 @@
-use crate::{push_fmt, source_file};
 use crate::{config::PrintConfigs, display::writer::Writer};
+use crate::{push_fmt, source_file};
 use anyhow::{Error, Result};
 use soul_utils::char_colors::*;
 use soul_utils::collections::module_store::ModuleStore;
@@ -65,7 +65,8 @@ fn fault_message(
     };
 
     match fault.span() {
-        Some(span) => push_fmt!(writer,
+        Some(span) => push_fmt!(
+            writer,
             "{severity_color}{severity}:{cyan} at {}:{span:?}\n{}{default}",
             modules
                 .get_path(span.module)
@@ -73,7 +74,8 @@ fn fault_message(
                 .to_string_lossy(),
             fault.message()
         )?,
-        None => push_fmt!(writer,
+        None => push_fmt!(
+            writer,
             "{severity_color}{severity}{cyan} {}{default}",
             fault.message()
         )?,

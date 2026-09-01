@@ -1,5 +1,9 @@
 use ast_model::{
-    AstModuleStore, AstStore, AstTree, CustomType, EntryKind, Module, NodeId, ScopeInfo, block::BlockId, declare_store::DeclareStore, scope::{ScopeId, ScopeValue}, statements::{FunctionModifier, StatementId, VarPattern, Variable},
+    AstModuleStore, AstStore, AstTree, CustomType, EntryKind, Module, NodeId, ScopeInfo,
+    block::BlockId,
+    declare_store::DeclareStore,
+    scope::{ScopeId, ScopeValue},
+    statements::{FunctionModifier, StatementId, VarPattern, Variable},
 };
 use soul_utils::{
     CrateContext, FunctionId, Ident,
@@ -158,7 +162,7 @@ impl<'a> NameResolver<'a> {
         function_id: FunctionId,
     ) -> Option<EntryKind<FunctionId>> {
         let function = self.store.functions.get(function_id)?;
-        let signature = &function.signature().value;
+        let signature = &function.signature();
         let is_public = signature.modifier.contains(FunctionModifier::PUBLIC);
         let header = &mut self.ast_modules.get_mut(self.current.module)?.header;
         let entry = match header.get_mut(signature.name.as_str()) {

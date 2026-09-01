@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use ast_model::{
     expression::{Expression, ExpressionId, ExpressionKind, TypeOf, TypeofKind},
     operators::{BinaryOperator, BinaryOperatorKind, UnaryOperator, UnaryOperatorKind},
@@ -173,13 +175,13 @@ impl<'a, 'f> Parser<'a, 'f> {
             return Loop::Break;
         }
 
-        return Loop::None;
+        Loop::None
     }
 
     fn current_precedence(&mut self) -> Precedence {
         match &self.token().kind {
             TokenKind::Ident(ident) => {
-                if let Some(keyword) = KeyWord::from_str(ident) {
+                if let Ok(keyword) = KeyWord::from_str(ident) {
                     Precedence::new(keyword.precedence())
                 } else {
                     Precedence::MIN
@@ -254,9 +256,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 }
 
                 match KeyWord::from_str(ident.as_str()) {
-                    Some(KeyWord::Typeof) => {
-                        return self.parse_typeof_operator(start_span);
-                    }
+                    Ok(KeyWord::Typeof) => self.parse_typeof_operator(start_span),
                     _ => get_invalid_error(self.token()),
                 }
             }
@@ -268,7 +268,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                     ));
                 }
 
-                return self.parse_typeof_operator(start_span);
+                self.parse_typeof_operator(start_span)
             }
             TokenKind::Symbol(sym) => {
                 if let Some(access) = AccessType::from_symbool(*sym) {
@@ -462,10 +462,7 @@ enum UnaryKinds {
 enum ExpressionOperator {
     Binary(BinaryOperator),
     TypeOf(TypeofKind),
-    Access {
-        ty: AccessType,
-        optional_map: bool,
-    },
+    Access { ty: AccessType, optional_map: bool },
 }
 
 define_symbols!(

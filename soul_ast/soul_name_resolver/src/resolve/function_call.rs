@@ -206,17 +206,12 @@ impl<'a> NameResolver<'a> {
         None
     }
 
-    fn parse_owner_from_field_access(
-        &mut self,
-        field_access: &FieldAccess,
-    ) -> Option<SoulType> {
+    fn parse_owner_from_field_access(&mut self, field_access: &FieldAccess) -> Option<SoulType> {
         let (module_entry, field_name) = self.follow_field_access_to_module(field_access)?;
         let ast_module = self.ast_modules.get(module_entry.module_id)?;
         let header_entry = ast_module.header.get(&field_name)?;
         let custom_type = header_entry.custom_type.as_ref()?;
-        Some(SoulType::Stub(Stub::new(
-            custom_type.value.name().as_str(),
-        )))
+        Some(SoulType::Stub(Stub::new(custom_type.value.name().as_str())))
     }
 
     /// Walk a FieldAccess chain like `Std.Io.Stdout` to find the innermost
@@ -276,7 +271,6 @@ impl<'a> NameResolver<'a> {
                 is_defer: false,
             },
         );
-        return;
     }
 
     fn lookup_module_function(
@@ -289,7 +283,7 @@ impl<'a> NameResolver<'a> {
             return self.lookup_function(&function_name);
         }
 
-        if let Some(_) = &module_entry.crate_name {
+        if module_entry.crate_name.is_some() {
             todo!("impl external crates")
         }
 

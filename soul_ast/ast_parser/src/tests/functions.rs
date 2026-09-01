@@ -1,9 +1,49 @@
 use ast_model::{
-    expression::{ExpressionKind, FunctionCall}, soul_type::{Generic, SoulType, Stub}, statements::{Function, FunctionModifier, StatementKind},
+    expression::{ExpressionKind, FunctionCall},
+    literal::Literal,
+    soul_type::{Generic, SoulType, Stub},
+    statements::{Function, FunctionModifier, StatementKind},
 };
 use soul_utils::fault::Severity;
 
 use crate::tests::{get_statement, parse};
+
+#[test]
+fn expression_bodied_function() {
+    let (module, store, context) = parse("describe(value: int): str => \"a\"");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let func_id = match &stmt.node {
+        StatementKind::Function(id) => *id,
+        _ => panic!("expected Function"),
+    };
+    let func = &store.functions[func_id];
+    let Function { signature, block } = match func {
+        ast_model::FunctionKind::Normal(f) => f,
+        _ => panic!("expected Normal function"),
+    };
+    assert_eq!(signature.value.name.as_str(), "describe");
+    assert_eq!(signature.value.return_type, SoulType::String);
+
+    let body = &store.blocks[*block];
+    assert_eq!(body.statements.len(), 1);
+    let stmt_id = body.statements[0];
+    let inner = &store.statements[stmt_id];
+    assert!(matches!(
+        inner.node,
+        StatementKind::Expression { expression, .. }
+            if matches!(
+                store.expressions[expression].node,
+                ExpressionKind::Literal((_, Literal::Str(_)))
+            )
+    ));
+}
 
 #[test]
 fn simple_function() {

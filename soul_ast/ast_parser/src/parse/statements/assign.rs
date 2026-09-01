@@ -54,8 +54,13 @@ impl<'a, 'f> Parser<'a, 'f> {
         };
 
         let rvalue = self.parse_expression_id(STAMENT_END_TOKENS)?;
-        let resolved_rvalue =
-            resolve_assign_type(&mut self.forest.store, lvalue, assign, rvalue, assign_token.span);
+        let resolved_rvalue = resolve_assign_type(
+            &mut self.forest.store,
+            lvalue,
+            assign,
+            rvalue,
+            assign_token.span,
+        );
 
         self.bump();
 
@@ -95,10 +100,6 @@ fn resolve_assign_type(
 
     let id = store.alloc_node();
     store.insert_expression(Expression::new_binary(
-        id,
-        lvalue.clone(),
-        operator,
-        rvalue,
-        full_span,
+        id, lvalue, operator, rvalue, full_span,
     ))
 }

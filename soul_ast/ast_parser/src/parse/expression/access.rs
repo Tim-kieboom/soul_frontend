@@ -1,8 +1,9 @@
-use std::mem::swap;
+use std::{mem::swap, str::FromStr};
 
 use ast_model::expression::{
     Constructor, Deref, Expression, ExpressionId, ExpressionKind, FunctionCallee,
-    FunctionCalleeKind, MatchMethod, MatchMethodArm, MatchMethodVariant, Ref, VariableExpression,
+    FunctionCalleeKind, MatchMethod, MatchMethodArm, MatchMethodVariant, Ref, TypeOf, TypeofKind,
+    VariableExpression,
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
@@ -59,8 +60,8 @@ impl<'a, 'f> Parser<'a, 'f> {
             vec![]
         };
 
-        match &self.token().kind {
-            &PASS => {
+        match self.token().kind {
+            PASS => {
                 self.bump();
                 let mut value = Expression::error();
                 swap(left, &mut value);
@@ -70,7 +71,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
                 return Ok(());
             }
-            &SIZEOF => {
+            SIZEOF => {
                 self.bump();
                 let mut value = Expression::error();
                 swap(left, &mut value);
@@ -80,7 +81,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
                 return Ok(());
             }
-            &COPY => {
+            COPY => {
                 self.bump();
                 let mut value = Expression::error();
                 swap(left, &mut value);
@@ -90,7 +91,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
                 return Ok(());
             }
-            &REF => {
+            REF => {
                 self.bump();
                 let mut expression = Expression::error();
                 swap(left, &mut expression);
@@ -112,7 +113,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
                 return Ok(());
             }
-            &POINTER => {
+            POINTER => {
                 self.bump();
                 let mut expression = Expression::error();
                 swap(left, &mut expression);
@@ -133,7 +134,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
                 return Ok(());
             }
-            &ROUND_OPEN => {
+            ROUND_OPEN => {
                 let mut value = Expression::error();
                 swap(left, &mut value);
 
@@ -178,8 +179,50 @@ impl<'a, 'f> Parser<'a, 'f> {
             return Ok(());
         }
 
+        if self.token().kind == TokenKind::Keyword(KeyWord::Typeof) {
+            self.bump();
+            let mut value = Expression::error();
+            swap(left, &mut value);
+            let value = self.forest.store.insert_expression(value);
+            *left = Expression::new(
+                ExpressionKind::TypeOf(TypeOf {
+                    value,
+                    kind: TypeofKind::Value,
+                }),
+                self.span_combine(start_span),
+            );
+            return Ok(());
+        }
+
         let success = self.try_parse_method_arm(left, start_span, optional_map)?;
         if success {
+            return Ok(());
+        }
+
+        if !matches!(self.token().kind, TokenKind::Ident(_)) {
+            let mut value = Expression::error();
+            swap(left, &mut value);
+
+            let name = match value.node {
+                ExpressionKind::Variable(VariableExpression { name, .. }) => name,
+                _ => {
+                    return Err(Fault::error(
+                        "expected identifier after '.'",
+                        Some(self.token().span),
+                    ));
+                }
+            };
+
+            let ty = self.type_from_ident(name, generics);
+            let ctor = Constructor {
+                id: self.alloc_node(),
+                ty,
+                arguments: vec![],
+            };
+            *left = Expression::new(
+                ExpressionKind::Constructor(ctor),
+                self.span_combine(start_span),
+            );
             return Ok(());
         }
 
@@ -266,7 +309,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             );
         }
 
-        return Ok(true);
+        Ok(true)
     }
 
     fn parse_field_access(
@@ -275,7 +318,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         ident: Ident,
         optional_map: bool,
     ) -> SoulResult<Expression> {
-        match KeyWord::from_str(ident.as_str()) {
+        match KeyWord::from_str(ident.as_str()).ok() {
             Some(KeyWord::Sizeof) => self.parse_sizeof(left),
             _ => Ok(Expression::new_field(
                 self.alloc_node(),

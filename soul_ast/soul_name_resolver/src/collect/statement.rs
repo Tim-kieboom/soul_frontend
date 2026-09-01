@@ -27,11 +27,9 @@ impl<'a> NameResolver<'a> {
                 }
 
                 for variant in &enum_.variants {
-                    match variant {
-                        EnumVariant::Assigned { value, .. } => {
-                            self.collect_expression(*value);
-                        }
-                        _ => (),
+
+                    if let EnumVariant::Assigned { value, .. } = variant {
+                        self.collect_expression(*value);
                     }
                 }
             }
@@ -43,11 +41,9 @@ impl<'a> NameResolver<'a> {
                 }
 
                 for variant in &union_.variants {
-                    match variant {
-                        EnumVariant::Assigned { value, .. } => {
-                            self.collect_expression(*value);
-                        }
-                        _ => (),
+
+                    if let EnumVariant::Assigned { value, .. } = variant {
+                        self.collect_expression(*value);
                     }
                 }
             }
@@ -147,7 +143,7 @@ impl<'a> NameResolver<'a> {
             return;
         };
 
-        let signature = &function_kind.signature().value;
+        let signature = &function_kind.signature();
         self.check_function_name(&signature.name);
 
         if let FunctionKind::Normal(function) = function_kind {
@@ -166,7 +162,7 @@ impl<'a> NameResolver<'a> {
         let id = self.declare_function(&function.signature);
         self.current.function = Some(id);
 
-        if is_main(&function.signature.value) {
+        if is_main(&function.signature) {
             self.declares.main_function = Some(id);
         }
 
@@ -304,7 +300,7 @@ impl<'a> NameResolver<'a> {
 }
 
 fn is_main(signature: &FunctionSignature) -> bool {
-    signature.name.as_str() == "main" && matches!(signature.method_type, SoulType::None)
+    signature.value.name.as_str() == "main" && matches!(signature.value.method_type, SoulType::None)
 }
 
 fn check_function_name(name: &Ident) -> SoulResult<()> {

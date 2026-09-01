@@ -1,9 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use ast_model::{
-    ExternalCrateData,
-    statements::ImportPath,
-};
+use ast_model::{ExternalCrateData, statements::ImportPath};
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
     collections::vec_set::VecSet,
@@ -14,8 +11,8 @@ use soul_utils::{
     span::{ModuleId, Span},
 };
 
-use crate::parser::Parser;
 use crate::ParseInfo;
+use crate::parser::Parser;
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_child_module(&mut self, path: &ImportPath, span: Span) {
@@ -263,12 +260,12 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     fn insure_parents_are_loaded(
         &mut self,
-        module_file_path: &PathBuf,
+        module_file_path: &Path,
         starting_parent: ModuleId,
         base_path: &Path,
         span: Span,
     ) {
-        fn get_module_name(current: &PathBuf) -> Option<String> {
+        fn get_module_name(current: &Path) -> Option<String> {
             let osstr = current.file_name()?;
             osstr
                 .to_str()?
@@ -329,9 +326,6 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
     }
 }
-fn to_crate_name(path: &PathBuf) -> PathBuf {
-    path
-        .components()
-        .skip(1)
-        .collect::<PathBuf>()
+fn to_crate_name(path: &Path) -> PathBuf {
+    path.components().skip(1).collect::<PathBuf>()
 }

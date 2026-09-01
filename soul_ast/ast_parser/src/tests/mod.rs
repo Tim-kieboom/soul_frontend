@@ -1,8 +1,4 @@
-use std::{
-    fs,
-    path::PathBuf,
-    sync::LazyLock,
-};
+use std::{fs, path::PathBuf, sync::LazyLock};
 
 use ast_model::{
     AstStore, AstTree, Module,
@@ -31,12 +27,12 @@ use soul_utils::{
 
 use crate::{ParseInfo, parse_module};
 
+mod associated_constants;
+mod attributes;
 mod big_test;
 mod conditional;
 mod enums;
 mod functions;
-mod associated_constants;
-mod attributes;
 mod lambda;
 mod literals;
 mod structs;
@@ -75,8 +71,7 @@ fn create_test_crate_store(test_env: &TestEnv) -> CrateStore {
     for name in &["foo", "soul", "bar"] {
         store.insert(
             name.to_string(),
-            CrateEntry::new(name.to_string(), test_env.base.clone())
-                .with_linkage(Linkage::Static),
+            CrateEntry::new(name.to_string(), test_env.base.clone()).with_linkage(Linkage::Static),
         );
     }
     store
@@ -1001,7 +996,7 @@ fn array_contructor_generic_literal() {
                 ExpressionKind::Array(AnyArray::Array(arr)) => {
                     let int = SoulType::Primitive(PrimitiveTypes::Int);
                     let collection = SoulType::Stub(Stub {
-                        name: "List".to_string(),
+                        name: Box::from("List"),
                         generics: vec![int],
                     });
                     assert_eq!(arr.collection_type, Some(collection));

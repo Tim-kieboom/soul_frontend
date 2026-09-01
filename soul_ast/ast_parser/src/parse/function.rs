@@ -1,6 +1,11 @@
 use ast_model::{
-    FunctionKind, expression::{Argument, Expression, FunctionCall, FunctionCallee}, soul_type::{ArrayKind, ArrayType, Generic, SoulType}, statements::{
-        ExternLanguage, Function, FunctionModifier, FunctionSignature, FunctionThisKind, Parameter, Statement,
+    FunctionKind,
+    block::Block,
+    expression::{Argument, Constructor, Expression, ExpressionKind, FunctionCall, FunctionCallee},
+    soul_type::{ArrayKind, ArrayType, Generic, SoulType},
+    statements::{
+        ExternLanguage, Function, FunctionModifier, FunctionSignature, FunctionSignatureHelper,
+        FunctionThisKind, InnerFunctionSignature, Parameter, Statement,
     },
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
@@ -18,20 +23,32 @@ use soul_utils::{
 };
 
 use crate::{
-    parser::Parser, utils::{
-        ARRAY, ARROW_LEFT, ARROW_RIGHT, ASSIGN, COLON, COMMA, CONST, CURLY_OPEN, DOT, DOUBLE_QUESTION, OPTIONAL, REF, ROUND_CLOSE, ROUND_OPEN, SEMI_COLON, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS,
+    parser::Parser,
+    utils::{
+        ARRAY, ARROW_LEFT, ARROW_RIGHT, ASSIGN, COLON, COMMA, CONST, CURLY_OPEN, DOT,
+        DOUBLE_QUESTION, LAMBDA_ARROW, OPTIONAL, REF, ROUND_CLOSE, ROUND_OPEN, SEMI_COLON,
+        SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS,
     },
 };
 const CONTRUCTOR_STR: &str = "This__ctor";
 const ARRAY_CONTRUCTOR_STR: &str = "This__arrayCtor";
 
-type FuncResult<T> = TryResult<T, (Ident, Fault)>;
+pub struct FuncError {
+    pub ident: Ident,
+    pub fault: Fault,
+}
+impl FuncError {
+    pub fn new(ident: Ident, fault: Fault) -> Box<Self> {
+        Box::new(Self { ident, fault })
+    }
+}
+
+type FuncResult<T> = TryResult<T, Box<FuncError>>;
 impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_any_function(&mut self) -> SoulResult<Statement> {
         let is_const = self.current_is(&CONST);
         if is_const {
             self.bump();
-
         }
 
         let ident = self.try_bump_consume_ident()?;
@@ -39,19 +56,14 @@ impl<'a, 'f> Parser<'a, 'f> {
         let span = self.token().span;
 
         let this_type = self.current.this_type.take().unwrap_or(SoulType::None);
-        let result = self.try_parse_function_declaration_id(
-            span,
-            &this_type,
-            is_const,
-            ident,
-        );
+        let result = self.try_parse_function_declaration_id(span, &this_type, is_const, ident);
         self.current.this_type = Some(this_type);
 
         match result {
             Ok(val) => Ok(Statement::from_function(val)),
             Err(TryError::IsErr(err)) => Err(err),
-            Err(TryError::IsNotValue((ident, _err))) => self
-                .try_parse_function_call(span, None, &ident)
+            Err(TryError::IsNotValue(err)) => self
+                .try_parse_function_call(span, None, &err.ident)
                 .merge_to_result()
                 .map(|expression| {
                     let id = self.forest.store.insert_expression(expression);
@@ -91,8 +103,22 @@ impl<'a, 'f> Parser<'a, 'f> {
                 return TryOk(Expression::from_any_array(array));
             }
 
+            if self.current_is(&ROUND_OPEN) {
+                let arguments = self.parse_arguments().try_err()?;
+                let ty = self.type_from_ident(name.clone(), generics);
+                let ctor = Constructor {
+                    id: self.alloc_node(),
+                    ty,
+                    arguments,
+                };
+                return TryOk(Expression::new(
+                    ExpressionKind::Constructor(ctor),
+                    self.span_combine(start_span),
+                ));
+            }
+
             return TryErr(Fault::error(
-                "expected array literal after type constructor",
+                "expected array literal or '(' after type constructor",
                 Some(self.token().span),
             ));
         }
@@ -152,7 +178,11 @@ impl<'a, 'f> Parser<'a, 'f> {
     ) -> FuncResult<Spanned<FunctionId>> {
         self.try_parse_function_declaration(start_span, methode_type, is_const, name)
             .map(|spanned| {
-                spanned.map(|function| self.forest.store.insert_function(FunctionKind::Normal(function)))
+                spanned.map(|function| {
+                    self.forest
+                        .store
+                        .insert_function(FunctionKind::Normal(function))
+                })
             })
     }
 
@@ -216,13 +246,8 @@ impl<'a, 'f> Parser<'a, 'f> {
         let name = self.try_bump_consume_ident()?;
 
         let span = self.token().span;
-        match self.try_parse_function_signature(
-            span,
-            &SoulType::None,
-            name,
-            false,
-            Some(external),
-        ) {
+        match self.try_parse_function_signature(span, &SoulType::None, name, false, Some(external))
+        {
             Ok(signature) => {
                 let span = signature.span;
                 let id = self
@@ -232,7 +257,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 Ok(Statement::from_external_function(Spanned::new(id, span)))
             }
             Err(TryError::IsErr(err)) => Err(err),
-            Err(TryError::IsNotValue((_, err))) => Err(err),
+            Err(TryError::IsNotValue(err)) => Err(err.fault),
         }
     }
 
@@ -243,7 +268,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         name: Ident,
         is_const: bool,
         external: Option<ExternLanguage>,
-    ) -> FuncResult<Spanned<FunctionSignature>> {
+    ) -> FuncResult<Box<Spanned<InnerFunctionSignature>>> {
         let begin_position = self.tokens.current_position();
         let result =
             self.inner_parse_function_signature(start_span, methode_type, name, is_const, external);
@@ -330,12 +355,12 @@ impl<'a, 'f> Parser<'a, 'f> {
     ) -> SoulResult<Spanned<Function>> {
         let start_span = self.token().span;
         self.expect(&DOT)?;
-        match &self.token().kind {
-            &ROUND_OPEN => {
+        match self.token().kind {
+            ROUND_OPEN => {
                 let name = Ident::new(CONTRUCTOR_STR, start_span);
                 let mut methode = self
-                    .try_parse_function_declaration(start_span, &methode_type, is_const, name)
-                    .map_try_not_value(|(_, err)| err)
+                    .try_parse_function_declaration(start_span, methode_type, is_const, name)
+                    .map_try_not_value(|err| err.fault)
                     .merge_to_result()?
                     .value;
 
@@ -351,7 +376,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
                 Ok(Spanned::new(methode, self.span_combine(start_span)))
             }
-            &SQUARE_OPEN => {
+            SQUARE_OPEN => {
                 let name = Ident::new(ARRAY_CONTRUCTOR_STR, start_span);
                 self.bump();
                 let mut array_type = self.try_parse_type().merge_to_result()?;
@@ -363,29 +388,48 @@ impl<'a, 'f> Parser<'a, 'f> {
                 self.expect(&ROUND_OPEN)?;
                 let arg = self.try_bump_consume_ident()?;
                 self.expect(&ROUND_CLOSE)?;
-                let block = self.parse_block(TypeModifier::Mut)?;
+                let block = if self.current_is(&LAMBDA_ARROW) {
+                    self.bump();
+                    self.skip_end_lines();
+                    let expression = self.parse_expression_id(STAMENT_END_TOKENS)?;
+                    let statement = Statement::from_expression(
+                        &self.forest.store,
+                        expression,
+                        self.current_is(&SEMI_COLON),
+                    );
+                    let statement = self.forest.store.insert_statement(statement);
+                    self.forest.store.insert_block(Block {
+                        statements: vec![statement],
+                        span: self.span_combine(start_span),
+                        is_const: false,
+                    })
+                } else {
+                    self.parse_block(TypeModifier::Mut)?
+                };
 
                 let id = self.forest.store.alloc_function();
+                let signature = InnerFunctionSignature {
+                    id,
+                    name,
+                    modifier: FunctionModifier::empty(),
+                    method_type: methode_type.clone(),
+                    return_type: methode_type.clone(),
+                    parameters: vec![Parameter {
+                        name: arg,
+                        default: None,
+                        ty: array_type,
+                        id: self.alloc_node(),
+                        is_mut: false,
+                    }],
+                    generics: vec![],
+                    function_kind: FunctionThisKind::ArrayCtor,
+                    external: None,
+                    node_id: self.alloc_node(),
+                };
+
                 let function = Function {
-                    signature: Spanned::new(
-                        FunctionSignature {
-                            id,
-                            name,
-                            modifier: FunctionModifier::empty(),
-                            method_type: methode_type.clone(),
-                            return_type: methode_type.clone(),
-                            parameters: vec![Parameter {
-                                name: arg,
-                                default: None,
-                                ty: array_type,
-                                id: self.alloc_node(),
-                                is_mut: false,
-                            }],
-                            generics: vec![],
-                            function_kind: FunctionThisKind::ArrayCtor,
-                            external: None,
-                            node_id: self.alloc_node(),
-                        },
+                    signature: FunctionSignature::with_span(
+                        signature,
                         self.span_combine(start_span),
                     ),
                     block,
@@ -404,14 +448,17 @@ impl<'a, 'f> Parser<'a, 'f> {
         name: Ident,
         is_const: bool,
         external: Option<ExternLanguage>,
-    ) -> FuncResult<Spanned<FunctionSignature>> {
+    ) -> FuncResult<Box<Spanned<InnerFunctionSignature>>> {
         if !self.current_is_any(&[ROUND_OPEN, ARROW_LEFT]) {
-            return TryNotValue((name, self.get_expect_any_error(&[ROUND_OPEN, ARROW_LEFT])));
+            return TryNotValue(FuncError::new(
+                name,
+                self.get_expect_any_error(&[ROUND_OPEN, ARROW_LEFT]),
+            ));
         }
 
         let generics = match self.parse_generic_declare() {
             Ok(val) => val.unwrap_or(vec![]),
-            Err(err) => return TryNotValue((name, err)),
+            Err(err) => return TryNotValue(FuncError::new(name, err)),
         };
 
         if !self.current_is(&ROUND_OPEN) {
@@ -421,7 +468,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let (parameters, function_kind) = match self.try_parse_parameters() {
             Ok(val) => val,
             Err(TryError::IsErr(err)) => return TryErr(err),
-            Err(TryError::IsNotValue(err)) => return TryNotValue((name, err)),
+            Err(TryError::IsNotValue(err)) => return TryNotValue(FuncError::new(name, err)),
         };
 
         let return_type = match self.current_is(&COLON) {
@@ -430,7 +477,9 @@ impl<'a, 'f> Parser<'a, 'f> {
                 match self.try_parse_type() {
                     Ok(val) => val,
                     Err(TryError::IsErr(err)) => return TryErr(err),
-                    Err(TryError::IsNotValue(err)) => return TryNotValue((name, err)),
+                    Err(TryError::IsNotValue(err)) => {
+                        return TryNotValue(FuncError::new(name, err));
+                    }
                 }
             }
             false => SoulType::None,
@@ -438,17 +487,16 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let generics = match self.parse_where_clause(generics) {
             Ok(val) => val,
-            Err(err) => return TryNotValue((name, err)),
+            Err(err) => return TryNotValue(FuncError::new(name, err)),
         };
 
         let modifier = if is_const {
             FunctionModifier::CONST
-        }
-        else {
+        } else {
             FunctionModifier::default()
         };
 
-        let signature = FunctionSignature {
+        let signature = InnerFunctionSignature {
             node_id: self.alloc_node(),
             name,
             external,
@@ -461,7 +509,8 @@ impl<'a, 'f> Parser<'a, 'f> {
             method_type: method_type.clone(),
         };
 
-        TryOk(Spanned::new(signature, self.span_combine(start_span)))
+        let signature = Spanned::new(signature, self.span_combine(start_span));
+        TryOk(Box::new(signature))
     }
 
     fn parse_where_clause(&mut self, mut generics: Vec<Generic>) -> SoulResult<Vec<Generic>> {
@@ -477,7 +526,10 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.expect(&COLON)?;
             let bound = self.try_parse_type().merge_to_result()?;
 
-            match generics.iter_mut().find(|g| g.name.as_str() == name.as_str()) {
+            match generics
+                .iter_mut()
+                .find(|g| g.name.as_str() == name.as_str())
+            {
                 Some(existing) => {
                     if existing.bound.is_none() {
                         existing.bound = Some(bound);
@@ -510,13 +562,30 @@ impl<'a, 'f> Parser<'a, 'f> {
         let signature =
             self.try_parse_function_signature(start_span, methode_type, name, is_const, external)?;
 
-        let block = match self.parse_block(TypeModifier::Mut) {
-            Ok(val) => val,
-            Err(err) => {
-                if signature.value.parameters.is_empty() {
-                    return TryNotValue((signature.value.name, err));
-                } else {
-                    return TryErr(err);
+        let block = if self.current_is(&LAMBDA_ARROW) {
+            self.bump();
+            self.skip_end_lines();
+            let expr = match self.parse_expression_id(STAMENT_END_TOKENS) {
+                Ok(val) => val,
+                Err(err) => return TryErr(err),
+            };
+            let statement =
+                Statement::from_expression(&self.forest.store, expr, self.current_is(&SEMI_COLON));
+            let statement = self.forest.store.insert_statement(statement);
+            self.forest.store.insert_block(Block {
+                statements: vec![statement],
+                span: signature.span,
+                is_const: false,
+            })
+        } else {
+            match self.parse_block(TypeModifier::Mut) {
+                Ok(val) => val,
+                Err(err) => {
+                    if signature.value.parameters.is_empty() {
+                        return TryNotValue(FuncError::new(signature.value.name, err));
+                    } else {
+                        return TryErr(err);
+                    }
                 }
             }
         };

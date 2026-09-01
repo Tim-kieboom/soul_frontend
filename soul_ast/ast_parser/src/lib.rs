@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use ast_model::{CrateForest};
+use ast_model::CrateForest;
 use soul_tokenizer::TokenStream;
 use soul_utils::{
     CrateContext,

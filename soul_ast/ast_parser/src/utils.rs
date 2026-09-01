@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{path::Path, str::FromStr};
 
 use ast_model::NodeId;
 use soul_tokenizer::{
@@ -265,7 +265,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     pub(crate) fn current_is_keyword(&self, expected: KeyWord) -> bool {
         match &self.token().kind {
-            TokenKind::Ident(ident) => KeyWord::from_str(ident.as_str()) == Some(expected),
+            TokenKind::Ident(ident) => KeyWord::from_str(ident.as_str()) == Ok(expected),
             TokenKind::Keyword(keyword) => *keyword == expected,
             _ => false,
         }
@@ -289,7 +289,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     pub(super) fn peek_is(&self, kind: &TokenKind) -> bool {
         match self.try_peek() {
             Ok(token) => &token.kind == kind,
-            Err(_) => return false,
+            Err(_) => false,
         }
     }
 

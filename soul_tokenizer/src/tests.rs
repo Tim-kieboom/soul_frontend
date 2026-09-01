@@ -268,3 +268,19 @@ fn lex_star_star_are_separate_symbols() {
 
     assert_eq!(tokens, expected);
 }
+
+#[test]
+fn lex_number_with_type_suffix() {
+    let tokens = lexer_to_vec("1_u8, 0_u32, 200_u8");
+
+    assert_eq!(
+        tokens,
+        vec![
+            TokenKind::Literal(TokenLiteral::Number(Number::Uint(1))),
+            TokenKind::Symbol(Symbol::Comma),
+            TokenKind::Literal(TokenLiteral::Number(Number::Uint(0))),
+            TokenKind::Symbol(Symbol::Comma),
+            TokenKind::Literal(TokenLiteral::Number(Number::Uint(200))),
+        ]
+    );
+}

@@ -1,10 +1,6 @@
 use ast_model::{
-    AstStore,
-    block::BlockId,
-    expression::{
-        AnyArray, Binding, Constructor, ExpressionId, ExpressionKind, For, ForCondition,
-        FunctionCall, FunctionCalleeKind, If, IfBranch, Lambda, Match, MatchMethod, MatchPattern,
-        StringFormat, StructConstructor, TypeOf, VariableExpression,
+    AstStore, block::BlockId, expression::{
+        AnyArray, Binding, Constructor, ExpressionId, ExpressionKind, FieldAccess, For, ForCondition, FunctionCall, FunctionCalleeKind, If, IfBranch, Lambda, Match, MatchMethod, MatchPattern, StringFormat, StructConstructor, TypeOf, VariableExpression,
     },
 };
 use soul_utils::span::Span;
@@ -73,18 +69,10 @@ impl<'a> NameResolver<'a> {
             ExpressionKind::Constructor(constructor) => self.collect_constructor(constructor),
             ExpressionKind::MatchMethod(match_method) => self.collect_match_methode(match_method),
             ExpressionKind::FieldAccess(field_access) => {
-                if let Some(expr) = self.store.expressions.get(field_access.object) {
-                    if let ExpressionKind::Variable(VariableExpression { name, .. }) = &expr.node {
-                        if self
-                            .scope_info
-                            .scopes
-                            .flat_lookup_type(name.as_str(), self.current.module)
-                            .is_some()
-                        {
-                            return;
-                        }
-                    }
+                if self.field_access_aleady_collected(field_access) {
+                    return;
                 }
+  
                 self.collect_expression(field_access.object)
             }
             ExpressionKind::StringFormat(string_format) => {
@@ -98,6 +86,18 @@ impl<'a> NameResolver<'a> {
             }
             ExpressionKind::Lambda(lambda) => self.collect_lambda(lambda),
         }
+    }
+
+    fn field_access_aleady_collected(&self, field_access: &FieldAccess) -> bool {
+        let Some(value) = self.store.expressions.get(field_access.object) else {
+            return false
+        };
+
+        let ExpressionKind::Variable(VariableExpression { name,.. }) = &value.node else {
+            return false
+        };
+
+        self.scope_info.scopes.flat_lookup_type(name.as_str(), self.current.module).is_some()
     }
 
     fn collect_lambda(&mut self, lambda: &Lambda) {
@@ -246,7 +246,7 @@ impl<'a> NameResolver<'a> {
                 if_condition,
             } => {
                 self.collect_expression(*if_condition);
-                self.collect_match_arm_pattern(&pattern);
+                self.collect_match_arm_pattern(pattern);
             }
             MatchPattern::Tuple(tuple) => {
                 for element in &tuple.elements {
@@ -293,7 +293,6 @@ impl<'a> NameResolver<'a> {
     }
 
     fn collect_if(&mut self, if_: &If) {
-
         self.push_scope(if_.block);
         self.inner_collect_expression(if_.condition);
         self.collect_scopeless_block(if_.block);

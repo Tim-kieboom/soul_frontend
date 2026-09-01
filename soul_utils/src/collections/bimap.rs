@@ -46,15 +46,14 @@ where
 
     /// Inserts a value and allocates a new key, or returns an existing key if the value already exists.
     pub fn insert(&mut self, alloc: &mut IdGenerator<K>, value: V) -> K {
-        match self.value_to_key.get(&value) {
-            Some(id) => return *id,
-            None => {
-                let id = alloc.alloc();
-                self.value_to_key.insert(value.clone(), id);
-                self.key_to_value.insert(id, value);
-                return id;
-            }
+        if let Some(id) = self.value_to_key.get(&value) {
+            return *id;
         }
+
+        let id = alloc.alloc();
+        self.value_to_key.insert(value.clone(), id);
+        self.key_to_value.insert(id, value);
+        id
     }
 
     /// Forces insertion of a key-value pair, overwriting any existing entry for either the key or value.

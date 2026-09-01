@@ -3,8 +3,13 @@ use crate::{
     ast::{
         block::{Block, BlockId},
         expression::{Expression, ExpressionId},
-        statements::{Enum, Function, FunctionSignature, Statement, StatementId, Struct, Trait},
-    }, declare_store::DeclareStore, scope::ScopeBuilder,
+        statements::{
+            Enum, Function, FunctionSignature, InnerFunctionSignature, Statement, StatementId,
+            Struct, Trait,
+        },
+    },
+    declare_store::DeclareStore,
+    scope::ScopeBuilder,
 };
 use soul_utils::{
     CrateContext, FunctionId, Ident,
@@ -15,7 +20,7 @@ use soul_utils::{
     fault::{Fault, FaultCollector},
     ids::IdGenerator,
     linkage::Linkage,
-    span::{ModuleId, Spanned},
+    span::ModuleId,
 };
 use std::{collections::HashMap, path::PathBuf};
 
@@ -34,7 +39,7 @@ pub struct ExternalCrateData {
 
 /// Holds all crate module trees. All modules live in `modules` (flat store).
 /// `external` tracks per-crate metadata for codegen separation.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CrateForest {
     pub store: AstStore,
     pub modules: AstModuleStore,
@@ -67,6 +72,11 @@ impl ScopeInfo {
         self.scopes.add_module(module)
     }
 }
+impl Default for ScopeInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct AstModuleStore {
@@ -76,7 +86,7 @@ pub struct AstModuleStore {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum FunctionKind {
     Normal(Function),
-    Signature(Spanned<FunctionSignature>),
+    Signature(FunctionSignature),
 }
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
@@ -178,11 +188,7 @@ impl AstTree {
 
 impl CrateForest {
     pub fn new() -> Self {
-        Self {
-            store: AstStore::new(),
-            modules: AstModuleStore::default(),
-            external: HashMap::new(),
-        }
+        Self::default()
     }
 
     pub fn modules(&self) -> &AstModuleStore {
@@ -221,22 +227,22 @@ impl AstModuleStore {
 }
 
 impl FunctionKind {
-    pub fn signature(&self) -> &Spanned<FunctionSignature> {
+    pub fn signature(&self) -> &InnerFunctionSignature {
         match self {
-            FunctionKind::Normal(function) => &function.signature,
-            FunctionKind::Signature(function_signature) => function_signature,
+            FunctionKind::Normal(function) => &function.signature.value,
+            FunctionKind::Signature(function_signature) => &function_signature.value,
         }
     }
 
-    pub fn signature_mut(&mut self) -> &mut Spanned<FunctionSignature> {
+    pub fn signature_mut(&mut self) -> &mut InnerFunctionSignature {
         match self {
-            FunctionKind::Normal(function) => &mut function.signature,
-            FunctionKind::Signature(function_signature) => function_signature,
+            FunctionKind::Normal(function) => &mut function.signature.value,
+            FunctionKind::Signature(function_signature) => &mut function_signature.value,
         }
     }
 
     pub fn node_id(&self) -> NodeId {
-        self.signature().value.node_id
+        self.signature().node_id
     }
 }
 
@@ -256,7 +262,7 @@ impl AstStore {
     }
 
     pub fn insert_function(&mut self, function: FunctionKind) -> FunctionId {
-        let id = function.signature().value.id;
+        let id = function.signature().id;
         self.functions.insert(id, function);
         id
     }

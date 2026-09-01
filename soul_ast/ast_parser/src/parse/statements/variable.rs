@@ -14,8 +14,8 @@ use soul_utils::{
 use crate::{
     parser::Parser,
     utils::{
-        ASSIGN, COLON, COLON_ASSIGN, COMMA, CURLY_CLOSE, CURLY_OPEN, DOUBLE_DOT, ROUND_CLOSE,
-        ROUND_OPEN, STAMENT_END_TOKENS,
+        COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, DOUBLE_DOT, ROUND_CLOSE, ROUND_OPEN,
+        STAMENT_END_TOKENS,
     },
 };
 
@@ -32,7 +32,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         // Error: `mut` is not allowed on compound patterns
         if modifier != TypeModifier::Immut && !matches!(pattern, VarPattern::Simple { .. }) {
             return Err(Fault::error(
-                format!("'{MUT_STR}' modifier cannot be applied to compound patterns; use per-binding '{MUT_STR}' instead (e.g., ({MUT_STR} a, b))", ),
+                format!(
+                    "'{MUT_STR}' modifier cannot be applied to compound patterns; use per-binding '{MUT_STR}' instead (e.g., ({MUT_STR} a, b))",
+                ),
                 Some(pattern_start),
             ));
         }
@@ -67,7 +69,17 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         if ty.is_some() && assign_type.is_none() {
-            return Err(self.get_expect_any_error(&[COLON_ASSIGN, ASSIGN]));
+            return Ok(Statement::new_variable(
+                Variable {
+                    id: self.alloc_node(),
+                    is_public: false,
+                    pattern,
+                    ty,
+                    modifier,
+                    initialize_value: None,
+                },
+                self.span_combine(pattern_start),
+            ));
         }
 
         let assign_type = match assign_type {
@@ -232,9 +244,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            let modifier = self
-                .try_bump_mut()
-                .unwrap_or(TypeModifier::Immut);
+            let modifier = self.try_bump_mut().unwrap_or(TypeModifier::Immut);
 
             let field = self.try_bump_consume_ident()?;
 
@@ -288,9 +298,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            let modifier = self
-                .try_bump_mut()
-                .unwrap_or(TypeModifier::Immut);
+            let modifier = self.try_bump_mut().unwrap_or(TypeModifier::Immut);
 
             let field = self.try_bump_consume_ident()?;
 

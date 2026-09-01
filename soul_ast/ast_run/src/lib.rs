@@ -18,7 +18,7 @@ pub struct AstRequest<'a> {
     pub crate_store: &'a CrateStore,
 }
 
-pub fn to_ast<'a, 'f>(
+pub fn to_ast<'a>(
     tokens: TokenStream<'a>,
     request: AstRequest<'a>,
     _options: &CompilerOptions,

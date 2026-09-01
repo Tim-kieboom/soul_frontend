@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
 use crate::{
-    CustomType, NodeId, soul_type::SoulType, statements::{Enum, FunctionSignature, Struct, Trait},
+    CustomType, NodeId,
+    soul_type::SoulType,
+    statements::{Enum, InnerFunctionSignature, Struct, Trait},
 };
 use soul_utils::{FunctionId, TypeModifier, collections::vec_map::VecMap, span::ModuleId};
 
@@ -17,7 +19,7 @@ pub struct DeclareStore {
     /// All structs declarations, indexed by their ID.
     custom_types: VecMap<NodeId, (CustomType, ModuleId)>,
     /// All function declarations, indexed by their ID.
-    functions: VecMap<FunctionId, (FunctionSignature, ModuleId)>,
+    functions: VecMap<FunctionId, (InnerFunctionSignature, ModuleId)>,
     /// All function declarations, indexed by their ID.
     function_names: HashMap<String, Vec<FunctionId>>,
     /// Variable type information, indexed by node ID.
@@ -41,7 +43,7 @@ impl DeclareStore {
     pub fn insert_functions(
         &mut self,
         index: FunctionId,
-        function: FunctionSignature,
+        function: InnerFunctionSignature,
         module: ModuleId,
     ) {
         if let Some(entries) = self.function_names.get_mut(function.name.as_str()) {
@@ -54,7 +56,7 @@ impl DeclareStore {
     }
 
     /// Retrieves a function by its ID.
-    pub fn get_function(&self, index: FunctionId) -> Option<&(FunctionSignature, ModuleId)> {
+    pub fn get_function(&self, index: FunctionId) -> Option<&(InnerFunctionSignature, ModuleId)> {
         self.functions.get(index)
     }
 
@@ -150,7 +152,7 @@ impl DeclareStore {
         None
     }
 
-    pub fn functions(&self) -> &VecMap<FunctionId, (FunctionSignature, ModuleId)> {
+    pub fn functions(&self) -> &VecMap<FunctionId, (InnerFunctionSignature, ModuleId)> {
         &self.functions
     }
 

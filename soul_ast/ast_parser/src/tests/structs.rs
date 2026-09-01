@@ -1,4 +1,7 @@
-use ast_model::{soul_type::SoulType, statements::StatementKind};
+use ast_model::{
+    soul_type::SoulType,
+    statements::{Function, StatementKind, VarPattern},
+};
 use soul_utils::fault::Severity;
 
 use crate::tests::{get_statement, parse};
@@ -94,6 +97,77 @@ fn struct_with_public_field() {
         struct_.fields[0].value.modifier,
         soul_utils::TypeModifier::Mut
     );
+}
+
+#[test]
+fn struct_with_bare_typed_fields() {
+    let (module, store, context) = parse("struct Foo { x: int\nlen: uint }");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let struct_ = match &stmt.node {
+        StatementKind::Struct(s) => s,
+        _ => panic!("expected Struct"),
+    };
+    assert_eq!(struct_.fields.len(), 2);
+    assert_eq!(struct_.fields[0].value.name().unwrap().as_str(), "x");
+    assert_eq!(struct_.fields[1].value.name().unwrap().as_str(), "len");
+    assert!(struct_.fields[0].value.initialize_value.is_none());
+    assert!(struct_.fields[1].value.initialize_value.is_none());
+}
+
+#[test]
+fn bare_typed_variable_declaration() {
+    let (module, store, context) = parse("x: int");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let variable = match &stmt.node {
+        StatementKind::Variable(v) => v,
+        _ => panic!("expected Variable"),
+    };
+    assert!(
+        matches!(&variable.pattern, VarPattern::Simple { binding, .. } if binding.ident.as_str() == "x")
+    );
+    assert!(variable.initialize_value.is_none());
+}
+
+#[test]
+fn struct_with_expression_bodied_method() {
+    let (module, store, context) = parse("struct Foo {\npub len(&this): uint => this.len\n}");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let struct_ = match &stmt.node {
+        StatementKind::Struct(s) => s,
+        _ => panic!("expected Struct"),
+    };
+    assert_eq!(struct_.statements.len(), 1);
+    let func_id = match &store.statements[struct_.statements[0]].node {
+        StatementKind::Function(id) => *id,
+        _ => panic!("expected Function in struct body"),
+    };
+    let func = &store.functions[func_id];
+    let Function { signature, .. } = match func {
+        ast_model::FunctionKind::Normal(f) => f,
+        _ => panic!("expected Normal function"),
+    };
+    assert_eq!(signature.value.name.as_str(), "len");
 }
 
 #[test]

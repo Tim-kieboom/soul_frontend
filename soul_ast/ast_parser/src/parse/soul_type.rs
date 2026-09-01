@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use ast_model::soul_type::{
     ArrayKind, ArrayType, NamedTuple, ReferenceType, SoulType, Stub, Tuple, TupleKind,
 };
@@ -38,12 +40,12 @@ impl<'a, 'f> Parser<'a, 'f> {
             return SoulType::None;
         };
 
-        if let Some(prim) = PrimitiveTypes::from_str(ident.as_str()) {
+        if let Ok(prim) = PrimitiveTypes::from_str(ident.as_str()) {
             return SoulType::Primitive(prim);
         }
 
         SoulType::Stub(Stub {
-            name: ident.into_string(),
+            name: ident.into_boxstr(),
             generics,
         })
     }
@@ -212,14 +214,14 @@ impl<'a, 'f> Parser<'a, 'f> {
         };
 
         let ident = self.try_bump_consume_ident().try_not_value()?;
-        if let Some(keyword) = KeyWord::from_str(ident.as_str()) {
+        if let Ok(keyword) = KeyWord::from_str(ident.as_str()) {
             return TryNotValue(Fault::error(
                 format!("keyword '{}' can not be type", keyword.as_str()),
                 Some(ident.span()),
             ));
         }
 
-        if let Some(prim) = PrimitiveTypes::from_str(ident.as_str()) {
+        if let Ok(prim) = PrimitiveTypes::from_str(ident.as_str()) {
             return TryOk(SoulType::Primitive(prim));
         }
 
@@ -230,7 +232,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         };
 
         TryOk(SoulType::Stub(Stub {
-            name: ident.into_string(),
+            name: ident.into_boxstr(),
             generics,
         }))
     }

@@ -181,6 +181,6 @@ impl<'a> NameResolver<'a> {
         self.scope_info
             .scopes
             .current_scope_mut(self.current.module)
-            .expect(&format!("{:?} has no scope", self.current.module))
+            .unwrap_or_else(|| panic!("{:?} has no scope", self.current.module))
     }
 }

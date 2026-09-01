@@ -63,7 +63,7 @@ impl<'a> NameResolver<'a> {
             ExpressionKind::TypeOf(type_of) => self.resolve_expression(type_of.value),
             ExpressionKind::Array(any_array) => self.resolve_any_array(any_array),
             ExpressionKind::Variable(variable) => {
-                self.resolve_variable_expression(&variable);
+                self.resolve_variable_expression(variable);
             }
             ExpressionKind::NewArray(any_array) => self.resolve_any_array(any_array),
             ExpressionKind::Return(expression_id) => {
@@ -125,17 +125,21 @@ impl<'a> NameResolver<'a> {
     }
 
     fn resolve_field_access(&mut self, field_access: &FieldAccess) {
-        if let Some(expr) = self.store.expressions.get(field_access.object) {
-            if let ExpressionKind::Variable(VariableExpression { name, .. }) = &expr.node {
-                let name_str = name.as_str();
-                if self.contains_type(name_str)
-                    || self.lookup_module(name_str).is_some()
-                    || self.is_crate_name(name_str)
-                {
-                    return;
-                }
+        let Some(expr) = self.store.expressions.get(field_access.object) else {
+            self.resolve_expression(field_access.object);
+            return
+        };
+
+        if let ExpressionKind::Variable(VariableExpression { name, .. }) = &expr.node {
+            let name_str = name.as_str();
+            if self.contains_type(name_str)
+                || self.lookup_module(name_str).is_some()
+                || self.is_crate_name(name_str)
+            {
+                return;
             }
         }
+
         self.resolve_expression(field_access.object);
     }
 

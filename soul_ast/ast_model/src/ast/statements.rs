@@ -5,7 +5,12 @@ use crate::{
     soul_type::{Generic, SoulType},
 };
 use soul_utils::{
-    FunctionId, Ident, TypeModifier, bitflags, collections::soul_import_path::SoulImportPath, error::SoulResult, fault::Fault, impl_soul_ids, soul_error_internal, span::{ItemMetaData, Span, Spanned},
+    FunctionId, Ident, TypeModifier, bitflags,
+    collections::soul_import_path::SoulImportPath,
+    error::SoulResult,
+    fault::Fault,
+    impl_soul_ids, soul_error_internal,
+    span::{ItemMetaData, Span, Spanned},
 };
 
 impl_soul_ids!(StatementId);
@@ -279,22 +284,32 @@ pub struct Assignment {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Function {
     /// The function's signature (name, parameters, return type, etc.).
-    pub signature: Spanned<FunctionSignature>,
+    pub signature: FunctionSignature,
     /// The function's body block.
     pub block: BlockId,
 }
 
-bitflags!{
+bitflags! {
     #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
     pub struct FunctionModifier: u8 {
         PUBLIC    = 1 << 0,
         ASYNC     = 1 << 1,
         CONST     = 1 << 2,
-    } 
+    }
+}
+
+pub type FunctionSignature = Box<Spanned<InnerFunctionSignature>>;
+pub trait FunctionSignatureHelper {
+    fn with_span(value: InnerFunctionSignature, span: Span) -> Self;
+}
+impl FunctionSignatureHelper for FunctionSignature {
+    fn with_span(value: InnerFunctionSignature, span: Span) -> Self {
+        Self::new(Spanned::new(value, span))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct FunctionSignature {
+pub struct InnerFunctionSignature {
     pub id: FunctionId,
     pub node_id: NodeId,
     pub modifier: FunctionModifier,
@@ -473,18 +488,14 @@ impl Statement {
         self.is_public
     }
 
-    pub fn try_set_async(
-        &mut self,
-        store: &mut AstStore,
-        span: Span,
-    ) -> SoulResult<()> {
+    pub fn try_set_async(&mut self, store: &mut AstStore, span: Span) -> SoulResult<()> {
         match &mut self.node {
             StatementKind::Function(id) | StatementKind::ExternalFunction(id) => {
                 let kind = store.functions.get_mut(*id).ok_or(soul_error_internal!(
                     format!("{id:?} not found"),
                     Some(span)
                 ))?;
-                kind.signature_mut().value.modifier |= FunctionModifier::ASYNC;
+                kind.signature_mut().modifier |= FunctionModifier::ASYNC;
                 Ok(())
             }
             _ => Err(Fault::error(
@@ -512,7 +523,7 @@ impl Statement {
                     format!("{id:?} not found"),
                     Some(span)
                 ))?;
-                kind.signature_mut().value.modifier |= FunctionModifier::PUBLIC;
+                kind.signature_mut().modifier |= FunctionModifier::PUBLIC;
                 self.is_public = is_public;
             }
 

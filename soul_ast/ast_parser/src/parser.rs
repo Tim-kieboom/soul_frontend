@@ -6,9 +6,7 @@ use ast_model::{
 use soul_tokenizer::TokenStream;
 #[cfg(debug_assertions)]
 use soul_tokenizer::model::Token;
-use soul_utils::{
-    CrateContext, collections::vec_set::VecSet, ids::IdAlloc, soul_error_internal,
-};
+use soul_utils::{CrateContext, collections::vec_set::VecSet, ids::IdAlloc, soul_error_internal};
 use soul_utils::{
     collections::{crate_store::CrateStore, module_store::ModuleStore},
     span::ModuleId,
@@ -25,14 +23,9 @@ pub(crate) struct DebugViewer {
     pub(crate) current: Token,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub(crate) struct Current {
     pub(crate) this_type: Option<SoulType>,
-}
-impl Default for Current {
-    fn default() -> Self {
-        Self { this_type: None }
-    }
 }
 
 /// Recursive descent parser that builds AST from token stream.

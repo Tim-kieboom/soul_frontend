@@ -147,7 +147,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             let name = self.try_bump_consume_ident()?;
             methods.push(
                 self.try_parse_function_declaration_id(start_span, method_type, is_const, name)
-                    .map_try_not_value(|(_, err)| err)
+                    .map_try_not_value(|err| err.fault)
                     .merge_to_result()?
                     .value,
             );
@@ -170,7 +170,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let name = self.try_bump_consume_ident()?;
         self.try_parse_function_declaration_id(start_span, ty, is_const, name)
             .map(|spanned| Methode::new(spanned.value, is_public))
-            .map_try_not_value(|(_, err)| err)
+            .map_try_not_value(|err| err.fault)
             .merge_to_result()
     }
 }

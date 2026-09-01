@@ -73,7 +73,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             TokenKind::Ident(ident) => match ident.as_str() {
                 AS_STR => {
                     self.bump();
-                    let alias = self.try_bump_consume_ident()?.into();
+                    let alias = self.try_bump_consume_ident()?;
                     ImportKind::Alias(alias)
                 }
                 _ => ImportKind::Module,

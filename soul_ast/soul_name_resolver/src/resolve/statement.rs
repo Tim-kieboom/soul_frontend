@@ -88,7 +88,7 @@ impl<'a> NameResolver<'a> {
         };
 
         let prev = self.current.function;
-        let signature = &function_kind.signature().value;
+        let signature = &function_kind.signature();
         self.current.function = Some(signature.id);
         for parameter in &signature.parameters {
             if let Some(default) = &parameter.default {
@@ -97,7 +97,7 @@ impl<'a> NameResolver<'a> {
         }
 
         self.declares
-            .insert_functions(signature.id, signature.clone(), self.current.module);
+            .insert_functions(signature.id, (*signature).clone(), self.current.module);
 
         match function_kind {
             FunctionKind::Signature(_) => (),

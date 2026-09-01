@@ -1,5 +1,11 @@
 use anyhow::Result;
-use soul_utils::{collections::{module_store::ModuleStore, vec_map::{VecMap, VecMapIndex}}, fault::Fault};
+use soul_utils::{
+    collections::{
+        module_store::ModuleStore,
+        vec_map::{VecMap, VecMapIndex},
+    },
+    fault::Fault,
+};
 use std::{
     fmt::Debug,
     fs::{File, OpenOptions},
@@ -7,7 +13,10 @@ use std::{
     path::Path,
 };
 
-use crate::{config, display::{fault::display_fault, writer::Writer}};
+use crate::{
+    config,
+    display::{fault::display_fault, writer::Writer},
+};
 
 pub(crate) mod ast;
 pub(crate) mod benchmark;
@@ -31,7 +40,7 @@ fn write_create_file(path: &Path) -> Result<File> {
         .create(true)
         .write(true)
         .truncate(true)
-        .open(&path)
+        .open(path)
         .map_err(|err| anyhow::anyhow!("Failed to create output file({path:?}): {}", err))
 }
 
@@ -54,7 +63,7 @@ pub(crate) fn fault_to_anyhow_error(fault: &Fault, module_store: &ModuleStore) -
     let mut message = String::new();
     if let Err(err) = display_fault(fault, module_store, &config::PRINT_CONFIGS, &mut message) {
         err
-    } else  {
+    } else {
         anyhow::Error::msg(message)
     }
 }

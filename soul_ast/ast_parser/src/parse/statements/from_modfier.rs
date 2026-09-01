@@ -5,20 +5,26 @@ use ast_model::{
 };
 use soul_tokenizer::model::TokenKind;
 use soul_utils::{
-    Ident, TypeModifier, collections::try_result::{
+    Ident, TypeModifier,
+    collections::try_result::{
         ResultMapNotValue, ResultTryErr, ToResult, TryErr, TryError, TryNotValue, TryOk, TryResult,
-    }, error::SoulResult, fault::Fault, soul_names::Symbol, span::Span,
+    },
+    error::SoulResult,
+    fault::Fault,
+    soul_names::Symbol,
+    span::Span,
 };
 
 use crate::{
-    parse::statements::{try_assign_type, variable::AssignType}, parser::Parser, utils::{ARROW_LEFT, COLON, CONST, CURLY_OPEN, MUT, ROUND_OPEN, SEMI_COLON, STAMENT_END_TOKENS},
+    parse::statements::{try_assign_type, variable::AssignType},
+    parser::Parser,
+    utils::{
+        ARROW_LEFT, COLON, CONST, CURLY_OPEN, MUT, ROUND_OPEN, SEMI_COLON, STAMENT_END_TOKENS,
+    },
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
-    pub(super) fn try_parse_from_mut(
-        &mut self,
-        start_span: Span
-    ) -> SoulResult<Statement> {
+    pub(super) fn try_parse_from_mut(&mut self, start_span: Span) -> SoulResult<Statement> {
         self.expect(&MUT)?;
         let modifier = TypeModifier::Mut;
 
@@ -77,12 +83,9 @@ impl<'a, 'f> Parser<'a, 'f> {
             variable,
             self.span_combine(start_span),
         ))
-    } 
+    }
 
-    pub(super) fn try_parse_from_const(
-        &mut self,
-        start_span: Span,
-    ) -> SoulResult<Statement> {
+    pub(super) fn try_parse_from_const(&mut self, start_span: Span) -> SoulResult<Statement> {
         self.expect(&CONST)?;
         let modifier = TypeModifier::Const;
         const IS_CONST: bool = true;
@@ -93,22 +96,19 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         if self.current_is(&CURLY_OPEN) {
-            return self.try_parse_named_tuple_or_block(modifier, start_span)
+            return self
+                .try_parse_named_tuple_or_block(modifier, start_span)
                 .merge_to_result();
         }
 
         let name = self.try_bump_consume_ident()?;
         match &self.token().kind {
-            &CURLY_OPEN => {
-                self.try_parse_constructor_declaration(name, modifier, start_span)
-            },
-            &ROUND_OPEN | &ARROW_LEFT => {
-                self
-                    .try_parse_function_declaration_id(start_span, &SoulType::None, IS_CONST, name)
-                    .map(Statement::from_function)
-                    .map_try_not_value(|(_, err)| err)
-                    .merge_to_result()
-            },
+            &CURLY_OPEN => self.try_parse_constructor_declaration(name, modifier, start_span),
+            &ROUND_OPEN | &ARROW_LEFT => self
+                .try_parse_function_declaration_id(start_span, &SoulType::None, IS_CONST, name)
+                .map(Statement::from_function)
+                .map_try_not_value(|err| err.fault)
+                .merge_to_result(),
             TokenKind::Symbol(Symbol::DoubleColon) => {
                 self.bump();
                 let value = self.parse_expression_id(STAMENT_END_TOKENS)?;
@@ -126,7 +126,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                     },
                     self.span_combine(start_span),
                 ))
-            },
+            }
             _ => {
                 let pattern = VarPattern::Simple {
                     modifier,
@@ -197,7 +197,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             return TryNotValue(());
         };
 
-        let Some(assign) = try_assign_type(&self.token()) else {
+        let Some(assign) = try_assign_type(self.token()) else {
             return TryNotValue(());
         };
 
@@ -221,7 +221,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 .try_err();
         }
 
-        return TryNotValue(());
+        TryNotValue(())
     }
 
     /// Try constructor destructuring: `TypeName{field1, field2} = expr`.

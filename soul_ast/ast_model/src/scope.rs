@@ -114,6 +114,11 @@ impl ScopeBuilder {
         Some(self.scopes.get(module)?.modules())
     }
 }
+impl Default for ScopeBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ModuleScopes {
@@ -220,16 +225,14 @@ impl ModuleScopes {
 
     fn modules(&self) -> impl Iterator<Item = (&std::string::String, &ScopeModuleEntry)> {
         self.scope_iter()
-            .map(|scope| {
+            .flat_map(|scope| {
                 scope
                     .entries
                     .iter()
-                    .filter_map(|(name, entry)| match &entry.module {
-                        Some(module) => Some((name, module)),
-                        None => None,
-                    })
+                    .filter_map(|(name, entry)| 
+                        entry.module.as_ref().map(|module| (name, module))
+                    )
             })
-            .flatten()
     }
 
     fn scope_iter<'a>(&'a self) -> ScopeIterator<'a> {

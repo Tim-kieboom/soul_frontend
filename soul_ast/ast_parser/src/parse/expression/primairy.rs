@@ -1,10 +1,12 @@
+use std::str::FromStr;
+
 use ast_model::{
     expression::{Array, Expression, ExpressionId, ExpressionKind, StringFormat},
     literal::Literal,
 };
 use soul_tokenizer::model::{StringFormatTag, TokenKind, keyword::KeyWord};
 use soul_utils::{
-    TypeModifier,
+    Ident, TypeModifier,
     collections::try_result::TryError,
     error::SoulResult,
     fault::Fault,
@@ -69,6 +71,11 @@ impl<'a, 'f> Parser<'a, 'f> {
                 Expression::from_array(Spanned::new(arr, start_span))
             }
             TokenKind::Ident(_) => self.parse_primary_ident(end_tokens, start_span)?,
+            TokenKind::Types(types) => {
+                let name = types.as_str().to_string();
+                self.bump();
+                Expression::new_variable(self.alloc_node(), Ident::new(name, start_span))
+            }
             TokenKind::Keyword(keyword) => {
                 let kw = *keyword;
                 match self.parse_keyword_primary(start_span, kw)? {
@@ -347,8 +354,8 @@ impl<'a, 'f> Parser<'a, 'f> {
     fn parse_primary_keyword(&mut self, start_span: Span) -> SoulResult<Option<Expression>> {
         let ident = self.try_token_as_ident_str()?;
         match KeyWord::from_str(ident) {
-            Some(keyword) => self.parse_keyword_primary(start_span, keyword),
-            None => Ok(None),
+            Ok(keyword) => self.parse_keyword_primary(start_span, keyword),
+            _ => Ok(None),
         }
     }
 }

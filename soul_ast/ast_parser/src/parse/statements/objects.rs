@@ -139,10 +139,10 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
 
             let ident = self.try_bump_consume_ident()?;
-            let variant = match &self.token().kind {
-                &ROUND_OPEN => self.parse_enum_tuple_union(ident)?,
-                &CURLY_OPEN => self.parse_enum_named_union(ident)?,
-                &ASSIGN => self.parse_enum_assign(ident)?,
+            let variant = match self.token().kind {
+                ROUND_OPEN => self.parse_enum_tuple_union(ident)?,
+                CURLY_OPEN => self.parse_enum_named_union(ident)?,
+                ASSIGN => self.parse_enum_assign(ident)?,
                 _ => EnumVariant::Normal(ident),
             };
 

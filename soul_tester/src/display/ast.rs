@@ -5,15 +5,23 @@ use std::{
 };
 
 use crate::{
-    config, display::{vecmap_to_pretty_vec, write_create_file, write_to_file, writer::Writer}, push_fmt,
+    config,
+    display::{vecmap_to_pretty_vec, write_create_file, write_to_file, writer::Writer},
+    push_fmt,
 };
 use anyhow::Result;
 use ast_model::{
-    AstStore, AstTree, ExternalCrateData, FunctionKind, block::BlockId, expression::{
+    AstStore, AstTree, ExternalCrateData, FunctionKind,
+    block::BlockId,
+    expression::{
         AnyArray, ExpressionId, ExpressionKind, ForCondition, FunctionCalleeKind, IfBranch, Lambda,
         MatchPattern, TypeofKind,
-    }, soul_type::{ArrayKind, Generic, SoulType, TupleKind}, statements::{
-        Assignment, Enum, EnumVariant, FunctionModifier, FunctionThisKind, ImplBlock, Import, ImportItem, ImportKind, Parameter, Statement, StatementId, StatementKind, Struct, Trait, TypeDef, UnionKind, UseBlock, VarPattern, Variable,
+    },
+    soul_type::{ArrayKind, Generic, SoulType, TupleKind},
+    statements::{
+        Assignment, Enum, EnumVariant, FunctionModifier, FunctionThisKind, ImplBlock, Import,
+        ImportItem, ImportKind, Parameter, Statement, StatementId, StatementKind, Struct, Trait,
+        TypeDef, UnionKind, UseBlock, VarPattern, Variable,
     },
 };
 use soul_tokenizer::model::{
@@ -21,7 +29,12 @@ use soul_tokenizer::model::{
     types::Types,
 };
 use soul_utils::{
-    FunctionId, TypeModifier, collections::vec_map::{VecMap, VecMapIndex}, ids::IdAlloc, linkage::Linkage, soul_names::{PrimitiveTypes, Symbol}, span::ModuleId,
+    FunctionId, TypeModifier,
+    collections::vec_map::{VecMap, VecMapIndex},
+    ids::IdAlloc,
+    linkage::Linkage,
+    soul_names::{PrimitiveTypes, Symbol},
+    span::ModuleId,
 };
 
 const IF_STR: &str = KeyWord::If.as_str();
@@ -68,7 +81,7 @@ fn inner_display_ast(tree: &AstTree) -> Result<()> {
 
     let modules = vecmap_to_json_str(tree.crates.modules.as_vecmap())?;
     let externals = serde_json::to_string_pretty(&tree.crates.external)?;
-    let scope_info = vecmap_to_json_str(&tree.scope_info.scopes.as_vecmap())?;
+    let scope_info = vecmap_to_json_str(tree.scope_info.scopes.as_vecmap())?;
 
     let blocks = vecmap_to_json_str(&tree.crates.store.blocks)?;
     let functions = vecmap_to_json_str(&tree.crates.store.functions)?;
@@ -98,12 +111,12 @@ where
     Ok(str)
 }
 
-fn display_ast_tree<'a>(ast: &AstTree, root_dir: &Path, writer: &mut impl Writer) -> Result<()> {
+fn display_ast_tree(ast: &AstTree, root_dir: &Path, writer: &mut impl Writer) -> Result<()> {
     let mut displayer = Displayer::new(ast, root_dir, &ast.crates.store, writer);
     displayer.write_crate_overview()?;
     displayer.write_entry(ast.root)?;
     for (name, data) in &ast.crates.external {
-        displayer.write_external(name, data)?        
+        displayer.write_external(name, data)?
     }
     writer.writer_flush()?;
     Ok(())
@@ -171,7 +184,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
     fn write_external(&mut self, name: &str, data: &ExternalCrateData) -> Result<()> {
         self.write_endln()?;
         self.write_depth()?;
-        
+
         self.push_fmt(format_args!("{} {name} {{", KeyWord::Crate.as_str()))?;
 
         self.push_depth();
@@ -180,7 +193,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
             self.write_module(module_id)?;
             self.write_endln()?;
         }
-        
+
         self.pop_depth();
         self.write_endln()?;
         self.write_depth()?;
@@ -190,7 +203,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
     fn write_module(&mut self, id: ModuleId) -> Result<()> {
         let module = self.ast.crates.modules.as_vecmap().get_err(id)?;
         if self.add_tags {
-            self.push_fmt(format_args!("// {id:?}\n"), )?;
+            self.push_fmt(format_args!("// {id:?}\n"))?;
         }
 
         self.write_depth()?;
@@ -276,7 +289,9 @@ impl<'a, W: Writer> Displayer<'a, W> {
     fn write_statement_tag(&mut self, statement: &Statement) -> Result<()> {
         self.push_str("// ")?;
         match &statement.node {
-            StatementKind::Expression { expression, .. } => self.write_expression_tag(*expression)?,
+            StatementKind::Expression { expression, .. } => {
+                self.write_expression_tag(*expression)?
+            }
             _ => self.push_str(statement.node.variant_name())?,
         }
 
@@ -285,9 +300,11 @@ impl<'a, W: Writer> Displayer<'a, W> {
         }
 
         match &statement.node {
-            StatementKind::Variable(variable) => if let Some(value) = variable.initialize_value {
-                self.push_str("= ")?;
-                self.write_expression_tag(value)?
+            StatementKind::Variable(variable) => {
+                if let Some(value) = variable.initialize_value {
+                    self.push_str("= ")?;
+                    self.write_expression_tag(value)?
+                }
             }
             StatementKind::Assignment(assignment) => {
                 self.write_expression_tag(assignment.left)?;
@@ -297,22 +314,27 @@ impl<'a, W: Writer> Displayer<'a, W> {
             StatementKind::Expression { expression, .. } => {
                 let value = self.store.expressions.get_err(*expression)?;
                 match &value.node {
-                    ExpressionKind::FunctionCall(function_call) => if let Some(resolved) = self.ast.declares.get_call_resolve(function_call.id) {
-                        self.push_fmt(format_args!(" resolved = {resolved:?}"))?
-                    } else {
-                        self.push_str(" resolved = null")?
+                    ExpressionKind::FunctionCall(function_call) => {
+                        if let Some(resolved) = self.ast.declares.get_call_resolve(function_call.id)
+                        {
+                            self.push_fmt(format_args!(" resolved = {resolved:?}"))?
+                        } else {
+                            self.push_str(" resolved = null")?
+                        }
                     }
-                    ExpressionKind::Variable(variable) => if let Some(resolved) = self.ast.declares.get_variable_resolve(variable.id) {
-                        self.push_fmt(format_args!(" resolved = {resolved:?}"))?
-                    } else {
-                        self.push_str(" resolved = null")?
+                    ExpressionKind::Variable(variable) => {
+                        if let Some(resolved) = self.ast.declares.get_variable_resolve(variable.id)
+                        {
+                            self.push_fmt(format_args!(" resolved = {resolved:?}"))?
+                        } else {
+                            self.push_str(" resolved = null")?
+                        }
                     }
                     _ => (),
                 }
             }
             _ => (),
         }
-        
 
         self.write_endln()?;
         self.write_depth()
@@ -382,7 +404,6 @@ impl<'a, W: Writer> Displayer<'a, W> {
     }
 
     fn write_variable(&mut self, variable: &Variable) -> Result<()> {
-        
         if variable.modifier == TypeModifier::Mut {
             self.push_str(KeyWord::Mut.as_str())?;
             self.push_char(' ')?;
@@ -397,8 +418,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
         if let Some(value) = variable.initialize_value {
             let assign_str = if variable.modifier == TypeModifier::Const {
                 " :: "
-            } 
-            else if variable.ty.is_some() {
+            } else if variable.ty.is_some() {
                 " = "
             } else {
                 " := "
@@ -570,9 +590,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
             match &path.kind {
                 ImportKind::This => self.push_str("this")?,
                 ImportKind::Glob => self.push_char('*')?,
-                ImportKind::Alias(ident) => {
-                    push_fmt!(self, " as {ident}")?
-                }
+                ImportKind::Alias(ident) => push_fmt!(self, " as {ident}")?,
                 ImportKind::Module => (),
                 ImportKind::Items {
                     has_this,
@@ -694,10 +712,11 @@ impl<'a, W: Writer> Displayer<'a, W> {
 
     fn write_any_function(&mut self, id: FunctionId) -> Result<()> {
         let function = self.store.functions.get_err(id)?;
-        let signature = &function.signature().value;
+        let signature = &function.signature();
 
         if let Some(external) = signature.external {
-            push_fmt!(self, 
+            push_fmt!(
+                self,
                 "{} \"{}\" ",
                 KeyWord::Extern.as_str(),
                 external.as_str()
@@ -738,9 +757,10 @@ impl<'a, W: Writer> Displayer<'a, W> {
     fn write_parameters(&mut self, parameters: &[Parameter]) -> Result<()> {
         let last_index = parameters.len().saturating_sub(1);
         for (i, parameter) in parameters.iter().enumerate() {
-            push_fmt!(self, 
+            push_fmt!(
+                self,
                 "{}{}: ",
-                if parameter.is_mut {"mut "} else {""},
+                if parameter.is_mut { "mut " } else { "" },
                 parameter.name.as_str()
             )?;
             self.write_type(&parameter.ty)?;
@@ -925,10 +945,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
                     self.push_char('.')?;
                     self.push_str(arm.variant.as_str())?;
                     if let Some(binding) = &arm.binding {
-                        push_fmt!(self, 
-                            "{{{} {LAMDA_ARROW_STR} ",
-                            binding.ident.as_str()
-                        )?;
+                        push_fmt!(self, "{{{} {LAMDA_ARROW_STR} ", binding.ident.as_str())?;
                         self.write_block(arm.body)?;
                         self.push_char('}')?;
                     } else {
@@ -965,23 +982,24 @@ impl<'a, W: Writer> Displayer<'a, W> {
             }
             ExpressionKind::Block(block_id) => self.write_block(*block_id),
             ExpressionKind::TypeOf(type_of) => {
+                if matches!(type_of.kind, TypeofKind::Value) {
+                    self.write_expression(type_of.value)?;
+                    self.push_str(Symbol::Dot.as_str())?;
+                    self.push_str(KeyWord::Typeof.as_str())?;
+                    return Ok(());
+                }
                 self.write_expression(type_of.value)?;
                 push_fmt!(self, " {TYPEOF_STR} ")?;
                 match &type_of.kind {
                     TypeofKind::Null => self.push_str(KeyWord::Null.as_str())?,
-                    TypeofKind::NotNull => push_fmt!(self, 
-                        "{}{}",
-                        Symbol::Not.as_str(),
-                        KeyWord::Null.as_str(),
-                    )?,
+                    TypeofKind::NotNull => {
+                        push_fmt!(self, "{}{}", Symbol::Not.as_str(), KeyWord::Null.as_str(),)?
+                    }
+                    TypeofKind::Value => unreachable!(),
                     TypeofKind::Union {
                         type_name,
                         variant_name,
-                    } => push_fmt!(self, 
-                        "{}.{}",
-                        type_name.as_str(),
-                        variant_name.as_str(),
-                    )?,
+                    } => push_fmt!(self, "{}.{}", type_name.as_str(), variant_name.as_str(),)?,
                 };
                 Ok(())
             }
@@ -1062,11 +1080,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
             }
             MatchPattern::Null => self.push_str(KeyWord::Null.as_str()),
             MatchPattern::NotNull(binding) => {
-                push_fmt!(self, 
-                    "{}{}(",
-                    Symbol::Not.as_str(),
-                    KeyWord::Null.as_str()
-                )?;
+                push_fmt!(self, "{}{}(", Symbol::Not.as_str(), KeyWord::Null.as_str())?;
                 self.push_str(binding.ident.as_str())?;
                 self.push_char(')')
             }
@@ -1085,11 +1099,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 self.push_char(']')
             }
             MatchPattern::Constructor(ctor) => {
-                push_fmt!(self, 
-                    "{}.{}",
-                    ctor.type_name,
-                    ctor.variant_name
-                )?;
+                push_fmt!(self, "{}.{}", ctor.type_name, ctor.variant_name)?;
                 if let Some(binding) = &ctor.binding {
                     push_fmt!(self, "({binding})")?;
                 }
@@ -1262,7 +1272,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
             }
             SoulType::Optional(soul_type) => {
                 self.push_char('?')?;
-                self.write_type(&soul_type)
+                self.write_type(soul_type)
             }
             SoulType::ImplTrait(inner) => {
                 self.push_str("impl ")?;
@@ -1317,10 +1327,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 }
                 push_fmt!(self, "{FOR_STR} ")?;
                 if let Some(binding) = &array.for_index {
-                    push_fmt!(self, 
-                        "{} {IN_FOR_LOOP_STR} ",
-                        binding.ident.as_str()
-                    )?;
+                    push_fmt!(self, "{} {IN_FOR_LOOP_STR} ", binding.ident.as_str())?;
                 }
                 self.write_expression(array.amount)?;
                 push_fmt!(self, " {LAMDA_ARROW_STR} ")?;
@@ -1330,7 +1337,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
         }
     }
 
-    fn write_generic_defines(&mut self, generics: &Vec<Generic>) -> Result<()> {
+    fn write_generic_defines(&mut self, generics: &[Generic]) -> Result<()> {
         if generics.is_empty() {
             return Ok(());
         }
@@ -1351,7 +1358,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
         self.push_char('>')
     }
 
-    fn write_generic_types(&mut self, generics: &Vec<SoulType>) -> Result<()> {
+    fn write_generic_types(&mut self, generics: &[SoulType]) -> Result<()> {
         if generics.is_empty() {
             return Ok(());
         }
@@ -1408,7 +1415,7 @@ impl<I: VecMapIndex + Debug + Clone, V> GetErr<I, V> for VecMap<I, V> {
     fn get_err(&self, index: I) -> Result<&V> {
         self.get(index.clone()).ok_or(anyhow::Error::msg(format!(
             "{index:?} is not found; {}\n",
-            Backtrace::force_capture().to_string()
+            Backtrace::force_capture()
         )))
     }
 }

@@ -156,7 +156,7 @@ fn use_block_with_generic_type() {
     assert_eq!(
         use_block.ty,
         SoulType::Stub(Stub {
-            name: "Foo".to_string(),
+            name: Box::from("Foo"),
             generics: vec![SoulType::Primitive(PrimitiveTypes::Int)]
         })
     );

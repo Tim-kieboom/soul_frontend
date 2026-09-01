@@ -211,17 +211,17 @@ impl<I: VecMapIndex, T> VecMap<I, T> {
 
     /// Returns an iterator over references to all existing values.
     pub fn values(&self) -> impl Iterator<Item = &T> {
-        self.vec.iter().flat_map(|el| el)
+        self.vec.iter().flatten()
     }
 
     /// Returns an iterator over references to all existing values.
     pub fn values_mut(&mut self) -> impl Iterator<Item = &mut T> {
-        self.vec.iter_mut().flat_map(|el| el)
+        self.vec.iter_mut().flatten()
     }
 
     /// Consumes the map and returns an iterator over all values.
     pub fn into_values(self) -> impl Iterator<Item = T> {
-        self.vec.into_iter().flat_map(|el| el)
+        self.vec.into_iter().flatten()
     }
 
     /// Raw index of inner vec
@@ -250,14 +250,14 @@ impl<I: VecMapIndex + Debug, T> Index<I> for VecMap<I, T> {
     fn index(&self, index: I) -> &Self::Output {
         self.vec[index.index()]
             .as_ref()
-            .expect(&format!("entry in VecMap[{:?}] not found", index))
+            .unwrap_or_else(|| panic!("entry in VecMap[{:?}] not found", index))
     }
 }
 impl<I: VecMapIndex + Debug, T> IndexMut<I> for VecMap<I, T> {
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
         self.vec[index.index()]
             .as_mut()
-            .expect(&format!("entry in VecMap[{:?}] not found", index))
+            .unwrap_or_else(|| panic!("entry in VecMap[{:?}] not found", index))
     }
 }
 impl<I: VecMapIndex, T> FromIterator<(I, T)> for VecMap<I, T> {
