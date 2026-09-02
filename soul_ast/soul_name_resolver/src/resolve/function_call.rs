@@ -1,8 +1,8 @@
 use ast_model::{
-    declare_store::FunctionResolve,
+    declare_store::{FunctionResolve, IntrinsicResolve},
     expression::{
-        ExpressionKind, FieldAccess, FunctionCall, FunctionCallee, FunctionCalleeKind,
-        VariableExpression,
+        ExpressionId, ExpressionKind, FieldAccess, FunctionCall, FunctionCallee,
+        FunctionCalleeKind, VariableExpression,
     },
     scope::{ScopeModuleEntry, ScopeTypeEntryKind},
     soul_type::{SoulType, Stub},
@@ -12,6 +12,7 @@ use soul_utils::soul_names::PrimitiveTypes;
 use soul_utils::{
     FunctionId,
     fault::Fault,
+    intrinsics::IntrinsicFunction,
     soul_error_internal,
     span::{ModuleId, Span},
 };
@@ -21,7 +22,66 @@ use crate::NameResolver;
 
 impl<'a> NameResolver<'a> {
     pub(super) fn resolve_function_call(&mut self, call: &FunctionCall) {
+        if let Some(path) = self.try_get_intrinsic_path(call) {
+            self.resolve_intrinsic_call(&path, call);
+            return;
+        }
+
         self.resolve_call(call);
+    }
+
+    /// Recognizes `intrinsic.<path>(...)` calls (e.g. `intrinsic.fieldIndex(...)`,
+    /// `intrinsic.array.toRaw(...)`) by walking the callee chain down to a bare
+    /// `intrinsic` variable, joining the field-access segments with `.`.
+    fn try_get_intrinsic_path(&mut self, call: &FunctionCall) -> Option<String> {
+        let callee = call.callee.as_ref()?;
+        let value = match &callee.kind {
+            FunctionCalleeKind::Type(_) => return None,
+            FunctionCalleeKind::Expression(id) => *id,
+        };
+
+        let mut segments = self.collect_intrinsic_path_segments(value)?;
+        segments.push(call.name.to_string());
+        Some(segments.join("."))
+    }
+
+    fn collect_intrinsic_path_segments(&mut self, id: ExpressionId) -> Option<Vec<String>> {
+        let expr = self.store.expressions.get(id)?;
+        match &expr.node {
+            ExpressionKind::Variable(VariableExpression { name, .. }) if name.as_str() == "intrinsic" => {
+                Some(Vec::new())
+            }
+            ExpressionKind::FieldAccess(field_access) => {
+                let mut segments = self.collect_intrinsic_path_segments(field_access.object)?;
+                segments.push(field_access.field.to_string());
+                Some(segments)
+            }
+            _ => None,
+        }
+    }
+
+    fn resolve_intrinsic_call(&mut self, path: &str, call: &FunctionCall) {
+        let Ok(kind) = IntrinsicFunction::from_str(path) else {
+            self.log_fault(Fault::error(
+                format!("unknown intrinsic 'intrinsic.{path}'"),
+                Some(call.name.span()),
+            ));
+            return;
+        };
+
+        if call.arguments.len() != kind.arity() {
+            self.log_fault(Fault::error(
+                format!(
+                    "'intrinsic.{path}' expects {} argument(s), got {}",
+                    kind.arity(),
+                    call.arguments.len()
+                ),
+                Some(call.name.span()),
+            ));
+        }
+
+        self.declares
+            .insert_intrinsic_resolve(call.id, IntrinsicResolve { kind });
     }
 
     fn resolve_call(&mut self, call: &FunctionCall) {
@@ -70,7 +130,7 @@ impl<'a> NameResolver<'a> {
             match &callee.kind {
                 FunctionCalleeKind::Type(_) => (),
                 FunctionCalleeKind::Expression(id) => {
-                    if !ignore_callee && !self.is_intrinsic_variable(*id) {
+                    if !ignore_callee {
                         self.resolve_expression(*id);
                     }
                 }
@@ -373,13 +433,6 @@ impl<'a> NameResolver<'a> {
         }
     }
 
-    fn is_intrinsic_variable(&self, id: ast_model::expression::ExpressionId) -> bool {
-        matches!(
-            self.store.expressions.get(id).map(|e| &e.node),
-            Some(ExpressionKind::Variable(VariableExpression { name, .. })) if name.as_str() == "intrinsic"
-        )
-    }
-
     pub(super) fn contains_type(&mut self, ident: &str) -> bool {
         self.scope_info
             .scopes
@@ -399,3 +452,7 @@ impl<'a> NameResolver<'a> {
             .lookup_function(string, self.current.module)
     }
 }
+
+#[cfg(test)]
+#[path = "function_call_tests.rs"]
+mod tests;

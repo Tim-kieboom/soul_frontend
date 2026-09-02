@@ -9,6 +9,7 @@ pub mod crate_id;
 pub mod error;
 pub mod fault;
 pub mod ids;
+pub mod intrinsics;
 pub mod linkage;
 pub mod literal;
 pub mod soul_names;

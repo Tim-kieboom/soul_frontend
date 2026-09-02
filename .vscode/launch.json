@@ -1,19 +1,47 @@
 {
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug soul_tester",
-            "cargo": {
-                "args": ["build", "-p", "soul_tester"],
-                "filter": {
-                    "name": "soul_tester",
-                    "kind": "bin"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}/soul_tester"
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug soul_tester",
+      "cargo": {
+        "args": ["build", "-p", "soul_tester"],
+        "filter": {
+          "name": "soul_tester",
+          "kind": "bin"
         }
-    ]
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}/soul_tester"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug soul_tester with backtrace",
+      "cargo": {
+        "args": ["build", "-p", "soul_tester", "--features", "error_backtrace"],
+        "filter": {
+          "name": "soul_tester",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}/soul_tester"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug soul_tester (release)",
+      "cargo": {
+        "args": ["build", "-p", "soul_tester", "--release"],
+        "filter": {
+          "name": "soul_tester",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}/soul_tester"
+    }
+  ]
 }

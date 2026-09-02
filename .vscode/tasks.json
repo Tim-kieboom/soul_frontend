@@ -1,13 +1,21 @@
 {
-    "version": "2.0.0",
-    "tasks": [
-        {
-            "type": "cargo",
-            "command": "build",
-            "args": ["-p", "soul_tester"],
-            "problemMatcher": ["$rustc"],
-            "group": "build",
-            "label": "cargo build soul_tester"
-        }
-    ]
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "cargo build soul_tester",
+      "type": "cargo",
+      "command": "build",
+      "args": ["-p", "soul_tester"],
+      "problemMatcher": ["$rustc"],
+      "group": "build"
+    },
+    {
+      "label": "cargo build soul_tester (release)",
+      "type": "cargo",
+      "command": "build",
+      "args": ["-p", "soul_tester", "--release"],
+      "problemMatcher": ["$rustc"],
+      "group": "build"
+    }
+  ]
 }

@@ -5,7 +5,10 @@ use crate::{
     soul_type::SoulType,
     statements::{Enum, InnerFunctionSignature, Struct, Trait},
 };
-use soul_utils::{FunctionId, TypeModifier, collections::vec_map::VecMap, span::ModuleId};
+use soul_utils::{
+    FunctionId, TypeModifier, collections::vec_map::VecMap, intrinsics::IntrinsicFunction,
+    span::ModuleId,
+};
 
 /// A store of all declarations in a module.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
@@ -16,6 +19,8 @@ pub struct DeclareStore {
     variable_resolves: VecMap<NodeId, NodeId>,
     /// All functionCall resolutions, indexed by their ID.
     function_resolves: VecMap<NodeId, FunctionResolve>,
+    /// All `intrinsic.*` call resolutions, indexed by their ID.
+    intrinsic_resolves: VecMap<NodeId, IntrinsicResolve>,
     /// All structs declarations, indexed by their ID.
     custom_types: VecMap<NodeId, (CustomType, ModuleId)>,
     /// All function declarations, indexed by their ID.
@@ -36,6 +41,7 @@ impl DeclareStore {
             variable_type: VecMap::new(),
             function_names: HashMap::new(),
             function_resolves: VecMap::new(),
+            intrinsic_resolves: VecMap::new(),
         }
     }
 
@@ -120,6 +126,18 @@ impl DeclareStore {
         self.function_resolves.get(node_id).copied()
     }
 
+    pub fn insert_intrinsic_resolve(
+        &mut self,
+        node_id: NodeId,
+        intrinsic: IntrinsicResolve,
+    ) -> Option<IntrinsicResolve> {
+        self.intrinsic_resolves.insert(node_id, intrinsic)
+    }
+
+    pub fn get_intrinsic_resolve(&self, node_id: NodeId) -> Option<IntrinsicResolve> {
+        self.intrinsic_resolves.get(node_id).copied()
+    }
+
     pub fn find_function_with_module(
         &self,
         name: &str,
@@ -181,4 +199,9 @@ pub struct FunctionResolve {
     pub id: FunctionId,
     pub is_defer: bool,
     pub ignore_callee: bool,
+}
+
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+pub struct IntrinsicResolve {
+    pub kind: IntrinsicFunction,
 }
