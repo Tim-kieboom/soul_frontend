@@ -1,0 +1,13 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "cargo",
+            "command": "build",
+            "args": ["-p", "soul_tester"],
+            "problemMatcher": ["$rustc"],
+            "group": "build",
+            "label": "cargo build soul_tester"
+        }
+    ]
+}

@@ -240,8 +240,10 @@ impl<'a> NameResolver<'a> {
                     self.collect_match_arm_pattern(arm);
                 }
             }
-            MatchPattern::Fallthrough(_) => {
-                todo!()
+            MatchPattern::Fallthrough(patterns) => {
+                for pattern in patterns {
+                    self.collect_match_arm_pattern(pattern);
+                }
             }
             MatchPattern::Constructor(match_contructor) => {
                 if let Some(binding) = &match_contructor.binding {

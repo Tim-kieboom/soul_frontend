@@ -3,3 +3,5 @@
 *.soulc
 *.ll
 /docs
+Cargo.lock
+/target

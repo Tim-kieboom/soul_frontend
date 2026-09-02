@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug soul_tester",
+            "cargo": {
+                "args": ["build", "-p", "soul_tester"],
+                "filter": {
+                    "name": "soul_tester",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}/soul_tester"
+        }
+    ]
+}

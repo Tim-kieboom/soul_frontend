@@ -1,0 +1,22 @@
+[workspace]
+resolver = "3"
+members = [
+    "soul_tester",
+    "soul_utils",
+    "soul_tokenizer",
+    "soul_ast/ast_model",
+    "soul_ast/ast_parser",
+    "soul_ast/ast_run",
+    "soul_ast/soul_name_resolver",
+]
+
+[profile.release-performance]
+inherits = "release"
+opt-level = 3                 # Maximum optimization for speed
+lto = "fat"                   # Most aggressive link-time optimization
+codegen-units = 1             # Single codegen unit = more optimization opportunities
+panic = "abort"               # Smaller/faster panic handling (no unwind tables)
+overflow-checks = false       # Disable arithmetic overflow checks in release
+strip = "none"                # Keep symbols if you need profiling; use "debuginfo" or true to strip
+debug = 1                     # Minimal debug info for profiling (optional)
+incremental = false           # Disable incremental compilation for max optimization

@@ -310,10 +310,9 @@ impl<'a> NameResolver<'a> {
             return self.lookup_function(&function_name);
         }
 
-        if module_entry.crate_name.is_some() {
-            todo!("impl external crates")
-        }
-
+        // External modules are parsed and resolved into `self.ast_modules` the
+        // same way local modules are (see `collect_import_path`), so the header
+        // lookup below applies to both local and external `module_entry`s.
         let module_id = module_entry.module_id;
         debug_assert!(module_id != ModuleId::ERROR);
         debug_assert!(self.ast_modules.contains(module_id));
