@@ -133,7 +133,8 @@ impl<'a> NameResolver<'a> {
 
         if let ExpressionKind::Variable(VariableExpression { name, .. }) = &expr.node {
             let name_str = name.as_str();
-            if self.contains_type(name_str)
+            if name_str == "intrinsic"
+                || self.contains_type(name_str)
                 || self.lookup_module(name_str).is_some()
                 || self.is_crate_name(name_str)
             {

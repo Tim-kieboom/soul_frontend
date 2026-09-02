@@ -11,16 +11,15 @@ use crate::{parser::Parser, utils::LAMBDA_ARROW};
 impl<'a, 'f> Parser<'a, 'f> {
     /// Try to parse a lambda expression: `params => body`.
     /// Returns `Ok(expr)` if successful, or `Err(())` on failure (caller should backtrack).
-    pub(super) fn try_parse_lambda(&mut self, start_span: Span) -> Result<Expression, ()> {
+    pub(super) fn try_parse_lambda(&mut self, start_span: Span) -> Option<Expression> {
         let saved = self.tokens.current_position();
 
         let pattern = self
-            .parse_var_pattern(TypeModifier::Const)
-            .map_err(|_| ())?;
+            .parse_var_pattern(TypeModifier::Const).ok()?;
 
         if self.current_is(&LAMBDA_ARROW) {
             self.bump();
-            let body_expression = self.parse_expression_id(LAMBDA_BODY_END).map_err(|_| ())?;
+            let body_expression = self.parse_expression_id(LAMBDA_BODY_END).ok()?;
             let params = match pattern {
                 VarPattern::Tuple(tuple) => tuple.elements,
                 other => vec![other],
@@ -41,7 +40,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 span: self.span_combine(start_span),
             });
 
-            Ok(Expression::from_lambda(
+            Some(Expression::from_lambda(
                 Lambda {
                     id: self.alloc_node(),
                     parameters: params,
@@ -51,7 +50,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             ))
         } else {
             self.goto(saved);
-            Err(())
+            None
         }
     }
 }

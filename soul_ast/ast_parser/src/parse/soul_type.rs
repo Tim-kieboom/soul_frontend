@@ -92,14 +92,13 @@ impl<'a, 'f> Parser<'a, 'f> {
         let inner = if self.current_is(&ARROW_LEFT) {
             let mut generics = self.parse_generic_define().merge_to_result()?;
 
-            if generics.len() != 1 {
+            let Some(inner) = generics.pop() else {
                 return Err(Fault::error(
                     "RawPtr expects exactly one generic type parameter, e.g. `RawPtr<int>`",
                     Some(self.token().span),
-                ));
-            }
+                ))
+            };
 
-            let inner = generics.pop().expect("just check if .len() is 1");
             Some(Box::new(inner))
         } else {
             None

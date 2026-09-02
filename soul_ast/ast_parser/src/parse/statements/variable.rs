@@ -56,28 +56,14 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.bump();
             let value = self.parse_expression_id(STAMENT_END_TOKENS)?;
             return Ok(Statement::new_variable(
-                Variable {
-                    id: self.alloc_node(),
-                    is_public: false,
-                    pattern,
-                    ty,
-                    modifier: TypeModifier::Const,
-                    initialize_value: Some(value),
-                },
+                Variable::new_const(self.alloc_node(), pattern, ty, Some(value)),
                 self.span_combine(pattern_start),
             ));
         }
 
         if ty.is_some() && assign_type.is_none() {
             return Ok(Statement::new_variable(
-                Variable {
-                    id: self.alloc_node(),
-                    is_public: false,
-                    pattern,
-                    ty,
-                    modifier,
-                    initialize_value: None,
-                },
+                Variable::new_const(self.alloc_node(), pattern, ty, None).apply_modifier(modifier),
                 self.span_combine(pattern_start),
             ));
         }
@@ -86,14 +72,8 @@ impl<'a, 'f> Parser<'a, 'f> {
             Some(val) => val,
             None => {
                 return Ok(Statement::new_variable(
-                    Variable {
-                        id: self.alloc_node(),
-                        is_public: false,
-                        pattern,
-                        ty,
-                        modifier,
-                        initialize_value: None,
-                    },
+                    Variable::new_const(self.alloc_node(), pattern, ty, None)
+                        .apply_modifier(modifier),
                     self.span_combine(pattern_start),
                 ));
             }
@@ -110,15 +90,10 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         self.bump();
+        let value = self.parse_expression_id(STAMENT_END_TOKENS)?;
         Ok(Statement::new_variable(
-            Variable {
-                id: self.alloc_node(),
-                is_public: false,
-                pattern,
-                ty,
-                modifier,
-                initialize_value: Some(self.parse_expression_id(STAMENT_END_TOKENS)?),
-            },
+            Variable::new_const(self.alloc_node(), pattern, ty, Some(value))
+                .apply_modifier(modifier),
             self.span_combine(pattern_start),
         ))
     }

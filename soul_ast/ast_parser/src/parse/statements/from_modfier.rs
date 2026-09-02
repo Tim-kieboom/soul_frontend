@@ -70,14 +70,8 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         self.bump();
         let value = self.parse_expression_id(STAMENT_END_TOKENS)?;
-        let variable = Variable {
-            id: self.alloc_node(),
-            is_public: false,
-            pattern,
-            ty,
-            modifier,
-            initialize_value: Some(value),
-        };
+        let variable = Variable::new_const(self.alloc_node(), pattern, ty, Some(value))
+            .apply_modifier(modifier);
 
         Ok(Statement::new_variable(
             variable,

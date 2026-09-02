@@ -30,7 +30,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         // Try lambda first: `param => body`
         let saved = self.tokens.current_position();
-        if let Ok(lambda) = self.try_parse_lambda(start_span) {
+        if let Some(lambda) = self.try_parse_lambda(start_span) {
             return Ok(lambda);
         }
         self.goto(saved);

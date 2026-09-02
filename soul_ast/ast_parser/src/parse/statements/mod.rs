@@ -181,26 +181,15 @@ impl<'a, 'f> Parser<'a, 'f> {
                     return TryNotValue(Fault::empty());
                 };
 
-                let assign = try_assign_type(self.token());
-                if !matches!(
-                    assign,
-                    Some(AssignType::Assign) | Some(AssignType::Declaration)
-                ) {
+                if let Err(err) = self.expect_assign_or_declaration() {
                     self.goto(saved);
-                    return TryNotValue(Fault::empty());
+                    return TryNotValue(err);
                 }
 
                 self.bump();
                 let statement = self.parse_expression_id(STAMENT_END_TOKENS).try_err()?;
                 Ok(Statement::new_variable(
-                    Variable {
-                        id: self.alloc_node(),
-                        is_public: false,
-                        pattern,
-                        ty: None,
-                        modifier: TypeModifier::Const,
-                        initialize_value: Some(statement),
-                    },
+                    Variable::new_const(self.alloc_node(), pattern, None, Some(statement)),
                     self.span_combine(start_span),
                 ))
             }
@@ -216,14 +205,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                         let value = self.parse_expression_id(STAMENT_END_TOKENS).try_err()?;
 
                         Ok(Statement::new_variable(
-                            Variable {
-                                id: self.alloc_node(),
-                                is_public: false,
-                                pattern,
-                                ty: None,
-                                modifier: TypeModifier::Const,
-                                initialize_value: Some(value),
-                            },
+                            Variable::new_const(self.alloc_node(), pattern, None, Some(value)),
                             self.span_combine(start_span),
                         ))
                     }
@@ -297,6 +279,22 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok((attributes, self.span_combine(start_span)))
     }
 
+    fn expect_assign_or_declaration(&mut self) -> SoulResult<AssignType> {
+        match try_assign_type(self.token()) {
+            Some(AssignType::Assign) => Ok(AssignType::Assign),
+            Some(AssignType::Declaration) => Ok(AssignType::Declaration),
+            _ => Err(Fault::error(
+                format!(
+                    "expected `{}` or `{}`, but got `{}`",
+                    AssignType::Assign.as_str(),
+                    AssignType::Declaration.as_str(),
+                    self.token().kind.display()
+                ),
+                Some(self.token().span),
+            )),
+        }
+    }
+
     fn try_parse_from_ident(&mut self, start_span: Span) -> TryResult<Statement, Fault> {
         let ident = self.try_token_as_ident_str().try_err()?;
         let is_this = ident == "This";
@@ -345,14 +343,12 @@ impl<'a, 'f> Parser<'a, 'f> {
                             .parse_expression_id(STAMENT_END_TOKENS)
                             .map(|value| {
                                 Statement::new_variable(
-                                    Variable {
-                                        id: self.alloc_node(),
-                                        is_public: false,
+                                    Variable::new_const(
+                                        self.alloc_node(),
                                         pattern,
-                                        ty: None,
-                                        modifier: TypeModifier::Const,
-                                        initialize_value: Some(value),
-                                    },
+                                        None,
+                                        Some(value),
+                                    ),
                                     self.span_combine(start_span),
                                 )
                             })

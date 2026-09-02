@@ -262,6 +262,22 @@ pub struct Variable {
 }
 
 impl Variable {
+    pub fn new_const(id: NodeId, pattern: VarPattern, ty: Option<SoulType>, value: Option<ExpressionId>) -> Self {
+        Self {
+            id,
+            pattern,
+            ty,
+            is_public: false,
+            initialize_value: value,
+            modifier: TypeModifier::Const,
+        }
+    }
+
+    pub fn apply_modifier(mut self, modifier: TypeModifier) -> Self {
+        self.modifier = modifier;
+        self
+    }
+
     /// If this is a simple pattern, returns the variable name.
     pub fn name(&self) -> Option<&Ident> {
         match &self.pattern {

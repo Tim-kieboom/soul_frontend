@@ -620,12 +620,12 @@ impl<'a, 'f> Parser<'a, 'f> {
             let name = self.try_bump_consume_ident().try_not_value()?;
 
             if !self.current_is(&COLON) {
-                // is probebly tuple
+                // is probably tuple
                 return Err(TryError::IsNotValue(self.get_expect_error(&COLON)));
             }
             self.bump();
 
-            let ty = self.try_parse_type()?; // if not value is probebly named_tuple expression
+            let ty = self.try_parse_type()?; // if not value is probably named_tuple expression
 
             let default = if self.current_is(&ASSIGN) {
                 self.bump();

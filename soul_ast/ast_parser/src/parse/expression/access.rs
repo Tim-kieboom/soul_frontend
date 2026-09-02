@@ -48,6 +48,12 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok(())
     }
 
+    fn take_left_id(&mut self, left: &mut Expression) -> ExpressionId {
+        let mut value = Expression::error();
+        swap(left, &mut value);
+        self.forest.store.insert_expression(value)
+    }
+
     pub(super) fn access_this_expression(
         &mut self,
         left: &mut Expression,
@@ -63,45 +69,35 @@ impl<'a, 'f> Parser<'a, 'f> {
         match self.token().kind {
             PASS => {
                 self.bump();
-                let mut value = Expression::error();
-                swap(left, &mut value);
-
-                let id = self.forest.store.insert_expression(value);
-                *left = Expression::new(ExpressionKind::Pass(id), self.span_combine(start_span));
+                let value = self.take_left_id(left);
+                *left = Expression::new(ExpressionKind::Pass(value), self.span_combine(start_span));
 
                 return Ok(());
             }
             SIZEOF => {
                 self.bump();
-                let mut value = Expression::error();
-                swap(left, &mut value);
-
-                let id = self.forest.store.insert_expression(value);
-                *left = Expression::new(ExpressionKind::Sizeof(id), self.span_combine(start_span));
+                let value = self.take_left_id(left);
+                *left =
+                    Expression::new(ExpressionKind::Sizeof(value), self.span_combine(start_span));
 
                 return Ok(());
             }
             COPY => {
                 self.bump();
-                let mut value = Expression::error();
-                swap(left, &mut value);
-
-                let id = self.forest.store.insert_expression(value);
-                *left = Expression::new(ExpressionKind::Copy(id), self.span_combine(start_span));
+                let value = self.take_left_id(left);
+                *left = Expression::new(ExpressionKind::Copy(value), self.span_combine(start_span));
 
                 return Ok(());
             }
             REF => {
                 self.bump();
-                let mut expression = Expression::error();
-                swap(left, &mut expression);
 
                 let is_mutable = self.current_is(&MUT);
                 if is_mutable {
                     self.bump();
                 }
 
-                let value = self.forest.store.insert_expression(expression);
+                let value = self.take_left_id(left);
                 *left = Expression::new(
                     ExpressionKind::Ref(Ref {
                         id: self.forest.store.alloc_node(),
@@ -115,15 +111,12 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
             POINTER => {
                 self.bump();
-                let mut expression = Expression::error();
-                swap(left, &mut expression);
-
                 let is_mutable = self.current_is(&MUT);
                 if is_mutable {
                     self.bump();
                 }
 
-                let value = self.forest.store.insert_expression(expression);
+                let value = self.take_left_id(left);
                 *left = Expression::new(
                     ExpressionKind::Deref(Deref {
                         id: self.forest.store.alloc_node(),
@@ -227,6 +220,12 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         let ident = self.try_bump_consume_ident()?;
+
+        let generics = if generics.is_empty() && self.current_is(&ARROW_LEFT) {
+            self.parse_generic_define().merge_to_result()?
+        } else {
+            generics
+        };
 
         let mut value = Expression::error();
         swap(left, &mut value);

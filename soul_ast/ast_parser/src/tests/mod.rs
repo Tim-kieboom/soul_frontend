@@ -13,10 +13,16 @@ use ast_model::{
 };
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
-    CrateContext, SharedStr, collections::{
+    CrateContext, SharedStr,
+    collections::{
         crate_store::{CrateEntry, CrateStore},
         module_store::ModuleStore,
-    }, fault::Severity, ids::IdAlloc, linkage::Linkage, soul_names::PrimitiveTypes, span::ModuleId,
+    },
+    fault::Severity,
+    ids::IdAlloc,
+    linkage::Linkage,
+    soul_names::PrimitiveTypes,
+    span::ModuleId,
 };
 
 use crate::{ParseInfo, parse_module};

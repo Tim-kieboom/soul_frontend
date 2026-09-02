@@ -92,33 +92,23 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.forest.modules()
     }
 
-    #[cfg(not(debug_assertions))]
+    
     fn new(tokens: TokenStream<'a>, info: ParseInfo<'f>) -> Self {
-        Self {
-            tokens,
-            id: info.id,
-            context: info.context,
-            modules: info.modules,
-            forest: info.forest,
-            source_path: info.source_folder,
-            crate_source_path: info.crate_source_folder,
-            crate_store: info.crate_store,
-            current: Current::default(),
-        }
-    }
-
-    #[cfg(debug_assertions)]
-    fn new(tokens: TokenStream<'a>, info: ParseInfo<'f>) -> Self {
-        use soul_tokenizer::model::TokenKind;
-        use soul_utils::span::Span;
-
-        let debug = DebugViewer {
-            current: Token::new(TokenKind::EndLine, Span::error()),
-            current_index: 0,
+        #[cfg(debug_assertions)] 
+        let debug = {
+            use soul_tokenizer::model::TokenKind;
+            use soul_utils::span::Span;
+            
+            DebugViewer {
+                current: Token::new(TokenKind::EndLine, Span::error()),
+                current_index: 0,
+            }
         };
 
         Self {
+            #[cfg(debug_assertions)]
             debug,
+
             tokens,
             id: info.id,
             context: info.context,

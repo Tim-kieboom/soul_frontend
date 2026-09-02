@@ -8,15 +8,12 @@ use soul_utils::{
     collections::try_result::TryError,
     error::SoulResult,
     fault::Fault,
-    soul_names::Symbol,
     span::{Span, Spanned},
 };
 
 use crate::{
-    parser::Parser,
-    utils::{
-        ARRAY, COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, FOR, IN, LAMBDA_ARROW, SQUARE_CLOSE,
-        SQUARE_OPEN,
+    parser::Parser, utils::{
+        ARRAY, COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, DOUBLE_DOT, FOR, IN, LAMBDA_ARROW, SQUARE_CLOSE, SQUARE_OPEN,
     },
 };
 
@@ -86,7 +83,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         loop {
             self.skip_end_lines();
 
-            if self.current_is(&TokenKind::Symbol(Symbol::DoubleDot)) {
+            if self.current_is(&DOUBLE_DOT) {
                 if defaults {
                     return Err(Fault::error(
                         "StructConstructor already has '..'",

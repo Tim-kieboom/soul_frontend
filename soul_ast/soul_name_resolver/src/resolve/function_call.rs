@@ -70,7 +70,7 @@ impl<'a> NameResolver<'a> {
             match &callee.kind {
                 FunctionCalleeKind::Type(_) => (),
                 FunctionCalleeKind::Expression(id) => {
-                    if !ignore_callee {
+                    if !ignore_callee && !self.is_intrinsic_variable(*id) {
                         self.resolve_expression(*id);
                     }
                 }
@@ -262,11 +262,11 @@ impl<'a> NameResolver<'a> {
     fn resolve_module_call(&mut self, module_entry: ScopeModuleEntry, call: &FunctionCall) {
         let resolve =
             self.lookup_module_function(&module_entry, call.name.as_str(), call.name.span());
-        if resolve == Some(FunctionId::ERROR) {
-            todo!("impl resolve_external_function")
-        }
+        let id = match resolve {
+            Some(id) => id,
+            None => self.resolve_external_function(&module_entry, call),
+        };
 
-        let id = resolve.unwrap_or(FunctionId::ERROR);
         let ignore_callee = id != FunctionId::ERROR;
         self.declares.insert_function_resolve(
             call.id,
@@ -276,6 +276,28 @@ impl<'a> NameResolver<'a> {
                 is_defer: false,
             },
         );
+    }
+
+    /// Called when a module-qualified call could not be resolved inside the
+    /// module's own header lookup. Reports a diagnostic naming the crate (for
+    /// external imports) or module (for local ones) and returns `FunctionId::ERROR`
+    /// so the caller still records a well-formed (if erroneous) resolution.
+    fn resolve_external_function(
+        &mut self,
+        module_entry: &ScopeModuleEntry,
+        call: &FunctionCall,
+    ) -> FunctionId {
+        let function_name = call.name.as_str();
+        let location = match &module_entry.crate_name {
+            Some(crate_name) => format!("crate '{crate_name}'"),
+            None => format!("module '{}'", module_entry.module_name),
+        };
+        self.log_fault(Fault::error(
+            format!("'{function_name}' not found in {location}"),
+            Some(call.name.span()),
+        ));
+
+        FunctionId::ERROR
     }
 
     fn lookup_module_function(
@@ -350,6 +372,13 @@ impl<'a> NameResolver<'a> {
             ExpressionKind::Variable(var) => Some(var.name.to_string()),
             _ => None,
         }
+    }
+
+    fn is_intrinsic_variable(&self, id: ast_model::expression::ExpressionId) -> bool {
+        matches!(
+            self.store.expressions.get(id).map(|e| &e.node),
+            Some(ExpressionKind::Variable(VariableExpression { name, .. })) if name.as_str() == "intrinsic"
+        )
     }
 
     pub(super) fn contains_type(&mut self, ident: &str) -> bool {

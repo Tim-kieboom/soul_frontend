@@ -637,7 +637,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         let mut bracket_stack = 1;
-        loop {
+        while !self.current_is(&TokenKind::EndFile) {
             self.bump();
             if self.current_is(&CURLY_OPEN) {
                 bracket_stack += 1;

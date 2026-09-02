@@ -5,7 +5,6 @@ use soul_tokenizer::to_token_stream;
 use soul_utils::{
     collections::vec_set::VecSet,
     fault::Fault,
-    ids::IdAlloc,
     linkage::Linkage,
     soul_error_internal,
     span::{ModuleId, Span},
@@ -155,17 +154,17 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         let Some(module_source) = self.read_module(module_file_path, module_name, span) else {
-            return ModuleId::error();
+            return ModuleId::ERROR
         };
 
-        let folder_path = module_file_path
-            .parent()
-            .expect("should have parent")
-            .to_path_buf();
+        let Some(folder_path) = module_file_path.parent() else {
+            self.log_fault(soul_error_internal!("module_file_path should have parent", None));
+            return ModuleId::ERROR
+        };
 
         self.parse_module(
             &module_source,
-            folder_path,
+            folder_path.to_path_buf(),
             module_id,
             parent,
             module_name.to_string(),
@@ -231,6 +230,8 @@ impl<'a, 'f> Parser<'a, 'f> {
                 format!("file '{:?}' not found", module_path),
                 Some(span),
             ));
+
+            return None;
         }
 
         Some(module_path)
