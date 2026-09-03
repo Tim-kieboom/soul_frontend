@@ -32,6 +32,10 @@ pub struct DeclareStore {
     variable_type: VecMap<NodeId, (TypeModifier, Option<SoulType>, ModuleId)>,
     /// Resolved type of an expression, indexed by its ID.
     expression_types: VecMap<ExpressionId, SoulType>,
+    /// Non-`distinct` `type X := Y` aliases, mapping `X`'s name to its
+    /// underlying type `Y`. A `distinct` alias is deliberately not
+    /// interchangeable with its underlying type, so it's never registered here.
+    type_aliases: HashMap<String, SoulType>,
 }
 impl DeclareStore {
     /// Creates a new empty declaration store.
@@ -46,6 +50,7 @@ impl DeclareStore {
             function_resolves: VecMap::new(),
             intrinsic_resolves: VecMap::new(),
             expression_types: VecMap::new(),
+            type_aliases: HashMap::new(),
         }
     }
 
@@ -205,6 +210,16 @@ impl DeclareStore {
     /// Sets the resolved type of an expression.
     pub fn insert_expression_type(&mut self, index: ExpressionId, ty: SoulType) {
         self.expression_types.insert(index, ty);
+    }
+
+    /// Registers a non-`distinct` `type X := Y` alias's underlying type.
+    pub fn insert_type_alias(&mut self, name: impl Into<String>, underlying: SoulType) {
+        self.type_aliases.insert(name.into(), underlying);
+    }
+
+    /// The underlying type of a non-`distinct` alias by name, if `name` is one.
+    pub fn get_type_alias(&self, name: &str) -> Option<&SoulType> {
+        self.type_aliases.get(name)
     }
 }
 

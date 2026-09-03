@@ -247,7 +247,7 @@ impl<'a> NameResolver<'a> {
             return;
         };
 
-        let Some(combined) = combine_operand_types(&left_ty, &right_ty) else {
+        let Some(combined) = self.combine_operand_types(&left_ty, &right_ty) else {
             self.log_fault(Fault::error(
                 format!(
                     "type mismatch in binary expression: left is `{left_ty:?}`, right is `{right_ty:?}`"
@@ -281,6 +281,36 @@ impl<'a> NameResolver<'a> {
             }
             _ => None,
         }
+    }
+
+    /// Resolves both operands' types (through any non-`distinct` type alias,
+    /// e.g. `Byte` → `u8`) and combines them — see [`combine_resolved_operand_types`].
+    pub(super) fn combine_operand_types(
+        &self,
+        left: &SoulType,
+        right: &SoulType,
+    ) -> Option<SoulType> {
+        let left = self.resolve_type_alias(left);
+        let right = self.resolve_type_alias(right);
+        combine_resolved_operand_types(&left, &right)
+    }
+
+    /// Follows a non-`distinct` `type X := Y` alias chain to its underlying
+    /// type. Bounded to guard against an accidental cycle; a `distinct`
+    /// alias, or a name that isn't a registered alias at all, is returned
+    /// unchanged.
+    fn resolve_type_alias(&self, ty: &SoulType) -> SoulType {
+        let mut current = ty.clone();
+        for _ in 0..8 {
+            let SoulType::Stub(stub) = &current else {
+                return current;
+            };
+            let Some(underlying) = self.declares.get_type_alias(stub.name.as_str()) else {
+                return current;
+            };
+            current = underlying.clone();
+        }
+        current
     }
 }
 
@@ -368,7 +398,7 @@ fn combine_untyped_kinds(a: PrimitiveTypes, b: PrimitiveTypes) -> PrimitiveTypes
     }
 }
 
-pub(super) fn combine_operand_types(left: &SoulType, right: &SoulType) -> Option<SoulType> {
+fn combine_resolved_operand_types(left: &SoulType, right: &SoulType) -> Option<SoulType> {
     match (untyped_kind_of(left), untyped_kind_of(right)) {
         (None, None) if left == right => Some(left.clone()),
         (None, None) => None,

@@ -11,7 +11,7 @@ use crate::{
 };
 use anyhow::Result;
 use ast_model::{
-    AstStore, AstTree, ExternalCrateData, FunctionKind,
+    AstStore, AstTree, ExternalCrateData, FunctionKind, NodeId,
     block::BlockId,
     expression::{
         AnyArray, ExpressionId, ExpressionKind, ForCondition, FunctionCalleeKind, IfBranch,
@@ -120,6 +120,15 @@ fn display_ast_tree(ast: &AstTree, root_dir: &Path, writer: &mut impl Writer) ->
     }
     writer.writer_flush()?;
     Ok(())
+}
+
+/// The `DeclareStore` keys a variable's inferred type by the pattern binding's
+/// `NodeId` for simple patterns (see `collect_variable`), not the `Variable`'s own id.
+fn variable_type_key(variable: &Variable) -> NodeId {
+    match &variable.pattern {
+        VarPattern::Simple { binding, .. } => binding.id,
+        _ => variable.id,
+    }
 }
 
 fn linkage_str(linkage: &soul_utils::linkage::Linkage) -> &'static str {
@@ -325,7 +334,9 @@ impl<'a, W: Writer> Displayer<'a, W> {
 
         match &statement.node {
             StatementKind::Variable(variable) => {
-                if let Some((modifier, ty, _)) = self.ast.declares.get_variable_type(variable.id) {
+                if let Some((modifier, ty, _)) =
+                    self.ast.declares.get_variable_type(variable_type_key(variable))
+                {
                     self.push_fmt(format_args!("{modifier:?}"))?;
                     if let Some(ty) = ty {
                         self.push_str(": ")?;
@@ -441,10 +452,9 @@ impl<'a, W: Writer> Displayer<'a, W> {
     }
 
     fn write_variable(&mut self, variable: &Variable) -> Result<()> {
-        if variable.modifier == TypeModifier::Mut {
-            self.push_str(KeyWord::Mut.as_str())?;
-            self.push_char(' ')?;
-        }
+        // `mut` on a `Simple` pattern is already rendered by `write_var_pattern`
+        // (it shares `variable.modifier` — see `parse_variable`); a compound
+        // pattern can't carry `mut` at this level at all.
         self.write_var_pattern(&variable.pattern)?;
 
         if let Some(ty) = &variable.ty {

@@ -86,6 +86,15 @@ impl<'a> NameResolver<'a> {
             StatementKind::TypeDef(type_def) => {
                 self.collect_type(&type_def.new_type);
                 self.collect_type(&type_def.old_type);
+
+                // A `distinct` alias is deliberately not interchangeable
+                // with its underlying type, so it's never registered.
+                if !type_def.is_distinct {
+                    if let SoulType::Stub(stub) = &type_def.new_type {
+                        self.declares
+                            .insert_type_alias(stub.name.as_str(), type_def.old_type.clone());
+                    }
+                }
             }
             StatementKind::Variable(variable) => self.collect_variable(variable),
             StatementKind::UseBlock(use_block) => self.collect_use_block(use_block),
@@ -236,8 +245,7 @@ impl<'a> NameResolver<'a> {
         };
 
         Some(match literal {
-            Literal::Int(_) => SoulType::Primitive(PrimitiveTypes::Int),
-            Literal::Uint(_) => SoulType::Primitive(PrimitiveTypes::Uint),
+            Literal::Int(_) | Literal::Uint(_) => SoulType::Primitive(PrimitiveTypes::Int),
             Literal::Float(_) => SoulType::Primitive(PrimitiveTypes::Float64),
             Literal::Bool(_) => SoulType::Primitive(PrimitiveTypes::Boolean),
             Literal::Char(_) => SoulType::Primitive(PrimitiveTypes::Char),

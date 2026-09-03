@@ -61,7 +61,7 @@ test_arrays_and_slices() {
     assertEq(d, [0, 1, 2])
     assertEq(heap.len(), 3)
 
-    sliceSum(&a)
+    sliceSum(&a);
 }
 
 sliceSum(values: [&]int): int {

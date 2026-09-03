@@ -60,13 +60,11 @@ fn variable_type(ast: &AstTree, name: &str) -> Option<SoulType> {
 }
 
 #[test]
-fn bare_uint_literal_binding_infers_uint() {
-    // A bare non-negative literal tokenizes as `Number::Uint`, not `Int` —
-    // see soul_tokenizer's lexer tests.
+fn bare_uint_literal_binding_infers_int() {
     let ast = resolve_source("main() {\n    a := 5\n}\n");
     assert_eq!(
         variable_type(&ast, "a"),
-        Some(SoulType::Primitive(PrimitiveTypes::Uint))
+        Some(SoulType::Primitive(PrimitiveTypes::Int))
     );
 }
 

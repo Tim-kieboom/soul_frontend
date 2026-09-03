@@ -68,3 +68,39 @@ fn arity_mismatched_call_is_skipped_without_type_fault() {
     let ast = resolve_source("foo(a: i64, b: i64) {}\nmain() {\n    foo(1)\n}\n");
     assert_eq!(fault_count_containing(&ast, "argument type mismatch"), 0);
 }
+
+#[test]
+fn same_generic_used_with_incompatible_argument_types_reports_exactly_one_fault() {
+    let ast = resolve_source(
+        "assertEq<T>(a: T, b: T) {}\nmain() {\n    assertEq(1, \"\")\n}\n",
+    );
+    assert_eq!(fault_count_containing(&ast, "generic parameter"), 1);
+}
+
+#[test]
+fn same_generic_used_with_matching_argument_types_reports_no_fault() {
+    let ast = resolve_source("assertEq<T>(a: T, b: T) {}\nmain() {\n    assertEq(1, 2)\n}\n");
+    assert_eq!(fault_count_containing(&ast, "generic parameter"), 0);
+}
+
+#[test]
+fn generic_used_once_is_skipped_without_fault() {
+    let ast = resolve_source("identity<T>(a: T): T => a\nmain() {\n    identity(1)\n}\n");
+    assert_eq!(fault_count_containing(&ast, "generic parameter"), 0);
+}
+
+#[test]
+fn non_distinct_type_alias_is_interchangeable_with_its_underlying_type() {
+    let ast = resolve_source(
+        "type Byte := u8\nassertEq<T>(a: T, b: T) {}\nmain() {\n    b: Byte := 200\n    assertEq(b, 200_u8)\n}\n",
+    );
+    assert_eq!(fault_count_containing(&ast, "generic parameter"), 0);
+}
+
+#[test]
+fn distinct_type_alias_is_not_interchangeable_with_its_underlying_type() {
+    let ast = resolve_source(
+        "type Meters := distinct f64\nassertEq<T>(a: T, b: T) {}\nmain() {\n    m: Meters := 1.0\n    assertEq(m, 1.0_f64)\n}\n",
+    );
+    assert_eq!(fault_count_containing(&ast, "generic parameter"), 1);
+}

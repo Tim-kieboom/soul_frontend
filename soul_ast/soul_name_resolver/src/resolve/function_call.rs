@@ -18,7 +18,6 @@ use soul_utils::{
 };
 use std::str::FromStr;
 
-use super::expression::combine_operand_types;
 use crate::NameResolver;
 
 impl<'a> NameResolver<'a> {
@@ -55,27 +54,50 @@ impl<'a> NameResolver<'a> {
         let parameters = signature.parameters.clone();
         let generics = signature.generics.clone();
 
-        if call.arguments.len() != parameters.len()
-            && !call.arguments.iter().all(|arg| arg.name.is_none())
-        {
-            self.declares.insert_expression_type(expression_id, return_type);
-            return
-        }
+        // Only checkable when arity matches positionally and no argument is named.
+        let checkable = call.arguments.len() == parameters.len()
+            && call.arguments.iter().all(|arg| arg.name.is_none());
 
-        for (argument, parameter) in call.arguments.iter().zip(&parameters) {
-            if is_generic_parameter(&parameter.ty, &generics) {
-                continue;
-            }
-            let Some(arg_ty) = self.expression_type(argument.value) else {
-                continue;
-            };
-            if combine_operand_types(&arg_ty, &parameter.ty).is_none() {
+        if checkable {
+            let mut generic_bindings: Vec<(&str, SoulType)> = Vec::new();
+
+            for (argument, parameter) in call.arguments.iter().zip(&parameters) {
+                if matches!(parameter.ty, SoulType::ImplTrait(_)) {
+                    continue;
+                }
+
+                let Some(arg_ty) = self.expression_type(argument.value) else {
+                    continue;
+                };
+
                 let span = self
                     .store
                     .expressions
                     .get(argument.value)
                     .map(|expr| expr.span)
                     .unwrap_or(call.name.span());
+
+                if let Some(generic_name) = generic_name_of(&parameter.ty, &generics) {
+                    match generic_bindings.iter().find(|(name, _)| *name == generic_name) {
+                        Some((_, bound_ty)) => {
+                            if self.combine_operand_types(&arg_ty, bound_ty).is_none() {
+                                self.log_fault(Fault::error(
+                                    format!(
+                                        "generic parameter `{generic_name}` inferred as both `{bound_ty:?}` and `{arg_ty:?}`"
+                                    ),
+                                    Some(span),
+                                ));
+                            }
+                        }
+                        None => generic_bindings.push((generic_name, arg_ty)),
+                    }
+                    continue;
+                }
+
+                if self.combine_operand_types(&arg_ty, &parameter.ty).is_some() {
+                    continue;
+                }
+
                 self.log_fault(Fault::error(
                     format!(
                         "argument type mismatch: expected `{:?}`, got `{arg_ty:?}`",
@@ -512,7 +534,7 @@ impl<'a> NameResolver<'a> {
     }
 }
 
-fn is_generic_parameter(ty: &SoulType, generics: &[Generic]) -> bool {
+pub(super) fn is_generic_parameter(ty: &SoulType, generics: &[Generic]) -> bool {
     match ty {
         SoulType::ImplTrait(_) => true,
         SoulType::Stub(stub) => generics
@@ -520,4 +542,17 @@ fn is_generic_parameter(ty: &SoulType, generics: &[Generic]) -> bool {
             .any(|generic| generic.name.as_str() == stub.name.as_str()),
         _ => false,
     }
+}
+
+/// The declared generic's name if `ty` is a bare reference to it (e.g. `T`
+/// in `foo<T>(a: T)`), so repeated uses of the same generic within one call
+/// can be checked against each other.
+fn generic_name_of<'g>(ty: &SoulType, generics: &'g [Generic]) -> Option<&'g str> {
+    let SoulType::Stub(stub) = ty else {
+        return None;
+    };
+    generics
+        .iter()
+        .find(|generic| generic.name.as_str() == stub.name.as_str())
+        .map(|generic| generic.name.as_str())
 }

@@ -101,7 +101,14 @@ impl<'a> NameResolver<'a> {
 
         match function_kind {
             FunctionKind::Signature(_) => (),
-            FunctionKind::Normal(function) => self.resolve_block(function.block),
+            FunctionKind::Normal(function) => {
+                self.resolve_block(function.block);
+                self.check_tail_return_type(
+                    function.block,
+                    &signature.return_type,
+                    &signature.generics,
+                );
+            }
         };
 
         self.current.function = prev;
