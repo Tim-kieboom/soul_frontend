@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     CustomType, NodeId,
+    expression::ExpressionId,
     soul_type::SoulType,
     statements::{Enum, InnerFunctionSignature, Struct, Trait},
 };
@@ -29,6 +30,8 @@ pub struct DeclareStore {
     function_names: HashMap<String, Vec<FunctionId>>,
     /// Variable type information, indexed by node ID.
     variable_type: VecMap<NodeId, (TypeModifier, Option<SoulType>, ModuleId)>,
+    /// Resolved type of an expression, indexed by its ID.
+    expression_types: VecMap<ExpressionId, SoulType>,
 }
 impl DeclareStore {
     /// Creates a new empty declaration store.
@@ -42,6 +45,7 @@ impl DeclareStore {
             function_names: HashMap::new(),
             function_resolves: VecMap::new(),
             intrinsic_resolves: VecMap::new(),
+            expression_types: VecMap::new(),
         }
     }
 
@@ -191,6 +195,16 @@ impl DeclareStore {
         module: ModuleId,
     ) {
         self.variable_type.insert(index, (modifier, ty, module));
+    }
+
+    /// Gets the resolved type of an expression by its ID.
+    pub fn get_expression_type(&self, index: ExpressionId) -> Option<&SoulType> {
+        self.expression_types.get(index)
+    }
+
+    /// Sets the resolved type of an expression.
+    pub fn insert_expression_type(&mut self, index: ExpressionId, ty: SoulType) {
+        self.expression_types.insert(index, ty);
     }
 }
 

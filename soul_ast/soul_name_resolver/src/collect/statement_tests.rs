@@ -54,7 +54,7 @@ fn variable_type(ast: &AstTree, name: &str) -> Option<SoulType> {
             return None;
         }
         ast.declares
-            .get_variable_type(variable.id)
+            .get_variable_type(binding.id)
             .and_then(|(_, ty, _)| ty.clone())
     })
 }

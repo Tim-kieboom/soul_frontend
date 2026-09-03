@@ -209,8 +209,13 @@ impl<'a> NameResolver<'a> {
             None => self.infer_literal_type(variable.initialize_value),
         };
 
+
+        let type_key = match &variable.pattern {
+            VarPattern::Simple { binding, .. } => binding.id,
+            _ => variable.id,
+        };
         self.declares
-            .insert_variable_type(variable.id, variable.modifier, ty, self.current.module);
+            .insert_variable_type(type_key, variable.modifier, ty, self.current.module);
 
         if let Some(value) = variable.initialize_value {
             self.collect_expression(value);

@@ -8,6 +8,8 @@ mod function_call;
 mod statement;
 
 #[cfg(test)]
+mod binary_expression_tests;
+#[cfg(test)]
 mod function_call_tests;
 
 impl<'a> NameResolver<'a> {

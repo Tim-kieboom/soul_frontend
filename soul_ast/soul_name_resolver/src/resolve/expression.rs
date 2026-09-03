@@ -1,12 +1,14 @@
 use ast_model::{
     expression::{
-        AnyArray, Constructor, ExpressionId, ExpressionKind, FieldAccess, For, ForCondition, If,
-        IfBranch, IfCondition, Lambda, Match, MatchMethod, StringFormat, StructConstructor,
-        VariableExpression,
+        AnyArray, Binary, Constructor, ExpressionId, ExpressionKind, FieldAccess, For,
+        ForCondition, If, IfBranch, IfCondition, Lambda, Match, MatchMethod, StringFormat,
+        StructConstructor, VariableExpression,
     },
+    operators::BinaryOperatorKind,
     scope::ScopeValue,
+    soul_type::SoulType,
 };
-use soul_utils::{fault::Fault, soul_error_internal};
+use soul_utils::{fault::Fault, soul_error_internal, soul_names::PrimitiveTypes, span::Span};
 
 use crate::NameResolver;
 
@@ -46,6 +48,7 @@ impl<'a> NameResolver<'a> {
             ExpressionKind::Binary(binary) => {
                 self.resolve_expression(binary.left);
                 self.resolve_expression(binary.right);
+                self.check_binary_expression(expression_id, expression.span, binary);
             }
 
             ExpressionKind::Tuple(values) => {
@@ -223,4 +226,58 @@ impl<'a> NameResolver<'a> {
             }
         }
     }
+
+    fn check_binary_expression(&mut self, expression_id: ExpressionId, span: Span, binary: &Binary) {
+        let Some(left_ty) = self.expression_type(binary.left) else {
+            return;
+        };
+        let Some(right_ty) = self.expression_type(binary.right) else {
+            return;
+        };
+
+        if left_ty != right_ty {
+            self.log_fault(Fault::error(
+                format!(
+                    "type mismatch in binary expression: left is `{left_ty:?}`, right is `{right_ty:?}`"
+                ),
+                Some(span),
+            ));
+            return;
+        }
+
+        let result_ty = if is_comparison_operator(binary.operator.value) {
+            SoulType::Primitive(PrimitiveTypes::Boolean)
+        } else {
+            left_ty
+        };
+        self.declares.insert_expression_type(expression_id, result_ty);
+    }
+
+    fn expression_type(&self, expression_id: ExpressionId) -> Option<SoulType> {
+        if let Some(ty) = self.declares.get_expression_type(expression_id) {
+            return Some(ty.clone());
+        }
+
+        let expression = self.store.expressions.get(expression_id)?;
+        let ExpressionKind::Variable(variable) = &expression.node else {
+            return None;
+        };
+        let resolved = self.declares.get_variable_resolve(variable.id)?;
+        let (_, ty, _) = self.declares.get_variable_type(resolved)?;
+        ty.clone()
+    }
+}
+
+fn is_comparison_operator(operator: BinaryOperatorKind) -> bool {
+    matches!(
+        operator,
+        BinaryOperatorKind::Eq
+            | BinaryOperatorKind::NotEq
+            | BinaryOperatorKind::Lt
+            | BinaryOperatorKind::Gt
+            | BinaryOperatorKind::Le
+            | BinaryOperatorKind::Ge
+            | BinaryOperatorKind::LogAnd
+            | BinaryOperatorKind::LogOr
+    )
 }
