@@ -127,10 +127,13 @@ fn untyped_chain_with_float_stays_untyped_float() {
 }
 
 #[test]
-fn operand_from_function_call_is_skipped_without_fault() {
+fn operand_from_function_call_uses_its_return_type() {
     let ast = resolve_source(
         "foo(): i64 {\n    return 1\n}\nmain() {\n    a: i64 = 1\n    c := a + foo()\n}\n",
     );
     assert_eq!(type_mismatch_fault_count(&ast), 0);
-    assert_eq!(expression_type_of_binding(&ast, "c"), None);
+    assert_eq!(
+        expression_type_of_binding(&ast, "c"),
+        Some(SoulType::Primitive(PrimitiveTypes::Int64))
+    );
 }

@@ -18,21 +18,73 @@ use soul_utils::{
 };
 use std::str::FromStr;
 
+use super::expression::combine_operand_types;
 use crate::NameResolver;
 
 impl<'a> NameResolver<'a> {
-    pub(super) fn resolve_function_call(&mut self, call: &FunctionCall) {
+    pub(super) fn resolve_function_call(
+        &mut self,
+        expression_id: ExpressionId,
+        call: &FunctionCall,
+    ) {
+        for argument in &call.arguments {
+            self.resolve_expression(argument.value);
+        }
+
         if let Some(path) = self.try_get_intrinsic_path(call) {
             self.resolve_intrinsic_call(&path, call);
             return;
         }
 
-        self.resolve_call(call);
+        self.resolve_call(expression_id, call);
     }
 
-    /// Recognizes `intrinsic.<path>(...)` calls (e.g. `intrinsic.fieldIndex(...)`,
-    /// `intrinsic.array.toRaw(...)`) by walking the callee chain down to a bare
-    /// `intrinsic` variable, joining the field-access segments with `.`.
+    fn finish_call_resolution(
+        &mut self,
+        expression_id: ExpressionId,
+        call: &FunctionCall,
+        function_id: FunctionId,
+    ) {
+        if function_id == FunctionId::ERROR {
+            return;
+        }
+        let Some((signature, _)) = self.declares.get_function(function_id) else {
+            return;
+        };
+        let return_type = signature.return_type.clone();
+        let parameters = signature.parameters.clone();
+
+        if call.arguments.len() != parameters.len()
+            && !call.arguments.iter().all(|arg| arg.name.is_none())
+        {
+            self.declares.insert_expression_type(expression_id, return_type);
+            return 
+        }
+
+        for (argument, parameter) in call.arguments.iter().zip(&parameters) {
+            let Some(arg_ty) = self.expression_type(argument.value) else {
+                continue;
+            };
+            if combine_operand_types(&arg_ty, &parameter.ty).is_none() {
+                let span = self
+                    .store
+                    .expressions
+                    .get(argument.value)
+                    .map(|expr| expr.span)
+                    .unwrap_or(call.name.span());
+                self.log_fault(Fault::error(
+                    format!(
+                        "argument type mismatch: expected `{:?}`, got `{arg_ty:?}`",
+                        parameter.ty
+                    ),
+                    Some(span),
+                ));
+            }
+        }
+
+        self.declares.insert_expression_type(expression_id, return_type);
+    }
+
     fn try_get_intrinsic_path(&mut self, call: &FunctionCall) -> Option<String> {
         let callee = call.callee.as_ref()?;
         let value = match &callee.kind {
@@ -86,14 +138,14 @@ impl<'a> NameResolver<'a> {
             .insert_intrinsic_resolve(call.id, IntrinsicResolve { kind });
     }
 
-    fn resolve_call(&mut self, call: &FunctionCall) {
+    fn resolve_call(&mut self, expression_id: ExpressionId, call: &FunctionCall) {
         let module_entry = match &self.try_get_callee_string(call) {
             Some(string) => self.lookup_module(string),
             None => None,
         };
 
         if let Some(module) = module_entry {
-            self.resolve_module_call(module, call);
+            self.resolve_module_call(expression_id, module, call);
             return;
         }
 
@@ -110,6 +162,7 @@ impl<'a> NameResolver<'a> {
                     ignore_callee: false,
                 },
             );
+            self.finish_call_resolution(expression_id, call, id);
             return;
         }
 
@@ -156,6 +209,7 @@ impl<'a> NameResolver<'a> {
                 ignore_callee: false,
             },
         );
+        self.finish_call_resolution(expression_id, call, id);
     }
 
     fn get_owner_kind(
@@ -321,7 +375,12 @@ impl<'a> NameResolver<'a> {
         None
     }
 
-    fn resolve_module_call(&mut self, module_entry: ScopeModuleEntry, call: &FunctionCall) {
+    fn resolve_module_call(
+        &mut self,
+        expression_id: ExpressionId,
+        module_entry: ScopeModuleEntry,
+        call: &FunctionCall,
+    ) {
         let resolve =
             self.lookup_module_function(&module_entry, call.name.as_str(), call.name.span());
         let id = match resolve {
@@ -338,12 +397,9 @@ impl<'a> NameResolver<'a> {
                 is_defer: false,
             },
         );
+        self.finish_call_resolution(expression_id, call, id);
     }
 
-    /// Called when a module-qualified call could not be resolved inside the
-    /// module's own header lookup. Reports a diagnostic naming the crate (for
-    /// external imports) or module (for local ones) and returns `FunctionId::ERROR`
-    /// so the caller still records a well-formed (if erroneous) resolution.
     fn resolve_external_function(
         &mut self,
         module_entry: &ScopeModuleEntry,
@@ -372,9 +428,6 @@ impl<'a> NameResolver<'a> {
             return self.lookup_function(&function_name);
         }
 
-        // External modules are parsed and resolved into `self.ast_modules` the
-        // same way local modules are (see `collect_import_path`), so the header
-        // lookup below applies to both local and external `module_entry`s.
         let module_id = module_entry.module_id;
         debug_assert!(module_id != ModuleId::ERROR);
         debug_assert!(self.ast_modules.contains(module_id));

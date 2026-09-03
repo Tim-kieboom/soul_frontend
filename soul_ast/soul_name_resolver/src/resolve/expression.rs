@@ -83,7 +83,7 @@ impl<'a> NameResolver<'a> {
                 self.resolve_string_format(string_format)
             }
             ExpressionKind::FunctionCall(function_call) => {
-                self.resolve_function_call(function_call)
+                self.resolve_function_call(expression_id, function_call)
             }
             ExpressionKind::StructConstructor(struct_constructor) => {
                 self.resolve_struct_contructor(struct_constructor)
@@ -260,7 +260,7 @@ impl<'a> NameResolver<'a> {
             .insert_expression_type(expression_id, result_ty);
     }
 
-    fn expression_type(&self, expression_id: ExpressionId) -> Option<SoulType> {
+    pub(super) fn expression_type(&self, expression_id: ExpressionId) -> Option<SoulType> {
         if let Some(ty) = self.declares.get_expression_type(expression_id) {
             return Some(ty.clone());
         }
@@ -362,7 +362,7 @@ fn combine_untyped_kinds(a: PrimitiveTypes, b: PrimitiveTypes) -> PrimitiveTypes
     }
 }
 
-fn combine_operand_types(left: &SoulType, right: &SoulType) -> Option<SoulType> {
+pub(super) fn combine_operand_types(left: &SoulType, right: &SoulType) -> Option<SoulType> {
     match (untyped_kind_of(left), untyped_kind_of(right)) {
         (None, None) if left == right => Some(left.clone()),
         (None, None) => None,
