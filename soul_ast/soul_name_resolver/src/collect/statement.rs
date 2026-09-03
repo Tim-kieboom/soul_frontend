@@ -10,7 +10,7 @@ use ast_model::{
     },
 };
 use soul_utils::{
-    FunctionId, Ident, error::SoulResult, fault::Fault, soul_error_internal,
+    FunctionId, Ident, TypeModifier, error::SoulResult, fault::Fault, soul_error_internal,
     soul_names::PrimitiveTypes,
 };
 
@@ -198,6 +198,19 @@ impl<'a> NameResolver<'a> {
             let span = parameter.name.span();
             let name = parameter.name.as_str();
             self.insert_value(name, parameter.id, span, ScopeValue::Variable);
+
+            let modifier = if parameter.is_mut {
+                TypeModifier::Mut
+            } else {
+                TypeModifier::Immut
+            };
+            self.declares.insert_variable_type(
+                parameter.id,
+                modifier,
+                Some(parameter.ty.clone()),
+                self.current.module,
+            );
+
             if let Some(value) = parameter.default {
                 self.collect_expression(value);
             }

@@ -9,6 +9,8 @@ mod return_type;
 mod statement;
 
 #[cfg(test)]
+mod assignment_tests;
+#[cfg(test)]
 mod binary_expression_tests;
 #[cfg(test)]
 mod function_call_argument_tests;

@@ -10,7 +10,9 @@ use ast_model::{
     soul_type::SoulType,
 };
 use soul_tokenizer::model::types::Types;
-use soul_utils::{fault::Fault, soul_error_internal, soul_names::PrimitiveTypes, span::Span};
+use soul_utils::{
+    TypeModifier, fault::Fault, soul_error_internal, soul_names::PrimitiveTypes, span::Span,
+};
 use std::str::FromStr;
 
 use crate::NameResolver;
@@ -284,6 +286,21 @@ impl<'a> NameResolver<'a> {
             }
             _ => None,
         }
+    }
+
+    /// The declared modifier and type of a plain variable reference (not an
+    /// index, field access, or deref) — used to check assignment targets.
+    pub(super) fn variable_lvalue(
+        &self,
+        expression_id: ExpressionId,
+    ) -> Option<(TypeModifier, SoulType)> {
+        let expression = self.store.expressions.get(expression_id)?;
+        let ExpressionKind::Variable(variable) = &expression.node else {
+            return None;
+        };
+        let resolved = self.declares.get_variable_resolve(variable.id)?;
+        let (modifier, ty, _) = self.declares.get_variable_type(resolved)?;
+        Some((*modifier, ty.clone()?))
     }
 
     /// Resolves both operands' types (through any non-`distinct` type alias,
