@@ -154,12 +154,15 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         let Some(module_source) = self.read_module(module_file_path, module_name, span) else {
-            return ModuleId::ERROR
+            return ModuleId::ERROR;
         };
 
         let Some(folder_path) = module_file_path.parent() else {
-            self.log_fault(soul_error_internal!("module_file_path should have parent", None));
-            return ModuleId::ERROR
+            self.log_fault(soul_error_internal!(
+                "module_file_path should have parent",
+                None
+            ));
+            return ModuleId::ERROR;
         };
 
         self.parse_module(

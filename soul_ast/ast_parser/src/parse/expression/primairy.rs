@@ -376,10 +376,8 @@ impl<'a, 'f> Parser<'a, 'f> {
                 let is_block = keyword == KeyWord::Task || keyword == KeyWord::Spawn;
                 let name = keyword.as_str();
                 self.bump();
-                if is_block {
-                    if let Ok(primary) = self.try_parse_keyword_block(start_span) {
-                        return Ok(Some(primary));
-                    }
+                if is_block && let Ok(primary) = self.try_parse_keyword_block(start_span) {
+                    return Ok(Some(primary));
                 }
                 Expression::new_variable(
                     self.alloc_node(),

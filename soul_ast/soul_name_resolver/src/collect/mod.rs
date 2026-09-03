@@ -18,6 +18,9 @@ mod import;
 mod soul_type;
 mod statement;
 
+#[cfg(test)]
+mod statement_tests;
+
 impl<'a> NameResolver<'a> {
     pub(super) fn collect_module(&mut self, id: ModuleId) {
         let global = match self.ast_modules.get(id) {

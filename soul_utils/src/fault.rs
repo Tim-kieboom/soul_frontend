@@ -86,7 +86,7 @@ impl Fault {
     }
 
     #[cfg(feature = "error_backtrace")]
-    pub fn backtract(&self) -> &Box<str> {
+    pub fn backtract(&self) -> &str {
         &self.backtrace
     }
 }

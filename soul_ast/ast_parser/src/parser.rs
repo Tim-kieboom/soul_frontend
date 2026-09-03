@@ -92,13 +92,12 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.forest.modules()
     }
 
-    
     fn new(tokens: TokenStream<'a>, info: ParseInfo<'f>) -> Self {
-        #[cfg(debug_assertions)] 
+        #[cfg(debug_assertions)]
         let debug = {
             use soul_tokenizer::model::TokenKind;
             use soul_utils::span::Span;
-            
+
             DebugViewer {
                 current: Token::new(TokenKind::EndLine, Span::error()),
                 current_index: 0,

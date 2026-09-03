@@ -312,7 +312,7 @@ impl<'a> NameResolver<'a> {
 
         let mut current = if_.branch.as_ref();
         while let Some(branch) = current {
-            match branch.as_ref() {
+            match branch {
                 IfBranch::If(elif) => {
                     self.collect_if_condition(&elif.condition);
                     self.push_scope(elif.block);

@@ -1,3 +1,5 @@
-const function(): int {
+pub const getOne(): int {
     1
 }
+
+priv() {}

@@ -96,7 +96,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 return Err(Fault::error(
                     "RawPtr expects exactly one generic type parameter, e.g. `RawPtr<int>`",
                     Some(self.token().span),
-                ))
+                ));
             };
 
             Some(Box::new(inner))

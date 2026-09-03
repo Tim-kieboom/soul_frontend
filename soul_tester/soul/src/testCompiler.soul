@@ -10,6 +10,8 @@
 
 import (
     crate.sub
+    Std
+    Core
 )
 
 // ---------------------------------------------------------------------------
@@ -447,6 +449,17 @@ test_type_aliases() {
     // OPEN: `distinct` types shouldn't accept the base type directly without
     // going through the constructor — uncommenting this should be a compile error:
     // raw: Wrapped := 1.0
+}
+
+// ---------------------------------------------------------------------------
+// §2 — Modules: local crate module and external crate dependencies
+// ---------------------------------------------------------------------------
+
+#[test]
+test_imports() {
+    assertEq(sub.getOne(), 1)
+    assertEq(Std.add(2, 3), 5)
+    assertEq(Core.sub(5, 2), 3)
 }
 
 // ---------------------------------------------------------------------------

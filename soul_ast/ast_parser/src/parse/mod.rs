@@ -23,23 +23,23 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.expect(&ARROW_LEFT).try_err()?;
         let mut types = vec![];
         loop {
-            if let TokenKind::Ident(_) = self.token().kind {
-                if self.peek_is(&ASSIGN) {
+            if let TokenKind::Ident(_) = self.token().kind
+                && self.peek_is(&ASSIGN)
+            {
+                self.bump();
+                self.bump();
+                let value = self.try_parse_type()?;
+                types.push(value);
+                if self.current_is(&ARROW_RIGHT) {
                     self.bump();
-                    self.bump();
-                    let value = self.try_parse_type()?;
-                    types.push(value);
-                    if self.current_is(&ARROW_RIGHT) {
-                        self.bump();
-                        break;
-                    }
-                    if !self.current_is(&COMMA) {
-                        self.goto(start_position);
-                        return TryNotValue(self.get_expect_error(&COMMA));
-                    }
-                    self.bump();
-                    continue;
+                    break;
                 }
+                if !self.current_is(&COMMA) {
+                    self.goto(start_position);
+                    return TryNotValue(self.get_expect_error(&COMMA));
+                }
+                self.bump();
+                continue;
             }
 
             let ty = self.try_parse_type()?;

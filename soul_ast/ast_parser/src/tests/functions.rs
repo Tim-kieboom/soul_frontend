@@ -509,13 +509,10 @@ fn function_with_where_clause() {
         _ => panic!("expected Normal function"),
     };
     assert_eq!(signature.value.generics.len(), 1);
-    match &signature.value.generics[0] {
-        Generic { name, bound } => {
-            assert_eq!(name.as_str(), "T");
-            let bound = bound.as_ref().expect("expected a bound");
-            assert_eq!(*bound, SoulType::Stub(Stub::new("Display")));
-        }
-    }
+    let Generic { name, bound } = &signature.value.generics[0];
+    assert_eq!(name.as_str(), "T");
+    let bound = bound.as_ref().expect("expected a bound");
+    assert_eq!(*bound, SoulType::Stub(Stub::new("Display")));
 }
 
 #[test]
@@ -539,18 +536,12 @@ fn function_with_multi_where_clause() {
         _ => panic!("expected Normal function"),
     };
     assert_eq!(signature.value.generics.len(), 2);
-    match &signature.value.generics[0] {
-        Generic { name, bound } => {
-            assert_eq!(name.as_str(), "T");
-            assert_eq!(*bound.as_ref().unwrap(), SoulType::Stub(Stub::new("A")));
-        }
-    }
-    match &signature.value.generics[1] {
-        Generic { name, bound } => {
-            assert_eq!(name.as_str(), "U");
-            assert_eq!(*bound.as_ref().unwrap(), SoulType::Stub(Stub::new("B")));
-        }
-    }
+    let Generic { name, bound } = &signature.value.generics[0];
+    assert_eq!(name.as_str(), "T");
+    assert_eq!(*bound.as_ref().unwrap(), SoulType::Stub(Stub::new("A")));
+    let Generic { name, bound } = &signature.value.generics[1];
+    assert_eq!(name.as_str(), "U");
+    assert_eq!(*bound.as_ref().unwrap(), SoulType::Stub(Stub::new("B")));
 }
 
 // ----------------------------------------------------------------

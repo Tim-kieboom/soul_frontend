@@ -7,7 +7,7 @@ use soul_utils::{Ident, collections::try_result::ToResult, error::SoulResult};
 
 use crate::{
     parser::Parser,
-    utils::{ASSIGN, COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, ROUND_CLOSE, ROUND_OPEN, STRUCT},
+    utils::{AS, ASSIGN, COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, ROUND_CLOSE, ROUND_OPEN, STRUCT},
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
@@ -88,10 +88,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.expect(&TokenKind::Keyword(KeyWord::Enum))?;
         let name = self.try_bump_consume_ident()?;
 
-        let impl_type = if self.current_is(&TokenKind::Keyword(KeyWord::As)) {
-            self.bump();
-            Some(self.try_parse_type().merge_to_result()?)
-        } else if self.current_is(&COLON) {
+        let impl_type = if self.current_is_any(&[AS, COLON]) {
             self.bump();
             Some(self.try_parse_type().merge_to_result()?)
         } else {

@@ -1,5 +1,7 @@
 use ast_model::{
     CustomType, FunctionKind,
+    expression::{ExpressionId, ExpressionKind},
+    literal::Literal,
     scope::ScopeValue,
     soul_type::SoulType,
     statements::{
@@ -7,7 +9,10 @@ use ast_model::{
         UseBlock, VarPattern, Variable,
     },
 };
-use soul_utils::{FunctionId, Ident, error::SoulResult, fault::Fault, soul_error_internal};
+use soul_utils::{
+    FunctionId, Ident, error::SoulResult, fault::Fault, soul_error_internal,
+    soul_names::PrimitiveTypes,
+};
 
 use crate::NameResolver;
 
@@ -199,13 +204,13 @@ impl<'a> NameResolver<'a> {
     fn collect_variable(&mut self, variable: &Variable) {
         self.collect_var_pattern(&variable.pattern);
 
-        // Only register the Variable's own NodeId for type storage
-        self.declares.insert_variable_type(
-            variable.id,
-            variable.modifier,
-            variable.ty.clone(),
-            self.current.module,
-        );
+        let ty = match variable.ty.clone() {
+            Some(ty) => Some(ty),
+            None => self.infer_literal_type(variable.initialize_value),
+        };
+
+        self.declares
+            .insert_variable_type(variable.id, variable.modifier, ty, self.current.module);
 
         if let Some(value) = variable.initialize_value {
             self.collect_expression(value);
@@ -218,6 +223,23 @@ impl<'a> NameResolver<'a> {
         if self.current.in_global {
             self.header_insert_variable(variable);
         }
+    }
+
+    fn infer_literal_type(&self, initialize_value: Option<ExpressionId>) -> Option<SoulType> {
+        let expression = self.store.expressions.get(initialize_value?)?;
+        let ExpressionKind::Literal((_, literal)) = &expression.node else {
+            return None;
+        };
+
+        Some(match literal {
+            Literal::Int(_) => SoulType::Primitive(PrimitiveTypes::Int),
+            Literal::Uint(_) => SoulType::Primitive(PrimitiveTypes::Uint),
+            Literal::Float(_) => SoulType::Primitive(PrimitiveTypes::Float64),
+            Literal::Bool(_) => SoulType::Primitive(PrimitiveTypes::Boolean),
+            Literal::Char(_) => SoulType::Primitive(PrimitiveTypes::Char),
+            Literal::Str(_) => SoulType::String,
+            Literal::Cstr(_) => SoulType::Primitive(PrimitiveTypes::CStr),
+        })
     }
 
     pub(crate) fn collect_var_pattern(&mut self, pattern: &VarPattern) {

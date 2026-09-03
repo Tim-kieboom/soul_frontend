@@ -1,3 +1,5 @@
+use core::f64;
+
 use ast_model::{
     expression::ExpressionKind, literal::Literal, operators::BinaryOperatorKind,
     statements::StatementKind,
@@ -45,7 +47,7 @@ fn expression_literal_float() {
             let expr = &store.expressions[*expression];
             assert!(matches!(
                 expr.node,
-                ExpressionKind::Literal((_, Literal::Float(3.14)))
+                ExpressionKind::Literal((_, Literal::Float(f64::consts::PI)))
             ));
         }
         _ => panic!("expected Expression statement"),

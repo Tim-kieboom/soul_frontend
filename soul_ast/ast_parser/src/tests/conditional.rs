@@ -66,7 +66,7 @@ fn if_else_statement() {
         StatementKind::Expression { expression, .. } => {
             let expr = &store.expressions[*expression];
             match &expr.node {
-                ExpressionKind::If(If { branch, .. }) => match branch.as_ref().unwrap().as_ref() {
+                ExpressionKind::If(If { branch, .. }) => match branch.as_ref().unwrap() {
                     IfBranch::Else(block_id) => {
                         let body = &store.blocks[*block_id];
                         assert!(body.statements.is_empty());

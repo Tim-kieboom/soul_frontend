@@ -1188,11 +1188,11 @@ impl<'a, W: Writer> Displayer<'a, W> {
         }
     }
 
-    fn display_branch(&mut self, if_arm: &Option<Box<IfBranch>>) -> Result<()> {
+    fn display_branch(&mut self, if_arm: &Option<IfBranch>) -> Result<()> {
         let mut current = if_arm.as_ref();
         while let Some(arm) = current {
             self.push_char(' ')?;
-            match arm.as_ref() {
+            match arm {
                 IfBranch::If(elif) => {
                     push_fmt!(self, "{ELSE_STR} {IF_STR} ")?;
                     self.write_if_condition(&elif.condition)?;

@@ -288,7 +288,7 @@ pub struct Binding {
 pub struct If {
     pub condition: IfCondition,
     pub block: BlockId,
-    pub branch: Option<Box<IfBranch>>,
+    pub branch: Option<IfBranch>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -310,8 +310,17 @@ pub enum IfCondition {
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum IfBranch {
-    If(If),
+    If(Box<If>),
     Else(BlockId),
+}
+impl IfBranch {
+    pub fn new_if(if_: If) -> Self {
+        Self::If(Box::new(if_))
+    }
+
+    pub fn new_else(block: BlockId) -> Self {
+        Self::Else(block)
+    }
 }
 
 /// A loop `for true {Println("loop")}` or conditional loop `for true {Println("loop")}` or iterator `for el in [1, 2, 3] {Println(el)}`.

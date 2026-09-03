@@ -12,8 +12,10 @@ use soul_utils::{
 };
 
 use crate::{
-    parser::Parser, utils::{
-        ARRAY, COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, DOUBLE_DOT, FOR, IN, LAMBDA_ARROW, SQUARE_CLOSE, SQUARE_OPEN,
+    parser::Parser,
+    utils::{
+        ARRAY, COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, DOUBLE_DOT, FOR, IN, LAMBDA_ARROW,
+        SQUARE_CLOSE, SQUARE_OPEN,
     },
 };
 

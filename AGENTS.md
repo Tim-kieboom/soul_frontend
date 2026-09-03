@@ -100,6 +100,12 @@ Every `unsafe` block requires a `SAFETY` comment.
 Prefer explicit code over clever code. Avoid complicated iterator chains when explicit
 control flow is easier to understand. Readable code always wins.
 
+### Documentation
+
+Doc comments (`///`, `//!`) should really only be written for `pub` items — the public
+API surface. Private and `pub(crate)`/`pub(super)` items should rely on clear naming and,
+where needed, brief `//` comments instead.
+
 ### Standard APIs
 
 Prefer Rust conventions: `new`, `Default`, `From`, `TryFrom`, `AsRef`, `Into`, `Iterator`,
@@ -121,6 +127,17 @@ Prefer Rust conventions: `new`, `Default`, `From`, `TryFrom`, `AsRef`, `Into`, `
 Generate production-quality Rust. Do not explain obvious Rust concepts. If a requested
 implementation violates these guidelines, explain why and produce a guideline-compliant
 alternative instead.
+
+### Validation
+
+Before considering a change complete, run:
+
+```
+cargo fmt --all
+cargo clippy --all-targets --all-features 
+```
+
+Fix any warnings raised by `cargo clippy` and ensure `cargo fmt` reports no diff.
 
 ## Code review checklist
 

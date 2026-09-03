@@ -215,7 +215,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok(arms)
     }
 
-    fn parse_if_arms(&mut self, head: &mut Option<Box<IfBranch>>) -> SoulResult<()> {
+    fn parse_if_arms(&mut self, head: &mut Option<IfBranch>) -> SoulResult<()> {
         let mut tail = head;
         let mut has_else = false;
 
@@ -245,7 +245,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                     self.bump();
                     let condition = self.parse_type_assert()?;
                     let block = self.parse_block(TypeModifier::Mut)?;
-                    IfBranch::If(If {
+                    IfBranch::new_if(If {
                         condition,
                         block,
                         branch: None,
@@ -253,7 +253,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 } else {
                     let condition = self.parse_expression_id(&[CURLY_OPEN])?;
                     let block = self.parse_block(TypeModifier::Mut)?;
-                    IfBranch::If(If {
+                    IfBranch::new_if(If {
                         condition: IfCondition::Expression(condition),
                         block,
                         branch: None,
@@ -265,7 +265,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 IfBranch::Else(block)
             };
 
-            *tail = Some(Box::new(else_kind));
+            *tail = Some(else_kind);
             tail = match try_next_mut(tail.as_mut().expect("just made Some(_)")) {
                 Some(val) => val,
                 None => return Ok(()),
@@ -655,7 +655,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 }
 
-fn try_next_mut(arm: &mut IfBranch) -> Option<&mut Option<Box<IfBranch>>> {
+fn try_next_mut(arm: &mut IfBranch) -> Option<&mut Option<IfBranch>> {
     match arm {
         IfBranch::If(arm) => Some(&mut arm.branch),
         IfBranch::Else(_) => None,

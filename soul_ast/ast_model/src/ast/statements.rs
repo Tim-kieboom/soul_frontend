@@ -262,7 +262,12 @@ pub struct Variable {
 }
 
 impl Variable {
-    pub fn new_const(id: NodeId, pattern: VarPattern, ty: Option<SoulType>, value: Option<ExpressionId>) -> Self {
+    pub fn new_const(
+        id: NodeId,
+        pattern: VarPattern,
+        ty: Option<SoulType>,
+        value: Option<ExpressionId>,
+    ) -> Self {
         Self {
             id,
             pattern,

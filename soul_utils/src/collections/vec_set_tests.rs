@@ -53,8 +53,8 @@ fn test_vecset_from_slice() {
 fn test_vecset_index() {
     let mut set: TestSet = TestSet::new();
     set.insert(TestIndex(5));
-    assert_eq!(set[TestIndex(5)], true);
-    assert_eq!(set[TestIndex(0)], false);
+    assert!(set[TestIndex(5)]);
+    assert!(!set[TestIndex(0)]);
 }
 
 #[test]

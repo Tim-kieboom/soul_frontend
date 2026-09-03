@@ -581,7 +581,7 @@ fn error_on_bad_token() {
 #[test]
 fn error_partial_expression() {
     let (_, _, context) = parse("1 +\n");
-    assert!(context.faults.faults.len() > 0);
+    assert!(!context.faults.faults.is_empty());
 }
 
 // ----------------------------------------------------------------

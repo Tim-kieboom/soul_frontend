@@ -48,7 +48,9 @@ impl<'a> NameResolver<'a> {
     fn collect_intrinsic_path_segments(&mut self, id: ExpressionId) -> Option<Vec<String>> {
         let expr = self.store.expressions.get(id)?;
         match &expr.node {
-            ExpressionKind::Variable(VariableExpression { name, .. }) if name.as_str() == "intrinsic" => {
+            ExpressionKind::Variable(VariableExpression { name, .. })
+                if name.as_str() == "intrinsic" =>
+            {
                 Some(Vec::new())
             }
             ExpressionKind::FieldAccess(field_access) => {

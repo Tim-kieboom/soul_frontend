@@ -70,7 +70,7 @@ fn test_insert_overwrite() {
 fn test_insert_high_index_after_low() {
     let mut map: TestMap<i32> = TestMap::new();
     map.insert(TestIndex(0), 5);
-    assert_eq!(map.contains(TestIndex(100)), false);
+    assert!(!map.contains(TestIndex(100)));
     assert_eq!(map.get(TestIndex(100)), None);
     assert_eq!(map.cap(), 1);
 }
