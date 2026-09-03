@@ -171,51 +171,61 @@ macro_rules! define_str_enum {
 /// # Variants
 /// ## Without precedence
 /// ```
-/// use models::symbool_kind::Symbol;
-/// use models::define_symbols;
+/// use soul_utils::soul_names::Symbol;
+/// use soul_utils::define_symbols;
 ///
-/// define_symbols!{
-///     enum Refs {
-///         /// Constant reference.
-///         ConstRef => "@", Symbol::ConstRef,
-///         MutRef => "&", Symbol::And,
+/// define_symbols! {
+///     /// Binary operator symbols without explicit precedence.
+///     pub enum BinOp {
+///         Plus      => "+",  Symbol::Plus,
+///         Minus     => "-",  Symbol::Minus,
+///         Star      => "*",  Symbol::Star,
+///         Slash     => "/",  Symbol::Slash,
+///         Mod       => "%",  Symbol::Mod,
 ///     }
 /// }
 ///
-/// assert_eq!(Refs::VARIANTS, &[Refs::ConstRef, Refs::MutRef]);
-/// assert_eq!(Refs::STRING_VALUES, &["@", "&"]);
-/// assert_eq!(Refs::SYMBOL_VALUES, &[Symbol::ConstRef, Symbol::And]);
-///
-/// const CONST_REF_STR: &str = Refs::ConstRef.as_str(); // const-time
-/// assert_eq!(CONST_REF_STR, "@");
-///
-/// const CONST_REF_SYMBOOL: Symbol = Refs::ConstRef.as_symbool(); // const-time
-/// assert_eq!(CONST_REF_SYMBOOL, Symbol::ConstRef);
-///
-/// const CONST_REF: Option<Refs> = Refs::from_symbool(Symbol::ConstRef); // const-time
-/// assert_eq!(CONST_REF, Some(Refs::ConstRef));
-///
-/// let mut_ref = Refs::from_str("&");
-/// assert_eq!(mut_ref, Some(Refs::MutRef));
-///
-/// let none_variant = Refs::from_str("none");
-/// assert_eq!(none_variant, None);
+/// // Usage:
+/// let op = BinOp::Plus;
+/// assert_eq!(op.as_str(), "+");
+/// assert_eq!(op.as_symbool(), Symbol::Plus);
+/// assert_eq!(BinOp::from_str("+"), Some(BinOp::Plus));
+/// assert_eq!(BinOp::from_symbool(Symbol::Minus), Some(BinOp::Minus));
 /// ```
 ///
 /// ## With precedence
 /// ```
-/// use models::symbool_kind::Symbol;
-/// use models::define_symbols;
+/// use soul_utils::soul_names::Symbol;
+/// use soul_utils::define_symbols;
 ///
-/// define_symbols!{
-///     enum RefsPrecedence {
-///         ConstRef => "@", Symbol::ConstRef, 1,
-///         MutRef => "&", Symbol::And, 0,
+/// define_symbols! {
+///     /// Expression operator symbols with precedence.
+///     pub enum ExprOp {
+///         // Lower number = lower precedence
+///         Or        => "||", Symbol::DoubleOr, 1,
+///         And       => "&&", Symbol::And,       2,
+///         Eq        => "==", Symbol::Eq,        3,
+///         NotEq     => "!=", Symbol::NotEq,     3,
+///         Less      => "<",  Symbol::LeftArray, 4,
+///         Greater   => ">",  Symbol::RightArray,4,
+///         Le        => "<=", Symbol::Le,        4,
+///         Ge        => ">=", Symbol::Ge,        4,
+///         Plus      => "+",  Symbol::Plus,      5,
+///         Minus     => "-",  Symbol::Minus,     5,
+///         Star      => "*",  Symbol::Star,      6,
+///         Slash     => "/",  Symbol::Slash,     6,
+///         Mod       => "%",  Symbol::Mod,       6,
 ///     }
 /// }
 ///
-/// assert_eq!(RefsPrecedence::ConstRef.precedence(), 1 as u8);
-/// assert_eq!(RefsPrecedence::MutRef.precedence(), 0 as u8);
+/// // Usage:
+/// let op = ExprOp::Star;
+/// assert_eq!(op.as_str(), "*");
+/// assert_eq!(op.as_symbool(), Symbol::Star);
+/// assert_eq!(op.precedence(), 6);
+///
+/// let parsed: ExprOp = "||".parse().unwrap();
+/// assert_eq!(parsed, ExprOp::Or);
 /// ```
 macro_rules! define_symbols {
     (
@@ -311,6 +321,12 @@ macro_rules! define_symbols {
                 }
             }
 
+            pub const fn as_symbool(&self) -> Symbol {
+                match self {
+                    $( $enum_name::$name => $symkind, )*
+                }
+            }
+            
             pub const fn from_symbool(k: Symbol) -> Option<Self> {
                 match k {
                     $( $symkind => Some($enum_name::$name), )*

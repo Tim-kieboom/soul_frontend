@@ -4,6 +4,7 @@ use ast_model::{
         ForCondition, If, IfBranch, IfCondition, Lambda, Match, MatchMethod, StringFormat,
         StructConstructor, VariableExpression,
     },
+    literal::Literal,
     operators::BinaryOperatorKind,
     scope::ScopeValue,
     soul_type::SoulType,
@@ -227,7 +228,12 @@ impl<'a> NameResolver<'a> {
         }
     }
 
-    fn check_binary_expression(&mut self, expression_id: ExpressionId, span: Span, binary: &Binary) {
+    fn check_binary_expression(
+        &mut self,
+        expression_id: ExpressionId,
+        span: Span,
+        binary: &Binary,
+    ) {
         let Some(left_ty) = self.expression_type(binary.left) else {
             return;
         };
@@ -235,7 +241,7 @@ impl<'a> NameResolver<'a> {
             return;
         };
 
-        if left_ty != right_ty {
+        let Some(combined) = combine_operand_types(&left_ty, &right_ty) else {
             self.log_fault(Fault::error(
                 format!(
                     "type mismatch in binary expression: left is `{left_ty:?}`, right is `{right_ty:?}`"
@@ -243,14 +249,15 @@ impl<'a> NameResolver<'a> {
                 Some(span),
             ));
             return;
-        }
+        };
 
         let result_ty = if is_comparison_operator(binary.operator.value) {
             SoulType::Primitive(PrimitiveTypes::Boolean)
         } else {
-            left_ty
+            combined
         };
-        self.declares.insert_expression_type(expression_id, result_ty);
+        self.declares
+            .insert_expression_type(expression_id, result_ty);
     }
 
     fn expression_type(&self, expression_id: ExpressionId) -> Option<SoulType> {
@@ -259,12 +266,27 @@ impl<'a> NameResolver<'a> {
         }
 
         let expression = self.store.expressions.get(expression_id)?;
-        let ExpressionKind::Variable(variable) = &expression.node else {
-            return None;
-        };
-        let resolved = self.declares.get_variable_resolve(variable.id)?;
-        let (_, ty, _) = self.declares.get_variable_type(resolved)?;
-        ty.clone()
+        match &expression.node {
+            ExpressionKind::Literal((_, literal)) => Some(literal_type(literal)),
+            ExpressionKind::Variable(variable) => {
+                let resolved = self.declares.get_variable_resolve(variable.id)?;
+                let (_, ty, _) = self.declares.get_variable_type(resolved)?;
+                ty.clone()
+            }
+            _ => None,
+        }
+    }
+}
+
+fn literal_type(literal: &Literal) -> SoulType {
+    match literal {
+        Literal::Int(_) => SoulType::Primitive(PrimitiveTypes::UntypedInt),
+        Literal::Uint(_) => SoulType::Primitive(PrimitiveTypes::UntypedUint),
+        Literal::Float(_) => SoulType::Primitive(PrimitiveTypes::UntypedFloat),
+        Literal::Bool(_) => SoulType::Primitive(PrimitiveTypes::Boolean),
+        Literal::Char(_) => SoulType::Primitive(PrimitiveTypes::Char),
+        Literal::Str(_) => SoulType::String,
+        Literal::Cstr(_) => SoulType::Primitive(PrimitiveTypes::CStr),
     }
 }
 
@@ -280,4 +302,85 @@ fn is_comparison_operator(operator: BinaryOperatorKind) -> bool {
             | BinaryOperatorKind::LogAnd
             | BinaryOperatorKind::LogOr
     )
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum NumCategory {
+    Int,
+    Uint,
+    Float,
+}
+
+fn concrete_num_category(prim: PrimitiveTypes) -> Option<NumCategory> {
+    match prim {
+        PrimitiveTypes::CInt
+        | PrimitiveTypes::Int
+        | PrimitiveTypes::Int8
+        | PrimitiveTypes::Int16
+        | PrimitiveTypes::Int32
+        | PrimitiveTypes::Int64
+        | PrimitiveTypes::Int128 => Some(NumCategory::Int),
+        PrimitiveTypes::CUint
+        | PrimitiveTypes::Uint
+        | PrimitiveTypes::Uint8
+        | PrimitiveTypes::Uint16
+        | PrimitiveTypes::Uint32
+        | PrimitiveTypes::Uint64
+        | PrimitiveTypes::Uint128 => Some(NumCategory::Uint),
+        PrimitiveTypes::Float16 | PrimitiveTypes::Float32 | PrimitiveTypes::Float64 => {
+            Some(NumCategory::Float)
+        }
+        _ => None,
+    }
+}
+
+fn untyped_targets(kind: PrimitiveTypes) -> &'static [NumCategory] {
+    match kind {
+        PrimitiveTypes::UntypedInt => &[NumCategory::Int, NumCategory::Float],
+        PrimitiveTypes::UntypedUint => &[NumCategory::Int, NumCategory::Uint, NumCategory::Float],
+        PrimitiveTypes::UntypedFloat => &[NumCategory::Float],
+        _ => &[],
+    }
+}
+
+fn untyped_kind_of(ty: &SoulType) -> Option<PrimitiveTypes> {
+    match ty {
+        SoulType::Primitive(
+            kind @ (PrimitiveTypes::UntypedInt
+            | PrimitiveTypes::UntypedUint
+            | PrimitiveTypes::UntypedFloat),
+        ) => Some(*kind),
+        _ => None,
+    }
+}
+
+fn combine_untyped_kinds(a: PrimitiveTypes, b: PrimitiveTypes) -> PrimitiveTypes {
+    if a == PrimitiveTypes::UntypedFloat || b == PrimitiveTypes::UntypedFloat {
+        PrimitiveTypes::UntypedFloat
+    } else {
+        PrimitiveTypes::UntypedInt
+    }
+}
+
+fn combine_operand_types(left: &SoulType, right: &SoulType) -> Option<SoulType> {
+    match (untyped_kind_of(left), untyped_kind_of(right)) {
+        (None, None) if left == right => Some(left.clone()),
+        (None, None) => None,
+        (Some(kind), None) => coerce_untyped_to_concrete(kind, right),
+        (None, Some(kind)) => coerce_untyped_to_concrete(kind, left),
+        (Some(a), Some(b)) => Some(SoulType::Primitive(combine_untyped_kinds(a, b))),
+    }
+}
+
+fn coerce_untyped_to_concrete(kind: PrimitiveTypes, concrete: &SoulType) -> Option<SoulType> {
+    let SoulType::Primitive(prim) = concrete else {
+        return None;
+    };
+
+    let category = concrete_num_category(*prim)?;
+    if untyped_targets(kind).contains(&category) {
+        Some(concrete.clone())
+    } else {
+        None
+    }
 }

@@ -50,7 +50,9 @@ fn expression_type_of_binding(ast: &AstTree, name: &str) -> Option<SoulType> {
         if binding.ident.as_str() != name {
             return None;
         }
-        ast.declares.get_expression_type(variable.initialize_value?).cloned()
+        ast.declares
+            .get_expression_type(variable.initialize_value?)
+            .cloned()
     })
 }
 
@@ -63,9 +65,7 @@ fn type_mismatch_fault_count(ast: &AstTree) -> usize {
 
 #[test]
 fn same_type_arithmetic_binary_infers_operand_type() {
-    let ast = resolve_source(
-        "main() {\n    a: i64 = 1\n    b: i64 = 2\n    c := a + b\n}\n",
-    );
+    let ast = resolve_source("main() {\n    a: i64 = 1\n    b: i64 = 2\n    c := a + b\n}\n");
     assert_eq!(
         expression_type_of_binding(&ast, "c"),
         Some(SoulType::Primitive(PrimitiveTypes::Int64))
@@ -75,9 +75,7 @@ fn same_type_arithmetic_binary_infers_operand_type() {
 
 #[test]
 fn same_type_comparison_binary_infers_bool() {
-    let ast = resolve_source(
-        "main() {\n    a: i64 = 1\n    b: i64 = 2\n    c := a == b\n}\n",
-    );
+    let ast = resolve_source("main() {\n    a: i64 = 1\n    b: i64 = 2\n    c := a == b\n}\n");
     assert_eq!(
         expression_type_of_binding(&ast, "c"),
         Some(SoulType::Primitive(PrimitiveTypes::Boolean))
@@ -86,16 +84,53 @@ fn same_type_comparison_binary_infers_bool() {
 
 #[test]
 fn mismatched_operand_types_report_exactly_one_fault() {
-    let ast = resolve_source(
-        "main() {\n    a: i64 = 1\n    b: u64 = 2\n    c := a + b\n}\n",
-    );
+    let ast = resolve_source("main() {\n    a: i64 = 1\n    b: u64 = 2\n    c := a + b\n}\n");
     assert_eq!(type_mismatch_fault_count(&ast), 1);
     assert_eq!(expression_type_of_binding(&ast, "c"), None);
 }
 
 #[test]
-fn operand_with_unknown_type_is_skipped_without_fault() {
+fn untyped_literal_operand_coerces_to_concrete_operand_type() {
     let ast = resolve_source("main() {\n    a: i64 = 1\n    c := a + 5\n}\n");
+    assert_eq!(type_mismatch_fault_count(&ast), 0);
+    assert_eq!(
+        expression_type_of_binding(&ast, "c"),
+        Some(SoulType::Primitive(PrimitiveTypes::Int64))
+    );
+}
+
+#[test]
+fn incompatible_untyped_literal_operand_reports_exactly_one_fault() {
+    let ast = resolve_source("main() {\n    a: str = \"hi\"\n    c := a + 5\n}\n");
+    assert_eq!(type_mismatch_fault_count(&ast), 1);
+    assert_eq!(expression_type_of_binding(&ast, "c"), None);
+}
+
+#[test]
+fn two_untyped_int_literals_combine_and_stay_untyped() {
+    let ast = resolve_source("main() {\n    c := 5 + -3\n}\n");
+    assert_eq!(type_mismatch_fault_count(&ast), 0);
+    assert_eq!(
+        expression_type_of_binding(&ast, "c"),
+        Some(SoulType::Primitive(PrimitiveTypes::UntypedInt))
+    );
+}
+
+#[test]
+fn untyped_chain_with_float_stays_untyped_float() {
+    let ast = resolve_source("main() {\n    c := 5 + -3 + 2.0\n}\n");
+    assert_eq!(type_mismatch_fault_count(&ast), 0);
+    assert_eq!(
+        expression_type_of_binding(&ast, "c"),
+        Some(SoulType::Primitive(PrimitiveTypes::UntypedFloat))
+    );
+}
+
+#[test]
+fn operand_from_function_call_is_skipped_without_fault() {
+    let ast = resolve_source(
+        "foo(): i64 {\n    return 1\n}\nmain() {\n    a: i64 = 1\n    c := a + foo()\n}\n",
+    );
     assert_eq!(type_mismatch_fault_count(&ast), 0);
     assert_eq!(expression_type_of_binding(&ast, "c"), None);
 }

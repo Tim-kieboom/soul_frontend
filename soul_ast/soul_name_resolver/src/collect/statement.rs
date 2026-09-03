@@ -209,7 +209,6 @@ impl<'a> NameResolver<'a> {
             None => self.infer_literal_type(variable.initialize_value),
         };
 
-
         let type_key = match &variable.pattern {
             VarPattern::Simple { binding, .. } => binding.id,
             _ => variable.id,
