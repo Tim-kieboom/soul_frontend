@@ -452,7 +452,3 @@ impl<'a> NameResolver<'a> {
             .lookup_function(string, self.current.module)
     }
 }
-
-#[cfg(test)]
-#[path = "function_call_tests.rs"]
-mod tests;

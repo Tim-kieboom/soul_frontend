@@ -7,6 +7,9 @@ mod expression;
 mod function_call;
 mod statement;
 
+#[cfg(test)]
+mod function_call_tests;
+
 impl<'a> NameResolver<'a> {
     pub(crate) fn resolve_module(&mut self, id: ModuleId) {
         let global = match self.ast_modules.get(id) {

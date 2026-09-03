@@ -108,9 +108,6 @@ Prefer Rust conventions: `new`, `Default`, `From`, `TryFrom`, `AsRef`, `Into`, `
 ### Testing
 
 - Write unit tests in separate test files, not inline `mod tests` blocks.
-- Place each module's tests in a `{name}_tests.rs` file next to the source
-  (`src/foo.rs` → `src/foo_tests.rs`) and declare it with
-  `#[cfg(test)] #[path = "foo_tests.rs"] mod tests;` in the source file, so tests keep
   access to private items.
 - Test public behavior and edge cases, not implementation details.
 - Keep test helpers small and focused.
