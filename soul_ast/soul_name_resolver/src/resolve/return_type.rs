@@ -4,7 +4,7 @@ use ast_model::{
     soul_type::{Generic, SoulType},
     statements::StatementKind,
 };
-use soul_utils::fault::Fault;
+use soul_utils::{fault::Fault, span::Span};
 
 use super::function_call::is_generic_parameter;
 use crate::NameResolver;
@@ -31,6 +31,41 @@ impl<'a> NameResolver<'a> {
             return;
         };
         self.check_tail_expression(tail, return_type, generics);
+    }
+
+    /// Checks an explicit `return` statement's value against the current
+    /// function's declared return type. A bare `return` (no value) is only
+    /// valid when that return type is void. Skipped entirely when there's no
+    /// current function context (e.g. inside a lambda, which has no declared
+    /// return type of its own) or the return type isn't one this checker
+    /// models (generic/`impl Trait`).
+    pub(super) fn check_return_statement(&mut self, value: Option<ExpressionId>, span: Span) {
+        let Some(function_id) = self.current.function else {
+            return;
+        };
+        let Some((signature, _)) = self.declares.get_function(function_id) else {
+            return;
+        };
+        let return_type = signature.return_type.clone();
+        let generics = signature.generics.clone();
+
+        if is_generic_parameter(&return_type, &generics) {
+            return;
+        }
+
+        match value {
+            Some(expression_id) => {
+                self.check_tail_expression(expression_id, &return_type, &generics)
+            }
+            None => {
+                if !matches!(return_type, SoulType::None) {
+                    self.log_fault(Fault::error(
+                        format!("return type mismatch: expected `{return_type:?}`, got nothing"),
+                        Some(span),
+                    ));
+                }
+            }
+        }
     }
 
     fn tail_position(&self, block_id: BlockId) -> Option<ExpressionId> {

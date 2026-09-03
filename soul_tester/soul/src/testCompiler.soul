@@ -14,10 +14,17 @@ import (
     Core
 )
 
-assertEq<T: Eq>(a: T, b: T) {
+#[inline]
+const assertEq<T: Eq>(a: T, b: T) {
     if a == b {
-        panic(f"{a} != {b}")
+        panic(f"assertion failed: {a} != {b}")
     }
+}
+
+lamdba() {
+    fn := () => return 2
+    num := fn()
+    assertEq(fn(), 2)
 }
 
 // ---------------------------------------------------------------------------

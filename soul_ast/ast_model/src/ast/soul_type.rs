@@ -1,8 +1,8 @@
-use std::rc::Rc;
+use std::{fmt, rc::Rc};
 
 use soul_utils::{Ident, SharedStr, soul_names::PrimitiveTypes};
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum SoulType {
     /// empty type
     None,
@@ -48,11 +48,89 @@ pub enum SoulType {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+impl fmt::Debug for SoulType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SoulType::None => write!(f, "none"),
+            SoulType::Never => write!(f, "!"),
+            SoulType::String => write!(f, "str"),
+            SoulType::FormatString => write!(f, "fstr"),
+            SoulType::Any => write!(f, "any"),
+            SoulType::TupleKind(kind) => write!(f, "{:?}", kind),
+            SoulType::Primitive(primitive) => write!(f, "{}", primitive),
+            SoulType::Array(array) => write!(f, "{:?}", array),
+            SoulType::Reference(reference) => {
+                write!(f, "&")?;
+                if let Some(lifetime) = &reference.lifetime {
+                    write!(f, "'{} ", lifetime)?;
+                }
+                if reference.mutable {
+                    write!(f, "mut ")?;
+                }
+                write!(f, "{:?}", reference.inner)
+            }
+            SoulType::Pointer(pointer) => {
+                write!(f, "*")?;
+                if let Some(lifetime) = &pointer.lifetime {
+                    write!(f, "'{} ", lifetime)?;
+                }
+                if pointer.mutable {
+                    write!(f, "mut ")?;
+                }
+                write!(f, "{:?}", pointer.inner)
+            }
+            SoulType::RawPtr(generic) => match generic {
+                Some(ty) => write!(f, "RawPtr<{:?}>", ty),
+                None => write!(f, "RawPtr"),
+            },
+            SoulType::Res { ok, err } => match (ok, err) {
+                (None, None) => write!(f, "Res"),
+                (Some(ok), None) => write!(f, "Res<{:?}>", ok),
+                (None, Some(err)) => write!(f, "Res<none, {:?}>", err),
+                (Some(ok), Some(err)) => write!(f, "Res<{:?}, {:?}>", ok, err),
+            },
+            SoulType::Error => write!(f, "Error"),
+            SoulType::Optional(inner) => write!(f, "?{:?}", inner),
+            SoulType::ImplTrait(inner) => write!(f, "impl {:?}", inner),
+            SoulType::Stub(stub) => write!(f, "{:?}", stub),
+            SoulType::NamedVariant { base, variant } => write!(f, "{:?}::{}", base, variant),
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum TupleKind {
     Tuple(Tuple),
     NamedTuple(NamedTuple),
 }
+
+impl fmt::Debug for TupleKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TupleKind::Tuple(types) => {
+                write!(f, "(")?;
+                for (i, ty) in types.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{:?}", ty)?;
+                }
+                write!(f, ")")
+            }
+            TupleKind::NamedTuple(items) => {
+                write!(f, "(")?;
+                for (i, (name, ty)) in items.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}: {:?}", name, ty)?;
+                }
+                write!(f, ")")
+            }
+        }
+    }
+}
+
 impl TupleKind {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
@@ -70,12 +148,25 @@ pub type Tuple = Vec<SoulType>;
 pub type NamedTuple = Vec<(Ident, SoulType)>;
 
 /// Array type
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ArrayType {
     /// The element type of the array.
     pub of_type: Box<SoulType>,
     /// Compile-time size, or `None` for dynamic arrays.
     pub kind: ArrayKind,
+}
+
+impl fmt::Debug for ArrayType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.kind {
+            ArrayKind::StackArrayWildcard => write!(f, "[_]")?,
+            ArrayKind::StackArray(size) => write!(f, "[{}]", size)?,
+            ArrayKind::HeapArray => write!(f, "[]")?,
+            ArrayKind::MutSlice => write!(f, "[&]")?,
+            ArrayKind::ConstSlice => write!(f, "[&mut]")?,
+        }
+        write!(f, "{:?}", self.of_type)
+    }
 }
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ArrayKind {
@@ -101,10 +192,27 @@ pub struct ReferenceType {
     pub mutable: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Stub {
     pub name: SharedStr,
     pub generics: Vec<SoulType>,
+}
+
+impl fmt::Debug for Stub {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.name)?;
+        if !self.generics.is_empty() {
+            write!(f, "<")?;
+            for (i, generic) in self.generics.iter().enumerate() {
+                if i > 0 {
+                    write!(f, ", ")?;
+                }
+                write!(f, "{:?}", generic)?;
+            }
+            write!(f, ">")?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

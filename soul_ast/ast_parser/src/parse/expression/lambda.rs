@@ -1,10 +1,10 @@
 use ast_model::{
     block::Block,
-    expression::{Expression, Lambda},
+    expression::{Expression, ExpressionId, ExpressionKind, Lambda},
     statements::{Statement, VarPattern},
 };
-use soul_tokenizer::model::TokenKind;
-use soul_utils::{TypeModifier, soul_names::Symbol, span::Span};
+use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
+use soul_utils::{TypeModifier, error::SoulResult, soul_names::Symbol, span::Span};
 
 use crate::{parser::Parser, utils::LAMBDA_ARROW};
 
@@ -18,7 +18,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         if self.current_is(&LAMBDA_ARROW) {
             self.bump();
-            let body_expression = self.parse_expression_id(LAMBDA_BODY_END).ok()?;
+            let body_expression = self.parse_lambda_body().ok()?;
             let params = match pattern {
                 VarPattern::Tuple(tuple) => tuple.elements,
                 other => vec![other],
@@ -51,6 +51,37 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.goto(saved);
             None
         }
+    }
+
+    fn parse_lambda_body(&mut self) -> SoulResult<ExpressionId> {
+        let start_span = self.token().span;
+
+        let keyword = match &self.token().kind {
+            TokenKind::Keyword(keyword @ (KeyWord::Break | KeyWord::Return | KeyWord::Continue)) => {
+                Some(*keyword)
+            }
+            _ => None,
+        };
+
+        if let Some(keyword) = keyword {
+            self.bump();
+            let kind = match keyword {
+                KeyWord::Break => ExpressionKind::Break,
+                KeyWord::Continue => ExpressionKind::Continue,
+                KeyWord::Return if self.current_is_any(LAMBDA_BODY_END) => {
+                    ExpressionKind::Return(None)
+                }
+                KeyWord::Return => {
+                    ExpressionKind::Return(Some(self.parse_expression_id(LAMBDA_BODY_END)?))
+                }
+                _ => unreachable!(),
+            };
+
+            let span = self.span_combine(start_span);
+            return Ok(Expression::new_id(&mut self.forest.store, kind, span));
+        }
+
+        self.parse_expression_id(LAMBDA_BODY_END)
     }
 }
 

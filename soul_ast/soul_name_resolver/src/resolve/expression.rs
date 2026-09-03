@@ -73,10 +73,11 @@ impl<'a> NameResolver<'a> {
                 self.resolve_variable_expression(variable);
             }
             ExpressionKind::NewArray(any_array) => self.resolve_any_array(any_array),
-            ExpressionKind::Return(expression_id) => {
-                if let Some(value) = expression_id {
+            ExpressionKind::Return(value) => {
+                if let Some(value) = value {
                     self.resolve_expression(*value);
                 }
+                self.check_return_statement(*value, expression.span);
             }
             ExpressionKind::Constructor(constructor) => self.resolve_contructor(constructor),
             ExpressionKind::FieldAccess(field_access) => self.resolve_field_access(field_access),
@@ -125,7 +126,9 @@ impl<'a> NameResolver<'a> {
     }
 
     fn resolve_lambda(&mut self, lambda: &Lambda) {
+        let prev_function = self.current.function.take();
         self.resolve_block(lambda.body);
+        self.current.function = prev_function;
     }
 
     fn resolve_match_method(&mut self, match_method: &MatchMethod) {
