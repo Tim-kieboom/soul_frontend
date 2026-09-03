@@ -9,7 +9,9 @@ use ast_model::{
     scope::ScopeValue,
     soul_type::SoulType,
 };
+use soul_tokenizer::model::types::Types;
 use soul_utils::{fault::Fault, soul_error_internal, soul_names::PrimitiveTypes, span::Span};
+use std::str::FromStr;
 
 use crate::NameResolver;
 
@@ -111,6 +113,10 @@ impl<'a> NameResolver<'a> {
             self.current.module,
         ) {
             Some(resolved) => _ = self.declares.insert_variable_resolve(variable.id, resolved),
+            None if self.contains_type(name.as_str()) || Types::from_str(name.as_str()).is_ok() => {
+                // A bare type name used as a first-class type value (e.g. `x.typeof == Coord`);
+                // there is no variable to resolve.
+            }
             None => self.log_fault(Fault::error(
                 format!("variable '{}' is undefined in scope", name.as_str()),
                 Some(name.span()),

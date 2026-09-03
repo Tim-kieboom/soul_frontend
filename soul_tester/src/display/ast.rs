@@ -34,7 +34,7 @@ use soul_utils::{
     ids::IdAlloc,
     linkage::Linkage,
     soul_names::{PrimitiveTypes, Symbol},
-    span::ModuleId,
+    span::{Attribute, ModuleId},
 };
 
 const IF_STR: &str = KeyWord::If.as_str();
@@ -250,6 +250,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
 
     fn write_statement(&mut self, id: StatementId) -> Result<()> {
         let statement = self.store.statements.get_err(id)?;
+        self.write_attributes(&statement.meta_data.attributes)?;
         if self.add_tags {
             self.write_statement_tag(statement)?;
         }
@@ -286,6 +287,29 @@ impl<'a, W: Writer> Displayer<'a, W> {
         }
     }
 
+    fn write_attributes(&mut self, attributes: &[Attribute]) -> Result<()> {
+        for attribute in attributes {
+            self.push_char('#')?;
+            self.push_char('[')?;
+            self.push_str(attribute.name.as_str())?;
+            if !attribute.values.is_empty() {
+                self.push_char('(')?;
+                let last_index = attribute.values.len().saturating_sub(1);
+                for (i, value) in attribute.values.iter().enumerate() {
+                    self.push_str(value.as_str())?;
+                    if i != last_index {
+                        self.push_str(", ")?;
+                    }
+                }
+                self.push_char(')')?;
+            }
+            self.push_char(']')?;
+            self.write_endln()?;
+            self.write_depth()?;
+        }
+        Ok(())
+    }
+
     fn write_statement_tag(&mut self, statement: &Statement) -> Result<()> {
         self.push_str("// ")?;
         match &statement.node {
@@ -301,6 +325,14 @@ impl<'a, W: Writer> Displayer<'a, W> {
 
         match &statement.node {
             StatementKind::Variable(variable) => {
+                if let Some((modifier, ty, _)) = self.ast.declares.get_variable_type(variable.id) {
+                    self.push_fmt(format_args!("{modifier:?}"))?;
+                    if let Some(ty) = ty {
+                        self.push_str(": ")?;
+                        self.write_type(ty)?;
+                    }
+                    self.push_char(' ')?;
+                }
                 if let Some(value) = variable.initialize_value {
                     self.push_str("= ")?;
                     self.write_expression_tag(value)?
@@ -342,7 +374,12 @@ impl<'a, W: Writer> Displayer<'a, W> {
 
     fn write_expression_tag(&mut self, id: ExpressionId) -> Result<()> {
         let expression = self.store.expressions.get_err(id)?;
-        self.push_str(expression.node.variant_name())
+        self.push_str(expression.node.variant_name())?;
+        if let Some(ty) = self.ast.declares.get_expression_type(id) {
+            self.push_str(": ")?;
+            self.write_type(ty)?;
+        }
+        Ok(())
     }
 
     fn write_assignment(&mut self, assignment: &Assignment) -> Result<()> {

@@ -5,7 +5,7 @@ use ast_model::{
         FunctionCalleeKind, VariableExpression,
     },
     scope::{ScopeModuleEntry, ScopeTypeEntryKind},
-    soul_type::{SoulType, Stub},
+    soul_type::{Generic, SoulType, Stub},
     statements::{ImportItem, ImportKind},
 };
 use soul_utils::soul_names::PrimitiveTypes;
@@ -53,15 +53,19 @@ impl<'a> NameResolver<'a> {
         };
         let return_type = signature.return_type.clone();
         let parameters = signature.parameters.clone();
+        let generics = signature.generics.clone();
 
         if call.arguments.len() != parameters.len()
             && !call.arguments.iter().all(|arg| arg.name.is_none())
         {
             self.declares.insert_expression_type(expression_id, return_type);
-            return 
+            return
         }
 
         for (argument, parameter) in call.arguments.iter().zip(&parameters) {
+            if is_generic_parameter(&parameter.ty, &generics) {
+                continue;
+            }
             let Some(arg_ty) = self.expression_type(argument.value) else {
                 continue;
             };
@@ -505,5 +509,15 @@ impl<'a> NameResolver<'a> {
         self.scope_info
             .scopes
             .lookup_function(string, self.current.module)
+    }
+}
+
+fn is_generic_parameter(ty: &SoulType, generics: &[Generic]) -> bool {
+    match ty {
+        SoulType::ImplTrait(_) => true,
+        SoulType::Stub(stub) => generics
+            .iter()
+            .any(|generic| generic.name.as_str() == stub.name.as_str()),
+        _ => false,
     }
 }
