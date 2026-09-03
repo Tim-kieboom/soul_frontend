@@ -119,6 +119,11 @@ impl DeclareStore {
             .insert(index, (CustomType::Struct(obj.clone()), module));
     }
 
+    /// Retrieves a struct/enum/trait declaration by its own declaration NodeId.
+    pub fn get_custom_type(&self, index: NodeId) -> Option<&(CustomType, ModuleId)> {
+        self.custom_types.get(index)
+    }
+
     pub fn insert_variable_resolve(&mut self, node_id: NodeId, resolved: NodeId) -> Option<NodeId> {
         self.variable_resolves.insert(node_id, resolved)
     }

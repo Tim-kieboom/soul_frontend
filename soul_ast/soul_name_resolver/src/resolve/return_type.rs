@@ -78,7 +78,11 @@ impl<'a> NameResolver<'a> {
         else {
             return None;
         };
-        if *ends_semicolon { None } else { Some(*expression) }
+        if *ends_semicolon {
+            None
+        } else {
+            Some(*expression)
+        }
     }
 
     fn check_tail_expression(
@@ -104,13 +108,11 @@ impl<'a> NameResolver<'a> {
                 };
 
                 if self.combine_operand_types(&tail_ty, return_type).is_some() {
-                    return
+                    return;
                 }
 
                 self.log_fault(Fault::error(
-                    format!(
-                        "return type mismatch: expected `{return_type:?}`, got `{tail_ty:?}`"
-                    ),
+                    format!("return type mismatch: expected `{return_type:?}`, got `{tail_ty:?}`"),
                     Some(expression.span),
                 ));
             }

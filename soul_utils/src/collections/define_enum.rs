@@ -326,7 +326,7 @@ macro_rules! define_symbols {
                     $( $enum_name::$name => $symkind, )*
                 }
             }
-            
+
             pub const fn from_symbool(k: Symbol) -> Option<Self> {
                 match k {
                     $( $symkind => Some($enum_name::$name), )*

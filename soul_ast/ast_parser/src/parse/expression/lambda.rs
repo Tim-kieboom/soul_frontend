@@ -57,9 +57,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         let start_span = self.token().span;
 
         let keyword = match &self.token().kind {
-            TokenKind::Keyword(keyword @ (KeyWord::Break | KeyWord::Return | KeyWord::Continue)) => {
-                Some(*keyword)
-            }
+            TokenKind::Keyword(
+                keyword @ (KeyWord::Break | KeyWord::Return | KeyWord::Continue),
+            ) => Some(*keyword),
             _ => None,
         };
 

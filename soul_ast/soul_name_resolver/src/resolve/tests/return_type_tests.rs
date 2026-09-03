@@ -87,7 +87,8 @@ fn exhaustive_if_tail_with_matching_branches_reports_no_fault() {
 
 #[test]
 fn non_exhaustive_if_tail_is_skipped() {
-    let ast = resolve_source("foo(): i64 {\n    a: bool = true\n    if a {\n        \"hi\"\n    }\n}\n");
+    let ast =
+        resolve_source("foo(): i64 {\n    a: bool = true\n    if a {\n        \"hi\"\n    }\n}\n");
     assert_eq!(fault_count_containing(&ast, "return type mismatch"), 0);
 }
 
@@ -99,7 +100,8 @@ fn explicit_return_with_matching_type_reports_no_fault() {
 
 #[test]
 fn explicit_return_with_mismatched_type_reports_exactly_one_fault() {
-    let ast = resolve_source("foo(): i64 {\n    if true {\n        return \"hi\"\n    }\n    2\n}\n");
+    let ast =
+        resolve_source("foo(): i64 {\n    if true {\n        return \"hi\"\n    }\n    2\n}\n");
     assert_eq!(fault_count_containing(&ast, "return type mismatch"), 1);
 }
 
@@ -117,8 +119,7 @@ fn bare_return_in_non_void_function_reports_exactly_one_fault() {
 
 #[test]
 fn return_inside_lambda_is_not_checked_against_enclosing_function() {
-    let ast = resolve_source(
-        "foo(): i64 {\n    f := x => {\n        return \"hi\"\n    }\n    1\n}\n",
-    );
+    let ast =
+        resolve_source("foo(): i64 {\n    f := x => {\n        return \"hi\"\n    }\n    1\n}\n");
     assert_eq!(fault_count_containing(&ast, "return type mismatch"), 0);
 }

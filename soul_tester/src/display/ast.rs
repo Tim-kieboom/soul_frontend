@@ -334,8 +334,10 @@ impl<'a, W: Writer> Displayer<'a, W> {
 
         match &statement.node {
             StatementKind::Variable(variable) => {
-                if let Some((modifier, ty, _)) =
-                    self.ast.declares.get_variable_type(variable_type_key(variable))
+                if let Some((modifier, ty, _)) = self
+                    .ast
+                    .declares
+                    .get_variable_type(variable_type_key(variable))
                 {
                     self.push_fmt(format_args!("{modifier:?}"))?;
                     if let Some(ty) = ty {

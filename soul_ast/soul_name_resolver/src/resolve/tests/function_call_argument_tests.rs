@@ -71,9 +71,7 @@ fn arity_mismatched_call_is_skipped_without_type_fault() {
 
 #[test]
 fn same_generic_used_with_incompatible_argument_types_reports_exactly_one_fault() {
-    let ast = resolve_source(
-        "assertEq<T>(a: T, b: T) {}\nmain() {\n    assertEq(1, \"\")\n}\n",
-    );
+    let ast = resolve_source("assertEq<T>(a: T, b: T) {}\nmain() {\n    assertEq(1, \"\")\n}\n");
     assert_eq!(fault_count_containing(&ast, "generic parameter"), 1);
 }
 

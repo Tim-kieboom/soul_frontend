@@ -60,11 +60,11 @@ impl<'a> NameResolver<'a> {
 
         let empty = vec![];
         let generics = match self.current.function {
-            Some(id) => {
-                self.declares.get_function(id)
-                    .map(|(signature, _)| &signature.generics)
-                    .unwrap_or(&empty)
-            },
+            Some(id) => self
+                .declares
+                .get_function(id)
+                .map(|(signature, _)| &signature.generics)
+                .unwrap_or(&empty),
             None => &empty,
         };
 

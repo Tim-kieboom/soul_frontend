@@ -78,7 +78,10 @@ impl<'a> NameResolver<'a> {
                     .unwrap_or(call.name.span());
 
                 if let Some(generic_name) = generic_name_of(&parameter.ty, &generics) {
-                    match generic_bindings.iter().find(|(name, _)| *name == generic_name) {
+                    match generic_bindings
+                        .iter()
+                        .find(|(name, _)| *name == generic_name)
+                    {
                         Some((_, bound_ty)) => {
                             if self.combine_operand_types(&arg_ty, bound_ty).is_none() {
                                 self.log_fault(Fault::error(
@@ -108,7 +111,8 @@ impl<'a> NameResolver<'a> {
             }
         }
 
-        self.declares.insert_expression_type(expression_id, return_type);
+        self.declares
+            .insert_expression_type(expression_id, return_type);
     }
 
     fn try_get_intrinsic_path(&mut self, call: &FunctionCall) -> Option<String> {

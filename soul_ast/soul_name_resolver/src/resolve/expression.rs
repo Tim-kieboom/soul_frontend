@@ -1,4 +1,5 @@
 use ast_model::{
+    CustomType,
     expression::{
         AnyArray, Binary, Constructor, ExpressionId, ExpressionKind, FieldAccess, For,
         ForCondition, If, IfBranch, IfCondition, Lambda, Match, MatchMethod, StringFormat,
@@ -8,12 +9,15 @@ use ast_model::{
     operators::BinaryOperatorKind,
     scope::ScopeValue,
     soul_type::SoulType,
+    statements::VarPattern,
 };
 use soul_tokenizer::model::types::Types;
 use soul_utils::{
     TypeModifier, fault::Fault, soul_error_internal, soul_names::PrimitiveTypes, span::Span,
 };
 use std::str::FromStr;
+
+use super::function_call::is_generic_parameter;
 
 use crate::NameResolver;
 
@@ -99,6 +103,69 @@ impl<'a> NameResolver<'a> {
     fn resolve_struct_contructor(&mut self, struct_constructor: &StructConstructor) {
         for (_, value) in &struct_constructor.values {
             self.resolve_expression(*value);
+        }
+        self.check_struct_constructor(struct_constructor);
+    }
+
+    fn check_struct_constructor(&mut self, struct_constructor: &StructConstructor) {
+        let SoulType::Stub(stub) = &struct_constructor.struct_type else {
+            return;
+        };
+
+        let Some(entry) = self
+            .scope_info
+            .scopes
+            .lookup_type(stub.name.as_str(), self.current.module)
+        else {
+            return;
+        };
+
+        let Some((CustomType::Struct(struct_), _)) = self.declares.get_custom_type(entry.node_id)
+        else {
+            return;
+        };
+
+        let struct_ = struct_.clone();
+
+        for (field_name, value_id) in &struct_constructor.values {
+            let Some(field) = struct_.fields.iter().find(|field| {
+                matches!(&field.value.pattern, VarPattern::Simple { binding, .. } if binding.ident.as_str() == field_name.as_str())
+            }) else {
+                self.log_fault(Fault::error(
+                    format!(
+                        "struct `{}` has no field `{}`",
+                        stub.name.as_str(),
+                        field_name.as_str()
+                    ),
+                    Some(field_name.span()),
+                ));
+                continue
+            };
+
+            let Some(field_ty) = &field.value.ty else {
+                continue;
+            };
+
+            if is_generic_parameter(field_ty, &struct_.generics) {
+                continue;
+            }
+
+            let Some(value_ty) = self.expression_type(*value_id) else {
+                continue;
+            };
+
+            if self.combine_operand_types(&value_ty, field_ty).is_some() {
+                continue;
+            }
+
+            let span = self.store.expressions.get(*value_id).map(|expr| expr.span);
+            self.log_fault(Fault::error(
+                format!(
+                    "field `{}` type mismatch: expected `{field_ty:?}`, got `{value_ty:?}`",
+                    field_name.as_str()
+                ),
+                span,
+            ));
         }
     }
 

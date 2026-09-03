@@ -7,8 +7,6 @@ use soul_utils::collections::{crate_store::CrateStore, module_store::ModuleStore
 
 use crate::name_resolve;
 
-/// Tokenizes, parses, and name-resolves a single-file snippet with no imports,
-/// returning the resulting `AstTree` so tests can inspect its faults/resolves.
 fn resolve_source(source: &str) -> AstTree {
     let mut module_store = ModuleStore::new();
     module_store.insert_root(PathBuf::from("test.soul"));
@@ -34,51 +32,46 @@ fn resolve_source(source: &str) -> AstTree {
     ast
 }
 
-fn intrinsic_fault_count(ast: &AstTree) -> usize {
+fn fault_count_containing(ast: &AstTree, needle: &str) -> usize {
     ast.faults()
         .iter()
-        .filter(|fault| fault.message().contains("intrinsic"))
+        .filter(|fault| fault.message().contains(needle))
         .count()
 }
 
 #[test]
-fn known_intrinsics_with_correct_arity_resolve_without_faults() {
+fn matching_field_types_report_no_fault() {
     let ast = resolve_source(
-        r#"
-main() {
-    a := intrinsic.fieldIndex(int, 0)
-    b := intrinsic.fieldCount(int)
-    c := intrinsic.typeinfo(int)
-    d := intrinsic.ptr.offset(int, 1)
-}
-"#,
+        "struct Point { x: i64\n    y: i64 }\nmain() {\n    Point { x: 1, y: 2 }\n}\n",
     );
-
-    assert_eq!(intrinsic_fault_count(&ast), 0);
+    assert_eq!(fault_count_containing(&ast, "type mismatch"), 0);
+    assert_eq!(fault_count_containing(&ast, "has no field"), 0);
 }
 
 #[test]
-fn unknown_intrinsic_reports_exactly_one_fault() {
+fn mismatched_field_type_reports_exactly_one_fault() {
     let ast = resolve_source(
-        r#"
-main() {
-    a := intrinsic.doesNotExist(1)
-}
-"#,
+        "struct Point { x: i64\n    y: i64 }\nmain() {\n    Point { x: 1, y: \"hi\" }\n}\n",
     );
-
-    assert_eq!(intrinsic_fault_count(&ast), 1);
+    assert_eq!(fault_count_containing(&ast, "field `y` type mismatch"), 1);
 }
 
 #[test]
-fn wrong_arity_reports_exactly_one_fault() {
+fn unknown_field_name_reports_exactly_one_fault() {
     let ast = resolve_source(
-        r#"
-main() {
-    a := intrinsic.typeinfo()
-}
-"#,
+        "struct Point { x: i64\n    y: i64 }\nmain() {\n    Point { x: 1, z: 2 }\n}\n",
     );
+    assert_eq!(
+        fault_count_containing(&ast, "struct `Point` has no field `z`"),
+        1
+    );
+}
 
-    assert_eq!(intrinsic_fault_count(&ast), 1);
+#[test]
+fn generic_struct_field_is_skipped_without_fault() {
+    let ast = resolve_source("struct Box<T> { value: T }\nmain() {\n    Box { value: 1 }\n}\n");
+    assert_eq!(
+        fault_count_containing(&ast, "field `value` type mismatch"),
+        0
+    );
 }
