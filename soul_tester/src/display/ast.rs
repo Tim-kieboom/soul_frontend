@@ -66,10 +66,6 @@ struct Displayer<'a, W: Writer> {
 }
 
 pub(crate) fn display_ast(tree: &AstTree) -> Result<()> {
-    inner_display_ast(tree).map_err(|err| anyhow::anyhow!("in display_ast: {err}"))
-}
-
-fn inner_display_ast(tree: &AstTree) -> Result<()> {
     let mut output_path = config::CONFIG.output_path().join("ast");
     output_path.push("tree.soulc");
 
@@ -1362,6 +1358,10 @@ impl<'a, W: Writer> Displayer<'a, W> {
             SoulType::FormatString => self.push_str(Types::FormatString.as_str()),
             SoulType::Any => self.push_str(Types::Any.as_str()),
             SoulType::Error => self.push_str(Types::Error.as_str()),
+            SoulType::Function { arity, return_type } => {
+                push_fmt!(self, "fn({arity} args) -> ")?;
+                self.write_type(return_type)
+            }
         }
     }
 

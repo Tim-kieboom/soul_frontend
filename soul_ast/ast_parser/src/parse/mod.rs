@@ -1,8 +1,7 @@
-use ast_model::soul_type::SoulType;
+use ast_model::{expression::{Expression, ExpressionId}, soul_type::SoulType};
 use soul_tokenizer::model::TokenKind;
 use soul_utils::{
-    collections::try_result::{ResultTryErr, TryNotValue, TryOk, TryResult},
-    fault::Fault,
+    collections::try_result::{ResultTryErr, TryNotValue, TryOk, TryResult}, error::SoulResult, fault::Fault, soul_error_internal,
 };
 
 use crate::{
@@ -57,5 +56,9 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.bump();
         }
         TryOk(types)
+    }
+
+    pub(crate) fn get_forest_expression(&self, id: ExpressionId) -> SoulResult<&Expression> {
+        self.forest.store.expressions.get(id).ok_or(soul_error_internal!(format!("{id:?} not found"), None))
     }
 }

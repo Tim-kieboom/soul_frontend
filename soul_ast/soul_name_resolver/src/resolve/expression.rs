@@ -351,6 +351,16 @@ impl<'a> NameResolver<'a> {
                 let (_, ty, _) = self.declares.get_variable_type(resolved)?;
                 ty.clone()
             }
+            ExpressionKind::Lambda(lambda) => {
+                let return_type = self
+                    .infer_tail_type(lambda.body)
+                    .map(default_concrete_type)
+                    .unwrap_or(SoulType::None);
+                Some(SoulType::Function {
+                    arity: lambda.parameters.len(),
+                    return_type: Box::new(return_type),
+                })
+            }
             _ => None,
         }
     }
@@ -482,6 +492,18 @@ fn combine_untyped_kinds(a: PrimitiveTypes, b: PrimitiveTypes) -> PrimitiveTypes
         PrimitiveTypes::UntypedFloat
     } else {
         PrimitiveTypes::UntypedInt
+    }
+}
+
+fn default_concrete_type(ty: SoulType) -> SoulType {
+    match ty {
+        SoulType::Primitive(PrimitiveTypes::UntypedInt | PrimitiveTypes::UntypedUint) => {
+            SoulType::Primitive(PrimitiveTypes::Int)
+        }
+        SoulType::Primitive(PrimitiveTypes::UntypedFloat) => {
+            SoulType::Primitive(PrimitiveTypes::Float64)
+        }
+        other => other,
     }
 }
 

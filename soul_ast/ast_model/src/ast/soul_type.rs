@@ -46,6 +46,11 @@ pub enum SoulType {
         base: Box<SoulType>,
         variant: Ident,
     },
+    /// A lambda/closure value's type.
+    Function {
+        arity: usize,
+        return_type: Box<SoulType>,
+    },
 }
 
 impl fmt::Debug for SoulType {
@@ -94,6 +99,9 @@ impl fmt::Debug for SoulType {
             SoulType::ImplTrait(inner) => write!(f, "impl {:?}", inner),
             SoulType::Stub(stub) => write!(f, "{:?}", stub),
             SoulType::NamedVariant { base, variant } => write!(f, "{:?}::{}", base, variant),
+            SoulType::Function { arity, return_type } => {
+                write!(f, "fn({arity} args) -> {return_type:?}")
+            }
         }
     }
 }

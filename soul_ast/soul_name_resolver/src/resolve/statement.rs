@@ -1,8 +1,9 @@
 use ast_model::{
     FunctionKind,
+    expression::{ExpressionId, ExpressionKind},
     statements::{
         Assignment, Enum, EnumVariant, StatementId, StatementKind, Struct, Trait, UseBlock,
-        Variable,
+        VarPattern, Variable,
     },
 };
 use soul_utils::{FunctionId, TypeModifier, fault::Fault, soul_error_internal};
@@ -47,11 +48,8 @@ impl<'a> NameResolver<'a> {
         };
 
         if matches!(modifier, TypeModifier::Immut | TypeModifier::Const) {
-            let span = self
-                .store
-                .expressions
-                .get(assignment.left)
-                .map(|expr| expr.span);
+            let span = self.get_expression(assignment.left).map(|expr| expr.span);
+
             self.log_fault(Fault::error(
                 "cannot assign to an immutable variable".to_string(),
                 span,
@@ -79,11 +77,7 @@ impl<'a> NameResolver<'a> {
             return;
         }
 
-        let span = self
-            .store
-            .expressions
-            .get(assignment.right)
-            .map(|expr| expr.span);
+        let span = self.get_expression(assignment.right).map(|expr| expr.span);
         self.log_fault(Fault::error(
             format!("assignment type mismatch: expected `{left_ty:?}`, got `{right_ty:?}`"),
             span,
@@ -109,7 +103,39 @@ impl<'a> NameResolver<'a> {
     fn resolve_variable(&mut self, variable: &Variable) {
         if let Some(value) = variable.initialize_value {
             self.resolve_expression(value);
+            self.backfill_lambda_variable_type(variable, value);
         }
+    }
+
+    fn backfill_lambda_variable_type(&mut self, variable: &Variable, value: ExpressionId) {
+        let is_lambda = self
+            .get_expression(value)
+            .is_some_and(|expr| matches!(expr.node, ExpressionKind::Lambda(_)));
+        if !is_lambda {
+            return;
+        }
+
+        let type_key = match &variable.pattern {
+            VarPattern::Simple { binding, .. } => binding.id,
+            _ => variable.id,
+        };
+        if self
+            .declares
+            .get_variable_type(type_key)
+            .is_some_and(|(_, ty, _)| ty.is_some())
+        {
+            return;
+        }
+
+        let Some(ty) = self.expression_type(value) else {
+            return;
+        };
+        self.declares.insert_variable_type(
+            type_key,
+            variable.modifier,
+            Some(ty),
+            self.current.module,
+        );
     }
 
     fn resolve_struct(&mut self, struct_: &Struct) {

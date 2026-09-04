@@ -1,8 +1,9 @@
 use ast_model::{
     NodeId,
-    expression::Binding,
+    block::{Block, BlockId},
+    expression::{Binding, Expression, ExpressionId},
     scope::{Scope, ScopeBuilder, ScopeValue},
-    statements::FunctionSignature,
+    statements::{FunctionSignature, Statement, StatementId},
 };
 use soul_utils::{
     CrateContext, FunctionId,
@@ -64,5 +65,17 @@ impl<'a> NameResolver<'a> {
                 Some(span),
             ));
         }
+    }
+
+    pub(crate) fn get_block(&self, id: BlockId) -> Option<&Block> {
+        self.store.blocks.get(id)
+    }
+
+    pub(crate) fn get_statement(&self, id: StatementId) -> Option<&Statement> {
+        self.store.statements.get(id)
+    }
+
+    pub(crate) fn get_expression(&self, id: ExpressionId) -> Option<&Expression> {
+        self.store.expressions.get(id)
     }
 }

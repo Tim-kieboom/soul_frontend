@@ -242,7 +242,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     fn parse_sizeof(&mut self, left_id: ExpressionId) -> SoulResult<Expression> {
-        let span = self.forest.store.expressions[left_id].span;
+        let span = self.get_forest_expression(left_id)?.span;
         Ok(Expression::new(
             ExpressionKind::Sizeof(left_id),
             self.span_combine(span),

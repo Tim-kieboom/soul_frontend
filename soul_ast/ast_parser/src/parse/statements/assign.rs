@@ -85,7 +85,13 @@ fn resolve_assign_type(
     rvalue: ExpressionId,
     span: Span,
 ) -> ExpressionId {
-    let rspan = store.expressions[rvalue].span;
+    let rspan = match store.expressions.get(rvalue) {
+        Some(val) => val.span,
+        None => {
+            debug_assert!(false, "{rvalue:?} not found");
+            return ExpressionId::ERROR
+        }
+    };
     let full_span = span.combine(rspan);
 
     let operator = match assign {

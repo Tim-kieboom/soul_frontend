@@ -74,10 +74,8 @@ impl<'a> NameResolver<'a> {
         custom: CustomType,
     ) -> Option<EntryKind<CustomType>> {
         let is_public = self
-            .store
-            .statements
-            .get(id)
-            .map(|s| s.is_public())
+            .get_statement(id)
+            .map(|it| it.is_public())
             .unwrap_or(false);
 
         let header = &mut self.ast_modules.get_mut(self.current.module)?.header;

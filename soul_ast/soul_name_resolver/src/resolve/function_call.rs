@@ -4,7 +4,7 @@ use ast_model::{
         ExpressionId, ExpressionKind, FieldAccess, FunctionCall, FunctionCallee,
         FunctionCalleeKind, VariableExpression,
     },
-    scope::{ScopeModuleEntry, ScopeTypeEntryKind},
+    scope::{ScopeModuleEntry, ScopeTypeEntryKind, ScopeValue},
     soul_type::{Generic, SoulType, Stub},
     statements::{ImportItem, ImportKind},
 };
@@ -115,6 +115,24 @@ impl<'a> NameResolver<'a> {
             .insert_expression_type(expression_id, return_type);
     }
 
+    fn resolve_variable_callable(&mut self, expression_id: ExpressionId, name: &str) -> bool {
+        let Some(var_id) =
+            self.scope_info
+                .scopes
+                .lookup_value(name, ScopeValue::Variable, self.current.module)
+        else {
+            return false;
+        };
+        let Some((_, Some(SoulType::Function { return_type, .. }), _)) =
+            self.declares.get_variable_type(var_id)
+        else {
+            return false;
+        };
+        self.declares
+            .insert_expression_type(expression_id, (**return_type).clone());
+        true
+    }
+
     fn try_get_intrinsic_path(&mut self, call: &FunctionCall) -> Option<String> {
         let callee = call.callee.as_ref()?;
         let value = match &callee.kind {
@@ -180,19 +198,31 @@ impl<'a> NameResolver<'a> {
         }
 
         if !self.is_function_imported(call) {
-            let id = self
-                .lookup_function(call.name.as_str())
-                .unwrap_or(FunctionId::ERROR);
-
-            self.declares.insert_function_resolve(
-                call.id,
-                FunctionResolve {
-                    id,
-                    is_defer: false,
-                    ignore_callee: false,
-                },
-            );
-            self.finish_call_resolution(expression_id, call, id);
+            let name = call.name.as_str();
+            match self.lookup_function(name) {
+                Some(id) => {
+                    self.declares.insert_function_resolve(
+                        call.id,
+                        FunctionResolve {
+                            id,
+                            is_defer: false,
+                            ignore_callee: false,
+                        },
+                    );
+                    self.finish_call_resolution(expression_id, call, id);
+                }
+                None if self.resolve_variable_callable(expression_id, name) => {}
+                None => {
+                    self.declares.insert_function_resolve(
+                        call.id,
+                        FunctionResolve {
+                            id: FunctionId::ERROR,
+                            is_defer: false,
+                            ignore_callee: false,
+                        },
+                    );
+                }
+            }
             return;
         }
 
@@ -224,13 +254,19 @@ impl<'a> NameResolver<'a> {
 
         let name = call.name.as_str();
         let owner_type = self.get_owner_kind(type_qualifier.as_ref(), call);
-        let resolved = if owner_type.is_some() {
+        let has_owner_type = owner_type.is_some();
+        let resolved = if has_owner_type {
             self.declares.find_function(name, owner_type)
         } else {
             self.lookup_function(name)
         };
 
-        let Some(id) = resolved else { return };
+        let Some(id) = resolved else {
+            if !has_owner_type {
+                self.resolve_variable_callable(expression_id, name);
+            }
+            return;
+        };
         self.declares.insert_function_resolve(
             call.id,
             FunctionResolve {

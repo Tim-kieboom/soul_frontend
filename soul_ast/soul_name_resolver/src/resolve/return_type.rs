@@ -10,14 +10,6 @@ use super::function_call::is_generic_parameter;
 use crate::NameResolver;
 
 impl<'a> NameResolver<'a> {
-    /// Checks a function body's implicit tail-expression return against its
-    /// declared return type. Explicit `return` statements are not checked
-    /// here — this only follows tail position, recursing through `if`/`match`
-    /// branches. Anything it can't fully determine (a non-exhaustive `if`, no
-    /// tail expression at all, a return type this checker doesn't model like
-    /// `impl Trait` or a generic parameter, an expression kind with no known
-    /// type) is silently skipped rather than faulted, to avoid false
-    /// positives.
     pub(super) fn check_tail_return_type(
         &mut self,
         block_id: BlockId,
@@ -33,12 +25,6 @@ impl<'a> NameResolver<'a> {
         self.check_tail_expression(tail, return_type, generics);
     }
 
-    /// Checks an explicit `return` statement's value against the current
-    /// function's declared return type. A bare `return` (no value) is only
-    /// valid when that return type is void. Skipped entirely when there's no
-    /// current function context (e.g. inside a lambda, which has no declared
-    /// return type of its own) or the return type isn't one this checker
-    /// models (generic/`impl Trait`).
     pub(super) fn check_return_statement(&mut self, value: Option<ExpressionId>, span: Span) {
         let Some(function_id) = self.current.function else {
             return;
@@ -69,8 +55,8 @@ impl<'a> NameResolver<'a> {
     }
 
     fn tail_position(&self, block_id: BlockId) -> Option<ExpressionId> {
-        let block = self.store.blocks.get(block_id)?;
-        let statement = self.store.statements.get(*block.statements.last()?)?;
+        let block = self.get_block(block_id)?;
+        let statement = self.get_statement(*block.statements.last()?)?;
         let StatementKind::Expression {
             expression,
             ends_semicolon,
@@ -101,6 +87,9 @@ impl<'a> NameResolver<'a> {
                 for arm in &match_.arms {
                     self.check_tail_return_type(arm.body, return_type, generics);
                 }
+            }
+            ExpressionKind::Block(block_id) => {
+                self.check_tail_return_type(*block_id, return_type, generics)
             }
             _ => {
                 let Some(tail_ty) = self.expression_type(expression_id) else {
@@ -139,5 +128,62 @@ impl<'a> NameResolver<'a> {
         for block_id in blocks {
             self.check_tail_return_type(block_id, return_type, generics);
         }
+    }
+
+    pub(super) fn infer_tail_type(&self, block_id: BlockId) -> Option<SoulType> {
+        self.infer_tail_expression_type(self.tail_position(block_id)?)
+    }
+
+    fn infer_tail_expression_type(&self, expression_id: ExpressionId) -> Option<SoulType> {
+        let expression = self.get_expression(expression_id)?;
+        match &expression.node {
+            ExpressionKind::If(if_) => self.infer_tail_if_type(if_),
+            ExpressionKind::Block(block_id) => self.infer_tail_type(*block_id),
+            ExpressionKind::Return(value) => {
+                self.infer_tail_expression_type((*value)?)
+            }
+            ExpressionKind::Match(match_) => {
+                let mut result: Option<SoulType> = None;
+                for arm in &match_.arms {
+                    let arm_ty = self.infer_tail_type(arm.body)?;
+                    match &result {
+                        None => result = Some(arm_ty),
+                        Some(existing) if *existing == arm_ty => {}
+                        Some(_) => return None,
+                    }
+                }
+                result
+            }
+            _ => self.expression_type(expression_id),
+        }
+    }
+
+    fn infer_tail_if_type(&self, if_: &If) -> Option<SoulType> {
+        let mut blocks = vec![if_.block];
+        let mut current = if_.branch.as_ref();
+        loop {
+            match current {
+                Some(IfBranch::Else(block_id)) => {
+                    blocks.push(*block_id);
+                    break;
+                }
+                Some(IfBranch::If(elif)) => {
+                    blocks.push(elif.block);
+                    current = elif.branch.as_ref();
+                }
+                None => return None,
+            }
+        }
+
+        let mut result: Option<SoulType> = None;
+        for block_id in blocks {
+            let ty = self.infer_tail_type(block_id)?;
+            match &result {
+                None => result = Some(ty),
+                Some(existing) if *existing == ty => {}
+                Some(_) => return None,
+            }
+        }
+        result
     }
 }

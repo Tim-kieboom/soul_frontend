@@ -15,15 +15,16 @@ import (
 )
 
 #[inline]
-const assertEq<T: Eq>(a: T, b: T) {
+assertEq<T: Eq>(a: T, b: T) {
     if a == b {
         panic(f"assertion failed: {a} != {b}")
     }
 }
 
 lamdba() {
-    fn := () => return 2
     num := fn()
+    fn := () => return 2
+    assertEq(fn(), "")
     assertEq(fn(), 2)
 }
 
