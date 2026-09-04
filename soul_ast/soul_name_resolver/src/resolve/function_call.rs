@@ -115,7 +115,8 @@ impl<'a> NameResolver<'a> {
             .insert_expression_type(expression_id, return_type);
     }
 
-    fn resolve_variable_callable(&mut self, expression_id: ExpressionId, name: &str) -> bool {
+    fn resolve_variable_callable(&mut self, expression_id: ExpressionId, call: &FunctionCall) -> bool {
+        let name = call.name.as_str();
         let Some(var_id) =
             self.scope_info
                 .scopes
@@ -123,13 +124,24 @@ impl<'a> NameResolver<'a> {
         else {
             return false;
         };
+
+        if var_id < self.synthetic_id_boundary && call.id < var_id {
+            self.log_fault(Fault::error(
+                format!("variable '{name}' is used before its declaration"),
+                Some(call.name.span()),
+            ));
+            return true;
+        }
+
         let Some((_, Some(SoulType::Function { return_type, .. }), _)) =
             self.declares.get_variable_type(var_id)
         else {
             return false;
         };
+        let return_type = (**return_type).clone();
+
         self.declares
-            .insert_expression_type(expression_id, (**return_type).clone());
+            .insert_expression_type(expression_id, return_type);
         true
     }
 
@@ -211,7 +223,7 @@ impl<'a> NameResolver<'a> {
                     );
                     self.finish_call_resolution(expression_id, call, id);
                 }
-                None if self.resolve_variable_callable(expression_id, name) => {}
+                None if self.resolve_variable_callable(expression_id, call) => {}
                 None => {
                     self.declares.insert_function_resolve(
                         call.id,
@@ -263,7 +275,7 @@ impl<'a> NameResolver<'a> {
 
         let Some(id) = resolved else {
             if !has_owner_type {
-                self.resolve_variable_callable(expression_id, name);
+                self.resolve_variable_callable(expression_id, call);
             }
             return;
         };

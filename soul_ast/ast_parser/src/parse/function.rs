@@ -350,7 +350,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     pub(crate) fn parse_function_contructor(
         &mut self,
-        methode_type: &SoulType,
+        method_type: &SoulType,
         is_const: bool,
     ) -> SoulResult<Spanned<Function>> {
         let start_span = self.token().span;
@@ -359,7 +359,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             ROUND_OPEN => {
                 let name = Ident::new(CONTRUCTOR_STR, start_span);
                 let mut methode = self
-                    .try_parse_function_declaration(start_span, methode_type, is_const, name)
+                    .try_parse_function_declaration(start_span, method_type, is_const, name)
                     .map_try_not_value(|err| err.fault)
                     .merge_to_result()?
                     .value;
@@ -372,73 +372,85 @@ impl<'a, 'f> Parser<'a, 'f> {
                     );
                 }
                 signature.function_kind = FunctionThisKind::Ctor;
-                signature.return_type = methode_type.clone();
+                signature.return_type = method_type.clone();
 
                 Ok(Spanned::new(methode, self.span_combine(start_span)))
             }
-            SQUARE_OPEN => {
-                let name = Ident::new(ARRAY_CONTRUCTOR_STR, start_span);
-                self.bump();
-                let mut array_type = self.try_parse_type().merge_to_result()?;
-                array_type = SoulType::Array(ArrayType {
-                    of_type: Box::new(array_type),
-                    kind: ArrayKind::StackArrayWildcard,
-                });
-                self.expect(&SQUARE_CLOSE)?;
-                self.expect(&ROUND_OPEN)?;
-                let arg = self.try_bump_consume_ident()?;
-                self.expect(&ROUND_CLOSE)?;
-                let block = if self.current_is(&LAMBDA_ARROW) {
-                    self.bump();
-                    self.skip_end_lines();
-                    let expression = self.parse_expression_id(STAMENT_END_TOKENS)?;
-                    let statement = Statement::from_expression(
-                        &self.forest.store,
-                        expression,
-                        self.current_is(&SEMI_COLON),
-                    );
-                    let statement = self.forest.store.insert_statement(statement);
-                    self.forest.store.insert_block(Block {
-                        statements: vec![statement],
-                        span: self.span_combine(start_span),
-                        is_const: false,
-                    })
-                } else {
-                    self.parse_block(TypeModifier::Mut)?
-                };
-
-                let id = self.forest.store.alloc_function();
-                let signature = InnerFunctionSignature {
-                    id,
-                    name,
-                    modifier: FunctionModifier::empty(),
-                    method_type: methode_type.clone(),
-                    return_type: methode_type.clone(),
-                    parameters: vec![Parameter {
-                        name: arg,
-                        default: None,
-                        ty: array_type,
-                        id: self.alloc_node(),
-                        is_mut: false,
-                    }],
-                    generics: vec![],
-                    function_kind: FunctionThisKind::ArrayCtor,
-                    external: None,
-                    node_id: self.alloc_node(),
-                };
-
-                let function = Function {
-                    signature: FunctionSignature::with_span(
-                        signature,
-                        self.span_combine(start_span),
-                    ),
-                    block,
-                };
-
-                Ok(Spanned::new(function, self.span_combine(start_span)))
-            }
+            SQUARE_OPEN => self.parse_array_contructor(method_type, start_span),
             _ => Err(self.get_expect_any_error(&[ROUND_OPEN, SQUARE_OPEN])),
         }
+    }
+
+    fn parse_array_contructor(&mut self, method_type: &SoulType, start_span: Span) -> SoulResult<Spanned<Function>> {
+        self.bump();
+
+        let name = Ident::new(ARRAY_CONTRUCTOR_STR, start_span);
+        let mut array_type = self.try_parse_type().merge_to_result()?;
+        
+        array_type = SoulType::Array(ArrayType {
+            of_type: Box::new(array_type),
+            kind: ArrayKind::StackArrayWildcard,
+        });
+        
+        self.expect(&SQUARE_CLOSE)?;
+        self.expect(&ROUND_OPEN)?;
+        
+        let arg = self.try_bump_consume_ident()?;
+        
+        self.expect(&ROUND_CLOSE)?;
+        
+        let arg_id = self.alloc_node();
+        let block = if self.current_is(&LAMBDA_ARROW) {
+            self.bump();
+            self.skip_end_lines();
+
+            let expression = self.parse_expression_id(STAMENT_END_TOKENS)?;
+            let statement = Statement::from_expression(
+                &self.forest.store,
+                expression,
+                self.current_is(&SEMI_COLON),
+            );
+
+            let statement = self.forest.store.insert_statement(statement);
+            self.forest.store.insert_block(Block {
+                statements: vec![statement],
+                span: self.span_combine(start_span),
+                is_const: false,
+            })
+
+        } else {
+            self.parse_block(TypeModifier::Mut)?
+        };
+
+        let id = self.forest.store.alloc_function();
+        let signature = InnerFunctionSignature {
+            id,
+            name,
+            modifier: FunctionModifier::empty(),
+            method_type: method_type.clone(),
+            return_type: method_type.clone(),
+            parameters: vec![Parameter {
+                name: arg,
+                default: None,
+                ty: array_type,
+                id: arg_id,
+                is_mut: false,
+            }],
+            generics: vec![],
+            function_kind: FunctionThisKind::ArrayCtor,
+            external: None,
+            node_id: self.alloc_node(),
+        };
+
+        let function = Function {
+            signature: FunctionSignature::with_span(
+                signature,
+                self.span_combine(start_span),
+            ),
+            block,
+        };
+
+        Ok(Spanned::new(function, self.span_combine(start_span)))
     }
 
     fn inner_parse_function_signature(

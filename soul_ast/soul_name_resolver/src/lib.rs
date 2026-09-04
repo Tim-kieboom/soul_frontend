@@ -38,6 +38,7 @@ struct NameResolver<'a> {
     current: Current,
     scope_ids: VecMap<BlockId, ScopeId>,
     node_generator: IdGenerator<NodeId>,
+    synthetic_id_boundary: NodeId,
 }
 
 struct Current {
@@ -70,6 +71,7 @@ impl<'a> NameResolver<'a> {
                 lambda_return_type: None,
             },
             scope_ids: VecMap::new(),
+            synthetic_id_boundary: ast.crates.store.clone_node_generator().last(),
             node_generator: ast.crates.store.clone_node_generator(),
         }
     }

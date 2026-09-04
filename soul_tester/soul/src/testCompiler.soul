@@ -22,14 +22,8 @@ assertEq<T: Eq>(a: T, b: T) {
 }
 
 lamdba() {
+    fn := () => 2
     num := fn()
-    fn := () => {
-        if true {
-            return 2
-        }
-        return ""
-    }
-    assertEq(fn(), "")
     assertEq(fn(), 2)
 }
 

@@ -55,7 +55,14 @@ macro_rules! soul_error_internal {
 /// makes [Fault] that adds in message `(file!(), line!())`
 ///
 /// ```
-/// let span = Span::default();
+/// use soul_utils::{
+///     fault::Fault,
+///     soul_error_internal,
+///     span::{Span, ModuleId},
+///     error::relative_to_project,
+/// };
+/// 
+/// let span = Span::default(ModuleId::ERROR);
 /// let err = soul_error_internal!("msg", Some(span));
 /// let expanded = Fault::error(
 ///     format!("!!internal_error!! {} at {}:{}", "msg", relative_to_project(file!()), line!()),

@@ -15,7 +15,8 @@
 /// # Variants
 /// ## Without precedence
 /// ```
-/// use models::define_str_enum;
+/// use soul_utils::define_str_enum;
+/// use std::str::FromStr;
 ///
 /// define_str_enum!{
 ///     // Always derives: [Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize]
@@ -32,16 +33,16 @@
 /// const MY_NAME_STR: &str = Names::MyName.as_str(); // const-time
 /// assert_eq!(MY_NAME_STR, "tim");
 ///
-/// let best_language = Names::from_str("soul"); // Runtime only
+/// let best_language = Names::from_str("soul").ok(); // Runtime only
 /// assert_eq!(best_language, Some(Names::BestLanguage));
 ///
-/// let none_variant = Names::from_str("none");
+/// let none_variant = Names::from_str("none").ok();
 /// assert_eq!(none_variant, None);
 /// ```
 ///
 /// ## With precedence
 /// ```
-/// use models::define_str_enum;
+/// use soul_utils::define_str_enum;
 ///
 /// define_str_enum!{
 ///     enum Precedence {
