@@ -567,6 +567,79 @@ fn tuple_with_all_mut() {
     );
 }
 
+// ----------------------------------------------------------------
+//  Bad-path: malformed variable declarations
+// ----------------------------------------------------------------
+#[test]
+fn missing_pattern_before_declare_is_rejected() {
+    let (_, _, context) = parse(":= 5");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error when a declaration has no pattern before ':='"
+    );
+}
+
+#[test]
+fn variable_missing_initializer_after_declare_is_rejected() {
+    let (_, _, context) = parse("x := ");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error when ':=' has no initializer expression"
+    );
+}
+
+#[test]
+fn invalid_assign_operator_for_declaration_is_rejected() {
+    let (_, _, context) = parse("x: int += 5");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error when a typed declaration uses a compound-assign operator"
+    );
+    assert!(
+        context.faults.faults.iter().any(|fault| fault
+            .message()
+            .contains("is not valid for variable declaration")),
+        "{:#?}",
+        context.faults.faults
+    );
+}
+
+#[test]
+fn unclosed_tuple_pattern_is_rejected() {
+    let (_, _, context) = parse("(a, b := get_pair()");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error on an unclosed tuple pattern"
+    );
+}
+
+#[test]
+fn unclosed_named_tuple_pattern_is_rejected() {
+    let (_, _, context) = parse("{x, y := get_point()");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error on an unclosed named-tuple pattern"
+    );
+}
+
+#[test]
+fn unclosed_constructor_pattern_is_rejected() {
+    let (_, _, context) = parse("Point{x, y := get_point()");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error on an unclosed constructor pattern"
+    );
+}
+
+#[test]
+fn named_tuple_missing_alias_after_colon_is_rejected() {
+    let (_, _, context) = parse("{x: } := get_point()");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error when a named-tuple field's alias is missing"
+    );
+}
+
 #[test]
 fn named_tuple_parsed_as_expression_in_expression_context() {
     // `{x, y} := ...` at statement level is parsed as destructuring (not block).

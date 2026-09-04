@@ -373,6 +373,27 @@ fn expression_fstring_complex_expression() {
     }
 }
 
+// ----------------------------------------------------------------
+//  Bad-path: malformed f-strings
+// ----------------------------------------------------------------
+#[test]
+fn fstring_unclosed_embedded_expression_brace_is_rejected() {
+    let (_, _, context) = parse(r#"f"hello {1 + 2""#);
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error for an f-string embedded expression missing '}}'"
+    );
+}
+
+#[test]
+fn fstring_malformed_embedded_expression_is_rejected() {
+    let (_, _, context) = parse(r#"f"hello {,} world""#);
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error for a malformed f-string embedded expression"
+    );
+}
+
 #[test]
 fn expression_null() {
     let (module, store, context) = parse("null");

@@ -19,6 +19,8 @@ mod soul_type;
 mod statement;
 
 #[cfg(test)]
+mod import_tests;
+#[cfg(test)]
 mod statement_tests;
 
 impl<'a> NameResolver<'a> {

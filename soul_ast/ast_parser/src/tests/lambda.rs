@@ -116,6 +116,27 @@ fn lambda_in_function_call() {
     assert_eq!(lambda.parameters.len(), 1);
 }
 
+// ----------------------------------------------------------------
+//  Bad-path: malformed lambdas
+// ----------------------------------------------------------------
+#[test]
+fn lambda_missing_body_is_rejected() {
+    let (_, _, context) = parse("x => ");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error when a lambda has no body"
+    );
+}
+
+#[test]
+fn lambda_unclosed_tuple_params_is_rejected() {
+    let (_, _, context) = parse("(a, b => a + b");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error for an unclosed tuple-parameter list"
+    );
+}
+
 #[test]
 fn lambda_in_variable() {
     let (module, store, context) = parse("f := x => x + 1");

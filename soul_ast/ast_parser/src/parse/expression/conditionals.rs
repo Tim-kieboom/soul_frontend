@@ -164,6 +164,11 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
+            if self.current_is(&TokenKind::EndFile) {
+                self.log_fault(self.get_expect_error(&CURLY_CLOSE));
+                break;
+            }
+
             let pattern = match self.parse_match_pattern() {
                 Ok(val) => val,
                 Err(err) => {

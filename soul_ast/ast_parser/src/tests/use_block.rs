@@ -326,6 +326,86 @@ fn use_block_method_with_return_type() {
     );
 }
 
+// ----------------------------------------------------------------
+//  Bad-path: malformed use blocks
+// ----------------------------------------------------------------
+#[test]
+fn use_block_rejects_variable_statement() {
+    let (_, _, context) = parse("use Foo { x := 5 }");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        1,
+        "{:#?}",
+        context.faults.faults
+    );
+    assert!(
+        context.faults.faults.iter().any(|fault| fault
+            .message()
+            .contains("Variable is not allowed in use block")),
+        "{:#?}",
+        context.faults.faults
+    );
+}
+
+#[test]
+fn use_block_rejects_assignment_statement() {
+    let (_, _, context) = parse("use Foo { x = 5 }");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error for an assignment statement inside a use block"
+    );
+}
+
+#[test]
+fn use_block_recovers_after_rejected_statement_and_still_parses_later_method() {
+    let (module, store, context) = parse("use Foo { x := 5\nbar() {} }");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        1,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let use_block = match &stmt.node {
+        StatementKind::UseBlock(b) => b,
+        _ => panic!("expected UseBlock"),
+    };
+    assert_eq!(use_block.methods.len(), 1);
+    let func = &store.functions[use_block.methods[0].id];
+    let FunctionKind::Normal(f) = func else {
+        panic!("expected Normal function");
+    };
+    assert_eq!(f.signature.value.name.as_str(), "bar");
+}
+
+#[test]
+fn use_block_missing_type_is_rejected() {
+    let (_, _, context) = parse("use { bar() {} }");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error when a use block has no type"
+    );
+}
+
+#[test]
+fn impl_block_missing_trait_type_is_rejected() {
+    let (_, _, context) = parse("use Foo { impl { bar() {} } }");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error when an impl block has no trait type"
+    );
+}
+
+#[test]
+fn unclosed_impl_block_is_rejected() {
+    let (_, _, context) = parse("use Foo { impl Bar { baz()");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error on an unclosed impl block"
+    );
+}
+
 #[test]
 fn use_block_method_with_params() {
     let (module, store, context) = parse("use Foo { bar(x: int, y: string) {} }");

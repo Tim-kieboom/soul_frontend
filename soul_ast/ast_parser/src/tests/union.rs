@@ -60,6 +60,36 @@ union Literal {
     }
 }
 
+// ----------------------------------------------------------------
+//  Bad-path: malformed union declarations
+// ----------------------------------------------------------------
+#[test]
+fn union_missing_name_is_rejected() {
+    let (_, _, context) = parse("union {}");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error when a union declaration has no name"
+    );
+}
+
+#[test]
+fn union_variants_missing_comma_is_rejected() {
+    let (_, _, context) = parse("union Foo { A B }");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error when variants aren't comma-separated"
+    );
+}
+
+#[test]
+fn union_tuple_variant_unclosed_paren_is_rejected() {
+    let (_, _, context) = parse("union Foo { Bar(int }");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error on an unclosed tuple-union parameter list"
+    );
+}
+
 #[test]
 fn union_empty() {
     let (module, store, context) = parse("union Foo {}");

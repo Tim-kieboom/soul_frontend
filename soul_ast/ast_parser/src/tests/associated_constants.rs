@@ -43,6 +43,15 @@ fn associated_constant_at_module_level() {
 }
 
 #[test]
+fn associated_constant_missing_value_is_rejected() {
+    let (_, _, context) = parse("MAX :: ");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error when an associated constant has no value"
+    );
+}
+
+#[test]
 fn associated_constant_inside_struct() {
     let (module, store, context) = parse(
         r#"

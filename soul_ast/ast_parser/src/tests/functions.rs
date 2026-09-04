@@ -574,6 +574,90 @@ fn param_impl_trait() {
     );
 }
 
+// ----------------------------------------------------------------
+//  Bad-path: malformed function declarations
+// ----------------------------------------------------------------
+#[test]
+fn non_default_parameter_after_default_parameter_is_rejected() {
+    let (_, _, context) = parse("foo(x: int = 5, y: int) {}");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        1,
+        "{:#?}",
+        context.faults.faults
+    );
+    assert!(
+        context.faults.faults.iter().any(|fault| fault
+            .message()
+            .contains("non default parameter after default parameter")),
+        "{:#?}",
+        context.faults.faults
+    );
+}
+
+#[test]
+fn parameter_missing_type_after_colon_is_rejected() {
+    let (_, _, context) = parse("foo(x:) {}");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error when a parameter's type is missing"
+    );
+}
+
+#[test]
+fn parameters_missing_comma_is_rejected() {
+    let (_, _, context) = parse("foo(x: int y: int) {}");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error when parameters aren't comma-separated"
+    );
+}
+
+#[test]
+fn multiple_this_parameters_is_rejected() {
+    let (_, _, context) = parse("foo(this, this) {}");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error when a signature declares 'this' more than once"
+    );
+    assert!(
+        context
+            .faults
+            .faults
+            .iter()
+            .any(|fault| fault.message().contains("more then one 'this'")),
+        "{:#?}",
+        context.faults.faults
+    );
+}
+
+#[test]
+fn extern_function_unsupported_language_is_rejected() {
+    let (_, _, context) = parse(r#"extern "Rust" printf(fmt: &char): int {}"#);
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error for an unsupported extern language"
+    );
+    assert!(
+        context
+            .faults
+            .faults
+            .iter()
+            .any(|fault| fault.message().contains("is not supported")),
+        "{:#?}",
+        context.faults.faults
+    );
+}
+
+#[test]
+fn extern_function_missing_language_string_is_rejected() {
+    let (_, _, context) = parse("extern printf(fmt: &char): int {}");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error when extern is missing its language string literal"
+    );
+}
+
 #[test]
 fn return_impl_trait() {
     let (module, store, context) = parse("makeDefault(): impl Display {}");

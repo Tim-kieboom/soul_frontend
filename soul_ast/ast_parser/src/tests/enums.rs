@@ -259,6 +259,63 @@ fn enum_with_underlying_type() {
     );
 }
 
+// ----------------------------------------------------------------
+//  Bad-path: malformed enum declarations
+// ----------------------------------------------------------------
+#[test]
+fn enum_missing_name_is_rejected() {
+    let (_, _, context) = parse("enum {}");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error when an enum declaration has no name"
+    );
+}
+
+#[test]
+fn enum_variants_missing_comma_is_rejected() {
+    let (_, _, context) = parse("enum Foo { A B }");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error when variants aren't comma-separated"
+    );
+}
+
+#[test]
+fn enum_assigned_variant_missing_value_is_rejected() {
+    let (_, _, context) = parse("enum Foo { A = }");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error when an assigned variant has no value"
+    );
+}
+
+#[test]
+fn enum_tuple_union_unclosed_paren_is_rejected() {
+    let (_, _, context) = parse("enum Foo { Bar(int }");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error on an unclosed tuple-union parameter list"
+    );
+}
+
+#[test]
+fn enum_named_union_missing_field_type_is_rejected() {
+    let (_, _, context) = parse("enum Foo { Bar{x} }");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error when a named-union field has no type"
+    );
+}
+
+#[test]
+fn enum_named_union_unclosed_outer_brace_is_rejected() {
+    let (_, _, context) = parse("enum Foo { Bar{x: int}");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error when the enum body itself is left unclosed"
+    );
+}
+
 #[test]
 fn enum_named_union_variant_field_types() {
     let (module, store, context) = parse("enum Foo { Bar{x: int, y: bool} }");

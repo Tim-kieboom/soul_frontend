@@ -200,6 +200,86 @@ fn struct_with_method() {
     }
 }
 
+// ----------------------------------------------------------------
+//  Bad-path: statements that aren't allowed in a struct body
+// ----------------------------------------------------------------
+#[test]
+fn struct_body_rejects_assignment_statement() {
+    let (_, _, context) = parse("struct Foo { x = 5 }");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        1,
+        "{:#?}",
+        context.faults.faults
+    );
+    assert!(
+        context
+            .faults
+            .faults
+            .iter()
+            .any(|fault| fault.message().contains("can not be used in struct body")),
+        "{:#?}",
+        context.faults.faults
+    );
+}
+
+#[test]
+fn struct_body_rejects_expression_statement() {
+    let (_, _, context) = parse("struct Foo { 5 }");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        1,
+        "{:#?}",
+        context.faults.faults
+    );
+    assert!(
+        context
+            .faults
+            .faults
+            .iter()
+            .any(|fault| fault.message().contains("can not be used in struct body")),
+        "{:#?}",
+        context.faults.faults
+    );
+}
+
+#[test]
+fn struct_recovers_after_a_rejected_statement_and_still_parses_later_fields() {
+    let (module, store, context) = parse("struct Foo { x = 5\ny: int }");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        1,
+        "{:#?}",
+        context.faults.faults
+    );
+
+    let stmt = get_statement(&store, &module, 0);
+    let struct_ = match &stmt.node {
+        StatementKind::Struct(s) => s,
+        _ => panic!("expected Struct"),
+    };
+    assert_eq!(struct_.fields.len(), 1);
+    assert_eq!(struct_.fields[0].value.name().unwrap().as_str(), "y");
+}
+
+#[test]
+fn struct_missing_name_is_rejected() {
+    let (_, _, context) = parse("struct { x: int }");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error when a struct declaration has no name"
+    );
+}
+
+#[test]
+fn struct_field_missing_type_after_colon_is_rejected() {
+    let (_, _, context) = parse("struct Foo { x: }");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error when a struct field's type is missing"
+    );
+}
+
 #[test]
 fn struct_with_type_alias() {
     let (module, store, context) = parse("struct Foo { type MyInt = int }");

@@ -88,3 +88,21 @@ fn test_unterminated_attribute_errors() {
         "expected error for unterminated attribute",
     );
 }
+
+#[test]
+fn test_attribute_missing_opening_bracket_errors() {
+    let (_, _, context) = parse("#test\nfoo() {}");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected error when '#' isn't followed by '['",
+    );
+}
+
+#[test]
+fn test_attribute_missing_name_errors() {
+    let (_, _, context) = parse("#[]\nfoo() {}");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected error when an attribute has no name",
+    );
+}

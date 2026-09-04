@@ -81,6 +81,37 @@ fn if_else_statement() {
 }
 
 // ----------------------------------------------------------------
+//  Bad-path: if / else
+// ----------------------------------------------------------------
+#[test]
+fn double_else_is_rejected() {
+    let (_, _, context) = parse("if true {} else {} else {}");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error for a second 'else' after 'else': {:#?}",
+        context.faults.faults
+    );
+}
+
+#[test]
+fn if_missing_condition_is_rejected() {
+    let (_, _, context) = parse("if {}");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error when 'if' has no condition"
+    );
+}
+
+#[test]
+fn if_missing_block_is_rejected() {
+    let (_, _, context) = parse("if true");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error when 'if' has no block"
+    );
+}
+
+// ----------------------------------------------------------------
 //  Match
 // ----------------------------------------------------------------
 #[test]
@@ -114,6 +145,36 @@ fn match_statement() {
         }
         _ => panic!("expected Expression statement"),
     }
+}
+
+// ----------------------------------------------------------------
+//  Bad-path: match
+// ----------------------------------------------------------------
+#[test]
+fn match_arm_missing_arrow_is_rejected() {
+    let (_, _, context) = parse("match x { _ 1 }");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error when a match arm has no '=>'"
+    );
+    assert!(
+        context
+            .faults
+            .faults
+            .iter()
+            .any(|fault| fault.message().contains("expected '=>' in match arm")),
+        "{:#?}",
+        context.faults.faults
+    );
+}
+
+#[test]
+fn unclosed_match_body_is_rejected() {
+    let (_, _, context) = parse("match x { _ => true");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error on an unclosed match body"
+    );
 }
 
 // ----------------------------------------------------------------
