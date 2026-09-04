@@ -569,19 +569,88 @@ fn multiple_statements() {
 // ----------------------------------------------------------------
 //  Error recovery — parser does not panic on bad input
 // ----------------------------------------------------------------
+fn has_fault_containing(context: &CrateContext, needle: &str) -> bool {
+    context
+        .faults
+        .faults
+        .iter()
+        .any(|fault| fault.message().contains(needle))
+}
+
 #[test]
 fn error_on_bad_token() {
     let (_, _, context) = parse("???");
     assert!(
-        !context.faults.faults.is_empty(),
-        "expected faults on bad input"
+        has_fault_containing(&context, "is invalid as start of expression"),
+        "expected an 'invalid start of expression' fault: {:#?}",
+        context.faults.faults
     );
 }
 
 #[test]
 fn error_partial_expression() {
     let (_, _, context) = parse("1 +\n");
-    assert!(!context.faults.faults.is_empty());
+    assert!(
+        has_fault_containing(&context, "is invalid as start of expression"),
+        "expected an 'invalid start of expression' fault: {:#?}",
+        context.faults.faults
+    );
+}
+
+#[test]
+fn unclosed_struct_brace_is_rejected() {
+    let (_, _, context) = parse("struct Foo {");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error on an unclosed struct body"
+    );
+}
+
+#[test]
+fn unclosed_function_paren_is_rejected() {
+    let (_, _, context) = parse("foo(");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error on an unclosed parameter list"
+    );
+}
+
+#[test]
+fn unclosed_enum_brace_is_rejected() {
+    let (_, _, context) = parse("enum Foo {");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error on an unclosed enum body"
+    );
+}
+
+#[test]
+fn unclosed_use_block_is_rejected() {
+    let (_, _, context) = parse("use Foo {");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error on an unclosed use block"
+    );
+}
+
+#[test]
+fn truncated_function_signature_is_rejected() {
+    let (_, _, context) = parse("foo(a:");
+    assert!(
+        context.faults.count_severity(Severity::Error) > 0,
+        "expected an error on a truncated parameter type"
+    );
+}
+
+#[test]
+fn well_formed_struct_after_malformed_examples_reports_no_error() {
+    let (_, _, context) = parse("struct Foo {}");
+    assert_eq!(
+        context.faults.count_severity(Severity::Error),
+        0,
+        "{:#?}",
+        context.faults.faults
+    );
 }
 
 // ----------------------------------------------------------------

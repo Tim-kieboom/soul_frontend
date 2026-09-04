@@ -1,10 +1,41 @@
+use ast_model::{AstStore, Module, statements::StatementKind};
 use soul_utils::fault::Severity;
 
-use crate::tests::parse;
+use crate::tests::{get_statement, parse};
 
 fn error_count(source: &str) -> usize {
     let (_, _, context) = parse(source);
     context.faults.count_severity(Severity::Error)
+}
+
+fn top_level_statement_kinds(store: &AstStore, module: &Module) -> Vec<&'static str> {
+    store.blocks[module.global]
+        .statements
+        .iter()
+        .map(|id| store.statements[*id].node.variant_name())
+        .collect()
+}
+
+fn function_body_statement_kinds(
+    store: &AstStore,
+    module: &Module,
+    index: usize,
+) -> Vec<&'static str> {
+    let stmt = get_statement(store, module, index);
+    let StatementKind::Function(func_id) = &stmt.node else {
+        panic!(
+            "expected a Function statement, got {:?}",
+            stmt.node.variant_name()
+        );
+    };
+    let ast_model::FunctionKind::Normal(function) = &store.functions[*func_id] else {
+        panic!("expected a Normal function");
+    };
+    store.blocks[function.block]
+        .statements
+        .iter()
+        .map(|id| store.statements[*id].node.variant_name())
+        .collect()
 }
 
 // ----------------------------------------------------------------
@@ -15,12 +46,14 @@ fn error_count(source: &str) -> usize {
 // ----------------------------------------------------------------
 #[test]
 fn assignment_as_last_block_statement_keeps_closing_brace() {
-    for source in [
-        "f() { total += v }",
-        "f() { x = 5 }",
-        "f(x) { x -= 1 }",
-        "f() {\n    total := 0\n    total += v\n}",
-        "f() { for v in values { total += v } }",
+    for (source, expected_body_kinds) in [
+        ("f() { total += v }", vec!["assignment"]),
+        ("f() { x = 5 }", vec!["assignment"]),
+        (
+            "f() {\n    total := 0\n    total += v\n}",
+            vec!["variable", "assignment"],
+        ),
+        ("f() { for v in values { total += v } }", vec!["expression"]),
     ] {
         assert_eq!(
             error_count(source),
@@ -28,7 +61,31 @@ fn assignment_as_last_block_statement_keeps_closing_brace() {
             "expected no parse errors for `{source}`: {:#?}",
             parse(source).2.faults.faults
         );
+        let (module, store, _) = parse(source);
+        assert_eq!(
+            top_level_statement_kinds(&store, &module),
+            vec!["function"],
+            "unexpected top-level shape for `{source}`"
+        );
+        assert_eq!(
+            function_body_statement_kinds(&store, &module, 0),
+            expected_body_kinds,
+            "unexpected body shape for `{source}`"
+        );
     }
+
+    let source = "f(x) { x -= 1 }";
+    assert_eq!(
+        error_count(source),
+        0,
+        "expected no parse errors for `{source}`: {:#?}",
+        parse(source).2.faults.faults
+    );
+    let (module, store, _) = parse(source);
+    assert_eq!(
+        top_level_statement_kinds(&store, &module),
+        vec!["expression", "expression"]
+    );
 }
 
 // ----------------------------------------------------------------
@@ -47,6 +104,12 @@ fn primitive_type_receiver_method_call_parses() {
             "expected no parse errors for `{source}`: {:#?}",
             parse(source).2.faults.faults
         );
+        let (module, store, _) = parse(source);
+        assert_eq!(
+            function_body_statement_kinds(&store, &module, 0),
+            vec!["variable"],
+            "unexpected body shape for `{source}`"
+        );
     }
 }
 
@@ -63,6 +126,11 @@ fn foreach_with_assignment_body() {
         "{:#?}",
         parse(source).2.faults.faults
     );
+    let (module, store, _) = parse(source);
+    assert_eq!(
+        function_body_statement_kinds(&store, &module, 0),
+        vec!["variable", "expression"]
+    );
 }
 
 // ----------------------------------------------------------------
@@ -78,6 +146,11 @@ fn for_while_with_limit_inline() {
         "{:#?}",
         parse(source).2.faults.faults
     );
+    let (module, store, _) = parse(source);
+    assert_eq!(
+        function_body_statement_kinds(&store, &module, 0),
+        vec!["variable"]
+    );
 }
 
 // ----------------------------------------------------------------
@@ -87,15 +160,29 @@ fn for_while_with_limit_inline() {
 // ----------------------------------------------------------------
 #[test]
 fn generic_type_in_expression_position() {
-    for source in [
-        "assertEq(mapped.typeof, Res<str>)",
-        "f() { assertEq(mapped.typeof, Res<str>) }",
-    ] {
-        assert_eq!(
-            error_count(source),
-            0,
-            "expected no parse errors for `{source}`: {:#?}",
-            parse(source).2.faults.faults
-        );
-    }
+    let source = "assertEq(mapped.typeof, Res<str>)";
+    assert_eq!(
+        error_count(source),
+        0,
+        "expected no parse errors for `{source}`: {:#?}",
+        parse(source).2.faults.faults
+    );
+    let (module, store, _) = parse(source);
+    assert_eq!(
+        top_level_statement_kinds(&store, &module),
+        vec!["expression"]
+    );
+
+    let source = "f() { assertEq(mapped.typeof, Res<str>) }";
+    assert_eq!(
+        error_count(source),
+        0,
+        "expected no parse errors for `{source}`: {:#?}",
+        parse(source).2.faults.faults
+    );
+    let (module, store, _) = parse(source);
+    assert_eq!(
+        function_body_statement_kinds(&store, &module, 0),
+        vec!["expression"]
+    );
 }
