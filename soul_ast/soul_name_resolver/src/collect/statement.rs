@@ -87,7 +87,9 @@ impl<'a> NameResolver<'a> {
                 self.collect_type(&type_def.new_type);
                 self.collect_type(&type_def.old_type);
 
-                if !type_def.is_distinct && let SoulType::Stub(stub) = &type_def.new_type {
+                if !type_def.is_distinct
+                    && let SoulType::Stub(stub) = &type_def.new_type
+                {
                     self.declares
                         .insert_type_alias(stub.name.as_str(), type_def.old_type.clone());
                 }

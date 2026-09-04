@@ -185,7 +185,10 @@ impl<'a> NameResolver<'a> {
             Some(resolved) => {
                 if resolved < self.synthetic_id_boundary && variable.id < resolved {
                     self.log_fault(Fault::error(
-                        format!("variable '{}' is used before its declaration", name.as_str()),
+                        format!(
+                            "variable '{}' is used before its declaration",
+                            name.as_str()
+                        ),
                         Some(name.span()),
                     ));
                 }

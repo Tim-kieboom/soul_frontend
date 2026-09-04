@@ -61,7 +61,7 @@ macro_rules! soul_error_internal {
 ///     span::{Span, ModuleId},
 ///     error::relative_to_project,
 /// };
-/// 
+///
 /// let span = Span::default(ModuleId::ERROR);
 /// let err = soul_error_internal!("msg", Some(span));
 /// let expanded = Fault::error(

@@ -61,8 +61,19 @@ import (
 - **Item-level visibility** inside a file uses `pub`, `pub(crate)`, `pub(super)` — unaffected by
   the file-capitalization rule above. Private-by-default at the item level.
 
-**Open:** how a multi-file project maps onto this — does `import Math` find `Math.soul` by
-convention, is there a project manifest for dependencies, how are external packages named?
+**Multi-file projects use a `Soul.toml` manifest.** A relative import (`import crate.sub`) finds
+`sub.soul` next to the importing file within the same crate; a named import (`import Math`)
+resolves against a dependency declared in `Soul.toml`:
+
+```toml
+name = "SoulTest"
+
+[dependencies]
+Std = {path = "lib/Std", linkage = "static"}
+Core = {path = "lib/Core", linkage = "static"}
+```
+
+See `docs/crate-system-plan.md` for the compiler-side `CrateForest`/`.soulo` design this maps onto.
 
 ---
 
@@ -875,8 +886,6 @@ Collected from inline **Open:** markers above, for at-a-glance status:
 - **Operators** — full list, precedence/associativity table, and the overloading design itself.
 - **Concurrency** — detached tasks, cancellation, channels/`select`, and whether an `actor`
   construct exists alongside `async`/`await` coloring.
-- **Modules** — how multi-file projects are organized on disk, and whether there's a manifest
-  format for dependencies.
 - **Misc** — whether a semicolon is ever *required* beyond the cases already settled in §1/§4;
   whether the implicit-apply-to-`it` sugar for bare `Type.` generalizes to any unapplied
   single-argument callable or stays specific to constructors.

@@ -381,24 +381,28 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
     }
 
-    fn parse_array_contructor(&mut self, method_type: &SoulType, start_span: Span) -> SoulResult<Spanned<Function>> {
+    fn parse_array_contructor(
+        &mut self,
+        method_type: &SoulType,
+        start_span: Span,
+    ) -> SoulResult<Spanned<Function>> {
         self.bump();
 
         let name = Ident::new(ARRAY_CONTRUCTOR_STR, start_span);
         let mut array_type = self.try_parse_type().merge_to_result()?;
-        
+
         array_type = SoulType::Array(ArrayType {
             of_type: Box::new(array_type),
             kind: ArrayKind::StackArrayWildcard,
         });
-        
+
         self.expect(&SQUARE_CLOSE)?;
         self.expect(&ROUND_OPEN)?;
-        
+
         let arg = self.try_bump_consume_ident()?;
-        
+
         self.expect(&ROUND_CLOSE)?;
-        
+
         let arg_id = self.alloc_node();
         let block = if self.current_is(&LAMBDA_ARROW) {
             self.bump();
@@ -417,7 +421,6 @@ impl<'a, 'f> Parser<'a, 'f> {
                 span: self.span_combine(start_span),
                 is_const: false,
             })
-
         } else {
             self.parse_block(TypeModifier::Mut)?
         };
@@ -443,10 +446,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         };
 
         let function = Function {
-            signature: FunctionSignature::with_span(
-                signature,
-                self.span_combine(start_span),
-            ),
+            signature: FunctionSignature::with_span(signature, self.span_combine(start_span)),
             block,
         };
 

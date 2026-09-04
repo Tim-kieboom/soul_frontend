@@ -115,7 +115,11 @@ impl<'a> NameResolver<'a> {
             .insert_expression_type(expression_id, return_type);
     }
 
-    fn resolve_variable_callable(&mut self, expression_id: ExpressionId, call: &FunctionCall) -> bool {
+    fn resolve_variable_callable(
+        &mut self,
+        expression_id: ExpressionId,
+        call: &FunctionCall,
+    ) -> bool {
         let name = call.name.as_str();
         let Some(var_id) =
             self.scope_info

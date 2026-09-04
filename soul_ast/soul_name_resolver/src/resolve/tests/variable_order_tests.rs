@@ -62,9 +62,7 @@ fn variable_used_after_its_declaration_reports_no_fault() {
 
 #[test]
 fn variable_used_before_declaration_inside_an_if_branch_still_faults() {
-    let ast = resolve_source(
-        "main() {\n    if true {\n        b := a\n    }\n    a: i64 = 1\n}\n",
-    );
+    let ast = resolve_source("main() {\n    if true {\n        b := a\n    }\n    a: i64 = 1\n}\n");
     assert_eq!(
         fault_count_containing(&ast, "is used before its declaration"),
         1
