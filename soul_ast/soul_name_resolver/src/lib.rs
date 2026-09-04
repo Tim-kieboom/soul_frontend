@@ -3,6 +3,7 @@ use ast_model::{
     block::BlockId,
     declare_store::DeclareStore,
     scope::{ScopeId, ScopeValue},
+    soul_type::SoulType,
     statements::{FunctionModifier, StatementId, VarPattern, Variable},
 };
 use soul_utils::{
@@ -41,6 +42,7 @@ struct Current {
     in_global: bool,
     module: ModuleId,
     function: Option<FunctionId>,
+    lambda_return_type: Option<SoulType>,
 }
 
 impl<'a> NameResolver<'a> {
@@ -62,6 +64,7 @@ impl<'a> NameResolver<'a> {
                 module,
                 in_global: true,
                 function: None,
+                lambda_return_type: None,
             },
             scope_ids: VecMap::new(),
             node_generator: ast.crates.store.clone_node_generator(),

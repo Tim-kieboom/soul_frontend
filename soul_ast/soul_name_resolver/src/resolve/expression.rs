@@ -196,8 +196,17 @@ impl<'a> NameResolver<'a> {
 
     fn resolve_lambda(&mut self, lambda: &Lambda) {
         let prev_function = self.current.function.take();
+        let prev_lambda_return_type = self.current.lambda_return_type.take();
+        self.current.lambda_return_type = self.first_lambda_return_type(lambda.body);
+
         self.resolve_block(lambda.body);
+
+        if let Some(return_type) = self.current.lambda_return_type.clone() {
+            self.check_tail_return_type(lambda.body, &return_type, &[]);
+        }
+
         self.current.function = prev_function;
+        self.current.lambda_return_type = prev_lambda_return_type;
     }
 
     fn resolve_match_method(&mut self, match_method: &MatchMethod) {
@@ -353,8 +362,7 @@ impl<'a> NameResolver<'a> {
             }
             ExpressionKind::Lambda(lambda) => {
                 let return_type = self
-                    .infer_tail_type(lambda.body)
-                    .map(default_concrete_type)
+                    .first_lambda_return_type(lambda.body)
                     .unwrap_or(SoulType::None);
                 Some(SoulType::Function {
                     arity: lambda.parameters.len(),
@@ -495,7 +503,7 @@ fn combine_untyped_kinds(a: PrimitiveTypes, b: PrimitiveTypes) -> PrimitiveTypes
     }
 }
 
-fn default_concrete_type(ty: SoulType) -> SoulType {
+pub(super) fn default_concrete_type(ty: SoulType) -> SoulType {
     match ty {
         SoulType::Primitive(PrimitiveTypes::UntypedInt | PrimitiveTypes::UntypedUint) => {
             SoulType::Primitive(PrimitiveTypes::Int)

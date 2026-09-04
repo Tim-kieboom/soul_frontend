@@ -103,8 +103,9 @@ control flow is easier to understand. Readable code always wins.
 ### Documentation
 
 Doc comments (`///`, `//!`) should really only be written for `pub` items — the public
-API surface. Private and `pub(crate)`/`pub(super)` items should rely on clear naming and,
-where needed, brief `//` comments instead.
+API surface. Private and `pub(crate)`/`pub(super)` items should rely on clear naming.
+
+Doc comments for functions should describe not the implementation but the abstract IO of the function. 
 
 ### Standard APIs
 

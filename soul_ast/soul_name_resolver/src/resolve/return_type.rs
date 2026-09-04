@@ -6,6 +6,7 @@ use ast_model::{
 };
 use soul_utils::{fault::Fault, span::Span};
 
+use super::expression::default_concrete_type;
 use super::function_call::is_generic_parameter;
 use crate::NameResolver;
 
@@ -26,22 +27,34 @@ impl<'a> NameResolver<'a> {
     }
 
     pub(super) fn check_return_statement(&mut self, value: Option<ExpressionId>, span: Span) {
-        let Some(function_id) = self.current.function else {
-            return;
-        };
-        let Some((signature, _)) = self.declares.get_function(function_id) else {
-            return;
-        };
-        let return_type = signature.return_type.clone();
-        let generics = signature.generics.clone();
-
-        if is_generic_parameter(&return_type, &generics) {
+        if let Some(function_id) = self.current.function {
+            let Some((signature, _)) = self.declares.get_function(function_id) else {
+                return;
+            };
+            let return_type = signature.return_type.clone();
+            let generics = signature.generics.clone();
+            if is_generic_parameter(&return_type, &generics) {
+                return;
+            }
+            self.check_return_value(value, &return_type, &generics, span);
             return;
         }
 
+        if let Some(return_type) = self.current.lambda_return_type.clone() {
+            self.check_return_value(value, &return_type, &[], span);
+        }
+    }
+
+    fn check_return_value(
+        &mut self,
+        value: Option<ExpressionId>,
+        return_type: &SoulType,
+        generics: &[Generic],
+        span: Span,
+    ) {
         match value {
             Some(expression_id) => {
-                self.check_tail_expression(expression_id, &return_type, &generics)
+                self.check_tail_expression(expression_id, return_type, generics)
             }
             None => {
                 if !matches!(return_type, SoulType::None) {
@@ -130,60 +143,66 @@ impl<'a> NameResolver<'a> {
         }
     }
 
-    pub(super) fn infer_tail_type(&self, block_id: BlockId) -> Option<SoulType> {
-        self.infer_tail_expression_type(self.tail_position(block_id)?)
+    pub(super) fn first_lambda_return_type(&self, body: BlockId) -> Option<SoulType> {
+        let value = self.first_return_value(body)?;
+        self.expression_type(value).map(default_concrete_type)
     }
 
-    fn infer_tail_expression_type(&self, expression_id: ExpressionId) -> Option<SoulType> {
+    fn first_return_value(&self, block_id: BlockId) -> Option<ExpressionId> {
+        let block = self.get_block(block_id)?;
+        let last_index = block.statements.len().checked_sub(1);
+        for (index, statement_id) in block.statements.iter().enumerate() {
+            let statement = self.get_statement(*statement_id)?;
+            let StatementKind::Expression {
+                expression,
+                ends_semicolon,
+            } = &statement.node
+            else {
+                continue;
+            };
+
+            if let Some(found) = self.first_return_in_expression(*expression) {
+                return Some(found);
+            }
+
+            if Some(index) == last_index && !ends_semicolon {
+                return Some(*expression);
+            }
+        }
+        None
+    }
+
+    fn first_return_in_expression(&self, expression_id: ExpressionId) -> Option<ExpressionId> {
         let expression = self.get_expression(expression_id)?;
         match &expression.node {
-            ExpressionKind::If(if_) => self.infer_tail_if_type(if_),
-            ExpressionKind::Block(block_id) => self.infer_tail_type(*block_id),
-            ExpressionKind::Return(value) => {
-                self.infer_tail_expression_type((*value)?)
-            }
-            ExpressionKind::Match(match_) => {
-                let mut result: Option<SoulType> = None;
-                for arm in &match_.arms {
-                    let arm_ty = self.infer_tail_type(arm.body)?;
-                    match &result {
-                        None => result = Some(arm_ty),
-                        Some(existing) if *existing == arm_ty => {}
-                        Some(_) => return None,
-                    }
-                }
-                result
-            }
-            _ => self.expression_type(expression_id),
+            ExpressionKind::Return(value) => *value,
+            ExpressionKind::Block(block_id) => self.first_return_value(*block_id),
+            ExpressionKind::If(if_) => self.first_return_in_if(if_),
+            ExpressionKind::Match(match_) => match_
+                .arms
+                .iter()
+                .find_map(|arm| self.first_return_value(arm.body)),
+            _ => None,
         }
     }
 
-    fn infer_tail_if_type(&self, if_: &If) -> Option<SoulType> {
-        let mut blocks = vec![if_.block];
+    fn first_return_in_if(&self, if_: &If) -> Option<ExpressionId> {
+        if let Some(found) = self.first_return_value(if_.block) {
+            return Some(found);
+        }
+
         let mut current = if_.branch.as_ref();
         loop {
             match current {
-                Some(IfBranch::Else(block_id)) => {
-                    blocks.push(*block_id);
-                    break;
-                }
+                Some(IfBranch::Else(block_id)) => return self.first_return_value(*block_id),
                 Some(IfBranch::If(elif)) => {
-                    blocks.push(elif.block);
+                    if let Some(found) = self.first_return_value(elif.block) {
+                        return Some(found);
+                    }
                     current = elif.branch.as_ref();
                 }
                 None => return None,
             }
         }
-
-        let mut result: Option<SoulType> = None;
-        for block_id in blocks {
-            let ty = self.infer_tail_type(block_id)?;
-            match &result {
-                None => result = Some(ty),
-                Some(existing) if *existing == ty => {}
-                Some(_) => return None,
-            }
-        }
-        result
     }
 }

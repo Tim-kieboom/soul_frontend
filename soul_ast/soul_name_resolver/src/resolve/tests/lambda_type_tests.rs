@@ -74,13 +74,13 @@ fn lambda_return_type_is_inferred_from_tail_position() {
 }
 
 #[test]
-fn lambda_with_non_exhaustive_if_tail_infers_unknown_return_type() {
+fn lambda_first_return_establishes_type_even_from_a_non_exhaustive_if() {
     let ast = resolve_source(
         "foo(a: str) {}\nmain() {\n    foo(x => {\n        if x {\n            1\n        }\n    })\n}\n",
     );
     assert!(
-        fault_count_containing(&ast, "-> none") > 0,
-        "expected an unresolved (`none`) return type: {:#?}",
+        fault_count_containing(&ast, "-> int") > 0,
+        "expected the first branch's value to establish `int`: {:#?}",
         ast.faults().iter().map(|f| f.message()).collect::<Vec<_>>()
     );
 }
@@ -134,13 +134,28 @@ fn calling_a_variable_bound_lambda_with_return_body_and_matching_type_reports_no
 }
 
 #[test]
-fn lambda_with_divergent_if_tail_branches_infers_unknown_return_type() {
+fn lambda_first_return_in_if_branch_establishes_type_and_later_return_faults() {
+    let ast = resolve_source(
+        "assertEq<T>(a: T, b: T) {}\nmain() {\n    fn := () => {\n        if true {\n            return 2\n        }\n        return \"\"\n    }\n}\n",
+    );
+    assert_eq!(
+        fault_count_containing(&ast, "return type mismatch: expected `int`, got `str`"),
+        1,
+    );
+}
+
+#[test]
+fn lambda_with_divergent_if_tail_branches_faults_on_the_later_branch() {
     let ast = resolve_source(
         "foo(a: str) {}\nmain() {\n    foo(x => {\n        if x {\n            1\n        } else {\n            \"hi\"\n        }\n    })\n}\n",
     );
+    assert_eq!(
+        fault_count_containing(&ast, "return type mismatch: expected `int`, got `str`"),
+        1,
+    );
     assert!(
-        fault_count_containing(&ast, "-> none") > 0,
-        "expected disagreeing branch types to fall back to `none`: {:#?}",
+        fault_count_containing(&ast, "-> int") > 0,
+        "expected the first branch's value to establish `int`: {:#?}",
         ast.faults().iter().map(|f| f.message()).collect::<Vec<_>>()
     );
 }
