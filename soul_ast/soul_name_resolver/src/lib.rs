@@ -17,6 +17,8 @@ mod collect;
 mod resolve;
 mod utils;
 
+/// Resolves all names (variables, functions, types) in `ast`'s root module,
+/// filling in the store's declarations and scope/resolution info in place.
 pub fn name_resolve(module_store: &mut ModuleStore, ast: &mut AstTree, crate_store: &CrateStore) {
     let root = ast.root;
     let mut resolver = NameResolver::new(ast.root, module_store, ast, crate_store);
@@ -46,6 +48,7 @@ struct Current {
 }
 
 impl<'a> NameResolver<'a> {
+    /// Creates a resolver for `module`, borrowing the AST's stores in place.
     pub fn new(
         module: ModuleId,
         modules: &'a mut ModuleStore,

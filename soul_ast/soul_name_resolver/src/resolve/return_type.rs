@@ -53,9 +53,7 @@ impl<'a> NameResolver<'a> {
         span: Span,
     ) {
         match value {
-            Some(expression_id) => {
-                self.check_tail_expression(expression_id, return_type, generics)
-            }
+            Some(expression_id) => self.check_tail_expression(expression_id, return_type, generics),
             None => {
                 if !matches!(return_type, SoulType::None) {
                     self.log_fault(Fault::error(

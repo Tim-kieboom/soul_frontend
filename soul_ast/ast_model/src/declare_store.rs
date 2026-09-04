@@ -75,10 +75,12 @@ impl DeclareStore {
         self.functions.get(index)
     }
 
+    /// Retrieves the resolved function-call info for a call-expression node.
     pub fn get_call_resolve(&self, id: NodeId) -> Option<&FunctionResolve> {
         self.function_resolves.get(id)
     }
 
+    /// Retrieves the node ID a variable reference resolves to.
     pub fn get_variable_resolve(&self, id: NodeId) -> Option<NodeId> {
         self.variable_resolves.get(id).copied()
     }
@@ -124,10 +126,14 @@ impl DeclareStore {
         self.custom_types.get(index)
     }
 
+    /// Records that a variable reference node resolves to the declaration
+    /// node `resolved`. Returns the previously stored resolution, if any.
     pub fn insert_variable_resolve(&mut self, node_id: NodeId, resolved: NodeId) -> Option<NodeId> {
         self.variable_resolves.insert(node_id, resolved)
     }
 
+    /// Records the resolved function-call info for a call-expression node.
+    /// Returns the previously stored resolution, if any.
     pub fn insert_function_resolve(
         &mut self,
         node_id: NodeId,
@@ -136,10 +142,13 @@ impl DeclareStore {
         self.function_resolves.insert(node_id, function)
     }
 
+    /// Retrieves the resolved function-call info for a call-expression node.
     pub fn get_function_resolve(&self, node_id: NodeId) -> Option<FunctionResolve> {
         self.function_resolves.get(node_id).copied()
     }
 
+    /// Records the resolved intrinsic-call info for a call-expression node.
+    /// Returns the previously stored resolution, if any.
     pub fn insert_intrinsic_resolve(
         &mut self,
         node_id: NodeId,
@@ -148,10 +157,13 @@ impl DeclareStore {
         self.intrinsic_resolves.insert(node_id, intrinsic)
     }
 
+    /// Retrieves the resolved intrinsic-call info for a call-expression node.
     pub fn get_intrinsic_resolve(&self, node_id: NodeId) -> Option<IntrinsicResolve> {
         self.intrinsic_resolves.get(node_id).copied()
     }
 
+    /// Finds a function by name and optional owner type (for method
+    /// resolution), also returning the module it was declared in.
     pub fn find_function_with_module(
         &self,
         name: &str,
@@ -172,6 +184,7 @@ impl DeclareStore {
         None
     }
 
+    /// Finds a function declared by `name` within a specific module.
     pub fn find_function_in_module(&self, name: &str, module: ModuleId) -> Option<FunctionId> {
         let functions = self.function_names.get(name)?;
         for id in functions {
@@ -184,6 +197,7 @@ impl DeclareStore {
         None
     }
 
+    /// Returns all function declarations in the store, indexed by their ID.
     pub fn functions(&self) -> &VecMap<FunctionId, (InnerFunctionSignature, ModuleId)> {
         &self.functions
     }
@@ -228,14 +242,21 @@ impl DeclareStore {
     }
 }
 
+/// The resolved target of a function call.
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct FunctionResolve {
+    /// The ID of the resolved function.
     pub id: FunctionId,
+    /// Whether the call is deferred (executed at scope exit).
     pub is_defer: bool,
+    /// Whether the callee expression should be ignored when generating code
+    /// for the call (e.g. because it was only used for method resolution).
     pub ignore_callee: bool,
 }
 
+/// The resolved target of an `intrinsic.*` call.
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct IntrinsicResolve {
+    /// Which intrinsic function the call resolves to.
     pub kind: IntrinsicFunction,
 }

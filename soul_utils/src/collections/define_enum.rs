@@ -246,30 +246,36 @@ macro_rules! define_symbols {
 
         impl $enum_name {
 
+            /// All enum variants, in declaration order.
             pub const VARIANTS: &[$enum_name] = &[
                 $( $enum_name::$name, )*
             ];
 
+            /// All string values corresponding to enum variants.
             pub const STRING_VALUES: &[&str] = &[
                 $( $symbol, )*
             ];
 
+            /// All [`Symbol`] values corresponding to enum variants.
             pub const SYMBOL_VALUES: &[Symbol] = &[
                 $( $symkind, )*
             ];
 
+            /// Returns the string representation of the variant (const-time).
             pub const fn as_str(&self) -> &'static str {
                 match self {
                     $( $enum_name::$name => $symbol, )*
                 }
             }
 
+            /// Returns the [`Symbol`] corresponding to this variant (const-time).
             pub const fn as_symbool(&self) -> Symbol {
                 match self {
                     $( $enum_name::$name => $symkind, )*
                 }
             }
 
+            /// Parses a variant from its string representation, if `s` matches one.
             pub fn from_str(s: &str) -> Option<Self> {
                 match s {
                     $( $symbol => Some($enum_name::$name), )*
@@ -277,6 +283,7 @@ macro_rules! define_symbols {
                 }
             }
 
+            /// Returns the variant corresponding to a [`Symbol`], if any matches (const-time).
             pub const fn from_symbool(k: Symbol) -> Option<Self> {
                 match k {
                     $( $symkind => Some($enum_name::$name), )*
@@ -303,30 +310,36 @@ macro_rules! define_symbols {
 
         impl $enum_name {
 
+            /// All enum variants, in declaration order.
             pub const VARIANTS: &[$enum_name] = &[
                 $( $enum_name::$name, )*
             ];
 
+            /// All string values corresponding to enum variants.
             pub const STRING_VALUES: &[&str] = &[
                 $( $symbol, )*
             ];
 
+            /// All [`Symbol`] values corresponding to enum variants.
             pub const SYMBOL_VALUES: &[Symbol] = &[
                 $( $symkind, )*
             ];
 
+            /// Returns the string representation of the variant (const-time).
             pub const fn as_str(&self) -> &'static str {
                 match self {
                     $( $enum_name::$name => $symbol, )*
                 }
             }
 
+            /// Returns the [`Symbol`] corresponding to this variant (const-time).
             pub const fn as_symbool(&self) -> Symbol {
                 match self {
                     $( $enum_name::$name => $symkind, )*
                 }
             }
 
+            /// Returns the variant corresponding to a [`Symbol`], if any matches (const-time).
             pub const fn from_symbool(k: Symbol) -> Option<Self> {
                 match k {
                     $( $symkind => Some($enum_name::$name), )*
@@ -334,6 +347,7 @@ macro_rules! define_symbols {
                 }
             }
 
+            /// Returns the precedence value of this variant.
             pub const fn precedence(&self) -> u8 {
                 match self {
                     $( $enum_name::$name => $precedence, )*

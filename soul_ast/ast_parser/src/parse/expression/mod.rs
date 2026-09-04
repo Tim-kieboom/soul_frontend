@@ -500,8 +500,14 @@ enum Loop {
     Break,
 }
 
+/// Converts a generic operator token into the unary/binary operator kind it
+/// represents, if any.
 pub trait ConvertOperator {
+    /// Returns the unary operator this represents, or `None` if it cannot be
+    /// used as a unary operator.
     fn to_unary(&self) -> Option<UnaryOperatorKind>;
+    /// Returns the binary operator this represents, or `None` if it cannot be
+    /// used as a binary operator.
     fn to_binary(&self) -> Option<BinaryOperatorKind>;
 }
 impl ConvertOperator for Operator {

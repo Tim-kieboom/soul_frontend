@@ -42,8 +42,11 @@ pub enum SoulType {
     ImplTrait(Box<SoulType>),
     /// unknown type
     Stub(Stub),
+    /// A specific variant of an enum type: `base::variant`.
     NamedVariant {
+        /// The enum type the variant belongs to.
         base: Box<SoulType>,
+        /// The variant's name.
         variant: Ident,
     },
     /// A lambda/closure value's type.
@@ -106,9 +109,13 @@ impl fmt::Debug for SoulType {
     }
 }
 
+/// A tuple type, either positional (`(int, str)`) or with named fields
+/// (`(number: int, text: str)`).
 #[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum TupleKind {
+    /// A positional tuple: `(int, str)`.
     Tuple(Tuple),
+    /// A tuple with named fields: `(number: int, text: str)`.
     NamedTuple(NamedTuple),
 }
 
@@ -140,10 +147,12 @@ impl fmt::Debug for TupleKind {
 }
 
 impl TupleKind {
+    /// Returns `true` if the tuple has no elements.
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    /// Returns the number of elements in the tuple.
     pub fn len(&self) -> usize {
         match self {
             TupleKind::Tuple(types) => types.len(),
@@ -152,7 +161,9 @@ impl TupleKind {
     }
 }
 
+/// The element types of a positional tuple.
 pub type Tuple = Vec<SoulType>;
+/// The name/type pairs of a named tuple.
 pub type NamedTuple = Vec<(Ident, SoulType)>;
 
 /// Array type
@@ -200,9 +211,13 @@ pub struct ReferenceType {
     pub mutable: bool,
 }
 
+/// An as-yet-unresolved named type reference (e.g. a struct/enum/trait name
+/// before it has been linked to its declaration), with any generic arguments.
 #[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Stub {
+    /// The referenced type's name.
     pub name: SharedStr,
+    /// The generic type arguments applied to the reference, if any.
     pub generics: Vec<SoulType>,
 }
 
@@ -225,12 +240,14 @@ impl fmt::Debug for Stub {
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Generic {
+    /// The generic parameter's name.
     pub name: Ident,
     /// Optional trait bound: `T: TraitName`
     pub bound: Option<SoulType>,
 }
 
 impl Stub {
+    /// Creates a stub reference to a named type with no generic arguments.
     pub fn new(name: impl Into<Rc<str>>) -> Self {
         Self {
             generics: vec![],
@@ -240,6 +257,7 @@ impl Stub {
 }
 
 impl ReferenceType {
+    /// Creates a reference type wrapping `ty`, without a lifetime annotation.
     pub fn new(ty: SoulType, mutable: bool) -> Self {
         Self {
             inner: Box::new(ty),

@@ -89,7 +89,7 @@ fn resolve_assign_type(
         Some(val) => val.span,
         None => {
             debug_assert!(false, "{rvalue:?} not found");
-            return ExpressionId::ERROR
+            return ExpressionId::ERROR;
         }
     };
     let full_span = span.combine(rspan);

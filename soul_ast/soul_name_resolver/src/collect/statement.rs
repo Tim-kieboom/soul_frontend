@@ -87,13 +87,9 @@ impl<'a> NameResolver<'a> {
                 self.collect_type(&type_def.new_type);
                 self.collect_type(&type_def.old_type);
 
-                // A `distinct` alias is deliberately not interchangeable
-                // with its underlying type, so it's never registered.
-                if !type_def.is_distinct {
-                    if let SoulType::Stub(stub) = &type_def.new_type {
-                        self.declares
-                            .insert_type_alias(stub.name.as_str(), type_def.old_type.clone());
-                    }
+                if !type_def.is_distinct && let SoulType::Stub(stub) = &type_def.new_type {
+                    self.declares
+                        .insert_type_alias(stub.name.as_str(), type_def.old_type.clone());
                 }
             }
             StatementKind::Variable(variable) => self.collect_variable(variable),
