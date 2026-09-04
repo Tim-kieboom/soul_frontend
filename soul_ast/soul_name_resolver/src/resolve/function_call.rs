@@ -272,7 +272,7 @@ impl<'a> NameResolver<'a> {
         let owner_type = self.get_owner_kind(type_qualifier.as_ref(), call);
         let has_owner_type = owner_type.is_some();
         let resolved = if has_owner_type {
-            self.declares.find_function(name, owner_type)
+            self.declares.find_function(name, owner_type.as_ref())
         } else {
             self.lookup_function(name)
         };
@@ -295,29 +295,18 @@ impl<'a> NameResolver<'a> {
     }
 
     fn get_owner_kind(
-        &'a self,
-        type_qualifier: Option<&'a SoulType>,
-        call: &'a FunctionCall,
-    ) -> Option<&'a SoulType> {
+        &self,
+        type_qualifier: Option<&SoulType>,
+        call: &FunctionCall,
+    ) -> Option<SoulType> {
         if let Some(ty) = type_qualifier {
-            return Some(ty);
+            return Some(ty.clone());
         }
 
         let callee = call.callee.as_ref()?;
-        let value = match &callee.kind {
-            FunctionCalleeKind::Type(soul_type) => return Some(soul_type),
-            FunctionCalleeKind::Expression(id) => self.store.expressions.get(*id)?,
-        };
-
-        match &value.node {
-            ExpressionKind::Variable(VariableExpression { id, .. }) => {
-                let resolved = self.declares.get_variable_resolve(*id)?;
-                match self.declares.get_variable_type(resolved)? {
-                    (_, Some(ty), _) => Some(ty),
-                    _ => None,
-                }
-            }
-            _ => None,
+        match &callee.kind {
+            FunctionCalleeKind::Type(soul_type) => Some(soul_type.clone()),
+            FunctionCalleeKind::Expression(id) => self.expression_type(*id),
         }
     }
 

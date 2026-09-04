@@ -1,4 +1,5 @@
 use soul_utils::{
+    fault::Fault,
     ids::IdAlloc,
     literal::{Number, TokenLiteral},
     soul_names::Symbol,
@@ -12,18 +13,24 @@ fn module_id() -> ModuleId {
 }
 
 fn lexer_to_vec(input: &str) -> Vec<TokenKind> {
+    try_lex(input).expect("lexer error")
+}
+
+/// Like `lexer_to_vec`, but returns the lex error instead of panicking on it —
+/// for tests asserting that malformed input is rejected.
+fn try_lex(input: &str) -> Result<Vec<TokenKind>, Fault> {
     let mut lexer = Lexer::new(input, module_id());
     let mut tokens = Vec::new();
 
     loop {
-        let token = lexer.next().expect("lexer error");
+        let token = lexer.next()?;
         if matches!(token.kind, TokenKind::EndFile) {
             break;
         }
         tokens.push(token.kind);
     }
 
-    tokens
+    Ok(tokens)
 }
 
 #[test]
@@ -281,6 +288,75 @@ fn lex_number_with_type_suffix() {
             TokenKind::Literal(TokenLiteral::Number(Number::Uint(0))),
             TokenKind::Symbol(Symbol::Comma),
             TokenKind::Literal(TokenLiteral::Number(Number::Uint(200))),
+        ]
+    );
+}
+
+// ----------------------------------------------------------------
+//  Malformed input (negative cases)
+// ----------------------------------------------------------------
+
+#[test]
+fn unterminated_string_literal_is_rejected() {
+    let err = try_lex(r#""hello"#).expect_err("unterminated string literal should not lex");
+    assert!(
+        err.message().contains("does not have an end qoute"),
+        "unexpected error message: {}",
+        err.message()
+    );
+}
+
+#[test]
+fn unterminated_char_literal_is_rejected() {
+    let err = try_lex("'").expect_err("unterminated char literal should not lex");
+    assert!(
+        err.message().contains("Unclosed char literal"),
+        "unexpected error message: {}",
+        err.message()
+    );
+}
+
+#[test]
+fn char_literal_missing_closing_quote_is_rejected() {
+    let err = try_lex("'a").expect_err("char literal missing closing quote should not lex");
+    assert!(
+        err.message().contains("char literal should end with"),
+        "unexpected error message: {}",
+        err.message()
+    );
+}
+
+#[test]
+fn unterminated_fstring_literal_is_rejected() {
+    let err = try_lex(r#"f"hello"#).expect_err("unterminated f-string literal should not lex");
+    assert!(
+        err.message().contains("unclosed format string literal"),
+        "unexpected error message: {}",
+        err.message()
+    );
+}
+
+#[test]
+fn unknown_character_is_rejected() {
+    let err = try_lex("`").expect_err("an unrecognized character should not lex");
+    assert!(
+        err.message().contains("is unknown"),
+        "unexpected error message: {}",
+        err.message()
+    );
+}
+
+#[test]
+fn well_formed_string_and_char_literals_are_accepted() {
+    // Positive counterpart to the unterminated-literal tests above.
+    let tokens = lexer_to_vec(r#""hello" 'a'"#);
+    assert_eq!(
+        tokens,
+        vec![
+            TokenKind::Literal(TokenLiteral::String(
+                soul_utils::literal::StringLiteral::Str("hello".to_string())
+            )),
+            TokenKind::Literal(TokenLiteral::Char('a')),
         ]
     );
 }

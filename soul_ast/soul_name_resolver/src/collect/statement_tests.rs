@@ -102,7 +102,10 @@ fn explicit_annotation_is_not_overridden_by_literal_inference() {
 }
 
 #[test]
-fn non_literal_initializer_is_left_unresolved() {
+fn non_literal_initializer_is_backfilled_once_resolve_runs() {
     let ast = resolve_source("main() {\n    b := 1\n    a := b\n}\n");
-    assert_eq!(variable_type(&ast, "a"), None);
+    assert_eq!(
+        variable_type(&ast, "a"),
+        Some(SoulType::Primitive(PrimitiveTypes::Int))
+    );
 }

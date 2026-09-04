@@ -40,46 +40,31 @@ fn fault_count_containing(ast: &AstTree, needle: &str) -> usize {
 }
 
 #[test]
-fn matching_field_types_report_no_fault() {
+fn field_access_value_can_be_used_in_a_binary_expression() {
     let ast = resolve_source(
-        "struct Point { x: i64\n    y: i64 }\nmain() {\n    Point { x: 1, y: 2 }\n}\n",
+        "struct Point {\n    x: i64\n}\nmain() {\n    p: Point = Point{x: 5}\n    y := p.x + 1\n}\n",
     );
     assert_eq!(fault_count_containing(&ast, "type mismatch"), 0);
-    assert_eq!(fault_count_containing(&ast, "has no field"), 0);
 }
 
 #[test]
-fn mismatched_field_type_reports_exactly_one_fault() {
+fn mismatched_field_access_value_in_a_binary_expression_reports_a_fault() {
     let ast = resolve_source(
-        "struct Point { x: i64\n    y: i64 }\nmain() {\n    Point { x: 1, y: \"hi\" }\n}\n",
+        "struct Point {\n    x: i64\n}\nmain() {\n    p: Point = Point{x: 5}\n    y := p.x + \"hi\"\n}\n",
     );
-    assert_eq!(fault_count_containing(&ast, "field `y` type mismatch"), 1);
+    assert_eq!(fault_count_containing(&ast, "type mismatch"), 1);
 }
 
 #[test]
-fn unknown_field_name_reports_exactly_one_fault() {
+fn method_call_on_a_nested_field_access_resolves() {
     let ast = resolve_source(
-        "struct Point { x: i64\n    y: i64 }\nmain() {\n    Point { x: 1, z: 2 }\n}\n",
+        "struct Inner {\n    n: i64\n}\nuse Inner {\n    get(&this): i64 => this.n\n}\nstruct Outer {\n    inner: Inner\n}\nmain() {\n    o: Outer = Outer{inner: Inner{n: 5}}\n    x := o.inner.get()\n}\n",
     );
-    assert_eq!(
-        fault_count_containing(&ast, "struct `Point` has no field `z`"),
-        1
-    );
+    assert_eq!(ast.faults().iter().count(), 0);
 }
 
 #[test]
-fn omitted_field_reports_no_fault() {
-    let ast =
-        resolve_source("struct Point { x: i64\n    y: i64 }\nmain() {\n    Point { x: 1 }\n}\n");
+fn field_access_on_an_undeclared_type_is_skipped_without_fault() {
+    let ast = resolve_source("main() {\n    y := notAThing.field\n}\n");
     assert_eq!(fault_count_containing(&ast, "type mismatch"), 0);
-    assert_eq!(fault_count_containing(&ast, "has no field"), 0);
-}
-
-#[test]
-fn generic_struct_field_is_skipped_without_fault() {
-    let ast = resolve_source("struct Box<T> { value: T }\nmain() {\n    Box { value: 1 }\n}\n");
-    assert_eq!(
-        fault_count_containing(&ast, "field `value` type mismatch"),
-        0
-    );
 }

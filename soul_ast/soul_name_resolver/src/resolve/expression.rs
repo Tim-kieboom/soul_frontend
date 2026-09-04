@@ -380,12 +380,37 @@ impl<'a> NameResolver<'a> {
                     return_type: Box::new(return_type),
                 })
             }
+            ExpressionKind::FieldAccess(field_access) => {
+                let object_ty = self.expression_type(field_access.object)?;
+                self.struct_field_type(&object_ty, field_access.field.as_str())
+            }
             _ => None,
         }
     }
 
-    /// The declared modifier and type of a plain variable reference (not an
-    /// index, field access, or deref) — used to check assignment targets.
+    fn struct_field_type(&self, ty: &SoulType, field_name: &str) -> Option<SoulType> {
+        let SoulType::Stub(stub) = ty else {
+            return None;
+        };
+        let entry = self
+            .scope_info
+            .scopes
+            .lookup_type(stub.name.as_str(), self.current.module)?;
+        let (CustomType::Struct(struct_), _) = self.declares.get_custom_type(entry.node_id)? else {
+            return None;
+        };
+
+        struct_.fields.iter().find_map(|field| {
+            let VarPattern::Simple { binding, .. } = &field.value.pattern else {
+                return None;
+            };
+            if binding.ident.as_str() != field_name {
+                return None;
+            }
+            field.value.ty.clone()
+        })
+    }
+
     pub(super) fn variable_lvalue(
         &self,
         expression_id: ExpressionId,
@@ -399,8 +424,6 @@ impl<'a> NameResolver<'a> {
         Some((*modifier, ty.clone()?))
     }
 
-    /// Resolves both operands' types (through any non-`distinct` type alias,
-    /// e.g. `Byte` → `u8`) and combines them — see [`combine_resolved_operand_types`].
     pub(super) fn combine_operand_types(
         &self,
         left: &SoulType,
@@ -411,10 +434,6 @@ impl<'a> NameResolver<'a> {
         combine_resolved_operand_types(&left, &right)
     }
 
-    /// Follows a non-`distinct` `type X := Y` alias chain to its underlying
-    /// type. Bounded to guard against an accidental cycle; a `distinct`
-    /// alias, or a name that isn't a registered alias at all, is returned
-    /// unchanged.
     fn resolve_type_alias(&self, ty: &SoulType) -> SoulType {
         let mut current = ty.clone();
         for _ in 0..8 {

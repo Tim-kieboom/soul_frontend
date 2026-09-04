@@ -40,46 +40,30 @@ fn fault_count_containing(ast: &AstTree, needle: &str) -> usize {
 }
 
 #[test]
-fn matching_field_types_report_no_fault() {
-    let ast = resolve_source(
-        "struct Point { x: i64\n    y: i64 }\nmain() {\n    Point { x: 1, y: 2 }\n}\n",
-    );
-    assert_eq!(fault_count_containing(&ast, "type mismatch"), 0);
-    assert_eq!(fault_count_containing(&ast, "has no field"), 0);
-}
-
-#[test]
-fn mismatched_field_type_reports_exactly_one_fault() {
-    let ast = resolve_source(
-        "struct Point { x: i64\n    y: i64 }\nmain() {\n    Point { x: 1, y: \"hi\" }\n}\n",
-    );
-    assert_eq!(fault_count_containing(&ast, "field `y` type mismatch"), 1);
-}
-
-#[test]
-fn unknown_field_name_reports_exactly_one_fault() {
-    let ast = resolve_source(
-        "struct Point { x: i64\n    y: i64 }\nmain() {\n    Point { x: 1, z: 2 }\n}\n",
-    );
-    assert_eq!(
-        fault_count_containing(&ast, "struct `Point` has no field `z`"),
-        1
-    );
-}
-
-#[test]
-fn omitted_field_reports_no_fault() {
+fn variable_from_a_function_call_can_be_used_in_a_binary_expression() {
     let ast =
-        resolve_source("struct Point { x: i64\n    y: i64 }\nmain() {\n    Point { x: 1 }\n}\n");
+        resolve_source("foo(): i64 {\n    1\n}\nmain() {\n    a := foo()\n    b := a + 1\n}\n");
     assert_eq!(fault_count_containing(&ast, "type mismatch"), 0);
-    assert_eq!(fault_count_containing(&ast, "has no field"), 0);
 }
 
 #[test]
-fn generic_struct_field_is_skipped_without_fault() {
-    let ast = resolve_source("struct Box<T> { value: T }\nmain() {\n    Box { value: 1 }\n}\n");
-    assert_eq!(
-        fault_count_containing(&ast, "field `value` type mismatch"),
-        0
+fn mismatched_use_of_a_function_call_initialized_variable_reports_a_fault() {
+    let ast = resolve_source(
+        "foo(): i64 {\n    1\n}\nmain() {\n    a := foo()\n    b := a + \"hi\"\n}\n",
     );
+    assert_eq!(fault_count_containing(&ast, "type mismatch"), 1);
+}
+
+#[test]
+fn variable_from_a_binary_expression_can_be_used_in_another_binary_expression() {
+    let ast = resolve_source("main() {\n    a := 1 + 2\n    b := a + 3\n}\n");
+    assert_eq!(fault_count_containing(&ast, "type mismatch"), 0);
+}
+
+#[test]
+fn variable_from_a_function_call_can_be_used_as_a_method_call_receiver() {
+    let ast = resolve_source(
+        "struct Counter {\n    n: i64\n}\nuse Counter {\n    get(&this): i64 => this.n\n}\nmakeCounter(): Counter => Counter{n: 5}\nmain() {\n    c := makeCounter()\n    x := c.get()\n}\n",
+    );
+    assert_eq!(ast.faults().iter().count(), 0);
 }

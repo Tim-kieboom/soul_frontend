@@ -1,6 +1,6 @@
 use ast_model::{
     FunctionKind,
-    expression::{ExpressionId, ExpressionKind},
+    expression::ExpressionId,
     statements::{
         Assignment, Enum, EnumVariant, StatementId, StatementKind, Struct, Trait, UseBlock,
         VarPattern, Variable,
@@ -103,18 +103,11 @@ impl<'a> NameResolver<'a> {
     fn resolve_variable(&mut self, variable: &Variable) {
         if let Some(value) = variable.initialize_value {
             self.resolve_expression(value);
-            self.backfill_lambda_variable_type(variable, value);
+            self.backfill_variable_type(variable, value);
         }
     }
 
-    fn backfill_lambda_variable_type(&mut self, variable: &Variable, value: ExpressionId) {
-        let is_lambda = self
-            .get_expression(value)
-            .is_some_and(|expr| matches!(expr.node, ExpressionKind::Lambda(_)));
-        if !is_lambda {
-            return;
-        }
-
+    fn backfill_variable_type(&mut self, variable: &Variable, value: ExpressionId) {
         let type_key = match &variable.pattern {
             VarPattern::Simple { binding, .. } => binding.id,
             _ => variable.id,
