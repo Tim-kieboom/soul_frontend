@@ -139,7 +139,10 @@ fn lambda_first_return_in_if_branch_establishes_type_and_later_return_faults() {
         "assertEq<T>(a: T, b: T) {}\nmain() {\n    fn := () => {\n        if true {\n            return 2\n        }\n        return \"\"\n    }\n}\n",
     );
     assert_eq!(
-        fault_count_containing(&ast, "return type mismatch: expected `int`, got `str`"),
+        fault_count_containing(
+            &ast,
+            "return type mismatch: expected `int`, got `&'static str`"
+        ),
         1,
     );
 }
@@ -150,7 +153,10 @@ fn lambda_with_divergent_if_tail_branches_faults_on_the_later_branch() {
         "foo(a: str) {}\nmain() {\n    foo(x => {\n        if x {\n            1\n        } else {\n            \"hi\"\n        }\n    })\n}\n",
     );
     assert_eq!(
-        fault_count_containing(&ast, "return type mismatch: expected `int`, got `str`"),
+        fault_count_containing(
+            &ast,
+            "return type mismatch: expected `int`, got `&'static str`"
+        ),
         1,
     );
     assert!(

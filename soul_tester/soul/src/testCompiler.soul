@@ -29,6 +29,11 @@ lamdba() {
     assertEq(fn(), 2)
 }
 
+trait Add {
+    add(this, b: This): This
+}
+use int impl Add add(this, b: This): This => this + b
+
 // ---------------------------------------------------------------------------
 // §3 — Types: primitives, optionals, arrays/slices, generics
 // ---------------------------------------------------------------------------
