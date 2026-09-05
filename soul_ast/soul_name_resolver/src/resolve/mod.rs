@@ -5,8 +5,8 @@ use crate::NameResolver;
 
 mod expression;
 mod function_call;
-mod return_type;
 mod statement;
+mod typecheck;
 
 #[cfg(test)]
 mod tests;

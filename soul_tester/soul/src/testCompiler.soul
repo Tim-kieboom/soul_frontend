@@ -93,10 +93,10 @@ makeDefault(): impl Display => 0   // impl Trait in return position (§3.4)
 
 #[test]
 test_generic_bounds() {
-    assertEq(describe(5), "5")
-    assertEq(describeWhere(5), "5")
-    assertEq(describeImpl(5), "5")
-    assertEq(f"{makeDefault()}", "0")
+    assertEq(&describe(5), "5")
+    assertEq(&describeWhere(5), "5")
+    assertEq(&describeImpl(5), "5")
+    assertEq(&f"{makeDefault()}", "0")
 }
 
 // ---------------------------------------------------------------------------
@@ -429,8 +429,8 @@ test_reflection() {
     x := 42
     s := "hello".copy
 
-    assertEq(describeAny(&x), "int(42)")
-    assertEq(describeAny(&s), "str(hello)")
+    assertEq(&describeAny(&x), "int(42)")
+    assertEq(&describeAny(&s), "str(hello)")
 
     info := intrinsic.typeinfo(Coord.typeof)
     match info {

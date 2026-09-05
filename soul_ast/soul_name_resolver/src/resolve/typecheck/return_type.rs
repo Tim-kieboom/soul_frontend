@@ -11,7 +11,7 @@ use super::function_call::is_generic_parameter;
 use crate::NameResolver;
 
 impl<'a> NameResolver<'a> {
-    pub(super) fn check_tail_return_type(
+    pub(crate) fn check_tail_return_type(
         &mut self,
         block_id: BlockId,
         return_type: &SoulType,
@@ -26,7 +26,7 @@ impl<'a> NameResolver<'a> {
         self.check_tail_expression(tail, return_type, generics);
     }
 
-    pub(super) fn check_return_statement(&mut self, value: Option<ExpressionId>, span: Span) {
+    pub(crate) fn check_return_statement(&mut self, value: Option<ExpressionId>, span: Span) {
         if let Some(function_id) = self.current.function {
             let Some((signature, _)) = self.declares.get_function(function_id) else {
                 return;
@@ -141,7 +141,7 @@ impl<'a> NameResolver<'a> {
         }
     }
 
-    pub(super) fn first_lambda_return_type(&self, body: BlockId) -> Option<SoulType> {
+    pub(crate) fn first_lambda_return_type(&self, body: BlockId) -> Option<SoulType> {
         let value = self.first_return_value(body)?;
         self.expression_type(value).map(default_concrete_type)
     }

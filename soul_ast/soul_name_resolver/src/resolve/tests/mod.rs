@@ -1,6 +1,8 @@
 mod assignment_tests;
 mod binary_expression_tests;
+mod enum_variant_construction_tests;
 mod field_access_type_tests;
+mod foreach_element_type_tests;
 mod function_call_argument_tests;
 mod function_call_tests;
 mod lambda_type_tests;

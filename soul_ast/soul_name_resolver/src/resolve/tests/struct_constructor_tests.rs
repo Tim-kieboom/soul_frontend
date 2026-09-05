@@ -83,3 +83,18 @@ fn generic_struct_field_is_skipped_without_fault() {
         0
     );
 }
+
+#[test]
+fn same_generic_used_on_two_fields_with_incompatible_types_reports_exactly_one_fault() {
+    let ast = resolve_source(
+        "struct Pair<T> { a: T\n    b: T }\nmain() {\n    Pair { a: 1, b: \"hi\" }\n}\n",
+    );
+    assert_eq!(fault_count_containing(&ast, "generic parameter"), 1);
+}
+
+#[test]
+fn same_generic_used_on_two_fields_with_matching_types_reports_no_fault() {
+    let ast =
+        resolve_source("struct Pair<T> { a: T\n    b: T }\nmain() {\n    Pair { a: 1, b: 2 }\n}\n");
+    assert_eq!(fault_count_containing(&ast, "generic parameter"), 0);
+}

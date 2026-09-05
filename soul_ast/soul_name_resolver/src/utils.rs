@@ -2,7 +2,7 @@ use ast_model::{
     NodeId,
     block::{Block, BlockId},
     expression::{Binding, Expression, ExpressionId},
-    scope::{Scope, ScopeBuilder, ScopeValue},
+    scope::{Scope, ScopeBuilder, ScopeTypeEntry, ScopeValue},
     statements::{FunctionSignature, Statement, StatementId},
 };
 use soul_utils::{
@@ -77,5 +77,13 @@ impl<'a> NameResolver<'a> {
 
     pub(crate) fn get_expression(&self, id: ExpressionId) -> Option<&Expression> {
         self.store.expressions.get(id)
+    }
+
+    pub(crate) fn lookup_type(
+        &self,
+        ident: impl AsRef<str>,
+        module: ModuleId,
+    ) -> Option<ScopeTypeEntry> {
+        self.scope_info.scopes.lookup_type(ident.as_ref(), module)
     }
 }

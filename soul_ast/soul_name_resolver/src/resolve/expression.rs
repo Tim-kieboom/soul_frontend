@@ -1,23 +1,15 @@
 use ast_model::{
-    CustomType,
     expression::{
-        AnyArray, Binary, Constructor, ExpressionId, ExpressionKind, FieldAccess, For,
-        ForCondition, If, IfBranch, IfCondition, Lambda, Match, MatchMethod, StringFormat,
-        StructConstructor, VariableExpression,
+        AnyArray, Constructor, ExpressionId, ExpressionKind, FieldAccess, For, ForCondition, If,
+        IfBranch, IfCondition, Lambda, Match, MatchMethod, StringFormat, StructConstructor,
+        VariableExpression,
     },
-    literal::Literal,
-    operators::BinaryOperatorKind,
     scope::ScopeValue,
-    soul_type::SoulType,
     statements::VarPattern,
 };
 use soul_tokenizer::model::types::Types;
-use soul_utils::{
-    TypeModifier, fault::Fault, soul_error_internal, soul_names::PrimitiveTypes, span::Span,
-};
+use soul_utils::{fault::Fault, soul_error_internal};
 use std::str::FromStr;
-
-use super::function_call::is_generic_parameter;
 
 use crate::NameResolver;
 
@@ -105,68 +97,6 @@ impl<'a> NameResolver<'a> {
             self.resolve_expression(*value);
         }
         self.check_struct_constructor(struct_constructor);
-    }
-
-    fn check_struct_constructor(&mut self, struct_constructor: &StructConstructor) {
-        let SoulType::Stub(stub) = &struct_constructor.struct_type else {
-            return;
-        };
-
-        let Some(entry) = self
-            .scope_info
-            .scopes
-            .lookup_type(stub.name.as_str(), self.current.module)
-        else {
-            return;
-        };
-
-        let Some((CustomType::Struct(struct_), _)) = self.declares.get_custom_type(entry.node_id)
-        else {
-            return;
-        };
-
-        let struct_ = struct_.clone();
-
-        for (field_name, value_id) in &struct_constructor.values {
-            let Some(field) = struct_.fields.iter().find(|field| {
-                matches!(&field.value.pattern, VarPattern::Simple { binding, .. } if binding.ident.as_str() == field_name.as_str())
-            }) else {
-                self.log_fault(Fault::error(
-                    format!(
-                        "struct `{}` has no field `{}`",
-                        stub.name.as_str(),
-                        field_name.as_str()
-                    ),
-                    Some(field_name.span()),
-                ));
-                continue
-            };
-
-            let Some(field_ty) = &field.value.ty else {
-                continue;
-            };
-
-            if is_generic_parameter(field_ty, &struct_.generics) {
-                continue;
-            }
-
-            let Some(value_ty) = self.expression_type(*value_id) else {
-                continue;
-            };
-
-            if self.combine_operand_types(&value_ty, field_ty).is_some() {
-                continue;
-            }
-
-            let span = self.store.expressions.get(*value_id).map(|expr| expr.span);
-            self.log_fault(Fault::error(
-                format!(
-                    "field `{}` type mismatch: expected `{field_ty:?}`, got `{value_ty:?}`",
-                    field_name.as_str()
-                ),
-                span,
-            ));
-        }
     }
 
     fn resolve_string_format(&mut self, string_format: &StringFormat) {
@@ -289,12 +219,46 @@ impl<'a> NameResolver<'a> {
         match &for_.condition {
             ForCondition::Loop => (),
             ForCondition::While(expression_id) => self.resolve_expression(*expression_id),
-            ForCondition::Foreach { collection, .. } => {
+            ForCondition::Foreach {
+                collection,
+                element_kind,
+                ..
+            } => {
                 self.resolve_expression(*collection);
+                self.backfill_foreach_element_type(element_kind, *collection);
             }
         }
 
         self.resolve_block(for_.block);
+    }
+
+    fn backfill_foreach_element_type(
+        &mut self,
+        element_kind: &VarPattern,
+        collection: ExpressionId,
+    ) {
+        let VarPattern::Simple { binding, modifier } = element_kind else {
+            return;
+        };
+
+        if self
+            .declares
+            .get_variable_type(binding.id)
+            .is_some_and(|(_, ty, _)| ty.is_some())
+        {
+            return;
+        }
+
+        let Some(elem_ty) = self.foreach_collection_element_type(collection) else {
+            return;
+        };
+
+        self.declares.insert_variable_type(
+            binding.id,
+            *modifier,
+            Some(elem_ty),
+            self.current.module,
+        );
     }
 
     fn resolve_if(&mut self, if_: &If) {
@@ -324,246 +288,5 @@ impl<'a> NameResolver<'a> {
                 self.resolve_expression(*scrutinee);
             }
         }
-    }
-
-    fn check_binary_expression(
-        &mut self,
-        expression_id: ExpressionId,
-        span: Span,
-        binary: &Binary,
-    ) {
-        let Some(left_ty) = self.expression_type(binary.left) else {
-            return;
-        };
-        let Some(right_ty) = self.expression_type(binary.right) else {
-            return;
-        };
-
-        let Some(combined) = self.combine_operand_types(&left_ty, &right_ty) else {
-            self.log_fault(Fault::error(
-                format!(
-                    "type mismatch in binary expression: left is `{left_ty:?}`, right is `{right_ty:?}`"
-                ),
-                Some(span),
-            ));
-            return;
-        };
-
-        let result_ty = if is_comparison_operator(binary.operator.value) {
-            SoulType::Primitive(PrimitiveTypes::Boolean)
-        } else {
-            combined
-        };
-        self.declares
-            .insert_expression_type(expression_id, result_ty);
-    }
-
-    pub(super) fn expression_type(&self, expression_id: ExpressionId) -> Option<SoulType> {
-        if let Some(ty) = self.declares.get_expression_type(expression_id) {
-            return Some(ty.clone());
-        }
-
-        let expression = self.store.expressions.get(expression_id)?;
-        match &expression.node {
-            ExpressionKind::Literal((_, literal)) => Some(literal_type(literal)),
-            ExpressionKind::Variable(variable) => {
-                let resolved = self.declares.get_variable_resolve(variable.id)?;
-                let (_, ty, _) = self.declares.get_variable_type(resolved)?;
-                ty.clone()
-            }
-            ExpressionKind::Lambda(lambda) => {
-                let return_type = self
-                    .first_lambda_return_type(lambda.body)
-                    .unwrap_or(SoulType::None);
-                Some(SoulType::Function {
-                    arity: lambda.parameters.len(),
-                    return_type: Box::new(return_type),
-                })
-            }
-            ExpressionKind::FieldAccess(field_access) => {
-                let object_ty = self.expression_type(field_access.object)?;
-                self.struct_field_type(&object_ty, field_access.field.as_str())
-            }
-            _ => None,
-        }
-    }
-
-    fn struct_field_type(&self, ty: &SoulType, field_name: &str) -> Option<SoulType> {
-        let SoulType::Stub(stub) = ty else {
-            return None;
-        };
-        let entry = self
-            .scope_info
-            .scopes
-            .lookup_type(stub.name.as_str(), self.current.module)?;
-        let (CustomType::Struct(struct_), _) = self.declares.get_custom_type(entry.node_id)? else {
-            return None;
-        };
-
-        struct_.fields.iter().find_map(|field| {
-            let VarPattern::Simple { binding, .. } = &field.value.pattern else {
-                return None;
-            };
-            if binding.ident.as_str() != field_name {
-                return None;
-            }
-            field.value.ty.clone()
-        })
-    }
-
-    pub(super) fn variable_lvalue(
-        &self,
-        expression_id: ExpressionId,
-    ) -> Option<(TypeModifier, SoulType)> {
-        let expression = self.store.expressions.get(expression_id)?;
-        let ExpressionKind::Variable(variable) = &expression.node else {
-            return None;
-        };
-        let resolved = self.declares.get_variable_resolve(variable.id)?;
-        let (modifier, ty, _) = self.declares.get_variable_type(resolved)?;
-        Some((*modifier, ty.clone()?))
-    }
-
-    pub(super) fn combine_operand_types(
-        &self,
-        left: &SoulType,
-        right: &SoulType,
-    ) -> Option<SoulType> {
-        let left = self.resolve_type_alias(left);
-        let right = self.resolve_type_alias(right);
-        combine_resolved_operand_types(&left, &right)
-    }
-
-    fn resolve_type_alias(&self, ty: &SoulType) -> SoulType {
-        let mut current = ty.clone();
-        for _ in 0..8 {
-            let SoulType::Stub(stub) = &current else {
-                return current;
-            };
-            let Some(underlying) = self.declares.get_type_alias(stub.name.as_str()) else {
-                return current;
-            };
-            current = underlying.clone();
-        }
-        current
-    }
-}
-
-fn literal_type(literal: &Literal) -> SoulType {
-    match literal {
-        Literal::Int(_) => SoulType::Primitive(PrimitiveTypes::UntypedInt),
-        Literal::Uint(_) => SoulType::Primitive(PrimitiveTypes::UntypedUint),
-        Literal::Float(_) => SoulType::Primitive(PrimitiveTypes::UntypedFloat),
-        Literal::Bool(_) => SoulType::Primitive(PrimitiveTypes::Boolean),
-        Literal::Char(_) => SoulType::Primitive(PrimitiveTypes::Char),
-        Literal::Str(_) => SoulType::String,
-        Literal::Cstr(_) => SoulType::Primitive(PrimitiveTypes::CStr),
-    }
-}
-
-fn is_comparison_operator(operator: BinaryOperatorKind) -> bool {
-    matches!(
-        operator,
-        BinaryOperatorKind::Eq
-            | BinaryOperatorKind::NotEq
-            | BinaryOperatorKind::Lt
-            | BinaryOperatorKind::Gt
-            | BinaryOperatorKind::Le
-            | BinaryOperatorKind::Ge
-            | BinaryOperatorKind::LogAnd
-            | BinaryOperatorKind::LogOr
-    )
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum NumCategory {
-    Int,
-    Uint,
-    Float,
-}
-
-fn concrete_num_category(prim: PrimitiveTypes) -> Option<NumCategory> {
-    match prim {
-        PrimitiveTypes::CInt
-        | PrimitiveTypes::Int
-        | PrimitiveTypes::Int8
-        | PrimitiveTypes::Int16
-        | PrimitiveTypes::Int32
-        | PrimitiveTypes::Int64
-        | PrimitiveTypes::Int128 => Some(NumCategory::Int),
-        PrimitiveTypes::CUint
-        | PrimitiveTypes::Uint
-        | PrimitiveTypes::Uint8
-        | PrimitiveTypes::Uint16
-        | PrimitiveTypes::Uint32
-        | PrimitiveTypes::Uint64
-        | PrimitiveTypes::Uint128 => Some(NumCategory::Uint),
-        PrimitiveTypes::Float16 | PrimitiveTypes::Float32 | PrimitiveTypes::Float64 => {
-            Some(NumCategory::Float)
-        }
-        _ => None,
-    }
-}
-
-fn untyped_targets(kind: PrimitiveTypes) -> &'static [NumCategory] {
-    match kind {
-        PrimitiveTypes::UntypedInt => &[NumCategory::Int, NumCategory::Float],
-        PrimitiveTypes::UntypedUint => &[NumCategory::Int, NumCategory::Uint, NumCategory::Float],
-        PrimitiveTypes::UntypedFloat => &[NumCategory::Float],
-        _ => &[],
-    }
-}
-
-fn untyped_kind_of(ty: &SoulType) -> Option<PrimitiveTypes> {
-    match ty {
-        SoulType::Primitive(
-            kind @ (PrimitiveTypes::UntypedInt
-            | PrimitiveTypes::UntypedUint
-            | PrimitiveTypes::UntypedFloat),
-        ) => Some(*kind),
-        _ => None,
-    }
-}
-
-fn combine_untyped_kinds(a: PrimitiveTypes, b: PrimitiveTypes) -> PrimitiveTypes {
-    if a == PrimitiveTypes::UntypedFloat || b == PrimitiveTypes::UntypedFloat {
-        PrimitiveTypes::UntypedFloat
-    } else {
-        PrimitiveTypes::UntypedInt
-    }
-}
-
-pub(super) fn default_concrete_type(ty: SoulType) -> SoulType {
-    match ty {
-        SoulType::Primitive(PrimitiveTypes::UntypedInt | PrimitiveTypes::UntypedUint) => {
-            SoulType::Primitive(PrimitiveTypes::Int)
-        }
-        SoulType::Primitive(PrimitiveTypes::UntypedFloat) => {
-            SoulType::Primitive(PrimitiveTypes::Float64)
-        }
-        other => other,
-    }
-}
-
-fn combine_resolved_operand_types(left: &SoulType, right: &SoulType) -> Option<SoulType> {
-    match (untyped_kind_of(left), untyped_kind_of(right)) {
-        (None, None) if left == right => Some(left.clone()),
-        (None, None) => None,
-        (Some(kind), None) => coerce_untyped_to_concrete(kind, right),
-        (None, Some(kind)) => coerce_untyped_to_concrete(kind, left),
-        (Some(a), Some(b)) => Some(SoulType::Primitive(combine_untyped_kinds(a, b))),
-    }
-}
-
-fn coerce_untyped_to_concrete(kind: PrimitiveTypes, concrete: &SoulType) -> Option<SoulType> {
-    let SoulType::Primitive(prim) = concrete else {
-        return None;
-    };
-
-    let category = concrete_num_category(*prim)?;
-    if untyped_targets(kind).contains(&category) {
-        Some(concrete.clone())
-    } else {
-        None
     }
 }
