@@ -35,7 +35,7 @@ impl<'a> StrIter<'a> {
         self.chars.peek().copied()
     }
 
-    pub(crate) fn slice(&self, range: std::ops::Range<usize>) -> &str {
+    pub(crate) fn slice(&self, range: std::ops::Range<usize>) -> &'a str {
         &self.source[range]
     }
 }

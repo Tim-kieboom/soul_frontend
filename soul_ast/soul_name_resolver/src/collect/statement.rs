@@ -91,7 +91,7 @@ impl<'a> NameResolver<'a> {
                     && let SoulType::Stub(stub) = &type_def.new_type
                 {
                     self.declares
-                        .insert_type_alias(stub.name.as_str(), type_def.old_type.clone());
+                        .insert_type_alias(stub.name.clone(), type_def.old_type.clone());
                 }
             }
             StatementKind::Variable(variable) => self.collect_variable(variable),
@@ -194,7 +194,7 @@ impl<'a> NameResolver<'a> {
         for parameter in signature.parameters.iter() {
             self.collect_type(&parameter.ty);
             let span = parameter.name.span();
-            let name = parameter.name.as_str();
+            let name = parameter.name.as_shared_str();
             self.insert_value(name, parameter.id, span, ScopeValue::Variable);
 
             let modifier = if parameter.is_mut {
@@ -273,7 +273,7 @@ impl<'a> NameResolver<'a> {
                     self.log_fault(err);
                 }
                 self.insert_value(
-                    binding.ident.as_str(),
+                    binding.ident.as_shared_str(),
                     binding.id,
                     binding.ident.span(),
                     ScopeValue::Variable,
@@ -291,7 +291,7 @@ impl<'a> NameResolver<'a> {
                             self.log_fault(err);
                         }
                         self.insert_value(
-                            binding.ident.as_str(),
+                            binding.ident.as_shared_str(),
                             binding.id,
                             binding.ident.span(),
                             ScopeValue::Variable,
@@ -306,7 +306,7 @@ impl<'a> NameResolver<'a> {
                             self.log_fault(err);
                         }
                         self.insert_value(
-                            binding.ident.as_str(),
+                            binding.ident.as_shared_str(),
                             binding.id,
                             binding.ident.span(),
                             ScopeValue::Variable,

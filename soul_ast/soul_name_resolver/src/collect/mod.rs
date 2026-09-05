@@ -102,7 +102,9 @@ impl<'a> NameResolver<'a> {
 
         self.declares
             .try_insert_enum(enum_.id, enum_, self.current.module);
-        let old_entry = self.current_scope_mut().insert_types(name.as_str(), entry);
+        let old_entry = self
+            .current_scope_mut()
+            .insert_types(name.as_shared_str(), entry);
 
         if old_entry.is_some() {
             self.log_fault(Fault::error(
@@ -125,7 +127,7 @@ impl<'a> NameResolver<'a> {
             .try_insert_trait(trait_.id, trait_, self.current.module);
         let old_entry = self
             .current_scope_mut()
-            .insert_types(name.as_str(), scope_type);
+            .insert_types(name.as_shared_str(), scope_type);
 
         if old_entry.is_some() {
             self.log_fault(Fault::error(
@@ -148,7 +150,7 @@ impl<'a> NameResolver<'a> {
             .try_insert_struct(struct_.id, struct_, self.current.module);
         let old_entry = self
             .current_scope_mut()
-            .insert_types(name.as_str(), scope_type);
+            .insert_types(name.as_shared_str(), scope_type);
 
         if old_entry.is_some() {
             self.log_fault(Fault::error(
@@ -170,7 +172,7 @@ impl<'a> NameResolver<'a> {
         }
 
         Self::static_current_scope_mut(scopes, module).insert_types(
-            name.as_str(),
+            name.as_shared_str(),
             ScopeTypeEntry {
                 span,
                 node_id: id,

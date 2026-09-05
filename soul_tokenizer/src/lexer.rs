@@ -117,12 +117,12 @@ impl<'a> Lexer<'a> {
         let string_tag = match self.try_get_ident_or_tag(char) {
             Ok(val) => val,
             Err(ident_str) => {
-                if let Ok(keyword) = KeyWord::from_str(&ident_str) {
+                if let Ok(keyword) = KeyWord::from_str(ident_str) {
                     return Ok(TokenKind::Keyword(keyword));
-                } else if let Ok(types) = Types::from_str(&ident_str) {
+                } else if let Ok(types) = Types::from_str(ident_str) {
                     return Ok(TokenKind::Types(types));
                 } else {
-                    return Ok(TokenKind::Ident(ident_str));
+                    return Ok(TokenKind::Ident(ident_str.to_string()));
                 }
             }
         };
@@ -228,7 +228,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn lex_ident(&mut self) -> (&str, Option<char>) {
+    fn lex_ident(&mut self) -> (&'a str, Option<char>) {
         let start = self.input.position();
         while let Some(char) = self.current {
             if char.is_alphabetic() || char == '_' || is_number(char) {
@@ -239,7 +239,7 @@ impl<'a> Lexer<'a> {
         }
 
         let peek = self.peek_char();
-        let slice = &self.input.slice(start..self.input.position());
+        let slice = self.input.slice(start..self.input.position());
         (slice, peek)
     }
 
@@ -314,7 +314,7 @@ impl<'a> Lexer<'a> {
         ))
     }
 
-    fn try_get_ident_or_tag(&mut self, char: char) -> Result<Option<StringTag>, String> {
+    fn try_get_ident_or_tag(&mut self, char: char) -> Result<Option<StringTag>, &'a str> {
         if self.peek_char() == Some('"') {
             match char {
                 'f' => return Ok(Some(StringTag::F)),
@@ -328,12 +328,11 @@ impl<'a> Lexer<'a> {
         }
 
         let (string, _peek) = self.lex_ident();
-        let string_owned = string.to_string();
         if string == "fstr" && self.current == Some('"') {
             return Ok(Some(StringTag::Fstr));
         }
 
-        Err(string_owned)
+        Err(string)
     }
 
     fn lex_number(&mut self, line: SpanLine) -> SoulResult<Number> {

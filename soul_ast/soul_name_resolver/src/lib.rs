@@ -192,7 +192,8 @@ impl<'a> NameResolver<'a> {
             return false;
         }
 
-        self.current_scope_mut().insert_function(name.as_str(), id);
+        self.current_scope_mut()
+            .insert_function(name.as_shared_str(), id);
         true
     }
 
@@ -207,7 +208,7 @@ impl<'a> NameResolver<'a> {
         }
 
         self.current_scope_mut()
-            .insert_value(name.as_str(), ScopeValue::Variable, id);
+            .insert_value(name.as_shared_str(), ScopeValue::Variable, id);
 
         true
     }

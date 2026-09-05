@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap};
 
 use crate::{
     CustomType, NodeId,
@@ -7,8 +7,7 @@ use crate::{
     statements::{Enum, InnerFunctionSignature, Struct, Trait},
 };
 use soul_utils::{
-    FunctionId, TypeModifier, collections::vec_map::VecMap, intrinsics::IntrinsicFunction,
-    span::ModuleId,
+    FunctionId, SharedStr, TypeModifier, collections::vec_map::VecMap, intrinsics::IntrinsicFunction, span::ModuleId,
 };
 
 /// A store of all declarations in a module.
@@ -27,7 +26,7 @@ pub struct DeclareStore {
     /// All function declarations, indexed by their ID.
     functions: VecMap<FunctionId, (InnerFunctionSignature, ModuleId)>,
     /// All function declarations, indexed by their ID.
-    function_names: HashMap<String, Vec<FunctionId>>,
+    function_names: HashMap<SharedStr, Vec<FunctionId>>,
     /// Variable type information, indexed by node ID.
     variable_type: VecMap<NodeId, (TypeModifier, Option<SoulType>, ModuleId)>,
     /// Resolved type of an expression, indexed by its ID.
@@ -35,7 +34,7 @@ pub struct DeclareStore {
     /// Non-`distinct` `type X := Y` aliases, mapping `X`'s name to its
     /// underlying type `Y`. A `distinct` alias is deliberately not
     /// interchangeable with its underlying type, so it's never registered here.
-    type_aliases: HashMap<String, SoulType>,
+    type_aliases: HashMap<SharedStr, SoulType>,
 }
 impl DeclareStore {
     /// Creates a new empty declaration store.
@@ -65,7 +64,7 @@ impl DeclareStore {
             entries.push(index);
         } else {
             self.function_names
-                .insert(function.name.to_string(), vec![index]);
+                .insert(function.name.as_shared_str(), vec![index]);
         }
         self.functions.insert(index, (function, module));
     }
@@ -232,7 +231,7 @@ impl DeclareStore {
     }
 
     /// Registers a non-`distinct` `type X := Y` alias's underlying type.
-    pub fn insert_type_alias(&mut self, name: impl Into<String>, underlying: SoulType) {
+    pub fn insert_type_alias(&mut self, name: impl Into<SharedStr>, underlying: SoulType) {
         self.type_aliases.insert(name.into(), underlying);
     }
 

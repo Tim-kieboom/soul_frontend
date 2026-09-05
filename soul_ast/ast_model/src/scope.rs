@@ -1,11 +1,7 @@
-use std::collections::HashMap;
+use std::{collections::HashMap};
 
 use soul_utils::{
-    FunctionId, Ident,
-    collections::vec_map::VecMap,
-    ids::IdGenerator,
-    impl_soul_ids,
-    span::{ModuleId, Span},
+    FunctionId, Ident, SharedStr, collections::vec_map::VecMap, ids::IdGenerator, impl_soul_ids, span::{ModuleId, Span},
 };
 
 use crate::{
@@ -110,7 +106,7 @@ impl ScopeBuilder {
     pub fn iter_modules(
         &self,
         module: ModuleId,
-    ) -> Option<impl Iterator<Item = (&String, &ScopeModuleEntry)>> {
+    ) -> Option<impl Iterator<Item = (&SharedStr, &ScopeModuleEntry)>> {
         Some(self.scopes.get(module)?.modules())
     }
 }
@@ -223,7 +219,7 @@ impl ModuleScopes {
         None
     }
 
-    fn modules(&self) -> impl Iterator<Item = (&std::string::String, &ScopeModuleEntry)> {
+    fn modules(&self) -> impl Iterator<Item = (&SharedStr, &ScopeModuleEntry)> {
         self.scope_iter().flat_map(|scope| {
             scope
                 .entries
@@ -280,7 +276,7 @@ pub struct ScopeModuleEntry {
 pub struct Scope {
     pub id: ScopeId,
     pub parent: Option<ScopeId>,
-    entries: HashMap<String, ScopeEntry>,
+    entries: HashMap<SharedStr, ScopeEntry>,
 }
 impl Scope {
     pub fn new_global(id: ScopeId) -> Self {
@@ -301,33 +297,39 @@ impl Scope {
         this
     }
 
-    pub fn get_entries(&self) -> &HashMap<String, ScopeEntry> {
+    pub fn get_entries(&self) -> &HashMap<SharedStr, ScopeEntry> {
         &self.entries
     }
 
-    pub fn insert_function(&mut self, name: &str, id: FunctionId) -> Option<FunctionId> {
-        self.get_mut_entry(name)?.function.replace(id)
+    pub fn insert_function(&mut self, name: impl Into<SharedStr>, id: FunctionId) -> Option<FunctionId> {
+        self.get_mut_entry(name).function.replace(id)
     }
 
-    pub fn insert_types(&mut self, name: &str, id: ScopeTypeEntry) -> Option<ScopeTypeEntry> {
-        self.get_mut_entry(name)?.types.replace(id)
+    pub fn insert_types(
+        &mut self,
+        name: impl Into<SharedStr>,
+        id: ScopeTypeEntry,
+    ) -> Option<ScopeTypeEntry> {
+        self.get_mut_entry(name).types.replace(id)
     }
 
-    pub fn insert_value(&mut self, name: &str, kind: ScopeValue, id: NodeId) -> Option<NodeId> {
-        if self.get_mut_entry(name)?.values.is_none() {
-            self.get_mut_entry(name)?.values = Some(ScopeValueEntry::default());
-        }
-
-        let values = &mut self.get_mut_entry(name)?.values.as_mut().unwrap();
+    pub fn insert_value(
+        &mut self,
+        name: impl Into<SharedStr>,
+        kind: ScopeValue,
+        id: NodeId,
+    ) -> Option<NodeId> {
+        let entry = self.get_mut_entry(name);
+        let values = entry.values.get_or_insert_with(ScopeValueEntry::default);
         values.insert(kind, id)
     }
 
     pub fn insert_module(
         &mut self,
-        name: &str,
+        name: impl Into<SharedStr>,
         entry: ScopeModuleEntry,
     ) -> Option<ScopeModuleEntry> {
-        self.get_mut_entry(name)?.module.replace(entry)
+        self.get_mut_entry(name).module.replace(entry)
     }
 
     pub fn get_module(&self, name: &str) -> Option<&ScopeModuleEntry> {
@@ -338,12 +340,8 @@ impl Scope {
         self.get_module(name)
     }
 
-    fn get_mut_entry(&mut self, name: &str) -> Option<&mut ScopeEntry> {
-        if !self.entries.contains_key(name) {
-            self.entries.insert(name.to_string(), ScopeEntry::default());
-        }
-
-        self.entries.get_mut(name)
+    fn get_mut_entry(&mut self, name: impl Into<SharedStr>) -> &mut ScopeEntry {
+        self.entries.entry(name.into()).or_default()
     }
 }
 
