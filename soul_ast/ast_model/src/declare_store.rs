@@ -1,4 +1,4 @@
-use std::{collections::HashMap};
+use std::collections::HashMap;
 
 use crate::{
     CustomType, NodeId,
@@ -7,7 +7,8 @@ use crate::{
     statements::{Enum, InnerFunctionSignature, Struct, Trait},
 };
 use soul_utils::{
-    FunctionId, SharedStr, TypeModifier, collections::vec_map::VecMap, intrinsics::IntrinsicFunction, span::ModuleId,
+    FunctionId, SharedStr, TypeModifier, collections::vec_map::VecMap,
+    intrinsics::IntrinsicFunction, span::ModuleId,
 };
 
 /// A store of all declarations in a module.

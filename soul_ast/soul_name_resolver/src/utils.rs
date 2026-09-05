@@ -6,7 +6,9 @@ use ast_model::{
     statements::{FunctionSignature, Statement, StatementId},
 };
 use soul_utils::{
-    CrateContext, FunctionId, SharedStr, fault::Fault, span::{ModuleId, Span},
+    CrateContext, FunctionId, SharedStr,
+    fault::Fault,
+    span::{ModuleId, Span},
 };
 
 use crate::NameResolver;

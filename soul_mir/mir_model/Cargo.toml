@@ -1,0 +1,9 @@
+[package]
+name = "mir_model"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+ast_model = { version = "0.1.0", path = "../../soul_ast/ast_model" }
+soul_utils = { version = "0.1.0", path = "../../soul_utils" }

@@ -1,7 +1,11 @@
-use std::{collections::HashMap};
+use std::collections::HashMap;
 
 use soul_utils::{
-    FunctionId, Ident, SharedStr, collections::vec_map::VecMap, ids::IdGenerator, impl_soul_ids, span::{ModuleId, Span},
+    FunctionId, Ident, SharedStr,
+    collections::vec_map::VecMap,
+    ids::IdGenerator,
+    impl_soul_ids,
+    span::{ModuleId, Span},
 };
 
 use crate::{
@@ -301,7 +305,11 @@ impl Scope {
         &self.entries
     }
 
-    pub fn insert_function(&mut self, name: impl Into<SharedStr>, id: FunctionId) -> Option<FunctionId> {
+    pub fn insert_function(
+        &mut self,
+        name: impl Into<SharedStr>,
+        id: FunctionId,
+    ) -> Option<FunctionId> {
         self.get_mut_entry(name).function.replace(id)
     }
 

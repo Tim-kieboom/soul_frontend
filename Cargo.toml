@@ -4,10 +4,13 @@ members = [
     "soul_tester",
     "soul_utils",
     "soul_tokenizer",
-    "soul_ast/ast_model",
-    "soul_ast/ast_parser",
     "soul_ast/ast_run",
-    "soul_ast/soul_name_resolver",
+    "soul_mir/mir_run",
+    "soul_mir/mir_model", 
+    "soul_ast/ast_model",
+    "soul_mir/mir_parser", 
+    "soul_ast/ast_parser",
+    "soul_ast/soul_name_resolver", 
 ]
 
 [profile.release-performance]
