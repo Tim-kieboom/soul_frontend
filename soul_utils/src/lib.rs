@@ -129,6 +129,11 @@ impl From<&str> for SharedStr {
         Self(value.into())
     }
 }
+impl From<SharedStr> for Rc<str> {
+    fn from(value: SharedStr) -> Self {
+        value.0
+    }
+}
 impl serde::Serialize for SharedStr {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where

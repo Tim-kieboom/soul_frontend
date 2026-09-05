@@ -1,5 +1,10 @@
 use ast_model::{
-    CustomType, expression::{AnyArray, Binary, ExpressionId, ExpressionKind, StructConstructor}, literal::Literal, operators::BinaryOperatorKind, soul_type::{ReferenceType, SoulType, Stub}, statements::{Field, Struct, VarPattern},
+    CustomType,
+    expression::{AnyArray, Binary, ExpressionId, ExpressionKind, StructConstructor},
+    literal::Literal,
+    operators::BinaryOperatorKind,
+    soul_type::{Mutable, ReferenceType, SoulType, Stub},
+    statements::{Field, Struct, VarPattern},
 };
 use soul_utils::{Ident, TypeModifier, fault::Fault, soul_names::PrimitiveTypes, span::Span};
 
@@ -27,7 +32,12 @@ impl<'a> NameResolver<'a> {
         }
     }
 
-    fn check_struct_fields(&self, struct_: &Struct, stub: &Stub, struct_constructor: &StructConstructor) -> Vec<Fault> {
+    fn check_struct_fields(
+        &self,
+        struct_: &Struct,
+        stub: &Stub,
+        struct_constructor: &StructConstructor,
+    ) -> Vec<Fault> {
         fn eq_field_name(field: &Field, field_name: &Ident) -> bool {
             matches!(&field.value.pattern, VarPattern::Simple { binding, .. } if binding.ident.as_str() == field_name.as_str())
         }
@@ -35,7 +45,11 @@ impl<'a> NameResolver<'a> {
         let mut faults = vec![];
         let mut generic_bindings = vec![];
         for (field_name, value_id) in &struct_constructor.values {
-            let Some(field) = struct_.fields.iter().find(|field| eq_field_name(field, field_name)) else {
+            let Some(field) = struct_
+                .fields
+                .iter()
+                .find(|field| eq_field_name(field, field_name))
+            else {
                 faults.push(Fault::error(
                     format!(
                         "struct `{}` has no field `{}`",
@@ -61,7 +75,7 @@ impl<'a> NameResolver<'a> {
                 let generic = generic_bindings
                     .iter()
                     .find(|(name, _)| *name == generic_name);
-                
+
                 match generic {
                     Some((_, bound_ty)) => {
                         if self.combine_operand_types(&value_ty, bound_ty).is_none() {
@@ -260,8 +274,12 @@ fn literal_type(literal: &Literal) -> SoulType {
         Literal::Float(_) => SoulType::Primitive(PrimitiveTypes::UntypedFloat),
         Literal::Bool(_) => SoulType::Primitive(PrimitiveTypes::Boolean),
         Literal::Char(_) => SoulType::Primitive(PrimitiveTypes::Char),
-        Literal::Str(_) => SoulType::Reference(ReferenceType::new(SoulType::String, false)),
         Literal::Cstr(_) => SoulType::Primitive(PrimitiveTypes::CStr),
+        Literal::Str(_) => SoulType::Reference(ReferenceType::with_lifetime(
+            SoulType::String,
+            Ident::new("static", Span::error()),
+            Mutable::Immut,
+        )),
     }
 }
 

@@ -8,7 +8,7 @@ use ast_model::{
     },
     literal::Literal,
     operators::BinaryOperatorKind,
-    soul_type::{ArrayKind, ArrayType, ReferenceType, SoulType, Stub},
+    soul_type::{ArrayKind, ArrayType, Mutable, ReferenceType, SoulType, Stub},
     statements::{Assignment, Import, ImportKind, Statement, StatementKind, Variable},
 };
 use soul_tokenizer::to_token_stream;
@@ -778,7 +778,7 @@ fn reference_type_variable() {
         *ty,
         Some(SoulType::Reference(ReferenceType::new(
             SoulType::Primitive(PrimitiveTypes::Int),
-            false
+            Mutable::Immut
         )))
     );
 }
@@ -802,7 +802,7 @@ fn mut_reference_type_variable() {
         *ty,
         Some(SoulType::Reference(ReferenceType::new(
             SoulType::Primitive(PrimitiveTypes::Int),
-            true
+            Mutable::Mut
         )))
     );
 }
@@ -1458,7 +1458,7 @@ fn pointer_type_variable() {
         Some(SoulType::Pointer(ReferenceType {
             inner,
             lifetime: None,
-            mutable: false
+            mutable: Mutable::Immut
         }))
     );
 }
@@ -1485,7 +1485,7 @@ fn pointer_mut_type_variable() {
         Some(SoulType::Pointer(ReferenceType {
             inner,
             lifetime: None,
-            mutable: true
+            mutable: Mutable::Mut
         }))
     );
 }

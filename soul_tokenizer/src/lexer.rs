@@ -392,8 +392,9 @@ impl<'a> Lexer<'a> {
 
     fn lex_number_suffix(&mut self) -> Option<&'static str> {
         const SUFFIXES: &[&str] = &[
-            "i8", "i16", "i32", "i64", "i128", "u8", "u16", "u32", "u64", "u128", "f16", "f32",
-            "f64",
+            "i8", "i16", "i32", "i64", "i128", 
+            "u8", "u16", "u32", "u64", "u128", 
+            "f16", "f32", "f64",
         ];
 
         let mut candidate = String::new();
@@ -432,19 +433,19 @@ impl<'a> Lexer<'a> {
         let current = self.current?;
 
         #[cfg(debug_assertions)]
-        TRY_GET_SYMBOL_INIT
-            .call_once(|| debug_assert!(Symbol::STRING_VALUES.iter().all(|name| name.len() <= 2)));
+        TRY_GET_SYMBOL_INIT.call_once(|| {
+            debug_assert!(Symbol::STRING_VALUES.iter().all(|name| name.len() <= 2));
+            assert_symbol_char_tables_in_sync();
+        });
 
-        if let Some(peek) = self.peek_char() {
-            let two_str = [current, peek].iter().collect::<String>();
-
-            if let Ok(symbol) = Symbol::from_str(&two_str) {
-                self.next_char();
-                return Some(symbol);
-            }
+        if let Some(peek) = self.peek_char()
+            && let Some(symbol) = symbol_from_two_chars(current, peek)
+        {
+            self.next_char();
+            return Some(symbol);
         }
 
-        Symbol::from_str(&current.to_string()).ok()
+        symbol_from_one_char(current)
     }
 
     fn is_negative_number(&mut self, symbol: Symbol) -> bool {
@@ -495,4 +496,86 @@ fn is_ident(ch: char) -> bool {
 
 fn is_number(ch: char) -> bool {
     ch.is_ascii_digit()
+}
+
+fn symbol_from_two_chars(a: char, b: char) -> Option<Symbol> {
+    Some(match (a, b) {
+        ('<', '/') => Symbol::Root,
+        ('|', '|') => Symbol::DoubleOr,
+        (':', '=') => Symbol::ColonAssign,
+        ('+', '=') => Symbol::PlusEq,
+        ('-', '=') => Symbol::MinusEq,
+        ('*', '=') => Symbol::StarEq,
+        ('/', '=') => Symbol::SlashEq,
+        ('%', '=') => Symbol::ModEq,
+        ('&', '=') => Symbol::AndEq,
+        ('|', '=') => Symbol::OrEq,
+        ('^', '=') => Symbol::XorEq,
+        ('=', '>') => Symbol::LambdaArrow,
+        ('=', '=') => Symbol::Eq,
+        ('?', '?') => Symbol::DoubleQuestion,
+        ('!', '=') => Symbol::NotEq,
+        ('<', '=') => Symbol::Le,
+        ('>', '=') => Symbol::Ge,
+        ('-', '>') => Symbol::RightArrow,
+        (':', ':') => Symbol::DoubleColon,
+        ('.', '.') => Symbol::DoubleDot,
+        ('[', ']') => Symbol::Array,
+        _ => return None,
+    })
+}
+
+fn symbol_from_one_char(c: char) -> Option<Symbol> {
+    Some(match c {
+        '+' => Symbol::Plus,
+        '-' => Symbol::Minus,
+        '*' => Symbol::Star,
+        '/' => Symbol::Slash,
+        '%' => Symbol::Mod,
+        '&' => Symbol::And,
+        '@' => Symbol::AtSign,
+        '$' => Symbol::Money,
+        '|' => Symbol::Or,
+        '^' => Symbol::Xor,
+        '=' => Symbol::Assign,
+        '!' => Symbol::Not,
+        '#' => Symbol::Hash,
+        '?' => Symbol::Question,
+        '<' => Symbol::LeftArray,
+        '>' => Symbol::RightArray,
+        ':' => Symbol::Colon,
+        ';' => Symbol::SemiColon,
+        '.' => Symbol::Dot,
+        ',' => Symbol::Comma,
+        '(' => Symbol::RoundOpen,
+        ')' => Symbol::RoundClose,
+        '[' => Symbol::SquareOpen,
+        ']' => Symbol::SquareClose,
+        '{' => Symbol::CurlyOpen,
+        '}' => Symbol::CurlyClose,
+        _ => return None,
+    })
+}
+
+/// Verifies `symbol_from_one_char`/`symbol_from_two_chars` agree with
+/// `Symbol::from_str` for every variant, so the hand-written char tables above
+/// can't silently drift from `soul_names::Symbol`'s string table.
+#[cfg(debug_assertions)]
+fn assert_symbol_char_tables_in_sync() {
+    for &symbol in Symbol::VARIANTS {
+        let s = symbol.as_str();
+        let mut chars = s.chars();
+        let found = match (chars.next(), chars.next()) {
+            (Some(a), Some(b)) => symbol_from_two_chars(a, b),
+            (Some(a), None) => symbol_from_one_char(a),
+            (None, _) => None,
+        };
+        debug_assert_eq!(
+            found,
+            Some(symbol),
+            "symbol_from_{{one,two}}_char(s) out of sync with Symbol::{:?} (\"{}\")",
+            symbol,
+            s
+        );
+    }
 }

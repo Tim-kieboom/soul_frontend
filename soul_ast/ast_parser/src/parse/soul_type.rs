@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use ast_model::soul_type::{
-    ArrayKind, ArrayType, NamedTuple, ReferenceType, SoulType, Stub, Tuple, TupleKind,
+    ArrayKind, ArrayType, Mutable, NamedTuple, ReferenceType, SoulType, Stub, Tuple, TupleKind,
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord, types::Types};
 use soul_utils::{
@@ -151,14 +151,18 @@ impl<'a, 'f> Parser<'a, 'f> {
             Err(e) => return Err(e),
         };
 
-        const CONST: bool = false;
-        const MUT: bool = true;
         for wrap in wrapper {
             ty = match wrap {
-                ParseWrappers::ConstRef => SoulType::Reference(ReferenceType::new(ty, CONST)),
-                ParseWrappers::MutRef => SoulType::Reference(ReferenceType::new(ty, MUT)),
-                ParseWrappers::ConstPointer => SoulType::Pointer(ReferenceType::new(ty, CONST)),
-                ParseWrappers::MutPointer => SoulType::Pointer(ReferenceType::new(ty, MUT)),
+                ParseWrappers::ConstRef => {
+                    SoulType::Reference(ReferenceType::new(ty, Mutable::Immut))
+                }
+                ParseWrappers::MutRef => SoulType::Reference(ReferenceType::new(ty, Mutable::Mut)),
+                ParseWrappers::ConstPointer => {
+                    SoulType::Pointer(ReferenceType::new(ty, Mutable::Immut))
+                }
+                ParseWrappers::MutPointer => {
+                    SoulType::Pointer(ReferenceType::new(ty, Mutable::Mut))
+                }
                 ParseWrappers::Option => SoulType::Optional(Box::new(ty)),
                 ParseWrappers::Array(kind) => {
                     let array = ArrayType {

@@ -20,7 +20,7 @@ pub enum SoulType {
     Primitive(PrimitiveTypes),
     /// array type: `[1]int` or `[&]int` or `[&mut]int` or `[]int`
     Array(ArrayType),
-    /// Reference type: `&int`` or `&mut int`
+    /// Reference type: `&int` or `&mut int`
     Reference(ReferenceType),
     /// Pointer type: `*int`
     Pointer(ReferenceType),
@@ -72,7 +72,7 @@ impl fmt::Debug for SoulType {
                 if let Some(lifetime) = &reference.lifetime {
                     write!(f, "'{} ", lifetime)?;
                 }
-                if reference.mutable {
+                if reference.mutable.is_mut() {
                     write!(f, "mut ")?;
                 }
                 write!(f, "{:?}", reference.inner)
@@ -82,7 +82,7 @@ impl fmt::Debug for SoulType {
                 if let Some(lifetime) = &pointer.lifetime {
                     write!(f, "'{} ", lifetime)?;
                 }
-                if pointer.mutable {
+                if pointer.mutable.is_mut() {
                     write!(f, "mut ")?;
                 }
                 write!(f, "{:?}", pointer.inner)
@@ -208,7 +208,18 @@ pub struct ReferenceType {
     /// The lifetime identifier.
     pub lifetime: Option<Ident>,
     /// Whether the reference is mutable.
-    pub mutable: bool,
+    pub mutable: Mutable,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum Mutable {
+    Mut,
+    Immut,
+}
+impl Mutable {
+    pub fn is_mut(&self) -> bool {
+        matches!(self, Mutable::Mut)
+    }
 }
 
 /// An as-yet-unresolved named type reference (e.g. a struct/enum/trait name
@@ -258,11 +269,20 @@ impl Stub {
 
 impl ReferenceType {
     /// Creates a reference type wrapping `ty`, without a lifetime annotation.
-    pub fn new(ty: SoulType, mutable: bool) -> Self {
+    pub fn new(ty: SoulType, mutable: Mutable) -> Self {
         Self {
             inner: Box::new(ty),
             lifetime: None,
             mutable,
+        }
+    }
+
+    /// Creates a reference type wrapping `ty`, with a lifetime annotation.
+    pub fn with_lifetime(ty: SoulType, lifetime: Ident, mutable: Mutable) -> Self {
+        Self {
+            mutable,
+            inner: Box::new(ty),
+            lifetime: Some(lifetime),
         }
     }
 }

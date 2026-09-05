@@ -1304,7 +1304,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 if let Some(lifetime) = &reference.lifetime {
                     push_fmt!(self, "'{} ", lifetime.as_str())?;
                 }
-                if reference.mutable {
+                if reference.mutable.is_mut() {
                     self.push_str("mut ")?;
                 }
                 self.write_type(&reference.inner)
