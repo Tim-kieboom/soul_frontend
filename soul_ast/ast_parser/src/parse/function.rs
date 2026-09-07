@@ -361,9 +361,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         &mut self,
         method_type: &SoulType,
         is_const: bool,
-    ) -> SoulResult<Spanned<Function>> {
+    ) -> Result<Spanned<Function>, crate::fault::AstFault> {
         let start_span = self.token().span;
-        self.expect(&DOT)?;
+        self.expect(&DOT).map_err(|err| err.map_kind(Into::into))?;
         match self.token().kind {
             ROUND_OPEN => {
                 let name = Ident::new(CONTRUCTOR_STR, start_span);
@@ -374,12 +374,8 @@ impl<'a, 'f> Parser<'a, 'f> {
                     name,
                 ) {
                     Ok(val) => val,
-                    Err(TryError::IsErr(err)) => {
-                        return Err(err.map_kind(|kind| {
-                            soul_utils::fault::UnclassifiedKind(kind.to_string().into_boxed_str())
-                        }));
-                    }
-                    Err(TryError::IsNotValue(err)) => return Err(err.fault),
+                    Err(TryError::IsErr(err)) => return Err(err),
+                    Err(TryError::IsNotValue(err)) => return Err(err.fault.map_kind(Into::into)),
                 }
                 .value;
 
@@ -396,7 +392,9 @@ impl<'a, 'f> Parser<'a, 'f> {
                 Ok(Spanned::new(methode, self.span_combine(start_span)))
             }
             SQUARE_OPEN => self.parse_array_contructor(method_type, start_span),
-            _ => Err(self.get_expect_any_error(&[ROUND_OPEN, SQUARE_OPEN])),
+            _ => Err(self
+                .get_expect_any_error(&[ROUND_OPEN, SQUARE_OPEN])
+                .map_kind(Into::into)),
         }
     }
 
@@ -404,30 +402,40 @@ impl<'a, 'f> Parser<'a, 'f> {
         &mut self,
         method_type: &SoulType,
         start_span: Span,
-    ) -> SoulResult<Spanned<Function>> {
+    ) -> Result<Spanned<Function>, crate::fault::AstFault> {
         self.bump();
 
         let name = Ident::new(ARRAY_CONTRUCTOR_STR, start_span);
-        let mut array_type = self.try_parse_type().merge_to_result()?;
+        let mut array_type = self
+            .try_parse_type()
+            .merge_to_result()
+            .map_err(|err| err.map_kind(Into::into))?;
 
         array_type = SoulType::Array(ArrayType {
             of_type: Box::new(array_type),
             kind: ArrayKind::StackArrayWildcard,
         });
 
-        self.expect(&SQUARE_CLOSE)?;
-        self.expect(&ROUND_OPEN)?;
+        self.expect(&SQUARE_CLOSE)
+            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&ROUND_OPEN)
+            .map_err(|err| err.map_kind(Into::into))?;
 
-        let arg = self.try_bump_consume_ident()?;
+        let arg = self
+            .try_bump_consume_ident()
+            .map_err(|err| err.map_kind(Into::into))?;
 
-        self.expect(&ROUND_CLOSE)?;
+        self.expect(&ROUND_CLOSE)
+            .map_err(|err| err.map_kind(Into::into))?;
 
         let arg_id = self.alloc_node();
         let block = if self.current_is(&LAMBDA_ARROW) {
             self.bump();
             self.skip_end_lines();
 
-            let expression = self.parse_expression_id(STAMENT_END_TOKENS)?;
+            let expression = self
+                .parse_expression_id(STAMENT_END_TOKENS)
+                .map_err(|err| err.map_kind(Into::into))?;
             let statement = Statement::from_expression(
                 &self.forest.store,
                 expression,
@@ -441,7 +449,8 @@ impl<'a, 'f> Parser<'a, 'f> {
                 is_const: false,
             })
         } else {
-            self.parse_block(TypeModifier::Mut)?
+            self.parse_block(TypeModifier::Mut)
+                .map_err(|err| err.map_kind(Into::into))?
         };
 
         let id = self.forest.store.alloc_function();

@@ -101,6 +101,25 @@ pub enum AstErrorKind {
 
     #[error("expected '=' or ':=' after destructuring pattern")]
     ExpectedAssignAfterDestructuringPattern,
+
+    #[error("`{found}` is not a valid operator")]
+    InvalidOperator { found: Box<str> },
+
+    #[error("`{found}` is not a valid unary operator")]
+    InvalidUnaryOperator { found: Box<str> },
+
+    #[error("expected ident or `null` or `!null` but got {found}")]
+    ExpectedIdentOrNullForTypeof { found: Box<str> },
+
+    #[error("expected `{expected1}` or `{expected2}`, but got `{found}`")]
+    ExpectedAssignOrDeclaration {
+        expected1: Box<str>,
+        expected2: Box<str>,
+        found: Box<str>,
+    },
+
+    #[error("contructor function should have methode type")]
+    ConstructorMissingMethodType,
 }
 
 impl From<UnclassifiedKind> for AstErrorKind {

@@ -185,7 +185,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
                 if let Err(err) = self.expect_assign_or_declaration() {
                     self.goto(saved);
-                    return TryNotValue(err);
+                    return TryNotValue(err.map_kind(Into::into));
                 }
 
                 self.bump();
@@ -281,17 +281,16 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok((attributes, self.span_combine(start_span)))
     }
 
-    fn expect_assign_or_declaration(&mut self) -> SoulResult<AssignType> {
+    fn expect_assign_or_declaration(&mut self) -> Result<AssignType, crate::fault::AstFault> {
         match try_assign_type(self.token()) {
             Some(AssignType::Assign) => Ok(AssignType::Assign),
             Some(AssignType::Declaration) => Ok(AssignType::Declaration),
-            _ => Err(Fault::error(
-                format!(
-                    "expected `{}` or `{}`, but got `{}`",
-                    AssignType::Assign.as_str(),
-                    AssignType::Declaration.as_str(),
-                    self.token().kind.display()
-                ),
+            _ => Err(Fault::error_with_kind(
+                crate::fault::AstErrorKind::ExpectedAssignOrDeclaration {
+                    expected1: AssignType::Assign.as_str().into(),
+                    expected2: AssignType::Declaration.as_str().into(),
+                    found: self.token().kind.display().into_boxed_str(),
+                },
                 Some(self.token().span),
             )),
         }
@@ -395,8 +394,8 @@ impl<'a, 'f> Parser<'a, 'f> {
         let this = self.current.this_type.take();
         let result = match &this {
             Some(ty) => self.parse_function_contructor(ty, false),
-            None => Err(Fault::error(
-                "contructor function should have methode type",
+            None => Err(Fault::error_with_kind(
+                crate::fault::AstErrorKind::ConstructorMissingMethodType,
                 Some(self.span_combine(start_span)),
             )),
         };
@@ -410,6 +409,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 })
             })
             .map(Statement::from_function)
+            .map_err(|err| err.map_kind(Into::into))
     }
 
     fn parse_extension_function(&mut self, start_span: Span) -> SoulResult<Statement> {

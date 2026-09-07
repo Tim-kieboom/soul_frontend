@@ -84,7 +84,10 @@ impl<'a, 'f> Parser<'a, 'f> {
                 _ => break,
             };
 
-            match self.consume_expression_operator(start_span)? {
+            match self
+                .consume_expression_operator(start_span)
+                .map_err(|err| err.map_kind(Into::into))?
+            {
                 ExpressionOperator::Access {
                     ty: AccessType::AccessThis,
                     optional_map,
@@ -127,7 +130,10 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            match self.consume_expression_operator(start_span)? {
+            match self
+                .consume_expression_operator(start_span)
+                .map_err(|err| err.map_kind(Into::into))?
+            {
                 ExpressionOperator::Binary(operator)
                     if operator.value == BinaryOperatorKind::Arrow =>
                 {
@@ -250,10 +256,15 @@ impl<'a, 'f> Parser<'a, 'f> {
         ))
     }
 
-    fn consume_expression_operator(&mut self, start_span: Span) -> SoulResult<ExpressionOperator> {
-        fn get_invalid_error(token: &Token) -> SoulResult<ExpressionOperator> {
-            Err(Fault::error(
-                format!("`{}` is not a valid operator", token.kind.display()),
+    fn consume_expression_operator(
+        &mut self,
+        start_span: Span,
+    ) -> Result<ExpressionOperator, crate::fault::AstFault> {
+        fn get_invalid_error(token: &Token) -> Result<ExpressionOperator, crate::fault::AstFault> {
+            Err(Fault::error_with_kind(
+                crate::fault::AstErrorKind::InvalidOperator {
+                    found: token.kind.display().into_boxed_str(),
+                },
                 Some(token.span),
             ))
         }
@@ -266,8 +277,10 @@ impl<'a, 'f> Parser<'a, 'f> {
         match &self.token().kind {
             TokenKind::Ident(ident) => {
                 if optional_map {
-                    return Err(Fault::error(
-                        format!("`{}` invalid", Symbol::Question.as_str()),
+                    return Err(Fault::error_with_kind(
+                        crate::fault::AstErrorKind::InvalidSymbolHere {
+                            symbol: Symbol::Question.as_str().into(),
+                        },
                         Some(self.span_combine(start_span)),
                     ));
                 }
@@ -279,8 +292,10 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
             TokenKind::Keyword(KeyWord::Typeof) => {
                 if optional_map {
-                    return Err(Fault::error(
-                        format!("`{}` invalid", Symbol::Question.as_str()),
+                    return Err(Fault::error_with_kind(
+                        crate::fault::AstErrorKind::InvalidSymbolHere {
+                            symbol: Symbol::Question.as_str().into(),
+                        },
                         Some(self.span_combine(start_span)),
                     ));
                 }
@@ -344,14 +359,23 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
     }
 
-    fn parse_typeof_operator(&mut self, _start_span: Span) -> SoulResult<ExpressionOperator> {
-        self.expect(&TokenKind::Keyword(KeyWord::Typeof))?;
+    fn parse_typeof_operator(
+        &mut self,
+        _start_span: Span,
+    ) -> Result<ExpressionOperator, crate::fault::AstFault> {
+        self.expect(&TokenKind::Keyword(KeyWord::Typeof))
+            .map_err(|err| err.map_kind(Into::into))?;
 
         let kind = match &self.token().kind {
             TokenKind::Ident(_) => {
-                let type_name = self.try_bump_consume_ident()?;
-                self.expect(&TokenKind::Symbol(Symbol::Dot))?;
-                let variant_name = self.try_bump_consume_ident()?;
+                let type_name = self
+                    .try_bump_consume_ident()
+                    .map_err(|err| err.map_kind(Into::into))?;
+                self.expect(&TokenKind::Symbol(Symbol::Dot))
+                    .map_err(|err| err.map_kind(Into::into))?;
+                let variant_name = self
+                    .try_bump_consume_ident()
+                    .map_err(|err| err.map_kind(Into::into))?;
                 TypeofKind::Union {
                     type_name,
                     variant_name,
@@ -367,11 +391,10 @@ impl<'a, 'f> Parser<'a, 'f> {
                 TypeofKind::NotNull
             }
             _ => {
-                return Err(Fault::error(
-                    format!(
-                        "expected ident or `null` or `!null` but got {}",
-                        self.token().kind.display(),
-                    ),
+                return Err(Fault::error_with_kind(
+                    crate::fault::AstErrorKind::ExpectedIdentOrNullForTypeof {
+                        found: self.token().kind.display().into_boxed_str(),
+                    },
                     Some(self.token().span),
                 ));
             }
@@ -380,25 +403,35 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok(ExpressionOperator::TypeOf(kind))
     }
 
-    fn parse_new_ptr(&mut self, start_span: Span) -> SoulResult<Expression> {
-        self.expect(&ROUND_OPEN)?;
-        let inner =
-            self.parse_expression_id(&[ROUND_CLOSE, TokenKind::EndLine, TokenKind::EndFile])?;
-        self.expect(&ROUND_CLOSE)?;
+    fn parse_new_ptr(
+        &mut self,
+        start_span: Span,
+    ) -> Result<Expression, crate::fault::AstFault> {
+        self.expect(&ROUND_OPEN).map_err(|err| err.map_kind(Into::into))?;
+        let inner = self
+            .parse_expression_id(&[ROUND_CLOSE, TokenKind::EndLine, TokenKind::EndFile])
+            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&ROUND_CLOSE)
+            .map_err(|err| err.map_kind(Into::into))?;
         Ok(Expression::new(
             ExpressionKind::New(inner),
             self.span_combine(start_span),
         ))
     }
 
-    fn parse_new_array(&mut self, start_span: Span) -> SoulResult<Expression> {
+    fn parse_new_array(
+        &mut self,
+        start_span: Span,
+    ) -> Result<Expression, crate::fault::AstFault> {
         const START: &[TokenKind] = &[SQUARE_OPEN, ARRAY];
 
         if !self.current_is_any(START) {
-            return Err(self.get_expect_any_error(START));
+            return Err(self.get_expect_any_error(START).map_kind(Into::into));
         }
 
-        let array = self.parse_array(None)?;
+        let array = self
+            .parse_array(None)
+            .map_err(|err| err.map_kind(Into::into))?;
         Ok(Expression::new(
             ExpressionKind::NewArray(array.value),
             self.span_combine(start_span),
@@ -421,12 +454,18 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
     }
 
-    fn expect_unary_kind(&mut self, start_span: Span, symbool: Symbol) -> SoulResult<UnaryKinds> {
+    fn expect_unary_kind(
+        &mut self,
+        start_span: Span,
+        symbool: Symbol,
+    ) -> Result<UnaryKinds, crate::fault::AstFault> {
         let op = match Operator::from_symbool(symbool) {
             Some(val) => val,
             None => {
-                return Err(Fault::error(
-                    format!("`{}` is not a valid operator", symbool.as_str()),
+                return Err(Fault::error_with_kind(
+                    crate::fault::AstErrorKind::InvalidOperator {
+                        found: symbool.as_str().into(),
+                    },
                     Some(self.span_combine(start_span)),
                 ));
             }
@@ -448,8 +487,10 @@ impl<'a, 'f> Parser<'a, 'f> {
                 }
                 Ok(UnaryKinds::Ref { mutable })
             }
-            _ => Err(Fault::error(
-                format!("`{}` is not a valid unary operator", op.as_str()),
+            _ => Err(Fault::error_with_kind(
+                crate::fault::AstErrorKind::InvalidUnaryOperator {
+                    found: op.as_str().into(),
+                },
                 Some(self.span_combine(start_span)),
             )),
         }
