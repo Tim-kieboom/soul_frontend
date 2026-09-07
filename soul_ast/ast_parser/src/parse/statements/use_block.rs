@@ -17,7 +17,8 @@ use crate::{
 impl<'a, 'f> Parser<'a, 'f> {
     pub(super) fn parse_use_block(&mut self) -> SoulResult<Statement> {
         let start_span = self.token().span;
-        self.expect(&TokenKind::Keyword(KeyWord::Use))?;
+        self.expect(&TokenKind::Keyword(KeyWord::Use))
+            .map_err(|err| err.map_kind(Into::into))?;
         let use_generics = self.parse_generic_declare()?.unwrap_or(vec![]);
 
         let method_type = self.try_parse_type().merge_to_result()?;
@@ -56,7 +57,8 @@ impl<'a, 'f> Parser<'a, 'f> {
             ));
         }
 
-        self.expect(&CURLY_OPEN)?;
+        self.expect(&CURLY_OPEN)
+            .map_err(|err| err.map_kind(Into::into))?;
         loop {
             self.skip_end_lines();
             if self.current_is(&CURLY_CLOSE) {
@@ -111,7 +113,8 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
         }
 
-        self.expect(&CURLY_CLOSE)?;
+        self.expect(&CURLY_CLOSE)
+            .map_err(|err| err.map_kind(Into::into))?;
         self.current.this_type = prev;
         let use_block = UseBlock {
             ty: method_type,
@@ -132,13 +135,15 @@ impl<'a, 'f> Parser<'a, 'f> {
         method_type: &SoulType,
         start_span: Span,
     ) -> SoulResult<ImplBlock> {
-        self.expect(&IMPL)?;
+        self.expect(&IMPL).map_err(|err| err.map_kind(Into::into))?;
         let impl_trait = self.try_parse_type().merge_to_result()?;
 
         let mut methods = vec![];
         if !self.current_is(&CURLY_OPEN) {
             let is_const = self.try_bump_const().is_some();
-            let name = self.try_bump_consume_ident()?;
+            let name = self
+                .try_bump_consume_ident()
+                .map_err(|err| err.map_kind(Into::into))?;
             methods.push(
                 match self.try_parse_function_declaration_id(
                     start_span,
@@ -147,11 +152,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                     name,
                 ) {
                     Ok(val) => val,
-                    Err(TryError::IsErr(err)) => {
-                        return Err(err.map_kind(|kind| {
-                            soul_utils::fault::UnclassifiedKind(kind.to_string().into_boxed_str())
-                        }));
-                    }
+                    Err(TryError::IsErr(err)) => return Err(err.map_kind(Into::into)),
                     Err(TryError::IsNotValue(err)) => return Err(err.fault),
                 }
                 .value,
@@ -162,7 +163,8 @@ impl<'a, 'f> Parser<'a, 'f> {
             });
         }
 
-        self.expect(&CURLY_OPEN)?;
+        self.expect(&CURLY_OPEN)
+            .map_err(|err| err.map_kind(Into::into))?;
         loop {
             self.skip_end_lines();
             if self.current_is(&CURLY_CLOSE) {
@@ -170,7 +172,9 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
 
             let is_const = self.try_bump_const().is_some();
-            let name = self.try_bump_consume_ident()?;
+            let name = self
+                .try_bump_consume_ident()
+                .map_err(|err| err.map_kind(Into::into))?;
             methods.push(
                 match self.try_parse_function_declaration_id(
                     start_span,
@@ -179,17 +183,14 @@ impl<'a, 'f> Parser<'a, 'f> {
                     name,
                 ) {
                     Ok(val) => val,
-                    Err(TryError::IsErr(err)) => {
-                        return Err(err.map_kind(|kind| {
-                            soul_utils::fault::UnclassifiedKind(kind.to_string().into_boxed_str())
-                        }));
-                    }
+                    Err(TryError::IsErr(err)) => return Err(err.map_kind(Into::into)),
                     Err(TryError::IsNotValue(err)) => return Err(err.fault),
                 }
                 .value,
             );
         }
-        self.expect(&CURLY_CLOSE)?;
+        self.expect(&CURLY_CLOSE)
+            .map_err(|err| err.map_kind(Into::into))?;
 
         Ok(ImplBlock {
             impl_trait,
@@ -222,12 +223,12 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         let is_const = self.try_bump_const().is_some();
-        let name = self.try_bump_consume_ident()?;
+        let name = self
+            .try_bump_consume_ident()
+            .map_err(|err| err.map_kind(Into::into))?;
         match self.try_parse_function_declaration_id(start_span, ty, is_const, name) {
             Ok(spanned) => Ok(Methode::new(spanned.value, is_public)),
-            Err(TryError::IsErr(err)) => Err(err.map_kind(|kind| {
-                soul_utils::fault::UnclassifiedKind(kind.to_string().into_boxed_str())
-            })),
+            Err(TryError::IsErr(err)) => Err(err.map_kind(Into::into)),
             Err(TryError::IsNotValue(err)) => Err(err.fault),
         }
     }

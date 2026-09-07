@@ -102,7 +102,8 @@ impl<'a, 'f> Parser<'a, 'f> {
         let start_span = self.token().span;
 
         let mut statements = vec![];
-        self.expect(&CURLY_OPEN)?;
+        self.expect(&CURLY_OPEN)
+            .map_err(|err| err.map_kind(Into::into))?;
         while !self.current_is_any(END_TOKENS) {
             self.skip_end_lines();
             if self.current_is(&CURLY_CLOSE) {
@@ -120,7 +121,8 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.skip_while_any(&[SEMI_COLON, TokenKind::EndLine]);
         }
 
-        self.expect(&CURLY_CLOSE)?;
+        self.expect(&CURLY_CLOSE)
+            .map_err(|err| err.map_kind(Into::into))?;
         Ok(self.forest.store.insert_block(Block {
             statements,
             span: self.span_combine(start_span),
@@ -249,7 +251,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.bump();
 
             if !self.current_is(&SQUARE_OPEN) {
-                return Err(self.get_expect_error(&SQUARE_OPEN));
+                return Err(self.get_expect_error(&SQUARE_OPEN).map_kind(Into::into));
             }
             self.bump();
 
@@ -263,12 +265,16 @@ impl<'a, 'f> Parser<'a, 'f> {
             let name_text = match token.kind {
                 TokenKind::Ident(ident) => ident,
                 TokenKind::Keyword(keyword) => keyword.as_str().to_string(),
-                _ => return Err(self.get_expect_ident_error("attribute name")),
+                _ => {
+                    return Err(self
+                        .get_expect_ident_error("attribute name")
+                        .map_kind(Into::into));
+                }
             };
             name.push_str(&name_text);
 
             if !self.current_is(&SQUARE_CLOSE) {
-                return Err(self.get_expect_error(&SQUARE_CLOSE));
+                return Err(self.get_expect_error(&SQUARE_CLOSE).map_kind(Into::into));
             }
             self.bump();
 
@@ -424,20 +430,27 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
     }
 
-    fn inner_parse_extension_function(&mut self, start_span: Span) -> SoulResult<Statement> {
+    fn inner_parse_extension_function(
+        &mut self,
+        start_span: Span,
+    ) -> Result<Statement, crate::fault::AstFault> {
         let receiver_ident = match &self.token().kind {
             TokenKind::Ident(val) => Ident::new(val.clone(), self.token().span),
             TokenKind::Types(val) => Ident::new(val.as_str(), self.token().span),
             other => {
-                return Err(Fault::error(
-                    format!("expected ident got `{}`", other.display()),
+                return Err(Fault::error_with_kind(
+                    crate::fault::AstErrorKind::ExpectedIdent {
+                        found: other.display().into_boxed_str(),
+                    },
                     Some(self.token().span),
                 ));
             }
         };
         self.bump();
-        self.expect(&DOT)?;
-        let method_ident = self.try_bump_consume_ident()?;
+        self.expect(&DOT).map_err(|err| err.map_kind(Into::into))?;
+        let method_ident = self
+            .try_bump_consume_ident()
+            .map_err(|err| err.map_kind(Into::into))?;
 
         let recv_type = self.type_from_ident(receiver_ident, vec![]);
         let saved = self.current.this_type.take();
@@ -447,10 +460,8 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.current.this_type = saved;
         match result {
             Ok(spanned) => Ok(Statement::from_function(spanned)),
-            Err(TryError::IsErr(fault)) => Err(fault.map_kind(|kind| {
-                soul_utils::fault::UnclassifiedKind(kind.to_string().into_boxed_str())
-            })),
-            Err(TryError::IsNotValue(err)) => Err(err.fault),
+            Err(TryError::IsErr(fault)) => Err(fault),
+            Err(TryError::IsNotValue(err)) => Err(err.fault.map_kind(Into::into)),
         }
     }
 }

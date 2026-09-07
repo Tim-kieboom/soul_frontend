@@ -4,9 +4,7 @@ use ast_model::{
 };
 use soul_tokenizer::model::TokenKind;
 use soul_utils::{
-    collections::try_result::{ResultTryErr, TryNotValue, TryOk, TryResult},
-    error::SoulResult,
-    fault::Fault,
+    collections::try_result::{ResultTryErr, TryError, TryErr, TryNotValue, TryOk, TryResult},
     soul_error_internal,
 };
 
@@ -22,7 +20,9 @@ mod soul_type;
 mod statements;
 
 impl<'a, 'f> Parser<'a, 'f> {
-    pub(crate) fn parse_generic_define(&mut self) -> TryResult<Vec<SoulType>, Fault> {
+    pub(crate) fn parse_generic_define(
+        &mut self,
+    ) -> TryResult<Vec<SoulType>, crate::fault::AstFault, crate::fault::AstErrorKind> {
         let start_position = self.tokens.current_position();
 
         self.expect(&ARROW_LEFT).try_err()?;
@@ -33,7 +33,13 @@ impl<'a, 'f> Parser<'a, 'f> {
             {
                 self.bump();
                 self.bump();
-                let value = self.try_parse_type()?;
+                let value = match self.try_parse_type() {
+                    Ok(val) => val,
+                    Err(TryError::IsErr(err)) => return TryErr(err),
+                    Err(TryError::IsNotValue(err)) => {
+                        return TryNotValue(err.map_kind(Into::into));
+                    }
+                };
                 types.push(value);
                 if self.current_is(&ARROW_RIGHT) {
                     self.bump();
@@ -47,7 +53,13 @@ impl<'a, 'f> Parser<'a, 'f> {
                 continue;
             }
 
-            let ty = self.try_parse_type()?;
+            let ty = match self.try_parse_type() {
+                Ok(val) => val,
+                Err(TryError::IsErr(err)) => return TryErr(err),
+                Err(TryError::IsNotValue(err)) => {
+                    return TryNotValue(err.map_kind(Into::into));
+                }
+            };
             types.push(ty);
 
             if self.current_is(&ARROW_RIGHT) {
@@ -64,11 +76,14 @@ impl<'a, 'f> Parser<'a, 'f> {
         TryOk(types)
     }
 
-    pub(crate) fn get_forest_expression(&self, id: ExpressionId) -> SoulResult<&Expression> {
+    pub(crate) fn get_forest_expression(
+        &self,
+        id: ExpressionId,
+    ) -> Result<&Expression, crate::fault::AstFault> {
         self.forest
             .store
             .expressions
             .get(id)
-            .ok_or(soul_error_internal!(format!("{id:?} not found"), None))
+            .ok_or_else(|| soul_error_internal!(format!("{id:?} not found"), None).map_kind(Into::into))
     }
 }

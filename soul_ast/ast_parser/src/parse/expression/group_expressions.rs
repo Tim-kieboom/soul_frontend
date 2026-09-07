@@ -6,7 +6,6 @@ use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
     Ident,
     collections::try_result::TryError,
-    error::SoulResult,
     fault::Fault,
     span::{Span, Spanned},
 };
@@ -23,7 +22,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_array(
         &mut self,
         collection_type: Option<SoulType>,
-    ) -> SoulResult<Spanned<AnyArray>> {
+    ) -> Result<Spanned<AnyArray>, crate::fault::AstFault> {
         let start_span = self.token().span;
         if self.current_is(&ARRAY) {
             self.bump();
@@ -33,7 +32,8 @@ impl<'a, 'f> Parser<'a, 'f> {
             ));
         }
 
-        self.expect(&SQUARE_OPEN)?;
+        self.expect(&SQUARE_OPEN)
+            .map_err(|err| err.map_kind(Into::into))?;
 
         let position = self.tokens.current_position();
         let element_type = match self.try_parse_type() {
@@ -149,11 +149,13 @@ impl<'a, 'f> Parser<'a, 'f> {
         collection_type: Option<SoulType>,
         element_type: Option<SoulType>,
         start_span: Span,
-    ) -> SoulResult<Spanned<ArrayFiller>> {
-        self.expect(&FOR)?;
+    ) -> Result<Spanned<ArrayFiller>, crate::fault::AstFault> {
+        self.expect(&FOR).map_err(|err| err.map_kind(Into::into))?;
         let for_index = if matches!(self.token().kind, TokenKind::Ident(_)) && self.peek_is(&IN) {
-            let binding = self.try_bump_consume_ident()?;
-            self.expect(&IN)?;
+            let binding = self
+                .try_bump_consume_ident()
+                .map_err(|err| err.map_kind(Into::into))?;
+            self.expect(&IN).map_err(|err| err.map_kind(Into::into))?;
             Some(Binding {
                 id: self.alloc_node(),
                 ident: binding,
@@ -161,10 +163,16 @@ impl<'a, 'f> Parser<'a, 'f> {
         } else {
             None
         };
-        let amount = self.parse_expression_id(&[LAMBDA_ARROW, SQUARE_CLOSE])?;
-        self.expect(&LAMBDA_ARROW)?;
-        let element = self.parse_expression_id(&[SQUARE_CLOSE])?;
-        self.expect(&SQUARE_CLOSE)?;
+        let amount = self
+            .parse_expression_id(&[LAMBDA_ARROW, SQUARE_CLOSE])
+            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&LAMBDA_ARROW)
+            .map_err(|err| err.map_kind(Into::into))?;
+        let element = self
+            .parse_expression_id(&[SQUARE_CLOSE])
+            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&SQUARE_CLOSE)
+            .map_err(|err| err.map_kind(Into::into))?;
         Ok(Spanned::new(
             ArrayFiller {
                 amount,
@@ -183,7 +191,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         collection_type: Option<SoulType>,
         element_type: Option<SoulType>,
         start_span: Span,
-    ) -> SoulResult<Spanned<Array>> {
+    ) -> Result<Spanned<Array>, crate::fault::AstFault> {
         let mut values = vec![];
         loop {
             self.skip_end_lines();
@@ -191,7 +199,9 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            let element = self.parse_expression_id(&[SQUARE_CLOSE, COMMA])?;
+            let element = self
+                .parse_expression_id(&[SQUARE_CLOSE, COMMA])
+                .map_err(|err| err.map_kind(Into::into))?;
             values.push(element);
 
             self.skip_end_lines();
@@ -199,11 +209,12 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            self.expect(&COMMA)?;
+            self.expect(&COMMA).map_err(|err| err.map_kind(Into::into))?;
         }
 
         self.skip_end_lines();
-        self.expect(&SQUARE_CLOSE)?;
+        self.expect(&SQUARE_CLOSE)
+            .map_err(|err| err.map_kind(Into::into))?;
         Ok(Spanned::new(
             Array {
                 id: self.alloc_node(),

@@ -61,7 +61,9 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let mut left = match primary {
             Some(value) => value,
-            None => self.parse_primary(end_tokens)?,
+            None => self
+                .parse_primary(end_tokens)
+                .map_err(|err| err.map_kind(Into::into))?,
         };
 
         loop {
@@ -100,7 +102,8 @@ impl<'a, 'f> Parser<'a, 'f> {
                     ty: AccessType::AccessIndex,
                     optional_map,
                 } => {
-                    self.access_index_expression(&mut left, start_span, optional_map)?;
+                    self.access_index_expression(&mut left, start_span, optional_map)
+                        .map_err(|err| err.map_kind(Into::into))?;
                     continue;
                 }
                 _ => break,
@@ -137,7 +140,10 @@ impl<'a, 'f> Parser<'a, 'f> {
                 ExpressionOperator::Binary(operator)
                     if operator.value == BinaryOperatorKind::Arrow =>
                 {
-                    if self.try_parse_method_arm(&mut left, start_span, false)? {
+                    if self
+                        .try_parse_method_arm(&mut left, start_span, false)
+                        .map_err(|err| err.map_kind(Into::into))?
+                    {
                         continue;
                     }
                     let right = self.pratt_parse_expression(precedence.next(), end_tokens, None)?;
@@ -249,7 +255,10 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     fn parse_sizeof(&mut self, left_id: ExpressionId) -> SoulResult<Expression> {
-        let span = self.get_forest_expression(left_id)?.span;
+        let span = self
+            .get_forest_expression(left_id)
+            .map_err(|err| err.map_kind(Into::into))?
+            .span;
         Ok(Expression::new(
             ExpressionKind::Sizeof(left_id),
             self.span_combine(span),

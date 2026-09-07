@@ -8,7 +8,6 @@ use soul_tokenizer::model::{StringFormatTag, TokenKind, keyword::KeyWord};
 use soul_utils::{
     Ident, TypeModifier,
     collections::try_result::TryError,
-    error::SoulResult,
     fault::Fault,
     literal::{Number, StringLiteral, TokenLiteral},
     soul_error_internal,
@@ -25,7 +24,10 @@ use crate::{
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
-    pub(super) fn parse_primary(&mut self, end_tokens: &[TokenKind]) -> SoulResult<Expression> {
+    pub(super) fn parse_primary(
+        &mut self,
+        end_tokens: &[TokenKind],
+    ) -> Result<Expression, crate::fault::AstFault> {
         let start_span = self.token().span;
 
         // Try lambda first: `param => body`
@@ -46,7 +48,9 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let expression = match &self.token().kind {
             &CURLY_OPEN => {
-                let block = self.parse_block(TypeModifier::Mut)?;
+                let block = self
+                    .parse_block(TypeModifier::Mut)
+                    .map_err(|err| err.map_kind(Into::into))?;
                 Expression::new_block(block, self.span_combine(start_span))
             }
             &SQUARE_OPEN => {
@@ -55,7 +59,9 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
             &ROUND_OPEN => {
                 self.bump();
-                let expr = self.parse_expression(&[COMMA, ROUND_CLOSE])?;
+                let expr = self
+                    .parse_expression(&[COMMA, ROUND_CLOSE])
+                    .map_err(|err| err.map_kind(Into::into))?;
                 if self.current_is(&COMMA) && !matches!(expr.node, ExpressionKind::Tuple(_)) {
                     let mut values = vec![self.forest.store.insert_expression(expr)];
                     loop {
@@ -65,13 +71,17 @@ impl<'a, 'f> Parser<'a, 'f> {
                         }
                         self.bump();
                         self.skip_end_lines();
-                        let expr = self.parse_expression(&[COMMA, ROUND_CLOSE])?;
+                        let expr = self
+                            .parse_expression(&[COMMA, ROUND_CLOSE])
+                            .map_err(|err| err.map_kind(Into::into))?;
                         values.push(self.forest.store.insert_expression(expr));
                     }
-                    self.expect(&ROUND_CLOSE)?;
+                    self.expect(&ROUND_CLOSE)
+                        .map_err(|err| err.map_kind(Into::into))?;
                     Expression::new(ExpressionKind::Tuple(values), self.span_combine(start_span))
                 } else {
-                    self.expect(&ROUND_CLOSE)?;
+                    self.expect(&ROUND_CLOSE)
+                        .map_err(|err| err.map_kind(Into::into))?;
                     expr
                 }
             }
@@ -100,14 +110,13 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
             TokenKind::Keyword(keyword) => {
                 let kw = *keyword;
-                match self
-                    .parse_keyword_primary(start_span, kw)
-                    .map_err(|err| err.map_kind(Into::into))?
-                {
+                match self.parse_keyword_primary(start_span, kw)? {
                     Some(expr) => expr,
                     None => {
-                        return Err(Fault::error(
-                            format!("`{}` is invalid as start of expression", kw.as_str()),
+                        return Err(Fault::error_with_kind(
+                            crate::fault::AstErrorKind::InvalidExpressionStart {
+                                found: kw.as_str().into(),
+                            },
                             Some(start_span),
                         ));
                     }
@@ -168,19 +177,20 @@ impl<'a, 'f> Parser<'a, 'f> {
                     ROUND_OPEN => self.parse_tuple_expression()?,
                     CURLY_OPEN => self.parse_named_tuple_expression()?,
                     _ => {
-                        return Err(Fault::error(
-                            format!(
-                                "`{}` is invalid as start of expression",
-                                Symbol::Dot.as_str()
-                            ),
+                        return Err(Fault::error_with_kind(
+                            crate::fault::AstErrorKind::InvalidSymbolHere {
+                                symbol: Symbol::Dot.as_str().into(),
+                            },
                             Some(start_span),
                         ));
                     }
                 }
             }
             other => {
-                return Err(Fault::error(
-                    format!("`{}` is invalid as start of expression", other.display(),),
+                return Err(Fault::error_with_kind(
+                    crate::fault::AstErrorKind::InvalidExpressionStart {
+                        found: other.display().into_boxed_str(),
+                    },
                     Some(start_span),
                 ));
             }
@@ -189,42 +199,55 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok(expression)
     }
 
-    fn parse_tuple_expression(&mut self) -> SoulResult<Expression> {
+    fn parse_tuple_expression(&mut self) -> Result<Expression, crate::fault::AstFault> {
         let start_span = self.token().span;
-        self.expect(&ROUND_OPEN)?;
+        self.expect(&ROUND_OPEN)
+            .map_err(|err| err.map_kind(Into::into))?;
         let mut values = vec![];
         loop {
             self.skip_end_lines();
-            values.push(self.parse_expression_id(&[COMMA, ROUND_CLOSE])?);
+            values.push(
+                self.parse_expression_id(&[COMMA, ROUND_CLOSE])
+                    .map_err(|err| err.map_kind(Into::into))?,
+            );
             self.skip_end_lines();
             if !self.current_is(&COMMA) {
                 break;
             }
             self.bump();
         }
-        self.expect(&ROUND_CLOSE)?;
+        self.expect(&ROUND_CLOSE)
+            .map_err(|err| err.map_kind(Into::into))?;
         Ok(Expression::new(
             ExpressionKind::Tuple(values),
             self.span_combine(start_span),
         ))
     }
 
-    fn parse_named_tuple_expression(&mut self) -> SoulResult<Expression> {
+    fn parse_named_tuple_expression(&mut self) -> Result<Expression, crate::fault::AstFault> {
         let start_span = self.token().span;
-        self.expect(&CURLY_OPEN)?;
+        self.expect(&CURLY_OPEN)
+            .map_err(|err| err.map_kind(Into::into))?;
         let mut values = vec![];
         loop {
             self.skip_end_lines();
-            let ident = self.try_bump_consume_ident()?;
-            self.expect(&COLON)?;
-            values.push((ident, self.parse_expression_id(&[COMMA, CURLY_CLOSE])?));
+            let ident = self
+                .try_bump_consume_ident()
+                .map_err(|err| err.map_kind(Into::into))?;
+            self.expect(&COLON).map_err(|err| err.map_kind(Into::into))?;
+            values.push((
+                ident,
+                self.parse_expression_id(&[COMMA, CURLY_CLOSE])
+                    .map_err(|err| err.map_kind(Into::into))?,
+            ));
             self.skip_end_lines();
             if !self.current_is(&COMMA) {
                 break;
             }
             self.bump();
         }
-        self.expect(&CURLY_CLOSE)?;
+        self.expect(&CURLY_CLOSE)
+            .map_err(|err| err.map_kind(Into::into))?;
         Ok(Expression::new(
             ExpressionKind::NamedTuple(values),
             self.span_combine(start_span),
@@ -285,12 +308,14 @@ impl<'a, 'f> Parser<'a, 'f> {
         &mut self,
         end_tokens: &[TokenKind],
         start_span: Span,
-    ) -> SoulResult<Expression> {
+    ) -> Result<Expression, crate::fault::AstFault> {
         if let Some(primary) = self.parse_primary_keyword(start_span)? {
             return Ok(primary);
         }
 
-        let ident = self.try_bump_consume_ident()?;
+        let ident = self
+            .try_bump_consume_ident()
+            .map_err(|err| err.map_kind(Into::into))?;
         let span = ident.span();
 
         let peek = self.peek();
@@ -299,7 +324,8 @@ impl<'a, 'f> Parser<'a, 'f> {
                 return Err(soul_error_internal!(
                     "collectionType array not yet impl",
                     Some(span)
-                ));
+                )
+                .map_kind(Into::into));
             }
             &ROUND_OPEN | &ARROW_LEFT => {
                 match self.try_parse_function_call(start_span, None, &ident) {
@@ -313,8 +339,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                         if self.current_is(&CURLY_OPEN) {
                             return self
                                 .parse_struct_contructor(ident, generics, start_span)
-                                .map(Expression::from_struct_contructor)
-                                .map_err(|err| err.map_kind(Into::into));
+                                .map(Expression::from_struct_contructor);
                         }
                         return Ok(Expression::new_variable(self.alloc_node(), ident));
                     }
@@ -325,8 +350,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             &CURLY_OPEN if !end_tokens.contains(&CURLY_OPEN) => {
                 return self
                     .parse_struct_contructor(ident, vec![], start_span)
-                    .map(Expression::from_struct_contructor)
-                    .map_err(|err| err.map_kind(Into::into));
+                    .map(Expression::from_struct_contructor);
             }
             _ => (),
         };
@@ -423,12 +447,15 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok(Expression::new_block(block, self.span_combine(start_span)))
     }
 
-    fn parse_primary_keyword(&mut self, start_span: Span) -> SoulResult<Option<Expression>> {
-        let ident = self.try_token_as_ident_str()?;
+    fn parse_primary_keyword(
+        &mut self,
+        start_span: Span,
+    ) -> Result<Option<Expression>, crate::fault::AstFault> {
+        let ident = self
+            .try_token_as_ident_str()
+            .map_err(|err| err.map_kind(Into::into))?;
         match KeyWord::from_str(ident) {
-            Ok(keyword) => self
-                .parse_keyword_primary(start_span, keyword)
-                .map_err(|err| err.map_kind(Into::into)),
+            Ok(keyword) => self.parse_keyword_primary(start_span, keyword),
             _ => Ok(None),
         }
     }

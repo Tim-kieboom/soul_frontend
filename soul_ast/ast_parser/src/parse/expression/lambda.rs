@@ -4,7 +4,7 @@ use ast_model::{
     statements::{Statement, VarPattern},
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
-use soul_utils::{TypeModifier, error::SoulResult, soul_names::Symbol, span::Span};
+use soul_utils::{TypeModifier, soul_names::Symbol, span::Span};
 
 use crate::{parser::Parser, utils::LAMBDA_ARROW};
 
@@ -53,7 +53,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
     }
 
-    fn parse_lambda_body(&mut self) -> SoulResult<ExpressionId> {
+    fn parse_lambda_body(&mut self) -> Result<ExpressionId, crate::fault::AstFault> {
         let start_span = self.token().span;
 
         let keyword = match &self.token().kind {
@@ -71,9 +71,10 @@ impl<'a, 'f> Parser<'a, 'f> {
                 KeyWord::Return if self.current_is_any(LAMBDA_BODY_END) => {
                     ExpressionKind::Return(None)
                 }
-                KeyWord::Return => {
-                    ExpressionKind::Return(Some(self.parse_expression_id(LAMBDA_BODY_END)?))
-                }
+                KeyWord::Return => ExpressionKind::Return(Some(
+                    self.parse_expression_id(LAMBDA_BODY_END)
+                        .map_err(|err| err.map_kind(Into::into))?,
+                )),
                 _ => unreachable!(),
             };
 
@@ -82,6 +83,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         self.parse_expression_id(LAMBDA_BODY_END)
+            .map_err(|err| err.map_kind(Into::into))
     }
 }
 

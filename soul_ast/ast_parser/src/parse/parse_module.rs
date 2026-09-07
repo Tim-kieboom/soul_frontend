@@ -40,22 +40,27 @@ impl<'a, 'f> Parser<'a, 'f> {
         let lib_name = match &path.lib_name {
             Some(name) => name.clone(),
             None => {
-                self.log_fault(Fault::error(
-                    "external import missing crate name".to_string(),
-                    Some(span),
-                ));
+                self.log_fault(
+                    Fault::error_with_kind(
+                        crate::fault::AstErrorKind::ExternalImportMissingCrateName,
+                        Some(span),
+                    )
+                    .map_kind(Into::into),
+                );
                 return;
             }
         };
 
         let Some(crate_entry) = self.crate_store.get(&lib_name) else {
-            self.log_fault(Fault::error(
-                format!(
-                    "external crate '{}' not found in Soul.toml dependencies",
-                    lib_name
-                ),
-                Some(span),
-            ));
+            self.log_fault(
+                Fault::error_with_kind(
+                    crate::fault::AstErrorKind::ExternalCrateNotFound {
+                        lib_name: lib_name.as_str().into(),
+                    },
+                    Some(span),
+                )
+                .map_kind(Into::into),
+            );
             return;
         };
 
@@ -217,10 +222,15 @@ impl<'a, 'f> Parser<'a, 'f> {
         if module_path.is_dir() {
             module_path.push("mod.soul");
             if !module_path.is_file() {
-                self.log_fault(Fault::error(
-                    format!("no 'mod.soul' found in folder '{:?}'", module_path),
-                    Some(span),
-                ));
+                self.log_fault(
+                    Fault::error_with_kind(
+                        crate::fault::AstErrorKind::MissingModFile {
+                            path: format!("{module_path:?}").into_boxed_str(),
+                        },
+                        Some(span),
+                    )
+                    .map_kind(Into::into),
+                );
                 return None;
             }
 
@@ -229,10 +239,15 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         module_path.add_extension("soul");
         if !module_path.is_file() {
-            self.log_fault(Fault::error(
-                format!("file '{:?}' not found", module_path),
-                Some(span),
-            ));
+            self.log_fault(
+                Fault::error_with_kind(
+                    crate::fault::AstErrorKind::ModuleFileNotFound {
+                        path: format!("{module_path:?}").into_boxed_str(),
+                    },
+                    Some(span),
+                )
+                .map_kind(Into::into),
+            );
 
             return None;
         }
@@ -252,13 +267,16 @@ impl<'a, 'f> Parser<'a, 'f> {
                 return Some(path);
             }
         }
-        self.log_fault(Fault::error(
-            format!(
-                "crate '{crate_name}' has no root file (lib.soul, main.soul, or mod.soul) in '{:?}'",
-                source_root
-            ),
-            Some(span),
-        ));
+        self.log_fault(
+            Fault::error_with_kind(
+                crate::fault::AstErrorKind::CrateMissingRootFile {
+                    crate_name: crate_name.into(),
+                    source_root: format!("{source_root:?}").into_boxed_str(),
+                },
+                Some(span),
+            )
+            .map_kind(Into::into),
+        );
         None
     }
 

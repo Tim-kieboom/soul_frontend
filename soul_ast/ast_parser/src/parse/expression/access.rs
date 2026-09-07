@@ -9,7 +9,6 @@ use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
     Ident,
     collections::try_result::{ToResult, TryError},
-    error::SoulResult,
     fault::Fault,
     soul_names::Symbol,
     span::Span,
@@ -29,10 +28,12 @@ impl<'a, 'f> Parser<'a, 'f> {
         left: &mut Expression,
         start_span: Span,
         optional_map: bool,
-    ) -> SoulResult<()> {
-        let index =
-            self.parse_expression_id(&[SQUARE_CLOSE, TokenKind::EndLine, TokenKind::EndFile])?;
-        self.expect(&SQUARE_CLOSE)?;
+    ) -> Result<(), crate::fault::AstFault> {
+        let index = self
+            .parse_expression_id(&[SQUARE_CLOSE, TokenKind::EndLine, TokenKind::EndFile])
+            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&SQUARE_CLOSE)
+            .map_err(|err| err.map_kind(Into::into))?;
 
         let mut value = Expression::error();
         swap(left, &mut value);
@@ -284,7 +285,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         left: &mut Expression,
         start_span: Span,
         optional_map: bool,
-    ) -> SoulResult<bool> {
+    ) -> Result<bool, crate::fault::AstFault> {
         let ident = match &self.token().kind {
             &ELSE if self.peek_is(&CURLY_OPEN) => {
                 self.bump();
@@ -301,7 +302,9 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
             TokenKind::Ident(_) if self.peek_is(&CURLY_OPEN) => {
                 let save = self.tokens.current_position();
-                let _ident = self.try_bump_consume_ident()?;
+                let _ident = self
+                    .try_bump_consume_ident()
+                    .map_err(|err| err.map_kind(Into::into))?;
                 self.bump();
                 self.skip_end_lines();
                 if matches!(self.token().kind, TokenKind::Ident(_)) && self.peek_is(&COLON) {
@@ -309,7 +312,9 @@ impl<'a, 'f> Parser<'a, 'f> {
                     return Ok(false);
                 }
                 self.goto(save);
-                let ident = self.try_bump_consume_ident()?;
+                let ident = self
+                    .try_bump_consume_ident()
+                    .map_err(|err| err.map_kind(Into::into))?;
                 MatchMethodVariant::Name(ident)
             }
             _ => return Ok(false),
@@ -355,9 +360,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         left: ExpressionId,
         ident: Ident,
         optional_map: bool,
-    ) -> SoulResult<Expression> {
+    ) -> Result<Expression, crate::fault::AstFault> {
         match KeyWord::from_str(ident.as_str()).ok() {
-            Some(KeyWord::Sizeof) => self.parse_sizeof(left),
+            Some(KeyWord::Sizeof) => self.parse_sizeof(left).map_err(|err| err.map_kind(Into::into)),
             _ => Ok(Expression::new_field(
                 self.alloc_node(),
                 &self.forest.store,

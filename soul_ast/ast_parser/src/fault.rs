@@ -120,6 +120,59 @@ pub enum AstErrorKind {
 
     #[error("contructor function should have methode type")]
     ConstructorMissingMethodType,
+
+    #[error("expected ident")]
+    ExpectedIdentForTypeAssert,
+
+    #[error("can not have '{else_kw}' or '{else_kw} {if_kw}' after '{else_kw}'")]
+    DuplicateElseBranch { else_kw: Box<str>, if_kw: Box<str> },
+
+    #[error("expected a literal or '_' for match pattern")]
+    ExpectedLiteralOrWildcardPattern,
+
+    #[error("expected variant name after '.' in constructor pattern")]
+    ExpectedVariantNameInPattern,
+
+    #[error("unexpected end of file while parsing expression")]
+    UnexpectedEndOfFileInExpression,
+
+    #[error("expected array literal or '(' after type constructor")]
+    ExpectedArrayLiteralOrParenAfterTypeConstructor,
+
+    #[error("external import missing crate name")]
+    ExternalImportMissingCrateName,
+
+    #[error("external crate '{lib_name}' not found in Soul.toml dependencies")]
+    ExternalCrateNotFound { lib_name: Box<str> },
+
+    #[error("no 'mod.soul' found in folder '{path}'")]
+    MissingModFile { path: Box<str> },
+
+    #[error("file '{path}' not found")]
+    ModuleFileNotFound { path: Box<str> },
+
+    #[error(
+        "crate '{crate_name}' has no root file (lib.soul, main.soul, or mod.soul) in '{source_root}'"
+    )]
+    CrateMissingRootFile {
+        crate_name: Box<str>,
+        source_root: Box<str>,
+    },
+
+    #[error("token '{found}' not allowed in array typeWrapper")]
+    InvalidArrayTypeWrapperToken { found: Box<str> },
+
+    #[error("expected ident got `{found}`")]
+    ExpectedIdent { found: Box<str> },
+
+    #[error("expected: `{expected}` but found: `{found}`")]
+    ExpectedExactToken { expected: Box<str>, found: Box<str> },
+
+    #[error("expected: `{expected}` but found: `{found}`")]
+    ExpectedExactIdent { expected: Box<str>, found: Box<str> },
+
+    #[error("expected on of: [`{expected}`] but found: `{found}`")]
+    ExpectedOneOfTokens { expected: Box<str>, found: Box<str> },
 }
 
 impl From<UnclassifiedKind> for AstErrorKind {
@@ -128,9 +181,6 @@ impl From<UnclassifiedKind> for AstErrorKind {
     }
 }
 
-/// Lets an `AstErrorKind` fault flow back into a not-yet-migrated,
-/// `UnclassifiedKind`-typed `TryResult` (e.g. via `.try_err()`), downgrading
-/// the structured kind to its rendered message.
 impl From<AstErrorKind> for UnclassifiedKind {
     fn from(value: AstErrorKind) -> Self {
         UnclassifiedKind(value.to_string().into_boxed_str())

@@ -175,7 +175,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     pub(crate) fn parse_tuple_pattern(&mut self) -> SoulResult<VarPattern> {
-        self.expect(&ROUND_OPEN)?;
+        self.expect(&ROUND_OPEN).map_err(|err| err.map_kind(Into::into))?;
         let mut elements = Vec::new();
         let mut rest = false;
 
@@ -187,7 +187,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
 
             if !first {
-                self.expect(&COMMA)?;
+                self.expect(&COMMA).map_err(|err| err.map_kind(Into::into))?;
                 self.skip_end_lines();
                 if self.current_is(&ROUND_CLOSE) {
                     break;
@@ -207,12 +207,14 @@ impl<'a, 'f> Parser<'a, 'f> {
             );
         }
 
-        self.expect(&ROUND_CLOSE)?;
+        self.expect(&ROUND_CLOSE)
+            .map_err(|err| err.map_kind(Into::into))?;
         Ok(VarPattern::Tuple(TuplePattern { elements, rest }))
     }
 
     pub(crate) fn parse_named_tuple_pattern(&mut self) -> SoulResult<VarPattern> {
-        self.expect(&CURLY_OPEN)?;
+        self.expect(&CURLY_OPEN)
+            .map_err(|err| err.map_kind(Into::into))?;
         let mut fields = Vec::new();
         let mut rest = false;
 
@@ -224,7 +226,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
 
             if !first {
-                self.expect(&COMMA)?;
+                self.expect(&COMMA).map_err(|err| err.map_kind(Into::into))?;
                 self.skip_end_lines();
                 if self.current_is(&CURLY_CLOSE) {
                     break;
@@ -240,11 +242,15 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             let modifier = self.try_bump_mut().unwrap_or(TypeModifier::Immut);
 
-            let field = self.try_bump_consume_ident()?;
+            let field = self
+                .try_bump_consume_ident()
+                .map_err(|err| err.map_kind(Into::into))?;
 
             let binding = if self.current_is(&COLON) {
                 self.bump();
-                let alias = self.try_bump_consume_ident()?;
+                let alias = self
+                    .try_bump_consume_ident()
+                    .map_err(|err| err.map_kind(Into::into))?;
                 if alias.as_str() == "_" {
                     None
                 } else {
@@ -261,12 +267,14 @@ impl<'a, 'f> Parser<'a, 'f> {
             });
         }
 
-        self.expect(&CURLY_CLOSE)?;
+        self.expect(&CURLY_CLOSE)
+            .map_err(|err| err.map_kind(Into::into))?;
         Ok(VarPattern::NamedTuple(NamedTuplePattern { fields, rest }))
     }
 
     pub(crate) fn parse_constructor_pattern(&mut self, type_name: Ident) -> SoulResult<VarPattern> {
-        self.expect(&CURLY_OPEN)?;
+        self.expect(&CURLY_OPEN)
+            .map_err(|err| err.map_kind(Into::into))?;
         let mut fields = Vec::new();
         let mut rest = false;
 
@@ -278,7 +286,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
 
             if !first {
-                self.expect(&COMMA)?;
+                self.expect(&COMMA).map_err(|err| err.map_kind(Into::into))?;
                 self.skip_end_lines();
                 if self.current_is(&CURLY_CLOSE) {
                     break;
@@ -294,11 +302,15 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             let modifier = self.try_bump_mut().unwrap_or(TypeModifier::Immut);
 
-            let field = self.try_bump_consume_ident()?;
+            let field = self
+                .try_bump_consume_ident()
+                .map_err(|err| err.map_kind(Into::into))?;
 
             let binding = if self.current_is(&COLON) {
                 self.bump();
-                let alias = self.try_bump_consume_ident()?;
+                let alias = self
+                    .try_bump_consume_ident()
+                    .map_err(|err| err.map_kind(Into::into))?;
                 if alias.as_str() == "_" {
                     None
                 } else {
@@ -315,7 +327,8 @@ impl<'a, 'f> Parser<'a, 'f> {
             });
         }
 
-        self.expect(&CURLY_CLOSE)?;
+        self.expect(&CURLY_CLOSE)
+            .map_err(|err| err.map_kind(Into::into))?;
         Ok(VarPattern::Constructor(VarConstructorPattern {
             type_name,
             fields,

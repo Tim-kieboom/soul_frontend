@@ -139,22 +139,29 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     fn parse_trait(&mut self) -> SoulResult<Statement> {
         let start_span = self.token().span;
-        self.expect(&TokenKind::Keyword(KeyWord::Trait))?;
-        let name = self.try_bump_consume_ident()?;
+        self.expect(&TokenKind::Keyword(KeyWord::Trait))
+            .map_err(|err| err.map_kind(Into::into))?;
+        let name = self
+            .try_bump_consume_ident()
+            .map_err(|err| err.map_kind(Into::into))?;
         let generics = self.parse_generic_declare()?.unwrap_or(vec![]);
 
         let mut trait_impls = vec![];
         if self.current_is(&COLON) {
             self.bump();
             loop {
-                trait_impls.push(self.try_bump_consume_ident()?);
+                trait_impls.push(
+                    self.try_bump_consume_ident()
+                        .map_err(|err| err.map_kind(Into::into))?,
+                );
                 if !self.current_is(&COMMA) {
                     break;
                 }
             }
         }
 
-        self.expect(&CURLY_OPEN)?;
+        self.expect(&CURLY_OPEN)
+            .map_err(|err| err.map_kind(Into::into))?;
 
         let mut methods = vec![];
         let mut typedefs = vec![];
@@ -174,7 +181,9 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             let start_span = self.token().span;
             let is_const = self.try_bump_const().is_some();
-            let name = self.try_bump_consume_ident()?;
+            let name = self
+                .try_bump_consume_ident()
+                .map_err(|err| err.map_kind(Into::into))?;
             let signature = match self
                 .try_parse_function_signature(start_span, &this_type, name, is_const, None)
             {
@@ -195,7 +204,8 @@ impl<'a, 'f> Parser<'a, 'f> {
             let id = self.forest.store.insert_function(spanned);
             methods.push(id);
         }
-        self.expect(&CURLY_CLOSE)?;
+        self.expect(&CURLY_CLOSE)
+            .map_err(|err| err.map_kind(Into::into))?;
         Ok(Statement::new(
             StatementKind::Trait(Trait {
                 id: self.alloc_node(),
@@ -211,11 +221,14 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     fn parse_typedef(&mut self) -> SoulResult<Spanned<TypeDef>> {
         let start_span = self.token().span;
-        self.expect(&TokenKind::Keyword(KeyWord::Type))?;
+        self.expect(&TokenKind::Keyword(KeyWord::Type))
+            .map_err(|err| err.map_kind(Into::into))?;
 
         let new_type = self.try_parse_type().merge_to_result()?;
         if !self.current_is_any(&[ASSIGN, COLON_ASSIGN]) {
-            return Err(self.get_expect_any_error(&[ASSIGN, COLON_ASSIGN]));
+            return Err(self
+                .get_expect_any_error(&[ASSIGN, COLON_ASSIGN])
+                .map_kind(Into::into));
         }
         self.bump();
         let is_distinct = self.current_is(&TokenKind::Keyword(KeyWord::Distinct));

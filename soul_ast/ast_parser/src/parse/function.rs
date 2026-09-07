@@ -51,7 +51,9 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.bump();
         }
 
-        let ident = self.try_bump_consume_ident()?;
+        let ident = self
+            .try_bump_consume_ident()
+            .map_err(|err| err.map_kind(Into::into))?;
 
         let span = self.token().span;
 
@@ -79,21 +81,32 @@ impl<'a, 'f> Parser<'a, 'f> {
         start_span: Span,
         callee: Option<FunctionCallee>,
         name: &Ident,
-    ) -> TryResult<Expression, Fault> {
+    ) -> TryResult<Expression, Fault, crate::fault::AstErrorKind> {
         if !self.current_is_any(&[ROUND_OPEN, ARROW_LEFT]) {
-            return TryNotValue(self.get_expect_any_error(&[ROUND_OPEN, ARROW_LEFT]));
+            return TryNotValue(
+                self.get_expect_any_error(&[ROUND_OPEN, ARROW_LEFT])
+                    .map_kind(Into::into),
+            );
         }
 
         let generics = if self.current_is(&ARROW_LEFT) {
-            self.parse_generic_define()?
+            match self.parse_generic_define() {
+                Ok(val) => val,
+                Err(TryError::IsErr(err)) => return TryErr(err),
+                Err(TryError::IsNotValue(err)) => {
+                    return TryNotValue(err.map_kind(Into::into));
+                }
+            }
         } else {
             vec![]
         };
 
         if self.current_is(&DOT) {
             if callee.is_some() {
-                return TryErr(Fault::error(
-                    format!("`{}` invalid", Symbol::Dot.as_str()),
+                return TryErr(Fault::error_with_kind(
+                    crate::fault::AstErrorKind::InvalidSymbolHere {
+                        symbol: Symbol::Dot.as_str().into(),
+                    },
                     Some(self.span_combine(start_span)),
                 ));
             }
@@ -119,8 +132,8 @@ impl<'a, 'f> Parser<'a, 'f> {
                 ));
             }
 
-            return TryErr(Fault::error(
-                "expected array literal or '(' after type constructor",
+            return TryErr(Fault::error_with_kind(
+                crate::fault::AstErrorKind::ExpectedArrayLiteralOrParenAfterTypeConstructor,
                 Some(self.token().span),
             ));
         }
@@ -142,12 +155,12 @@ impl<'a, 'f> Parser<'a, 'f> {
         callee: Option<FunctionCallee>,
         generics: Vec<SoulType>,
         ident: &Ident,
-    ) -> TryResult<Spanned<FunctionCall>, Fault> {
+    ) -> TryResult<Spanned<FunctionCall>, Fault, crate::fault::AstErrorKind> {
         let start_position = self.tokens.current_position();
 
         if !self.current_is(&ROUND_OPEN) {
             self.goto(start_position);
-            return TryNotValue(self.get_expect_error(&CURLY_OPEN));
+            return TryNotValue(self.get_expect_error(&CURLY_OPEN).map_kind(Into::into));
         }
 
         let arguments = self.parse_arguments().try_err()?;
@@ -291,7 +304,11 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     pub(crate) fn try_parse_parameters(
         &mut self,
-    ) -> TryResult<(Vec<Parameter>, FunctionThisKind), Fault, crate::fault::AstErrorKind> {
+    ) -> TryResult<
+        (Vec<Parameter>, FunctionThisKind),
+        crate::fault::AstFault,
+        crate::fault::AstErrorKind,
+    > {
         let begin = self.tokens.current_position();
 
         let result = self.inner_parameters();
@@ -310,10 +327,16 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.bump();
         let mut generics = vec![];
         loop {
-            let name = self.try_bump_consume_ident()?;
+            let name = self
+                .try_bump_consume_ident()
+                .map_err(|err| err.map_kind(Into::into))?;
             let bound = if self.current_is(&COLON) {
                 self.bump();
-                Some(self.try_parse_type().merge_to_result()?)
+                Some(
+                    self.try_parse_type()
+                        .merge_to_result()
+                        .map_err(|err| err.map_kind(Into::into))?,
+                )
             } else {
                 None
             };
@@ -323,12 +346,13 @@ impl<'a, 'f> Parser<'a, 'f> {
                 self.bump();
                 return Ok(Some(generics));
             }
-            self.expect(&COMMA)?;
+            self.expect(&COMMA).map_err(|err| err.map_kind(Into::into))?;
         }
     }
 
     pub(crate) fn parse_arguments(&mut self) -> SoulResult<Vec<Argument>> {
-        self.expect(&ROUND_OPEN)?;
+        self.expect(&ROUND_OPEN)
+            .map_err(|err| err.map_kind(Into::into))?;
         if self.current_is(&ROUND_CLOSE) {
             self.bump();
             return Ok(vec![]);
@@ -337,8 +361,10 @@ impl<'a, 'f> Parser<'a, 'f> {
         let mut values = vec![];
         loop {
             let name = if self.peek().kind == COLON {
-                let name = self.try_bump_consume_ident()?;
-                self.expect(&COLON)?;
+                let name = self
+                    .try_bump_consume_ident()
+                    .map_err(|err| err.map_kind(Into::into))?;
+                self.expect(&COLON).map_err(|err| err.map_kind(Into::into))?;
                 Some(name)
             } else {
                 None
@@ -353,7 +379,8 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.bump();
         }
 
-        self.expect(&ROUND_CLOSE)?;
+        self.expect(&ROUND_CLOSE)
+            .map_err(|err| err.map_kind(Into::into))?;
         Ok(values)
     }
 
@@ -492,7 +519,8 @@ impl<'a, 'f> Parser<'a, 'f> {
         if !self.current_is_any(&[ROUND_OPEN, ARROW_LEFT]) {
             return TryNotValue(FuncError::new(
                 name,
-                self.get_expect_any_error(&[ROUND_OPEN, ARROW_LEFT]),
+                self.get_expect_any_error(&[ROUND_OPEN, ARROW_LEFT])
+                    .map_kind(Into::into),
             ));
         }
 
@@ -508,7 +536,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         let (parameters, function_kind) = match self.try_parse_parameters() {
             Ok(val) => val,
             Err(TryError::IsErr(err)) => return TryErr(err),
-            Err(TryError::IsNotValue(err)) => return TryNotValue(FuncError::new(name, err)),
+            Err(TryError::IsNotValue(err)) => {
+                return TryNotValue(FuncError::new(name, err.map_kind(Into::into)));
+            }
         };
 
         let return_type = match self.current_is(&COLON) {
@@ -562,9 +592,14 @@ impl<'a, 'f> Parser<'a, 'f> {
         loop {
             self.skip_end_lines();
 
-            let name = self.try_bump_consume_ident()?;
-            self.expect(&COLON)?;
-            let bound = self.try_parse_type().merge_to_result()?;
+            let name = self
+                .try_bump_consume_ident()
+                .map_err(|err| err.map_kind(Into::into))?;
+            self.expect(&COLON).map_err(|err| err.map_kind(Into::into))?;
+            let bound = self
+                .try_parse_type()
+                .merge_to_result()
+                .map_err(|err| err.map_kind(Into::into))?;
 
             match generics
                 .iter_mut()
@@ -639,7 +674,11 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     fn inner_parameters(
         &mut self,
-    ) -> TryResult<(Vec<Parameter>, FunctionThisKind), Fault, crate::fault::AstErrorKind> {
+    ) -> TryResult<
+        (Vec<Parameter>, FunctionThisKind),
+        crate::fault::AstFault,
+        crate::fault::AstErrorKind,
+    > {
         self.expect(&ROUND_OPEN).try_err()?;
 
         let mut types = vec![];
@@ -671,7 +710,9 @@ impl<'a, 'f> Parser<'a, 'f> {
             let ty = match self.try_parse_type() {
                 Ok(ty) => ty,
                 Err(TryError::IsErr(err)) => return TryErr(err.map_kind(Into::into)),
-                Err(TryError::IsNotValue(err)) => return TryNotValue(err),
+                Err(TryError::IsNotValue(err)) => {
+                    return TryNotValue(err.map_kind(Into::into));
+                }
             };
 
             let default = if self.current_is(&ASSIGN) {
@@ -714,7 +755,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         &mut self,
         kind: &mut FunctionThisKind,
         types: &mut Vec<Parameter>,
-    ) -> TryResult<Loop, Fault, crate::fault::AstErrorKind> {
+    ) -> TryResult<Loop, crate::fault::AstFault, crate::fault::AstErrorKind> {
         let mut is_ref_prefix = false;
         let this = match &self.token().kind {
             &REF => {
@@ -741,7 +782,9 @@ impl<'a, 'f> Parser<'a, 'f> {
             let ty = match self.try_parse_type() {
                 Ok(ty) => ty,
                 Err(TryError::IsErr(err)) => return TryErr(err.map_kind(Into::into)),
-                Err(TryError::IsNotValue(err)) => return TryNotValue(err),
+                Err(TryError::IsNotValue(err)) => {
+                    return TryNotValue(err.map_kind(Into::into));
+                }
             };
             types.push(Parameter {
                 id: self.alloc_node(),

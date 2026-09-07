@@ -24,20 +24,16 @@ use crate::{
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
-    pub(crate) fn try_parse_type(&mut self) -> TryResult<SoulType, Fault> {
+    pub(crate) fn try_parse_type(
+        &mut self,
+    ) -> TryResult<SoulType, Fault, crate::fault::AstErrorKind> {
         let begin = self.tokens.current_position();
         let result = self.inner_parse_type();
         if result.is_err() {
             self.goto(begin);
         }
 
-        match result {
-            Ok(val) => TryOk(val),
-            Err(TryError::IsErr(err)) => TryErr(err.map_kind(|kind| {
-                soul_utils::fault::UnclassifiedKind(kind.to_string().into_boxed_str())
-            })),
-            Err(TryError::IsNotValue(err)) => TryNotValue(err),
-        }
+        result
     }
 
     pub(crate) fn type_from_ident(&mut self, ident: Ident, generics: Vec<SoulType>) -> SoulType {
@@ -235,7 +231,10 @@ impl<'a, 'f> Parser<'a, 'f> {
             _ => (),
         };
 
-        let ident = self.try_bump_consume_ident().try_not_value()?;
+        let ident = self
+            .try_bump_consume_ident()
+            .map_err(|err| err.map_kind(Into::into))
+            .try_not_value()?;
         if let Ok(keyword) = KeyWord::from_str(ident.as_str()) {
             return TryNotValue(Fault::error(
                 format!("keyword '{}' can not be type", keyword.as_str()),
@@ -250,8 +249,10 @@ impl<'a, 'f> Parser<'a, 'f> {
         let generics = if self.current_is(&ARROW_LEFT) {
             match self.parse_generic_define() {
                 Ok(val) => val,
-                Err(TryError::IsErr(err)) => return TryErr(err.map_kind(Into::into)),
-                Err(TryError::IsNotValue(err)) => return TryNotValue(err),
+                Err(TryError::IsErr(err)) => return TryErr(err),
+                Err(TryError::IsNotValue(err)) => {
+                    return TryNotValue(err.map_kind(Into::into));
+                }
             }
         } else {
             vec![]
@@ -334,14 +335,15 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         self.bump();
         if self.token().kind != SQUARE_CLOSE {
-            return TryNotValue(self.get_expect_error(&SQUARE_CLOSE));
+            return TryNotValue(self.get_expect_error(&SQUARE_CLOSE).map_kind(Into::into));
         }
 
         Ok(kind)
     }
 
     fn parse_tuple_kind(&mut self) -> SoulResult<TupleKind> {
-        self.expect(&ROUND_OPEN)?;
+        self.expect(&ROUND_OPEN)
+            .map_err(|err| err.map_kind(Into::into))?;
         self.skip_end_lines();
         if self.peek_is(&COLON) {
             return self.parse_named_tuple().map(TupleKind::NamedTuple);
@@ -353,8 +355,10 @@ impl<'a, 'f> Parser<'a, 'f> {
     fn parse_named_tuple(&mut self) -> SoulResult<NamedTuple> {
         let mut values = NamedTuple::new();
         loop {
-            let ident = self.try_bump_consume_ident()?;
-            self.expect(&COLON)?;
+            let ident = self
+                .try_bump_consume_ident()
+                .map_err(|err| err.map_kind(Into::into))?;
+            self.expect(&COLON).map_err(|err| err.map_kind(Into::into))?;
             let ty = self.try_parse_type().merge_to_result()?;
             values.push((ident, ty));
 
@@ -365,7 +369,8 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.bump();
         }
 
-        self.expect(&ROUND_CLOSE)?;
+        self.expect(&ROUND_CLOSE)
+            .map_err(|err| err.map_kind(Into::into))?;
         Ok(values)
     }
 
@@ -382,7 +387,8 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.bump();
         }
 
-        self.expect(&ROUND_CLOSE)?;
+        self.expect(&ROUND_CLOSE)
+            .map_err(|err| err.map_kind(Into::into))?;
         Ok(values)
     }
 }

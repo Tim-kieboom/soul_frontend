@@ -153,20 +153,22 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
     }
 
-    pub(crate) fn try_token_as_ident_str(&mut self) -> SoulResult<&str> {
+    pub(crate) fn try_token_as_ident_str(&mut self) -> Result<&str, crate::fault::AstFault> {
         let token = &self.token();
         match &token.kind {
             TokenKind::Ident(val) => Ok(val),
             TokenKind::Types(val) => Ok(val.as_str()),
-            _ => Err(Fault::error(
-                format!("expected ident got `{}`", self.token().kind.display()),
+            _ => Err(Fault::error_with_kind(
+                crate::fault::AstErrorKind::ExpectedIdent {
+                    found: self.token().kind.display().into_boxed_str(),
+                },
                 Some(self.token().span),
             )),
         }
     }
 
     /// Expects exact token kind, errors if mismatch.
-    pub(crate) fn expect(&mut self, kind: &TokenKind) -> SoulResult<()> {
+    pub(crate) fn expect(&mut self, kind: &TokenKind) -> Result<(), crate::fault::AstFault> {
         if self.current_is(kind) {
             self.bump();
             Ok(())
@@ -176,7 +178,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     /// Expects exact token kind, errors if mismatch.
-    pub(crate) fn expect_ident(&mut self, ident: &str) -> SoulResult<()> {
+    pub(crate) fn expect_ident(&mut self, ident: &str) -> Result<(), crate::fault::AstFault> {
         if self.current_is_ident(ident) {
             self.bump();
             Ok(())
@@ -186,26 +188,29 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     /// Creates error for expected single token kind.
-    pub(super) fn get_expect_ident_error(&self, string: &str) -> Fault {
-        let message = format!(
-            "expected: `{string}` but found: `{}`",
-            self.token().kind.display()
-        );
-        Fault::error(message, Some(self.token().span))
+    pub(super) fn get_expect_ident_error(&self, string: &str) -> crate::fault::AstFault {
+        Fault::error_with_kind(
+            crate::fault::AstErrorKind::ExpectedExactIdent {
+                expected: string.into(),
+                found: self.token().kind.display().into_boxed_str(),
+            },
+            Some(self.token().span),
+        )
     }
 
     /// Creates error for expected single token kind.
-    pub(super) fn get_expect_error(&self, expected: &TokenKind) -> Fault {
-        let message = format!(
-            "expected: `{}` but found: `{}`",
-            expected.display(),
-            self.token().kind.display()
-        );
-        Fault::error(message, Some(self.token().span))
+    pub(super) fn get_expect_error(&self, expected: &TokenKind) -> crate::fault::AstFault {
+        Fault::error_with_kind(
+            crate::fault::AstErrorKind::ExpectedExactToken {
+                expected: expected.display().into_boxed_str(),
+                found: self.token().kind.display().into_boxed_str(),
+            },
+            Some(self.token().span),
+        )
     }
 
     /// Creates error for expected token from set.
-    pub(super) fn get_expect_any_error(&self, expected: &[TokenKind]) -> Fault {
+    pub(super) fn get_expect_any_error(&self, expected: &[TokenKind]) -> crate::fault::AstFault {
         let mut tokens_string = String::new();
 
         let last_index = expected.len().saturating_sub(1);
@@ -218,13 +223,13 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
         }
 
-        let message = format!(
-            "expected on of: [`{}`] but found: `{}`",
-            tokens_string,
-            self.token().kind.display()
-        );
-
-        Fault::error(message, Some(self.token().span))
+        Fault::error_with_kind(
+            crate::fault::AstErrorKind::ExpectedOneOfTokens {
+                expected: tokens_string.into_boxed_str(),
+                found: self.token().kind.display().into_boxed_str(),
+            },
+            Some(self.token().span),
+        )
     }
 
     pub(crate) fn try_bump_mut(&mut self) -> Option<TypeModifier> {
@@ -247,10 +252,12 @@ impl<'a, 'f> Parser<'a, 'f> {
         })
     }
 
-    pub(crate) fn try_bump_consume_ident(&mut self) -> SoulResult<Ident> {
+    pub(crate) fn try_bump_consume_ident(&mut self) -> Result<Ident, crate::fault::AstFault> {
         if !matches!(self.token().kind, TokenKind::Ident(_)) {
-            return Err(Fault::error(
-                format!("expected ident got {}", self.token().kind.display()),
+            return Err(Fault::error_with_kind(
+                crate::fault::AstErrorKind::ExpectedIdent {
+                    found: self.token().kind.display().into_boxed_str(),
+                },
                 Some(self.token().span),
             ));
         }
