@@ -6,7 +6,11 @@ use soul_utils::{
 };
 
 use crate::{
-    TokenKind, fault::TokenFault, lexer::Lexer, model::StringFormatTag, model::keyword::KeyWord,
+    TokenKind,
+    fault::{TokenErrorKind, TokenFault},
+    lexer::Lexer,
+    model::StringFormatTag,
+    model::keyword::KeyWord,
 };
 
 fn module_id() -> ModuleId {
@@ -300,50 +304,47 @@ fn lex_number_with_type_suffix() {
 #[test]
 fn unterminated_string_literal_is_rejected() {
     let err = try_lex(r#""hello"#).expect_err("unterminated string literal should not lex");
-    assert!(
-        err.message().contains("does not have an end qoute"),
-        "unexpected error message: {}",
-        err.message()
-    );
+    assert_eq!(err.kind(), &TokenErrorKind::UnterminatedString);
 }
 
 #[test]
 fn unterminated_char_literal_is_rejected() {
     let err = try_lex("'").expect_err("unterminated char literal should not lex");
-    assert!(
-        err.message().contains("Unclosed char literal"),
-        "unexpected error message: {}",
-        err.message()
-    );
+    assert_eq!(err.kind(), &TokenErrorKind::UnclosedCharLiteral);
 }
 
 #[test]
 fn char_literal_missing_closing_quote_is_rejected() {
     let err = try_lex("'a").expect_err("char literal missing closing quote should not lex");
-    assert!(
-        err.message().contains("char literal should end with"),
-        "unexpected error message: {}",
-        err.message()
-    );
+    assert_eq!(err.kind(), &TokenErrorKind::CharLiteralMissingEndQuote);
 }
 
 #[test]
 fn unterminated_fstring_literal_is_rejected() {
     let err = try_lex(r#"f"hello"#).expect_err("unterminated f-string literal should not lex");
-    assert!(
-        err.message().contains("unclosed format string literal"),
-        "unexpected error message: {}",
-        err.message()
-    );
+    assert_eq!(err.kind(), &TokenErrorKind::UnclosedFormatString);
 }
 
 #[test]
 fn unknown_character_is_rejected() {
     let err = try_lex("`").expect_err("an unrecognized character should not lex");
+    assert_eq!(err.kind(), &TokenErrorKind::UnknownChar { found: '`' });
+}
+
+#[test]
+fn invalid_number_suffix_is_rejected() {
+    let err = try_lex("1_bogus").expect_err("unrecognized number suffix should not lex");
+    assert_eq!(err.kind(), &TokenErrorKind::InvalidNumberSuffix);
+}
+
+#[test]
+fn number_literal_overflowing_u64_is_rejected() {
+    let err = try_lex("999999999999999999999")
+        .expect_err("a number literal beyond u64::MAX should not lex");
     assert!(
-        err.message().contains("is unknown"),
-        "unexpected error message: {}",
-        err.message()
+        matches!(err.kind(), TokenErrorKind::InvalidNumberLiteral(_)),
+        "unexpected error kind: {:?}",
+        err.kind()
     );
 }
 
