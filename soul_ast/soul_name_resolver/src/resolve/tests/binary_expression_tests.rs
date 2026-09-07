@@ -59,7 +59,12 @@ fn expression_type_of_binding(ast: &AstTree<AstErrorKind>, name: &str) -> Option
 fn type_mismatch_fault_count(ast: &AstTree<AstErrorKind>) -> usize {
     ast.faults()
         .iter()
-        .filter(|fault| matches!(fault.kind(), AstErrorKind::BinaryExpressionTypeMismatch { .. }))
+        .filter(|fault| {
+            matches!(
+                fault.kind(),
+                AstErrorKind::BinaryExpressionTypeMismatch { .. }
+            )
+        })
         .count()
 }
 

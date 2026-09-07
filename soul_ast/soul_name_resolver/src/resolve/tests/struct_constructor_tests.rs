@@ -32,7 +32,10 @@ fn resolve_source(source: &str) -> AstTree<AstErrorKind> {
     ast
 }
 
-fn fault_count_matching(ast: &AstTree<AstErrorKind>, predicate: impl Fn(&AstErrorKind) -> bool) -> usize {
+fn fault_count_matching(
+    ast: &AstTree<AstErrorKind>,
+    predicate: impl Fn(&AstErrorKind) -> bool,
+) -> usize {
     ast.faults()
         .iter()
         .filter(|fault| predicate(fault.kind()))
@@ -74,7 +77,10 @@ fn mismatched_field_type_reports_exactly_one_fault() {
     let ast = resolve_source(
         "struct Point { x: i64\n    y: i64 }\nmain() {\n    Point { x: 1, y: \"hi\" }\n}\n",
     );
-    assert_eq!(fault_count_matching(&ast, is_field_type_mismatch_named("y")), 1);
+    assert_eq!(
+        fault_count_matching(&ast, is_field_type_mismatch_named("y")),
+        1
+    );
 }
 
 #[test]
@@ -103,7 +109,10 @@ fn omitted_field_reports_no_fault() {
 #[test]
 fn generic_struct_field_is_skipped_without_fault() {
     let ast = resolve_source("struct Box<T> { value: T }\nmain() {\n    Box { value: 1 }\n}\n");
-    assert_eq!(fault_count_matching(&ast, is_field_type_mismatch_named("value")), 0);
+    assert_eq!(
+        fault_count_matching(&ast, is_field_type_mismatch_named("value")),
+        0
+    );
 }
 
 #[test]

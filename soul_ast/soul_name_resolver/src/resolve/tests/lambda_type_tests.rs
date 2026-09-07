@@ -32,7 +32,10 @@ fn resolve_source(source: &str) -> AstTree<AstErrorKind> {
     ast
 }
 
-fn fault_count_matching(ast: &AstTree<AstErrorKind>, predicate: impl Fn(&AstErrorKind) -> bool) -> usize {
+fn fault_count_matching(
+    ast: &AstTree<AstErrorKind>,
+    predicate: impl Fn(&AstErrorKind) -> bool,
+) -> usize {
     ast.faults()
         .iter()
         .filter(|fault| predicate(fault.kind()))
@@ -171,7 +174,10 @@ fn lambda_first_return_in_if_branch_establishes_type_and_later_return_faults() {
     let ast = resolve_source(
         "assertEq<T>(a: T, b: T) {}\nmain() {\n    fn := () => {\n        if true {\n            return 2\n        }\n        return \"\"\n    }\n}\n",
     );
-    assert_eq!(fault_count_matching(&ast, is_return_type_mismatch_int_to_str), 1,);
+    assert_eq!(
+        fault_count_matching(&ast, is_return_type_mismatch_int_to_str),
+        1,
+    );
 }
 
 #[test]
@@ -179,7 +185,10 @@ fn lambda_with_divergent_if_tail_branches_faults_on_the_later_branch() {
     let ast = resolve_source(
         "foo(a: str) {}\nmain() {\n    foo(x => {\n        if x {\n            1\n        } else {\n            \"hi\"\n        }\n    })\n}\n",
     );
-    assert_eq!(fault_count_matching(&ast, is_return_type_mismatch_int_to_str), 1,);
+    assert_eq!(
+        fault_count_matching(&ast, is_return_type_mismatch_int_to_str),
+        1,
+    );
     assert!(
         fault_count_matching(&ast, mentions_int_return) > 0,
         "expected the first branch's value to establish `int`: {:#?}",

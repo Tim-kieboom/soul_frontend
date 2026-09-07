@@ -16,9 +16,7 @@ pub enum MirErrorKind {
     )]
     NonSimpleVariablePatternUnsupported,
 
-    #[error(
-        "a variable declaration with no initializer isn't supported in this lowering slice"
-    )]
+    #[error("a variable declaration with no initializer isn't supported in this lowering slice")]
     UninitializedVariableUnsupported,
 
     #[error("variable has no resolved type")]

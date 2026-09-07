@@ -6,8 +6,7 @@ use ast_model::{
 };
 use ast_parser::fault::AstErrorKind;
 use soul_utils::{
-    Ident,
-    soul_error_internal,
+    Ident, soul_error_internal,
     span::{ModuleId, Span},
 };
 

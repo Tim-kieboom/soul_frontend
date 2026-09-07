@@ -164,6 +164,10 @@ impl<K> FaultCollector<K> {
         self.faults.iter()
     }
 
+    pub fn into_iter(self) -> impl Iterator<Item = Fault<K>> {
+        self.faults.into_iter()
+    }
+
     pub fn count_severity(&self, severity: Severity) -> usize {
         self.faults
             .iter()
@@ -173,6 +177,25 @@ impl<K> FaultCollector<K> {
 
     pub fn fails(&self, fail_level: Severity) -> bool {
         self.faults.iter().any(|d| d.severity == fail_level)
+    }
+
+    pub fn into_unclassified(self) -> FaultCollector<UnclassifiedKind>
+    where
+        K: Into<UnclassifiedKind>,
+    {
+        FaultCollector {
+            faults: self.faults.into_iter().map(Fault::into_kind).collect(),
+        }
+    }
+}
+impl FaultCollector<UnclassifiedKind> {
+    pub fn extend_into<K>(&mut self, faults: FaultCollector<K>)
+    where
+        K: Into<UnclassifiedKind>,
+    {
+        for fault in faults.into_iter() {
+            self.push(fault.into_kind());
+        }
     }
 }
 

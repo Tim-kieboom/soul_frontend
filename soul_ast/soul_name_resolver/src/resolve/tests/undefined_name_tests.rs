@@ -32,7 +32,10 @@ fn resolve_source(source: &str) -> AstTree<AstErrorKind> {
     ast
 }
 
-fn fault_count_matching(ast: &AstTree<AstErrorKind>, predicate: impl Fn(&AstErrorKind) -> bool) -> usize {
+fn fault_count_matching(
+    ast: &AstTree<AstErrorKind>,
+    predicate: impl Fn(&AstErrorKind) -> bool,
+) -> usize {
     ast.faults()
         .iter()
         .filter(|fault| predicate(fault.kind()))
@@ -50,7 +53,10 @@ fn is_undefined_variable(kind: &AstErrorKind) -> bool {
 #[test]
 fn bare_undefined_variable_reports_exactly_one_fault() {
     let ast = resolve_source("main() {\n    b := a\n}\n");
-    assert_eq!(fault_count_matching(&ast, is_undefined_variable_named("a")), 1);
+    assert_eq!(
+        fault_count_matching(&ast, is_undefined_variable_named("a")),
+        1
+    );
 }
 
 #[test]

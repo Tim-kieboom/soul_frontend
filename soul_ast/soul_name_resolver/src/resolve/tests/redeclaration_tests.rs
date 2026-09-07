@@ -32,7 +32,10 @@ fn resolve_source(source: &str) -> AstTree<AstErrorKind> {
     ast
 }
 
-fn fault_count_matching(ast: &AstTree<AstErrorKind>, predicate: impl Fn(&AstErrorKind) -> bool) -> usize {
+fn fault_count_matching(
+    ast: &AstTree<AstErrorKind>,
+    predicate: impl Fn(&AstErrorKind) -> bool,
+) -> usize {
     ast.faults()
         .iter()
         .filter(|fault| predicate(fault.kind()))
@@ -42,7 +45,8 @@ fn fault_count_matching(ast: &AstTree<AstErrorKind>, predicate: impl Fn(&AstErro
 fn is_already_exists_in_scope(kind: &AstErrorKind) -> bool {
     matches!(
         kind,
-        AstErrorKind::TypeAlreadyExistsInScope { .. } | AstErrorKind::ValueAlreadyExistsInScope { .. }
+        AstErrorKind::TypeAlreadyExistsInScope { .. }
+            | AstErrorKind::ValueAlreadyExistsInScope { .. }
     )
 }
 
@@ -76,7 +80,10 @@ fn same_variable_name_in_separate_function_scopes_reports_no_fault() {
 #[test]
 fn redeclaring_a_struct_in_the_same_scope_reports_exactly_one_fault() {
     let ast = resolve_source("struct Foo {}\nstruct Foo {}\n");
-    assert_eq!(fault_count_matching(&ast, is_type_already_exists_named("Foo")), 1);
+    assert_eq!(
+        fault_count_matching(&ast, is_type_already_exists_named("Foo")),
+        1
+    );
 }
 
 #[test]
@@ -88,11 +95,17 @@ fn distinct_struct_names_report_no_fault() {
 #[test]
 fn redeclaring_an_enum_in_the_same_scope_reports_exactly_one_fault() {
     let ast = resolve_source("enum Foo {\n    A\n}\nenum Foo {\n    B\n}\n");
-    assert_eq!(fault_count_matching(&ast, is_type_already_exists_named("Foo")), 1);
+    assert_eq!(
+        fault_count_matching(&ast, is_type_already_exists_named("Foo")),
+        1
+    );
 }
 
 #[test]
 fn a_struct_and_an_enum_sharing_a_name_reports_exactly_one_fault() {
     let ast = resolve_source("struct Foo {}\nenum Foo {\n    A\n}\n");
-    assert_eq!(fault_count_matching(&ast, is_type_already_exists_named("Foo")), 1);
+    assert_eq!(
+        fault_count_matching(&ast, is_type_already_exists_named("Foo")),
+        1
+    );
 }

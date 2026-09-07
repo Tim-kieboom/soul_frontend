@@ -53,7 +53,10 @@ fn resolve_in_dir(dir: &Path, source: &str) -> AstTree<AstErrorKind> {
     ast
 }
 
-fn fault_count_matching(ast: &AstTree<AstErrorKind>, predicate: impl Fn(&AstErrorKind) -> bool) -> usize {
+fn fault_count_matching(
+    ast: &AstTree<AstErrorKind>,
+    predicate: impl Fn(&AstErrorKind) -> bool,
+) -> usize {
     ast.faults()
         .iter()
         .filter(|fault| predicate(fault.kind()))
@@ -96,7 +99,10 @@ fn importing_a_private_function_reports_a_fault() {
     write_module(&dir, "dep", "secret() {}\n");
     let ast = resolve_in_dir(&dir, "import .dep { secret }\n");
     assert_eq!(
-        fault_count_matching(&ast, |kind| matches!(kind, AstErrorKind::ItemIsPrivate { .. })),
+        fault_count_matching(&ast, |kind| matches!(
+            kind,
+            AstErrorKind::ItemIsPrivate { .. }
+        )),
         1,
         "{:#?}",
         ast.faults()
@@ -109,7 +115,10 @@ fn importing_a_public_function_reports_no_privacy_fault() {
     write_module(&dir, "dep", "pub greet() {}\n");
     let ast = resolve_in_dir(&dir, "import .dep { greet }\n");
     assert_eq!(
-        fault_count_matching(&ast, |kind| matches!(kind, AstErrorKind::ItemIsPrivate { .. })),
+        fault_count_matching(&ast, |kind| matches!(
+            kind,
+            AstErrorKind::ItemIsPrivate { .. }
+        )),
         0,
         "{:#?}",
         ast.faults()

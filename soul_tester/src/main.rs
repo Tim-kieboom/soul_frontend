@@ -6,8 +6,10 @@ use anyhow::Result;
 use ast_model::AstTree;
 use ast_parser::fault::AstErrorKind;
 use ast_run::{AstRequest, to_ast};
+use mir_parser::fault::MirErrorKind;
 use soul_tokenizer::{TokenStream, to_token_stream};
 use soul_utils::{
+    CrateContext,
     char_colors::{DEFAULT, GREEN, RED},
     collections::{
         benchmark::Benchmark,
@@ -53,11 +55,19 @@ fn frontend(benchmark: &mut Benchmark) -> Result<bool> {
         },
     )?;
 
-    for fault in ast.faults().iter() {
+    let mut all_faults = ast.faults().clone().into_unclassified();
+    let fail = all_faults.fails(config::COMPILER_OPTIONS.fail_level);
+
+    if !fail {
+        let mut mir_context = CrateContext::<MirErrorKind>::default();
+        mir_run::to_mir(&ast, benchmark, &mut mir_context, &config::COMPILER_OPTIONS);
+        all_faults.extend_into(mir_context.faults);
+    }
+
+    for fault in all_faults.iter() {
         display_fault(fault, &module_store, &config::PRINT_CONFIGS, &mut stdout())?;
     }
 
-    let fail = ast.faults().fails(config::COMPILER_OPTIONS.fail_level);
     display_benchmark(benchmark, &config::PRINT_CONFIGS, &mut stdout())?;
     Ok(!fail)
 }

@@ -16,6 +16,8 @@ pub mod compiler_options;
 pub mod crate_id;
 pub mod error;
 pub mod fault;
+#[cfg(test)]
+mod fault_tests;
 pub mod ids;
 pub mod intrinsics;
 pub mod linkage;

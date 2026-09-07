@@ -207,7 +207,10 @@ pub enum AstErrorKind {
     ImportedModuleNotFound { path: Box<str> },
 
     #[error("module `{module_name}` does not export `{item}`")]
-    ModuleDoesNotExportItem { module_name: Box<str>, item: Box<str> },
+    ModuleDoesNotExportItem {
+        module_name: Box<str>,
+        item: Box<str>,
+    },
 
     #[error("{kind} '{name}' is private")]
     ItemIsPrivate { kind: Box<str>, name: Box<str> },
