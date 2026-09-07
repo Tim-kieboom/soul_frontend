@@ -12,7 +12,7 @@ use ast_model::{
     statements::{Assignment, Statement, StatementKind},
 };
 use soul_tokenizer::model::TokenKind;
-use soul_utils::{error::SoulResult, fault::Fault, span::Span};
+use soul_utils::{fault::Fault, span::Span};
 
 static ASSIGNMENT_TOKENS: LazyLock<Vec<TokenKind>> = LazyLock::new(|| {
     AssignType::SYMBOL_VALUES
@@ -27,8 +27,13 @@ static ASSIGNMENT_TOKENS: LazyLock<Vec<TokenKind>> = LazyLock::new(|| {
 });
 
 impl<'a, 'f> Parser<'a, 'f> {
-    pub(crate) fn parse_assign_or_expression(&mut self, start_span: Span) -> SoulResult<Statement> {
-        let lvalue = self.parse_expression_id(&ASSIGNMENT_TOKENS)?;
+    pub(crate) fn parse_assign_or_expression(
+        &mut self,
+        start_span: Span,
+    ) -> Result<Statement, crate::fault::AstFault> {
+        let lvalue = self
+            .parse_expression_id(&ASSIGNMENT_TOKENS)
+            .map_err(|err| err.map_kind(Into::into))?;
         if self.current_is_any(STAMENT_END_TOKENS) {
             return Ok(Statement::from_expression(
                 &self.forest.store,
@@ -43,17 +48,18 @@ impl<'a, 'f> Parser<'a, 'f> {
                 AssignType::from_symbool(*val).unwrap()
             }
             _ => {
-                return Err(Fault::error(
-                    format!(
-                        "'{}' should be a assign symbool",
-                        assign_token.kind.display(),
-                    ),
+                return Err(Fault::error_with_kind(
+                    crate::fault::AstErrorKind::ExpectedAssignSymbol {
+                        found: assign_token.kind.display().into_boxed_str(),
+                    },
                     Some(self.span_combine(start_span)),
                 ));
             }
         };
 
-        let rvalue = self.parse_expression_id(STAMENT_END_TOKENS)?;
+        let rvalue = self
+            .parse_expression_id(STAMENT_END_TOKENS)
+            .map_err(|err| err.map_kind(Into::into))?;
         let resolved_rvalue = resolve_assign_type(
             &mut self.forest.store,
             lvalue,

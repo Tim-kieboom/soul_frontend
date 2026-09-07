@@ -89,7 +89,8 @@ impl<'a, 'f> Parser<'a, 'f> {
                     ty: AccessType::AccessThis,
                     optional_map,
                 } => {
-                    self.access_this_expression(&mut left, start_span, optional_map)?;
+                    self.access_this_expression(&mut left, start_span, optional_map)
+                        .map_err(|err| err.map_kind(Into::into))?;
                     continue;
                 }
                 ExpressionOperator::Access {

@@ -59,9 +59,11 @@ impl<'a, 'f> Parser<'a, 'f> {
         left: &mut Expression,
         start_span: Span,
         optional_map: bool,
-    ) -> SoulResult<()> {
+    ) -> Result<(), crate::fault::AstFault> {
         let generics = if self.current_is(&ARROW_LEFT) {
-            self.parse_generic_define().merge_to_result()?
+            self.parse_generic_define()
+                .merge_to_result()
+                .map_err(|err| err.map_kind(Into::into))?
         } else {
             vec![]
         };
@@ -133,10 +135,17 @@ impl<'a, 'f> Parser<'a, 'f> {
 
                 let name = match value.node {
                     ExpressionKind::Variable(VariableExpression { name, .. }) => name,
-                    _ => return Err(Fault::error("should be ident", Some(value.span))),
+                    _ => {
+                        return Err(Fault::error_with_kind(
+                            crate::fault::AstErrorKind::ExpectedIdentBeforeCallArguments,
+                            Some(value.span),
+                        ));
+                    }
                 };
 
-                let arguments = self.parse_arguments()?;
+                let arguments = self
+                    .parse_arguments()
+                    .map_err(|err| err.map_kind(Into::into))?;
                 let ty = self.type_from_ident(name, generics);
                 let ctor = Constructor {
                     id: self.alloc_node(),
@@ -155,8 +164,10 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         if self.current_is_any(&[SQUARE_OPEN, ARRAY]) {
             if !matches!(left.node, ExpressionKind::Variable(_)) {
-                return Err(Fault::error(
-                    format!("`{}` is invalid", Symbol::Dot.as_str()),
+                return Err(Fault::error_with_kind(
+                    crate::fault::AstErrorKind::InvalidSymbolHere {
+                        symbol: Symbol::Dot.as_str().into(),
+                    },
                     Some(self.token().span),
                 ));
             }
@@ -168,7 +179,10 @@ impl<'a, 'f> Parser<'a, 'f> {
                 _ => unreachable!(),
             };
             let collection_type = self.type_from_ident(name, generics);
-            *left = Expression::from_any_array(self.parse_array(Some(collection_type))?);
+            *left = Expression::from_any_array(
+                self.parse_array(Some(collection_type))
+                    .map_err(|err| err.map_kind(Into::into))?,
+            );
             return Ok(());
         }
 
@@ -187,7 +201,9 @@ impl<'a, 'f> Parser<'a, 'f> {
             return Ok(());
         }
 
-        let success = self.try_parse_method_arm(left, start_span, optional_map)?;
+        let success = self
+            .try_parse_method_arm(left, start_span, optional_map)
+            .map_err(|err| err.map_kind(Into::into))?;
         if success {
             return Ok(());
         }
@@ -199,8 +215,8 @@ impl<'a, 'f> Parser<'a, 'f> {
             let name = match value.node {
                 ExpressionKind::Variable(VariableExpression { name, .. }) => name,
                 _ => {
-                    return Err(Fault::error(
-                        "expected identifier after '.'",
+                    return Err(Fault::error_with_kind(
+                        crate::fault::AstErrorKind::ExpectedIdentAfterDot,
                         Some(self.token().span),
                     ));
                 }
@@ -219,10 +235,14 @@ impl<'a, 'f> Parser<'a, 'f> {
             return Ok(());
         }
 
-        let ident = self.try_bump_consume_ident()?;
+        let ident = self
+            .try_bump_consume_ident()
+            .map_err(|err| err.map_kind(Into::into))?;
 
         let generics = if generics.is_empty() && self.current_is(&ARROW_LEFT) {
-            self.parse_generic_define().merge_to_result()?
+            self.parse_generic_define()
+                .merge_to_result()
+                .map_err(|err| err.map_kind(Into::into))?
         } else {
             generics
         };
@@ -251,8 +271,10 @@ impl<'a, 'f> Parser<'a, 'f> {
             &ident,
         ) {
             Ok(call) => Expression::from_function_call(call),
-            Err(TryError::IsNotValue(_)) => self.parse_field_access(value, ident, optional_map)?,
-            Err(TryError::IsErr(err)) => return Err(err),
+            Err(TryError::IsNotValue(_)) => self
+                .parse_field_access(value, ident, optional_map)
+                .map_err(|err| err.map_kind(Into::into))?,
+            Err(TryError::IsErr(err)) => return Err(err.map_kind(Into::into)),
         };
         Ok(())
     }

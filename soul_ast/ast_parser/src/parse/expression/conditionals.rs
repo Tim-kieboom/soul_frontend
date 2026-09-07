@@ -103,7 +103,9 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let scrutinee = self.parse_expression_id(&[CURLY_OPEN])?;
 
-        let arms = self.parse_match_arms()?;
+        let arms = self
+            .parse_match_arms()
+            .map_err(|err| err.map_kind(Into::into))?;
 
         Ok(Expression::new(
             ExpressionKind::Match(Match { arms, scrutinee }),
@@ -153,8 +155,8 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok((None, body))
     }
 
-    fn parse_match_arms(&mut self) -> SoulResult<Vec<MatchArm>> {
-        self.expect(&CURLY_OPEN)?;
+    fn parse_match_arms(&mut self) -> Result<Vec<MatchArm>, crate::fault::AstFault> {
+        self.expect(&CURLY_OPEN).map_err(|err| err.map_kind(Into::into))?;
         let mut arms = Vec::new();
 
         loop {
@@ -181,23 +183,26 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.skip_end_lines();
 
             if !self.current_is(&LAMBDA_ARROW) {
-                return Err(Fault::error(
-                    "expected '=>' in match arm",
+                return Err(Fault::error_with_kind(
+                    crate::fault::AstErrorKind::ExpectedMatchArrow,
                     Some(self.token().span),
                 ));
             }
             self.bump();
 
             let body = if self.current_is(&CURLY_OPEN) {
-                self.parse_block(TypeModifier::Mut)?
+                self.parse_block(TypeModifier::Mut)
+                    .map_err(|err| err.map_kind(Into::into))?
             } else {
                 let span = self.token().span;
-                let expr = self.parse_expression_id(&[
-                    COMMA,
-                    CURLY_CLOSE,
-                    TokenKind::EndFile,
-                    TokenKind::EndLine,
-                ])?;
+                let expr = self
+                    .parse_expression_id(&[
+                        COMMA,
+                        CURLY_CLOSE,
+                        TokenKind::EndFile,
+                        TokenKind::EndLine,
+                    ])
+                    .map_err(|err| err.map_kind(Into::into))?;
                 let statement = self
                     .forest
                     .store

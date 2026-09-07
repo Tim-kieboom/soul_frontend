@@ -342,10 +342,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok(Some(match keyword {
             KeyWord::If => self.parse_if().map_err(|err| err.map_kind(Into::into))?,
             KeyWord::Match => self.parse_match().map_err(|err| err.map_kind(Into::into))?,
-            KeyWord::For => self
-                .parse_for_loop()
-                .map(Expression::from_for)
-                .map_err(|err| err.map_kind(Into::into))?,
+            KeyWord::For => self.parse_for_loop().map(Expression::from_for)?,
 
             KeyWord::True | KeyWord::False => {
                 let value = keyword == KeyWord::True;

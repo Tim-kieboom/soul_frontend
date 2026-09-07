@@ -9,7 +9,6 @@ use soul_utils::{
     collections::try_result::{
         ResultTryErr, ToResult, TryErr, TryError, TryNotValue, TryOk, TryResult,
     },
-    error::SoulResult,
     fault::Fault,
     soul_names::Symbol,
     span::Span,
@@ -24,11 +23,16 @@ use crate::{
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
-    pub(super) fn try_parse_from_mut(&mut self, start_span: Span) -> SoulResult<Statement> {
-        self.expect(&MUT)?;
+    pub(super) fn try_parse_from_mut(
+        &mut self,
+        start_span: Span,
+    ) -> Result<Statement, crate::fault::AstFault> {
+        self.expect(&MUT).map_err(|err| err.map_kind(Into::into))?;
         let modifier = TypeModifier::Mut;
 
-        let name = self.try_bump_consume_ident()?;
+        let name = self
+            .try_bump_consume_ident()
+            .map_err(|err| err.map_kind(Into::into))?;
         let pattern = if name.as_str() == "_" {
             VarPattern::Discard
         } else {
@@ -41,7 +45,11 @@ impl<'a, 'f> Parser<'a, 'f> {
         let mut ty = None;
         if self.current_is(&COLON) {
             self.bump();
-            ty = Some(self.try_parse_type().merge_to_result()?);
+            ty = Some(
+                self.try_parse_type()
+                    .merge_to_result()
+                    .map_err(|err| err.map_kind(Into::into))?,
+            );
         }
 
         if self.current_is_any(STAMENT_END_TOKENS) {
@@ -69,7 +77,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         self.bump();
-        let value = self.parse_expression_id(STAMENT_END_TOKENS)?;
+        let value = self
+            .parse_expression_id(STAMENT_END_TOKENS)
+            .map_err(|err| err.map_kind(Into::into))?;
         let variable = Variable::new_const(self.alloc_node(), pattern, ty, Some(value))
             .apply_modifier(modifier);
 
@@ -79,23 +89,31 @@ impl<'a, 'f> Parser<'a, 'f> {
         ))
     }
 
-    pub(super) fn try_parse_from_const(&mut self, start_span: Span) -> SoulResult<Statement> {
-        self.expect(&CONST)?;
+    pub(super) fn try_parse_from_const(
+        &mut self,
+        start_span: Span,
+    ) -> Result<Statement, crate::fault::AstFault> {
+        self.expect(&CONST).map_err(|err| err.map_kind(Into::into))?;
         let modifier = TypeModifier::Const;
         const IS_CONST: bool = true;
 
         if self.current_is(&ROUND_OPEN) {
-            let pattern = self.parse_tuple_pattern()?;
+            let pattern = self
+                .parse_tuple_pattern()
+                .map_err(|err| err.map_kind(Into::into))?;
             return self.parse_pattern_declaration(pattern, modifier, start_span);
         }
 
         if self.current_is(&CURLY_OPEN) {
             return self
                 .try_parse_named_tuple_or_block(modifier, start_span)
-                .merge_to_result();
+                .merge_to_result()
+                .map_err(|err| err.map_kind(Into::into));
         }
 
-        let name = self.try_bump_consume_ident()?;
+        let name = self
+            .try_bump_consume_ident()
+            .map_err(|err| err.map_kind(Into::into))?;
         match &self.token().kind {
             &CURLY_OPEN => self.try_parse_constructor_declaration(name, modifier, start_span),
             &ROUND_OPEN | &ARROW_LEFT => {
@@ -106,15 +124,15 @@ impl<'a, 'f> Parser<'a, 'f> {
                     name,
                 ) {
                     Ok(val) => Ok(Statement::from_function(val)),
-                    Err(TryError::IsErr(err)) => Err(err.map_kind(|kind| {
-                        soul_utils::fault::UnclassifiedKind(kind.to_string().into_boxed_str())
-                    })),
-                    Err(TryError::IsNotValue(err)) => Err(err.fault),
+                    Err(TryError::IsErr(err)) => Err(err),
+                    Err(TryError::IsNotValue(err)) => Err(err.fault.map_kind(Into::into)),
                 }
             }
             TokenKind::Symbol(Symbol::DoubleColon) => {
                 self.bump();
-                let value = self.parse_expression_id(STAMENT_END_TOKENS)?;
+                let value = self
+                    .parse_expression_id(STAMENT_END_TOKENS)
+                    .map_err(|err| err.map_kind(Into::into))?;
                 Ok(Statement::new_variable(
                     Variable {
                         id: self.alloc_node(),
@@ -145,7 +163,9 @@ impl<'a, 'f> Parser<'a, 'f> {
                     return Err(self.invalid_assign());
                 }
                 self.bump();
-                let value = self.parse_expression_id(STAMENT_END_TOKENS)?;
+                let value = self
+                    .parse_expression_id(STAMENT_END_TOKENS)
+                    .map_err(|err| err.map_kind(Into::into))?;
                 Ok(Statement::new_variable(
                     Variable {
                         id: self.alloc_node(),
@@ -166,12 +186,12 @@ impl<'a, 'f> Parser<'a, 'f> {
         &mut self,
         modifier: TypeModifier,
         start_span: Span,
-    ) -> TryResult<Statement, Fault> {
+    ) -> TryResult<Statement, Fault, crate::fault::AstErrorKind> {
         let saved = self.tokens.current_position();
 
         match self.try_parse_named_tuple(start_span, modifier) {
             Ok(val) => return TryOk(val),
-            Err(TryError::IsErr(err)) => return TryErr(err),
+            Err(TryError::IsErr(err)) => return TryErr(err.map_kind(Into::into)),
             Err(TryError::IsNotValue(())) => (),
         }
 
@@ -233,32 +253,35 @@ impl<'a, 'f> Parser<'a, 'f> {
         type_name: Ident,
         modifier: TypeModifier,
         start_span: Span,
-    ) -> SoulResult<Statement> {
-        let pattern = self.parse_constructor_pattern(type_name)?;
+    ) -> Result<Statement, crate::fault::AstFault> {
+        let pattern = self
+            .parse_constructor_pattern(type_name)
+            .map_err(|err| err.map_kind(Into::into))?;
         let assign = match &self.token().kind {
             TokenKind::Symbol(val) if AssignType::from_symbool(*val).is_some() => {
                 AssignType::from_symbool(*val).unwrap()
             }
             _ => {
-                return Err(Fault::error(
-                    "expected '=' or ':=' after constructor pattern",
+                return Err(Fault::error_with_kind(
+                    crate::fault::AstErrorKind::ExpectedAssignAfterConstructorPattern,
                     Some(self.token().span),
                 ));
             }
         };
 
         if assign != AssignType::Assign && assign != AssignType::Declaration {
-            return Err(Fault::error(
-                format!(
-                    "'{}' is not valid for variable declaration (can use ['=', ':='])",
-                    assign.as_str()
-                ),
+            return Err(Fault::error_with_kind(
+                crate::fault::AstErrorKind::InvalidAssignOperatorForDeclaration {
+                    assign_op: assign.as_str().into(),
+                },
                 Some(self.token().span),
             ));
         }
 
         self.bump();
-        let value = self.parse_expression_id(STAMENT_END_TOKENS)?;
+        let value = self
+            .parse_expression_id(STAMENT_END_TOKENS)
+            .map_err(|err| err.map_kind(Into::into))?;
         Ok(Statement::new_variable(
             Variable {
                 id: self.alloc_node(),
@@ -278,31 +301,32 @@ impl<'a, 'f> Parser<'a, 'f> {
         pattern: VarPattern,
         modifier: TypeModifier,
         start_span: Span,
-    ) -> SoulResult<Statement> {
+    ) -> Result<Statement, crate::fault::AstFault> {
         let assign = match &self.token().kind {
             TokenKind::Symbol(val) if AssignType::from_symbool(*val).is_some() => {
                 AssignType::from_symbool(*val).unwrap()
             }
             _ => {
-                return Err(Fault::error(
-                    "expected '=' or ':=' after destructuring pattern",
+                return Err(Fault::error_with_kind(
+                    crate::fault::AstErrorKind::ExpectedAssignAfterDestructuringPattern,
                     Some(self.token().span),
                 ));
             }
         };
 
         if assign != AssignType::Assign && assign != AssignType::Declaration {
-            return Err(Fault::error(
-                format!(
-                    "'{}' is not valid for variable declaration (can use ['=', ':='])",
-                    assign.as_str()
-                ),
+            return Err(Fault::error_with_kind(
+                crate::fault::AstErrorKind::InvalidAssignOperatorForDeclaration {
+                    assign_op: assign.as_str().into(),
+                },
                 Some(self.token().span),
             ));
         }
 
         self.bump();
-        let value = self.parse_expression_id(STAMENT_END_TOKENS)?;
+        let value = self
+            .parse_expression_id(STAMENT_END_TOKENS)
+            .map_err(|err| err.map_kind(Into::into))?;
         Ok(Statement::new_variable(
             Variable {
                 id: self.alloc_node(),
@@ -316,9 +340,11 @@ impl<'a, 'f> Parser<'a, 'f> {
         ))
     }
 
-    fn invalid_assign(&self) -> Fault {
-        Fault::error(
-            format!("'{}' should be '=' or ':='", self.token().kind.display(),),
+    fn invalid_assign(&self) -> crate::fault::AstFault {
+        Fault::error_with_kind(
+            crate::fault::AstErrorKind::InvalidAssignSymbol {
+                found: self.token().kind.display().into_boxed_str(),
+            },
             Some(self.token().span),
         )
     }

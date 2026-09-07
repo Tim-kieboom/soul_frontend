@@ -71,6 +71,36 @@ pub enum AstErrorKind {
 
     #[error("expected block after keyword")]
     ExpectedBlockAfterKeyword,
+
+    #[error("expected '=>' in match arm")]
+    ExpectedMatchArrow,
+
+    #[error("`{symbol}` is invalid")]
+    InvalidSymbolHere { symbol: Box<str> },
+
+    #[error("should be ident")]
+    ExpectedIdentBeforeCallArguments,
+
+    #[error("expected identifier after '.'")]
+    ExpectedIdentAfterDot,
+
+    #[error("'{found}' should be a assign symbool")]
+    ExpectedAssignSymbol { found: Box<str> },
+
+    #[error("expected ',' or '}}' in import list")]
+    ExpectedCommaOrCurlyCloseInImportList,
+
+    #[error("could not pop path")]
+    CouldNotPopImportPath,
+
+    #[error("'{found}' should be '=' or ':='")]
+    InvalidAssignSymbol { found: Box<str> },
+
+    #[error("expected '=' or ':=' after constructor pattern")]
+    ExpectedAssignAfterConstructorPattern,
+
+    #[error("expected '=' or ':=' after destructuring pattern")]
+    ExpectedAssignAfterDestructuringPattern,
 }
 
 impl From<UnclassifiedKind> for AstErrorKind {

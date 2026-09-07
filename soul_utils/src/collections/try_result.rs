@@ -59,11 +59,14 @@ pub trait ToResult<T> {
     fn merge_to_result(self) -> SoulResult<T>;
 }
 
-impl<T> ToResult<T> for TryResult<T, Fault> {
+impl<T, K> ToResult<T> for TryResult<T, Fault, K>
+where
+    UnclassifiedKind: From<K>,
+{
     fn merge_to_result(self) -> SoulResult<T> {
         match self {
             Ok(val) => Ok(val),
-            Err(TryError::IsErr(err)) => Err(err),
+            Err(TryError::IsErr(err)) => Err(err.map_kind(Into::into)),
             Err(TryError::IsNotValue(err)) => Err(err),
         }
     }

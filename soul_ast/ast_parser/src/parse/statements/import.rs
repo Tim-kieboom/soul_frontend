@@ -3,8 +3,7 @@ use std::path::PathBuf;
 use ast_model::statements::{Import, ImportItem, ImportKind, ImportPath, Statement, StatementKind};
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
-    Ident, collections::soul_import_path::SoulImportPath, error::SoulResult, fault::Fault,
-    soul_names::Symbol,
+    Ident, collections::soul_import_path::SoulImportPath, fault::Fault, soul_names::Symbol,
 };
 
 use crate::{
@@ -13,12 +12,12 @@ use crate::{
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
-    pub(super) fn parse_import(&mut self) -> SoulResult<Statement> {
+    pub(super) fn parse_import(&mut self) -> Result<Statement, crate::fault::AstFault> {
         let start_span = self.token().span;
 
         let mut spans = vec![];
         let mut paths = vec![];
-        self.expect(&IMPORT)?;
+        self.expect(&IMPORT).map_err(|err| err.map_kind(Into::into))?;
         if self.current_is(&ROUND_OPEN) {
             self.bump();
             self.skip_end_lines();
@@ -34,7 +33,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 self.skip_end_lines();
             }
 
-            self.expect(&ROUND_CLOSE)?;
+            self.expect(&ROUND_CLOSE).map_err(|err| err.map_kind(Into::into))?;
         } else {
             let span = self.token().span;
             paths.push(self.inner_parse_import()?);
@@ -53,13 +52,14 @@ impl<'a, 'f> Parser<'a, 'f> {
         ))
     }
 
-    fn inner_parse_import(&mut self) -> SoulResult<ImportPath> {
+    fn inner_parse_import(&mut self) -> Result<ImportPath, crate::fault::AstFault> {
         let (path, lib_name) = self.parse_import_path()?;
         let kind = match &self.token().kind {
             &CURLY_OPEN => {
                 self.bump();
                 let (this, this_alias, items) = self.parse_import_items()?;
-                self.expect(&CURLY_CLOSE)?;
+                self.expect(&CURLY_CLOSE)
+                    .map_err(|err| err.map_kind(Into::into))?;
                 ImportKind::Items {
                     has_this: this,
                     this_alias,
@@ -73,7 +73,9 @@ impl<'a, 'f> Parser<'a, 'f> {
             TokenKind::Ident(ident) => match ident.as_str() {
                 AS_STR => {
                     self.bump();
-                    let alias = self.try_bump_consume_ident()?;
+                    let alias = self
+                        .try_bump_consume_ident()
+                        .map_err(|err| err.map_kind(Into::into))?;
                     ImportKind::Alias(alias)
                 }
                 _ => ImportKind::Module,
@@ -88,22 +90,30 @@ impl<'a, 'f> Parser<'a, 'f> {
         })
     }
 
-    fn parse_import_items(&mut self) -> SoulResult<(bool, Option<Ident>, Vec<ImportItem>)> {
+    fn parse_import_items(
+        &mut self,
+    ) -> Result<(bool, Option<Ident>, Vec<ImportItem>), crate::fault::AstFault> {
         let mut this = false;
         let mut items = vec![];
         let mut this_alias = None;
         loop {
-            let name = self.try_bump_consume_ident()?;
+            let name = self
+                .try_bump_consume_ident()
+                .map_err(|err| err.map_kind(Into::into))?;
             if name.as_str() == "this" {
                 this = true;
                 if self.current_is(&AS) {
                     self.bump();
-                    let alias = self.try_bump_consume_ident()?;
+                    let alias = self
+                        .try_bump_consume_ident()
+                        .map_err(|err| err.map_kind(Into::into))?;
                     this_alias = Some(alias);
                 }
             } else if self.current_is(&AS) {
                 self.bump();
-                let alias = self.try_bump_consume_ident()?;
+                let alias = self
+                    .try_bump_consume_ident()
+                    .map_err(|err| err.map_kind(Into::into))?;
                 items.push(ImportItem::Alias { name, alias })
             } else {
                 items.push(ImportItem::Normal(name))
@@ -117,8 +127,8 @@ impl<'a, 'f> Parser<'a, 'f> {
                     break;
                 }
                 _ => {
-                    return Err(Fault::error(
-                        "expected ',' or '}' in import list".to_string(),
+                    return Err(Fault::error_with_kind(
+                        crate::fault::AstErrorKind::ExpectedCommaOrCurlyCloseInImportList,
                         Some(self.token().span),
                     ));
                 }
@@ -127,7 +137,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok((this, this_alias, items))
     }
 
-    fn parse_import_path(&mut self) -> SoulResult<(SoulImportPath, Option<String>)> {
+    fn parse_import_path(
+        &mut self,
+    ) -> Result<(SoulImportPath, Option<String>), crate::fault::AstFault> {
         const IS_EXTERNAL: bool = true;
         const IS_INTERNAL: bool = false;
         const CRATE: TokenKind = TokenKind::Keyword(KeyWord::Crate);
@@ -143,7 +155,8 @@ impl<'a, 'f> Parser<'a, 'f> {
                 path = SoulImportPath::new(current_path, IS_INTERNAL);
                 path.set_absolute();
                 self.bump();
-                self.expect(&SEPARATOR)?;
+                self.expect(&SEPARATOR)
+                    .map_err(|err| err.map_kind(Into::into))?;
             }
             &SEPARATOR => {
                 let mut current_path = self.current_path().to_path_buf();
@@ -152,10 +165,14 @@ impl<'a, 'f> Parser<'a, 'f> {
                 while self.current_is(&PREV_SUPER) {
                     self.bump();
                     if !current_path.pop() {
-                        return Err(Fault::error("could not pop path", Some(self.token().span)));
+                        return Err(Fault::error_with_kind(
+                            crate::fault::AstErrorKind::CouldNotPopImportPath,
+                            Some(self.token().span),
+                        ));
                     }
 
-                    self.expect(&SEPARATOR)?;
+                    self.expect(&SEPARATOR)
+                        .map_err(|err| err.map_kind(Into::into))?;
                 }
 
                 path = SoulImportPath::new(current_path, IS_INTERNAL);
@@ -176,7 +193,9 @@ impl<'a, 'f> Parser<'a, 'f> {
                 return Ok((path, lib_name));
             }
 
-            let ident = self.try_bump_consume_ident()?;
+            let ident = self
+                .try_bump_consume_ident()
+                .map_err(|err| err.map_kind(Into::into))?;
             path.push(ident.as_str());
 
             if !self.current_is(&SEPARATOR) {
@@ -191,7 +210,8 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         if !self.current_is(&TokenKind::EndFile) {
-            self.expect(&TokenKind::EndLine)?;
+            self.expect(&TokenKind::EndLine)
+                .map_err(|err| err.map_kind(Into::into))?;
         }
 
         Ok((path, lib_name))

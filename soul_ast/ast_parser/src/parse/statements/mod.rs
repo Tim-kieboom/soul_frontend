@@ -145,7 +145,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         if let STAR = self.token().kind {
-            return self.parse_assign_or_expression(start_span);
+            return self
+                .parse_assign_or_expression(start_span)
+                .map_err(|err| err.map_kind(Into::into));
         }
 
         match self.parse_possible_statement(start_span) {
@@ -417,6 +419,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             Err(_) => {
                 self.goto(position);
                 self.parse_assign_or_expression(start_span)
+                    .map_err(|err| err.map_kind(Into::into))
             }
         }
     }
