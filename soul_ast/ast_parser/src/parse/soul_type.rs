@@ -31,7 +31,13 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.goto(begin);
         }
 
-        result
+        match result {
+            Ok(val) => TryOk(val),
+            Err(TryError::IsErr(err)) => TryErr(err.map_kind(|kind| {
+                soul_utils::fault::UnclassifiedKind(kind.to_string().into_boxed_str())
+            })),
+            Err(TryError::IsNotValue(err)) => TryNotValue(err),
+        }
     }
 
     pub(crate) fn type_from_ident(&mut self, ident: Ident, generics: Vec<SoulType>) -> SoulType {
@@ -50,7 +56,10 @@ impl<'a, 'f> Parser<'a, 'f> {
         })
     }
 
-    fn parse_token_type(&mut self, type_val: Types) -> TryResult<SoulType, Fault> {
+    fn parse_token_type(
+        &mut self,
+        type_val: Types,
+    ) -> TryResult<SoulType, Fault, crate::fault::AstErrorKind> {
         self.bump();
 
         let prim = match type_val {
@@ -88,13 +97,16 @@ impl<'a, 'f> Parser<'a, 'f> {
         TryOk(SoulType::Primitive(prim))
     }
 
-    fn parse_raw_ptr(&mut self) -> SoulResult<SoulType> {
+    fn parse_raw_ptr(&mut self) -> Result<SoulType, crate::fault::AstFault> {
         let inner = if self.current_is(&ARROW_LEFT) {
-            let mut generics = self.parse_generic_define().merge_to_result()?;
+            let mut generics = match self.parse_generic_define().merge_to_result() {
+                Ok(val) => val,
+                Err(err) => return Err(err.map_kind(Into::into)),
+            };
 
             let Some(inner) = generics.pop() else {
-                return Err(Fault::error(
-                    "RawPtr expects exactly one generic type parameter, e.g. `RawPtr<int>`",
+                return Err(Fault::error_with_kind(
+                    crate::fault::AstErrorKind::RawPtrExpectsOneGeneric,
                     Some(self.token().span),
                 ));
             };
@@ -107,13 +119,16 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok(SoulType::RawPtr(inner))
     }
 
-    fn parse_res(&mut self) -> SoulResult<SoulType> {
+    fn parse_res(&mut self) -> Result<SoulType, crate::fault::AstFault> {
         if self.current_is(&ARROW_LEFT) {
-            let mut generics = self.parse_generic_define().merge_to_result()?;
+            let mut generics = match self.parse_generic_define().merge_to_result() {
+                Ok(val) => val,
+                Err(err) => return Err(err.map_kind(Into::into)),
+            };
 
             if generics.len() > 2 {
-                return Err(Fault::error(
-                    "Res expects at most two generic type parameters, e.g. `Res<int, str>`",
+                return Err(Fault::error_with_kind(
+                    crate::fault::AstErrorKind::ResExpectsAtMostTwoGenerics,
                     Some(self.token().span),
                 ));
             }
@@ -138,13 +153,13 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
     }
 
-    fn inner_parse_type(&mut self) -> TryResult<SoulType, Fault> {
+    fn inner_parse_type(&mut self) -> TryResult<SoulType, Fault, crate::fault::AstErrorKind> {
         let wrapper = self.get_type_wrapper()?;
         let mut ty = match self.get_base_type() {
             Ok(ty) => ty,
             Err(TryError::IsNotValue(_)) if !wrapper.is_empty() => {
-                return TryErr(Fault::error(
-                    "expected element type after array size, e.g. `[64]char`",
+                return TryErr(Fault::error_with_kind(
+                    crate::fault::AstErrorKind::ArrayMissingElementType,
                     Some(self.token().span),
                 ));
             }
@@ -189,12 +204,16 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok(ty)
     }
 
-    fn get_base_type(&mut self) -> TryResult<SoulType, Fault> {
+    fn get_base_type(&mut self) -> TryResult<SoulType, Fault, crate::fault::AstErrorKind> {
         const NONE_STR: &str = PrimitiveTypes::None.as_str();
 
         if self.current_is(&TokenKind::Keyword(KeyWord::Impl)) {
             self.bump();
-            let inner = self.try_parse_type()?;
+            let inner = match self.try_parse_type() {
+                Ok(val) => val,
+                Err(TryError::IsErr(err)) => return TryErr(err.map_kind(Into::into)),
+                Err(TryError::IsNotValue(err)) => return TryNotValue(err),
+            };
             return TryOk(SoulType::ImplTrait(Box::new(inner)));
         }
 
@@ -229,7 +248,11 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         let generics = if self.current_is(&ARROW_LEFT) {
-            self.parse_generic_define()?
+            match self.parse_generic_define() {
+                Ok(val) => val,
+                Err(TryError::IsErr(err)) => return TryErr(err.map_kind(Into::into)),
+                Err(TryError::IsNotValue(err)) => return TryNotValue(err),
+            }
         } else {
             vec![]
         };
@@ -240,7 +263,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         }))
     }
 
-    fn get_type_wrapper(&mut self) -> TryResult<Vec<ParseWrappers>, Fault> {
+    fn get_type_wrapper(&mut self) -> TryResult<Vec<ParseWrappers>, Fault, crate::fault::AstErrorKind> {
         let mut wrappers = vec![];
         loop {
             let possible_wrap = match self.token().kind {
@@ -279,7 +302,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         TryOk(wrappers)
     }
 
-    fn get_array_type_wrapper(&mut self) -> TryResult<ArrayKind, Fault> {
+    fn get_array_type_wrapper(&mut self) -> TryResult<ArrayKind, Fault, crate::fault::AstErrorKind> {
         self.bump();
 
         let kind = if self.current_is_ident("_") {

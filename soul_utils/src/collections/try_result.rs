@@ -69,15 +69,17 @@ impl<T> ToResult<T> for TryResult<T, Fault> {
     }
 }
 
-/// Converts `Result<T, Fault<UnclassifiedKind>>` (the output of the parser's
-/// shared, not-yet-migrated utility methods) into `TryResult<T, R, K>` for
-/// any migrated `K`, wrapping the unclassified fault into `K`'s fallback
-/// variant via `From<UnclassifiedKind>`.
-impl<T, R, K> ResultTryErr<T, R, K> for Result<T, Fault>
+/// Converts `Result<T, Fault<K1>>` into `TryResult<T, R, K2>` for any target
+/// `K2` that `K1` can convert into (including `K1 == K2`, via the reflexive
+/// `From` impl). This is what lets a not-yet-migrated utility method
+/// returning `Fault<UnclassifiedKind>` plug into a migrated function's
+/// `AstErrorKind`-typed `TryResult` via `.try_err()`, and what lets an
+/// already-migrated method's `Fault<K>` pass through unchanged.
+impl<T, R, K1, K2> ResultTryErr<T, R, K2> for Result<T, Fault<K1>>
 where
-    K: From<UnclassifiedKind>,
+    K2: From<K1>,
 {
-    fn try_err(self) -> TryResult<T, R, K> {
+    fn try_err(self) -> TryResult<T, R, K2> {
         match self {
             Ok(val) => TryOk(val),
             Err(err) => TryErr(err.map_kind(Into::into)),

@@ -4,7 +4,7 @@ use ast_model::{
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
-    collections::try_result::{ResultMapNotValue, ToResult},
+    collections::try_result::{ToResult, TryError},
     error::SoulResult,
     span::Span,
 };
@@ -140,10 +140,21 @@ impl<'a, 'f> Parser<'a, 'f> {
             let is_const = self.try_bump_const().is_some();
             let name = self.try_bump_consume_ident()?;
             methods.push(
-                self.try_parse_function_declaration_id(start_span, method_type, is_const, name)
-                    .map_try_not_value(|err| err.fault)
-                    .merge_to_result()?
-                    .value,
+                match self.try_parse_function_declaration_id(
+                    start_span,
+                    method_type,
+                    is_const,
+                    name,
+                ) {
+                    Ok(val) => val,
+                    Err(TryError::IsErr(err)) => {
+                        return Err(err.map_kind(|kind| {
+                            soul_utils::fault::UnclassifiedKind(kind.to_string().into_boxed_str())
+                        }));
+                    }
+                    Err(TryError::IsNotValue(err)) => return Err(err.fault),
+                }
+                .value,
             );
             return Ok(ImplBlock {
                 impl_trait,
@@ -161,10 +172,21 @@ impl<'a, 'f> Parser<'a, 'f> {
             let is_const = self.try_bump_const().is_some();
             let name = self.try_bump_consume_ident()?;
             methods.push(
-                self.try_parse_function_declaration_id(start_span, method_type, is_const, name)
-                    .map_try_not_value(|err| err.fault)
-                    .merge_to_result()?
-                    .value,
+                match self.try_parse_function_declaration_id(
+                    start_span,
+                    method_type,
+                    is_const,
+                    name,
+                ) {
+                    Ok(val) => val,
+                    Err(TryError::IsErr(err)) => {
+                        return Err(err.map_kind(|kind| {
+                            soul_utils::fault::UnclassifiedKind(kind.to_string().into_boxed_str())
+                        }));
+                    }
+                    Err(TryError::IsNotValue(err)) => return Err(err.fault),
+                }
+                .value,
             );
         }
         self.expect(&CURLY_CLOSE)?;
@@ -201,9 +223,12 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let is_const = self.try_bump_const().is_some();
         let name = self.try_bump_consume_ident()?;
-        self.try_parse_function_declaration_id(start_span, ty, is_const, name)
-            .map(|spanned| Methode::new(spanned.value, is_public))
-            .map_try_not_value(|err| err.fault)
-            .merge_to_result()
+        match self.try_parse_function_declaration_id(start_span, ty, is_const, name) {
+            Ok(spanned) => Ok(Methode::new(spanned.value, is_public)),
+            Err(TryError::IsErr(err)) => Err(err.map_kind(|kind| {
+                soul_utils::fault::UnclassifiedKind(kind.to_string().into_boxed_str())
+            })),
+            Err(TryError::IsNotValue(err)) => Err(err.fault),
+        }
     }
 }

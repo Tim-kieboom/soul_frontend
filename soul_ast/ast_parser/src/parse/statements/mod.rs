@@ -444,7 +444,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.current.this_type = saved;
         match result {
             Ok(spanned) => Ok(Statement::from_function(spanned)),
-            Err(TryError::IsErr(fault)) => Err(fault),
+            Err(TryError::IsErr(fault)) => Err(fault.map_kind(|kind| {
+                soul_utils::fault::UnclassifiedKind(kind.to_string().into_boxed_str())
+            })),
             Err(TryError::IsNotValue(err)) => Err(err.fault),
         }
     }

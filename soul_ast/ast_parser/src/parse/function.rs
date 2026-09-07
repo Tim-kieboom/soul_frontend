@@ -12,8 +12,8 @@ use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
     FunctionId, Ident, TypeModifier,
     collections::try_result::{
-        ResultMapNotValue, ResultTryErr, ResultTryNotValue, ToResult, TryErr, TryError,
-        TryNotValue, TryOk, TryResult,
+        ResultTryErr, ResultTryNotValue, ToResult, TryErr, TryError, TryNotValue, TryOk,
+        TryResult,
     },
     error::SoulResult,
     fault::Fault,
@@ -43,7 +43,7 @@ impl FuncError {
     }
 }
 
-type FuncResult<T> = TryResult<T, Box<FuncError>>;
+type FuncResult<T, K = soul_utils::fault::UnclassifiedKind> = TryResult<T, Box<FuncError>, K>;
 impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_any_function(&mut self) -> SoulResult<Statement> {
         let is_const = self.current_is(&CONST);
@@ -61,7 +61,9 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         match result {
             Ok(val) => Ok(Statement::from_function(val)),
-            Err(TryError::IsErr(err)) => Err(err),
+            Err(TryError::IsErr(err)) => Err(err.map_kind(|kind| {
+                soul_utils::fault::UnclassifiedKind(kind.to_string().into_boxed_str())
+            })),
             Err(TryError::IsNotValue(err)) => self
                 .try_parse_function_call(span, None, &err.ident)
                 .merge_to_result()
@@ -175,7 +177,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         methode_type: &SoulType,
         is_const: bool,
         name: Ident,
-    ) -> FuncResult<Spanned<FunctionId>> {
+    ) -> FuncResult<Spanned<FunctionId>, crate::fault::AstErrorKind> {
         self.try_parse_function_declaration(start_span, methode_type, is_const, name)
             .map(|spanned| {
                 spanned.map(|function| {
@@ -192,7 +194,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         methode_type: &SoulType,
         is_const: bool,
         name: Ident,
-    ) -> FuncResult<Spanned<Function>> {
+    ) -> FuncResult<Spanned<Function>, crate::fault::AstErrorKind> {
         let position = self.tokens.current_position();
         match self.inner_function_declaration(start_span, methode_type, name, is_const, None) {
             Ok(spanned) => Ok(spanned),
@@ -203,17 +205,19 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
     }
 
-    pub(crate) fn parse_extern_function(&mut self) -> SoulResult<Statement> {
-        self.expect(&TokenKind::Keyword(KeyWord::Extern))?;
+    pub(crate) fn parse_extern_function(
+        &mut self,
+    ) -> Result<Statement, crate::fault::AstFault> {
+        self.expect(&TokenKind::Keyword(KeyWord::Extern))
+            .map_err(|err| err.map_kind(Into::into))?;
 
         let string_literal = match &self.token().kind {
             TokenKind::Literal(TokenLiteral::String(val)) => val,
             other => {
-                return Err(Fault::error(
-                    format!(
-                        "expected string_literal of language name but got {}",
-                        other.display()
-                    ),
+                return Err(Fault::error_with_kind(
+                    crate::fault::AstErrorKind::ExpectedLanguageStringLiteral {
+                        found: other.display().into_boxed_str(),
+                    },
                     Some(self.token().span),
                 ));
             }
@@ -223,10 +227,10 @@ impl<'a, 'f> Parser<'a, 'f> {
             StringLiteral::Str(val) => val,
             other => {
                 let tag = other.to_tag().expect("is not normal so should have tag");
-                return Err(Fault::error(
-                    format!(
-                        "expected normal string_literal of language name but got {tag:?} string_literl",
-                    ),
+                return Err(Fault::error_with_kind(
+                    crate::fault::AstErrorKind::ExpectedNormalLanguageStringLiteral {
+                        tag: format!("{tag:?}").into_boxed_str(),
+                    },
                     Some(self.token().span),
                 ));
             }
@@ -235,15 +239,20 @@ impl<'a, 'f> Parser<'a, 'f> {
         let external = match normal_string.as_str() {
             "C" => ExternLanguage::C,
             _ => {
-                return Err(Fault::error(
-                    format!("language {normal_string} is not supported"),
+                return Err(Fault::error_with_kind(
+                    crate::fault::AstErrorKind::UnsupportedExternLanguage {
+                        language: normal_string.as_str().into(),
+                    },
                     Some(self.token().span),
                 ));
             }
         };
 
         self.bump();
-        let name = self.try_bump_consume_ident()?;
+        let name = match self.try_bump_consume_ident() {
+            Ok(val) => val,
+            Err(err) => return Err(err.map_kind(Into::into)),
+        };
 
         let span = self.token().span;
         match self.try_parse_function_signature(span, &SoulType::None, name, false, Some(external))
@@ -257,7 +266,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 Ok(Statement::from_external_function(Spanned::new(id, span)))
             }
             Err(TryError::IsErr(err)) => Err(err),
-            Err(TryError::IsNotValue(err)) => Err(err.fault),
+            Err(TryError::IsNotValue(err)) => Err(err.fault.map_kind(Into::into)),
         }
     }
 
@@ -268,7 +277,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         name: Ident,
         is_const: bool,
         external: Option<ExternLanguage>,
-    ) -> FuncResult<Box<Spanned<InnerFunctionSignature>>> {
+    ) -> FuncResult<Box<Spanned<InnerFunctionSignature>>, crate::fault::AstErrorKind> {
         let begin_position = self.tokens.current_position();
         let result =
             self.inner_parse_function_signature(start_span, methode_type, name, is_const, external);
@@ -282,7 +291,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     pub(crate) fn try_parse_parameters(
         &mut self,
-    ) -> TryResult<(Vec<Parameter>, FunctionThisKind), Fault> {
+    ) -> TryResult<(Vec<Parameter>, FunctionThisKind), Fault, crate::fault::AstErrorKind> {
         let begin = self.tokens.current_position();
 
         let result = self.inner_parameters();
@@ -358,11 +367,21 @@ impl<'a, 'f> Parser<'a, 'f> {
         match self.token().kind {
             ROUND_OPEN => {
                 let name = Ident::new(CONTRUCTOR_STR, start_span);
-                let mut methode = self
-                    .try_parse_function_declaration(start_span, method_type, is_const, name)
-                    .map_try_not_value(|err| err.fault)
-                    .merge_to_result()?
-                    .value;
+                let mut methode = match self.try_parse_function_declaration(
+                    start_span,
+                    method_type,
+                    is_const,
+                    name,
+                ) {
+                    Ok(val) => val,
+                    Err(TryError::IsErr(err)) => {
+                        return Err(err.map_kind(|kind| {
+                            soul_utils::fault::UnclassifiedKind(kind.to_string().into_boxed_str())
+                        }));
+                    }
+                    Err(TryError::IsNotValue(err)) => return Err(err.fault),
+                }
+                .value;
 
                 let signature = &mut methode.signature.value;
                 if signature.function_kind != FunctionThisKind::Static {
@@ -460,7 +479,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         name: Ident,
         is_const: bool,
         external: Option<ExternLanguage>,
-    ) -> FuncResult<Box<Spanned<InnerFunctionSignature>>> {
+    ) -> FuncResult<Box<Spanned<InnerFunctionSignature>>, crate::fault::AstErrorKind> {
         if !self.current_is_any(&[ROUND_OPEN, ARROW_LEFT]) {
             return TryNotValue(FuncError::new(
                 name,
@@ -474,7 +493,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         };
 
         if !self.current_is(&ROUND_OPEN) {
-            return TryErr(self.get_expect_error(&ROUND_OPEN));
+            return TryErr(self.get_expect_error(&ROUND_OPEN).map_kind(Into::into));
         }
 
         let (parameters, function_kind) = match self.try_parse_parameters() {
@@ -488,7 +507,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 self.bump();
                 match self.try_parse_type() {
                     Ok(val) => val,
-                    Err(TryError::IsErr(err)) => return TryErr(err),
+                    Err(TryError::IsErr(err)) => return TryErr(err.map_kind(Into::into)),
                     Err(TryError::IsNotValue(err)) => {
                         return TryNotValue(FuncError::new(name, err));
                     }
@@ -570,7 +589,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         name: Ident,
         is_const: bool,
         external: Option<ExternLanguage>,
-    ) -> FuncResult<Spanned<Function>> {
+    ) -> FuncResult<Spanned<Function>, crate::fault::AstErrorKind> {
         let signature =
             self.try_parse_function_signature(start_span, methode_type, name, is_const, external)?;
 
@@ -579,7 +598,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.skip_end_lines();
             let expr = match self.parse_expression_id(STAMENT_END_TOKENS) {
                 Ok(val) => val,
-                Err(err) => return TryErr(err),
+                Err(err) => return TryErr(err.map_kind(Into::into)),
             };
             let statement =
                 Statement::from_expression(&self.forest.store, expr, self.current_is(&SEMI_COLON));
@@ -596,7 +615,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                     if signature.value.parameters.is_empty() {
                         return TryNotValue(FuncError::new(signature.value.name, err));
                     } else {
-                        return TryErr(err);
+                        return TryErr(err.map_kind(Into::into));
                     }
                 }
             }
@@ -609,7 +628,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         ))
     }
 
-    fn inner_parameters(&mut self) -> TryResult<(Vec<Parameter>, FunctionThisKind), Fault> {
+    fn inner_parameters(
+        &mut self,
+    ) -> TryResult<(Vec<Parameter>, FunctionThisKind), Fault, crate::fault::AstErrorKind> {
         self.expect(&ROUND_OPEN).try_err()?;
 
         let mut types = vec![];
@@ -622,16 +643,10 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            match self.inner_parameter_this(&mut function_kind, &mut types) {
-                Ok(Loop::None) => (),
-                Ok(Loop::Break) => break,
-                Ok(Loop::Continue) => continue,
-                Err(TryError::IsErr(err)) => {
-                    return TryErr(err.map_kind(|kind| {
-                        soul_utils::fault::UnclassifiedKind(kind.to_string().into_boxed_str())
-                    }));
-                }
-                Err(TryError::IsNotValue(err)) => return TryNotValue(err),
+            match self.inner_parameter_this(&mut function_kind, &mut types)? {
+                Loop::None => (),
+                Loop::Break => break,
+                Loop::Continue => continue,
             }
 
             let modifier = self.try_bump_mut().unwrap_or(TypeModifier::Const);
@@ -643,7 +658,12 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
             self.bump();
 
-            let ty = self.try_parse_type()?; // if not value is probably named_tuple expression
+            // if not value is probably named_tuple expression
+            let ty = match self.try_parse_type() {
+                Ok(ty) => ty,
+                Err(TryError::IsErr(err)) => return TryErr(err.map_kind(Into::into)),
+                Err(TryError::IsNotValue(err)) => return TryNotValue(err),
+            };
 
             let default = if self.current_is(&ASSIGN) {
                 self.bump();

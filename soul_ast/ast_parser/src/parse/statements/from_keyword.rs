@@ -9,9 +9,7 @@ use ast_model::{
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
     TypeModifier,
-    collections::try_result::{
-        ResultMapNotValue, ResultTryErr, ToResult, TryErr, TryOk, TryResult,
-    },
+    collections::try_result::{ResultTryErr, ToResult, TryError, TryErr, TryOk, TryResult},
     error::SoulResult,
     fault::Fault,
     soul_error_internal,
@@ -177,11 +175,18 @@ impl<'a, 'f> Parser<'a, 'f> {
             let start_span = self.token().span;
             let is_const = self.try_bump_const().is_some();
             let name = self.try_bump_consume_ident()?;
-            let signature = self
+            let signature = match self
                 .try_parse_function_signature(start_span, &this_type, name, is_const, None)
-                .map_try_not_value(|err| err.fault)
-                .merge_to_result()?
-                .value;
+            {
+                Ok(val) => val,
+                Err(TryError::IsErr(err)) => {
+                    return Err(err.map_kind(|kind| {
+                        soul_utils::fault::UnclassifiedKind(kind.to_string().into_boxed_str())
+                    }));
+                }
+                Err(TryError::IsNotValue(err)) => return Err(err.fault),
+            }
+            .value;
 
             let spanned = FunctionKind::Signature(FunctionSignature::with_span(
                 signature,

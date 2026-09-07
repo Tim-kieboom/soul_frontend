@@ -7,7 +7,7 @@ use soul_tokenizer::model::TokenKind;
 use soul_utils::{
     Ident, TypeModifier,
     collections::try_result::{
-        ResultMapNotValue, ResultTryErr, ToResult, TryErr, TryError, TryNotValue, TryOk, TryResult,
+        ResultTryErr, ToResult, TryErr, TryError, TryNotValue, TryOk, TryResult,
     },
     error::SoulResult,
     fault::Fault,
@@ -98,11 +98,20 @@ impl<'a, 'f> Parser<'a, 'f> {
         let name = self.try_bump_consume_ident()?;
         match &self.token().kind {
             &CURLY_OPEN => self.try_parse_constructor_declaration(name, modifier, start_span),
-            &ROUND_OPEN | &ARROW_LEFT => self
-                .try_parse_function_declaration_id(start_span, &SoulType::None, IS_CONST, name)
-                .map(Statement::from_function)
-                .map_try_not_value(|err| err.fault)
-                .merge_to_result(),
+            &ROUND_OPEN | &ARROW_LEFT => {
+                match self.try_parse_function_declaration_id(
+                    start_span,
+                    &SoulType::None,
+                    IS_CONST,
+                    name,
+                ) {
+                    Ok(val) => Ok(Statement::from_function(val)),
+                    Err(TryError::IsErr(err)) => Err(err.map_kind(|kind| {
+                        soul_utils::fault::UnclassifiedKind(kind.to_string().into_boxed_str())
+                    })),
+                    Err(TryError::IsNotValue(err)) => Err(err.fault),
+                }
+            }
             TokenKind::Symbol(Symbol::DoubleColon) => {
                 self.bump();
                 let value = self.parse_expression_id(STAMENT_END_TOKENS)?;
