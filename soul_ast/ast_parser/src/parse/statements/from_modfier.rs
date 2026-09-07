@@ -7,7 +7,7 @@ use soul_tokenizer::model::TokenKind;
 use soul_utils::{
     Ident, TypeModifier,
     collections::try_result::{
-        ResultTryErr, ToResult, TryErr, TryError, TryNotValue, TryOk, TryResult,
+        ResultTryErr, ToResult, TryErr, TryError, TryNotValue, TryOk,
     },
     fault::Fault,
     soul_names::Symbol,
@@ -15,9 +15,7 @@ use soul_utils::{
 };
 
 use crate::{
-    parse::statements::{try_assign_type, variable::AssignType},
-    parser::Parser,
-    utils::{
+    fault::{AstFault, AstResult, AstTryResult}, parse::statements::{try_assign_type, variable::AssignType}, parser::Parser, utils::{
         ARROW_LEFT, COLON, CONST, CURLY_OPEN, MUT, ROUND_OPEN, SEMI_COLON, STAMENT_END_TOKENS,
     },
 };
@@ -27,12 +25,11 @@ impl<'a, 'f> Parser<'a, 'f> {
         &mut self,
         start_span: Span,
     ) -> Result<Statement, crate::fault::AstFault> {
-        self.expect(&MUT).map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&MUT)?;
         let modifier = TypeModifier::Mut;
 
         let name = self
-            .try_bump_consume_ident()
-            .map_err(|err| err.map_kind(Into::into))?;
+            .try_bump_consume_ident()?;
         let pattern = if name.as_str() == "_" {
             VarPattern::Discard
         } else {
@@ -47,8 +44,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.bump();
             ty = Some(
                 self.try_parse_type()
-                    .merge_to_result()
-                    .map_err(|err| err.map_kind(Into::into))?,
+                    .merge_to_result()?,
             );
         }
 
@@ -78,8 +74,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         self.bump();
         let value = self
-            .parse_expression_id(STAMENT_END_TOKENS)
-            .map_err(|err| err.map_kind(Into::into))?;
+            .parse_expression_id(STAMENT_END_TOKENS)?;
         let variable = Variable::new_const(self.alloc_node(), pattern, ty, Some(value))
             .apply_modifier(modifier);
 
@@ -92,28 +87,25 @@ impl<'a, 'f> Parser<'a, 'f> {
     pub(super) fn try_parse_from_const(
         &mut self,
         start_span: Span,
-    ) -> Result<Statement, crate::fault::AstFault> {
-        self.expect(&CONST).map_err(|err| err.map_kind(Into::into))?;
+    ) -> AstResult<Statement> {
+        self.expect(&CONST)?;
         let modifier = TypeModifier::Const;
         const IS_CONST: bool = true;
 
         if self.current_is(&ROUND_OPEN) {
             let pattern = self
-                .parse_tuple_pattern()
-                .map_err(|err| err.map_kind(Into::into))?;
+                .parse_tuple_pattern()?;
             return self.parse_pattern_declaration(pattern, modifier, start_span);
         }
 
         if self.current_is(&CURLY_OPEN) {
             return self
                 .try_parse_named_tuple_or_block(modifier, start_span)
-                .merge_to_result()
-                .map_err(|err| err.map_kind(Into::into));
+                .merge_to_result();
         }
 
         let name = self
-            .try_bump_consume_ident()
-            .map_err(|err| err.map_kind(Into::into))?;
+            .try_bump_consume_ident()?;
         match &self.token().kind {
             &CURLY_OPEN => self.try_parse_constructor_declaration(name, modifier, start_span),
             &ROUND_OPEN | &ARROW_LEFT => {
@@ -125,14 +117,13 @@ impl<'a, 'f> Parser<'a, 'f> {
                 ) {
                     Ok(val) => Ok(Statement::from_function(val)),
                     Err(TryError::IsErr(err)) => Err(err),
-                    Err(TryError::IsNotValue(err)) => Err(err.fault.map_kind(Into::into)),
+                    Err(TryError::IsNotValue(err)) => Err(err.fault),
                 }
             }
             TokenKind::Symbol(Symbol::DoubleColon) => {
                 self.bump();
                 let value = self
-                    .parse_expression_id(STAMENT_END_TOKENS)
-                    .map_err(|err| err.map_kind(Into::into))?;
+                    .parse_expression_id(STAMENT_END_TOKENS)?;
                 Ok(Statement::new_variable(
                     Variable {
                         id: self.alloc_node(),
@@ -164,8 +155,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 }
                 self.bump();
                 let value = self
-                    .parse_expression_id(STAMENT_END_TOKENS)
-                    .map_err(|err| err.map_kind(Into::into))?;
+                    .parse_expression_id(STAMENT_END_TOKENS)?;
                 Ok(Statement::new_variable(
                     Variable {
                         id: self.alloc_node(),
@@ -186,12 +176,12 @@ impl<'a, 'f> Parser<'a, 'f> {
         &mut self,
         modifier: TypeModifier,
         start_span: Span,
-    ) -> TryResult<Statement, Fault, crate::fault::AstErrorKind> {
+    ) -> AstTryResult<Statement, AstFault> {
         let saved = self.tokens.current_position();
 
         match self.try_parse_named_tuple(start_span, modifier) {
             Ok(val) => return TryOk(val),
-            Err(TryError::IsErr(err)) => return TryErr(err.map_kind(Into::into)),
+            Err(TryError::IsErr(err)) => return TryErr(err),
             Err(TryError::IsNotValue(())) => (),
         }
 
@@ -211,7 +201,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         &mut self,
         start_span: Span,
         modifier: TypeModifier,
-    ) -> TryResult<Statement, ()> {
+    ) -> AstTryResult<Statement, ()> {
         if modifier != TypeModifier::Const {
             return TryNotValue(());
         }
@@ -253,10 +243,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         type_name: Ident,
         modifier: TypeModifier,
         start_span: Span,
-    ) -> Result<Statement, crate::fault::AstFault> {
+    ) -> AstResult<Statement> {
         let pattern = self
-            .parse_constructor_pattern(type_name)
-            .map_err(|err| err.map_kind(Into::into))?;
+            .parse_constructor_pattern(type_name)?;
         let assign = match &self.token().kind {
             TokenKind::Symbol(val) if AssignType::from_symbool(*val).is_some() => {
                 AssignType::from_symbool(*val).unwrap()
@@ -280,8 +269,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         self.bump();
         let value = self
-            .parse_expression_id(STAMENT_END_TOKENS)
-            .map_err(|err| err.map_kind(Into::into))?;
+            .parse_expression_id(STAMENT_END_TOKENS)?;
         Ok(Statement::new_variable(
             Variable {
                 id: self.alloc_node(),
@@ -325,8 +313,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         self.bump();
         let value = self
-            .parse_expression_id(STAMENT_END_TOKENS)
-            .map_err(|err| err.map_kind(Into::into))?;
+            .parse_expression_id(STAMENT_END_TOKENS)?;
         Ok(Statement::new_variable(
             Variable {
                 id: self.alloc_node(),

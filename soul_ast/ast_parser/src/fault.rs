@@ -1,4 +1,4 @@
-use soul_utils::fault::{Fault, FaultCollector, UnclassifiedKind};
+use soul_utils::{collections::try_result::TryResult, fault::{Fault, UnclassifiedKind}};
 
 /// Structured error kinds for the AST parser. `Unclassified` is a migration
 /// fallback carrying the raw message from call sites not yet converted to a
@@ -173,6 +173,29 @@ pub enum AstErrorKind {
 
     #[error("expected on of: [`{expected}`] but found: `{found}`")]
     ExpectedOneOfTokens { expected: Box<str>, found: Box<str> },
+
+    #[error("`This.(..)` has to be static function")]
+    NonStaticThisConstructor,
+
+    #[error("you can not have a non default parameter after default parameter")]
+    NonDefaultParameterAfterDefault,
+
+    #[error("'{found}' not allowed in import")]
+    TokenNotAllowedInImport { found: Box<str> },
+
+    #[error(
+        "`{token}` at the end of a line can only be used for expressions at the end of a block"
+    )]
+    ExpressionOnlyAtEndOfBlock { token: Box<str> },
+
+    #[error("{kind} can not be used in struct body")]
+    StatementNotAllowedInBody { kind: Box<str> },
+
+    #[error("Variable is not allowed in use block")]
+    VariableNotAllowedInUseBlock,
+
+    #[error("keyword '{keyword}' can not be type")]
+    KeywordUsedAsType { keyword: Box<str> },
 }
 
 impl From<UnclassifiedKind> for AstErrorKind {
@@ -180,7 +203,6 @@ impl From<UnclassifiedKind> for AstErrorKind {
         AstErrorKind::Unclassified(value.0)
     }
 }
-
 impl From<AstErrorKind> for UnclassifiedKind {
     fn from(value: AstErrorKind) -> Self {
         UnclassifiedKind(value.to_string().into_boxed_str())
@@ -188,4 +210,5 @@ impl From<AstErrorKind> for UnclassifiedKind {
 }
 
 pub type AstFault = Fault<AstErrorKind>;
-pub type AstFaultCollector = FaultCollector<AstErrorKind>;
+pub type AstTryResult<O, N> = TryResult<O, N, AstFault>;
+pub type AstResult<T> = std::result::Result<T, AstFault>;

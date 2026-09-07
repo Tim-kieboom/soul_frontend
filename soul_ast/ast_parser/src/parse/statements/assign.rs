@@ -1,9 +1,7 @@
 use std::{iter, sync::LazyLock};
 
 use crate::{
-    parse::statements::variable::AssignType,
-    parser::Parser,
-    utils::{CURLY_CLOSE, SEMI_COLON, STAMENT_END_TOKENS},
+    fault::AstResult, parse::statements::variable::AssignType, parser::Parser, utils::{CURLY_CLOSE, SEMI_COLON, STAMENT_END_TOKENS},
 };
 use ast_model::{
     AstStore,
@@ -30,10 +28,9 @@ impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_assign_or_expression(
         &mut self,
         start_span: Span,
-    ) -> Result<Statement, crate::fault::AstFault> {
+    ) -> AstResult<Statement> {
         let lvalue = self
-            .parse_expression_id(&ASSIGNMENT_TOKENS)
-            .map_err(|err| err.map_kind(Into::into))?;
+            .parse_expression_id(&ASSIGNMENT_TOKENS)?;
         if self.current_is_any(STAMENT_END_TOKENS) {
             return Ok(Statement::from_expression(
                 &self.forest.store,
@@ -58,8 +55,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         };
 
         let rvalue = self
-            .parse_expression_id(STAMENT_END_TOKENS)
-            .map_err(|err| err.map_kind(Into::into))?;
+            .parse_expression_id(STAMENT_END_TOKENS)?;
         let resolved_rvalue = resolve_assign_type(
             &mut self.forest.store,
             lvalue,

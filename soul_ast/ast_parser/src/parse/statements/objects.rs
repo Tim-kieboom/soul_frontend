@@ -3,24 +3,21 @@ use ast_model::{
     statements::{Enum, EnumVariant, Field, Statement, StatementKind, Struct, UnionKind},
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
-use soul_utils::{Ident, collections::try_result::ToResult, error::SoulResult};
+use soul_utils::{Ident, collections::try_result::ToResult, fault::Fault};
 
 use crate::{
-    parser::Parser,
-    utils::{AS, ASSIGN, COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, ROUND_CLOSE, ROUND_OPEN, STRUCT},
+    fault::AstResult, parser::Parser, utils::{AS, ASSIGN, COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, ROUND_CLOSE, ROUND_OPEN, STRUCT},
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
-    pub fn parse_struct(&mut self) -> SoulResult<Statement> {
+    pub fn parse_struct(&mut self) -> AstResult<Statement> {
         let struct_span = self.token().span;
-        self.expect(&STRUCT).map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&STRUCT)?;
         let struct_name = self
-            .try_bump_consume_ident()
-            .map_err(|err| err.map_kind(Into::into))?;
+            .try_bump_consume_ident()?;
         let generics = self.parse_generic_declare()?.unwrap_or(vec![]);
 
-        self.expect(&CURLY_OPEN)
-            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&CURLY_OPEN)?;
         self.skip_end_lines();
 
         let mut fields = vec![];
@@ -57,12 +54,13 @@ impl<'a, 'f> Parser<'a, 'f> {
                 }
 
                 StatementKind::Assignment(_) | StatementKind::Expression { .. } => {
-                    self.log_error(
-                        format!(
-                            "{} can not be used in struct body",
-                            statement.node.variant_name()
+                    self.log_fault(
+                        Fault::error_with_kind(
+                            crate::fault::AstErrorKind::StatementNotAllowedInBody {
+                                kind: statement.node.variant_name().into(),
+                            },
+                            Some(self.span_combine(start_span)),
                         ),
-                        Some(self.span_combine(start_span)),
                     );
                     continue;
                 }
@@ -70,8 +68,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
         self.current.this_type = prev_type;
 
-        self.expect(&CURLY_CLOSE)
-            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&CURLY_CLOSE)?;
 
         let struct_ = Struct {
             id: self.alloc_node(),
@@ -87,13 +84,11 @@ impl<'a, 'f> Parser<'a, 'f> {
         ))
     }
 
-    pub(crate) fn parse_enum(&mut self) -> SoulResult<Statement> {
+    pub(crate) fn parse_enum(&mut self) -> AstResult<Statement> {
         let start_span = self.token().span;
-        self.expect(&TokenKind::Keyword(KeyWord::Enum))
-            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&TokenKind::Keyword(KeyWord::Enum))?;
         let name = self
-            .try_bump_consume_ident()
-            .map_err(|err| err.map_kind(Into::into))?;
+            .try_bump_consume_ident()?;
 
         let impl_type = if self.current_is_any(&[AS, COLON]) {
             self.bump();
@@ -116,13 +111,11 @@ impl<'a, 'f> Parser<'a, 'f> {
         ))
     }
 
-    pub(crate) fn parse_union(&mut self) -> SoulResult<Statement> {
+    pub(crate) fn parse_union(&mut self) -> AstResult<Statement> {
         let start_span = self.token().span;
-        self.expect(&TokenKind::Keyword(KeyWord::Union))
-            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&TokenKind::Keyword(KeyWord::Union))?;
         let name = self
-            .try_bump_consume_ident()
-            .map_err(|err| err.map_kind(Into::into))?;
+            .try_bump_consume_ident()?;
 
         let variants = self.parse_union_variants()?;
 
@@ -138,10 +131,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         ))
     }
 
-    fn parse_union_variants(&mut self) -> SoulResult<Vec<EnumVariant>> {
+    fn parse_union_variants(&mut self) -> AstResult<Vec<EnumVariant>> {
         let mut variants = vec![];
-        self.expect(&CURLY_OPEN)
-            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&CURLY_OPEN)?;
         loop {
             self.skip_end_lines();
             if self.current_is(&CURLY_CLOSE) {
@@ -149,8 +141,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
 
             let ident = self
-                .try_bump_consume_ident()
-                .map_err(|err| err.map_kind(Into::into))?;
+                .try_bump_consume_ident()?;
             let variant = match self.token().kind {
                 ROUND_OPEN => self.parse_enum_tuple_union(ident)?,
                 CURLY_OPEN => self.parse_enum_named_union(ident)?,
@@ -166,22 +157,20 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             self.bump();
         }
-        self.expect(&CURLY_CLOSE)
-            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&CURLY_CLOSE)?;
         Ok(variants)
     }
 
-    fn parse_enum_assign(&mut self, ident: Ident) -> SoulResult<EnumVariant> {
-        self.expect(&ASSIGN).map_err(|err| err.map_kind(Into::into))?;
+    fn parse_enum_assign(&mut self, ident: Ident) -> AstResult<EnumVariant> {
+        self.expect(&ASSIGN)?;
 
         let value = self.parse_expression_id(&[COMMA, CURLY_CLOSE])?;
         Ok(EnumVariant::Assigned { name: ident, value })
     }
 
-    fn parse_enum_tuple_union(&mut self, ident: Ident) -> SoulResult<EnumVariant> {
+    fn parse_enum_tuple_union(&mut self, ident: Ident) -> AstResult<EnumVariant> {
         let mut parameters = vec![];
-        self.expect(&ROUND_OPEN)
-            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&ROUND_OPEN)?;
         loop {
             self.skip_end_lines();
             if self.current_is(&ROUND_CLOSE) {
@@ -198,8 +187,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             self.bump();
         }
-        self.expect(&ROUND_CLOSE)
-            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&ROUND_CLOSE)?;
 
         Ok(EnumVariant::Union(UnionKind::Tuple {
             name: ident,
@@ -207,10 +195,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         }))
     }
 
-    fn parse_enum_named_union(&mut self, ident: Ident) -> SoulResult<EnumVariant> {
+    fn parse_enum_named_union(&mut self, ident: Ident) -> AstResult<EnumVariant> {
         let mut parameters = vec![];
-        self.expect(&CURLY_OPEN)
-            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&CURLY_OPEN)?;
         loop {
             self.skip_end_lines();
             if self.current_is(&CURLY_CLOSE) {
@@ -218,10 +205,9 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
 
             let name = self
-                .try_bump_consume_ident()
-                .map_err(|err| err.map_kind(Into::into))?;
+                .try_bump_consume_ident()?;
 
-            self.expect(&COLON).map_err(|err| err.map_kind(Into::into))?;
+            self.expect(&COLON)?;
             let ty = self.try_parse_type().merge_to_result()?;
             parameters.push((name, ty));
 
@@ -232,8 +218,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             self.bump();
         }
-        self.expect(&CURLY_CLOSE)
-            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&CURLY_CLOSE)?;
 
         Ok(EnumVariant::Union(UnionKind::NamedTuple {
             name: ident,

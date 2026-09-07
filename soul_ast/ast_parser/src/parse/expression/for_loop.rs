@@ -4,22 +4,21 @@ use ast_model::{
 };
 use soul_utils::{
     TypeModifier,
-    collections::try_result::{ResultTryErr, ResultTryNotValue, TryError, TryOk, TryResult},
+    collections::try_result::{ResultTryErr, ResultTryNotValue, TryError, TryOk},
     fault::Fault,
     soul_names::Symbol,
     span::Spanned,
 };
 
 use crate::{
-    parser::Parser,
-    utils::{COMMA, CURLY_OPEN, FOR, IN},
+    fault::AstTryResult, parser::Parser, utils::{COMMA, CURLY_OPEN, FOR, IN},
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub fn parse_for_loop(&mut self) -> Result<Spanned<For>, crate::fault::AstFault> {
         let start_span = self.token().span;
-        self.expect(&FOR).map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&FOR)?;
 
         let condition = match &self.token().kind {
             &CURLY_OPEN => ForCondition::Loop,
@@ -28,8 +27,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
                 let index = if self.peek_is(&COMMA) {
                     let ident = self
-                        .try_bump_consume_ident()
-                        .map_err(|err| err.map_kind(Into::into))?;
+                        .try_bump_consume_ident()?;
                     self.bump();
                     Some(Binding::new(self.alloc_node(), ident))
                 } else {
@@ -57,8 +55,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                             .parse_expression_id(&[
                                 CURLY_OPEN,
                                 TokenKind::Keyword(KeyWord::Limit),
-                            ])
-                            .map_err(|err| err.map_kind(Into::into))?;
+                            ])?;
                         if self.current_is_keyword(KeyWord::Limit) {
                             self.bump();
                             let saved = self.tokens.current_position();
@@ -78,8 +75,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         };
 
         let block = self
-            .parse_block(TypeModifier::Mut)
-            .map_err(|err| err.map_kind(Into::into))?;
+            .parse_block(TypeModifier::Mut)?;
         Ok(Spanned::new(
             For { block, condition },
             self.span_combine(start_span),
@@ -88,7 +84,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     fn try_parse_foreach_elements(
         &mut self,
-    ) -> TryResult<(VarPattern, ExpressionId), (), crate::fault::AstErrorKind> {
+    ) -> AstTryResult<(VarPattern, ExpressionId), ()> {
         let var_pattern = self
             .parse_var_pattern(TypeModifier::Const)
             .try_not_value()?;

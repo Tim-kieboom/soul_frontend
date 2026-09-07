@@ -44,8 +44,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                     Fault::error_with_kind(
                         crate::fault::AstErrorKind::ExternalImportMissingCrateName,
                         Some(span),
-                    )
-                    .map_kind(Into::into),
+                    ),
                 );
                 return;
             }
@@ -58,8 +57,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                         lib_name: lib_name.as_str().into(),
                     },
                     Some(span),
-                )
-                .map_kind(Into::into),
+                ),
             );
             return;
         };
@@ -71,7 +69,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                      use linkage = \"static\" in Soul.toml"
                 ),
                 Some(span)
-            ));
+            ).into_kind());
             return;
         }
 
@@ -166,7 +164,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.log_fault(soul_error_internal!(
                 "module_file_path should have parent",
                 None
-            ));
+            ).into_kind());
             return ModuleId::ERROR;
         };
 
@@ -192,7 +190,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let tokens = match to_token_stream(source, module_id) {
             Ok(val) => val,
             Err(err) => {
-                self.log_fault(err);
+                self.log_fault(err.into_kind());
                 return;
             }
         };
@@ -228,8 +226,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                             path: format!("{module_path:?}").into_boxed_str(),
                         },
                         Some(span),
-                    )
-                    .map_kind(Into::into),
+                    ),
                 );
                 return None;
             }
@@ -245,8 +242,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                         path: format!("{module_path:?}").into_boxed_str(),
                     },
                     Some(span),
-                )
-                .map_kind(Into::into),
+                ),
             );
 
             return None;
@@ -274,8 +270,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                     source_root: format!("{source_root:?}").into_boxed_str(),
                 },
                 Some(span),
-            )
-            .map_kind(Into::into),
+            ),
         );
         None
     }
@@ -300,7 +295,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let relative_path = match module_file_path.strip_prefix(base_path) {
             Ok(val) => val,
             Err(err) => {
-                self.log_fault(soul_error_internal!(format!("{}", err.to_string()), None));
+                self.log_fault(soul_error_internal!(format!("{}", err.to_string()), None).into_kind());
                 return;
             }
         };
@@ -314,7 +309,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                     self.log_fault(soul_error_internal!(
                         format!("file_name of '{:?}' not found", current),
                         None
-                    ));
+                    ).into_kind());
                     return;
                 }
             };
@@ -342,7 +337,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                         err,
                     ),
                     Some(span)
-                ));
+                ).into_kind());
                 None
             }
         }

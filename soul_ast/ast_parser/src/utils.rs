@@ -97,7 +97,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     /// Advances to next token.
     pub(super) fn bump(&mut self) {
         if let Err(err) = self.tokens.advance() {
-            self.log_fault(err);
+            self.log_fault(err.into_kind());
         }
 
         #[cfg(debug_assertions)]
@@ -117,7 +117,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         match self.tokens.peek() {
             Ok(val) => val,
             Err(err) => {
-                self.log_fault(err);
+                self.log_fault(err.into_kind());
                 self.token().clone()
             }
         }
@@ -128,7 +128,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let token = match self.tokens.consume_advance() {
             (token, None) => token,
             (token, Some(err)) => {
-                self.log_fault(err);
+                self.log_fault(err.into_kind());
                 token
             }
         };
@@ -338,11 +338,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.forest.store.alloc_node()
     }
 
-    pub(crate) fn log_fault(&mut self, fault: Fault) {
-        self.context.faults.push(fault);
-    }
-
-    pub(super) fn log_error(&mut self, message: impl Into<Box<str>>, span: Option<Span>) {
-        self.context.faults.push_error(message, span);
+    pub(crate) fn log_fault(&mut self, fault: crate::fault::AstFault) {
+        self.context.faults.push(fault.into_kind());
     }
 }

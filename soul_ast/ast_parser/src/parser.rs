@@ -80,7 +80,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         match this.forest.modules_mut().get_mut(id) {
             Some(module) => module.global = global,
-            None => this.log_fault(soul_error_internal!(format!("{id:?} not found"), None)),
+            None => this.log_fault(soul_error_internal!(format!("{id:?} not found"), None).into_kind()),
         }
     }
 

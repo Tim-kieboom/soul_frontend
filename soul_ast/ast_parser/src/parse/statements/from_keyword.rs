@@ -9,16 +9,13 @@ use ast_model::{
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
     TypeModifier,
-    collections::try_result::{ResultTryErr, ToResult, TryError, TryErr, TryOk, TryResult},
-    error::SoulResult,
-    fault::Fault,
+    collections::try_result::{ResultTryErr, ToResult, TryError, TryErr, TryOk},
     soul_error_internal,
     span::{Span, Spanned},
 };
 
 use crate::{
-    parser::Parser,
-    utils::{
+    fault::{AstFault, AstResult, AstTryResult}, parser::Parser, utils::{
         ASSIGN, COLON, COLON_ASSIGN, COMMA, CURLY_CLOSE, CURLY_OPEN, SEMI_COLON, STAMENT_END_TOKENS,
     },
 };
@@ -28,7 +25,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         &mut self,
         start_span: Span,
         keyword: KeyWord,
-    ) -> TryResult<Statement, Fault> {
+    ) -> AstTryResult<Statement, AstFault> {
         TryOk(match keyword {
             KeyWord::Mut => return self.try_parse_from_mut(start_span).try_err(),
             KeyWord::Const => return self.try_parse_from_const(start_span).try_err(),
@@ -83,6 +80,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 let span = pub_span.combine(start_span);
                 statement
                     .try_set_public(&mut self.forest.store, is_public, span)
+                    .map_err(|err| err.into_kind())
                     .try_err()?;
 
                 statement
@@ -96,6 +94,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 let span = async_span.combine(start_span);
                 statement
                     .try_set_async(&mut self.forest.store, span)
+                    .map_err(|err| err.into_kind())
                     .try_err()?;
 
                 statement
@@ -125,7 +124,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                         keyword.as_str()
                     ),
                     Some(self.token().span)
-                ));
+                ).into_kind());
             }
 
             KeyWord::Use => return self.parse_use_block().try_err(),
@@ -137,13 +136,11 @@ impl<'a, 'f> Parser<'a, 'f> {
         })
     }
 
-    fn parse_trait(&mut self) -> SoulResult<Statement> {
+    fn parse_trait(&mut self) -> AstResult<Statement> {
         let start_span = self.token().span;
-        self.expect(&TokenKind::Keyword(KeyWord::Trait))
-            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&TokenKind::Keyword(KeyWord::Trait))?;
         let name = self
-            .try_bump_consume_ident()
-            .map_err(|err| err.map_kind(Into::into))?;
+            .try_bump_consume_ident()?;
         let generics = self.parse_generic_declare()?.unwrap_or(vec![]);
 
         let mut trait_impls = vec![];
@@ -151,8 +148,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.bump();
             loop {
                 trait_impls.push(
-                    self.try_bump_consume_ident()
-                        .map_err(|err| err.map_kind(Into::into))?,
+                    self.try_bump_consume_ident()?,
                 );
                 if !self.current_is(&COMMA) {
                     break;
@@ -160,8 +156,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
         }
 
-        self.expect(&CURLY_OPEN)
-            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&CURLY_OPEN)?;
 
         let mut methods = vec![];
         let mut typedefs = vec![];
@@ -182,16 +177,13 @@ impl<'a, 'f> Parser<'a, 'f> {
             let start_span = self.token().span;
             let is_const = self.try_bump_const().is_some();
             let name = self
-                .try_bump_consume_ident()
-                .map_err(|err| err.map_kind(Into::into))?;
+                .try_bump_consume_ident()?;
             let signature = match self
                 .try_parse_function_signature(start_span, &this_type, name, is_const, None)
             {
                 Ok(val) => val,
                 Err(TryError::IsErr(err)) => {
-                    return Err(err.map_kind(|kind| {
-                        soul_utils::fault::UnclassifiedKind(kind.to_string().into_boxed_str())
-                    }));
+                    return Err(err);
                 }
                 Err(TryError::IsNotValue(err)) => return Err(err.fault),
             }
@@ -204,8 +196,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             let id = self.forest.store.insert_function(spanned);
             methods.push(id);
         }
-        self.expect(&CURLY_CLOSE)
-            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&CURLY_CLOSE)?;
         Ok(Statement::new(
             StatementKind::Trait(Trait {
                 id: self.alloc_node(),
@@ -219,16 +210,14 @@ impl<'a, 'f> Parser<'a, 'f> {
         ))
     }
 
-    fn parse_typedef(&mut self) -> SoulResult<Spanned<TypeDef>> {
+    fn parse_typedef(&mut self) -> AstResult<Spanned<TypeDef>> {
         let start_span = self.token().span;
-        self.expect(&TokenKind::Keyword(KeyWord::Type))
-            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&TokenKind::Keyword(KeyWord::Type))?;
 
         let new_type = self.try_parse_type().merge_to_result()?;
         if !self.current_is_any(&[ASSIGN, COLON_ASSIGN]) {
             return Err(self
-                .get_expect_any_error(&[ASSIGN, COLON_ASSIGN])
-                .map_kind(Into::into));
+                .get_expect_any_error(&[ASSIGN, COLON_ASSIGN]));
         }
         self.bump();
         let is_distinct = self.current_is(&TokenKind::Keyword(KeyWord::Distinct));

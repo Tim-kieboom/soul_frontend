@@ -15,8 +15,7 @@ use soul_utils::{
 };
 
 use crate::{
-    parser::Parser,
-    utils::{
+    fault::AstFault, parser::Parser, utils::{
         ARRAY, ARROW_LEFT, COLON, COPY, CURLY_OPEN, ELSE, MUT, NOT, NULL, PASS, POINTER, REF,
         ROUND_OPEN, SIZEOF, SQUARE_CLOSE, SQUARE_OPEN,
     },
@@ -28,12 +27,11 @@ impl<'a, 'f> Parser<'a, 'f> {
         left: &mut Expression,
         start_span: Span,
         optional_map: bool,
-    ) -> Result<(), crate::fault::AstFault> {
+    ) -> Result<(), AstFault> {
         let index = self
-            .parse_expression_id(&[SQUARE_CLOSE, TokenKind::EndLine, TokenKind::EndFile])
-            .map_err(|err| err.map_kind(Into::into))?;
-        self.expect(&SQUARE_CLOSE)
-            .map_err(|err| err.map_kind(Into::into))?;
+            .parse_expression_id(&[SQUARE_CLOSE, TokenKind::EndLine, TokenKind::EndFile])?;
+
+        self.expect(&SQUARE_CLOSE)?;
 
         let mut value = Expression::error();
         swap(left, &mut value);
@@ -63,8 +61,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     ) -> Result<(), crate::fault::AstFault> {
         let generics = if self.current_is(&ARROW_LEFT) {
             self.parse_generic_define()
-                .merge_to_result()
-                .map_err(|err| err.map_kind(Into::into))?
+                .merge_to_result()?
         } else {
             vec![]
         };
@@ -145,8 +142,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 };
 
                 let arguments = self
-                    .parse_arguments()
-                    .map_err(|err| err.map_kind(Into::into))?;
+                    .parse_arguments()?;
                 let ty = self.type_from_ident(name, generics);
                 let ctor = Constructor {
                     id: self.alloc_node(),
@@ -181,8 +177,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             };
             let collection_type = self.type_from_ident(name, generics);
             *left = Expression::from_any_array(
-                self.parse_array(Some(collection_type))
-                    .map_err(|err| err.map_kind(Into::into))?,
+                self.parse_array(Some(collection_type))?,
             );
             return Ok(());
         }
@@ -203,8 +198,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         let success = self
-            .try_parse_method_arm(left, start_span, optional_map)
-            .map_err(|err| err.map_kind(Into::into))?;
+            .try_parse_method_arm(left, start_span, optional_map)?;
         if success {
             return Ok(());
         }
@@ -237,13 +231,11 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         let ident = self
-            .try_bump_consume_ident()
-            .map_err(|err| err.map_kind(Into::into))?;
+            .try_bump_consume_ident()?;
 
         let generics = if generics.is_empty() && self.current_is(&ARROW_LEFT) {
             self.parse_generic_define()
-                .merge_to_result()
-                .map_err(|err| err.map_kind(Into::into))?
+                .merge_to_result()?
         } else {
             generics
         };
@@ -254,8 +246,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let value = self.forest.store.insert_expression(value);
         if self.current_is(&CURLY_OPEN) {
             *left = Expression::from_struct_contructor(
-                self.parse_struct_contructor(ident, generics, start_span)
-                    .map_err(|err| err.map_kind(Into::into))?,
+                self.parse_struct_contructor(ident, generics, start_span)?,
             );
             return Ok(());
         }
@@ -273,9 +264,8 @@ impl<'a, 'f> Parser<'a, 'f> {
         ) {
             Ok(call) => Expression::from_function_call(call),
             Err(TryError::IsNotValue(_)) => self
-                .parse_field_access(value, ident, optional_map)
-                .map_err(|err| err.map_kind(Into::into))?,
-            Err(TryError::IsErr(err)) => return Err(err.map_kind(Into::into)),
+                .parse_field_access(value, ident, optional_map)?,
+            Err(TryError::IsErr(err)) => return Err(err),
         };
         Ok(())
     }
@@ -303,8 +293,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             TokenKind::Ident(_) if self.peek_is(&CURLY_OPEN) => {
                 let save = self.tokens.current_position();
                 let _ident = self
-                    .try_bump_consume_ident()
-                    .map_err(|err| err.map_kind(Into::into))?;
+                    .try_bump_consume_ident()?;
                 self.bump();
                 self.skip_end_lines();
                 if matches!(self.token().kind, TokenKind::Ident(_)) && self.peek_is(&COLON) {
@@ -313,8 +302,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 }
                 self.goto(save);
                 let ident = self
-                    .try_bump_consume_ident()
-                    .map_err(|err| err.map_kind(Into::into))?;
+                    .try_bump_consume_ident()?;
                 MatchMethodVariant::Name(ident)
             }
             _ => return Ok(false),
@@ -362,7 +350,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         optional_map: bool,
     ) -> Result<Expression, crate::fault::AstFault> {
         match KeyWord::from_str(ident.as_str()).ok() {
-            Some(KeyWord::Sizeof) => self.parse_sizeof(left).map_err(|err| err.map_kind(Into::into)),
+            Some(KeyWord::Sizeof) => self.parse_sizeof(left),
             _ => Ok(Expression::new_field(
                 self.alloc_node(),
                 &self.forest.store,

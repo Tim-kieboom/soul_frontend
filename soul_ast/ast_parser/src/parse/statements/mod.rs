@@ -7,17 +7,14 @@ use ast_model::{
 use soul_tokenizer::model::TokenKind;
 use soul_utils::{
     Ident, TypeModifier,
-    collections::try_result::{ResultTryErr, TryErr, TryError, TryNotValue, TryOk, TryResult},
-    error::SoulResult,
+    collections::try_result::{ResultTryErr, TryErr, TryError, TryNotValue, TryOk},
     fault::Fault,
     soul_names::Symbol,
     span::{Attribute, Span},
 };
 
 use crate::{
-    parse::statements::variable::AssignType,
-    parser::Parser,
-    utils::{
+    fault::{AstFault, AstResult, AstTryResult}, parse::statements::variable::AssignType, parser::Parser, utils::{
         ARROW_LEFT, COLON, COLON_ASSIGN, CURLY_CLOSE, CURLY_OPEN, DOT, HASH, NOT, ROUND_OPEN,
         SEMI_COLON, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS, STAMENT_SKIP_TOKENS, STAR,
     },
@@ -77,33 +74,33 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
     }
 
-    pub(crate) fn parse_statement_id(&mut self) -> SoulResult<StatementId> {
+    pub(crate) fn parse_statement_id(&mut self) -> AstResult<StatementId> {
         let value = self.parse_statement()?;
         Ok(self.forest.store.insert_statement(value))
     }
 
-    pub(crate) fn parse_statement(&mut self) -> SoulResult<Statement> {
+    pub(crate) fn parse_statement(&mut self) -> AstResult<Statement> {
         let statement = self.inner_parse_statement()?;
         if !statement.is_expression() && self.ends_semicolon() {
-            self.log_error(
-                format!(
-                    "`{}` at the end of a line can only be used for expressions at the end of a block", 
-                    Symbol::SemiColon.as_str()
-                ),
-                Some(self.token().span),
+            self.log_fault(
+                Fault::error_with_kind(
+                    crate::fault::AstErrorKind::ExpressionOnlyAtEndOfBlock {
+                        token: Symbol::SemiColon.as_str().into(),
+                    },
+                    Some(self.token().span),
+                ).into_kind(),
             );
         }
 
         Ok(statement)
     }
 
-    pub(crate) fn parse_block(&mut self, modifier: TypeModifier) -> SoulResult<BlockId> {
+    pub(crate) fn parse_block(&mut self, modifier: TypeModifier) -> AstResult<BlockId> {
         const END_TOKENS: &[TokenKind] = &[CURLY_CLOSE, TokenKind::EndFile];
         let start_span = self.token().span;
 
         let mut statements = vec![];
-        self.expect(&CURLY_OPEN)
-            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&CURLY_OPEN)?;
         while !self.current_is_any(END_TOKENS) {
             self.skip_end_lines();
             if self.current_is(&CURLY_CLOSE) {
@@ -121,8 +118,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.skip_while_any(&[SEMI_COLON, TokenKind::EndLine]);
         }
 
-        self.expect(&CURLY_CLOSE)
-            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&CURLY_CLOSE)?;
         Ok(self.forest.store.insert_block(Block {
             statements,
             span: self.span_combine(start_span),
@@ -130,7 +126,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         }))
     }
 
-    pub(super) fn inner_parse_statement(&mut self) -> SoulResult<Statement> {
+    pub(super) fn inner_parse_statement(&mut self) -> AstResult<Statement> {
         let begin_position = self.tokens.current_position();
 
         self.skip_while_any(STAMENT_SKIP_TOKENS);
@@ -148,8 +144,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         if let STAR = self.token().kind {
             return self
-                .parse_assign_or_expression(start_span)
-                .map_err(|err| err.map_kind(Into::into));
+                .parse_assign_or_expression(start_span);
         }
 
         match self.parse_possible_statement(start_span) {
@@ -174,7 +169,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
     }
 
-    fn parse_possible_statement(&mut self, start_span: Span) -> TryResult<Statement, Fault> {
+    fn parse_possible_statement(&mut self, start_span: Span) -> AstTryResult<Statement, AstFault> {
         match &self.token().kind {
             TokenKind::Ident(_) | TokenKind::Types(_) => self.try_parse_from_ident(start_span),
             &ROUND_OPEN => {
@@ -182,12 +177,12 @@ impl<'a, 'f> Parser<'a, 'f> {
 
                 let Ok(pattern) = self.parse_tuple_pattern() else {
                     self.goto(saved);
-                    return TryNotValue(Fault::empty());
+                    return TryNotValue(Fault::empty().into_kind());
                 };
 
                 if let Err(err) = self.expect_assign_or_declaration() {
                     self.goto(saved);
-                    return TryNotValue(err.map_kind(Into::into));
+                    return TryNotValue(err);
                 }
 
                 self.bump();
@@ -236,14 +231,14 @@ impl<'a, 'f> Parser<'a, 'f> {
                 }
             }
             &STAR => unreachable!(),
-            _ => TryNotValue(Fault::empty()),
+            _ => TryNotValue(Fault::empty().into_kind()),
         }
     }
 
     /// Parses one or more attribute groups `#[ ident]` / `#[ ! ident]` that precede an item.
     ///
     /// Negated markers (`#[!Trait]`) store their name with a `!` prefix.
-    pub(crate) fn parse_statement_attributes(&mut self) -> SoulResult<(Vec<Attribute>, Span)> {
+    pub(crate) fn parse_statement_attributes(&mut self) -> AstResult<(Vec<Attribute>, Span)> {
         let start_span = self.token().span;
         let mut attributes = Vec::new();
 
@@ -251,7 +246,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.bump();
 
             if !self.current_is(&SQUARE_OPEN) {
-                return Err(self.get_expect_error(&SQUARE_OPEN).map_kind(Into::into));
+                return Err(self.get_expect_error(&SQUARE_OPEN));
             }
             self.bump();
 
@@ -267,14 +262,13 @@ impl<'a, 'f> Parser<'a, 'f> {
                 TokenKind::Keyword(keyword) => keyword.as_str().to_string(),
                 _ => {
                     return Err(self
-                        .get_expect_ident_error("attribute name")
-                        .map_kind(Into::into));
+                        .get_expect_ident_error("attribute name"));
                 }
             };
             name.push_str(&name_text);
 
             if !self.current_is(&SQUARE_CLOSE) {
-                return Err(self.get_expect_error(&SQUARE_CLOSE).map_kind(Into::into));
+                return Err(self.get_expect_error(&SQUARE_CLOSE));
             }
             self.bump();
 
@@ -302,7 +296,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
     }
 
-    fn try_parse_from_ident(&mut self, start_span: Span) -> TryResult<Statement, Fault> {
+    fn try_parse_from_ident(&mut self, start_span: Span) -> AstTryResult<Statement, AstFault> {
         let ident = self.try_token_as_ident_str().try_err()?;
         let is_this = ident == "This";
         let is_unsafe = ident == "unsafe";
@@ -375,7 +369,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         &mut self,
         name: String,
         start_span: Span,
-    ) -> SoulResult<Statement> {
+    ) -> AstResult<Statement> {
         self.bump();
         self.bump();
         let value = self.parse_expression_id(STAMENT_END_TOKENS)?;
@@ -395,7 +389,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         ))
     }
 
-    fn parse_contructor(&mut self, start_span: Span) -> SoulResult<Statement> {
+    fn parse_contructor(&mut self, start_span: Span) -> AstResult<Statement> {
         self.bump();
         let this = self.current.this_type.take();
         let result = match &this {
@@ -415,17 +409,15 @@ impl<'a, 'f> Parser<'a, 'f> {
                 })
             })
             .map(Statement::from_function)
-            .map_err(|err| err.map_kind(Into::into))
     }
 
-    fn parse_extension_function(&mut self, start_span: Span) -> SoulResult<Statement> {
+    fn parse_extension_function(&mut self, start_span: Span) -> AstResult<Statement> {
         let position = self.tokens.current_position();
         match self.inner_parse_extension_function(start_span) {
             Ok(stmt) => Ok(stmt),
             Err(_) => {
                 self.goto(position);
                 self.parse_assign_or_expression(start_span)
-                    .map_err(|err| err.map_kind(Into::into))
             }
         }
     }
@@ -447,10 +439,10 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
         };
         self.bump();
-        self.expect(&DOT).map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&DOT).map_err(|err| err)?;
         let method_ident = self
             .try_bump_consume_ident()
-            .map_err(|err| err.map_kind(Into::into))?;
+            .map_err(|err| err)?;
 
         let recv_type = self.type_from_ident(receiver_ident, vec![]);
         let saved = self.current.this_type.take();
@@ -461,7 +453,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         match result {
             Ok(spanned) => Ok(Statement::from_function(spanned)),
             Err(TryError::IsErr(fault)) => Err(fault),
-            Err(TryError::IsNotValue(err)) => Err(err.fault.map_kind(Into::into)),
+            Err(TryError::IsNotValue(err)) => Err(err.fault),
         }
     }
 }

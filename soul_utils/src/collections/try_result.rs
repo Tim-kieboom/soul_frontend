@@ -1,5 +1,4 @@
 use crate::{
-    error::SoulResult,
     fault::{Fault, UnclassifiedKind},
 };
 
@@ -9,7 +8,7 @@ use crate::{
 /// - `TryError::IsErr(Fault<K>)` - the value is of the expected type but has an error
 pub enum TryError<R, K = UnclassifiedKind> {
     /// The value is of the correct type but an error occurred.
-    IsErr(Fault<K>),
+    IsErr(K),
     /// The value is not of the expected type.
     IsNotValue(R),
 }
@@ -29,7 +28,7 @@ pub fn TryOk<T, R, K>(ok: T) -> TryResult<T, R, K> {
 
 /// Creates a `TryResult` with an error.
 #[allow(non_snake_case)]
-pub fn TryErr<T, R, K>(err: Fault<K>) -> TryResult<T, R, K> {
+pub fn TryErr<T, R, K>(err: K) -> TryResult<T, R, K> {
     Err(TryError::IsErr(err))
 }
 
@@ -55,20 +54,18 @@ pub trait ResultMapNotValue<T, R, V, K = UnclassifiedKind> {
 }
 
 /// Utility trait for merging `TryResult` to `SoulResult`.
-pub trait ToResult<T> {
-    fn merge_to_result(self) -> SoulResult<T>;
+pub trait ToResult<T, E> {
+    fn merge_to_result(self) -> Result<T, E>;
 }
 
-impl<T, K1, K2> ToResult<T> for TryResult<T, Fault<K1>, K2>
-where
-    UnclassifiedKind: From<K1>,
-    UnclassifiedKind: From<K2>,
+impl<T, E1, E2> ToResult<T, E1> for TryResult<T, E1, E2>
+where E1: From<E2>
 {
-    fn merge_to_result(self) -> SoulResult<T> {
+    fn merge_to_result(self) -> Result<T, E1> {
         match self {
             Ok(val) => Ok(val),
-            Err(TryError::IsErr(err)) => Err(err.map_kind(Into::into)),
-            Err(TryError::IsNotValue(err)) => Err(err.map_kind(Into::into)),
+            Err(TryError::IsErr(err)) => Err(err.into()),
+            Err(TryError::IsNotValue(err)) => Err(err),
         }
     }
 }
@@ -79,14 +76,14 @@ where
 /// returning `Fault<UnclassifiedKind>` plug into a migrated function's
 /// `AstErrorKind`-typed `TryResult` via `.try_err()`, and what lets an
 /// already-migrated method's `Fault<K>` pass through unchanged.
-impl<T, R, K1, K2> ResultTryErr<T, R, K2> for Result<T, Fault<K1>>
+impl<T, R, E1, E2> ResultTryErr<T, R, E2> for Result<T, E1>
 where
-    K2: From<K1>,
+    E2: From<E1>,
 {
-    fn try_err(self) -> TryResult<T, R, K2> {
+    fn try_err(self) -> TryResult<T, R, E2> {
         match self {
             Ok(val) => TryOk(val),
-            Err(err) => TryErr(err.map_kind(Into::into)),
+            Err(err) => TryErr(err.into()),
         }
     }
 }

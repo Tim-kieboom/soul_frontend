@@ -4,13 +4,12 @@ use ast_model::{
 };
 use soul_tokenizer::model::TokenKind;
 use soul_utils::{
-    collections::try_result::{ResultTryErr, TryError, TryErr, TryNotValue, TryOk, TryResult},
+    collections::try_result::{ResultTryErr, TryError, TryErr, TryNotValue, TryOk},
     soul_error_internal,
 };
 
 use crate::{
-    parser::Parser,
-    utils::{ARROW_LEFT, ARROW_RIGHT, ASSIGN, COMMA},
+    fault::AstTryResult, parser::Parser, utils::{ARROW_LEFT, ARROW_RIGHT, ASSIGN, COMMA},
 };
 
 mod expression;
@@ -22,7 +21,7 @@ mod statements;
 impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_generic_define(
         &mut self,
-    ) -> TryResult<Vec<SoulType>, crate::fault::AstFault, crate::fault::AstErrorKind> {
+    ) -> AstTryResult<Vec<SoulType>, crate::fault::AstFault> {
         let start_position = self.tokens.current_position();
 
         self.expect(&ARROW_LEFT).try_err()?;
@@ -37,7 +36,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                     Ok(val) => val,
                     Err(TryError::IsErr(err)) => return TryErr(err),
                     Err(TryError::IsNotValue(err)) => {
-                        return TryNotValue(err.map_kind(Into::into));
+                        return TryNotValue(err);
                     }
                 };
                 types.push(value);
@@ -57,7 +56,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 Ok(val) => val,
                 Err(TryError::IsErr(err)) => return TryErr(err),
                 Err(TryError::IsNotValue(err)) => {
-                    return TryNotValue(err.map_kind(Into::into));
+                    return TryNotValue(err);
                 }
             };
             types.push(ty);
@@ -84,6 +83,6 @@ impl<'a, 'f> Parser<'a, 'f> {
             .store
             .expressions
             .get(id)
-            .ok_or_else(|| soul_error_internal!(format!("{id:?} not found"), None).map_kind(Into::into))
+            .ok_or_else(|| soul_error_internal!(format!("{id:?} not found"), None).into_kind())
     }
 }

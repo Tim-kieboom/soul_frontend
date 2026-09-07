@@ -72,8 +72,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                     ExpressionKind::Return(None)
                 }
                 KeyWord::Return => ExpressionKind::Return(Some(
-                    self.parse_expression_id(LAMBDA_BODY_END)
-                        .map_err(|err| err.map_kind(Into::into))?,
+                    self.parse_expression_id(LAMBDA_BODY_END)?,
                 )),
                 _ => unreachable!(),
             };
@@ -83,7 +82,6 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         self.parse_expression_id(LAMBDA_BODY_END)
-            .map_err(|err| err.map_kind(Into::into))
     }
 }
 

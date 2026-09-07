@@ -39,6 +39,10 @@ impl From<Box<str>> for UnclassifiedKind {
     }
 }
 
+pub trait FromFaultKind<Kind> {
+    fn from_kind(value: Kind) -> Self;
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Fault<K = UnclassifiedKind> {
     severity: Severity,
@@ -62,13 +66,12 @@ impl<K> Fault<K> {
         &self.kind
     }
 
-    /// Converts a fault's kind into a different kind type, e.g. wrapping an
-    /// unmigrated `Fault<UnclassifiedKind>` into a crate-specific error-kind
-    /// enum's `Unclassified`/fallback variant.
-    pub fn map_kind<K2>(self, f: impl FnOnce(K) -> K2) -> Fault<K2> {
+    pub fn into_kind<K2>(self) -> Fault<K2> 
+    where K: Into<K2>
+    {
         Fault {
             severity: self.severity,
-            kind: f(self.kind),
+            kind: self.kind.into(),
             span: self.span,
             #[cfg(feature = "error_backtrace")]
             backtrace: self.backtrace,

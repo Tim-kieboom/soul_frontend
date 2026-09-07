@@ -5,20 +5,18 @@ use ast_model::{
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
     collections::try_result::{ToResult, TryError},
-    error::SoulResult,
+    fault::Fault,
     span::Span,
 };
 
 use crate::{
-    parser::Parser,
-    utils::{CONST, CURLY_CLOSE, CURLY_OPEN, IMPL, MUT, PUB},
+    fault::AstResult, parser::Parser, utils::{CONST, CURLY_CLOSE, CURLY_OPEN, IMPL, MUT, PUB},
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
-    pub(super) fn parse_use_block(&mut self) -> SoulResult<Statement> {
+    pub(super) fn parse_use_block(&mut self) -> AstResult<Statement> {
         let start_span = self.token().span;
-        self.expect(&TokenKind::Keyword(KeyWord::Use))
-            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&TokenKind::Keyword(KeyWord::Use))?;
         let use_generics = self.parse_generic_declare()?.unwrap_or(vec![]);
 
         let method_type = self.try_parse_type().merge_to_result()?;
@@ -57,8 +55,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             ));
         }
 
-        self.expect(&CURLY_OPEN)
-            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&CURLY_OPEN)?;
         loop {
             self.skip_end_lines();
             if self.current_is(&CURLY_CLOSE) {
@@ -76,9 +73,11 @@ impl<'a, 'f> Parser<'a, 'f> {
             let is_public = statement.is_public();
             match statement.node {
                 StatementKind::Variable(_) => {
-                    self.log_error(
-                        "Variable is not allowed in use block",
-                        Some(self.span_combine(start_span)),
+                    self.log_fault(
+                        Fault::error_with_kind(
+                            crate::fault::AstErrorKind::VariableNotAllowedInUseBlock,
+                            Some(self.span_combine(start_span)),
+                        ),
                     );
                     continue;
                 }
@@ -101,20 +100,20 @@ impl<'a, 'f> Parser<'a, 'f> {
                 StatementKind::UseBlock(_)
                 | StatementKind::Assignment(_)
                 | StatementKind::Expression { .. } => {
-                    self.log_error(
-                        format!(
-                            "{} can not be used in struct body",
-                            statement.node.variant_name()
+                    self.log_fault(
+                        Fault::error_with_kind(
+                            crate::fault::AstErrorKind::StatementNotAllowedInBody {
+                                kind: statement.node.variant_name().into(),
+                            },
+                            Some(self.span_combine(start_span)),
                         ),
-                        Some(self.span_combine(start_span)),
                     );
                     continue;
                 }
             }
         }
 
-        self.expect(&CURLY_CLOSE)
-            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&CURLY_CLOSE)?;
         self.current.this_type = prev;
         let use_block = UseBlock {
             ty: method_type,
@@ -134,16 +133,15 @@ impl<'a, 'f> Parser<'a, 'f> {
         &mut self,
         method_type: &SoulType,
         start_span: Span,
-    ) -> SoulResult<ImplBlock> {
-        self.expect(&IMPL).map_err(|err| err.map_kind(Into::into))?;
+    ) -> AstResult<ImplBlock> {
+        self.expect(&IMPL)?;
         let impl_trait = self.try_parse_type().merge_to_result()?;
 
         let mut methods = vec![];
         if !self.current_is(&CURLY_OPEN) {
             let is_const = self.try_bump_const().is_some();
             let name = self
-                .try_bump_consume_ident()
-                .map_err(|err| err.map_kind(Into::into))?;
+                .try_bump_consume_ident()?;
             methods.push(
                 match self.try_parse_function_declaration_id(
                     start_span,
@@ -152,7 +150,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                     name,
                 ) {
                     Ok(val) => val,
-                    Err(TryError::IsErr(err)) => return Err(err.map_kind(Into::into)),
+                    Err(TryError::IsErr(err)) => return Err(err),
                     Err(TryError::IsNotValue(err)) => return Err(err.fault),
                 }
                 .value,
@@ -163,8 +161,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             });
         }
 
-        self.expect(&CURLY_OPEN)
-            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&CURLY_OPEN)?;
         loop {
             self.skip_end_lines();
             if self.current_is(&CURLY_CLOSE) {
@@ -173,8 +170,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             let is_const = self.try_bump_const().is_some();
             let name = self
-                .try_bump_consume_ident()
-                .map_err(|err| err.map_kind(Into::into))?;
+                .try_bump_consume_ident()?;
             methods.push(
                 match self.try_parse_function_declaration_id(
                     start_span,
@@ -183,14 +179,13 @@ impl<'a, 'f> Parser<'a, 'f> {
                     name,
                 ) {
                     Ok(val) => val,
-                    Err(TryError::IsErr(err)) => return Err(err.map_kind(Into::into)),
+                    Err(TryError::IsErr(err)) => return Err(err),
                     Err(TryError::IsNotValue(err)) => return Err(err.fault),
                 }
                 .value,
             );
         }
-        self.expect(&CURLY_CLOSE)
-            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&CURLY_CLOSE)?;
 
         Ok(ImplBlock {
             impl_trait,
@@ -198,7 +193,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         })
     }
 
-    pub(crate) fn parse_impl_statement(&mut self, start_span: Span) -> SoulResult<Statement> {
+    pub(crate) fn parse_impl_statement(&mut self, start_span: Span) -> AstResult<Statement> {
         let method_type = self.current.this_type.clone().unwrap_or(SoulType::None);
         let impls = vec![self.parse_impl_block(&method_type, start_span)?];
 
@@ -216,7 +211,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         ))
     }
 
-    fn parse_use_method(&mut self, ty: &SoulType, start_span: Span) -> SoulResult<Methode> {
+    fn parse_use_method(&mut self, ty: &SoulType, start_span: Span) -> AstResult<Methode> {
         let is_public = self.current_is(&PUB);
         if is_public {
             self.bump();
@@ -224,11 +219,10 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let is_const = self.try_bump_const().is_some();
         let name = self
-            .try_bump_consume_ident()
-            .map_err(|err| err.map_kind(Into::into))?;
+            .try_bump_consume_ident()?;
         match self.try_parse_function_declaration_id(start_span, ty, is_const, name) {
             Ok(spanned) => Ok(Methode::new(spanned.value, is_public)),
-            Err(TryError::IsErr(err)) => Err(err.map_kind(Into::into)),
+            Err(TryError::IsErr(err)) => Err(err),
             Err(TryError::IsNotValue(err)) => Err(err.fault),
         }
     }

@@ -7,16 +7,13 @@ use ast_model::{
 use soul_tokenizer::model::{Token, TokenKind, keyword::KeyWord};
 use soul_utils::{
     define_symbols,
-    error::SoulResult,
     fault::Fault,
     soul_names::{Operator, Symbol},
     span::Span,
 };
 
 use crate::{
-    parse::expression::precedence::Precedence,
-    parser::Parser,
-    utils::{ARRAY, DOT, NOT, NULL, OPTIONAL, ROUND_CLOSE, ROUND_OPEN, SQUARE_OPEN},
+    fault::AstResult, parse::expression::precedence::Precedence, parser::Parser, utils::{ARRAY, DOT, NOT, NULL, OPTIONAL, ROUND_CLOSE, ROUND_OPEN, SQUARE_OPEN},
 };
 
 mod access;
@@ -31,12 +28,13 @@ impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_expression_id(
         &mut self,
         end_tokens: &[TokenKind],
-    ) -> SoulResult<ExpressionId> {
-        let value = self.pratt_parse_expression(Precedence::MIN, end_tokens, None)?;
+    ) -> AstResult<ExpressionId> {
+        let value = self
+            .pratt_parse_expression(Precedence::MIN, end_tokens, None)?;
         Ok(self.forest.store.insert_expression(value))
     }
 
-    pub(crate) fn parse_expression(&mut self, end_tokens: &[TokenKind]) -> SoulResult<Expression> {
+    pub(crate) fn parse_expression(&mut self, end_tokens: &[TokenKind]) -> AstResult<Expression> {
         self.pratt_parse_expression(Precedence::MIN, end_tokens, None)
     }
 
@@ -44,7 +42,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         &mut self,
         primary: Expression,
         end_tokens: &[TokenKind],
-    ) -> SoulResult<Expression> {
+    ) -> AstResult<Expression> {
         self.pratt_parse_expression(Precedence::MIN, end_tokens, Some(primary))
     }
 
@@ -53,7 +51,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         min_precedence: Precedence,
         end_tokens: &[TokenKind],
         primary: Option<Expression>,
-    ) -> SoulResult<Expression> {
+    ) -> AstResult<Expression> {
         let start_span = self.token().span;
 
         let mut unary_operators = vec![];
@@ -61,9 +59,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let mut left = match primary {
             Some(value) => value,
-            None => self
-                .parse_primary(end_tokens)
-                .map_err(|err| err.map_kind(Into::into))?,
+            None => self.parse_primary(end_tokens)?,
         };
 
         loop {
@@ -74,8 +70,8 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
 
             if self.current_is(&TokenKind::EndFile) {
-                return Err(Fault::error(
-                    "unexpected end of file while parsing expression".to_string(),
+                return Err(Fault::error_with_kind(
+                    crate::fault::AstErrorKind::UnexpectedEndOfFileInExpression,
                     Some(self.span_combine(start_span)),
                 ));
             }
@@ -86,24 +82,19 @@ impl<'a, 'f> Parser<'a, 'f> {
                 _ => break,
             };
 
-            match self
-                .consume_expression_operator(start_span)
-                .map_err(|err| err.map_kind(Into::into))?
-            {
+            match self.consume_expression_operator(start_span)? {
                 ExpressionOperator::Access {
                     ty: AccessType::AccessThis,
                     optional_map,
                 } => {
-                    self.access_this_expression(&mut left, start_span, optional_map)
-                        .map_err(|err| err.map_kind(Into::into))?;
+                    self.access_this_expression(&mut left, start_span, optional_map)?;
                     continue;
                 }
                 ExpressionOperator::Access {
                     ty: AccessType::AccessIndex,
                     optional_map,
                 } => {
-                    self.access_index_expression(&mut left, start_span, optional_map)
-                        .map_err(|err| err.map_kind(Into::into))?;
+                    self.access_index_expression(&mut left, start_span, optional_map)?;
                     continue;
                 }
                 _ => break,
@@ -120,8 +111,8 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
 
             if self.current_is(&TokenKind::EndFile) {
-                return Err(Fault::error(
-                    "unexpected end of file while parsing expression".to_string(),
+                return Err(Fault::error_with_kind(
+                    crate::fault::AstErrorKind::UnexpectedEndOfFileInExpression,
                     Some(self.span_combine(start_span)),
                 ));
             }
@@ -133,17 +124,11 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            match self
-                .consume_expression_operator(start_span)
-                .map_err(|err| err.map_kind(Into::into))?
-            {
+            match self.consume_expression_operator(start_span)? {
                 ExpressionOperator::Binary(operator)
                     if operator.value == BinaryOperatorKind::Arrow =>
                 {
-                    if self
-                        .try_parse_method_arm(&mut left, start_span, false)
-                        .map_err(|err| err.map_kind(Into::into))?
-                    {
+                    if self.try_parse_method_arm(&mut left, start_span, false)? {
                         continue;
                     }
                     let right = self.pratt_parse_expression(precedence.next(), end_tokens, None)?;
@@ -254,10 +239,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         left
     }
 
-    fn parse_sizeof(&mut self, left_id: ExpressionId) -> SoulResult<Expression> {
+    fn parse_sizeof(&mut self, left_id: ExpressionId) -> AstResult<Expression> {
         let span = self
-            .get_forest_expression(left_id)
-            .map_err(|err| err.map_kind(Into::into))?
+            .get_forest_expression(left_id)?
             .span;
         Ok(Expression::new(
             ExpressionKind::Sizeof(left_id),
@@ -372,19 +356,15 @@ impl<'a, 'f> Parser<'a, 'f> {
         &mut self,
         _start_span: Span,
     ) -> Result<ExpressionOperator, crate::fault::AstFault> {
-        self.expect(&TokenKind::Keyword(KeyWord::Typeof))
-            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&TokenKind::Keyword(KeyWord::Typeof))?;
 
         let kind = match &self.token().kind {
             TokenKind::Ident(_) => {
                 let type_name = self
-                    .try_bump_consume_ident()
-                    .map_err(|err| err.map_kind(Into::into))?;
-                self.expect(&TokenKind::Symbol(Symbol::Dot))
-                    .map_err(|err| err.map_kind(Into::into))?;
+                    .try_bump_consume_ident()?;
+                self.expect(&TokenKind::Symbol(Symbol::Dot))?;
                 let variant_name = self
-                    .try_bump_consume_ident()
-                    .map_err(|err| err.map_kind(Into::into))?;
+                    .try_bump_consume_ident()?;
                 TypeofKind::Union {
                     type_name,
                     variant_name,
@@ -416,12 +396,10 @@ impl<'a, 'f> Parser<'a, 'f> {
         &mut self,
         start_span: Span,
     ) -> Result<Expression, crate::fault::AstFault> {
-        self.expect(&ROUND_OPEN).map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&ROUND_OPEN)?;
         let inner = self
-            .parse_expression_id(&[ROUND_CLOSE, TokenKind::EndLine, TokenKind::EndFile])
-            .map_err(|err| err.map_kind(Into::into))?;
-        self.expect(&ROUND_CLOSE)
-            .map_err(|err| err.map_kind(Into::into))?;
+            .parse_expression_id(&[ROUND_CLOSE, TokenKind::EndLine, TokenKind::EndFile])?;
+        self.expect(&ROUND_CLOSE)?;
         Ok(Expression::new(
             ExpressionKind::New(inner),
             self.span_combine(start_span),
@@ -435,12 +413,11 @@ impl<'a, 'f> Parser<'a, 'f> {
         const START: &[TokenKind] = &[SQUARE_OPEN, ARRAY];
 
         if !self.current_is_any(START) {
-            return Err(self.get_expect_any_error(START).map_kind(Into::into));
+            return Err(self.get_expect_any_error(START));
         }
 
         let array = self
-            .parse_array(None)
-            .map_err(|err| err.map_kind(Into::into))?;
+            .parse_array(None)?;
         Ok(Expression::new(
             ExpressionKind::NewArray(array.value),
             self.span_combine(start_span),

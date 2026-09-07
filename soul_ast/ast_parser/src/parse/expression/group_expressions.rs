@@ -32,8 +32,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             ));
         }
 
-        self.expect(&SQUARE_OPEN)
-            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&SQUARE_OPEN)?;
 
         let position = self.tokens.current_position();
         let element_type = match self.try_parse_type() {
@@ -65,7 +64,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         generics: Vec<SoulType>,
         start_span: Span,
     ) -> Result<Spanned<StructConstructor>, crate::fault::AstFault> {
-        self.expect(&CURLY_OPEN).map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&CURLY_OPEN)?;
         self.skip_end_lines();
         let struct_type = self.type_from_ident(ident, generics);
 
@@ -106,17 +105,15 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
 
             let ident = self
-                .try_bump_consume_ident()
-                .map_err(|err| err.map_kind(Into::into))?;
+                .try_bump_consume_ident()?;
             let value = if self.current_is(&COMMA) || self.current_is(&CURLY_CLOSE) {
                 let id = self.alloc_node();
                 self.forest
                     .store
                     .insert_expression(Expression::new_variable(id, ident.clone()))
             } else {
-                self.expect(&COLON).map_err(|err| err.map_kind(Into::into))?;
-                self.parse_expression_id(&[COMMA, CURLY_CLOSE])
-                    .map_err(|err| err.map_kind(Into::into))?
+                self.expect(&COLON)?;
+                self.parse_expression_id(&[COMMA, CURLY_CLOSE])?
             };
 
             values.push((ident, value));
@@ -134,7 +131,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             continue;
         }
         self.skip_end_lines();
-        self.expect(&CURLY_CLOSE).map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&CURLY_CLOSE)?;
 
         let ctor = StructConstructor {
             values,
@@ -150,12 +147,11 @@ impl<'a, 'f> Parser<'a, 'f> {
         element_type: Option<SoulType>,
         start_span: Span,
     ) -> Result<Spanned<ArrayFiller>, crate::fault::AstFault> {
-        self.expect(&FOR).map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&FOR)?;
         let for_index = if matches!(self.token().kind, TokenKind::Ident(_)) && self.peek_is(&IN) {
             let binding = self
-                .try_bump_consume_ident()
-                .map_err(|err| err.map_kind(Into::into))?;
-            self.expect(&IN).map_err(|err| err.map_kind(Into::into))?;
+                .try_bump_consume_ident()?;
+            self.expect(&IN)?;
             Some(Binding {
                 id: self.alloc_node(),
                 ident: binding,
@@ -164,15 +160,11 @@ impl<'a, 'f> Parser<'a, 'f> {
             None
         };
         let amount = self
-            .parse_expression_id(&[LAMBDA_ARROW, SQUARE_CLOSE])
-            .map_err(|err| err.map_kind(Into::into))?;
-        self.expect(&LAMBDA_ARROW)
-            .map_err(|err| err.map_kind(Into::into))?;
+            .parse_expression_id(&[LAMBDA_ARROW, SQUARE_CLOSE])?;
+        self.expect(&LAMBDA_ARROW)?;
         let element = self
-            .parse_expression_id(&[SQUARE_CLOSE])
-            .map_err(|err| err.map_kind(Into::into))?;
-        self.expect(&SQUARE_CLOSE)
-            .map_err(|err| err.map_kind(Into::into))?;
+            .parse_expression_id(&[SQUARE_CLOSE])?;
+        self.expect(&SQUARE_CLOSE)?;
         Ok(Spanned::new(
             ArrayFiller {
                 amount,
@@ -200,8 +192,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
 
             let element = self
-                .parse_expression_id(&[SQUARE_CLOSE, COMMA])
-                .map_err(|err| err.map_kind(Into::into))?;
+                .parse_expression_id(&[SQUARE_CLOSE, COMMA])?;
             values.push(element);
 
             self.skip_end_lines();
@@ -209,12 +200,11 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            self.expect(&COMMA).map_err(|err| err.map_kind(Into::into))?;
+            self.expect(&COMMA)?;
         }
 
         self.skip_end_lines();
-        self.expect(&SQUARE_CLOSE)
-            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&SQUARE_CLOSE)?;
         Ok(Spanned::new(
             Array {
                 id: self.alloc_node(),

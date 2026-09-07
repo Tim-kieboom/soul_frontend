@@ -17,7 +17,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let mut spans = vec![];
         let mut paths = vec![];
-        self.expect(&IMPORT).map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&IMPORT)?;
         if self.current_is(&ROUND_OPEN) {
             self.bump();
             self.skip_end_lines();
@@ -33,7 +33,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 self.skip_end_lines();
             }
 
-            self.expect(&ROUND_CLOSE).map_err(|err| err.map_kind(Into::into))?;
+            self.expect(&ROUND_CLOSE)?;
         } else {
             let span = self.token().span;
             paths.push(self.inner_parse_import()?);
@@ -58,8 +58,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             &CURLY_OPEN => {
                 self.bump();
                 let (this, this_alias, items) = self.parse_import_items()?;
-                self.expect(&CURLY_CLOSE)
-                    .map_err(|err| err.map_kind(Into::into))?;
+                self.expect(&CURLY_CLOSE)?;
                 ImportKind::Items {
                     has_this: this,
                     this_alias,
@@ -74,8 +73,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 AS_STR => {
                     self.bump();
                     let alias = self
-                        .try_bump_consume_ident()
-                        .map_err(|err| err.map_kind(Into::into))?;
+                        .try_bump_consume_ident()?;
                     ImportKind::Alias(alias)
                 }
                 _ => ImportKind::Module,
@@ -98,22 +96,19 @@ impl<'a, 'f> Parser<'a, 'f> {
         let mut this_alias = None;
         loop {
             let name = self
-                .try_bump_consume_ident()
-                .map_err(|err| err.map_kind(Into::into))?;
+                .try_bump_consume_ident()?;
             if name.as_str() == "this" {
                 this = true;
                 if self.current_is(&AS) {
                     self.bump();
                     let alias = self
-                        .try_bump_consume_ident()
-                        .map_err(|err| err.map_kind(Into::into))?;
+                        .try_bump_consume_ident()?;
                     this_alias = Some(alias);
                 }
             } else if self.current_is(&AS) {
                 self.bump();
                 let alias = self
-                    .try_bump_consume_ident()
-                    .map_err(|err| err.map_kind(Into::into))?;
+                    .try_bump_consume_ident()?;
                 items.push(ImportItem::Alias { name, alias })
             } else {
                 items.push(ImportItem::Normal(name))
@@ -155,8 +150,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 path = SoulImportPath::new(current_path, IS_INTERNAL);
                 path.set_absolute();
                 self.bump();
-                self.expect(&SEPARATOR)
-                    .map_err(|err| err.map_kind(Into::into))?;
+                self.expect(&SEPARATOR)?;
             }
             &SEPARATOR => {
                 let mut current_path = self.current_path().to_path_buf();
@@ -171,8 +165,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                         ));
                     }
 
-                    self.expect(&SEPARATOR)
-                        .map_err(|err| err.map_kind(Into::into))?;
+                    self.expect(&SEPARATOR)?;
                 }
 
                 path = SoulImportPath::new(current_path, IS_INTERNAL);
@@ -181,9 +174,13 @@ impl<'a, 'f> Parser<'a, 'f> {
                 lib_name = Some(name.clone());
             }
             _ => {
-                self.log_error(
-                    format!("'{}' not allowed in import", self.token().kind.display()),
-                    Some(self.token().span),
+                self.log_fault(
+                    Fault::error_with_kind(
+                        crate::fault::AstErrorKind::TokenNotAllowedInImport {
+                            found: self.token().kind.display().into_boxed_str(),
+                        },
+                        Some(self.token().span),
+                    ),
                 );
             }
         }
@@ -194,8 +191,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
 
             let ident = self
-                .try_bump_consume_ident()
-                .map_err(|err| err.map_kind(Into::into))?;
+                .try_bump_consume_ident()?;
             path.push(ident.as_str());
 
             if !self.current_is(&SEPARATOR) {
@@ -210,8 +206,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         if !self.current_is(&TokenKind::EndFile) {
-            self.expect(&TokenKind::EndLine)
-                .map_err(|err| err.map_kind(Into::into))?;
+            self.expect(&TokenKind::EndLine)?;
         }
 
         Ok((path, lib_name))

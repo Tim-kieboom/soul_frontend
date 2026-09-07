@@ -7,17 +7,15 @@ use soul_tokenizer::model::{TokenKind, keyword::KeyWord, types::Types};
 use soul_utils::{
     Ident,
     collections::try_result::{
-        ResultTryErr, ResultTryNotValue, ToResult, TryErr, TryError, TryNotValue, TryOk, TryResult,
+        ResultTryErr, ResultTryNotValue, ToResult, TryErr, TryError, TryNotValue, TryOk,
     },
-    error::SoulResult,
     fault::Fault,
     literal::{Number, TokenLiteral},
     soul_names::PrimitiveTypes,
 };
 
 use crate::{
-    parser::Parser,
-    utils::{
+    fault::{AstFault, AstResult, AstTryResult}, parser::Parser, utils::{
         ARRAY, ARROW_LEFT, COLON, COMMA, DOT, MUT, NOT, OPTIONAL, POINTER, REF, ROUND_CLOSE,
         ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN,
     },
@@ -26,7 +24,7 @@ use crate::{
 impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn try_parse_type(
         &mut self,
-    ) -> TryResult<SoulType, Fault, crate::fault::AstErrorKind> {
+    ) -> AstTryResult<SoulType, AstFault> {
         let begin = self.tokens.current_position();
         let result = self.inner_parse_type();
         if result.is_err() {
@@ -55,7 +53,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     fn parse_token_type(
         &mut self,
         type_val: Types,
-    ) -> TryResult<SoulType, Fault, crate::fault::AstErrorKind> {
+    ) -> AstTryResult<SoulType, AstFault> {
         self.bump();
 
         let prim = match type_val {
@@ -97,7 +95,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let inner = if self.current_is(&ARROW_LEFT) {
             let mut generics = match self.parse_generic_define().merge_to_result() {
                 Ok(val) => val,
-                Err(err) => return Err(err.map_kind(Into::into)),
+                Err(err) => return Err(err),
             };
 
             let Some(inner) = generics.pop() else {
@@ -119,7 +117,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         if self.current_is(&ARROW_LEFT) {
             let mut generics = match self.parse_generic_define().merge_to_result() {
                 Ok(val) => val,
-                Err(err) => return Err(err.map_kind(Into::into)),
+                Err(err) => return Err(err),
             };
 
             if generics.len() > 2 {
@@ -149,7 +147,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
     }
 
-    fn inner_parse_type(&mut self) -> TryResult<SoulType, Fault, crate::fault::AstErrorKind> {
+    fn inner_parse_type(&mut self) -> AstTryResult<SoulType, AstFault> {
         let wrapper = self.get_type_wrapper()?;
         let mut ty = match self.get_base_type() {
             Ok(ty) => ty,
@@ -200,14 +198,14 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok(ty)
     }
 
-    fn get_base_type(&mut self) -> TryResult<SoulType, Fault, crate::fault::AstErrorKind> {
+    fn get_base_type(&mut self) -> AstTryResult<SoulType, AstFault> {
         const NONE_STR: &str = PrimitiveTypes::None.as_str();
 
         if self.current_is(&TokenKind::Keyword(KeyWord::Impl)) {
             self.bump();
             let inner = match self.try_parse_type() {
                 Ok(val) => val,
-                Err(TryError::IsErr(err)) => return TryErr(err.map_kind(Into::into)),
+                Err(TryError::IsErr(err)) => return TryErr(err),
                 Err(TryError::IsNotValue(err)) => return TryNotValue(err),
             };
             return TryOk(SoulType::ImplTrait(Box::new(inner)));
@@ -233,13 +231,17 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let ident = self
             .try_bump_consume_ident()
-            .map_err(|err| err.map_kind(Into::into))
             .try_not_value()?;
+        
         if let Ok(keyword) = KeyWord::from_str(ident.as_str()) {
-            return TryNotValue(Fault::error(
-                format!("keyword '{}' can not be type", keyword.as_str()),
-                Some(ident.span()),
-            ));
+            return TryNotValue(
+                Fault::error_with_kind(
+                    crate::fault::AstErrorKind::KeywordUsedAsType {
+                        keyword: keyword.as_str().into(),
+                    },
+                    Some(ident.span()),
+                ),
+            );
         }
 
         if let Ok(prim) = PrimitiveTypes::from_str(ident.as_str()) {
@@ -251,7 +253,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 Ok(val) => val,
                 Err(TryError::IsErr(err)) => return TryErr(err),
                 Err(TryError::IsNotValue(err)) => {
-                    return TryNotValue(err.map_kind(Into::into));
+                    return TryNotValue(err);
                 }
             }
         } else {
@@ -264,7 +266,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         }))
     }
 
-    fn get_type_wrapper(&mut self) -> TryResult<Vec<ParseWrappers>, Fault, crate::fault::AstErrorKind> {
+    fn get_type_wrapper(&mut self) -> AstTryResult<Vec<ParseWrappers>, AstFault> {
         let mut wrappers = vec![];
         loop {
             let possible_wrap = match self.token().kind {
@@ -303,7 +305,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         TryOk(wrappers)
     }
 
-    fn get_array_type_wrapper(&mut self) -> TryResult<ArrayKind, Fault, crate::fault::AstErrorKind> {
+    fn get_array_type_wrapper(&mut self) -> AstTryResult<ArrayKind, AstFault> {
         self.bump();
 
         let kind = if self.current_is_ident("_") {
@@ -322,28 +324,28 @@ impl<'a, 'f> Parser<'a, 'f> {
                     ArrayKind::StackArray(*size)
                 }
                 other => {
-                    return TryNotValue(Fault::error(
-                        format!(
-                            "token '{}' not allowed in array typeWrapper",
-                            other.display()
+                    return TryNotValue(
+                        Fault::error_with_kind(
+                            crate::fault::AstErrorKind::InvalidArrayTypeWrapperToken {
+                                found: other.display().into_boxed_str(),
+                            },
+                            Some(self.token().span),
                         ),
-                        Some(self.token().span),
-                    ));
+                    );
                 }
             }
         };
 
         self.bump();
         if self.token().kind != SQUARE_CLOSE {
-            return TryNotValue(self.get_expect_error(&SQUARE_CLOSE).map_kind(Into::into));
+            return TryNotValue(self.get_expect_error(&SQUARE_CLOSE));
         }
 
         Ok(kind)
     }
 
-    fn parse_tuple_kind(&mut self) -> SoulResult<TupleKind> {
-        self.expect(&ROUND_OPEN)
-            .map_err(|err| err.map_kind(Into::into))?;
+    fn parse_tuple_kind(&mut self) -> AstResult<TupleKind> {
+        self.expect(&ROUND_OPEN)?;
         self.skip_end_lines();
         if self.peek_is(&COLON) {
             return self.parse_named_tuple().map(TupleKind::NamedTuple);
@@ -352,13 +354,12 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.parse_tuple().map(TupleKind::Tuple)
     }
 
-    fn parse_named_tuple(&mut self) -> SoulResult<NamedTuple> {
+    fn parse_named_tuple(&mut self) -> AstResult<NamedTuple> {
         let mut values = NamedTuple::new();
         loop {
             let ident = self
-                .try_bump_consume_ident()
-                .map_err(|err| err.map_kind(Into::into))?;
-            self.expect(&COLON).map_err(|err| err.map_kind(Into::into))?;
+                .try_bump_consume_ident()?;
+            self.expect(&COLON)?;
             let ty = self.try_parse_type().merge_to_result()?;
             values.push((ident, ty));
 
@@ -369,12 +370,11 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.bump();
         }
 
-        self.expect(&ROUND_CLOSE)
-            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&ROUND_CLOSE)?;
         Ok(values)
     }
 
-    fn parse_tuple(&mut self) -> SoulResult<Tuple> {
+    fn parse_tuple(&mut self) -> AstResult<Tuple> {
         let mut values = Tuple::new();
         loop {
             let ty = self.try_parse_type().merge_to_result()?;
@@ -387,8 +387,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.bump();
         }
 
-        self.expect(&ROUND_CLOSE)
-            .map_err(|err| err.map_kind(Into::into))?;
+        self.expect(&ROUND_CLOSE)?;
         Ok(values)
     }
 }
