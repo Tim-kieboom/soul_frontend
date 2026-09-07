@@ -1,0 +1,46 @@
+answer(): int {
+    return 42
+}
+
+add(a: int, b: int): int {
+    c := a + b
+    return c
+}
+
+computeChain(a: int, b: int, c: int): int {
+    x := a + b
+    y := x * c
+    z := y - a
+    return z
+}
+
+weightedSum(a: int, b: int, c: int): int {
+    return a + b * c
+}
+
+arithmeticOps(a: int, b: int): int {
+    CONST :: 1
+    sum := a + b
+    diff := a - b
+    product := a * b
+    quotient := a / b
+    remainder := a % b
+    return sum + diff + product + quotient - remainder
+}
+
+addUint(a: uint, b: uint): uint {
+    return a + b
+}
+
+average(mut a: f64, b: f64): f64 {
+    sum := a + b
+    return sum
+}
+
+identity(flag: bool): bool {
+    return flag
+}
+
+alwaysTrue(): bool {
+    return true
+}

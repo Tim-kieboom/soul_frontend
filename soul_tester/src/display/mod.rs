@@ -21,6 +21,7 @@ use crate::{
 pub(crate) mod ast;
 pub(crate) mod benchmark;
 pub(crate) mod fault;
+pub(crate) mod mir;
 pub(crate) mod tokenizer;
 pub mod writer;
 

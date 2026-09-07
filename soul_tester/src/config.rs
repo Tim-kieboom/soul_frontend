@@ -47,7 +47,7 @@ impl Configs {
         }
     }
 
-    pub fn create_main_path(&self) -> PathBuf {
+    pub fn to_main_path(&self) -> PathBuf {
         self.source_path.join(&self.main_file_name)
     }
 

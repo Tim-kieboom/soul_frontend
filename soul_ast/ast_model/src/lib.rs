@@ -181,6 +181,12 @@ impl<K> AstTree<K> {
         &self.context.faults
     }
 
+    pub fn drain_faults(&mut self) -> FaultCollector<K> {
+        let mut faults = FaultCollector::default();
+        std::mem::swap(&mut self.context.faults, &mut faults);
+        faults
+    }
+
     pub fn log_fault(&mut self, fault: Fault<K>) {
         self.context.faults.push(fault);
     }

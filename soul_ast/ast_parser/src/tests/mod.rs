@@ -72,7 +72,7 @@ fn create_test_crate_store(test_env: &TestEnv) -> CrateStore {
     for name in &["foo", "soul", "bar"] {
         store.insert(
             name.to_string(),
-            CrateEntry::new(name.to_string(), test_env.base.clone()).with_linkage(Linkage::Static),
+            CrateEntry::new(name.to_string(), test_env.base.clone()).apply_linkage(Linkage::Static),
         );
     }
     store

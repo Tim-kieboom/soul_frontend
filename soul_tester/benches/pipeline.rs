@@ -58,7 +58,7 @@ fn build_crate_store(manifest_dir: &Path) -> CrateStore {
         let source_root = soul_utils::collections::crate_store::resolve_source_root(&canonical);
         store.insert(
             name.clone(),
-            CrateEntry::new(name.clone(), source_root).with_linkage(spec.linkage),
+            CrateEntry::new(name.clone(), source_root).apply_linkage(spec.linkage),
         );
     }
     store

@@ -60,7 +60,7 @@ impl CrateEntry {
         }
     }
 
-    pub fn with_linkage(mut self, linkage: Linkage) -> Self {
+    pub fn apply_linkage(mut self, linkage: Linkage) -> Self {
         self.linkage = linkage;
         self
     }

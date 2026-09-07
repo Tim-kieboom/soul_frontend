@@ -1,12 +1,13 @@
 use crate::display::{
     ast::display_ast, benchmark::display_benchmark, fault::display_fault, fault_to_anyhow_error,
-    tokenizer::display_tokenizer,
+    mir::display_mir, tokenizer::display_tokenizer,
 };
 use anyhow::Result;
 use ast_model::AstTree;
 use ast_parser::fault::AstErrorKind;
 use ast_run::{AstRequest, to_ast};
 use mir_parser::fault::MirErrorKind;
+use mir_run::MirProgram;
 use soul_tokenizer::{TokenStream, to_token_stream};
 use soul_utils::{
     CrateContext,
@@ -16,6 +17,7 @@ use soul_utils::{
         crate_store::{CrateEntry, CrateStore, Manifest, resolve_source_root},
         module_store::ModuleStore,
     },
+    fault::FaultCollector,
 };
 
 use std::{
@@ -30,13 +32,13 @@ fn main() {
     match frontend(&mut Benchmark::new()) {
         Ok(true) => println!("{GREEN}success{DEFAULT}"),
         Ok(false) => eprintln!("{RED}failed{DEFAULT}"),
-        Err(err) => eprintln!("{err}"),
+        Err(err) => eprintln!("{RED}!!error!!: {err}{DEFAULT}"),
     }
 }
 
 fn frontend(benchmark: &mut Benchmark) -> Result<bool> {
     let source_folder = config::CONFIG.source_path().to_path_buf();
-    let main_path = config::CONFIG.create_main_path();
+    let main_path = config::CONFIG.to_main_path();
     let mut module_store = ModuleStore::new();
 
     let crate_store = build_crate_store(&source_folder);
@@ -45,7 +47,7 @@ fn frontend(benchmark: &mut Benchmark) -> Result<bool> {
     module_store.insert_root(main_path);
     let tokens = tokenize(&file, &module_store)?;
 
-    let ast = ast(
+    let mut ast = ast(
         tokens,
         AstRequest {
             benchmark,
@@ -55,21 +57,27 @@ fn frontend(benchmark: &mut Benchmark) -> Result<bool> {
         },
     )?;
 
-    let mut all_faults = ast.faults().clone().into_unclassified();
-    let fail = all_faults.fails(config::COMPILER_OPTIONS.fail_level);
-
-    if !fail {
-        let mut mir_context = CrateContext::<MirErrorKind>::default();
-        mir_run::to_mir(&ast, benchmark, &mut mir_context, &config::COMPILER_OPTIONS);
-        all_faults.extend_into(mir_context.faults);
-    }
+    let mut all_faults = ast.drain_faults().into_unclassified();
+    // Captured once, before MIR faults are merged in below: MIR lowering only
+    // covers a small subset of the language today (see `mir_parser`'s module
+    // docs), so a function it can't lower isn't a compiler-correctness
+    // failure the way an actual parse/resolve error is. Deciding pass/fail
+    // from `all_faults` again *after* the merge would silently let MIR faults
+    // flip it, which is exactly the bug this comment is here to prevent.
+    let ast_failed = failed(&all_faults);
+    let mir_program = if ast_failed {
+        MirProgram::empty()
+    } else {
+        mir(&ast, benchmark, &mut all_faults)
+    };
+    display_mir(&mir_program)?;
 
     for fault in all_faults.iter() {
         display_fault(fault, &module_store, &config::PRINT_CONFIGS, &mut stdout())?;
     }
 
     display_benchmark(benchmark, &config::PRINT_CONFIGS, &mut stdout())?;
-    Ok(!fail)
+    Ok(!ast_failed)
 }
 
 fn build_crate_store(source_folder: &Path) -> CrateStore {
@@ -83,26 +91,26 @@ fn build_crate_store(source_folder: &Path) -> CrateStore {
         return store;
     };
 
-    let Some(deps) = &manifest.dependencies else {
+    let Some(dependencies) = &manifest.dependencies else {
         return store;
     };
 
-    for (name, spec) in deps {
+    for (name, spec) in dependencies {
         let Some(path_str) = &spec.path else {
             continue;
         };
 
-        let dep_path = if Path::new(path_str).is_absolute() {
+        let dependencie_path = if Path::new(path_str).is_absolute() {
             PathBuf::from(path_str)
         } else {
             manifest_dir.join(path_str)
         };
 
-        let canonical = dep_path.canonicalize().unwrap_or(dep_path);
+        let canonical = dependencie_path.canonicalize().unwrap_or(dependencie_path);
         let source_root = resolve_source_root(&canonical);
         store.insert(
             name.clone(),
-            CrateEntry::new(name.clone(), source_root).with_linkage(spec.linkage),
+            CrateEntry::new(name.clone(), source_root).apply_linkage(spec.linkage),
         );
     }
     store
@@ -119,6 +127,14 @@ fn find_manifest_dir(start: &Path) -> Option<PathBuf> {
     None
 }
 
+fn failed(faults: &FaultCollector) -> bool {
+    faults.fails(config::COMPILER_OPTIONS.fail_level)
+}
+
+fn source_file(path: &Path) -> io::Result<String> {
+    std::fs::read_to_string(path)
+}
+
 fn tokenize<'a>(file: &'a str, modules: &ModuleStore) -> Result<TokenStream<'a>> {
     let tokens = to_token_stream(file, modules.get_root_id())
         .map_err(|f| fault_to_anyhow_error(&f, modules))?;
@@ -133,6 +149,13 @@ fn ast<'a>(tokens: TokenStream<'a>, request: AstRequest<'a>) -> Result<AstTree<A
     Ok(ast)
 }
 
-fn source_file(path: &Path) -> io::Result<String> {
-    std::fs::read_to_string(path)
+fn mir(
+    ast: &AstTree<AstErrorKind>,
+    benchmark: &mut Benchmark,
+    all_faults: &mut FaultCollector,
+) -> MirProgram {
+    let mut mir_context = CrateContext::<MirErrorKind>::default();
+    let mir_program = mir_run::to_mir(ast, benchmark, &mut mir_context, &config::COMPILER_OPTIONS);
+    all_faults.extend_into(mir_context.faults);
+    mir_program
 }

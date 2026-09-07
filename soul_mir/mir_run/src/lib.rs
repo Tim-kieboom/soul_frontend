@@ -34,6 +34,13 @@ use soul_utils::{
 pub struct MirProgram {
     pub functions: VecMap<FunctionId, MirFunction>,
 }
+impl MirProgram {
+    pub const fn empty() -> Self {
+        Self {
+            functions: VecMap::const_default(),
+        }
+    }
+}
 
 pub fn to_mir<K>(
     ast: &AstTree<K>,

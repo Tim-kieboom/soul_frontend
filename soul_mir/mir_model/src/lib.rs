@@ -25,7 +25,7 @@ pub type MirType = SoulType;
 /// (e.g. a post-monomorphization sized-array constant).
 pub type ConstValue = Literal;
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct MirFunction {
     pub name: FunctionId,
     pub locals: VecMap<LocalId, LocalDecl>,
@@ -36,14 +36,14 @@ pub struct MirFunction {
     pub return_local: LocalId,
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct LocalDecl {
     pub ty: MirType,
     pub mutability: TypeModifier,
     pub span: Span,
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct BasicBlock {
     pub statements: Vec<Statement>,
     pub terminator: Terminator,
@@ -51,7 +51,7 @@ pub struct BasicBlock {
 
 /// No control flow of their own — always fall through to the next statement (or
 /// the block's terminator, for the last one).
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub enum Statement {
     Assign(Place, Rvalue),
     /// Marks a local as moved-from without an assignment (e.g. the source operand
@@ -66,7 +66,7 @@ pub enum Statement {
     StorageDead(LocalId),
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub enum Rvalue {
     Use(Operand),
     BinaryOp(BinaryOperatorKind, Operand, Operand),
@@ -76,14 +76,14 @@ pub enum Rvalue {
     Cast(Operand, MirType),
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub enum AggregateKind {
     Struct,
     Tuple,
     Array,
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub enum Operand {
     /// `place`'s type is `Copy` or `AutoCopy`; reading it doesn't invalidate the source.
     Copy(Place),
@@ -93,7 +93,7 @@ pub enum Operand {
     Constant(ConstValue),
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct Place {
     pub local: LocalId,
     pub projection: Vec<PlaceElem>,
@@ -109,7 +109,7 @@ impl Place {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub enum PlaceElem {
     Field(usize),
     Index(LocalId),
@@ -117,7 +117,7 @@ pub enum PlaceElem {
 }
 
 /// Every block ends in exactly one of these; this is the whole CFG.
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub enum Terminator {
     Goto(BlockId),
     /// Covers `if`/match-chain/traditional `match` uniformly.
