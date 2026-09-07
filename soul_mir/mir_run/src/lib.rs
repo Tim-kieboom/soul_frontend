@@ -35,8 +35,8 @@ pub struct MirProgram {
     pub functions: VecMap<FunctionId, MirFunction>,
 }
 
-pub fn to_mir(
-    ast: &AstTree,
+pub fn to_mir<K>(
+    ast: &AstTree<K>,
     benchmark: &mut Benchmark,
     context: &mut CrateContext,
     _options: &CompilerOptions,

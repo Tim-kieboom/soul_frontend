@@ -213,11 +213,11 @@ fn struct_body_rejects_assignment_statement() {
         context.faults.faults
     );
     assert!(
-        context
-            .faults
-            .faults
-            .iter()
-            .any(|fault| fault.message().contains("can not be used in struct body")),
+        context.faults.faults.iter().any(|fault| matches!(
+            fault.kind(),
+            crate::fault::AstErrorKind::StatementNotAllowedInBody { kind }
+                if kind.as_ref() == "assignment"
+        )),
         "{:#?}",
         context.faults.faults
     );
@@ -233,11 +233,11 @@ fn struct_body_rejects_expression_statement() {
         context.faults.faults
     );
     assert!(
-        context
-            .faults
-            .faults
-            .iter()
-            .any(|fault| fault.message().contains("can not be used in struct body")),
+        context.faults.faults.iter().any(|fault| matches!(
+            fault.kind(),
+            crate::fault::AstErrorKind::StatementNotAllowedInBody { kind }
+                if kind.as_ref() == "expression"
+        )),
         "{:#?}",
         context.faults.faults
     );

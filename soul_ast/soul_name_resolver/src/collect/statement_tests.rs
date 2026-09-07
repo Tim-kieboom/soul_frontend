@@ -5,7 +5,7 @@ use ast_model::{
     soul_type::SoulType,
     statements::{StatementKind, VarPattern},
 };
-use ast_parser::{ParseInfo, parse_module};
+use ast_parser::{ParseInfo, fault::AstErrorKind, parse_module};
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
     collections::{crate_store::CrateStore, module_store::ModuleStore},
@@ -16,7 +16,7 @@ use crate::name_resolve;
 
 /// Tokenizes, parses, and name-resolves a single-file snippet with no imports,
 /// returning the resulting `AstTree` so tests can inspect its declares/faults.
-fn resolve_source(source: &str) -> AstTree {
+fn resolve_source(source: &str) -> AstTree<AstErrorKind> {
     let mut module_store = ModuleStore::new();
     module_store.insert_root(PathBuf::from("test.soul"));
     let root = module_store.get_root_id();
@@ -42,7 +42,7 @@ fn resolve_source(source: &str) -> AstTree {
 }
 
 /// Finds the inferred/declared type of the first `let`/`mut` binding named `name`.
-fn variable_type(ast: &AstTree, name: &str) -> Option<SoulType> {
+fn variable_type(ast: &AstTree<ast_parser::fault::AstErrorKind>, name: &str) -> Option<SoulType> {
     ast.crates.store.statements.values().find_map(|statement| {
         let StatementKind::Variable(variable) = &statement.node else {
             return None;

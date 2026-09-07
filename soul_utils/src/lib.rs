@@ -5,7 +5,10 @@ use std::{
     rc::Rc,
 };
 
-use crate::{fault::FaultCollector, span::Span};
+use crate::{
+    fault::{FaultCollector, UnclassifiedKind},
+    span::Span,
+};
 
 pub mod char_colors;
 pub mod collections;
@@ -45,10 +48,19 @@ macro_rules! dbg_println {
     };
 }
 
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
-pub struct CrateContext {
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CrateContext<K = UnclassifiedKind> {
     pub is_lib: bool,
-    pub faults: FaultCollector,
+    pub faults: FaultCollector<K>,
+}
+
+impl<K> Default for CrateContext<K> {
+    fn default() -> Self {
+        CrateContext {
+            is_lib: false,
+            faults: FaultCollector::default(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]

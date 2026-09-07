@@ -596,9 +596,11 @@ fn invalid_assign_operator_for_declaration_is_rejected() {
         "expected an error when a typed declaration uses a compound-assign operator"
     );
     assert!(
-        context.faults.faults.iter().any(|fault| fault
-            .message()
-            .contains("is not valid for variable declaration")),
+        context.faults.faults.iter().any(|fault| matches!(
+            fault.kind(),
+            crate::fault::AstErrorKind::InvalidAssignOperatorForDeclaration { assign_op }
+                if assign_op.as_ref() == "+="
+        )),
         "{:#?}",
         context.faults.faults
     );

@@ -31,7 +31,7 @@ fn display_tokens<'a>(
     writer: &mut impl Writer,
 ) -> Result<()> {
     for token in tokens {
-        let token = token.map_err(|f| fault_to_anyhow_error(&f.into_kind(), modules))?;
+        let token = token.map_err(|f| fault_to_anyhow_error(&f, modules))?;
         let span_str = format!("{:?}", token.span);
         let tab = " ".repeat(30 - span_str.len());
 

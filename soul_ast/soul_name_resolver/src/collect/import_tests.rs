@@ -5,7 +5,7 @@ use std::{
 };
 
 use ast_model::AstTree;
-use ast_parser::{ParseInfo, parse_module};
+use ast_parser::{ParseInfo, fault::AstErrorKind, parse_module};
 use soul_tokenizer::to_token_stream;
 use soul_utils::collections::{crate_store::CrateStore, module_store::ModuleStore};
 
@@ -28,7 +28,7 @@ fn write_module(dir: &Path, name: &str, content: &str) {
     fs::write(dir.join(format!("{name}.soul")), content).expect("failed to write test module");
 }
 
-fn resolve_in_dir(dir: &Path, source: &str) -> AstTree {
+fn resolve_in_dir(dir: &Path, source: &str) -> AstTree<AstErrorKind> {
     let mut module_store = ModuleStore::new();
     module_store.insert_root(PathBuf::from("root.soul"));
     let root = module_store.get_root_id();
@@ -53,7 +53,7 @@ fn resolve_in_dir(dir: &Path, source: &str) -> AstTree {
     ast
 }
 
-fn fault_count_containing(ast: &AstTree, needle: &str) -> usize {
+fn fault_count_containing(ast: &AstTree<AstErrorKind>, needle: &str) -> usize {
     ast.faults()
         .iter()
         .filter(|fault| fault.message().contains(needle))

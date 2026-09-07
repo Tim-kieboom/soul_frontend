@@ -6,6 +6,7 @@ use ast_model::{
     soul_type::SoulType,
     statements::{FunctionModifier, StatementId, VarPattern, Variable},
 };
+use ast_parser::fault::AstErrorKind;
 use soul_utils::{
     CrateContext, FunctionId, Ident,
     collections::{crate_store::CrateStore, module_store::ModuleStore, vec_map::VecMap},
@@ -19,7 +20,11 @@ mod utils;
 
 /// Resolves all names (variables, functions, types) in `ast`'s root module,
 /// filling in the store's declarations and scope/resolution info in place.
-pub fn name_resolve(module_store: &mut ModuleStore, ast: &mut AstTree, crate_store: &CrateStore) {
+pub fn name_resolve(
+    module_store: &mut ModuleStore,
+    ast: &mut AstTree<AstErrorKind>,
+    crate_store: &CrateStore,
+) {
     let root = ast.root;
     let mut resolver = NameResolver::new(ast.root, module_store, ast, crate_store);
     resolver.collect_module(root);
@@ -30,7 +35,7 @@ struct NameResolver<'a> {
     store: &'a AstStore,
     crate_store: &'a CrateStore,
     modules: &'a mut ModuleStore,
-    context: &'a mut CrateContext,
+    context: &'a mut CrateContext<AstErrorKind>,
     scope_info: &'a mut ScopeInfo,
     declares: &'a mut DeclareStore,
     ast_modules: &'a mut AstModuleStore,
@@ -53,7 +58,7 @@ impl<'a> NameResolver<'a> {
     pub fn new(
         module: ModuleId,
         modules: &'a mut ModuleStore,
-        ast: &'a mut AstTree,
+        ast: &'a mut AstTree<AstErrorKind>,
         crate_store: &'a CrateStore,
     ) -> Self {
         Self {

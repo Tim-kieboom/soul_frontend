@@ -4,6 +4,7 @@ use crate::display::{
 };
 use anyhow::Result;
 use ast_model::AstTree;
+use ast_parser::fault::AstErrorKind;
 use ast_run::{AstRequest, to_ast};
 use soul_tokenizer::{TokenStream, to_token_stream};
 use soul_utils::{
@@ -110,13 +111,13 @@ fn find_manifest_dir(start: &Path) -> Option<PathBuf> {
 
 fn tokenize<'a>(file: &'a str, modules: &ModuleStore) -> Result<TokenStream<'a>> {
     let tokens = to_token_stream(file, modules.get_root_id())
-        .map_err(|f| fault_to_anyhow_error(&f.into_kind(), modules))?;
+        .map_err(|f| fault_to_anyhow_error(&f, modules))?;
 
     display_tokenizer(&tokens, modules)?;
     Ok(tokens)
 }
 
-fn ast<'a>(tokens: TokenStream<'a>, request: AstRequest<'a>) -> Result<AstTree> {
+fn ast<'a>(tokens: TokenStream<'a>, request: AstRequest<'a>) -> Result<AstTree<AstErrorKind>> {
     let ast = to_ast(tokens, request, &config::COMPILER_OPTIONS);
     display_ast(&ast)?;
     Ok(ast)

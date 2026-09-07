@@ -7,7 +7,7 @@ use soul_utils::{
     fault::Fault,
 };
 use std::{
-    fmt::Debug,
+    fmt::{Debug, Display},
     fs::{File, OpenOptions},
     io::Write,
     path::Path,
@@ -59,7 +59,10 @@ fn vecmap_to_pretty_vec<K: VecMapIndex + Debug, V>(map: &VecMap<K, V>) -> Vec<Ve
         .collect()
 }
 
-pub(crate) fn fault_to_anyhow_error(fault: &Fault, module_store: &ModuleStore) -> anyhow::Error {
+pub(crate) fn fault_to_anyhow_error<K: Display>(
+    fault: &Fault<K>,
+    module_store: &ModuleStore,
+) -> anyhow::Error {
     let mut message = String::new();
     if let Err(err) = display_fault(fault, module_store, &config::PRINT_CONFIGS, &mut message) {
         err

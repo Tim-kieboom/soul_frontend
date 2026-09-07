@@ -5,11 +5,12 @@ use soul_utils::char_colors::*;
 use soul_utils::collections::module_store::ModuleStore;
 use soul_utils::fault::Severity;
 use soul_utils::{fault::Fault, span::Span};
+use std::fmt::Display;
 use std::path::PathBuf;
 use std::str::Lines;
 
-pub(crate) fn display_fault(
-    fault: &Fault,
+pub(crate) fn display_fault<K: Display>(
+    fault: &Fault<K>,
     modules: &ModuleStore,
     configs: &PrintConfigs,
     writer: &mut impl Writer,
@@ -44,8 +45,8 @@ pub(crate) fn display_fault(
     Ok(())
 }
 
-fn fault_message(
-    fault: &Fault,
+fn fault_message<K: std::fmt::Display>(
+    fault: &Fault<K>,
     modules: &ModuleStore,
     writer: &mut impl Writer,
     configs: &PrintConfigs,

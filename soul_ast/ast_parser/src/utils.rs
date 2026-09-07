@@ -339,6 +339,6 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     pub(crate) fn log_fault(&mut self, fault: crate::fault::AstFault) {
-        self.context.faults.push(fault.into_kind());
+        self.context.faults.push(fault);
     }
 }

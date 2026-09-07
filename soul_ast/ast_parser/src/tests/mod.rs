@@ -25,7 +25,7 @@ use soul_utils::{
     span::ModuleId,
 };
 
-use crate::{ParseInfo, parse_module};
+use crate::{ParseInfo, fault::AstErrorKind, parse_module};
 
 mod associated_constants;
 mod attributes;
@@ -78,7 +78,7 @@ fn create_test_crate_store(test_env: &TestEnv) -> CrateStore {
     store
 }
 
-fn parse(source: &str) -> (Module, AstStore, CrateContext) {
+fn parse(source: &str) -> (Module, AstStore, CrateContext<AstErrorKind>) {
     let test_env = &*TEST_ENV;
     let module_id = module_id();
     let stream = to_token_stream(source, module_id).unwrap();
@@ -569,19 +569,27 @@ fn multiple_statements() {
 // ----------------------------------------------------------------
 //  Error recovery — parser does not panic on bad input
 // ----------------------------------------------------------------
-fn has_fault_containing(context: &CrateContext, needle: &str) -> bool {
+fn has_fault_matching(
+    context: &CrateContext<crate::fault::AstErrorKind>,
+    predicate: impl Fn(&crate::fault::AstErrorKind) -> bool,
+) -> bool {
     context
         .faults
         .faults
         .iter()
-        .any(|fault| fault.message().contains(needle))
+        .any(|fault| predicate(fault.kind()))
 }
 
 #[test]
 fn error_on_bad_token() {
     let (_, _, context) = parse("???");
     assert!(
-        has_fault_containing(&context, "is invalid as start of expression"),
+        has_fault_matching(&context, |kind| {
+            matches!(
+                kind,
+                crate::fault::AstErrorKind::InvalidExpressionStart { .. }
+            )
+        }),
         "expected an 'invalid start of expression' fault: {:#?}",
         context.faults.faults
     );
@@ -591,7 +599,12 @@ fn error_on_bad_token() {
 fn error_partial_expression() {
     let (_, _, context) = parse("1 +\n");
     assert!(
-        has_fault_containing(&context, "is invalid as start of expression"),
+        has_fault_matching(&context, |kind| {
+            matches!(
+                kind,
+                crate::fault::AstErrorKind::InvalidExpressionStart { .. }
+            )
+        }),
         "expected an 'invalid start of expression' fault: {:#?}",
         context.faults.faults
     );

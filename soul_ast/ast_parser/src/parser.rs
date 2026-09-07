@@ -44,7 +44,7 @@ pub(crate) struct Parser<'a, 'f> {
     pub(crate) tokens: TokenStream<'a>,
     pub(crate) crate_source_path: PathBuf,
     pub(crate) modules: &'f mut ModuleStore,
-    pub(crate) context: &'f mut CrateContext,
+    pub(crate) context: &'f mut CrateContext<crate::fault::AstErrorKind>,
     pub(crate) forest: &'f mut CrateForest,
     pub(crate) crate_store: &'f CrateStore,
 }

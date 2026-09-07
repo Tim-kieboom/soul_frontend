@@ -339,9 +339,10 @@ fn use_block_rejects_variable_statement() {
         context.faults.faults
     );
     assert!(
-        context.faults.faults.iter().any(|fault| fault
-            .message()
-            .contains("Variable is not allowed in use block")),
+        context.faults.faults.iter().any(|fault| matches!(
+            fault.kind(),
+            crate::fault::AstErrorKind::VariableNotAllowedInUseBlock
+        )),
         "{:#?}",
         context.faults.faults
     );

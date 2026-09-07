@@ -10,7 +10,7 @@ use soul_utils::{
 
 use crate::parser::Parser;
 
-mod fault;
+pub mod fault;
 mod parse;
 mod parser;
 mod utils;
@@ -25,7 +25,7 @@ pub struct ParseInfo<'f> {
     pub crate_source_folder: PathBuf,
 
     pub modules: &'f mut ModuleStore,
-    pub context: &'f mut CrateContext,
+    pub context: &'f mut CrateContext<crate::fault::AstErrorKind>,
     pub forest: &'f mut CrateForest,
     pub crate_store: &'f CrateStore,
 }

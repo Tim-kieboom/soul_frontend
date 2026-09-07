@@ -17,7 +17,7 @@ use soul_utils::{
         vec_map::{VecMap, VecMapIndex},
         vec_set::VecSet,
     },
-    fault::{Fault, FaultCollector},
+    fault::{Fault, FaultCollector, UnclassifiedKind},
     ids::IdGenerator,
     linkage::Linkage,
     span::ModuleId,
@@ -47,9 +47,9 @@ pub struct CrateForest {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct AstTree {
+pub struct AstTree<K = UnclassifiedKind> {
     pub root: ModuleId,
-    pub context: CrateContext,
+    pub context: CrateContext<K>,
     pub scope_info: ScopeInfo,
     pub declares: DeclareStore,
     pub crates: CrateForest,
@@ -166,7 +166,7 @@ impl AstStore {
     }
 }
 
-impl AstTree {
+impl<K> AstTree<K> {
     pub fn new(root: ModuleId) -> Self {
         Self {
             root,
@@ -177,11 +177,11 @@ impl AstTree {
         }
     }
 
-    pub fn faults(&self) -> &FaultCollector {
+    pub fn faults(&self) -> &FaultCollector<K> {
         &self.context.faults
     }
 
-    pub fn log_fault(&mut self, fault: Fault) {
+    pub fn log_fault(&mut self, fault: Fault<K>) {
         self.context.faults.push(fault);
     }
 }

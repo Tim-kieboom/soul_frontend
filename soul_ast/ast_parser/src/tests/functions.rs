@@ -587,9 +587,10 @@ fn non_default_parameter_after_default_parameter_is_rejected() {
         context.faults.faults
     );
     assert!(
-        context.faults.faults.iter().any(|fault| fault
-            .message()
-            .contains("non default parameter after default parameter")),
+        context.faults.faults.iter().any(|fault| matches!(
+            fault.kind(),
+            crate::fault::AstErrorKind::NonDefaultParameterAfterDefault
+        )),
         "{:#?}",
         context.faults.faults
     );
@@ -621,11 +622,10 @@ fn multiple_this_parameters_is_rejected() {
         "expected an error when a signature declares 'this' more than once"
     );
     assert!(
-        context
-            .faults
-            .faults
-            .iter()
-            .any(|fault| fault.message().contains("more then one 'this'")),
+        context.faults.faults.iter().any(|fault| matches!(
+            fault.kind(),
+            crate::fault::AstErrorKind::DuplicateThisParameter
+        )),
         "{:#?}",
         context.faults.faults
     );
@@ -639,11 +639,11 @@ fn extern_function_unsupported_language_is_rejected() {
         "expected an error for an unsupported extern language"
     );
     assert!(
-        context
-            .faults
-            .faults
-            .iter()
-            .any(|fault| fault.message().contains("is not supported")),
+        context.faults.faults.iter().any(|fault| matches!(
+            fault.kind(),
+            crate::fault::AstErrorKind::UnsupportedExternLanguage { language }
+                if language.as_ref() == "Rust"
+        )),
         "{:#?}",
         context.faults.faults
     );

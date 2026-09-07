@@ -162,7 +162,7 @@ fn match_arm_missing_arrow_is_rejected() {
             .faults
             .faults
             .iter()
-            .any(|fault| fault.message().contains("expected '=>' in match arm")),
+            .any(|fault| matches!(fault.kind(), crate::fault::AstErrorKind::ExpectedMatchArrow)),
         "{:#?}",
         context.faults.faults
     );

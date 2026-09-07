@@ -5,6 +5,7 @@ use ast_model::{
     scope::{Scope, ScopeBuilder, ScopeTypeEntry, ScopeValue},
     statements::{FunctionSignature, Statement, StatementId},
 };
+use ast_parser::fault::AstErrorKind;
 use soul_utils::{
     CrateContext, FunctionId, SharedStr,
     fault::Fault,
@@ -15,11 +16,11 @@ use crate::NameResolver;
 
 impl<'a> NameResolver<'a> {
     pub(crate) fn log_fault(&mut self, fault: Fault) {
-        self.context.faults.push(fault);
+        self.context.faults.push(fault.into_kind());
     }
 
-    pub(crate) fn static_log_fault(context: &mut CrateContext, fault: Fault) {
-        context.faults.push(fault);
+    pub(crate) fn static_log_fault(context: &mut CrateContext<AstErrorKind>, fault: Fault) {
+        context.faults.push(fault.into_kind());
     }
 
     pub(crate) fn alloc_node(&mut self) -> NodeId {

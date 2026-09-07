@@ -55,17 +55,17 @@ const IMPORT_STR: &str = KeyWord::Import.as_str();
 const DISTINCT_STR: &str = KeyWord::Distinct.as_str();
 const IN_FOR_LOOP_STR: &str = KeyWord::InForLoop.as_str();
 const LAMDA_ARROW_STR: &str = Symbol::LambdaArrow.as_str();
-struct Displayer<'a, W: Writer> {
+struct Displayer<'a, K, W: Writer> {
     writer: &'a mut W,
     depth: String,
 
     root_dir: &'a Path,
     store: &'a AstStore,
-    ast: &'a AstTree,
+    ast: &'a AstTree<K>,
     add_tags: bool,
 }
 
-pub(crate) fn display_ast(tree: &AstTree) -> Result<()> {
+pub(crate) fn display_ast<K>(tree: &AstTree<K>) -> Result<()> {
     let mut output_path = config::CONFIG.output_path().join("ast");
     output_path.push("tree.soulc");
 
@@ -107,7 +107,7 @@ where
     Ok(str)
 }
 
-fn display_ast_tree(ast: &AstTree, root_dir: &Path, writer: &mut impl Writer) -> Result<()> {
+fn display_ast_tree<K>(ast: &AstTree<K>, root_dir: &Path, writer: &mut impl Writer) -> Result<()> {
     let mut displayer = Displayer::new(ast, root_dir, &ast.crates.store, writer);
     displayer.write_crate_overview()?;
     displayer.write_entry(ast.root)?;
@@ -134,8 +134,13 @@ fn linkage_str(linkage: &soul_utils::linkage::Linkage) -> &'static str {
     }
 }
 
-impl<'a, W: Writer> Displayer<'a, W> {
-    fn new(ast: &'a AstTree, root_dir: &'a Path, store: &'a AstStore, writer: &'a mut W) -> Self {
+impl<'a, K, W: Writer> Displayer<'a, K, W> {
+    fn new(
+        ast: &'a AstTree<K>,
+        root_dir: &'a Path,
+        store: &'a AstStore,
+        writer: &'a mut W,
+    ) -> Self {
         Self {
             ast,
             store,
