@@ -53,10 +53,10 @@ fn resolve_in_dir(dir: &Path, source: &str) -> AstTree<AstErrorKind> {
     ast
 }
 
-fn fault_count_containing(ast: &AstTree<AstErrorKind>, needle: &str) -> usize {
+fn fault_count_matching(ast: &AstTree<AstErrorKind>, predicate: impl Fn(&AstErrorKind) -> bool) -> usize {
     ast.faults()
         .iter()
-        .filter(|fault| fault.message().contains(needle))
+        .filter(|fault| predicate(fault.kind()))
         .count()
 }
 
@@ -65,7 +65,10 @@ fn importing_a_missing_internal_module_reports_a_fault() {
     let dir = make_temp_dir("missing_module");
     let ast = resolve_in_dir(&dir, "import .missing\n");
     assert!(
-        fault_count_containing(&ast, "not found in ModuleStore") > 0,
+        fault_count_matching(&ast, |kind| matches!(
+            kind,
+            AstErrorKind::ImportedModuleNotFound { .. }
+        )) > 0,
         "{:#?}",
         ast.faults()
     );
@@ -77,7 +80,10 @@ fn importing_an_unexported_name_reports_a_fault() {
     write_module(&dir, "dep", "pub greet() {}\n");
     let ast = resolve_in_dir(&dir, "import .dep { missingName }\n");
     assert_eq!(
-        fault_count_containing(&ast, "does not export"),
+        fault_count_matching(&ast, |kind| matches!(
+            kind,
+            AstErrorKind::ModuleDoesNotExportItem { .. }
+        )),
         1,
         "{:#?}",
         ast.faults()
@@ -90,7 +96,7 @@ fn importing_a_private_function_reports_a_fault() {
     write_module(&dir, "dep", "secret() {}\n");
     let ast = resolve_in_dir(&dir, "import .dep { secret }\n");
     assert_eq!(
-        fault_count_containing(&ast, "is private"),
+        fault_count_matching(&ast, |kind| matches!(kind, AstErrorKind::ItemIsPrivate { .. })),
         1,
         "{:#?}",
         ast.faults()
@@ -103,7 +109,7 @@ fn importing_a_public_function_reports_no_privacy_fault() {
     write_module(&dir, "dep", "pub greet() {}\n");
     let ast = resolve_in_dir(&dir, "import .dep { greet }\n");
     assert_eq!(
-        fault_count_containing(&ast, "is private"),
+        fault_count_matching(&ast, |kind| matches!(kind, AstErrorKind::ItemIsPrivate { .. })),
         0,
         "{:#?}",
         ast.faults()
@@ -116,7 +122,10 @@ fn importing_the_same_item_twice_reports_exactly_one_fault() {
     write_module(&dir, "dep", "pub greet() {}\n");
     let ast = resolve_in_dir(&dir, "import .dep { greet, greet }\n");
     assert_eq!(
-        fault_count_containing(&ast, "already exists"),
+        fault_count_matching(&ast, |kind| matches!(
+            kind,
+            AstErrorKind::ItemAliasAlreadyExists { .. }
+        )),
         1,
         "{:#?}",
         ast.faults()
@@ -128,7 +137,10 @@ fn importing_from_an_unregistered_external_crate_reports_a_fault() {
     let dir = make_temp_dir("unregistered_crate");
     let ast = resolve_in_dir(&dir, "import missingcrate.thing\n");
     assert!(
-        fault_count_containing(&ast, "not found in Soul.toml dependencies") > 0,
+        fault_count_matching(&ast, |kind| matches!(
+            kind,
+            AstErrorKind::ExternalCrateNotFound { .. }
+        )) > 0,
         "{:#?}",
         ast.faults()
     );

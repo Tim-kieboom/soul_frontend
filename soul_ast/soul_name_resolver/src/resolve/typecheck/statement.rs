@@ -1,5 +1,6 @@
 use ast_model::statements::Assignment;
-use soul_utils::{TypeModifier, fault::Fault};
+use ast_parser::fault::AstErrorKind;
+use soul_utils::TypeModifier;
 
 use super::function_call::is_generic_parameter;
 use crate::NameResolver;
@@ -13,10 +14,7 @@ impl<'a> NameResolver<'a> {
         if matches!(modifier, TypeModifier::Immut | TypeModifier::Const) {
             let span = self.get_expression(assignment.left).map(|expr| expr.span);
 
-            self.log_fault(Fault::error(
-                "cannot assign to an immutable variable".to_string(),
-                span,
-            ));
+            self.log_error(AstErrorKind::AssignToImmutableVariable, span);
         }
 
         let empty = vec![];
@@ -41,9 +39,12 @@ impl<'a> NameResolver<'a> {
         }
 
         let span = self.get_expression(assignment.right).map(|expr| expr.span);
-        self.log_fault(Fault::error(
-            format!("assignment type mismatch: expected `{left_ty:?}`, got `{right_ty:?}`"),
+        self.log_error(
+            AstErrorKind::AssignmentTypeMismatch {
+                expected: format!("{left_ty:?}").into(),
+                got: format!("{right_ty:?}").into(),
+            },
             span,
-        ));
+        );
     }
 }

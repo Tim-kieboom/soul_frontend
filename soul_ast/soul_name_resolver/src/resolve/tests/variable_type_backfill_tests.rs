@@ -32,18 +32,22 @@ fn resolve_source(source: &str) -> AstTree<AstErrorKind> {
     ast
 }
 
-fn fault_count_containing(ast: &AstTree<AstErrorKind>, needle: &str) -> usize {
+fn fault_count_matching(ast: &AstTree<AstErrorKind>, predicate: impl Fn(&AstErrorKind) -> bool) -> usize {
     ast.faults()
         .iter()
-        .filter(|fault| fault.message().contains(needle))
+        .filter(|fault| predicate(fault.kind()))
         .count()
+}
+
+fn is_type_mismatch(kind: &AstErrorKind) -> bool {
+    matches!(kind, AstErrorKind::BinaryExpressionTypeMismatch { .. })
 }
 
 #[test]
 fn variable_from_a_function_call_can_be_used_in_a_binary_expression() {
     let ast =
         resolve_source("foo(): i64 {\n    1\n}\nmain() {\n    a := foo()\n    b := a + 1\n}\n");
-    assert_eq!(fault_count_containing(&ast, "type mismatch"), 0);
+    assert_eq!(fault_count_matching(&ast, is_type_mismatch), 0);
 }
 
 #[test]
@@ -51,13 +55,13 @@ fn mismatched_use_of_a_function_call_initialized_variable_reports_a_fault() {
     let ast = resolve_source(
         "foo(): i64 {\n    1\n}\nmain() {\n    a := foo()\n    b := a + \"hi\"\n}\n",
     );
-    assert_eq!(fault_count_containing(&ast, "type mismatch"), 1);
+    assert_eq!(fault_count_matching(&ast, is_type_mismatch), 1);
 }
 
 #[test]
 fn variable_from_a_binary_expression_can_be_used_in_another_binary_expression() {
     let ast = resolve_source("main() {\n    a := 1 + 2\n    b := a + 3\n}\n");
-    assert_eq!(fault_count_containing(&ast, "type mismatch"), 0);
+    assert_eq!(fault_count_matching(&ast, is_type_mismatch), 0);
 }
 
 #[test]

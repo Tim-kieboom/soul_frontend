@@ -32,26 +32,31 @@ fn resolve_source(source: &str) -> AstTree<AstErrorKind> {
     ast
 }
 
-fn fault_count_containing(ast: &AstTree<AstErrorKind>, needle: &str) -> usize {
+fn fault_count_matching(ast: &AstTree<AstErrorKind>, predicate: impl Fn(&AstErrorKind) -> bool) -> usize {
     ast.faults()
         .iter()
-        .filter(|fault| fault.message().contains(needle))
+        .filter(|fault| predicate(fault.kind()))
         .count()
+}
+
+fn is_undefined_variable_named(name: &str) -> impl Fn(&AstErrorKind) -> bool + '_ {
+    move |kind| matches!(kind, AstErrorKind::UndefinedVariable { name: got } if got.as_ref() == name)
+}
+
+fn is_undefined_variable(kind: &AstErrorKind) -> bool {
+    matches!(kind, AstErrorKind::UndefinedVariable { .. })
 }
 
 #[test]
 fn bare_undefined_variable_reports_exactly_one_fault() {
     let ast = resolve_source("main() {\n    b := a\n}\n");
-    assert_eq!(
-        fault_count_containing(&ast, "variable 'a' is undefined in scope"),
-        1
-    );
+    assert_eq!(fault_count_matching(&ast, is_undefined_variable_named("a")), 1);
 }
 
 #[test]
 fn defined_variable_reports_no_undefined_fault() {
     let ast = resolve_source("main() {\n    a := 1\n    b := a\n}\n");
-    assert_eq!(fault_count_containing(&ast, "is undefined in scope"), 0);
+    assert_eq!(fault_count_matching(&ast, is_undefined_variable), 0);
 }
 
 #[test]

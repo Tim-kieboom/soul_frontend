@@ -9,9 +9,9 @@ use ast_model::{
         UseBlock, VarPattern, Variable,
     },
 };
+use ast_parser::fault::{AstErrorKind, AstFault};
 use soul_utils::{
-    FunctionId, Ident, TypeModifier, error::SoulResult, fault::Fault, soul_error_internal,
-    soul_names::PrimitiveTypes,
+    FunctionId, Ident, TypeModifier, fault::Fault, soul_error_internal, soul_names::PrimitiveTypes,
 };
 
 use crate::NameResolver;
@@ -270,7 +270,7 @@ impl<'a> NameResolver<'a> {
             VarPattern::Discard => {}
             VarPattern::Simple { binding, .. } => {
                 if let Err(err) = check_variable_name(&binding.ident) {
-                    self.log_fault(err);
+                    self.context.faults.push(err);
                 }
                 self.insert_value(
                     binding.ident.as_shared_str(),
@@ -288,7 +288,7 @@ impl<'a> NameResolver<'a> {
                 for field in &named.fields {
                     if let Some(binding) = &field.binding {
                         if let Err(err) = check_variable_name(&binding.ident) {
-                            self.log_fault(err);
+                            self.context.faults.push(err);
                         }
                         self.insert_value(
                             binding.ident.as_shared_str(),
@@ -303,7 +303,7 @@ impl<'a> NameResolver<'a> {
                 for field in &ctor.fields {
                     if let Some(binding) = &field.binding {
                         if let Err(err) = check_variable_name(&binding.ident) {
-                            self.log_fault(err);
+                            self.context.faults.push(err);
                         }
                         self.insert_value(
                             binding.ident.as_shared_str(),
@@ -319,7 +319,7 @@ impl<'a> NameResolver<'a> {
 
     fn check_function_name(&mut self, name: &Ident) {
         if let Err(err) = check_function_name(name) {
-            self.log_fault(err);
+            self.context.faults.push(err);
         }
 
         let Some(id) = self.current.function else {
@@ -336,10 +336,7 @@ impl<'a> NameResolver<'a> {
         let signature = &function.signature.value;
 
         if signature.name.as_str() == name.as_str() {
-            self.log_fault(Fault::error(
-                "parent and child function can not have the same name",
-                Some(name.span()),
-            ));
+            self.log_error(AstErrorKind::ParentChildFunctionSameName, Some(name.span()));
         }
     }
 }
@@ -348,23 +345,22 @@ fn is_main(signature: &FunctionSignature) -> bool {
     signature.value.name.as_str() == "main" && matches!(signature.value.method_type, SoulType::None)
 }
 
-fn check_function_name(name: &Ident) -> SoulResult<()> {
+fn check_function_name(name: &Ident) -> Result<(), AstFault> {
     let mut chars = name.as_str().chars();
-    let first = chars.next().ok_or(Fault::error(
-        "function name can not be empty",
-        Some(name.span()),
-    ))?;
+    let first = chars
+        .next()
+        .ok_or(Fault::error_with_kind(AstErrorKind::FunctionNameEmpty, Some(name.span())))?;
 
     if !first.is_alphabetic() && first != '_' {
-        return Err(Fault::error(
-            format!("function name should not start with '{first}' (start with letter or '_')"),
+        return Err(Fault::error_with_kind(
+            AstErrorKind::FunctionNameInvalidStart { found: first },
             Some(name.span()),
         ));
     }
 
     if name.as_str().contains("___") {
-        return Err(Fault::error(
-            "function name should not have '___' in the name",
+        return Err(Fault::error_with_kind(
+            AstErrorKind::FunctionNameTripleUnderscore,
             Some(name.span()),
         ));
     }
@@ -372,16 +368,15 @@ fn check_function_name(name: &Ident) -> SoulResult<()> {
     Ok(())
 }
 
-fn check_variable_name(name: &Ident) -> SoulResult<()> {
+fn check_variable_name(name: &Ident) -> Result<(), AstFault> {
     let mut chars = name.as_str().chars();
-    let first = chars.next().ok_or(Fault::error(
-        "variable name can not be empty",
-        Some(name.span()),
-    ))?;
+    let first = chars
+        .next()
+        .ok_or(Fault::error_with_kind(AstErrorKind::VariableNameEmpty, Some(name.span())))?;
 
     if !first.is_alphabetic() && first != '_' {
-        return Err(Fault::error(
-            format!("variable name should not start with '{first}' (start with letter or '_')"),
+        return Err(Fault::error_with_kind(
+            AstErrorKind::VariableNameInvalidStart { found: first },
             Some(name.span()),
         ));
     }

@@ -35,7 +35,12 @@ fn resolve_source(source: &str) -> AstTree<AstErrorKind> {
 fn intrinsic_fault_count(ast: &AstTree<AstErrorKind>) -> usize {
     ast.faults()
         .iter()
-        .filter(|fault| fault.message().contains("intrinsic"))
+        .filter(|fault| {
+            matches!(
+                fault.kind(),
+                AstErrorKind::UnknownIntrinsic { .. } | AstErrorKind::IntrinsicArityMismatch { .. }
+            )
+        })
         .count()
 }
 

@@ -8,10 +8,10 @@ use ast_model::{
     soul_type::{SoulType, Stub},
     statements::{ImportItem, ImportKind},
 };
+use ast_parser::fault::AstErrorKind;
 use soul_utils::soul_names::PrimitiveTypes;
 use soul_utils::{
     FunctionId,
-    fault::Fault,
     intrinsics::IntrinsicFunction,
     soul_error_internal,
     span::{ModuleId, Span},
@@ -53,10 +53,10 @@ impl<'a> NameResolver<'a> {
         };
 
         if var_id < self.synthetic_id_boundary && call.id < var_id {
-            self.log_fault(Fault::error(
-                format!("variable '{name}' is used before its declaration"),
+            self.log_error(
+                AstErrorKind::VariableUsedBeforeDeclaration { name: name.into() },
                 Some(call.name.span()),
-            ));
+            );
             return true;
         }
 
@@ -103,22 +103,22 @@ impl<'a> NameResolver<'a> {
 
     fn resolve_intrinsic_call(&mut self, path: &str, call: &FunctionCall) {
         let Ok(kind) = IntrinsicFunction::from_str(path) else {
-            self.log_fault(Fault::error(
-                format!("unknown intrinsic 'intrinsic.{path}'"),
+            self.log_error(
+                AstErrorKind::UnknownIntrinsic { path: path.into() },
                 Some(call.name.span()),
-            ));
+            );
             return;
         };
 
         if call.arguments.len() != kind.arity() {
-            self.log_fault(Fault::error(
-                format!(
-                    "'intrinsic.{path}' expects {} argument(s), got {}",
-                    kind.arity(),
-                    call.arguments.len()
-                ),
+            self.log_error(
+                AstErrorKind::IntrinsicArityMismatch {
+                    path: path.into(),
+                    expected: kind.arity(),
+                    got: call.arguments.len(),
+                },
                 Some(call.name.span()),
-            ));
+            );
         }
 
         self.declares
@@ -403,10 +403,13 @@ impl<'a> NameResolver<'a> {
             Some(crate_name) => format!("crate '{crate_name}'"),
             None => format!("module '{}'", module_entry.module_name),
         };
-        self.log_fault(Fault::error(
-            format!("'{function_name}' not found in {location}"),
+        self.log_error(
+            AstErrorKind::FunctionNotFoundIn {
+                function_name: function_name.into(),
+                location: location.into(),
+            },
             Some(call.name.span()),
-        ));
+        );
 
         FunctionId::ERROR
     }
@@ -428,10 +431,13 @@ impl<'a> NameResolver<'a> {
         let header = &self.ast_modules.get(module_id)?.header;
         let entry = header.get(function_name)?.function?;
         if !entry.is_public {
-            self.log_fault(Fault::error(
-                format!("'{function_name}' is private"),
+            self.log_error(
+                AstErrorKind::ItemIsPrivate {
+                    kind: "function".into(),
+                    name: function_name.into(),
+                },
                 Some(span),
-            ));
+            );
         }
 
         Some(entry.value)

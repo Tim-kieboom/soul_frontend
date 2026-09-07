@@ -4,7 +4,8 @@ use ast_model::{
     soul_type::{Generic, SoulType},
     statements::{EnumVariant, UnionKind},
 };
-use soul_utils::{FunctionId, fault::Fault};
+use ast_parser::fault::AstErrorKind;
+use soul_utils::FunctionId;
 
 use crate::NameResolver;
 
@@ -55,12 +56,14 @@ impl<'a> NameResolver<'a> {
                     {
                         Some((_, bound_ty)) => {
                             if self.combine_operand_types(&arg_ty, bound_ty).is_none() {
-                                self.log_fault(Fault::error(
-                                    format!(
-                                        "generic parameter `{generic_name}` inferred as both `{bound_ty:?}` and `{arg_ty:?}`"
-                                    ),
+                                self.log_error(
+                                    AstErrorKind::GenericParameterConflict {
+                                        generic_name: generic_name.into(),
+                                        first: format!("{bound_ty:?}").into(),
+                                        second: format!("{arg_ty:?}").into(),
+                                    },
                                     Some(span),
-                                ));
+                                );
                             }
                         }
                         None => generic_bindings.push((generic_name, arg_ty)),
@@ -72,13 +75,13 @@ impl<'a> NameResolver<'a> {
                     continue;
                 }
 
-                self.log_fault(Fault::error(
-                    format!(
-                        "argument type mismatch: expected `{:?}`, got `{arg_ty:?}`",
-                        parameter.ty
-                    ),
+                self.log_error(
+                    AstErrorKind::ArgumentTypeMismatch {
+                        expected: format!("{:?}", parameter.ty).into(),
+                        got: format!("{arg_ty:?}").into(),
+                    },
                     Some(span),
-                ));
+                );
             }
         }
 
@@ -115,16 +118,15 @@ impl<'a> NameResolver<'a> {
         let parameters = parameters.clone();
 
         if call.arguments.len() != parameters.len() {
-            self.log_fault(Fault::error(
-                format!(
-                    "variant `{}.{}` expects {} argument(s), got {}",
-                    stub.name,
-                    variant_name,
-                    parameters.len(),
-                    call.arguments.len()
-                ),
+            self.log_error(
+                AstErrorKind::EnumVariantArityMismatch {
+                    enum_name: stub.name.as_str().into(),
+                    variant_name: variant_name.into(),
+                    expected: parameters.len(),
+                    got: call.arguments.len(),
+                },
                 Some(call.name.span()),
-            ));
+            );
             return;
         }
 
@@ -137,14 +139,15 @@ impl<'a> NameResolver<'a> {
             }
 
             let span = self.store.expressions.get(argument.value).map(|e| e.span);
-            self.log_fault(Fault::error(
-                format!(
-                    "variant `{}.{}` argument type mismatch: expected `{param_ty:?}`, got `{arg_ty:?}`",
-                    stub.name.as_str(),
-                    variant_name
-                ),
+            self.log_error(
+                AstErrorKind::EnumVariantArgumentTypeMismatch {
+                    enum_name: stub.name.as_str().into(),
+                    variant_name: variant_name.into(),
+                    expected: format!("{param_ty:?}").into(),
+                    got: format!("{arg_ty:?}").into(),
+                },
                 span,
-            ));
+            );
         }
     }
 }

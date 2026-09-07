@@ -6,6 +6,7 @@ use ast_model::{
     soul_type::{Mutable, ReferenceType, SoulType, Stub},
     statements::{Field, Struct, VarPattern},
 };
+use ast_parser::fault::{AstErrorKind, AstFault};
 use soul_utils::{Ident, TypeModifier, fault::Fault, soul_names::PrimitiveTypes, span::Span};
 
 use super::function_call::{generic_name_of, is_generic_parameter};
@@ -28,7 +29,7 @@ impl<'a> NameResolver<'a> {
 
         let faults = self.check_struct_fields(struct_, stub, struct_constructor);
         for fault in faults {
-            self.log_fault(fault);
+            self.context.faults.push(fault);
         }
     }
 
@@ -37,7 +38,7 @@ impl<'a> NameResolver<'a> {
         struct_: &Struct,
         stub: &Stub,
         struct_constructor: &StructConstructor,
-    ) -> Vec<Fault> {
+    ) -> Vec<AstFault> {
         fn eq_field_name(field: &Field, field_name: &Ident) -> bool {
             matches!(&field.value.pattern, VarPattern::Simple { binding, .. } if binding.ident.as_str() == field_name.as_str())
         }
@@ -50,12 +51,11 @@ impl<'a> NameResolver<'a> {
                 .iter()
                 .find(|field| eq_field_name(field, field_name))
             else {
-                faults.push(Fault::error(
-                    format!(
-                        "struct `{}` has no field `{}`",
-                        stub.name.as_str(),
-                        field_name.as_str()
-                    ),
+                faults.push(Fault::error_with_kind(
+                    AstErrorKind::StructHasNoField {
+                        struct_name: stub.name.as_str().into(),
+                        field_name: field_name.as_str().into(),
+                    },
                     Some(field_name.span()),
                 ));
                 continue;
@@ -79,10 +79,12 @@ impl<'a> NameResolver<'a> {
                 match generic {
                     Some((_, bound_ty)) => {
                         if self.combine_operand_types(&value_ty, bound_ty).is_none() {
-                            faults.push(Fault::error(
-                                format!(
-                                    "generic parameter `{generic_name}` inferred as both `{bound_ty:?}` and `{value_ty:?}`"
-                                ),
+                            faults.push(Fault::error_with_kind(
+                                AstErrorKind::GenericParameterConflict {
+                                    generic_name: generic_name.into(),
+                                    first: format!("{bound_ty:?}").into(),
+                                    second: format!("{value_ty:?}").into(),
+                                },
                                 span,
                             ));
                         }
@@ -104,11 +106,12 @@ impl<'a> NameResolver<'a> {
                 continue;
             }
 
-            faults.push(Fault::error(
-                format!(
-                    "field `{}` type mismatch: expected `{field_ty:?}`, got `{value_ty:?}`",
-                    field_name.as_str()
-                ),
+            faults.push(Fault::error_with_kind(
+                AstErrorKind::FieldTypeMismatch {
+                    field_name: field_name.as_str().into(),
+                    expected: format!("{field_ty:?}").into(),
+                    got: format!("{value_ty:?}").into(),
+                },
                 span,
             ));
         }
@@ -130,12 +133,13 @@ impl<'a> NameResolver<'a> {
         };
 
         let Some(combined) = self.combine_operand_types(&left_ty, &right_ty) else {
-            self.log_fault(Fault::error(
-                format!(
-                    "type mismatch in binary expression: left is `{left_ty:?}`, right is `{right_ty:?}`"
-                ),
+            self.log_error(
+                AstErrorKind::BinaryExpressionTypeMismatch {
+                    left: format!("{left_ty:?}").into(),
+                    right: format!("{right_ty:?}").into(),
+                },
                 Some(span),
-            ));
+            );
             return;
         };
 

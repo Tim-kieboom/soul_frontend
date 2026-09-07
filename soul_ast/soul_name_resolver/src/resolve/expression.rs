@@ -7,8 +7,9 @@ use ast_model::{
     scope::ScopeValue,
     statements::VarPattern,
 };
+use ast_parser::fault::AstErrorKind;
 use soul_tokenizer::model::types::Types;
-use soul_utils::{fault::Fault, soul_error_internal};
+use soul_utils::soul_error_internal;
 use std::str::FromStr;
 
 use crate::NameResolver;
@@ -114,13 +115,12 @@ impl<'a> NameResolver<'a> {
         ) {
             Some(resolved) => {
                 if resolved < self.synthetic_id_boundary && variable.id < resolved {
-                    self.log_fault(Fault::error(
-                        format!(
-                            "variable '{}' is used before its declaration",
-                            name.as_str()
-                        ),
+                    self.log_error(
+                        AstErrorKind::VariableUsedBeforeDeclaration {
+                            name: name.as_str().into(),
+                        },
                         Some(name.span()),
-                    ));
+                    );
                 }
                 self.declares.insert_variable_resolve(variable.id, resolved);
             }
@@ -128,10 +128,12 @@ impl<'a> NameResolver<'a> {
                 // A bare type name used as a first-class type value (e.g. `x.typeof == Coord`);
                 // there is no variable to resolve.
             }
-            None => self.log_fault(Fault::error(
-                format!("variable '{}' is undefined in scope", name.as_str()),
+            None => self.log_error(
+                AstErrorKind::UndefinedVariable {
+                    name: name.as_str().into(),
+                },
                 Some(name.span()),
-            )),
+            ),
         }
     }
 

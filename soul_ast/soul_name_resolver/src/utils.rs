@@ -19,8 +19,20 @@ impl<'a> NameResolver<'a> {
         self.context.faults.push(fault.into_kind());
     }
 
-    pub(crate) fn static_log_fault(context: &mut CrateContext<AstErrorKind>, fault: Fault) {
-        context.faults.push(fault.into_kind());
+    pub(crate) fn log_error(&mut self, kind: AstErrorKind, span: Option<Span>) {
+        self.context
+            .faults
+            .push(soul_utils::fault::Fault::error_with_kind(kind, span));
+    }
+
+    pub(crate) fn static_log_error(
+        context: &mut CrateContext<AstErrorKind>,
+        kind: AstErrorKind,
+        span: Option<Span>,
+    ) {
+        context
+            .faults
+            .push(soul_utils::fault::Fault::error_with_kind(kind, span));
     }
 
     pub(crate) fn alloc_node(&mut self) -> NodeId {
@@ -68,10 +80,12 @@ impl<'a> NameResolver<'a> {
             .insert_value(name.clone(), kind, id)
             .is_some()
         {
-            self.log_fault(Fault::error(
-                format!("`{name}` already exists in scope"),
+            self.log_error(
+                AstErrorKind::ValueAlreadyExistsInScope {
+                    name: name.as_ref().into(),
+                },
                 Some(span),
-            ));
+            );
         }
     }
 

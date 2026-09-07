@@ -5,9 +5,9 @@ use ast_model::{
     scope::ScopeModuleEntry,
     statements::{ImportItem, ImportKind, ImportPath},
 };
+use ast_parser::fault::AstErrorKind;
 use soul_utils::{
     FunctionId, Ident,
-    fault::Fault,
     ids::IdAlloc,
     soul_error_internal,
     span::{ModuleId, Span},
@@ -80,10 +80,12 @@ impl<'a> NameResolver<'a> {
         match result {
             Some(val) => val,
             None => {
-                self.log_fault(soul_error_internal!(
-                    format!("module: {:?} not found in ModuleStore", pathbuf),
-                    Some(span)
-                ));
+                self.log_error(
+                    AstErrorKind::ImportedModuleNotFound {
+                        path: format!("{:?}", pathbuf).into(),
+                    },
+                    Some(span),
+                );
                 ModuleId::ERROR
             }
         }
@@ -93,22 +95,18 @@ impl<'a> NameResolver<'a> {
         let lib_name = match &path.lib_name {
             Some(name) => name,
             None => {
-                self.log_fault(Fault::error(
-                    "external import missing crate name".to_string(),
-                    Some(span),
-                ));
+                self.log_error(AstErrorKind::ExternalImportMissingCrateName, Some(span));
                 return ModuleId::ERROR;
             }
         };
 
         let Some(crate_entry) = self.crate_store.get(lib_name) else {
-            self.log_fault(Fault::error(
-                format!(
-                    "external crate '{}' not found in Soul.toml dependencies",
-                    lib_name
-                ),
+            self.log_error(
+                AstErrorKind::ExternalCrateNotFound {
+                    lib_name: lib_name.as_str().into(),
+                },
                 Some(span),
-            ));
+            );
             return ModuleId::ERROR;
         };
 
@@ -164,10 +162,13 @@ impl<'a> NameResolver<'a> {
         };
 
         let Some(entry) = module.header.get(name) else {
-            self.log_fault(Fault::error(
-                format!("module `{}` does not export `{}`", module_name, name),
+            self.log_error(
+                AstErrorKind::ModuleDoesNotExportItem {
+                    module_name: module_name.into(),
+                    item: name.into(),
+                },
                 Some(span),
-            ));
+            );
             return;
         };
 
@@ -175,16 +176,13 @@ impl<'a> NameResolver<'a> {
         let entry_function = entry.function;
         if let Some(entry) = &entry.custom_type {
             if !entry.is_public {
-                Self::static_log_fault(
+                Self::static_log_error(
                     self.context,
-                    Fault::error(
-                        format!(
-                            "{} {} is private",
-                            entry.value.variant_name(),
-                            alias_name.as_str()
-                        ),
-                        Some(alias_name.span()),
-                    ),
+                    AstErrorKind::ItemIsPrivate {
+                        kind: entry.value.variant_name().into(),
+                        name: alias_name.as_str().into(),
+                    },
+                    Some(alias_name.span()),
                 );
             }
 
@@ -196,16 +194,13 @@ impl<'a> NameResolver<'a> {
                 id,
                 self.current.module,
             ) {
-                Self::static_log_fault(
+                Self::static_log_error(
                     self.context,
-                    Fault::error(
-                        format!(
-                            "{} {} already exists",
-                            entry.value.variant_name(),
-                            alias_name.as_str()
-                        ),
-                        Some(alias_name.span()),
-                    ),
+                    AstErrorKind::ItemAliasAlreadyExists {
+                        kind: entry.value.variant_name().into(),
+                        name: alias_name.as_str().into(),
+                    },
+                    Some(alias_name.span()),
                 );
             }
         }
@@ -221,33 +216,45 @@ impl<'a> NameResolver<'a> {
 
     fn collect_entry_variable(&mut self, entry: EntryKind<NodeId>, alias_name: &Ident) {
         if !entry.is_public {
-            self.log_fault(Fault::error(
-                format!("variable '{}' is private", alias_name.as_str()),
+            self.log_error(
+                AstErrorKind::ItemIsPrivate {
+                    kind: "variable".into(),
+                    name: alias_name.as_str().into(),
+                },
                 Some(alias_name.span()),
-            ));
+            );
         }
 
         if !self.insert_variable_alias(alias_name, entry.value) {
-            self.log_fault(Fault::error(
-                format!("variable '{}' already exists", alias_name.as_str()),
+            self.log_error(
+                AstErrorKind::ItemAliasAlreadyExists {
+                    kind: "variable".into(),
+                    name: alias_name.as_str().into(),
+                },
                 Some(alias_name.span()),
-            ));
+            );
         }
     }
 
     fn collect_entry_function(&mut self, entry: EntryKind<FunctionId>, alias_name: &Ident) {
         if !entry.is_public {
-            self.log_fault(Fault::error(
-                format!("function '{}' is private", alias_name.as_str()),
+            self.log_error(
+                AstErrorKind::ItemIsPrivate {
+                    kind: "function".into(),
+                    name: alias_name.as_str().into(),
+                },
                 Some(alias_name.span()),
-            ));
+            );
         }
 
         if !self.insert_function_alias(alias_name, entry.value) {
-            self.log_fault(Fault::error(
-                format!("function '{}' already exists", alias_name.as_str()),
+            self.log_error(
+                AstErrorKind::ItemAliasAlreadyExists {
+                    kind: "function".into(),
+                    name: alias_name.as_str().into(),
+                },
                 Some(alias_name.span()),
-            ));
+            );
         }
     }
 

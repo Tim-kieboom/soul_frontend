@@ -200,6 +200,123 @@ pub enum AstErrorKind {
     #[error("keyword '{keyword}' can not be type")]
     KeywordUsedAsType { keyword: Box<str> },
 
+    // ----------------------------------------------------------------
+    //  Name resolution (soul_name_resolver shares this CrateContext)
+    // ----------------------------------------------------------------
+    #[error("module `{path}` not found in ModuleStore")]
+    ImportedModuleNotFound { path: Box<str> },
+
+    #[error("module `{module_name}` does not export `{item}`")]
+    ModuleDoesNotExportItem { module_name: Box<str>, item: Box<str> },
+
+    #[error("{kind} '{name}' is private")]
+    ItemIsPrivate { kind: Box<str>, name: Box<str> },
+
+    #[error("{kind} '{name}' already exists")]
+    ItemAliasAlreadyExists { kind: Box<str>, name: Box<str> },
+
+    #[error("type of name {name} already exists in scope")]
+    TypeAlreadyExistsInScope { name: Box<str> },
+
+    #[error("`{name}` already exists in scope")]
+    ValueAlreadyExistsInScope { name: Box<str> },
+
+    #[error("parent and child function can not have the same name")]
+    ParentChildFunctionSameName,
+
+    #[error("function name can not be empty")]
+    FunctionNameEmpty,
+
+    #[error("function name should not start with '{found}' (start with letter or '_')")]
+    FunctionNameInvalidStart { found: char },
+
+    #[error("function name should not have '___' in the name")]
+    FunctionNameTripleUnderscore,
+
+    #[error("variable name can not be empty")]
+    VariableNameEmpty,
+
+    #[error("variable name should not start with '{found}' (start with letter or '_')")]
+    VariableNameInvalidStart { found: char },
+
+    #[error("variable '{name}' is used before its declaration")]
+    VariableUsedBeforeDeclaration { name: Box<str> },
+
+    #[error("variable '{name}' is undefined in scope")]
+    UndefinedVariable { name: Box<str> },
+
+    #[error("unknown intrinsic 'intrinsic.{path}'")]
+    UnknownIntrinsic { path: Box<str> },
+
+    #[error("'intrinsic.{path}' expects {expected} argument(s), got {got}")]
+    IntrinsicArityMismatch {
+        path: Box<str>,
+        expected: usize,
+        got: usize,
+    },
+
+    #[error("'{function_name}' not found in {location}")]
+    FunctionNotFoundIn {
+        function_name: Box<str>,
+        location: Box<str>,
+    },
+
+    #[error("struct `{struct_name}` has no field `{field_name}`")]
+    StructHasNoField {
+        struct_name: Box<str>,
+        field_name: Box<str>,
+    },
+
+    #[error("generic parameter `{generic_name}` inferred as both `{first}` and `{second}`")]
+    GenericParameterConflict {
+        generic_name: Box<str>,
+        first: Box<str>,
+        second: Box<str>,
+    },
+
+    #[error("field `{field_name}` type mismatch: expected `{expected}`, got `{got}`")]
+    FieldTypeMismatch {
+        field_name: Box<str>,
+        expected: Box<str>,
+        got: Box<str>,
+    },
+
+    #[error("type mismatch in binary expression: left is `{left}`, right is `{right}`")]
+    BinaryExpressionTypeMismatch { left: Box<str>, right: Box<str> },
+
+    #[error("argument type mismatch: expected `{expected}`, got `{got}`")]
+    ArgumentTypeMismatch { expected: Box<str>, got: Box<str> },
+
+    #[error("variant `{enum_name}.{variant_name}` expects {expected} argument(s), got {got}")]
+    EnumVariantArityMismatch {
+        enum_name: Box<str>,
+        variant_name: Box<str>,
+        expected: usize,
+        got: usize,
+    },
+
+    #[error(
+        "variant `{enum_name}.{variant_name}` argument type mismatch: expected `{expected}`, got `{got}`"
+    )]
+    EnumVariantArgumentTypeMismatch {
+        enum_name: Box<str>,
+        variant_name: Box<str>,
+        expected: Box<str>,
+        got: Box<str>,
+    },
+
+    #[error("return type mismatch: expected `{expected}`, got nothing")]
+    ReturnTypeMismatchMissing { expected: Box<str> },
+
+    #[error("return type mismatch: expected `{expected}`, got `{got}`")]
+    ReturnTypeMismatch { expected: Box<str>, got: Box<str> },
+
+    #[error("cannot assign to an immutable variable")]
+    AssignToImmutableVariable,
+
+    #[error("assignment type mismatch: expected `{expected}`, got `{got}`")]
+    AssignmentTypeMismatch { expected: Box<str>, got: Box<str> },
+
     #[error(transparent)]
     LexError(#[from] soul_tokenizer::fault::TokenErrorKind),
 }

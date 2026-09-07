@@ -4,9 +4,9 @@ use ast_model::{
     scope::{Scope, ScopeBuilder, ScopeTypeEntry, ScopeTypeEntryKind},
     statements::{Enum, Struct, Trait},
 };
+use ast_parser::fault::AstErrorKind;
 use soul_utils::{
     Ident,
-    fault::Fault,
     soul_error_internal,
     span::{ModuleId, Span},
 };
@@ -107,10 +107,12 @@ impl<'a> NameResolver<'a> {
             .insert_types(name.as_shared_str(), entry);
 
         if old_entry.is_some() {
-            self.log_fault(Fault::error(
-                format!("type of name {} already exists in scope", name.as_str()),
+            self.log_error(
+                AstErrorKind::TypeAlreadyExistsInScope {
+                    name: name.as_str().into(),
+                },
                 Some(name.span()),
-            ));
+            );
         }
     }
 
@@ -130,10 +132,12 @@ impl<'a> NameResolver<'a> {
             .insert_types(name.as_shared_str(), scope_type);
 
         if old_entry.is_some() {
-            self.log_fault(Fault::error(
-                format!("type of name {} already exists in scope", name.as_str()),
+            self.log_error(
+                AstErrorKind::TypeAlreadyExistsInScope {
+                    name: name.as_str().into(),
+                },
                 Some(name.span()),
-            ));
+            );
         }
     }
 
@@ -153,10 +157,12 @@ impl<'a> NameResolver<'a> {
             .insert_types(name.as_shared_str(), scope_type);
 
         if old_entry.is_some() {
-            self.log_fault(Fault::error(
-                format!("type of name {} already exists in scope", name.as_str()),
+            self.log_error(
+                AstErrorKind::TypeAlreadyExistsInScope {
+                    name: name.as_str().into(),
+                },
                 Some(name.span()),
-            ));
+            );
         }
     }
 

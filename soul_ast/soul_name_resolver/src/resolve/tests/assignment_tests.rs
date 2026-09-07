@@ -32,78 +32,86 @@ fn resolve_source(source: &str) -> AstTree<AstErrorKind> {
     ast
 }
 
-fn fault_count_containing(ast: &AstTree<AstErrorKind>, needle: &str) -> usize {
+fn fault_count_matching(ast: &AstTree<AstErrorKind>, predicate: impl Fn(&AstErrorKind) -> bool) -> usize {
     ast.faults()
         .iter()
-        .filter(|fault| fault.message().contains(needle))
+        .filter(|fault| predicate(fault.kind()))
         .count()
+}
+
+fn is_assignment_type_mismatch(kind: &AstErrorKind) -> bool {
+    matches!(kind, AstErrorKind::AssignmentTypeMismatch { .. })
+}
+
+fn is_assign_to_immutable(kind: &AstErrorKind) -> bool {
+    matches!(kind, AstErrorKind::AssignToImmutableVariable)
 }
 
 #[test]
 fn matching_assignment_reports_no_fault() {
     let ast = resolve_source("main() {\n    mut a: i64 = 1\n    a = 2\n}\n");
-    assert_eq!(fault_count_containing(&ast, "assignment type mismatch"), 0);
+    assert_eq!(fault_count_matching(&ast, is_assignment_type_mismatch), 0);
 }
 
 #[test]
 fn mismatched_assignment_reports_exactly_one_fault() {
     let ast = resolve_source("main() {\n    mut a: i64 = 1\n    a = \"hi\"\n}\n");
-    assert_eq!(fault_count_containing(&ast, "assignment type mismatch"), 1);
+    assert_eq!(fault_count_matching(&ast, is_assignment_type_mismatch), 1);
 }
 
 #[test]
 fn compound_assignment_reuses_binary_type_checking() {
     let ast = resolve_source("main() {\n    mut a: i64 = 1\n    b: str = \"hi\"\n    a += b\n}\n");
-    assert_eq!(fault_count_containing(&ast, "type mismatch"), 1);
+    assert_eq!(
+        fault_count_matching(&ast, |kind| matches!(
+            kind,
+            AstErrorKind::BinaryExpressionTypeMismatch { .. }
+        )),
+        1
+    );
 }
 
 #[test]
 fn matching_compound_assignment_reports_no_fault() {
     let ast = resolve_source("main() {\n    mut a: i64 = 1\n    a += 2\n}\n");
-    assert_eq!(fault_count_containing(&ast, "type mismatch"), 0);
+    assert_eq!(
+        fault_count_matching(&ast, |kind| matches!(
+            kind,
+            AstErrorKind::BinaryExpressionTypeMismatch { .. }
+        )),
+        0
+    );
 }
 
 #[test]
 fn assigning_to_immutable_variable_reports_exactly_one_fault() {
     let ast = resolve_source("main() {\n    a: i64 = 1\n    a = 2\n}\n");
-    assert_eq!(
-        fault_count_containing(&ast, "cannot assign to an immutable variable"),
-        1
-    );
+    assert_eq!(fault_count_matching(&ast, is_assign_to_immutable), 1);
 }
 
 #[test]
 fn assigning_to_mutable_variable_reports_no_mutability_fault() {
     let ast = resolve_source("main() {\n    mut a: i64 = 1\n    a = 2\n}\n");
-    assert_eq!(
-        fault_count_containing(&ast, "cannot assign to an immutable variable"),
-        0
-    );
+    assert_eq!(fault_count_matching(&ast, is_assign_to_immutable), 0);
 }
 
 #[test]
 fn assigning_to_immutable_parameter_reports_exactly_one_fault() {
     let ast = resolve_source("foo(a: i64) {\n    a = 2\n}\n");
-    assert_eq!(
-        fault_count_containing(&ast, "cannot assign to an immutable variable"),
-        1
-    );
+    assert_eq!(fault_count_matching(&ast, is_assign_to_immutable), 1);
 }
 
 #[test]
 fn assigning_mismatched_type_to_mutable_parameter_reports_exactly_one_fault() {
     let ast = resolve_source("foo(mut a: i64) {\n    a = \"hi\"\n}\n");
-    assert_eq!(fault_count_containing(&ast, "assignment type mismatch"), 1);
+    assert_eq!(fault_count_matching(&ast, is_assignment_type_mismatch), 1);
 }
 
 #[test]
 fn assigning_matching_type_to_mutable_parameter_reports_no_fault() {
     let ast = resolve_source("foo(mut a: i64) {\n    a = 2\n}\n");
-    assert_eq!(fault_count_containing(&ast, "assignment type mismatch"), 0);
-    assert_eq!(
-        fault_count_containing(&ast, "cannot assign to an immutable variable"),
-        0
-    );
+    assert_eq!(fault_count_matching(&ast, is_assignment_type_mismatch), 0);
+    assert_eq!(fault_count_matching(&ast, is_assign_to_immutable), 0);
 }
 
 #[test]
@@ -111,5 +119,5 @@ fn assignment_to_generic_parameter_is_skipped_without_fault() {
     let ast = resolve_source(
         "swap<T>(mut a: T, b: T) {\n    a = b\n}\nmain() {\n    x: i64 = 1\n    y: i64 = 2\n    swap(x, y)\n}\n",
     );
-    assert_eq!(fault_count_containing(&ast, "assignment type mismatch"), 0);
+    assert_eq!(fault_count_matching(&ast, is_assignment_type_mismatch), 0);
 }

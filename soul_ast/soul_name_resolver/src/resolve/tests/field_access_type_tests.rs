@@ -32,11 +32,15 @@ fn resolve_source(source: &str) -> AstTree<AstErrorKind> {
     ast
 }
 
-fn fault_count_containing(ast: &AstTree<AstErrorKind>, needle: &str) -> usize {
+fn fault_count_matching(ast: &AstTree<AstErrorKind>, predicate: impl Fn(&AstErrorKind) -> bool) -> usize {
     ast.faults()
         .iter()
-        .filter(|fault| fault.message().contains(needle))
+        .filter(|fault| predicate(fault.kind()))
         .count()
+}
+
+fn is_type_mismatch(kind: &AstErrorKind) -> bool {
+    matches!(kind, AstErrorKind::BinaryExpressionTypeMismatch { .. })
 }
 
 #[test]
@@ -44,7 +48,7 @@ fn field_access_value_can_be_used_in_a_binary_expression() {
     let ast = resolve_source(
         "struct Point {\n    x: i64\n}\nmain() {\n    p: Point = Point{x: 5}\n    y := p.x + 1\n}\n",
     );
-    assert_eq!(fault_count_containing(&ast, "type mismatch"), 0);
+    assert_eq!(fault_count_matching(&ast, is_type_mismatch), 0);
 }
 
 #[test]
@@ -52,7 +56,7 @@ fn mismatched_field_access_value_in_a_binary_expression_reports_a_fault() {
     let ast = resolve_source(
         "struct Point {\n    x: i64\n}\nmain() {\n    p: Point = Point{x: 5}\n    y := p.x + \"hi\"\n}\n",
     );
-    assert_eq!(fault_count_containing(&ast, "type mismatch"), 1);
+    assert_eq!(fault_count_matching(&ast, is_type_mismatch), 1);
 }
 
 #[test]
@@ -66,5 +70,5 @@ fn method_call_on_a_nested_field_access_resolves() {
 #[test]
 fn field_access_on_an_undeclared_type_is_skipped_without_fault() {
     let ast = resolve_source("main() {\n    y := notAThing.field\n}\n");
-    assert_eq!(fault_count_containing(&ast, "type mismatch"), 0);
+    assert_eq!(fault_count_matching(&ast, is_type_mismatch), 0);
 }

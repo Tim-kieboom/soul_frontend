@@ -4,7 +4,8 @@ use ast_model::{
     soul_type::{Generic, SoulType},
     statements::StatementKind,
 };
-use soul_utils::{fault::Fault, span::Span};
+use ast_parser::fault::AstErrorKind;
+use soul_utils::span::Span;
 
 use super::expression::default_concrete_type;
 use super::function_call::is_generic_parameter;
@@ -56,10 +57,12 @@ impl<'a> NameResolver<'a> {
             Some(expression_id) => self.check_tail_expression(expression_id, return_type, generics),
             None => {
                 if !matches!(return_type, SoulType::None) {
-                    self.log_fault(Fault::error(
-                        format!("return type mismatch: expected `{return_type:?}`, got nothing"),
+                    self.log_error(
+                        AstErrorKind::ReturnTypeMismatchMissing {
+                            expected: format!("{return_type:?}").into(),
+                        },
                         Some(span),
-                    ));
+                    );
                 }
             }
         }
@@ -111,10 +114,13 @@ impl<'a> NameResolver<'a> {
                     return;
                 }
 
-                self.log_fault(Fault::error(
-                    format!("return type mismatch: expected `{return_type:?}`, got `{tail_ty:?}`"),
+                self.log_error(
+                    AstErrorKind::ReturnTypeMismatch {
+                        expected: format!("{return_type:?}").into(),
+                        got: format!("{tail_ty:?}").into(),
+                    },
                     Some(expression.span),
-                ));
+                );
             }
         }
     }
