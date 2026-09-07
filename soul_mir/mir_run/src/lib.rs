@@ -21,7 +21,7 @@ use std::time::Instant;
 
 use ast_model::{AstTree, FunctionKind};
 use mir_model::MirFunction;
-use mir_parser::lower_function;
+use mir_parser::{fault::MirErrorKind, lower_function};
 use soul_utils::{
     CrateContext, FunctionId,
     collections::{benchmark::Benchmark, vec_map::VecMap},
@@ -38,7 +38,7 @@ pub struct MirProgram {
 pub fn to_mir<K>(
     ast: &AstTree<K>,
     benchmark: &mut Benchmark,
-    context: &mut CrateContext,
+    context: &mut CrateContext<MirErrorKind>,
     _options: &CompilerOptions,
 ) -> MirProgram {
     let time = Instant::now();
@@ -58,7 +58,7 @@ pub fn to_mir<K>(
             Ok(mir_function) => {
                 functions.insert(id, mir_function);
             }
-            Err(fault) => context.faults.push(fault.into_kind()),
+            Err(fault) => context.faults.push(fault),
         }
     }
 

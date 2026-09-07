@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use ast_model::AstTree;
 use ast_parser::fault::AstErrorKind;
 use ast_run::{AstRequest, to_ast};
+use mir_parser::fault::MirErrorKind;
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
     CrateContext,
@@ -13,7 +14,7 @@ use soul_utils::{
 
 use crate::MirProgram;
 
-fn create_mir<K>(ast: &AstTree<K>) -> (MirProgram, CrateContext) {
+fn create_mir<K>(ast: &AstTree<K>) -> (MirProgram, CrateContext<MirErrorKind>) {
     let mut benchmark = Benchmark::new();
     create_mir_with_benchmark(ast, &mut benchmark)
 }
@@ -21,7 +22,7 @@ fn create_mir<K>(ast: &AstTree<K>) -> (MirProgram, CrateContext) {
 fn create_mir_with_benchmark<K>(
     ast: &AstTree<K>,
     benchmark: &mut Benchmark,
-) -> (MirProgram, CrateContext) {
+) -> (MirProgram, CrateContext<MirErrorKind>) {
     let mut context = CrateContext::default();
     let mir = crate::to_mir(ast, benchmark, &mut context, &CompilerOptions::default());
     (mir, context)
@@ -91,6 +92,14 @@ fn out_of_scope_function_pushes_a_fault_into_the_context_not_a_panic() {
         "{:#?}",
         context.faults.iter().collect::<Vec<_>>()
     );
+    assert!(
+        context
+            .faults
+            .iter()
+            .any(|fault| matches!(fault.kind(), MirErrorKind::NonPrimitiveType { .. })),
+        "{:#?}",
+        context.faults.iter().collect::<Vec<_>>()
+    );
 }
 
 #[test]
@@ -120,6 +129,14 @@ fn mixed_program_lowers_what_it_can_and_faults_on_the_rest() {
     assert_eq!(
         context.faults.count_severity(Severity::Error),
         1,
+        "{:#?}",
+        context.faults.iter().collect::<Vec<_>>()
+    );
+    assert!(
+        context
+            .faults
+            .iter()
+            .any(|fault| matches!(fault.kind(), MirErrorKind::NonPrimitiveType { .. })),
         "{:#?}",
         context.faults.iter().collect::<Vec<_>>()
     );
