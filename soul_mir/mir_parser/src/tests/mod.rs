@@ -8,9 +8,10 @@ use soul_tokenizer::to_token_stream;
 use soul_utils::{
     FunctionId,
     collections::{crate_store::CrateStore, module_store::ModuleStore},
+    error::SoulResult,
 };
 
-use crate::{LowerError, lower_function};
+use crate::lower_function;
 
 fn resolve_source(source: &str) -> AstTree {
     let mut module_store = ModuleStore::new();
@@ -56,10 +57,28 @@ fn find_function(store: &AstStore, name: &str) -> FunctionId {
         .unwrap_or_else(|| panic!("no function named `{name}` found"))
 }
 
-fn lower_source(source: &str, function_name: &str) -> Result<mir_model::MirFunction, LowerError> {
+fn lower_source(source: &str, function_name: &str) -> SoulResult<mir_model::MirFunction> {
     let ast = resolve_source(source);
     let function_id = find_function(&ast.crates.store, function_name);
     lower_function(&ast.crates.store, &ast.declares, function_id)
+}
+
+/// Asserts `result` is an `Err` whose message contains `needle` and which carries
+/// a span — matching the "every fault has a message and a location" convention
+/// used by every other pipeline stage's faults.
+fn assert_rejected_with(result: &SoulResult<mir_model::MirFunction>, needle: &str) {
+    let Err(fault) = result else {
+        panic!("expected lowering to fail, got {:#?}", result.as_ref().ok());
+    };
+    assert!(
+        fault.message().contains(needle),
+        "expected fault message to contain `{needle}`, got `{}`",
+        fault.message()
+    );
+    assert!(
+        fault.span().is_some(),
+        "expected the fault to carry a span, got {fault:#?}"
+    );
 }
 
 #[test]
@@ -113,13 +132,13 @@ fn lowers_a_bare_literal_return() {
 #[test]
 fn missing_return_is_rejected() {
     let result = lower_source("f(): int {\n    x := 1\n}\n", "f");
-    assert!(matches!(result, Err(LowerError::MissingReturn)));
+    assert_rejected_with(&result, "no `return <expr>`");
 }
 
 #[test]
 fn non_primitive_return_type_is_rejected() {
     let result = lower_source("f() {\n    x := 1\n}\n", "f");
-    assert!(matches!(result, Err(LowerError::UnsupportedType(_))));
+    assert_rejected_with(&result, "isn't a primitive scalar");
 }
 
 #[test]
@@ -128,7 +147,7 @@ fn destructuring_variable_pattern_is_rejected() {
         "f(): int {\n    (a, b) := get_pair()\n    return a\n}\n",
         "f",
     );
-    assert!(matches!(result, Err(LowerError::UnsupportedStatement(_))));
+    assert_rejected_with(&result, "non-destructuring");
 }
 
 #[test]
@@ -137,16 +156,47 @@ fn struct_typed_parameter_is_rejected() {
         "struct Point { x: int }\nf(p: Point): int {\n    return p.x\n}\n",
         "f",
     );
-    assert!(matches!(result, Err(LowerError::UnsupportedType(_))));
+    assert_rejected_with(&result, "isn't a primitive scalar");
 }
 
 #[test]
-fn nested_compound_expression_is_rejected() {
-    let result = lower_source(
+fn nested_compound_expression_is_lowered_via_a_temporary() {
+    let mir = lower_source(
         "f(a: int, b: int, c: int): int {\n    return a + b * c\n}\n",
         "f",
+    )
+    .expect("expected successful lowering");
+
+    // 3 params + return local + 1 temp for `b * c` = 5 locals; no local for the
+    // outer `a + temp` since it's assigned straight to the return local.
+    assert_eq!(mir.locals.entries().count(), 5);
+
+    let (_, block) = mir.blocks.entries().next().unwrap();
+    assert_eq!(block.statements.len(), 2, "{:#?}", block.statements);
+
+    let mir_model::Statement::Assign(temp_place, Rvalue::BinaryOp(op, _, _)) = &block.statements[0]
+    else {
+        panic!(
+            "expected first statement to assign the nested `b * c` to a temp, got {:#?}",
+            block.statements[0]
+        );
+    };
+    assert_eq!(*op, ast_model::operators::BinaryOperatorKind::Mul);
+
+    let mir_model::Statement::Assign(ret_place, Rvalue::BinaryOp(op, _, right)) =
+        &block.statements[1]
+    else {
+        panic!(
+            "expected second statement to assign the outer `a + ..` to the return local, got {:#?}",
+            block.statements[1]
+        );
+    };
+    assert_eq!(*op, ast_model::operators::BinaryOperatorKind::Add);
+    assert_eq!(ret_place.local, mir.return_local);
+    assert!(
+        matches!(right, Operand::Copy(place) if place.local == temp_place.local),
+        "expected the outer expression's right operand to read back the temp from statement 0"
     );
-    assert!(matches!(result, Err(LowerError::UnsupportedExpression(_))));
 }
 
 #[test]
@@ -155,7 +205,16 @@ fn function_call_in_body_is_rejected() {
         "g(): int { return 1 }\nf(): int {\n    return g()\n}\n",
         "f",
     );
-    assert!(matches!(result, Err(LowerError::UnsupportedExpression(_))));
+    assert_rejected_with(&result, "only literals, variables, and arithmetic");
+}
+
+#[test]
+fn nested_function_call_operand_is_rejected() {
+    let result = lower_source(
+        "g(): int { return 1 }\nf(a: int): int {\n    return a + g()\n}\n",
+        "f",
+    );
+    assert_rejected_with(&result, "only literals, variables, and arithmetic");
 }
 
 #[test]
@@ -171,5 +230,5 @@ fn non_normal_function_is_rejected() {
         .expect("expected one function entry");
 
     let result = lower_function(&ast.crates.store, &ast.declares, function_id);
-    assert!(matches!(result, Err(LowerError::NotANormalFunction)));
+    assert_rejected_with(&result, "no body to lower to MIR");
 }

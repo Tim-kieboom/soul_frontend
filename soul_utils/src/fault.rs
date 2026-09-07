@@ -3,11 +3,21 @@ use std::fmt::Debug;
 use crate::span::Span;
 
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+    Debug,
+    Clone,
+    Default,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    serde::Serialize,
+    serde::Deserialize,
 )]
 pub enum Severity {
     Note = 0,
     Warning = 1,
+    #[default]
     Error = 2,
 }
 
