@@ -233,7 +233,8 @@ impl<'a, 'f> Parser<'a, 'f> {
         let value = self.forest.store.insert_expression(value);
         if self.current_is(&CURLY_OPEN) {
             *left = Expression::from_struct_contructor(
-                self.parse_struct_contructor(ident, generics, start_span)?,
+                self.parse_struct_contructor(ident, generics, start_span)
+                    .map_err(|err| err.map_kind(Into::into))?,
             );
             return Ok(());
         }

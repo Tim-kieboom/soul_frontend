@@ -87,8 +87,8 @@ where
     }
 }
 
-impl<T, K> ResultTryNotValue<T, Fault, K> for Result<T, Fault> {
-    fn try_not_value(self) -> TryResult<T, Fault, K> {
+impl<T, K1, K2> ResultTryNotValue<T, Fault<K1>, K2> for Result<T, Fault<K1>> {
+    fn try_not_value(self) -> TryResult<T, Fault<K1>, K2> {
         match self {
             Ok(val) => TryOk(val),
             Err(err) => TryNotValue(err),
@@ -96,8 +96,8 @@ impl<T, K> ResultTryNotValue<T, Fault, K> for Result<T, Fault> {
     }
 }
 
-impl<T, K> ResultTryNotValue<T, (), K> for Result<T, Fault> {
-    fn try_not_value(self) -> TryResult<T, (), K> {
+impl<T, K1, K2> ResultTryNotValue<T, (), K2> for Result<T, Fault<K1>> {
+    fn try_not_value(self) -> TryResult<T, (), K2> {
         match self {
             Ok(val) => TryOk(val),
             Err(_) => TryNotValue(()),

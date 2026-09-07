@@ -100,7 +100,10 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
             TokenKind::Keyword(keyword) => {
                 let kw = *keyword;
-                match self.parse_keyword_primary(start_span, kw)? {
+                match self
+                    .parse_keyword_primary(start_span, kw)
+                    .map_err(|err| err.map_kind(Into::into))?
+                {
                     Some(expr) => expr,
                     None => {
                         return Err(Fault::error(
@@ -147,7 +150,9 @@ impl<'a, 'f> Parser<'a, 'f> {
                     StringFormatTag::Fstr => false,
                 };
 
-                let string_format = self.parse_fstring_body()?;
+                let string_format = self
+                    .parse_fstring_body()
+                    .map_err(|err| err.map_kind(Into::into))?;
                 Expression::new(
                     ExpressionKind::StringFormat(StringFormat {
                         to_string,
@@ -226,7 +231,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         ))
     }
 
-    fn parse_fstring_body(&mut self) -> SoulResult<(Vec<(String, ExpressionId)>, String)> {
+    fn parse_fstring_body(
+        &mut self,
+    ) -> Result<(Vec<(String, ExpressionId)>, String), crate::fault::AstFault> {
         self.bump(); // consume StringFormat tag
 
         let mut parts = vec![];
@@ -241,13 +248,16 @@ impl<'a, 'f> Parser<'a, 'f> {
                     match &self.token().kind {
                         TokenKind::Symbol(Symbol::CurlyOpen) => {
                             self.bump();
-                            let expr_id = self.parse_expression_id(&[
-                                TokenKind::Symbol(Symbol::CurlyClose),
-                                TokenKind::EndLine,
-                                TokenKind::EndFile,
-                            ])?;
+                            let expr_id = self
+                                .parse_expression_id(&[
+                                    TokenKind::Symbol(Symbol::CurlyClose),
+                                    TokenKind::EndLine,
+                                    TokenKind::EndFile,
+                                ])
+                                .map_err(|err| err.map_kind(Into::into))?;
                             self.tokens.set_fstr_mode(true);
-                            self.expect(&CURLY_CLOSE)?;
+                            self.expect(&CURLY_CLOSE)
+                                .map_err(|err| err.map_kind(Into::into))?;
                             parts.push((text, expr_id));
                         }
                         _ => {
@@ -260,8 +270,8 @@ impl<'a, 'f> Parser<'a, 'f> {
                     break;
                 }
                 _ => {
-                    return Err(Fault::error(
-                        "expected format string part or end of format string",
+                    return Err(Fault::error_with_kind(
+                        crate::fault::AstErrorKind::UnterminatedFormatString,
                         Some(self.token().span),
                     ));
                 }
@@ -303,7 +313,8 @@ impl<'a, 'f> Parser<'a, 'f> {
                         if self.current_is(&CURLY_OPEN) {
                             return self
                                 .parse_struct_contructor(ident, generics, start_span)
-                                .map(Expression::from_struct_contructor);
+                                .map(Expression::from_struct_contructor)
+                                .map_err(|err| err.map_kind(Into::into));
                         }
                         return Ok(Expression::new_variable(self.alloc_node(), ident));
                     }
@@ -314,7 +325,8 @@ impl<'a, 'f> Parser<'a, 'f> {
             &CURLY_OPEN if !end_tokens.contains(&CURLY_OPEN) => {
                 return self
                     .parse_struct_contructor(ident, vec![], start_span)
-                    .map(Expression::from_struct_contructor);
+                    .map(Expression::from_struct_contructor)
+                    .map_err(|err| err.map_kind(Into::into));
             }
             _ => (),
         };
@@ -326,11 +338,14 @@ impl<'a, 'f> Parser<'a, 'f> {
         &mut self,
         start_span: Span,
         keyword: KeyWord,
-    ) -> SoulResult<Option<Expression>> {
+    ) -> Result<Option<Expression>, crate::fault::AstFault> {
         Ok(Some(match keyword {
-            KeyWord::If => self.parse_if()?,
-            KeyWord::Match => self.parse_match()?,
-            KeyWord::For => self.parse_for_loop().map(Expression::from_for)?,
+            KeyWord::If => self.parse_if().map_err(|err| err.map_kind(Into::into))?,
+            KeyWord::Match => self.parse_match().map_err(|err| err.map_kind(Into::into))?,
+            KeyWord::For => self
+                .parse_for_loop()
+                .map(Expression::from_for)
+                .map_err(|err| err.map_kind(Into::into))?,
 
             KeyWord::True | KeyWord::False => {
                 let value = keyword == KeyWord::True;
@@ -352,8 +367,10 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
 
             KeyWord::Break | KeyWord::Return | KeyWord::Continue => {
-                return Err(Fault::error(
-                    format!("can not have {} in expression", keyword.as_str()),
+                return Err(Fault::error_with_kind(
+                    crate::fault::AstErrorKind::KeywordNotAllowedInExpression {
+                        keyword: keyword.as_str().into(),
+                    },
                     Some(self.token().span),
                 ));
             }
@@ -361,11 +378,15 @@ impl<'a, 'f> Parser<'a, 'f> {
             KeyWord::New => {
                 self.bump();
                 match &self.token().kind {
-                    &ROUND_OPEN => self.parse_new_ptr(start_span)?,
-                    &SQUARE_OPEN | &ARRAY => self.parse_new_array(start_span)?,
+                    &ROUND_OPEN => self
+                        .parse_new_ptr(start_span)
+                        .map_err(|err| err.map_kind(Into::into))?,
+                    &SQUARE_OPEN | &ARRAY => self
+                        .parse_new_array(start_span)
+                        .map_err(|err| err.map_kind(Into::into))?,
                     _ => {
-                        return Err(Fault::error(
-                            "expected '(' or ':[' after 'new'".to_string(),
+                        return Err(Fault::error_with_kind(
+                            crate::fault::AstErrorKind::ExpectedNewArguments,
                             Some(self.token().span),
                         ));
                     }
@@ -389,21 +410,28 @@ impl<'a, 'f> Parser<'a, 'f> {
         }))
     }
 
-    fn try_parse_keyword_block(&mut self, start_span: Span) -> SoulResult<Expression> {
+    fn try_parse_keyword_block(
+        &mut self,
+        start_span: Span,
+    ) -> Result<Expression, crate::fault::AstFault> {
         if !self.current_is(&CURLY_OPEN) {
-            return Err(Fault::error(
-                "expected block after keyword".to_string(),
+            return Err(Fault::error_with_kind(
+                crate::fault::AstErrorKind::ExpectedBlockAfterKeyword,
                 Some(self.token().span),
             ));
         }
-        let block = self.parse_block(TypeModifier::Mut)?;
+        let block = self
+            .parse_block(TypeModifier::Mut)
+            .map_err(|err| err.map_kind(Into::into))?;
         Ok(Expression::new_block(block, self.span_combine(start_span)))
     }
 
     fn parse_primary_keyword(&mut self, start_span: Span) -> SoulResult<Option<Expression>> {
         let ident = self.try_token_as_ident_str()?;
         match KeyWord::from_str(ident) {
-            Ok(keyword) => self.parse_keyword_primary(start_span, keyword),
+            Ok(keyword) => self
+                .parse_keyword_primary(start_span, keyword)
+                .map_err(|err| err.map_kind(Into::into)),
             _ => Ok(None),
         }
     }

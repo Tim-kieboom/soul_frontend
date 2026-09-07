@@ -28,6 +28,49 @@ pub enum AstErrorKind {
 
     #[error("language {language} is not supported")]
     UnsupportedExternLanguage { language: Box<str> },
+
+    #[error(
+        "'{modifier}' modifier cannot be applied to compound patterns; use per-binding '{modifier}' instead (e.g., ({modifier} a, b))"
+    )]
+    MutOnCompoundPattern { modifier: Box<str> },
+
+    #[error("'{assign_op}' is not valid for variable declaration (can use ['=', ':='])")]
+    InvalidAssignOperatorForDeclaration { assign_op: Box<str> },
+
+    #[error("'mut' cannot be applied to constructor patterns; use per-field 'mut' instead")]
+    MutOnConstructorPattern,
+
+    #[error(
+        "'mut' cannot be applied to tuple patterns; use per-element 'mut' instead (e.g., (mut a, b))"
+    )]
+    MutOnTuplePattern,
+
+    #[error("'mut' cannot be applied to named-tuple patterns; use per-field 'mut' instead")]
+    MutOnNamedTuplePattern,
+
+    #[error("expected variable name, `_`, `(`, or `{{` but found `{found}`")]
+    ExpectedPatternStart { found: Box<str> },
+
+    #[error("StructConstructor already has '..'")]
+    DuplicateStructSpread,
+
+    #[error("StructConstructor's '..' should only be used at the end expected '}}'")]
+    StructSpreadNotAtEnd,
+
+    #[error("`{found}` is invalid as start of expression")]
+    InvalidExpressionStart { found: Box<str> },
+
+    #[error("expected format string part or end of format string")]
+    UnterminatedFormatString,
+
+    #[error("can not have {keyword} in expression")]
+    KeywordNotAllowedInExpression { keyword: Box<str> },
+
+    #[error("expected '(' or ':[' after 'new'")]
+    ExpectedNewArguments,
+
+    #[error("expected block after keyword")]
+    ExpectedBlockAfterKeyword,
 }
 
 impl From<UnclassifiedKind> for AstErrorKind {

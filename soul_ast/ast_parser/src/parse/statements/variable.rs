@@ -22,19 +22,22 @@ use crate::{
 const MUT_STR: &str = KeyWord::Mut.as_str();
 
 impl<'a, 'f> Parser<'a, 'f> {
-    pub(crate) fn parse_variable(&mut self) -> SoulResult<Statement> {
+    pub(crate) fn parse_variable(&mut self) -> Result<Statement, crate::fault::AstFault> {
         const DEFAULT_MODIFIER: TypeModifier = TypeModifier::Immut;
         let modifier = self.try_bump_mut().unwrap_or(DEFAULT_MODIFIER);
         let pattern_start = self.token().span;
 
-        let pattern = self.parse_var_pattern(modifier)?;
+        let pattern = match self.parse_var_pattern(modifier) {
+            Ok(val) => val,
+            Err(err) => return Err(err.map_kind(Into::into)),
+        };
 
         // Error: `mut` is not allowed on compound patterns
         if modifier != TypeModifier::Immut && !matches!(pattern, VarPattern::Simple { .. }) {
-            return Err(Fault::error(
-                format!(
-                    "'{MUT_STR}' modifier cannot be applied to compound patterns; use per-binding '{MUT_STR}' instead (e.g., ({MUT_STR} a, b))",
-                ),
+            return Err(Fault::error_with_kind(
+                crate::fault::AstErrorKind::MutOnCompoundPattern {
+                    modifier: MUT_STR.into(),
+                },
                 Some(pattern_start),
             ));
         }
@@ -42,7 +45,10 @@ impl<'a, 'f> Parser<'a, 'f> {
         let ty = match self.current_is(&COLON) {
             true => {
                 self.bump();
-                Some(self.try_parse_type().merge_to_result()?)
+                match self.try_parse_type().merge_to_result() {
+                    Ok(val) => Some(val),
+                    Err(err) => return Err(err.map_kind(Into::into)),
+                }
             }
             false => None,
         };
@@ -54,7 +60,10 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         if let TokenKind::Symbol(Symbol::DoubleColon) = self.token().kind {
             self.bump();
-            let value = self.parse_expression_id(STAMENT_END_TOKENS)?;
+            let value = match self.parse_expression_id(STAMENT_END_TOKENS) {
+                Ok(val) => val,
+                Err(err) => return Err(err.map_kind(Into::into)),
+            };
             return Ok(Statement::new_variable(
                 Variable::new_const(self.alloc_node(), pattern, ty, Some(value)),
                 self.span_combine(pattern_start),
@@ -80,17 +89,19 @@ impl<'a, 'f> Parser<'a, 'f> {
         };
 
         if assign_type != AssignType::Declaration && assign_type != AssignType::Assign {
-            return Err(Fault::error(
-                format!(
-                    "'{}' is not valid for variable declaration (can use ['=', ':='])",
-                    assign_type.as_str()
-                ),
+            return Err(Fault::error_with_kind(
+                crate::fault::AstErrorKind::InvalidAssignOperatorForDeclaration {
+                    assign_op: assign_type.as_str().into(),
+                },
                 Some(self.token().span),
             ));
         }
 
         self.bump();
-        let value = self.parse_expression_id(STAMENT_END_TOKENS)?;
+        let value = match self.parse_expression_id(STAMENT_END_TOKENS) {
+            Ok(val) => val,
+            Err(err) => return Err(err.map_kind(Into::into)),
+        };
         Ok(Statement::new_variable(
             Variable::new_const(self.alloc_node(), pattern, ty, Some(value))
                 .apply_modifier(modifier),
@@ -103,7 +114,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_var_pattern(
         &mut self,
         default_modifier: TypeModifier,
-    ) -> SoulResult<VarPattern> {
+    ) -> Result<VarPattern, crate::fault::AstFault> {
         let explicit_mod = self.try_bump_mut();
         let modifier = explicit_mod.unwrap_or(default_modifier);
 
@@ -114,15 +125,20 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         match &self.token().kind {
             TokenKind::Ident(_) => {
-                let ident = self.try_bump_consume_ident()?;
+                let ident = match self.try_bump_consume_ident() {
+                    Ok(val) => val,
+                    Err(err) => return Err(err.map_kind(Into::into)),
+                };
                 if self.current_is(&CURLY_OPEN) {
                     if explicit_mod.is_some() {
-                        return Err(Fault::error(
-                            "'mut' cannot be applied to constructor patterns; use per-field 'mut' instead".to_string(),
+                        return Err(Fault::error_with_kind(
+                            crate::fault::AstErrorKind::MutOnConstructorPattern,
                             Some(ident.span()),
                         ));
                     }
-                    return self.parse_constructor_pattern(ident);
+                    return self
+                        .parse_constructor_pattern(ident)
+                        .map_err(|err| err.map_kind(Into::into));
                 }
                 Ok(VarPattern::Simple {
                     binding: Binding::new(self.alloc_node(), ident),
@@ -131,28 +147,28 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
             &ROUND_OPEN => {
                 if explicit_mod.is_some() {
-                    return Err(Fault::error(
-                        "'mut' cannot be applied to tuple patterns; use per-element 'mut' instead (e.g., (mut a, b))"
-                            .to_string(),
+                    return Err(Fault::error_with_kind(
+                        crate::fault::AstErrorKind::MutOnTuplePattern,
                         Some(self.token().span),
                     ));
                 }
                 self.parse_tuple_pattern()
+                    .map_err(|err| err.map_kind(Into::into))
             }
             &CURLY_OPEN => {
                 if explicit_mod.is_some() {
-                    return Err(Fault::error(
-                        "'mut' cannot be applied to named-tuple patterns; use per-field 'mut' instead".to_string(),
+                    return Err(Fault::error_with_kind(
+                        crate::fault::AstErrorKind::MutOnNamedTuplePattern,
                         Some(self.token().span),
                     ));
                 }
                 self.parse_named_tuple_pattern()
+                    .map_err(|err| err.map_kind(Into::into))
             }
-            _ => Err(Fault::error(
-                format!(
-                    "expected variable name, `_`, `(`, or `{{` but found `{}`",
-                    self.token().kind.display()
-                ),
+            _ => Err(Fault::error_with_kind(
+                crate::fault::AstErrorKind::ExpectedPatternStart {
+                    found: self.token().kind.display().into_boxed_str(),
+                },
                 Some(self.token().span),
             )),
         }
@@ -185,7 +201,10 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            elements.push(self.parse_var_pattern(TypeModifier::Const)?);
+            elements.push(
+                self.parse_var_pattern(TypeModifier::Const)
+                    .map_err(|err| err.map_kind(Into::into))?,
+            );
         }
 
         self.expect(&ROUND_CLOSE)?;

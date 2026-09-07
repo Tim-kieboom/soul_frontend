@@ -64,8 +64,8 @@ impl<'a, 'f> Parser<'a, 'f> {
         ident: Ident,
         generics: Vec<SoulType>,
         start_span: Span,
-    ) -> SoulResult<Spanned<StructConstructor>> {
-        self.expect(&CURLY_OPEN)?;
+    ) -> Result<Spanned<StructConstructor>, crate::fault::AstFault> {
+        self.expect(&CURLY_OPEN).map_err(|err| err.map_kind(Into::into))?;
         self.skip_end_lines();
         let struct_type = self.type_from_ident(ident, generics);
 
@@ -87,8 +87,8 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             if self.current_is(&DOUBLE_DOT) {
                 if defaults {
-                    return Err(Fault::error(
-                        "StructConstructor already has '..'",
+                    return Err(Fault::error_with_kind(
+                        crate::fault::AstErrorKind::DuplicateStructSpread,
                         Some(self.token().span),
                     ));
                 }
@@ -97,23 +97,26 @@ impl<'a, 'f> Parser<'a, 'f> {
                 self.bump();
                 self.skip_end_lines();
                 if !self.current_is(&CURLY_CLOSE) {
-                    return Err(Fault::error(
-                        "StructConstructor's '..' should only be used at the end expected '}'",
+                    return Err(Fault::error_with_kind(
+                        crate::fault::AstErrorKind::StructSpreadNotAtEnd,
                         Some(self.token().span),
                     ));
                 }
                 break;
             }
 
-            let ident = self.try_bump_consume_ident()?;
+            let ident = self
+                .try_bump_consume_ident()
+                .map_err(|err| err.map_kind(Into::into))?;
             let value = if self.current_is(&COMMA) || self.current_is(&CURLY_CLOSE) {
                 let id = self.alloc_node();
                 self.forest
                     .store
                     .insert_expression(Expression::new_variable(id, ident.clone()))
             } else {
-                self.expect(&COLON)?;
-                self.parse_expression_id(&[COMMA, CURLY_CLOSE])?
+                self.expect(&COLON).map_err(|err| err.map_kind(Into::into))?;
+                self.parse_expression_id(&[COMMA, CURLY_CLOSE])
+                    .map_err(|err| err.map_kind(Into::into))?
             };
 
             values.push((ident, value));
@@ -131,7 +134,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             continue;
         }
         self.skip_end_lines();
-        self.expect(&CURLY_CLOSE)?;
+        self.expect(&CURLY_CLOSE).map_err(|err| err.map_kind(Into::into))?;
 
         let ctor = StructConstructor {
             values,
