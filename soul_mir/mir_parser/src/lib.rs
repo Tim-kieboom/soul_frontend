@@ -12,6 +12,7 @@
 //! resolved, well-typed input, so every fault here means "not supported by this
 //! slice yet," not "the input program is invalid."
 
+pub mod fault;
 #[cfg(test)]
 mod tests;
 
@@ -26,22 +27,23 @@ use ast_model::{
     soul_type::SoulType,
     statements::{StatementKind, VarPattern},
 };
+use fault::{MirErrorKind, MirResult};
 use mir_model::{BasicBlock, LocalId, MirFunction, MirType, Operand, Place, Rvalue, Terminator};
 use soul_utils::{
-    FunctionId, TypeModifier, collections::vec_map::VecMap, error::SoulResult, fault::Fault,
-    ids::IdGenerator, span::Span,
+    FunctionId, TypeModifier, collections::vec_map::VecMap, fault::Fault, ids::IdGenerator,
+    span::Span,
 };
 
 pub fn lower_function(
     store: &AstStore,
     declares: &DeclareStore,
     function_id: FunctionId,
-) -> SoulResult<MirFunction> {
+) -> MirResult<MirFunction> {
     let function = match &store.functions[function_id] {
         FunctionKind::Normal(function) => function,
         FunctionKind::Signature(signature) => {
-            return Err(Fault::error(
-                "extern/signature-only declarations have no body to lower to MIR",
+            return Err(Fault::error_with_kind(
+                MirErrorKind::SignatureOnlyFunctionHasNoBody,
                 Some(signature.span),
             ));
         }
@@ -85,14 +87,14 @@ pub fn lower_function(
         match &stmt.node {
             StatementKind::Variable(var) => {
                 let VarPattern::Simple { binding, modifier } = &var.pattern else {
-                    return Err(Fault::error(
-                        "only simple (non-destructuring) variable bindings are supported in this lowering slice",
+                    return Err(Fault::error_with_kind(
+                        MirErrorKind::NonSimpleVariablePatternUnsupported,
                         Some(stmt.span),
                     ));
                 };
                 let Some(init) = var.initialize_value else {
-                    return Err(Fault::error(
-                        "a variable declaration with no initializer isn't supported in this lowering slice",
+                    return Err(Fault::error_with_kind(
+                        MirErrorKind::UninitializedVariableUnsupported,
                         Some(stmt.span),
                     ));
                 };
@@ -100,7 +102,10 @@ pub fn lower_function(
                     .get_variable_type(binding.id)
                     .and_then(|(_, ty, _)| ty.clone())
                     .ok_or_else(|| {
-                        Fault::error("variable has no resolved type", Some(binding.ident.span()))
+                        Fault::error_with_kind(
+                            MirErrorKind::VariableHasNoResolvedType,
+                            Some(binding.ident.span()),
+                        )
                     })?;
 
                 require_primitive(&ty, binding.ident.span())?;
@@ -113,8 +118,8 @@ pub fn lower_function(
             StatementKind::Expression { expression, .. } => {
                 let expr = &store.expressions[*expression];
                 let ExpressionKind::Return(Some(value_id)) = &expr.node else {
-                    return Err(Fault::error(
-                        "only a `return <expr>` statement is supported as a function's terminal statement in this lowering slice",
+                    return Err(Fault::error_with_kind(
+                        MirErrorKind::NonReturnTerminalStatementUnsupported,
                         Some(stmt.span),
                     ));
                 };
@@ -127,8 +132,8 @@ pub fn lower_function(
                 break;
             }
             _ => {
-                return Err(Fault::error(
-                    "this statement kind isn't supported in this lowering slice",
+                return Err(Fault::error_with_kind(
+                    MirErrorKind::UnsupportedStatementKind,
                     Some(stmt.span),
                 ));
             }
@@ -136,10 +141,7 @@ pub fn lower_function(
     }
 
     let terminator = terminator.ok_or_else(|| {
-        Fault::error(
-            "function has no `return <expr>` as its final reachable statement",
-            Some(fn_span),
-        )
+        Fault::error_with_kind(MirErrorKind::MissingReturnStatement, Some(fn_span))
     })?;
 
     // A single basic block is all this slice ever produces; a real block
@@ -168,14 +170,14 @@ pub fn lower_function(
 /// this slice always lower a variable read as `Operand::Copy` without checking a
 /// real `AutoCopy` bound (that check doesn't exist yet in the resolver) — so
 /// non-primitive types are out of scope until it does.
-fn require_primitive(ty: &SoulType, span: Span) -> SoulResult<()> {
+fn require_primitive(ty: &SoulType, span: Span) -> MirResult<()> {
     if matches!(ty, SoulType::Primitive(_)) {
         Ok(())
     } else {
-        Err(Fault::error(
-            format!(
-                "type `{ty:?}` isn't a primitive scalar, which is all this lowering slice supports"
-            ),
+        Err(Fault::error_with_kind(
+            MirErrorKind::NonPrimitiveType {
+                ty: format!("{ty:?}").into(),
+            },
             Some(span),
         ))
     }
@@ -221,13 +223,13 @@ impl<'a> Lowerer<'a> {
         &mut self,
         expr_id: ExpressionId,
         statements: &mut Vec<mir_model::Statement>,
-    ) -> SoulResult<Rvalue> {
+    ) -> MirResult<Rvalue> {
         let expr = &self.store.expressions[expr_id];
         match &expr.node {
             ExpressionKind::Binary(binary) => {
                 if !is_supported_arithmetic_op(binary.operator.value) {
-                    return Err(Fault::error(
-                        "only arithmetic binary operators (+ - * / %) are supported in this lowering slice",
+                    return Err(Fault::error_with_kind(
+                        MirErrorKind::UnsupportedBinaryOperator,
                         Some(expr.span),
                     ));
                 }
@@ -252,19 +254,19 @@ impl<'a> Lowerer<'a> {
         &mut self,
         expr_id: ExpressionId,
         statements: &mut Vec<mir_model::Statement>,
-    ) -> SoulResult<Operand> {
+    ) -> MirResult<Operand> {
         let expr = &self.store.expressions[expr_id];
         match &expr.node {
             ExpressionKind::Literal((_, literal)) => Ok(Operand::Constant(literal.clone())),
             ExpressionKind::Variable(var) => {
                 let resolved = self.declares.get_variable_resolve(var.id).ok_or_else(|| {
-                    Fault::error("variable has no resolved binding", Some(expr.span))
-                })?;
-                let local = *self.node_to_local.get(&resolved).ok_or_else(|| {
-                    Fault::error(
-                        "variable isn't bound to a local in this function's lowered scope",
+                    Fault::error_with_kind(
+                        MirErrorKind::VariableHasNoResolvedBinding,
                         Some(expr.span),
                     )
+                })?;
+                let local = *self.node_to_local.get(&resolved).ok_or_else(|| {
+                    Fault::error_with_kind(MirErrorKind::VariableNotBoundToLocal, Some(expr.span))
                 })?;
                 Ok(Operand::Copy(Place::local(local)))
             }
@@ -275,7 +277,10 @@ impl<'a> Lowerer<'a> {
                     .get_expression_type(expr_id)
                     .cloned()
                     .ok_or_else(|| {
-                        Fault::error("nested expression has no resolved type", Some(span))
+                        Fault::error_with_kind(
+                            MirErrorKind::NestedExpressionHasNoResolvedType,
+                            Some(span),
+                        )
                     })?;
                 require_primitive(&ty, span)?;
 
@@ -284,8 +289,8 @@ impl<'a> Lowerer<'a> {
                 statements.push(mir_model::Statement::Assign(Place::local(temp), rvalue));
                 Ok(Operand::Copy(Place::local(temp)))
             }
-            _ => Err(Fault::error(
-                "only literals, variables, and arithmetic binary expressions are supported as operands in this lowering slice",
+            _ => Err(Fault::error_with_kind(
+                MirErrorKind::UnsupportedOperandExpression,
                 Some(expr.span),
             )),
         }

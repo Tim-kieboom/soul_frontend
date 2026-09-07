@@ -8,10 +8,12 @@ use soul_tokenizer::to_token_stream;
 use soul_utils::{
     FunctionId,
     collections::{crate_store::CrateStore, module_store::ModuleStore},
-    error::SoulResult,
 };
 
-use crate::lower_function;
+use crate::{
+    fault::{MirErrorKind, MirResult},
+    lower_function,
+};
 
 fn resolve_source(source: &str) -> AstTree<AstErrorKind> {
     let mut module_store = ModuleStore::new();
@@ -57,28 +59,35 @@ fn find_function(store: &AstStore, name: &str) -> FunctionId {
         .unwrap_or_else(|| panic!("no function named `{name}` found"))
 }
 
-fn lower_source(source: &str, function_name: &str) -> SoulResult<mir_model::MirFunction> {
+fn lower_source(source: &str, function_name: &str) -> MirResult<mir_model::MirFunction> {
     let ast = resolve_source(source);
     let function_id = find_function(&ast.crates.store, function_name);
     lower_function(&ast.crates.store, &ast.declares, function_id)
 }
 
-/// Asserts `result` is an `Err` whose message contains `needle` and which carries
-/// a span — matching the "every fault has a message and a location" convention
-/// used by every other pipeline stage's faults.
-fn assert_rejected_with(result: &SoulResult<mir_model::MirFunction>, needle: &str) {
+/// Asserts `result` is an `Err` whose kind satisfies `predicate` and which carries
+/// a span — matching the "every fault has a kind and a location" convention used
+/// by every other pipeline stage's faults.
+fn assert_rejected_matching(
+    result: &MirResult<mir_model::MirFunction>,
+    predicate: impl Fn(&MirErrorKind) -> bool,
+) {
     let Err(fault) = result else {
         panic!("expected lowering to fail, got {:#?}", result.as_ref().ok());
     };
     assert!(
-        fault.message().contains(needle),
-        "expected fault message to contain `{needle}`, got `{}`",
-        fault.message()
+        predicate(fault.kind()),
+        "unexpected fault kind: {:?}",
+        fault.kind()
     );
     assert!(
         fault.span().is_some(),
         "expected the fault to carry a span, got {fault:#?}"
     );
+}
+
+fn assert_rejected_with(result: &MirResult<mir_model::MirFunction>, expected: MirErrorKind) {
+    assert_rejected_matching(result, |kind| *kind == expected);
 }
 
 #[test]
@@ -132,13 +141,15 @@ fn lowers_a_bare_literal_return() {
 #[test]
 fn missing_return_is_rejected() {
     let result = lower_source("f(): int {\n    x := 1\n}\n", "f");
-    assert_rejected_with(&result, "no `return <expr>`");
+    assert_rejected_with(&result, MirErrorKind::MissingReturnStatement);
 }
 
 #[test]
 fn non_primitive_return_type_is_rejected() {
     let result = lower_source("f() {\n    x := 1\n}\n", "f");
-    assert_rejected_with(&result, "isn't a primitive scalar");
+    assert_rejected_matching(&result, |kind| {
+        matches!(kind, MirErrorKind::NonPrimitiveType { .. })
+    });
 }
 
 #[test]
@@ -147,7 +158,7 @@ fn destructuring_variable_pattern_is_rejected() {
         "f(): int {\n    (a, b) := get_pair()\n    return a\n}\n",
         "f",
     );
-    assert_rejected_with(&result, "non-destructuring");
+    assert_rejected_with(&result, MirErrorKind::NonSimpleVariablePatternUnsupported);
 }
 
 #[test]
@@ -156,7 +167,9 @@ fn struct_typed_parameter_is_rejected() {
         "struct Point { x: int }\nf(p: Point): int {\n    return p.x\n}\n",
         "f",
     );
-    assert_rejected_with(&result, "isn't a primitive scalar");
+    assert_rejected_matching(&result, |kind| {
+        matches!(kind, MirErrorKind::NonPrimitiveType { .. })
+    });
 }
 
 #[test]
@@ -205,7 +218,7 @@ fn function_call_in_body_is_rejected() {
         "g(): int { return 1 }\nf(): int {\n    return g()\n}\n",
         "f",
     );
-    assert_rejected_with(&result, "only literals, variables, and arithmetic");
+    assert_rejected_with(&result, MirErrorKind::UnsupportedOperandExpression);
 }
 
 #[test]
@@ -214,7 +227,7 @@ fn nested_function_call_operand_is_rejected() {
         "g(): int { return 1 }\nf(a: int): int {\n    return a + g()\n}\n",
         "f",
     );
-    assert_rejected_with(&result, "only literals, variables, and arithmetic");
+    assert_rejected_with(&result, MirErrorKind::UnsupportedOperandExpression);
 }
 
 #[test]
@@ -230,5 +243,5 @@ fn non_normal_function_is_rejected() {
         .expect("expected one function entry");
 
     let result = lower_function(&ast.crates.store, &ast.declares, function_id);
-    assert_rejected_with(&result, "no body to lower to MIR");
+    assert_rejected_with(&result, MirErrorKind::SignatureOnlyFunctionHasNoBody);
 }

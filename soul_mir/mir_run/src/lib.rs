@@ -58,7 +58,7 @@ pub fn to_mir<K>(
             Ok(mir_function) => {
                 functions.insert(id, mir_function);
             }
-            Err(fault) => context.faults.push(fault),
+            Err(fault) => context.faults.push(fault.into_kind()),
         }
     }
 
