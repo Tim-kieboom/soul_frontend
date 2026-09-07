@@ -1,7 +1,10 @@
 use std::{iter, sync::LazyLock};
 
 use crate::{
-    fault::AstResult, parse::statements::variable::AssignType, parser::Parser, utils::{CURLY_CLOSE, SEMI_COLON, STAMENT_END_TOKENS},
+    fault::AstResult,
+    parse::statements::variable::AssignType,
+    parser::Parser,
+    utils::{CURLY_CLOSE, SEMI_COLON, STAMENT_END_TOKENS},
 };
 use ast_model::{
     AstStore,
@@ -25,12 +28,8 @@ static ASSIGNMENT_TOKENS: LazyLock<Vec<TokenKind>> = LazyLock::new(|| {
 });
 
 impl<'a, 'f> Parser<'a, 'f> {
-    pub(crate) fn parse_assign_or_expression(
-        &mut self,
-        start_span: Span,
-    ) -> AstResult<Statement> {
-        let lvalue = self
-            .parse_expression_id(&ASSIGNMENT_TOKENS)?;
+    pub(crate) fn parse_assign_or_expression(&mut self, start_span: Span) -> AstResult<Statement> {
+        let lvalue = self.parse_expression_id(&ASSIGNMENT_TOKENS)?;
         if self.current_is_any(STAMENT_END_TOKENS) {
             return Ok(Statement::from_expression(
                 &self.forest.store,
@@ -54,8 +53,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
         };
 
-        let rvalue = self
-            .parse_expression_id(STAMENT_END_TOKENS)?;
+        let rvalue = self.parse_expression_id(STAMENT_END_TOKENS)?;
         let resolved_rvalue = resolve_assign_type(
             &mut self.forest.store,
             lvalue,

@@ -12,8 +12,7 @@ use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
     FunctionId, Ident, TypeModifier,
     collections::try_result::{
-        ResultTryErr, ResultTryNotValue, ToResult, TryErr, TryError, TryNotValue, TryOk,
-        TryResult,
+        ResultTryErr, ResultTryNotValue, ToResult, TryErr, TryError, TryNotValue, TryOk, TryResult,
     },
     fault::Fault,
     literal::{StringLiteral, TokenLiteral},
@@ -22,7 +21,9 @@ use soul_utils::{
 };
 
 use crate::{
-    fault::{AstFault, AstResult, AstTryResult}, parser::Parser, utils::{
+    fault::{AstFault, AstResult, AstTryResult},
+    parser::Parser,
+    utils::{
         ARRAY, ARROW_LEFT, ARROW_RIGHT, ASSIGN, COLON, COMMA, CONST, CURLY_OPEN, DOT,
         DOUBLE_QUESTION, LAMBDA_ARROW, OPTIONAL, REF, ROUND_CLOSE, ROUND_OPEN, SEMI_COLON,
         SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS,
@@ -49,8 +50,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.bump();
         }
 
-        let ident = self
-            .try_bump_consume_ident()?;
+        let ident = self.try_bump_consume_ident()?;
 
         let span = self.token().span;
 
@@ -78,9 +78,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         name: &Ident,
     ) -> AstTryResult<Expression, AstFault> {
         if !self.current_is_any(&[ROUND_OPEN, ARROW_LEFT]) {
-            return TryNotValue(
-                self.get_expect_any_error(&[ROUND_OPEN, ARROW_LEFT]),
-            );
+            return TryNotValue(self.get_expect_any_error(&[ROUND_OPEN, ARROW_LEFT]));
         }
 
         let generics = if self.current_is(&ARROW_LEFT) {
@@ -212,9 +210,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
     }
 
-    pub(crate) fn parse_extern_function(
-        &mut self,
-    ) -> Result<Statement, AstFault> {
+    pub(crate) fn parse_extern_function(&mut self) -> Result<Statement, AstFault> {
         self.expect(&TokenKind::Keyword(KeyWord::Extern))?;
 
         let string_literal = match &self.token().kind {
@@ -255,11 +251,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         };
 
         self.bump();
-        let name = match self.try_bump_consume_ident() {
-            Ok(val) => val,
-            Err(err) => return Err(err),
-        };
-
+        let name = self.try_bump_consume_ident()?;
         let span = self.token().span;
         match self.try_parse_function_signature(span, &SoulType::None, name, false, Some(external))
         {
@@ -297,10 +289,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     pub(crate) fn try_parse_parameters(
         &mut self,
-    ) -> AstTryResult<
-        (Vec<Parameter>, FunctionThisKind),
-        AstFault,
-    > {
+    ) -> AstTryResult<(Vec<Parameter>, FunctionThisKind), AstFault> {
         let begin = self.tokens.current_position();
 
         let result = self.inner_parameters();
@@ -319,14 +308,10 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.bump();
         let mut generics = vec![];
         loop {
-            let name = self
-                .try_bump_consume_ident()?;
+            let name = self.try_bump_consume_ident()?;
             let bound = if self.current_is(&COLON) {
                 self.bump();
-                Some(
-                    self.try_parse_type()
-                        .merge_to_result()?
-                )
+                Some(self.try_parse_type().merge_to_result()?)
             } else {
                 None
             };
@@ -350,8 +335,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let mut values = vec![];
         loop {
             let name = if self.peek().kind == COLON {
-                let name = self
-                    .try_bump_consume_ident()?;
+                let name = self.try_bump_consume_ident()?;
                 self.expect(&COLON)?;
                 Some(name)
             } else {
@@ -395,12 +379,10 @@ impl<'a, 'f> Parser<'a, 'f> {
 
                 let signature = &mut methode.signature.value;
                 if signature.function_kind != FunctionThisKind::Static {
-                    self.log_fault(
-                        Fault::error_with_kind(
-                            crate::fault::AstErrorKind::NonStaticThisConstructor,
-                            Some(signature.name.span()),
-                        ),
-                    );
+                    self.log_fault(Fault::error_with_kind(
+                        crate::fault::AstErrorKind::NonStaticThisConstructor,
+                        Some(signature.name.span()),
+                    ));
                 }
                 signature.function_kind = FunctionThisKind::Ctor;
                 signature.return_type = method_type.clone();
@@ -408,8 +390,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 Ok(Spanned::new(methode, self.span_combine(start_span)))
             }
             SQUARE_OPEN => self.parse_array_contructor(method_type, start_span),
-            _ => Err(self
-                .get_expect_any_error(&[ROUND_OPEN, SQUARE_OPEN])),
+            _ => Err(self.get_expect_any_error(&[ROUND_OPEN, SQUARE_OPEN])),
         }
     }
 
@@ -421,9 +402,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.bump();
 
         let name = Ident::new(ARRAY_CONTRUCTOR_STR, start_span);
-        let mut array_type = self
-            .try_parse_type()
-            .merge_to_result()?;
+        let mut array_type = self.try_parse_type().merge_to_result()?;
 
         array_type = SoulType::Array(ArrayType {
             of_type: Box::new(array_type),
@@ -433,8 +412,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.expect(&SQUARE_CLOSE)?;
         self.expect(&ROUND_OPEN)?;
 
-        let arg = self
-            .try_bump_consume_ident()?;
+        let arg = self.try_bump_consume_ident()?;
 
         self.expect(&ROUND_CLOSE)?;
 
@@ -443,8 +421,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.bump();
             self.skip_end_lines();
 
-            let expression = self
-                .parse_expression_id(STAMENT_END_TOKENS)?;
+            let expression = self.parse_expression_id(STAMENT_END_TOKENS)?;
             let statement = Statement::from_expression(
                 &self.forest.store,
                 expression,
@@ -572,13 +549,10 @@ impl<'a, 'f> Parser<'a, 'f> {
         loop {
             self.skip_end_lines();
 
-            let name = self
-                .try_bump_consume_ident()?;
+            let name = self.try_bump_consume_ident()?;
 
             self.expect(&COLON)?;
-            let bound = self
-                .try_parse_type()
-                .merge_to_result()?;
+            let bound = self.try_parse_type().merge_to_result()?;
 
             match generics
                 .iter_mut()
@@ -651,12 +625,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         ))
     }
 
-    fn inner_parameters(
-        &mut self,
-    ) -> AstTryResult<
-        (Vec<Parameter>, FunctionThisKind),
-        AstFault,
-    > {
+    fn inner_parameters(&mut self) -> AstTryResult<(Vec<Parameter>, FunctionThisKind), AstFault> {
         self.expect(&ROUND_OPEN).try_err()?;
 
         let mut types = vec![];
@@ -702,12 +671,10 @@ impl<'a, 'f> Parser<'a, 'f> {
             };
 
             if default.is_none() && has_default {
-                self.log_fault(
-                    Fault::error_with_kind(
-                        crate::fault::AstErrorKind::NonDefaultParameterAfterDefault,
-                        Some(name.span()),
-                    ),
-                );
+                self.log_fault(Fault::error_with_kind(
+                    crate::fault::AstErrorKind::NonDefaultParameterAfterDefault,
+                    Some(name.span()),
+                ));
             }
 
             types.push(Parameter {
@@ -800,9 +767,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                     self.bump();
                     TryOk(Loop::Continue)
                 }
-                _ => TryErr(
-                    self.get_expect_any_error(&[COMMA, ROUND_CLOSE]),
-                ),
+                _ => TryErr(self.get_expect_any_error(&[COMMA, ROUND_CLOSE])),
             };
         }
 

@@ -11,7 +11,9 @@ use soul_utils::{
 };
 
 use crate::{
-    fault::AstTryResult, parser::Parser, utils::{COMMA, CURLY_OPEN, FOR, IN},
+    fault::AstTryResult,
+    parser::Parser,
+    utils::{COMMA, CURLY_OPEN, FOR, IN},
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 
@@ -26,8 +28,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 let saved = self.tokens.current_position();
 
                 let index = if self.peek_is(&COMMA) {
-                    let ident = self
-                        .try_bump_consume_ident()?;
+                    let ident = self.try_bump_consume_ident()?;
                     self.bump();
                     Some(Binding::new(self.alloc_node(), ident))
                 } else {
@@ -51,11 +52,10 @@ impl<'a, 'f> Parser<'a, 'f> {
                         }
 
                         self.goto(saved);
-                        let value = self
-                            .parse_expression_id(&[
-                                CURLY_OPEN,
-                                TokenKind::Keyword(KeyWord::Limit),
-                            ])?;
+                        let value = self.parse_expression_id(&[
+                            CURLY_OPEN,
+                            TokenKind::Keyword(KeyWord::Limit),
+                        ])?;
                         if self.current_is_keyword(KeyWord::Limit) {
                             self.bump();
                             let saved = self.tokens.current_position();
@@ -74,17 +74,14 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
         };
 
-        let block = self
-            .parse_block(TypeModifier::Mut)?;
+        let block = self.parse_block(TypeModifier::Mut)?;
         Ok(Spanned::new(
             For { block, condition },
             self.span_combine(start_span),
         ))
     }
 
-    fn try_parse_foreach_elements(
-        &mut self,
-    ) -> AstTryResult<(VarPattern, ExpressionId), ()> {
+    fn try_parse_foreach_elements(&mut self) -> AstTryResult<(VarPattern, ExpressionId), ()> {
         let var_pattern = self
             .parse_var_pattern(TypeModifier::Const)
             .try_not_value()?;

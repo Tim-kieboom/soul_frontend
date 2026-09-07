@@ -1,12 +1,13 @@
 use soul_utils::{
-    fault::Fault,
     ids::IdAlloc,
     literal::{Number, TokenLiteral},
     soul_names::Symbol,
     span::ModuleId,
 };
 
-use crate::{TokenKind, lexer::Lexer, model::StringFormatTag, model::keyword::KeyWord};
+use crate::{
+    TokenKind, fault::TokenFault, lexer::Lexer, model::StringFormatTag, model::keyword::KeyWord,
+};
 
 fn module_id() -> ModuleId {
     ModuleId::error()
@@ -18,7 +19,7 @@ fn lexer_to_vec(input: &str) -> Vec<TokenKind> {
 
 /// Like `lexer_to_vec`, but returns the lex error instead of panicking on it —
 /// for tests asserting that malformed input is rejected.
-fn try_lex(input: &str) -> Result<Vec<TokenKind>, Fault> {
+fn try_lex(input: &str) -> Result<Vec<TokenKind>, TokenFault> {
     let mut lexer = Lexer::new(input, module_id());
     let mut tokens = Vec::new();
 

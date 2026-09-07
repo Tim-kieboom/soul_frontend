@@ -19,8 +19,7 @@ use ast_model::{
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
-    Ident, TypeModifier, collections::try_result::ToResult, fault::Fault,
-    ids::IdAlloc, span::Span,
+    Ident, TypeModifier, collections::try_result::ToResult, fault::Fault, ids::IdAlloc, span::Span,
 };
 
 const IF_STR: &str = KeyWord::If.as_str();
@@ -34,8 +33,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let condition = if self.current_is_keyword(KeyWord::Type) {
             self.bump();
             let condition = self.parse_type_assert()?;
-            let block = self
-                .parse_block(TypeModifier::Mut)?;
+            let block = self.parse_block(TypeModifier::Mut)?;
             let mut r#if = If {
                 condition,
                 block,
@@ -56,8 +54,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 }
             }
         };
-        let if_block = self
-            .parse_block(TypeModifier::Mut)?;
+        let if_block = self.parse_block(TypeModifier::Mut)?;
 
         let mut r#if = If {
             condition: IfCondition::Expression(condition),
@@ -77,9 +74,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.skip_end_lines();
         if self.current_is(&COLON) {
             self.bump();
-            let ty = self
-                .try_parse_type()
-                .merge_to_result()?;
+            let ty = self.try_parse_type().merge_to_result()?;
             let binding = match pattern {
                 MatchPattern::Binding(binding) => binding,
                 MatchPattern::NotNull(binding) => binding,
@@ -92,8 +87,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             };
             self.skip_end_lines();
             self.expect(&COLON_ASSIGN)?;
-            let scrutinee = self
-                .parse_expression_id(&[CURLY_OPEN])?;
+            let scrutinee = self.parse_expression_id(&[CURLY_OPEN])?;
             return Ok(IfCondition::CastType {
                 binding,
                 ty,
@@ -103,8 +97,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         self.skip_end_lines();
         self.expect(&COLON_ASSIGN)?;
-        let scrutinee = self
-            .parse_expression_id(&[CURLY_OPEN])?;
+        let scrutinee = self.parse_expression_id(&[CURLY_OPEN])?;
         Ok(IfCondition::MatchType { pattern, scrutinee })
     }
 
@@ -112,8 +105,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let start_span = self.token().span;
         self.expect(&MATCH)?;
 
-        let scrutinee = self
-            .parse_expression_id(&[CURLY_OPEN])?;
+        let scrutinee = self.parse_expression_id(&[CURLY_OPEN])?;
 
         let arms = self.parse_match_arms()?;
 
@@ -134,16 +126,15 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let Ok(ident) = self.try_bump_consume_ident() else {
             self.goto(save_pos);
-            let body = self
-                .parse_block(TypeModifier::Mut)?;
+            let body = self.parse_block(TypeModifier::Mut)?;
             return Ok((None, body));
         };
 
         self.skip_end_lines();
         if self.current_is(&LAMBDA_ARROW) {
             self.bump();
-            let expression = self
-                .parse_expression_id(&[CURLY_CLOSE, TokenKind::EndLine, TokenKind::EndFile])?;
+            let expression =
+                self.parse_expression_id(&[CURLY_CLOSE, TokenKind::EndLine, TokenKind::EndFile])?;
             self.expect(&CURLY_CLOSE)?;
             let statement = self
                 .forest
@@ -162,8 +153,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         self.goto(save_pos);
-        let body = self
-            .parse_block(TypeModifier::Mut)?;
+        let body = self.parse_block(TypeModifier::Mut)?;
         Ok((None, body))
     }
 
@@ -203,18 +193,15 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.bump();
 
             let body = if self.current_is(&CURLY_OPEN) {
-                self.parse_block(TypeModifier::Mut)
-                    .map_err(|err| err)?
+                self.parse_block(TypeModifier::Mut)?
             } else {
                 let span = self.token().span;
-                let expr = self
-                    .parse_expression_id(&[
-                        COMMA,
-                        CURLY_CLOSE,
-                        TokenKind::EndFile,
-                        TokenKind::EndLine,
-                    ])
-                    .map_err(|err| err)?;
+                let expr = self.parse_expression_id(&[
+                    COMMA,
+                    CURLY_CLOSE,
+                    TokenKind::EndFile,
+                    TokenKind::EndLine,
+                ])?;
                 let statement = self
                     .forest
                     .store
@@ -237,10 +224,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok(arms)
     }
 
-    fn parse_if_arms(
-        &mut self,
-        head: &mut Option<IfBranch>,
-    ) -> Result<(), crate::fault::AstFault> {
+    fn parse_if_arms(&mut self, head: &mut Option<IfBranch>) -> Result<(), crate::fault::AstFault> {
         let mut tail = head;
         let mut has_else = false;
 
@@ -270,18 +254,15 @@ impl<'a, 'f> Parser<'a, 'f> {
                 if self.current_is_keyword(KeyWord::Type) {
                     self.bump();
                     let condition = self.parse_type_assert()?;
-                    let block = self
-                        .parse_block(TypeModifier::Mut)?;
+                    let block = self.parse_block(TypeModifier::Mut)?;
                     IfBranch::new_if(If {
                         condition,
                         block,
                         branch: None,
                     })
                 } else {
-                    let condition = self
-                        .parse_expression_id(&[CURLY_OPEN])?;
-                    let block = self
-                        .parse_block(TypeModifier::Mut)?;
+                    let condition = self.parse_expression_id(&[CURLY_OPEN])?;
+                    let block = self.parse_block(TypeModifier::Mut)?;
                     IfBranch::new_if(If {
                         condition: IfCondition::Expression(condition),
                         block,
@@ -290,8 +271,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 }
             } else {
                 has_else = true;
-                let block = self
-                    .parse_block(TypeModifier::Mut)?;
+                let block = self.parse_block(TypeModifier::Mut)?;
                 IfBranch::Else(block)
             };
 
@@ -324,8 +304,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
             IF => {
                 self.bump();
-                let if_condition = self
-                    .parse_expression_id(&[LAMBDA_ARROW])?;
+                let if_condition = self.parse_expression_id(&[LAMBDA_ARROW])?;
                 MatchPattern::If {
                     pattern: Box::new(pattern),
                     if_condition,
@@ -385,8 +364,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.bump();
 
             self.expect(&ROUND_OPEN)?;
-            let binding = self
-                .try_bump_consume_ident()?;
+            let binding = self.try_bump_consume_ident()?;
             self.expect(&ROUND_CLOSE)?;
             return Ok(MatchPattern::NotNull(Binding::new(
                 self.alloc_node(),
@@ -410,8 +388,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                     CURLY_CLOSE,
                     ROUND_CLOSE,
                 ];
-                let expr = self
-                    .parse_expression(&end_tokens)?;
+                let expr = self.parse_expression(&end_tokens)?;
                 return match expr.node {
                     ExpressionKind::Literal((_, lit)) => Ok(MatchPattern::Literal(lit)),
                     _ => Err(Fault::error_with_kind(
@@ -431,8 +408,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 CURLY_CLOSE,
                 ROUND_CLOSE,
             ];
-            let expr = self
-                .parse_expression(&end_tokens)?;
+            let expr = self.parse_expression(&end_tokens)?;
             return match expr.node {
                 ExpressionKind::Literal((_, lit)) => Ok(MatchPattern::Literal(lit)),
                 _ => Err(Fault::error_with_kind(
@@ -556,9 +532,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok(MatchPattern::Tuple(TupleMatchPattern { elements, rest }))
     }
 
-    fn parse_match_named_tuple_pattern(
-        &mut self,
-    ) -> Result<MatchPattern, crate::fault::AstFault> {
+    fn parse_match_named_tuple_pattern(&mut self) -> Result<MatchPattern, crate::fault::AstFault> {
         self.expect(&CURLY_OPEN)?;
         let mut fields = Vec::new();
         let mut rest = false;
@@ -585,8 +559,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            let field = self
-                .try_bump_consume_ident()?;
+            let field = self.try_bump_consume_ident()?;
 
             let binding = if self.current_is(&COLON) {
                 self.bump();
@@ -594,8 +567,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                     self.bump();
                     None
                 } else {
-                    let alias = self
-                        .try_bump_consume_ident()?;
+                    let alias = self.try_bump_consume_ident()?;
                     Some(Binding::new(self.alloc_node(), alias))
                 }
             } else {
@@ -642,8 +614,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            let field = self
-                .try_bump_consume_ident()?;
+            let field = self.try_bump_consume_ident()?;
 
             let binding = if self.current_is(&COLON) {
                 self.bump();
@@ -651,8 +622,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                     self.bump();
                     None
                 } else {
-                    let alias = self
-                        .try_bump_consume_ident()?;
+                    let alias = self.try_bump_consume_ident()?;
                     Some(Binding::new(self.alloc_node(), alias))
                 }
             } else {

@@ -13,7 +13,10 @@ use soul_utils::{
 };
 
 use crate::{
-    fault::AstResult, parse::expression::precedence::Precedence, parser::Parser, utils::{ARRAY, DOT, NOT, NULL, OPTIONAL, ROUND_CLOSE, ROUND_OPEN, SQUARE_OPEN},
+    fault::AstResult,
+    parse::expression::precedence::Precedence,
+    parser::Parser,
+    utils::{ARRAY, DOT, NOT, NULL, OPTIONAL, ROUND_CLOSE, ROUND_OPEN, SQUARE_OPEN},
 };
 
 mod access;
@@ -29,8 +32,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         &mut self,
         end_tokens: &[TokenKind],
     ) -> AstResult<ExpressionId> {
-        let value = self
-            .pratt_parse_expression(Precedence::MIN, end_tokens, None)?;
+        let value = self.pratt_parse_expression(Precedence::MIN, end_tokens, None)?;
         Ok(self.forest.store.insert_expression(value))
     }
 
@@ -240,9 +242,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     }
 
     fn parse_sizeof(&mut self, left_id: ExpressionId) -> AstResult<Expression> {
-        let span = self
-            .get_forest_expression(left_id)?
-            .span;
+        let span = self.get_forest_expression(left_id)?.span;
         Ok(Expression::new(
             ExpressionKind::Sizeof(left_id),
             self.span_combine(span),
@@ -360,11 +360,9 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let kind = match &self.token().kind {
             TokenKind::Ident(_) => {
-                let type_name = self
-                    .try_bump_consume_ident()?;
+                let type_name = self.try_bump_consume_ident()?;
                 self.expect(&TokenKind::Symbol(Symbol::Dot))?;
-                let variant_name = self
-                    .try_bump_consume_ident()?;
+                let variant_name = self.try_bump_consume_ident()?;
                 TypeofKind::Union {
                     type_name,
                     variant_name,
@@ -392,13 +390,10 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok(ExpressionOperator::TypeOf(kind))
     }
 
-    fn parse_new_ptr(
-        &mut self,
-        start_span: Span,
-    ) -> Result<Expression, crate::fault::AstFault> {
+    fn parse_new_ptr(&mut self, start_span: Span) -> Result<Expression, crate::fault::AstFault> {
         self.expect(&ROUND_OPEN)?;
-        let inner = self
-            .parse_expression_id(&[ROUND_CLOSE, TokenKind::EndLine, TokenKind::EndFile])?;
+        let inner =
+            self.parse_expression_id(&[ROUND_CLOSE, TokenKind::EndLine, TokenKind::EndFile])?;
         self.expect(&ROUND_CLOSE)?;
         Ok(Expression::new(
             ExpressionKind::New(inner),
@@ -406,18 +401,14 @@ impl<'a, 'f> Parser<'a, 'f> {
         ))
     }
 
-    fn parse_new_array(
-        &mut self,
-        start_span: Span,
-    ) -> Result<Expression, crate::fault::AstFault> {
+    fn parse_new_array(&mut self, start_span: Span) -> Result<Expression, crate::fault::AstFault> {
         const START: &[TokenKind] = &[SQUARE_OPEN, ARRAY];
 
         if !self.current_is_any(START) {
             return Err(self.get_expect_any_error(START));
         }
 
-        let array = self
-            .parse_array(None)?;
+        let array = self.parse_array(None)?;
         Ok(Expression::new(
             ExpressionKind::NewArray(array.value),
             self.span_combine(start_span),

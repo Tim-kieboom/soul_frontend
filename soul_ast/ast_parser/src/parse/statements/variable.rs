@@ -7,12 +7,14 @@ use ast_model::{
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
-    Ident, TypeModifier, collections::try_result::ToResult, define_symbols,
-    fault::Fault, soul_names::Symbol,
+    Ident, TypeModifier, collections::try_result::ToResult, define_symbols, fault::Fault,
+    soul_names::Symbol,
 };
 
 use crate::{
-    fault::AstResult, parser::Parser, utils::{
+    fault::AstResult,
+    parser::Parser,
+    utils::{
         COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, DOUBLE_DOT, ROUND_CLOSE, ROUND_OPEN,
         STAMENT_END_TOKENS,
     },
@@ -26,10 +28,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let modifier = self.try_bump_mut().unwrap_or(DEFAULT_MODIFIER);
         let pattern_start = self.token().span;
 
-        let pattern = match self.parse_var_pattern(modifier) {
-            Ok(val) => val,
-            Err(err) => return Err(err),
-        };
+        let pattern = self.parse_var_pattern(modifier)?;
 
         // Error: `mut` is not allowed on compound patterns
         if modifier != TypeModifier::Immut && !matches!(pattern, VarPattern::Simple { .. }) {
@@ -44,10 +43,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let ty = match self.current_is(&COLON) {
             true => {
                 self.bump();
-                match self.try_parse_type().merge_to_result() {
-                    Ok(val) => Some(val),
-                    Err(err) => return Err(err),
-                }
+                Some(self.try_parse_type().merge_to_result()?)
             }
             false => None,
         };
@@ -59,10 +55,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         if let TokenKind::Symbol(Symbol::DoubleColon) = self.token().kind {
             self.bump();
-            let value = match self.parse_expression_id(STAMENT_END_TOKENS) {
-                Ok(val) => val,
-                Err(err) => return Err(err),
-            };
+            let value = self.parse_expression_id(STAMENT_END_TOKENS)?;
             return Ok(Statement::new_variable(
                 Variable::new_const(self.alloc_node(), pattern, ty, Some(value)),
                 self.span_combine(pattern_start),
@@ -97,10 +90,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         self.bump();
-        let value = match self.parse_expression_id(STAMENT_END_TOKENS) {
-            Ok(val) => val,
-            Err(err) => return Err(err),
-        };
+        let value = self.parse_expression_id(STAMENT_END_TOKENS)?;
         Ok(Statement::new_variable(
             Variable::new_const(self.alloc_node(), pattern, ty, Some(value))
                 .apply_modifier(modifier),
@@ -124,10 +114,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         match &self.token().kind {
             TokenKind::Ident(_) => {
-                let ident = match self.try_bump_consume_ident() {
-                    Ok(val) => val,
-                    Err(err) => return Err(err),
-                };
+                let ident = self.try_bump_consume_ident()?;
                 if self.current_is(&CURLY_OPEN) {
                     if explicit_mod.is_some() {
                         return Err(Fault::error_with_kind(
@@ -135,9 +122,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                             Some(ident.span()),
                         ));
                     }
-                    return self
-                        .parse_constructor_pattern(ident)
-                        .map_err(|err| err);
+                    return self.parse_constructor_pattern(ident);
                 }
                 Ok(VarPattern::Simple {
                     binding: Binding::new(self.alloc_node(), ident),
@@ -198,9 +183,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            elements.push(
-                self.parse_var_pattern(TypeModifier::Const)?,
-            );
+            elements.push(self.parse_var_pattern(TypeModifier::Const)?);
         }
 
         self.expect(&ROUND_CLOSE)?;
@@ -236,13 +219,11 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             let modifier = self.try_bump_mut().unwrap_or(TypeModifier::Immut);
 
-            let field = self
-                .try_bump_consume_ident()?;
+            let field = self.try_bump_consume_ident()?;
 
             let binding = if self.current_is(&COLON) {
                 self.bump();
-                let alias = self
-                    .try_bump_consume_ident()?;
+                let alias = self.try_bump_consume_ident()?;
                 if alias.as_str() == "_" {
                     None
                 } else {
@@ -292,13 +273,11 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             let modifier = self.try_bump_mut().unwrap_or(TypeModifier::Immut);
 
-            let field = self
-                .try_bump_consume_ident()?;
+            let field = self.try_bump_consume_ident()?;
 
             let binding = if self.current_is(&COLON) {
                 self.bump();
-                let alias = self
-                    .try_bump_consume_ident()?;
+                let alias = self.try_bump_consume_ident()?;
                 if alias.as_str() == "_" {
                     None
                 } else {

@@ -40,36 +40,35 @@ impl<'a, 'f> Parser<'a, 'f> {
         let lib_name = match &path.lib_name {
             Some(name) => name.clone(),
             None => {
-                self.log_fault(
-                    Fault::error_with_kind(
-                        crate::fault::AstErrorKind::ExternalImportMissingCrateName,
-                        Some(span),
-                    ),
-                );
+                self.log_fault(Fault::error_with_kind(
+                    crate::fault::AstErrorKind::ExternalImportMissingCrateName,
+                    Some(span),
+                ));
                 return;
             }
         };
 
         let Some(crate_entry) = self.crate_store.get(&lib_name) else {
-            self.log_fault(
-                Fault::error_with_kind(
-                    crate::fault::AstErrorKind::ExternalCrateNotFound {
-                        lib_name: lib_name.as_str().into(),
-                    },
-                    Some(span),
-                ),
-            );
+            self.log_fault(Fault::error_with_kind(
+                crate::fault::AstErrorKind::ExternalCrateNotFound {
+                    lib_name: lib_name.as_str().into(),
+                },
+                Some(span),
+            ));
             return;
         };
 
         if crate_entry.linkage == Linkage::Dynamic {
-            self.log_fault(soul_error_internal!(
-                format!(
-                    "dynamic linking for crate '{lib_name}' is not yet implemented; \
+            self.log_fault(
+                soul_error_internal!(
+                    format!(
+                        "dynamic linking for crate '{lib_name}' is not yet implemented; \
                      use linkage = \"static\" in Soul.toml"
-                ),
-                Some(span)
-            ).into_kind());
+                    ),
+                    Some(span)
+                )
+                .into_kind(),
+            );
             return;
         }
 
@@ -161,10 +160,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         };
 
         let Some(folder_path) = module_file_path.parent() else {
-            self.log_fault(soul_error_internal!(
-                "module_file_path should have parent",
-                None
-            ).into_kind());
+            self.log_fault(
+                soul_error_internal!("module_file_path should have parent", None).into_kind(),
+            );
             return ModuleId::ERROR;
         };
 
@@ -220,14 +218,12 @@ impl<'a, 'f> Parser<'a, 'f> {
         if module_path.is_dir() {
             module_path.push("mod.soul");
             if !module_path.is_file() {
-                self.log_fault(
-                    Fault::error_with_kind(
-                        crate::fault::AstErrorKind::MissingModFile {
-                            path: format!("{module_path:?}").into_boxed_str(),
-                        },
-                        Some(span),
-                    ),
-                );
+                self.log_fault(Fault::error_with_kind(
+                    crate::fault::AstErrorKind::MissingModFile {
+                        path: format!("{module_path:?}").into_boxed_str(),
+                    },
+                    Some(span),
+                ));
                 return None;
             }
 
@@ -236,14 +232,12 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         module_path.add_extension("soul");
         if !module_path.is_file() {
-            self.log_fault(
-                Fault::error_with_kind(
-                    crate::fault::AstErrorKind::ModuleFileNotFound {
-                        path: format!("{module_path:?}").into_boxed_str(),
-                    },
-                    Some(span),
-                ),
-            );
+            self.log_fault(Fault::error_with_kind(
+                crate::fault::AstErrorKind::ModuleFileNotFound {
+                    path: format!("{module_path:?}").into_boxed_str(),
+                },
+                Some(span),
+            ));
 
             return None;
         }
@@ -263,15 +257,13 @@ impl<'a, 'f> Parser<'a, 'f> {
                 return Some(path);
             }
         }
-        self.log_fault(
-            Fault::error_with_kind(
-                crate::fault::AstErrorKind::CrateMissingRootFile {
-                    crate_name: crate_name.into(),
-                    source_root: format!("{source_root:?}").into_boxed_str(),
-                },
-                Some(span),
-            ),
-        );
+        self.log_fault(Fault::error_with_kind(
+            crate::fault::AstErrorKind::CrateMissingRootFile {
+                crate_name: crate_name.into(),
+                source_root: format!("{source_root:?}").into_boxed_str(),
+            },
+            Some(span),
+        ));
         None
     }
 
@@ -295,7 +287,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         let relative_path = match module_file_path.strip_prefix(base_path) {
             Ok(val) => val,
             Err(err) => {
-                self.log_fault(soul_error_internal!(format!("{}", err.to_string()), None).into_kind());
+                self.log_fault(
+                    soul_error_internal!(format!("{}", err.to_string()), None).into_kind(),
+                );
                 return;
             }
         };
@@ -306,10 +300,13 @@ impl<'a, 'f> Parser<'a, 'f> {
             let name = match get_module_name(&current) {
                 Some(val) => val,
                 None => {
-                    self.log_fault(soul_error_internal!(
-                        format!("file_name of '{:?}' not found", current),
-                        None
-                    ).into_kind());
+                    self.log_fault(
+                        soul_error_internal!(
+                            format!("file_name of '{:?}' not found", current),
+                            None
+                        )
+                        .into_kind(),
+                    );
                     return;
                 }
             };
@@ -329,15 +326,18 @@ impl<'a, 'f> Parser<'a, 'f> {
         match std::fs::read_to_string(path) {
             Ok(val) => Some(val),
             Err(err) => {
-                self.log_fault(soul_error_internal!(
-                    format!(
-                        "import '{}': could not read module file '{}': {}",
-                        module_name,
-                        path.display(),
-                        err,
-                    ),
-                    Some(span)
-                ).into_kind());
+                self.log_fault(
+                    soul_error_internal!(
+                        format!(
+                            "import '{}': could not read module file '{}': {}",
+                            module_name,
+                            path.display(),
+                            err,
+                        ),
+                        Some(span)
+                    )
+                    .into_kind(),
+                );
                 None
             }
         }

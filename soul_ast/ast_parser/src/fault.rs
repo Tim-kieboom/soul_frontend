@@ -1,4 +1,7 @@
-use soul_utils::{collections::try_result::TryResult, fault::{Fault, UnclassifiedKind}};
+use soul_utils::{
+    collections::try_result::TryResult,
+    fault::{Fault, UnclassifiedKind},
+};
 
 /// Structured error kinds for the AST parser. `Unclassified` is a migration
 /// fallback carrying the raw message from call sites not yet converted to a
@@ -196,6 +199,9 @@ pub enum AstErrorKind {
 
     #[error("keyword '{keyword}' can not be type")]
     KeywordUsedAsType { keyword: Box<str> },
+
+    #[error(transparent)]
+    LexError(#[from] soul_tokenizer::fault::TokenErrorKind),
 }
 
 impl From<UnclassifiedKind> for AstErrorKind {

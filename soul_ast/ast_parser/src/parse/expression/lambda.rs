@@ -71,9 +71,9 @@ impl<'a, 'f> Parser<'a, 'f> {
                 KeyWord::Return if self.current_is_any(LAMBDA_BODY_END) => {
                     ExpressionKind::Return(None)
                 }
-                KeyWord::Return => ExpressionKind::Return(Some(
-                    self.parse_expression_id(LAMBDA_BODY_END)?,
-                )),
+                KeyWord::Return => {
+                    ExpressionKind::Return(Some(self.parse_expression_id(LAMBDA_BODY_END)?))
+                }
                 _ => unreachable!(),
             };
 

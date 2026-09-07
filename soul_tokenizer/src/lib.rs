@@ -1,9 +1,9 @@
+use crate::fault::TokenFault;
 use crate::lexer::Lexer;
 use crate::model::{Token, TokenKind};
-use soul_utils::error::SoulResult;
-use soul_utils::fault::Fault;
 use soul_utils::span::{ModuleId, Span};
 
+pub mod fault;
 pub(crate) mod lexer;
 pub mod model;
 pub(crate) mod str_iter;
@@ -22,13 +22,16 @@ pub struct TokenStream<'a> {
 }
 
 /// Converts source code into a token stream for parsing.
-pub fn to_token_stream<'a>(source: &'a str, module: ModuleId) -> SoulResult<TokenStream<'a>> {
+pub fn to_token_stream<'a>(
+    source: &'a str,
+    module: ModuleId,
+) -> Result<TokenStream<'a>, TokenFault> {
     TokenStream::new(source, module)
 }
 
 impl<'a> TokenStream<'a> {
     /// Creates a new token stream from the given source code.
-    pub fn new(source: &'a str, module: ModuleId) -> SoulResult<Self> {
+    pub fn new(source: &'a str, module: ModuleId) -> Result<Self, TokenFault> {
         let mut this = Self {
             index: 0,
             lexer: Lexer::new(source, module),
@@ -42,7 +45,7 @@ impl<'a> TokenStream<'a> {
         self.index
     }
 
-    fn initialize(&mut self) -> SoulResult<()> {
+    fn initialize(&mut self) -> Result<(), TokenFault> {
         self.advance()
     }
 
@@ -62,7 +65,7 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Peeks at the next token without advancing the stream position.
-    pub fn peek(&self) -> SoulResult<Token> {
+    pub fn peek(&self) -> Result<Token, TokenFault> {
         self.lexer.clone().next()
     }
 
@@ -80,7 +83,7 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Advances the stream to the next token, updating the current token.
-    pub fn advance(&mut self) -> SoulResult<()> {
+    pub fn advance(&mut self) -> Result<(), TokenFault> {
         self.current = self.lexer.next()?;
         self.index += 1;
         Ok(())
@@ -91,7 +94,7 @@ impl<'a> TokenStream<'a> {
     /// # Returns
     /// - `(Token, None)` - no lexer error, returns the token
     /// - `(Token, Some(Fault))` - lexer error, returns the token
-    pub fn consume_advance(&mut self) -> (Token, Option<Fault>) {
+    pub fn consume_advance(&mut self) -> (Token, Option<TokenFault>) {
         use std::mem::swap;
 
         let mut consume_token = Token::new(TokenKind::EndLine, Span::error());
@@ -105,7 +108,7 @@ impl<'a> TokenStream<'a> {
     }
 }
 impl<'a> Iterator for TokenStream<'a> {
-    type Item = SoulResult<Token>;
+    type Item = Result<Token, TokenFault>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.current.kind == TokenKind::EndFile {

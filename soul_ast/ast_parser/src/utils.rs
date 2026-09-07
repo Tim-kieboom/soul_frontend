@@ -109,7 +109,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     /// Peeks at next token without consuming.
     pub(super) fn try_peek(&self) -> SoulResult<Token> {
-        self.tokens.peek()
+        self.tokens.peek().map_err(|err| err.into_kind())
     }
 
     /// Peeks at next token without consuming.

@@ -6,16 +6,17 @@ use ast_model::{
 use soul_tokenizer::model::TokenKind;
 use soul_utils::{
     Ident, TypeModifier,
-    collections::try_result::{
-        ResultTryErr, ToResult, TryErr, TryError, TryNotValue, TryOk,
-    },
+    collections::try_result::{ResultTryErr, ToResult, TryErr, TryError, TryNotValue, TryOk},
     fault::Fault,
     soul_names::Symbol,
     span::Span,
 };
 
 use crate::{
-    fault::{AstFault, AstResult, AstTryResult}, parse::statements::{try_assign_type, variable::AssignType}, parser::Parser, utils::{
+    fault::{AstFault, AstResult, AstTryResult},
+    parse::statements::{try_assign_type, variable::AssignType},
+    parser::Parser,
+    utils::{
         ARROW_LEFT, COLON, CONST, CURLY_OPEN, MUT, ROUND_OPEN, SEMI_COLON, STAMENT_END_TOKENS,
     },
 };
@@ -28,8 +29,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         self.expect(&MUT)?;
         let modifier = TypeModifier::Mut;
 
-        let name = self
-            .try_bump_consume_ident()?;
+        let name = self.try_bump_consume_ident()?;
         let pattern = if name.as_str() == "_" {
             VarPattern::Discard
         } else {
@@ -42,10 +42,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let mut ty = None;
         if self.current_is(&COLON) {
             self.bump();
-            ty = Some(
-                self.try_parse_type()
-                    .merge_to_result()?,
-            );
+            ty = Some(self.try_parse_type().merge_to_result()?);
         }
 
         if self.current_is_any(STAMENT_END_TOKENS) {
@@ -73,8 +70,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         self.bump();
-        let value = self
-            .parse_expression_id(STAMENT_END_TOKENS)?;
+        let value = self.parse_expression_id(STAMENT_END_TOKENS)?;
         let variable = Variable::new_const(self.alloc_node(), pattern, ty, Some(value))
             .apply_modifier(modifier);
 
@@ -84,17 +80,13 @@ impl<'a, 'f> Parser<'a, 'f> {
         ))
     }
 
-    pub(super) fn try_parse_from_const(
-        &mut self,
-        start_span: Span,
-    ) -> AstResult<Statement> {
+    pub(super) fn try_parse_from_const(&mut self, start_span: Span) -> AstResult<Statement> {
         self.expect(&CONST)?;
         let modifier = TypeModifier::Const;
         const IS_CONST: bool = true;
 
         if self.current_is(&ROUND_OPEN) {
-            let pattern = self
-                .parse_tuple_pattern()?;
+            let pattern = self.parse_tuple_pattern()?;
             return self.parse_pattern_declaration(pattern, modifier, start_span);
         }
 
@@ -104,8 +96,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 .merge_to_result();
         }
 
-        let name = self
-            .try_bump_consume_ident()?;
+        let name = self.try_bump_consume_ident()?;
         match &self.token().kind {
             &CURLY_OPEN => self.try_parse_constructor_declaration(name, modifier, start_span),
             &ROUND_OPEN | &ARROW_LEFT => {
@@ -122,8 +113,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
             TokenKind::Symbol(Symbol::DoubleColon) => {
                 self.bump();
-                let value = self
-                    .parse_expression_id(STAMENT_END_TOKENS)?;
+                let value = self.parse_expression_id(STAMENT_END_TOKENS)?;
                 Ok(Statement::new_variable(
                     Variable {
                         id: self.alloc_node(),
@@ -154,8 +144,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                     return Err(self.invalid_assign());
                 }
                 self.bump();
-                let value = self
-                    .parse_expression_id(STAMENT_END_TOKENS)?;
+                let value = self.parse_expression_id(STAMENT_END_TOKENS)?;
                 Ok(Statement::new_variable(
                     Variable {
                         id: self.alloc_node(),
@@ -244,8 +233,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         modifier: TypeModifier,
         start_span: Span,
     ) -> AstResult<Statement> {
-        let pattern = self
-            .parse_constructor_pattern(type_name)?;
+        let pattern = self.parse_constructor_pattern(type_name)?;
         let assign = match &self.token().kind {
             TokenKind::Symbol(val) if AssignType::from_symbool(*val).is_some() => {
                 AssignType::from_symbool(*val).unwrap()
@@ -268,8 +256,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         self.bump();
-        let value = self
-            .parse_expression_id(STAMENT_END_TOKENS)?;
+        let value = self.parse_expression_id(STAMENT_END_TOKENS)?;
         Ok(Statement::new_variable(
             Variable {
                 id: self.alloc_node(),
@@ -312,8 +299,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         self.bump();
-        let value = self
-            .parse_expression_id(STAMENT_END_TOKENS)?;
+        let value = self.parse_expression_id(STAMENT_END_TOKENS)?;
         Ok(Statement::new_variable(
             Variable {
                 id: self.alloc_node(),

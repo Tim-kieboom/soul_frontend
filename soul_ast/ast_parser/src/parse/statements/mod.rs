@@ -14,7 +14,10 @@ use soul_utils::{
 };
 
 use crate::{
-    fault::{AstFault, AstResult, AstTryResult}, parse::statements::variable::AssignType, parser::Parser, utils::{
+    fault::{AstFault, AstResult, AstTryResult},
+    parse::statements::variable::AssignType,
+    parser::Parser,
+    utils::{
         ARROW_LEFT, COLON, COLON_ASSIGN, CURLY_CLOSE, CURLY_OPEN, DOT, HASH, NOT, ROUND_OPEN,
         SEMI_COLON, SQUARE_CLOSE, SQUARE_OPEN, STAMENT_END_TOKENS, STAMENT_SKIP_TOKENS, STAR,
     },
@@ -88,7 +91,8 @@ impl<'a, 'f> Parser<'a, 'f> {
                         token: Symbol::SemiColon.as_str().into(),
                     },
                     Some(self.token().span),
-                ).into_kind(),
+                )
+                .into_kind(),
             );
         }
 
@@ -143,8 +147,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         if let STAR = self.token().kind {
-            return self
-                .parse_assign_or_expression(start_span);
+            return self.parse_assign_or_expression(start_span);
         }
 
         match self.parse_possible_statement(start_span) {
@@ -261,8 +264,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 TokenKind::Ident(ident) => ident,
                 TokenKind::Keyword(keyword) => keyword.as_str().to_string(),
                 _ => {
-                    return Err(self
-                        .get_expect_ident_error("attribute name"));
+                    return Err(self.get_expect_ident_error("attribute name"));
                 }
             };
             name.push_str(&name_text);
@@ -439,10 +441,8 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
         };
         self.bump();
-        self.expect(&DOT).map_err(|err| err)?;
-        let method_ident = self
-            .try_bump_consume_ident()
-            .map_err(|err| err)?;
+        self.expect(&DOT)?;
+        let method_ident = self.try_bump_consume_ident()?;
 
         let recv_type = self.type_from_ident(receiver_ident, vec![]);
         let saved = self.current.this_type.take();

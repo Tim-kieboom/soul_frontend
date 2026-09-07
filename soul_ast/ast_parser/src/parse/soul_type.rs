@@ -15,16 +15,16 @@ use soul_utils::{
 };
 
 use crate::{
-    fault::{AstFault, AstResult, AstTryResult}, parser::Parser, utils::{
+    fault::{AstFault, AstResult, AstTryResult},
+    parser::Parser,
+    utils::{
         ARRAY, ARROW_LEFT, COLON, COMMA, DOT, MUT, NOT, OPTIONAL, POINTER, REF, ROUND_CLOSE,
         ROUND_OPEN, SQUARE_CLOSE, SQUARE_OPEN,
     },
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
-    pub(crate) fn try_parse_type(
-        &mut self,
-    ) -> AstTryResult<SoulType, AstFault> {
+    pub(crate) fn try_parse_type(&mut self) -> AstTryResult<SoulType, AstFault> {
         let begin = self.tokens.current_position();
         let result = self.inner_parse_type();
         if result.is_err() {
@@ -50,10 +50,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         })
     }
 
-    fn parse_token_type(
-        &mut self,
-        type_val: Types,
-    ) -> AstTryResult<SoulType, AstFault> {
+    fn parse_token_type(&mut self, type_val: Types) -> AstTryResult<SoulType, AstFault> {
         self.bump();
 
         let prim = match type_val {
@@ -93,10 +90,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     fn parse_raw_ptr(&mut self) -> Result<SoulType, crate::fault::AstFault> {
         let inner = if self.current_is(&ARROW_LEFT) {
-            let mut generics = match self.parse_generic_define().merge_to_result() {
-                Ok(val) => val,
-                Err(err) => return Err(err),
-            };
+            let mut generics = self.parse_generic_define().merge_to_result()?;
 
             let Some(inner) = generics.pop() else {
                 return Err(Fault::error_with_kind(
@@ -115,10 +109,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     fn parse_res(&mut self) -> Result<SoulType, crate::fault::AstFault> {
         if self.current_is(&ARROW_LEFT) {
-            let mut generics = match self.parse_generic_define().merge_to_result() {
-                Ok(val) => val,
-                Err(err) => return Err(err),
-            };
+            let mut generics = self.parse_generic_define().merge_to_result()?;
 
             if generics.len() > 2 {
                 return Err(Fault::error_with_kind(
@@ -229,19 +220,15 @@ impl<'a, 'f> Parser<'a, 'f> {
             _ => (),
         };
 
-        let ident = self
-            .try_bump_consume_ident()
-            .try_not_value()?;
-        
+        let ident = self.try_bump_consume_ident().try_not_value()?;
+
         if let Ok(keyword) = KeyWord::from_str(ident.as_str()) {
-            return TryNotValue(
-                Fault::error_with_kind(
-                    crate::fault::AstErrorKind::KeywordUsedAsType {
-                        keyword: keyword.as_str().into(),
-                    },
-                    Some(ident.span()),
-                ),
-            );
+            return TryNotValue(Fault::error_with_kind(
+                crate::fault::AstErrorKind::KeywordUsedAsType {
+                    keyword: keyword.as_str().into(),
+                },
+                Some(ident.span()),
+            ));
         }
 
         if let Ok(prim) = PrimitiveTypes::from_str(ident.as_str()) {
@@ -324,14 +311,12 @@ impl<'a, 'f> Parser<'a, 'f> {
                     ArrayKind::StackArray(*size)
                 }
                 other => {
-                    return TryNotValue(
-                        Fault::error_with_kind(
-                            crate::fault::AstErrorKind::InvalidArrayTypeWrapperToken {
-                                found: other.display().into_boxed_str(),
-                            },
-                            Some(self.token().span),
-                        ),
-                    );
+                    return TryNotValue(Fault::error_with_kind(
+                        crate::fault::AstErrorKind::InvalidArrayTypeWrapperToken {
+                            found: other.display().into_boxed_str(),
+                        },
+                        Some(self.token().span),
+                    ));
                 }
             }
         };
@@ -357,8 +342,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     fn parse_named_tuple(&mut self) -> AstResult<NamedTuple> {
         let mut values = NamedTuple::new();
         loop {
-            let ident = self
-                .try_bump_consume_ident()?;
+            let ident = self.try_bump_consume_ident()?;
             self.expect(&COLON)?;
             let ty = self.try_parse_type().merge_to_result()?;
             values.push((ident, ty));

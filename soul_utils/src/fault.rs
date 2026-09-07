@@ -66,8 +66,9 @@ impl<K> Fault<K> {
         &self.kind
     }
 
-    pub fn into_kind<K2>(self) -> Fault<K2> 
-    where K: Into<K2>
+    pub fn into_kind<K2>(self) -> Fault<K2>
+    where
+        K: Into<K2>,
     {
         Fault {
             severity: self.severity,

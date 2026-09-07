@@ -1,6 +1,4 @@
-use crate::{
-    fault::{Fault, UnclassifiedKind},
-};
+use crate::fault::{Fault, UnclassifiedKind};
 
 /// Error type for try-parsing operations.
 ///
@@ -59,7 +57,8 @@ pub trait ToResult<T, E> {
 }
 
 impl<T, E1, E2> ToResult<T, E1> for TryResult<T, E1, E2>
-where E1: From<E2>
+where
+    E1: From<E2>,
 {
     fn merge_to_result(self) -> Result<T, E1> {
         match self {

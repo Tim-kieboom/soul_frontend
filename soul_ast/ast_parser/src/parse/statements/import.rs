@@ -72,8 +72,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             TokenKind::Ident(ident) => match ident.as_str() {
                 AS_STR => {
                     self.bump();
-                    let alias = self
-                        .try_bump_consume_ident()?;
+                    let alias = self.try_bump_consume_ident()?;
                     ImportKind::Alias(alias)
                 }
                 _ => ImportKind::Module,
@@ -95,20 +94,17 @@ impl<'a, 'f> Parser<'a, 'f> {
         let mut items = vec![];
         let mut this_alias = None;
         loop {
-            let name = self
-                .try_bump_consume_ident()?;
+            let name = self.try_bump_consume_ident()?;
             if name.as_str() == "this" {
                 this = true;
                 if self.current_is(&AS) {
                     self.bump();
-                    let alias = self
-                        .try_bump_consume_ident()?;
+                    let alias = self.try_bump_consume_ident()?;
                     this_alias = Some(alias);
                 }
             } else if self.current_is(&AS) {
                 self.bump();
-                let alias = self
-                    .try_bump_consume_ident()?;
+                let alias = self.try_bump_consume_ident()?;
                 items.push(ImportItem::Alias { name, alias })
             } else {
                 items.push(ImportItem::Normal(name))
@@ -174,14 +170,12 @@ impl<'a, 'f> Parser<'a, 'f> {
                 lib_name = Some(name.clone());
             }
             _ => {
-                self.log_fault(
-                    Fault::error_with_kind(
-                        crate::fault::AstErrorKind::TokenNotAllowedInImport {
-                            found: self.token().kind.display().into_boxed_str(),
-                        },
-                        Some(self.token().span),
-                    ),
-                );
+                self.log_fault(Fault::error_with_kind(
+                    crate::fault::AstErrorKind::TokenNotAllowedInImport {
+                        found: self.token().kind.display().into_boxed_str(),
+                    },
+                    Some(self.token().span),
+                ));
             }
         }
 
@@ -190,8 +184,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 return Ok((path, lib_name));
             }
 
-            let ident = self
-                .try_bump_consume_ident()?;
+            let ident = self.try_bump_consume_ident()?;
             path.push(ident.as_str());
 
             if !self.current_is(&SEPARATOR) {

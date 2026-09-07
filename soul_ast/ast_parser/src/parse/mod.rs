@@ -4,12 +4,14 @@ use ast_model::{
 };
 use soul_tokenizer::model::TokenKind;
 use soul_utils::{
-    collections::try_result::{ResultTryErr, TryError, TryErr, TryNotValue, TryOk},
+    collections::try_result::{ResultTryErr, TryErr, TryError, TryNotValue, TryOk},
     soul_error_internal,
 };
 
 use crate::{
-    fault::AstTryResult, parser::Parser, utils::{ARROW_LEFT, ARROW_RIGHT, ASSIGN, COMMA},
+    fault::AstTryResult,
+    parser::Parser,
+    utils::{ARROW_LEFT, ARROW_RIGHT, ASSIGN, COMMA},
 };
 
 mod expression;

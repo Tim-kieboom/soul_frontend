@@ -9,13 +9,15 @@ use ast_model::{
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
     TypeModifier,
-    collections::try_result::{ResultTryErr, ToResult, TryError, TryErr, TryOk},
+    collections::try_result::{ResultTryErr, ToResult, TryErr, TryError, TryOk},
     soul_error_internal,
     span::{Span, Spanned},
 };
 
 use crate::{
-    fault::{AstFault, AstResult, AstTryResult}, parser::Parser, utils::{
+    fault::{AstFault, AstResult, AstTryResult},
+    parser::Parser,
+    utils::{
         ASSIGN, COLON, COLON_ASSIGN, COMMA, CURLY_CLOSE, CURLY_OPEN, SEMI_COLON, STAMENT_END_TOKENS,
     },
 };
@@ -118,13 +120,16 @@ impl<'a, 'f> Parser<'a, 'f> {
             | KeyWord::GenericWhere
             | KeyWord::Spawn
             | KeyWord::Limit => {
-                return TryErr(soul_error_internal!(
-                    format!(
-                        "keyword '{}' should be parsed in expression not statement",
-                        keyword.as_str()
-                    ),
-                    Some(self.token().span)
-                ).into_kind());
+                return TryErr(
+                    soul_error_internal!(
+                        format!(
+                            "keyword '{}' should be parsed in expression not statement",
+                            keyword.as_str()
+                        ),
+                        Some(self.token().span)
+                    )
+                    .into_kind(),
+                );
             }
 
             KeyWord::Use => return self.parse_use_block().try_err(),
@@ -139,17 +144,14 @@ impl<'a, 'f> Parser<'a, 'f> {
     fn parse_trait(&mut self) -> AstResult<Statement> {
         let start_span = self.token().span;
         self.expect(&TokenKind::Keyword(KeyWord::Trait))?;
-        let name = self
-            .try_bump_consume_ident()?;
+        let name = self.try_bump_consume_ident()?;
         let generics = self.parse_generic_declare()?.unwrap_or(vec![]);
 
         let mut trait_impls = vec![];
         if self.current_is(&COLON) {
             self.bump();
             loop {
-                trait_impls.push(
-                    self.try_bump_consume_ident()?,
-                );
+                trait_impls.push(self.try_bump_consume_ident()?);
                 if !self.current_is(&COMMA) {
                     break;
                 }
@@ -176,8 +178,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             let start_span = self.token().span;
             let is_const = self.try_bump_const().is_some();
-            let name = self
-                .try_bump_consume_ident()?;
+            let name = self.try_bump_consume_ident()?;
             let signature = match self
                 .try_parse_function_signature(start_span, &this_type, name, is_const, None)
             {
@@ -216,8 +217,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         let new_type = self.try_parse_type().merge_to_result()?;
         if !self.current_is_any(&[ASSIGN, COLON_ASSIGN]) {
-            return Err(self
-                .get_expect_any_error(&[ASSIGN, COLON_ASSIGN]));
+            return Err(self.get_expect_any_error(&[ASSIGN, COLON_ASSIGN]));
         }
         self.bump();
         let is_distinct = self.current_is(&TokenKind::Keyword(KeyWord::Distinct));

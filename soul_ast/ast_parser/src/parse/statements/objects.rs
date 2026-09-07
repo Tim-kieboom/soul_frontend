@@ -6,15 +6,16 @@ use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{Ident, collections::try_result::ToResult, fault::Fault};
 
 use crate::{
-    fault::AstResult, parser::Parser, utils::{AS, ASSIGN, COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, ROUND_CLOSE, ROUND_OPEN, STRUCT},
+    fault::AstResult,
+    parser::Parser,
+    utils::{AS, ASSIGN, COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, ROUND_CLOSE, ROUND_OPEN, STRUCT},
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub fn parse_struct(&mut self) -> AstResult<Statement> {
         let struct_span = self.token().span;
         self.expect(&STRUCT)?;
-        let struct_name = self
-            .try_bump_consume_ident()?;
+        let struct_name = self.try_bump_consume_ident()?;
         let generics = self.parse_generic_declare()?.unwrap_or(vec![]);
 
         self.expect(&CURLY_OPEN)?;
@@ -54,14 +55,12 @@ impl<'a, 'f> Parser<'a, 'f> {
                 }
 
                 StatementKind::Assignment(_) | StatementKind::Expression { .. } => {
-                    self.log_fault(
-                        Fault::error_with_kind(
-                            crate::fault::AstErrorKind::StatementNotAllowedInBody {
-                                kind: statement.node.variant_name().into(),
-                            },
-                            Some(self.span_combine(start_span)),
-                        ),
-                    );
+                    self.log_fault(Fault::error_with_kind(
+                        crate::fault::AstErrorKind::StatementNotAllowedInBody {
+                            kind: statement.node.variant_name().into(),
+                        },
+                        Some(self.span_combine(start_span)),
+                    ));
                     continue;
                 }
             }
@@ -87,8 +86,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_enum(&mut self) -> AstResult<Statement> {
         let start_span = self.token().span;
         self.expect(&TokenKind::Keyword(KeyWord::Enum))?;
-        let name = self
-            .try_bump_consume_ident()?;
+        let name = self.try_bump_consume_ident()?;
 
         let impl_type = if self.current_is_any(&[AS, COLON]) {
             self.bump();
@@ -114,8 +112,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_union(&mut self) -> AstResult<Statement> {
         let start_span = self.token().span;
         self.expect(&TokenKind::Keyword(KeyWord::Union))?;
-        let name = self
-            .try_bump_consume_ident()?;
+        let name = self.try_bump_consume_ident()?;
 
         let variants = self.parse_union_variants()?;
 
@@ -140,8 +137,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            let ident = self
-                .try_bump_consume_ident()?;
+            let ident = self.try_bump_consume_ident()?;
             let variant = match self.token().kind {
                 ROUND_OPEN => self.parse_enum_tuple_union(ident)?,
                 CURLY_OPEN => self.parse_enum_named_union(ident)?,
@@ -204,8 +200,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            let name = self
-                .try_bump_consume_ident()?;
+            let name = self.try_bump_consume_ident()?;
 
             self.expect(&COLON)?;
             let ty = self.try_parse_type().merge_to_result()?;

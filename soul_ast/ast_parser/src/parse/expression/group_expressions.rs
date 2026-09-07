@@ -104,8 +104,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            let ident = self
-                .try_bump_consume_ident()?;
+            let ident = self.try_bump_consume_ident()?;
             let value = if self.current_is(&COMMA) || self.current_is(&CURLY_CLOSE) {
                 let id = self.alloc_node();
                 self.forest
@@ -149,8 +148,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     ) -> Result<Spanned<ArrayFiller>, crate::fault::AstFault> {
         self.expect(&FOR)?;
         let for_index = if matches!(self.token().kind, TokenKind::Ident(_)) && self.peek_is(&IN) {
-            let binding = self
-                .try_bump_consume_ident()?;
+            let binding = self.try_bump_consume_ident()?;
             self.expect(&IN)?;
             Some(Binding {
                 id: self.alloc_node(),
@@ -159,11 +157,9 @@ impl<'a, 'f> Parser<'a, 'f> {
         } else {
             None
         };
-        let amount = self
-            .parse_expression_id(&[LAMBDA_ARROW, SQUARE_CLOSE])?;
+        let amount = self.parse_expression_id(&[LAMBDA_ARROW, SQUARE_CLOSE])?;
         self.expect(&LAMBDA_ARROW)?;
-        let element = self
-            .parse_expression_id(&[SQUARE_CLOSE])?;
+        let element = self.parse_expression_id(&[SQUARE_CLOSE])?;
         self.expect(&SQUARE_CLOSE)?;
         Ok(Spanned::new(
             ArrayFiller {
@@ -191,8 +187,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            let element = self
-                .parse_expression_id(&[SQUARE_CLOSE, COMMA])?;
+            let element = self.parse_expression_id(&[SQUARE_CLOSE, COMMA])?;
             values.push(element);
 
             self.skip_end_lines();

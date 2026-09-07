@@ -110,7 +110,7 @@ fn find_manifest_dir(start: &Path) -> Option<PathBuf> {
 
 fn tokenize<'a>(file: &'a str, modules: &ModuleStore) -> Result<TokenStream<'a>> {
     let tokens = to_token_stream(file, modules.get_root_id())
-        .map_err(|f| fault_to_anyhow_error(&f, modules))?;
+        .map_err(|f| fault_to_anyhow_error(&f.into_kind(), modules))?;
 
     display_tokenizer(&tokens, modules)?;
     Ok(tokens)

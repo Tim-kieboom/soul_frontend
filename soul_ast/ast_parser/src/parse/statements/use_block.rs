@@ -10,7 +10,9 @@ use soul_utils::{
 };
 
 use crate::{
-    fault::AstResult, parser::Parser, utils::{CONST, CURLY_CLOSE, CURLY_OPEN, IMPL, MUT, PUB},
+    fault::AstResult,
+    parser::Parser,
+    utils::{CONST, CURLY_CLOSE, CURLY_OPEN, IMPL, MUT, PUB},
 };
 
 impl<'a, 'f> Parser<'a, 'f> {
@@ -73,12 +75,10 @@ impl<'a, 'f> Parser<'a, 'f> {
             let is_public = statement.is_public();
             match statement.node {
                 StatementKind::Variable(_) => {
-                    self.log_fault(
-                        Fault::error_with_kind(
-                            crate::fault::AstErrorKind::VariableNotAllowedInUseBlock,
-                            Some(self.span_combine(start_span)),
-                        ),
-                    );
+                    self.log_fault(Fault::error_with_kind(
+                        crate::fault::AstErrorKind::VariableNotAllowedInUseBlock,
+                        Some(self.span_combine(start_span)),
+                    ));
                     continue;
                 }
 
@@ -100,14 +100,12 @@ impl<'a, 'f> Parser<'a, 'f> {
                 StatementKind::UseBlock(_)
                 | StatementKind::Assignment(_)
                 | StatementKind::Expression { .. } => {
-                    self.log_fault(
-                        Fault::error_with_kind(
-                            crate::fault::AstErrorKind::StatementNotAllowedInBody {
-                                kind: statement.node.variant_name().into(),
-                            },
-                            Some(self.span_combine(start_span)),
-                        ),
-                    );
+                    self.log_fault(Fault::error_with_kind(
+                        crate::fault::AstErrorKind::StatementNotAllowedInBody {
+                            kind: statement.node.variant_name().into(),
+                        },
+                        Some(self.span_combine(start_span)),
+                    ));
                     continue;
                 }
             }
@@ -140,8 +138,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         let mut methods = vec![];
         if !self.current_is(&CURLY_OPEN) {
             let is_const = self.try_bump_const().is_some();
-            let name = self
-                .try_bump_consume_ident()?;
+            let name = self.try_bump_consume_ident()?;
             methods.push(
                 match self.try_parse_function_declaration_id(
                     start_span,
@@ -169,8 +166,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
 
             let is_const = self.try_bump_const().is_some();
-            let name = self
-                .try_bump_consume_ident()?;
+            let name = self.try_bump_consume_ident()?;
             methods.push(
                 match self.try_parse_function_declaration_id(
                     start_span,
@@ -218,8 +214,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         }
 
         let is_const = self.try_bump_const().is_some();
-        let name = self
-            .try_bump_consume_ident()?;
+        let name = self.try_bump_consume_ident()?;
         match self.try_parse_function_declaration_id(start_span, ty, is_const, name) {
             Ok(spanned) => Ok(Methode::new(spanned.value, is_public)),
             Err(TryError::IsErr(err)) => Err(err),

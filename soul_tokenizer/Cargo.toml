@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 serde = { version = "1.0.228", features = ["derive"] }
 soul_utils = { version = "0.1.0", path = "../soul_utils" }
+thiserror = "2.0"

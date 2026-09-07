@@ -3,11 +3,11 @@ use std::str::FromStr;
 use std::sync::Once;
 
 use crate::{
+    fault::{TokenErrorKind, TokenFault},
     model::{StringFormatTag, Token, TokenKind, keyword::KeyWord, types::Types},
     str_iter::StrIter,
 };
 use soul_utils::{
-    error::SoulResult,
     fault::Fault,
     literal::{Number, StringLiteral, StringTag, TokenLiteral},
     soul_names::Symbol,
@@ -59,7 +59,7 @@ impl<'a> Lexer<'a> {
         self.input.peek()
     }
 
-    pub fn next(&mut self) -> SoulResult<Token> {
+    pub fn next(&mut self) -> Result<Token, TokenFault> {
         if self.current.is_none() {
             return Ok(Token::new(TokenKind::EndFile, self.span(self.line)));
         }
@@ -113,7 +113,7 @@ impl<'a> Lexer<'a> {
         Ok(Token::new(kind, self.span(line)))
     }
 
-    fn get_token_kind(&mut self, char: char, line: SpanLine) -> SoulResult<TokenKind> {
+    fn get_token_kind(&mut self, char: char, line: SpanLine) -> Result<TokenKind, TokenFault> {
         let string_tag = match self.try_get_ident_or_tag(char) {
             Ok(val) => val,
             Err(ident_str) => {
@@ -165,8 +165,8 @@ impl<'a> Lexer<'a> {
             ch if is_number(ch) => TokenKind::Literal(TokenLiteral::Number(self.lex_number(line)?)),
             _ => {
                 self.next_char();
-                return Err(Fault::error(
-                    format!("{char:?} is unknown"),
+                return Err(Fault::error_with_kind(
+                    TokenErrorKind::UnknownChar { found: char },
                     Some(self.span(line)),
                 ));
             }
@@ -198,7 +198,7 @@ impl<'a> Lexer<'a> {
         string
     }
 
-    fn lex_fstring_part(&mut self) -> SoulResult<Token> {
+    fn lex_fstring_part(&mut self) -> Result<Token, TokenFault> {
         let line = self.line;
         let text = self.lex_format_string_part();
 
@@ -216,13 +216,13 @@ impl<'a> Lexer<'a> {
             }
             Some(ch) => {
                 self.next_char();
-                Err(Fault::error(
-                    format!("unexpected character {ch:?} in format string"),
+                Err(Fault::error_with_kind(
+                    TokenErrorKind::UnexpectedCharInFormatString { found: ch },
                     Some(self.span(line)),
                 ))
             }
-            None => Err(Fault::error(
-                "unclosed format string literal".to_string(),
+            None => Err(Fault::error_with_kind(
+                TokenErrorKind::UnclosedFormatString,
                 Some(self.span(line)),
             )),
         }
@@ -243,7 +243,7 @@ impl<'a> Lexer<'a> {
         (slice, peek)
     }
 
-    fn lex_char(&mut self, line: SpanLine) -> SoulResult<char> {
+    fn lex_char(&mut self, line: SpanLine) -> Result<char, TokenFault> {
         self.next_char();
 
         let char = if self.current == Some('\\') {
@@ -256,8 +256,8 @@ impl<'a> Lexer<'a> {
                 Some('\'') => '\'',
                 Some('\\') => '\\',
                 _ => {
-                    return Err(Fault::error(
-                        "Unclosed char literal escape sequence",
+                    return Err(Fault::error_with_kind(
+                        TokenErrorKind::UnclosedCharEscape,
                         Some(self.span(line)),
                     ));
                 }
@@ -265,12 +265,15 @@ impl<'a> Lexer<'a> {
         } else if let Some(char) = self.current {
             char
         } else {
-            return Err(Fault::error("Unclosed char literal", Some(self.span(line))));
+            return Err(Fault::error_with_kind(
+                TokenErrorKind::UnclosedCharLiteral,
+                Some(self.span(line)),
+            ));
         };
 
         if self.peek_char() != Some('\'') {
-            return Err(Fault::error(
-                "char literal should end with \'",
+            return Err(Fault::error_with_kind(
+                TokenErrorKind::CharLiteralMissingEndQuote,
                 Some(self.span(line)),
             ));
         }
@@ -280,7 +283,7 @@ impl<'a> Lexer<'a> {
         Ok(char)
     }
 
-    fn lex_string(&mut self, line: SpanLine) -> SoulResult<String> {
+    fn lex_string(&mut self, line: SpanLine) -> Result<String, TokenFault> {
         let mut cstr = String::new();
         let mut backslash = false;
 
@@ -308,8 +311,8 @@ impl<'a> Lexer<'a> {
             self.next_char();
         }
 
-        Err(Fault::error(
-            "StringLiteral does not have an end qoute",
+        Err(Fault::error_with_kind(
+            TokenErrorKind::UnterminatedString,
             Some(self.span(line)),
         ))
     }
@@ -335,7 +338,7 @@ impl<'a> Lexer<'a> {
         Err(string)
     }
 
-    fn lex_number(&mut self, line: SpanLine) -> SoulResult<Number> {
+    fn lex_number(&mut self, line: SpanLine) -> Result<Number, TokenFault> {
         let mut string = String::new();
         let mut is_float = false;
         let mut has_minus = false;
@@ -364,28 +367,34 @@ impl<'a> Lexer<'a> {
             if let Some(suffix) = self.lex_number_suffix() {
                 let _ = suffix;
             } else {
-                return Err(Fault::error(
-                    "invalid suffix after number literal",
+                return Err(Fault::error_with_kind(
+                    TokenErrorKind::InvalidNumberSuffix,
                     Some(self.span(line)),
                 ));
             }
         }
 
         if is_float {
-            string
-                .parse::<f64>()
-                .map(Number::Float)
-                .map_err(|err| Fault::error(err.to_string(), Some(self.span(line))))
+            string.parse::<f64>().map(Number::Float).map_err(|err| {
+                Fault::error_with_kind(
+                    TokenErrorKind::InvalidNumberLiteral(err.to_string().into_boxed_str()),
+                    Some(self.span(line)),
+                )
+            })
         } else if has_minus {
-            string
-                .parse::<i64>()
-                .map(Number::Int)
-                .map_err(|err| Fault::error(err.to_string(), Some(self.span(line))))
+            string.parse::<i64>().map(Number::Int).map_err(|err| {
+                Fault::error_with_kind(
+                    TokenErrorKind::InvalidNumberLiteral(err.to_string().into_boxed_str()),
+                    Some(self.span(line)),
+                )
+            })
         } else {
-            string
-                .parse::<u64>()
-                .map(Number::Uint)
-                .map_err(|err| Fault::error(err.to_string(), Some(self.span(line))))
+            string.parse::<u64>().map(Number::Uint).map_err(|err| {
+                Fault::error_with_kind(
+                    TokenErrorKind::InvalidNumberLiteral(err.to_string().into_boxed_str()),
+                    Some(self.span(line)),
+                )
+            })
         }
     }
 
