@@ -622,10 +622,16 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            match self.inner_parameter_this(&mut function_kind, &mut types)? {
-                Loop::None => (),
-                Loop::Break => break,
-                Loop::Continue => continue,
+            match self.inner_parameter_this(&mut function_kind, &mut types) {
+                Ok(Loop::None) => (),
+                Ok(Loop::Break) => break,
+                Ok(Loop::Continue) => continue,
+                Err(TryError::IsErr(err)) => {
+                    return TryErr(err.map_kind(|kind| {
+                        soul_utils::fault::UnclassifiedKind(kind.to_string().into_boxed_str())
+                    }));
+                }
+                Err(TryError::IsNotValue(err)) => return TryNotValue(err),
             }
 
             let modifier = self.try_bump_mut().unwrap_or(TypeModifier::Const);
@@ -679,7 +685,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         &mut self,
         kind: &mut FunctionThisKind,
         types: &mut Vec<Parameter>,
-    ) -> TryResult<Loop, Fault> {
+    ) -> TryResult<Loop, Fault, crate::fault::AstErrorKind> {
         let mut is_ref_prefix = false;
         let this = match &self.token().kind {
             &REF => {
@@ -703,7 +709,11 @@ impl<'a, 'f> Parser<'a, 'f> {
                 return Err(TryError::IsNotValue(self.get_expect_error(&COLON)));
             }
             self.bump();
-            let ty = self.try_parse_type()?;
+            let ty = match self.try_parse_type() {
+                Ok(ty) => ty,
+                Err(TryError::IsErr(err)) => return TryErr(err.map_kind(Into::into)),
+                Err(TryError::IsNotValue(err)) => return TryNotValue(err),
+            };
             types.push(Parameter {
                 id: self.alloc_node(),
                 ty,
@@ -723,8 +733,8 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         if let Some(callee) = this {
             if *kind != FunctionThisKind::Static {
-                return TryErr(Fault::error(
-                    "can not have more then one 'this' in methode",
+                return TryErr(Fault::error_with_kind(
+                    crate::fault::AstErrorKind::DuplicateThisParameter,
                     Some(self.token().span),
                 ));
             }
@@ -738,7 +748,10 @@ impl<'a, 'f> Parser<'a, 'f> {
                     self.bump();
                     TryOk(Loop::Continue)
                 }
-                _ => TryErr(self.get_expect_any_error(&[COMMA, ROUND_CLOSE])),
+                _ => TryErr(
+                    self.get_expect_any_error(&[COMMA, ROUND_CLOSE])
+                        .map_kind(Into::into),
+                ),
             };
         }
 

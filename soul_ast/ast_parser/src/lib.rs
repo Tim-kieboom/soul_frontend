@@ -10,6 +10,7 @@ use soul_utils::{
 
 use crate::parser::Parser;
 
+mod fault;
 mod parse;
 mod parser;
 mod utils;

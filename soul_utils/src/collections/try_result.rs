@@ -1,12 +1,15 @@
-use crate::{error::SoulResult, fault::Fault};
+use crate::{
+    error::SoulResult,
+    fault::{Fault, UnclassifiedKind},
+};
 
 /// Error type for try-parsing operations.
 ///
 /// - `TryError::IsNotValue(R)` - the value is not of the expected type
-/// - `TryError::IsErr(SoulError)` - the value is of the expected type but has an error
-pub enum TryError<R> {
+/// - `TryError::IsErr(Fault<K>)` - the value is of the expected type but has an error
+pub enum TryError<R, K = UnclassifiedKind> {
     /// The value is of the correct type but an error occurred.
-    IsErr(Fault),
+    IsErr(Fault<K>),
     /// The value is not of the expected type.
     IsNotValue(R),
 }
@@ -15,40 +18,40 @@ pub enum TryError<R> {
 ///
 /// - `Ok(T)` success
 /// - `Err(TryError::IsNotValue(R))` - the value is not of the expected type
-/// - `Err(TryError::IsErr(SoulError))` - the value is of the type but has an error
-pub type TryResult<T, R> = Result<T, TryError<R>>;
+/// - `Err(TryError::IsErr(Fault<K>))` - the value is of the type but has an error
+pub type TryResult<T, R, K = UnclassifiedKind> = Result<T, TryError<R, K>>;
 
 /// Creates a successful `TryResult`.
 #[allow(non_snake_case)]
-pub fn TryOk<T, R>(ok: T) -> TryResult<T, R> {
+pub fn TryOk<T, R, K>(ok: T) -> TryResult<T, R, K> {
     Ok(ok)
 }
 
 /// Creates a `TryResult` with an error.
 #[allow(non_snake_case)]
-pub fn TryErr<T, R>(err: Fault) -> TryResult<T, R> {
+pub fn TryErr<T, R, K>(err: Fault<K>) -> TryResult<T, R, K> {
     Err(TryError::IsErr(err))
 }
 
 /// Creates a `TryResult` indicating the value is not of the expected type.
 #[allow(non_snake_case)]
-pub fn TryNotValue<T, R>(rest: R) -> TryResult<T, R> {
+pub fn TryNotValue<T, R, K>(rest: R) -> TryResult<T, R, K> {
     Err(TryError::IsNotValue(rest))
 }
 
 /// Utility trait for converting `Result` to `TryResult`.
-pub trait ResultTryErr<T, R> {
-    fn try_err(self) -> TryResult<T, R>;
+pub trait ResultTryErr<T, R, K = UnclassifiedKind> {
+    fn try_err(self) -> TryResult<T, R, K>;
 }
 
 /// Utility trait for converting `Result` to `TryResult`.
-pub trait ResultTryNotValue<T, R> {
-    fn try_not_value(self) -> TryResult<T, R>;
+pub trait ResultTryNotValue<T, R, K = UnclassifiedKind> {
+    fn try_not_value(self) -> TryResult<T, R, K>;
 }
 
 /// Utility trait for mapping the "not value" case in `TryResult`.
-pub trait ResultMapNotValue<T, R, V> {
-    fn map_try_not_value<F: Fn(R) -> V>(self, func: F) -> TryResult<T, V>;
+pub trait ResultMapNotValue<T, R, V, K = UnclassifiedKind> {
+    fn map_try_not_value<F: Fn(R) -> V>(self, func: F) -> TryResult<T, V, K>;
 }
 
 /// Utility trait for merging `TryResult` to `SoulResult`.
@@ -66,17 +69,24 @@ impl<T> ToResult<T> for TryResult<T, Fault> {
     }
 }
 
-impl<T, R> ResultTryErr<T, R> for Result<T, Fault> {
-    fn try_err(self) -> TryResult<T, R> {
+/// Converts `Result<T, Fault<UnclassifiedKind>>` (the output of the parser's
+/// shared, not-yet-migrated utility methods) into `TryResult<T, R, K>` for
+/// any migrated `K`, wrapping the unclassified fault into `K`'s fallback
+/// variant via `From<UnclassifiedKind>`.
+impl<T, R, K> ResultTryErr<T, R, K> for Result<T, Fault>
+where
+    K: From<UnclassifiedKind>,
+{
+    fn try_err(self) -> TryResult<T, R, K> {
         match self {
             Ok(val) => TryOk(val),
-            Err(err) => TryErr(err),
+            Err(err) => TryErr(err.map_kind(Into::into)),
         }
     }
 }
 
-impl<T> ResultTryNotValue<T, Fault> for Result<T, Fault> {
-    fn try_not_value(self) -> TryResult<T, Fault> {
+impl<T, K> ResultTryNotValue<T, Fault, K> for Result<T, Fault> {
+    fn try_not_value(self) -> TryResult<T, Fault, K> {
         match self {
             Ok(val) => TryOk(val),
             Err(err) => TryNotValue(err),
@@ -84,8 +94,8 @@ impl<T> ResultTryNotValue<T, Fault> for Result<T, Fault> {
     }
 }
 
-impl<T> ResultTryNotValue<T, ()> for Result<T, Fault> {
-    fn try_not_value(self) -> TryResult<T, ()> {
+impl<T, K> ResultTryNotValue<T, (), K> for Result<T, Fault> {
+    fn try_not_value(self) -> TryResult<T, (), K> {
         match self {
             Ok(val) => TryOk(val),
             Err(_) => TryNotValue(()),
@@ -93,8 +103,8 @@ impl<T> ResultTryNotValue<T, ()> for Result<T, Fault> {
     }
 }
 
-impl<T, R, V> ResultMapNotValue<T, R, V> for TryResult<T, R> {
-    fn map_try_not_value<F: FnOnce(R) -> V>(self, func: F) -> TryResult<T, V> {
+impl<T, R, V, K> ResultMapNotValue<T, R, V, K> for TryResult<T, R, K> {
+    fn map_try_not_value<F: FnOnce(R) -> V>(self, func: F) -> TryResult<T, V, K> {
         match self {
             Ok(val) => TryOk(val),
             Err(TryError::IsErr(err)) => TryErr(err),
