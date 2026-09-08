@@ -6,6 +6,7 @@ use crate::{
     push_fmt,
 };
 use anyhow::Result;
+use ast_model::AstStore;
 use mir_model::{
     AggregateKind, Function, LocalDecl, LocalId, Operand, Place, PlaceElem, Rvalue, Statement,
     Terminator,
@@ -16,17 +17,13 @@ use soul_utils::{
     collections::vec_map::{VecMap, VecMapIndex},
 };
 
-/// Writes a pretty-printed textual dump of every lowered `MirFunction` (mirrors
-/// `display::ast::display_ast`'s `tree.soulc`, but for MIR — see
-/// `docs/mir-design.md` for the shape this reconstructs), plus a JSON dump of
-/// the raw `MirProgram` for programmatic inspection.
-pub(crate) fn display_mir(program: &MirProgram) -> Result<()> {
+pub(crate) fn display_mir(program: &MirProgram, ast: &AstStore) -> Result<()> {
     let mut output_path = config::CONFIG.output_path().join("mir");
     output_path.push("tree.soulc");
 
     let mut writer = write_create_file(&output_path)?;
     for (_, function) in program.functions.entries() {
-        write_function(&mut writer, function)?;
+        write_function(&mut writer, function, ast)?;
         writer.push_char('\n')?;
     }
     writer.writer_flush()?;
@@ -57,10 +54,17 @@ fn block_str(id: impl VecMapIndex) -> String {
     format!("bb{}", id.index())
 }
 
-fn write_function(writer: &mut impl Writer, function: &Function) -> Result<()> {
+fn write_function(writer: &mut impl Writer, function: &Function, ast: &AstStore) -> Result<()> {
     let mut locals = function.locals.entries().enumerate();
 
-    push_fmt!(writer, "{:?}(", function.name)?;
+    let id = function.id;
+    let name = ast
+        .functions
+        .get(id)
+        .map(|kind| kind.signature().name.as_shared_str())
+        .unwrap_or(format!("{id:?}").into());
+
+    push_fmt!(writer, "{name}(")?;
     write_parameters(writer, function, &mut locals)?;
     writer.push_char(')')?;
     write_return_local(writer, &mut locals)?;
@@ -96,10 +100,18 @@ fn write_locals<'a, Iter>(
 where
     Iter: Iterator<Item = (LocalId, &'a LocalDecl)>,
 {
-    writer.push_str("\tlocals: [\n\t\t")?;
+    writer.push_str("\tlocals.[")?;
+    let Some((_i, local)) = locals.next() else {
+        writer.push_str("]\n")?;
+        return Ok(());
+    };
+    writer.push_str("\n\t\t")?;
+    write_local(writer, local)?;
+    writer.push_str("\n\t\t")?;
+
     let last_index = function.locals.len().saturating_sub(1);
-    for (i, (id, decl)) in locals {
-        write_local(writer, id, decl)?;
+    for (i, local) in locals {
+        write_local(writer, local)?;
         if i != last_index {
             writer.push_str(",\n\t\t")?;
         }
@@ -120,11 +132,11 @@ where
         if i > 0 {
             writer.push_str(", ")?;
         }
-        let Some((_i, (id, decl))) = locals.next() else {
+        let Some((_i, local)) = locals.next() else {
             writer.push_str("<missing parameter local>")?;
             break;
         };
-        write_local(writer, id, decl)?;
+        write_local(writer, local)?;
     }
     Ok(())
 }
@@ -139,13 +151,14 @@ where
     writer.push_str("-> ")?;
 
     match locals.next() {
-        Some((_i, (id, decl))) => write_local(writer, id, decl)?,
+        Some((_i, local)) => write_local(writer, local)?,
         None => writer.push_str("<missing return local>")?,
     };
     Ok(())
 }
 
-fn write_local(writer: &mut impl Writer, id: LocalId, decl: &LocalDecl) -> Result<()> {
+fn write_local(writer: &mut impl Writer, local: (LocalId, &LocalDecl)) -> Result<()> {
+    let (id, decl) = local;
     let name = local_str(id);
     let ty = &decl.ty;
     match decl.mutability {

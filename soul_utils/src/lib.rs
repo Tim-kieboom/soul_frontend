@@ -180,6 +180,11 @@ impl From<&str> for SharedStr {
         Self(value.into())
     }
 }
+impl From<String> for SharedStr {
+    fn from(value: String) -> Self {
+        Self(value.into())
+    }
+}
 impl From<SharedStr> for Rc<str> {
     fn from(value: SharedStr) -> Self {
         value.0

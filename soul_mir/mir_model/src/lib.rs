@@ -27,7 +27,7 @@ pub type ConstValue = Literal;
 
 #[derive(Debug, serde::Serialize)]
 pub struct Function {
-    pub name: FunctionId,
+    pub id: FunctionId,
     pub locals: VecMap<LocalId, LocalDecl>,
     pub blocks: VecMap<BlockId, BasicBlock>,
     /// `locals[0..arg_count]` are parameters, by convention.

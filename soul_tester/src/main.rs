@@ -65,7 +65,7 @@ fn frontend(benchmark: &mut Benchmark) -> Result<bool> {
     } else {
         mir(&ast, benchmark, &mut all_faults)
     };
-    display_mir(&mir_program)?;
+    display_mir(&mir_program, &ast.crates.store)?;
 
     for fault in all_faults.iter() {
         display_fault(fault, &module_store, &config::PRINT_CONFIGS, &mut stdout())?;

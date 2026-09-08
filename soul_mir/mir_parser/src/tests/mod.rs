@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use ast_model::{AstStore, AstTree, FunctionKind};
+use ast_model::{AstStore, AstTree, FunctionKind, declare_store::DeclareStore};
 use ast_parser::{ParseInfo, fault::AstErrorKind, parse_module};
 use mir_model::{ConstValue, Operand, Rvalue};
 use soul_name_resolver::name_resolve;
@@ -11,8 +11,8 @@ use soul_utils::{
 };
 
 use crate::{
+    MirLowerer,
     fault::{MirErrorKind, MirResult},
-    lower_function,
 };
 
 fn resolve_source(source: &str) -> AstTree<AstErrorKind> {
@@ -57,6 +57,16 @@ fn find_function(store: &AstStore, name: &str) -> FunctionId {
             _ => None,
         })
         .unwrap_or_else(|| panic!("no function named `{name}` found"))
+}
+
+fn lower_function(
+    store: &AstStore,
+    declares: &DeclareStore,
+    id: FunctionId,
+) -> MirResult<mir_model::Function> {
+    let mut lowerer = MirLowerer::new(&store, &declares);
+    lowerer.lower_function(id)?;
+    Ok(lowerer.functions.into_values().next().unwrap())
 }
 
 fn lower_source(source: &str, function_name: &str) -> MirResult<mir_model::Function> {

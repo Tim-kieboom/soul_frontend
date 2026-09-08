@@ -21,7 +21,7 @@ use std::time::Instant;
 
 use ast_model::{AstTree, FunctionKind};
 use mir_model::Function;
-use mir_parser::{fault::MirErrorKind, lower_function};
+use mir_parser::{MirLowerer, fault::MirErrorKind};
 use soul_utils::{
     CrateContext, FunctionId,
     collections::{benchmark::Benchmark, vec_map::VecMap},
@@ -47,20 +47,19 @@ pub fn to_mir<K>(
 ) -> MirProgram {
     let time = Instant::now();
 
-    let mut functions = VecMap::new();
+    let mut lowerer = MirLowerer::new(&ast.crates.store, &ast.declares);
     for (id, kind) in ast.crates.store.functions.entries() {
         if !matches!(kind, FunctionKind::Normal(_)) {
             continue;
         }
 
-        match lower_function(&ast.crates.store, &ast.declares, id) {
-            Ok(mir_function) => {
-                functions.insert(id, mir_function);
-            }
-            Err(fault) => context.faults.push(fault),
+        if let Err(fault) = lowerer.lower_function(id) {
+            context.faults.push(fault);
         }
     }
 
     benchmark.add_benchmark("mir", time.elapsed());
-    MirProgram { functions }
+    MirProgram {
+        functions: lowerer.into_functions(),
+    }
 }
