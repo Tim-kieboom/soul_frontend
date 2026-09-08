@@ -235,7 +235,7 @@ impl<'a> FunctionLowerer<'a> {
                         self.lower_if(return_local, nested_if, span)?;
                     }
                 }
-                
+
                 let reaches = !self.is_terminated();
                 if reaches {
                     self.seal(mir::Terminator::Goto(join_id), None);
@@ -441,7 +441,7 @@ impl<'a> FunctionLowerer<'a> {
                 require_primitive(&ty, span)?;
 
                 let rvalue = self.lower_rvalue(expr_id)?;
-                let temp = self.alloc_local(ty, TypeModifier::Comptime, span);
+                let temp = self.alloc_local(ty, TypeModifier::Immut, span);
                 self.statements
                     .push(mir::Statement::Assign(mir::Place::local(temp), rvalue));
                 Ok(mir::Operand::Copy(mir::Place::local(temp)))

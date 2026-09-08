@@ -215,6 +215,16 @@ fn nested_compound_expression_is_lowered_via_a_temporary() {
         matches!(right, Operand::Copy(place) if place.local == temp_place.local),
         "expected the outer expression's right operand to read back the temp from statement 0"
     );
+
+    let temp_decl = mir
+        .locals
+        .get(temp_place.local)
+        .expect("expected the temp to have a local declaration");
+    assert_eq!(
+        temp_decl.mutability,
+        soul_utils::TypeModifier::Immut,
+        "a temp holding a runtime-computed sub-expression must not be marked `Comptime`"
+    );
 }
 
 #[test]
