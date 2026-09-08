@@ -64,7 +64,7 @@ fn lower_function(
     declares: &DeclareStore,
     id: FunctionId,
 ) -> MirResult<mir_model::Function> {
-    let mut lowerer = MirLowerer::new(&store, &declares);
+    let mut lowerer = MirLowerer::new(store, declares);
     lowerer.lower_function(id)?;
     Ok(lowerer.functions.into_values().next().unwrap())
 }
@@ -75,9 +75,6 @@ fn lower_source(source: &str, function_name: &str) -> MirResult<mir_model::Funct
     lower_function(&ast.crates.store, &ast.declares, function_id)
 }
 
-/// Asserts `result` is an `Err` whose kind satisfies `predicate` and which carries
-/// a span — matching the "every fault has a kind and a location" convention used
-/// by every other pipeline stage's faults.
 fn assert_rejected_matching(
     result: &MirResult<mir_model::Function>,
     predicate: impl Fn(&MirErrorKind) -> bool,
@@ -190,8 +187,6 @@ fn nested_compound_expression_is_lowered_via_a_temporary() {
     )
     .expect("expected successful lowering");
 
-    // 3 params + return local + 1 temp for `b * c` = 5 locals; no local for the
-    // outer `a + temp` since it's assigned straight to the return local.
     assert_eq!(mir.locals.entries().count(), 5);
 
     let (_, block) = mir.blocks.entries().next().unwrap();
@@ -254,4 +249,157 @@ fn non_normal_function_is_rejected() {
 
     let result = lower_function(&ast.crates.store, &ast.declares, function_id);
     assert_rejected_with(&result, MirErrorKind::SignatureOnlyFunctionHasNoBody);
+}
+
+#[test]
+fn if_without_else_joins_after_the_then_branch() {
+    let mir = lower_source(
+        "f(): int {\n    if true {\n        return 1\n    }\n    return 2\n}\n",
+        "f",
+    )
+    .expect("expected successful lowering");
+
+    // entry (switchInt) + then (return 1) + join (return 2)
+    assert_eq!(mir.blocks.entries().count(), 3, "{:#?}", mir.blocks);
+
+    let switch_blocks = mir
+        .blocks
+        .entries()
+        .filter(|(_, block)| matches!(block.terminator, mir_model::Terminator::SwitchInt { .. }))
+        .count();
+    assert_eq!(switch_blocks, 1, "expected exactly one switchInt block");
+
+    let return_blocks = mir
+        .blocks
+        .entries()
+        .filter(|(_, block)| matches!(block.terminator, mir_model::Terminator::Return))
+        .count();
+    assert_eq!(
+        return_blocks, 2,
+        "expected both the then-branch and the join block to return"
+    );
+}
+
+#[test]
+fn if_else_where_both_branches_return_has_no_join_block() {
+    let mir = lower_source(
+        "f(): int {\n    if true {\n        return 1\n    } else {\n        return 2\n    }\n}\n",
+        "f",
+    )
+    .expect("expected successful lowering");
+
+    // entry (switchInt) + then (return 1) + else (return 2) — no join block,
+    // since both branches terminate and nothing reaches it.
+    assert_eq!(mir.blocks.entries().count(), 3, "{:#?}", mir.blocks);
+}
+
+#[test]
+fn statement_after_an_if_else_that_always_returns_is_unreachable() {
+    let result = lower_source(
+        "f(): int {\n    if true {\n        return 1\n    } else {\n        return 2\n    }\n    return 3\n}\n",
+        "f",
+    );
+    assert_rejected_with(&result, MirErrorKind::UnreachableStatement);
+}
+
+#[test]
+fn statement_after_a_return_is_unreachable() {
+    let result = lower_source("f(): int {\n    return 1\n    return 2\n}\n", "f");
+    assert_rejected_with(&result, MirErrorKind::UnreachableStatement);
+}
+
+#[test]
+fn non_bool_if_condition_is_rejected() {
+    let result = lower_source(
+        "f(): int {\n    if 1 {\n        return 1\n    }\n    return 2\n}\n",
+        "f",
+    );
+    assert_rejected_with(&result, MirErrorKind::UnsupportedConditionExpression);
+}
+
+#[test]
+fn while_loop_with_break_reaches_the_exit_block() {
+    let mir = lower_source(
+        "f(): int {\n    for true {\n        break\n    }\n    return 1\n}\n",
+        "f",
+    )
+    .expect("expected successful lowering");
+
+    // entry (goto header) + header (switchInt) + body (goto exit via break) + exit (return)
+    assert_eq!(mir.blocks.entries().count(), 4, "{:#?}", mir.blocks);
+}
+
+#[test]
+fn continue_in_while_body_jumps_back_to_the_header() {
+    let mir = lower_source(
+        "f(): int {\n    for true {\n        continue\n    }\n    return 1\n}\n",
+        "f",
+    )
+    .expect("expected successful lowering");
+
+    let (header_id, _) = mir
+        .blocks
+        .entries()
+        .find(|(_, block)| matches!(block.terminator, mir_model::Terminator::SwitchInt { .. }))
+        .expect("expected a header block with a switchInt terminator");
+
+    let continues_to_header = mir.blocks.entries().any(|(_, block)| {
+        matches!(block.terminator, mir_model::Terminator::Goto(target) if target == header_id)
+    });
+    assert!(
+        continues_to_header,
+        "expected `continue` to jump back to the loop header, {:#?}",
+        mir.blocks
+    );
+}
+
+#[test]
+fn break_nested_inside_an_if_targets_the_enclosing_loops_exit_block() {
+    let mir = lower_source(
+        "f(): int {\n    for true {\n        if true {\n            break\n        }\n    }\n    return 1\n}\n",
+        "f",
+    )
+    .expect("expected successful lowering");
+
+    let (_, header) = mir
+        .blocks
+        .entries()
+        .find(|(_, block)| matches!(block.terminator, mir_model::Terminator::SwitchInt { .. }))
+        .expect("expected a loop header block");
+    let mir_model::Terminator::SwitchInt {
+        otherwise: exit_id, ..
+    } = header.terminator
+    else {
+        unreachable!("just matched on SwitchInt above")
+    };
+
+    let break_targets_exit = mir.blocks.entries().any(|(_, block)| {
+        matches!(block.terminator, mir_model::Terminator::Goto(target) if target == exit_id)
+    });
+    assert!(
+        break_targets_exit,
+        "expected the nested `break` to jump to the loop's exit block, {:#?}",
+        mir.blocks
+    );
+}
+
+#[test]
+fn break_outside_a_loop_is_rejected() {
+    let result = lower_source("f(): int {\n    break\n    return 1\n}\n", "f");
+    assert_rejected_with(&result, MirErrorKind::BreakOutsideLoop);
+}
+
+#[test]
+fn continue_outside_a_loop_is_rejected() {
+    let result = lower_source("f(): int {\n    continue\n    return 1\n}\n", "f");
+    assert_rejected_with(&result, MirErrorKind::ContinueOutsideLoop);
+}
+
+#[test]
+fn bare_for_loop_without_a_condition_is_rejected() {
+    let result = lower_source(
+        "f(): int {\n    for {\n        break\n    }\n    return 1\n}\n",
+        "f",
+    );
+    assert_rejected_with(&result, MirErrorKind::UnsupportedLoopCondition);
 }

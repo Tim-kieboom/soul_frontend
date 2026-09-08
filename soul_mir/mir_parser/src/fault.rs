@@ -52,6 +52,25 @@ pub enum MirErrorKind {
         "only literals, variables, and arithmetic binary expressions are supported as operands in this lowering slice"
     )]
     UnsupportedOperandExpression,
+
+    #[error(
+        "only a bare `bool` literal is supported as an `if`/`while` condition in this lowering slice"
+    )]
+    UnsupportedConditionExpression,
+
+    #[error(
+        "only `while <cond> {{ .. }}` loops are supported in this lowering slice, not bare `for` loops or `foreach`"
+    )]
+    UnsupportedLoopCondition,
+
+    #[error("`break` outside of a loop")]
+    BreakOutsideLoop,
+
+    #[error("`continue` outside of a loop")]
+    ContinueOutsideLoop,
+
+    #[error("statement is unreachable: every preceding path already returned, broke, or continued")]
+    UnreachableStatement,
 }
 
 impl From<UnclassifiedKind> for MirErrorKind {

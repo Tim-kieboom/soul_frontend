@@ -44,3 +44,51 @@ identity(flag: bool): bool {
 alwaysTrue(): bool {
     return true
 }
+
+ifWithoutElse(): int {
+    if true {
+        return 1
+    }
+    return 2
+}
+
+ifElse(): int {
+    if true {
+        return 1
+    } else {
+        return 2
+    }
+}
+
+ifElseIfElse(): int {
+    if false {
+        return 1
+    } else if true {
+        return 2
+    } else {
+        return 3
+    }
+}
+
+loopWithBreak(): int {
+    for true {
+        break
+    }
+    return 1
+}
+
+loopWithContinue(): int {
+    for true {
+        continue
+    }
+    return 1
+}
+
+loopWithNestedIfBreak(): int {
+    for true {
+        if true {
+            break
+        }
+    }
+    return 1
+}
