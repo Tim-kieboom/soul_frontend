@@ -36,7 +36,9 @@ pub enum MirErrorKind {
     #[error("type `{ty}` isn't a primitive scalar, which is all this lowering slice supports")]
     NonPrimitiveType { ty: Box<str> },
 
-    #[error("only arithmetic binary operators (+ - * / %) are supported in this lowering slice")]
+    #[error(
+        "only arithmetic (+ - * / %), comparison (== != < > <= >=), and logical (&& ||) binary operators are supported in this lowering slice"
+    )]
     UnsupportedBinaryOperator,
 
     #[error("variable has no resolved binding")]
@@ -49,12 +51,12 @@ pub enum MirErrorKind {
     NestedExpressionHasNoResolvedType,
 
     #[error(
-        "only literals, variables, and arithmetic binary expressions are supported as operands in this lowering slice"
+        "only literals, variables, and arithmetic/comparison/logical binary expressions are supported as operands in this lowering slice"
     )]
     UnsupportedOperandExpression,
 
     #[error(
-        "only a bare `bool` literal is supported as an `if`/`while` condition in this lowering slice"
+        "only a bare `bool` literal or a comparison/logical (`&&`/`||`) expression is supported as an `if`/`while` condition in this lowering slice"
     )]
     UnsupportedConditionExpression,
 

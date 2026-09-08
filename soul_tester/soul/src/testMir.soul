@@ -92,3 +92,28 @@ loopWithNestedIfBreak(): int {
     }
     return 1
 }
+
+comparisonCondition(a: int, b: int): int {
+    if a > b {
+        return 1
+    }
+    return 2
+}
+
+logicalAndCondition(a: int, b: int, c: int, d: int): int {
+    if a > b && c < d {
+        return 1
+    }
+    return 2
+}
+
+logicalOrCondition(a: int, b: int): bool {
+    return a == b || a > b
+}
+
+whileWithComparisonCondition(n: int): int {
+    for n > 0 {
+        break
+    }
+    return n
+}

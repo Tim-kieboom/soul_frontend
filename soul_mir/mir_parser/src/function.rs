@@ -3,7 +3,8 @@ use ast_model::{
 };
 use mir_model as mir;
 use soul_utils::{
-    TypeModifier, collections::vec_map::VecMap, fault::Fault, ids::IdGenerator, span::Span,
+    TypeModifier, collections::vec_map::VecMap, fault::Fault, ids::IdGenerator,
+    soul_names::PrimitiveTypes, span::Span,
 };
 
 use crate::fault::{MirErrorKind, MirResult};
@@ -320,10 +321,15 @@ impl<'a> FunctionLowerer<'a> {
 
     fn lower_bool_condition(&mut self, expr_id: ast::ExpressionId) -> MirResult<mir::Operand> {
         let expr = &self.store.expressions[expr_id];
-        if !matches!(
-            &expr.node,
-            ast::ExpressionKind::Literal((_, ast::Literal::Bool(_)))
-        ) {
+        let is_bool = match &expr.node {
+            ast::ExpressionKind::Literal((_, ast::Literal::Bool(_))) => true,
+            ast::ExpressionKind::Binary(_) => matches!(
+                self.declares.get_expression_type(expr_id),
+                Some(SoulType::Primitive(PrimitiveTypes::Boolean))
+            ),
+            _ => false,
+        };
+        if !is_bool {
             return Err(Fault::error_with_kind(
                 MirErrorKind::UnsupportedConditionExpression,
                 Some(expr.span),
@@ -388,7 +394,7 @@ impl<'a> FunctionLowerer<'a> {
         let expr = &self.store.expressions[expr_id];
         match &expr.node {
             ast::ExpressionKind::Binary(binary) => {
-                if !is_supported_arithmetic_op(binary.operator.value) {
+                if !is_supported_binary_op(binary.operator.value) {
                     return Err(Fault::error_with_kind(
                         MirErrorKind::UnsupportedBinaryOperator,
                         Some(expr.span),
@@ -467,7 +473,7 @@ fn require_primitive(ty: &SoulType, span: Span) -> MirResult<()> {
     }
 }
 
-fn is_supported_arithmetic_op(op: BinaryOperatorKind) -> bool {
+fn is_supported_binary_op(op: BinaryOperatorKind) -> bool {
     matches!(
         op,
         BinaryOperatorKind::Add
@@ -475,5 +481,13 @@ fn is_supported_arithmetic_op(op: BinaryOperatorKind) -> bool {
             | BinaryOperatorKind::Mul
             | BinaryOperatorKind::Div
             | BinaryOperatorKind::Mod
+            | BinaryOperatorKind::Eq
+            | BinaryOperatorKind::NotEq
+            | BinaryOperatorKind::Lt
+            | BinaryOperatorKind::Gt
+            | BinaryOperatorKind::Le
+            | BinaryOperatorKind::Ge
+            | BinaryOperatorKind::LogAnd
+            | BinaryOperatorKind::LogOr
     )
 }

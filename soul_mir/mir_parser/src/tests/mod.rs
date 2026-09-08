@@ -413,3 +413,78 @@ fn bare_for_loop_without_a_condition_is_rejected() {
     );
     assert_rejected_with(&result, MirErrorKind::UnsupportedLoopCondition);
 }
+
+#[test]
+fn comparison_condition_lowers_via_a_temp_into_switch_int() {
+    let mir = lower_source(
+        "f(a: int, b: int): int {\n    if a > b {\n        return 1\n    }\n    return 2\n}\n",
+        "f",
+    )
+    .expect("expected successful lowering");
+
+    let (_, entry) = mir
+        .blocks
+        .entries()
+        .next()
+        .expect("expected an entry block");
+    assert_eq!(
+        entry.statements.len(),
+        1,
+        "expected the comparison to be lowered into one temp, {:#?}",
+        entry.statements
+    );
+
+    let mir_model::Statement::Assign(cond_place, Rvalue::BinaryOp(op, _, _)) = &entry.statements[0]
+    else {
+        panic!(
+            "expected the comparison to be assigned to a temp, got {:#?}",
+            entry.statements[0]
+        );
+    };
+    assert_eq!(*op, ast_model::operators::BinaryOperatorKind::Gt);
+
+    let mir_model::Terminator::SwitchInt { discriminant, .. } = &entry.terminator else {
+        panic!(
+            "expected the entry block to end in a switchInt, got {:#?}",
+            entry.terminator
+        );
+    };
+    assert!(
+        matches!(discriminant, Operand::Copy(place) if place.local == cond_place.local),
+        "expected switchInt to read back the comparison's temp"
+    );
+}
+
+#[test]
+fn logical_and_of_two_comparisons_is_lowered_as_nested_temps() {
+    let mir = lower_source(
+        "f(a: int, b: int, c: int, d: int): int {\n    if a > b && c < d {\n        return 1\n    }\n    return 2\n}\n",
+        "f",
+    )
+    .expect("expected successful lowering");
+
+    let (_, entry) = mir
+        .blocks
+        .entries()
+        .next()
+        .expect("expected an entry block");
+    // `a > b` -> temp, `c < d` -> temp, `temp1 && temp2` -> temp, then switchInt.
+    assert_eq!(entry.statements.len(), 3, "{:#?}", entry.statements);
+
+    let mir_model::Statement::Assign(_, Rvalue::BinaryOp(op, ..)) = &entry.statements[2] else {
+        panic!(
+            "expected the third statement to combine the two comparisons, got {:#?}",
+            entry.statements[2]
+        );
+    };
+    assert_eq!(*op, ast_model::operators::BinaryOperatorKind::LogAnd);
+}
+
+#[test]
+fn bitwise_and_condition_is_rejected_as_non_bool() {
+    let result = lower_source(
+        "f(a: int, b: int): int {\n    if a & b {\n        return 1\n    }\n    return 2\n}\n",
+        "f",
+    );
+    assert_rejected_with(&result, MirErrorKind::UnsupportedConditionExpression);
+}
