@@ -1,8 +1,4 @@
-use ast_model::{
-    expression::Binding,
-    soul_type::SoulType,
-    statements::{Statement, VarPattern, Variable},
-};
+use ast_model::{AssignType, Binding, SoulType, Statement, VarPattern, Variable};
 use soul_tokenizer::model::TokenKind;
 use soul_utils::{
     Ident, TypeModifier,
@@ -14,7 +10,7 @@ use soul_utils::{
 
 use crate::{
     fault::{AstFault, AstResult, AstTryResult},
-    parse::statements::{try_assign_type, variable::AssignType},
+    parse::statements::try_assign_type,
     parser::Parser,
     utils::{
         ARROW_LEFT, COLON, CONST, CURLY_OPEN, MUT, ROUND_OPEN, SEMI_COLON, STAMENT_END_TOKENS,
@@ -82,7 +78,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     pub(super) fn try_parse_from_const(&mut self, start_span: Span) -> AstResult<Statement> {
         self.expect(&CONST)?;
-        let modifier = TypeModifier::Const;
+        let modifier = TypeModifier::Comptime;
         const IS_CONST: bool = true;
 
         if self.current_is(&ROUND_OPEN) {
@@ -191,7 +187,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         start_span: Span,
         modifier: TypeModifier,
     ) -> AstTryResult<Statement, ()> {
-        if modifier != TypeModifier::Const {
+        if modifier != TypeModifier::Comptime {
             return TryNotValue(());
         }
 
@@ -248,9 +244,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         if assign != AssignType::Assign && assign != AssignType::Declaration {
             return Err(Fault::error_with_kind(
-                crate::fault::AstErrorKind::InvalidAssignOperatorForDeclaration {
-                    assign_op: assign.as_str().into(),
-                },
+                crate::fault::AstErrorKind::InvalidAssignOperatorForDeclaration { assign },
                 Some(self.token().span),
             ));
         }
@@ -291,9 +285,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         if assign != AssignType::Assign && assign != AssignType::Declaration {
             return Err(Fault::error_with_kind(
-                crate::fault::AstErrorKind::InvalidAssignOperatorForDeclaration {
-                    assign_op: assign.as_str().into(),
-                },
+                crate::fault::AstErrorKind::InvalidAssignOperatorForDeclaration { assign },
                 Some(self.token().span),
             ));
         }
@@ -316,7 +308,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     fn invalid_assign(&self) -> crate::fault::AstFault {
         Fault::error_with_kind(
             crate::fault::AstErrorKind::InvalidAssignSymbol {
-                found: self.token().kind.display().into_boxed_str(),
+                found: self.token().kind.clone(),
             },
             Some(self.token().span),
         )

@@ -1,10 +1,7 @@
 use ast_model::{
-    CustomType,
-    expression::{ExpressionId, FunctionCall},
-    soul_type::{Generic, SoulType},
-    statements::{EnumVariant, UnionKind},
+    CustomType, EnumVariant, ExpressionId, FunctionCall, Generic, SoulType, UnionKind,
 };
-use ast_parser::fault::AstErrorKind;
+use ast_parser::fault::{AstErrorKind, EnumVariantArgumentTypeMismatch};
 use soul_utils::FunctionId;
 
 use crate::NameResolver;
@@ -140,12 +137,13 @@ impl<'a> NameResolver<'a> {
 
             let span = self.store.expressions.get(argument.value).map(|e| e.span);
             self.log_error(
-                AstErrorKind::EnumVariantArgumentTypeMismatch {
+                EnumVariantArgumentTypeMismatch {
                     enum_name: stub.name.as_str().into(),
                     variant_name: variant_name.into(),
-                    expected: format!("{param_ty:?}").into(),
-                    got: format!("{arg_ty:?}").into(),
-                },
+                    expected: param_ty.clone(),
+                    got: arg_ty.clone(),
+                }
+                .into(),
                 span,
             );
         }

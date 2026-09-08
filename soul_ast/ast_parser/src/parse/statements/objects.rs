@@ -1,6 +1,5 @@
 use ast_model::{
-    soul_type::{SoulType, Stub},
-    statements::{Enum, EnumVariant, Field, Statement, StatementKind, Struct, UnionKind},
+    Enum, EnumVariant, Field, SoulType, Statement, StatementKind, Struct, Stub, UnionKind,
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{Ident, collections::try_result::ToResult, fault::Fault};

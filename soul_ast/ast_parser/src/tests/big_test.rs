@@ -1,12 +1,8 @@
 use ast_model::{
-    expression::{
-        ExpressionKind, FunctionCall, FunctionCalleeKind, IfCondition, MatchPattern,
-        StructConstructor,
-    },
-    literal::Literal,
+    ExpressionKind, FunctionCall, FunctionCalleeKind, IfCondition, Import, ImportItem, ImportKind,
+    Literal, MatchPattern, SoulType, StatementKind, StructConstructor, Stub, TypeDef, VarPattern,
+    Variable,
     operators::{BinaryOperatorKind, UnaryOperatorKind},
-    soul_type::{SoulType, Stub},
-    statements::{Import, ImportItem, ImportKind, StatementKind, TypeDef, VarPattern, Variable},
 };
 use soul_utils::{TypeModifier, fault::Severity, soul_names::PrimitiveTypes};
 
@@ -136,7 +132,7 @@ fn all_kinds() {
     assert!(
         matches!(v_global_pat, VarPattern::Simple { binding, .. } if binding.ident.as_str() == "GLOBAL")
     );
-    assert_eq!(*v_global_mod, TypeModifier::Const);
+    assert_eq!(*v_global_mod, TypeModifier::Comptime);
     assert!(v_global_init.is_some());
 
     // --- statement 3: function -----------------------------------------------
@@ -172,7 +168,7 @@ fn all_kinds() {
     assert!(
         matches!(v0_pat, VarPattern::Simple { binding, .. } if binding.ident.as_str() == "CONST")
     );
-    assert_eq!(*v0_mod, TypeModifier::Const);
+    assert_eq!(*v0_mod, TypeModifier::Comptime);
     assert!(v0_init.is_some());
 
     // 1: CONST_TYPED: int :: 1  — typed associated constant
@@ -190,7 +186,7 @@ fn all_kinds() {
     assert!(
         matches!(v1_pat, VarPattern::Simple { binding, .. } if binding.ident.as_str() == "CONST_TYPED")
     );
-    assert_eq!(*v1_mod, TypeModifier::Const);
+    assert_eq!(*v1_mod, TypeModifier::Comptime);
     assert_eq!(
         *v1_ty,
         Some(SoulType::Primitive(
@@ -656,5 +652,5 @@ fn all_kinds() {
     assert!(
         matches!(v_pub_pat, VarPattern::Simple { binding, .. } if binding.ident.as_str() == "GLOBAL")
     );
-    assert_eq!(*v_pub_mod, TypeModifier::Const);
+    assert_eq!(*v_pub_mod, TypeModifier::Comptime);
 }

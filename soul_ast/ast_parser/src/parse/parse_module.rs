@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use ast_model::{ExternalCrateData, statements::ImportPath};
+use ast_model::{ExternalCrateData, ImportPath};
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
     collections::vec_set::VecSet,
@@ -219,9 +219,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             module_path.push("mod.soul");
             if !module_path.is_file() {
                 self.log_fault(Fault::error_with_kind(
-                    crate::fault::AstErrorKind::MissingModFile {
-                        path: format!("{module_path:?}").into_boxed_str(),
-                    },
+                    crate::fault::AstErrorKind::MissingModFile { path: module_path },
                     Some(span),
                 ));
                 return None;
@@ -233,9 +231,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         module_path.add_extension("soul");
         if !module_path.is_file() {
             self.log_fault(Fault::error_with_kind(
-                crate::fault::AstErrorKind::ModuleFileNotFound {
-                    path: format!("{module_path:?}").into_boxed_str(),
-                },
+                crate::fault::AstErrorKind::ModuleFileNotFound { path: module_path },
                 Some(span),
             ));
 

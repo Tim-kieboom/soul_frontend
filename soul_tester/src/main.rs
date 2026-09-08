@@ -58,12 +58,7 @@ fn frontend(benchmark: &mut Benchmark) -> Result<bool> {
     )?;
 
     let mut all_faults = ast.drain_faults().into_unclassified();
-    // Captured once, before MIR faults are merged in below: MIR lowering only
-    // covers a small subset of the language today (see `mir_parser`'s module
-    // docs), so a function it can't lower isn't a compiler-correctness
-    // failure the way an actual parse/resolve error is. Deciding pass/fail
-    // from `all_faults` again *after* the merge would silently let MIR faults
-    // flip it, which is exactly the bug this comment is here to prevent.
+
     let ast_failed = failed(&all_faults);
     let mir_program = if ast_failed {
         MirProgram::empty()

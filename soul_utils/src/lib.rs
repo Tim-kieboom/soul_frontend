@@ -34,7 +34,40 @@ pub enum TypeModifier {
     /// is immutable
     Immut,
     /// is compiletime
-    Const,
+    Comptime,
+}
+impl TypeModifier {
+    pub fn to_mutable(&self) -> Mutable {
+        if *self == TypeModifier::Mut {
+            Mutable::Mut
+        } else {
+            Mutable::Immut
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum Mutable {
+    Mut,
+    Immut,
+}
+impl Mutable {
+    pub fn is_mut(&self) -> bool {
+        matches!(self, Mutable::Mut)
+    }
+    pub fn to_type_modifier(&self) -> TypeModifier {
+        if self.is_mut() {
+            TypeModifier::Mut
+        } else {
+            TypeModifier::Immut
+        }
+    }
+}
+
+pub enum LoopState {
+    None,
+    Break,
+    Continue,
 }
 
 #[cfg(debug_assertions)]

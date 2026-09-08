@@ -1,8 +1,6 @@
 use ast_model::{
-    NodeId,
-    block::BlockId,
+    BlockId, Enum, NodeId, Struct, Trait,
     scope::{Scope, ScopeBuilder, ScopeTypeEntry, ScopeTypeEntryKind},
-    statements::{Enum, Struct, Trait},
 };
 use ast_parser::fault::AstErrorKind;
 use soul_utils::{

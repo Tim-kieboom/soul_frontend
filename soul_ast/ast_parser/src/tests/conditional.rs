@@ -1,7 +1,5 @@
 use ast_model::{
-    expression::{ExpressionKind, If, IfBranch, IfCondition, Match, MatchPattern},
-    literal::Literal,
-    statements::StatementKind,
+    ExpressionKind, If, IfBranch, IfCondition, Literal, Match, MatchPattern, StatementKind,
 };
 use soul_utils::fault::Severity;
 

@@ -1,11 +1,11 @@
 use std::str::FromStr;
 
-use ast_model::soul_type::{
-    ArrayKind, ArrayType, Mutable, NamedTuple, ReferenceType, SoulType, Stub, Tuple, TupleKind,
+use ast_model::{
+    ArrayKind, ArrayType, NamedTuple, ReferenceType, SoulType, Stub, Tuple, TupleKind,
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord, types::Types};
 use soul_utils::{
-    Ident,
+    Ident, Mutable,
     collections::try_result::{
         ResultTryErr, ResultTryNotValue, ToResult, TryErr, TryError, TryNotValue, TryOk,
     },
@@ -224,9 +224,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         if let Ok(keyword) = KeyWord::from_str(ident.as_str()) {
             return TryNotValue(Fault::error_with_kind(
-                crate::fault::AstErrorKind::KeywordUsedAsType {
-                    keyword: keyword.as_str().into(),
-                },
+                crate::fault::AstErrorKind::KeywordUsedAsType { keyword },
                 Some(ident.span()),
             ));
         }
@@ -313,7 +311,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 other => {
                     return TryNotValue(Fault::error_with_kind(
                         crate::fault::AstErrorKind::InvalidArrayTypeWrapperToken {
-                            found: other.display().into_boxed_str(),
+                            found: other.clone(),
                         },
                         Some(self.token().span),
                     ));

@@ -1,7 +1,4 @@
-use ast_model::{
-    soul_type::SoulType,
-    statements::{ImplBlock, Methode, Statement, StatementKind, UseBlock},
-};
+use ast_model::{ImplBlock, Methode, SoulType, Statement, StatementKind, UseBlock};
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
     collections::try_result::{ToResult, TryError},

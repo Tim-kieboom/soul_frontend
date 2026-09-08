@@ -1,10 +1,6 @@
 use ast_model::{
-    FunctionKind,
-    expression::ExpressionId,
-    statements::{
-        Assignment, Enum, EnumVariant, StatementId, StatementKind, Struct, Trait, UseBlock,
-        VarPattern, Variable,
-    },
+    Assignment, Enum, EnumVariant, ExpressionId, FunctionKind, StatementId, StatementKind, Struct,
+    Trait, UseBlock, VarPattern, Variable,
 };
 use soul_utils::{FunctionId, soul_error_internal};
 

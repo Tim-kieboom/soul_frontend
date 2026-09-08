@@ -1,12 +1,8 @@
 use ast_model::{
+    ExpressionId, ExpressionKind, FieldAccess, FunctionCall, FunctionCallee, FunctionCalleeKind,
+    ImportItem, ImportKind, SoulType, Stub, VariableExpression,
     declare_store::{FunctionResolve, IntrinsicResolve},
-    expression::{
-        ExpressionId, ExpressionKind, FieldAccess, FunctionCall, FunctionCallee,
-        FunctionCalleeKind, VariableExpression,
-    },
     scope::{ScopeModuleEntry, ScopeTypeEntryKind, ScopeValue},
-    soul_type::{SoulType, Stub},
-    statements::{ImportItem, ImportKind},
 };
 use ast_parser::fault::AstErrorKind;
 use soul_utils::soul_names::PrimitiveTypes;
@@ -450,12 +446,12 @@ impl<'a> NameResolver<'a> {
     ) -> Option<String> {
         for item in &module_entry.imported_items {
             match item {
-                ast_model::statements::ImportItem::Normal(name) => {
+                ImportItem::Normal(name) => {
                     if name.as_str() == function_name {
                         return Some(name.to_string());
                     }
                 }
-                ast_model::statements::ImportItem::Alias { alias, name } => {
+                ImportItem::Alias { alias, name } => {
                     if alias.as_str() == function_name {
                         return Some(name.to_string());
                     }

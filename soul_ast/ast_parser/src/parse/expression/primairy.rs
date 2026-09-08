@@ -1,9 +1,6 @@
 use std::str::FromStr;
 
-use ast_model::{
-    expression::{Array, Expression, ExpressionId, ExpressionKind, StringFormat},
-    literal::Literal,
-};
+use ast_model::{Array, Expression, ExpressionId, ExpressionKind, Literal, StringFormat};
 use soul_tokenizer::model::{StringFormatTag, TokenKind, keyword::KeyWord};
 use soul_utils::{
     Ident, TypeModifier,
@@ -167,7 +164,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                     _ => {
                         return Err(Fault::error_with_kind(
                             crate::fault::AstErrorKind::InvalidSymbolHere {
-                                symbol: Symbol::Dot.as_str().into(),
+                                symbol: Symbol::Dot,
                             },
                             Some(start_span),
                         ));
@@ -367,9 +364,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             KeyWord::Break | KeyWord::Return | KeyWord::Continue => {
                 return Err(Fault::error_with_kind(
-                    crate::fault::AstErrorKind::KeywordNotAllowedInExpression {
-                        keyword: keyword.as_str().into(),
-                    },
+                    crate::fault::AstErrorKind::KeywordNotAllowedInExpression { keyword },
                     Some(self.token().span),
                 ));
             }

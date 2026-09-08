@@ -1,8 +1,4 @@
-use ast_model::{
-    expression::ExpressionKind,
-    literal::Literal,
-    statements::{StatementKind, VarPattern, Variable},
-};
+use ast_model::{ExpressionKind, Literal, StatementKind, VarPattern, Variable};
 use soul_utils::{TypeModifier, fault::Severity};
 
 use crate::tests::{get_statement, parse};
@@ -31,7 +27,7 @@ fn associated_constant_at_module_level() {
     assert!(
         matches!(pattern, VarPattern::Simple { binding, .. } if binding.ident.as_str() == "MAX")
     );
-    assert_eq!(*modifier, TypeModifier::Const);
+    assert_eq!(*modifier, TypeModifier::Comptime);
     assert!(ty.is_none());
     assert!(initialize_value.is_some());
 

@@ -9,21 +9,14 @@ use crate::{
     },
 };
 use ast_model::{
-    block::{Block, BlockId},
-    expression::{
-        Binding, ConstructorStructPattern, Expression, ExpressionId, ExpressionKind, If, IfBranch,
-        IfCondition, Match, MatchArm, MatchContructor, MatchPattern, NamedMatchPattern,
-        NamedTupleMatchPattern, TupleMatchPattern,
-    },
-    statements::Statement,
+    Binding, Block, BlockId, ConstructorStructPattern, Expression, ExpressionId, ExpressionKind,
+    If, IfBranch, IfCondition, Match, MatchArm, MatchContructor, MatchPattern, NamedMatchPattern,
+    NamedTupleMatchPattern, Statement, TupleMatchPattern,
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
-    Ident, TypeModifier, collections::try_result::ToResult, fault::Fault, ids::IdAlloc, span::Span,
+    Ident, TypeModifier, collections::try_result::ToResult, fault::Fault, span::Span,
 };
-
-const IF_STR: &str = KeyWord::If.as_str();
-const ELSE_STR: &str = KeyWord::Else.as_str();
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_if(&mut self) -> Result<Expression, crate::fault::AstFault> {
@@ -50,7 +43,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 Err(err) => {
                     self.log_fault(err);
                     self.skip_till(&[CURLY_OPEN]);
-                    ExpressionId::error()
+                    ExpressionId::ERROR
                 }
             }
         };
@@ -240,10 +233,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
             if has_else {
                 return Err(Fault::error_with_kind(
-                    crate::fault::AstErrorKind::DuplicateElseBranch {
-                        else_kw: ELSE_STR.into(),
-                        if_kw: IF_STR.into(),
-                    },
+                    crate::fault::AstErrorKind::DuplicateElseBranch,
                     Some(start_span),
                 ));
             }

@@ -1,10 +1,6 @@
 use std::path::PathBuf;
 
-use ast_model::{
-    AstTree,
-    soul_type::SoulType,
-    statements::{StatementKind, VarPattern},
-};
+use ast_model::{AstTree, SoulType, StatementKind, VarPattern};
 use ast_parser::{ParseInfo, fault::AstErrorKind, parse_module};
 use soul_tokenizer::to_token_stream;
 use soul_utils::{

@@ -164,10 +164,6 @@ impl<K> FaultCollector<K> {
         self.faults.iter()
     }
 
-    pub fn into_iter(self) -> impl Iterator<Item = Fault<K>> {
-        self.faults.into_iter()
-    }
-
     pub fn count_severity(&self, severity: Severity) -> usize {
         self.faults
             .iter()
@@ -186,6 +182,14 @@ impl<K> FaultCollector<K> {
         FaultCollector {
             faults: self.faults.into_iter().map(Fault::into_kind).collect(),
         }
+    }
+}
+impl<K> IntoIterator for FaultCollector<K> {
+    type Item = Fault<K>;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.faults.into_iter()
     }
 }
 impl FaultCollector<UnclassifiedKind> {
@@ -224,14 +228,5 @@ impl FaultCollector<UnclassifiedKind> {
 
     pub fn push_note(&mut self, message: impl Into<Box<str>>, span: Option<Span>) {
         self.faults.push(Fault::note(message, span));
-    }
-}
-
-impl<K> IntoIterator for FaultCollector<K> {
-    type Item = Fault<K>;
-    type IntoIter = std::vec::IntoIter<Fault<K>>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.faults.into_iter()
     }
 }

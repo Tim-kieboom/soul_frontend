@@ -1,7 +1,4 @@
-use ast_model::{
-    soul_type::SoulType,
-    statements::{Function, StatementKind, VarPattern},
-};
+use ast_model::{Function, SoulType, StatementKind, VarPattern};
 use soul_utils::fault::Severity;
 
 use crate::tests::{get_statement, parse};

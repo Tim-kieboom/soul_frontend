@@ -1,10 +1,8 @@
 use ast_model::{
-    AstModuleStore, AstStore, AstTree, CustomType, EntryKind, Module, NodeId, ScopeInfo,
-    block::BlockId,
+    AstModuleStore, AstStore, AstTree, BlockId, CustomType, EntryKind, FunctionModifier, Module,
+    NodeId, ScopeInfo, SoulType, StatementId, VarPattern, Variable,
     declare_store::DeclareStore,
     scope::{ScopeId, ScopeValue},
-    soul_type::SoulType,
-    statements::{FunctionModifier, StatementId, VarPattern, Variable},
 };
 use ast_parser::fault::AstErrorKind;
 use soul_utils::{

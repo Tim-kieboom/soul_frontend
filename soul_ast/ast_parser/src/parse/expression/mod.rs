@@ -1,12 +1,12 @@
 use std::str::FromStr;
 
 use ast_model::{
-    expression::{Expression, ExpressionId, ExpressionKind, TypeOf, TypeofKind},
+    Expression, ExpressionId, ExpressionKind, TypeOf, TypeofKind,
     operators::{BinaryOperator, BinaryOperatorKind, UnaryOperator, UnaryOperatorKind},
 };
 use soul_tokenizer::model::{Token, TokenKind, keyword::KeyWord};
 use soul_utils::{
-    define_symbols,
+    LoopState, define_symbols,
     fault::Fault,
     soul_names::{Operator, Symbol},
     span::Span,
@@ -66,9 +66,9 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         loop {
             match self.check_for_end_tokens(end_tokens) {
-                Loop::None => (),
-                Loop::Break => break,
-                Loop::Continue => continue,
+                LoopState::None => (),
+                LoopState::Break => break,
+                LoopState::Continue => continue,
             }
 
             if self.current_is(&TokenKind::EndFile) {
@@ -107,9 +107,9 @@ impl<'a, 'f> Parser<'a, 'f> {
 
         loop {
             match self.check_for_end_tokens(end_tokens) {
-                Loop::None => (),
-                Loop::Break => break,
-                Loop::Continue => continue,
+                LoopState::None => (),
+                LoopState::Break => break,
+                LoopState::Continue => continue,
             }
 
             if self.current_is(&TokenKind::EndFile) {
@@ -172,26 +172,26 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok(left)
     }
 
-    fn check_for_end_tokens(&mut self, end_tokens: &[TokenKind]) -> Loop {
+    fn check_for_end_tokens(&mut self, end_tokens: &[TokenKind]) -> LoopState {
         if self.current_is(&TokenKind::EndLine) && self.current_is_any(end_tokens) {
             let saved = self.tokens.current_position();
             self.skip_end_lines();
             if self.current_is(&DOT) {
-                return Loop::Continue;
+                return LoopState::Continue;
             }
             self.goto(saved);
         }
 
         if self.current_is_any(end_tokens) {
-            return Loop::Break;
+            return LoopState::Break;
         }
 
         self.skip_end_lines();
         if self.current_is_any(end_tokens) {
-            return Loop::Break;
+            return LoopState::Break;
         }
 
-        Loop::None
+        LoopState::None
     }
 
     fn current_precedence(&mut self) -> Precedence {
@@ -272,7 +272,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 if optional_map {
                     return Err(Fault::error_with_kind(
                         crate::fault::AstErrorKind::InvalidSymbolHere {
-                            symbol: Symbol::Question.as_str().into(),
+                            symbol: Symbol::Question,
                         },
                         Some(self.span_combine(start_span)),
                     ));
@@ -287,7 +287,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 if optional_map {
                     return Err(Fault::error_with_kind(
                         crate::fault::AstErrorKind::InvalidSymbolHere {
-                            symbol: Symbol::Question.as_str().into(),
+                            symbol: Symbol::Question,
                         },
                         Some(self.span_combine(start_span)),
                     ));
@@ -465,9 +465,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 Ok(UnaryKinds::Ref { mutable })
             }
             _ => Err(Fault::error_with_kind(
-                crate::fault::AstErrorKind::InvalidUnaryOperator {
-                    found: op.as_str().into(),
-                },
+                crate::fault::AstErrorKind::InvalidUnaryOperator { found: op },
                 Some(self.span_combine(start_span)),
             )),
         }
@@ -512,12 +510,6 @@ define_symbols!(
         AccessIndex => "[", Symbol::SquareOpen, u8::MAX,
     }
 );
-
-enum Loop {
-    None,
-    Continue,
-    Break,
-}
 
 /// Converts a generic operator token into the unary/binary operator kind it
 /// represents, if any.

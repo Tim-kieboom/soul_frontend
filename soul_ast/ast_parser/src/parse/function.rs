@@ -1,16 +1,12 @@
 use ast_model::{
-    FunctionKind,
-    block::Block,
-    expression::{Argument, Constructor, Expression, ExpressionKind, FunctionCall, FunctionCallee},
-    soul_type::{ArrayKind, ArrayType, Generic, SoulType},
-    statements::{
-        ExternLanguage, Function, FunctionModifier, FunctionSignature, FunctionSignatureHelper,
-        FunctionThisKind, InnerFunctionSignature, Parameter, Statement,
-    },
+    Argument, ArrayKind, ArrayType, Block, Constructor, Expression, ExpressionKind, ExternLanguage,
+    Function, FunctionCall, FunctionCallee, FunctionKind, FunctionModifier, FunctionSignature,
+    FunctionSignatureHelper, FunctionThisKind, Generic, InnerFunctionSignature, Parameter,
+    SoulType, Statement,
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
-    FunctionId, Ident, TypeModifier,
+    FunctionId, Ident, LoopState, Mutable, TypeModifier,
     collections::try_result::{
         ResultTryErr, ResultTryNotValue, ToResult, TryErr, TryError, TryNotValue, TryOk, TryResult,
     },
@@ -97,7 +93,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             if callee.is_some() {
                 return TryErr(Fault::error_with_kind(
                     crate::fault::AstErrorKind::InvalidSymbolHere {
-                        symbol: Symbol::Dot.as_str().into(),
+                        symbol: Symbol::Dot,
                     },
                     Some(self.span_combine(start_span)),
                 ));
@@ -218,7 +214,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             other => {
                 return Err(Fault::error_with_kind(
                     crate::fault::AstErrorKind::ExpectedLanguageStringLiteral {
-                        found: other.display().into_boxed_str(),
+                        found: other.clone(),
                     },
                     Some(self.token().span),
                 ));
@@ -230,9 +226,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             other => {
                 let tag = other.to_tag().expect("is not normal so should have tag");
                 return Err(Fault::error_with_kind(
-                    crate::fault::AstErrorKind::ExpectedNormalLanguageStringLiteral {
-                        tag: format!("{tag:?}").into_boxed_str(),
-                    },
+                    crate::fault::AstErrorKind::ExpectedNormalLanguageStringLiteral { tag },
                     Some(self.token().span),
                 ));
             }
@@ -450,7 +444,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 default: None,
                 ty: array_type,
                 id: arg_id,
-                is_mut: false,
+                mutable: Mutable::Immut,
             }],
             generics: vec![],
             function_kind: FunctionThisKind::ArrayCtor,
@@ -639,12 +633,12 @@ impl<'a, 'f> Parser<'a, 'f> {
             }
 
             match self.inner_parameter_this(&mut function_kind, &mut types)? {
-                Loop::None => (),
-                Loop::Break => break,
-                Loop::Continue => continue,
+                LoopState::None => (),
+                LoopState::Break => break,
+                LoopState::Continue => continue,
             }
 
-            let modifier = self.try_bump_mut().unwrap_or(TypeModifier::Const);
+            let modifier = self.try_bump_mut().unwrap_or(TypeModifier::Comptime);
             let name = self.try_bump_consume_ident().try_not_value()?;
 
             if !self.current_is(&COLON) {
@@ -682,7 +676,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 ty,
                 name,
                 default,
-                is_mut: modifier == TypeModifier::Mut,
+                mutable: modifier.to_mutable(),
             });
 
             self.skip_end_lines();
@@ -702,7 +696,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         &mut self,
         kind: &mut FunctionThisKind,
         types: &mut Vec<Parameter>,
-    ) -> AstTryResult<Loop, AstFault> {
+    ) -> AstTryResult<LoopState, AstFault> {
         let mut is_ref_prefix = false;
         let this = match &self.token().kind {
             &REF => {
@@ -720,11 +714,17 @@ impl<'a, 'f> Parser<'a, 'f> {
         };
 
         if is_ref_prefix && !self.current_is_ident("this") {
-            let is_mut = matches!(this, Some(FunctionThisKind::MutRef));
+            let mutable = if this == Some(FunctionThisKind::MutRef) {
+                Mutable::Mut
+            } else {
+                Mutable::Immut
+            };
+
             let name = self.try_bump_consume_ident().try_not_value()?;
             if !self.current_is(&COLON) {
                 return Err(TryError::IsNotValue(self.get_expect_error(&COLON)));
             }
+
             self.bump();
             let ty = match self.try_parse_type() {
                 Ok(ty) => ty,
@@ -733,20 +733,21 @@ impl<'a, 'f> Parser<'a, 'f> {
                     return TryNotValue(err);
                 }
             };
+
             types.push(Parameter {
                 id: self.alloc_node(),
                 ty,
                 name,
                 default: None,
-                is_mut,
+                mutable,
             });
 
             self.skip_end_lines();
             return if self.current_is(&ROUND_CLOSE) {
-                TryOk(Loop::Break)
+                TryOk(LoopState::Break)
             } else {
                 self.expect(&COMMA).try_err()?;
-                TryOk(Loop::Continue)
+                TryOk(LoopState::Continue)
             };
         }
 
@@ -762,21 +763,15 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.expect_ident("this").try_not_value()?;
 
             return match self.token().kind {
-                ROUND_CLOSE => TryOk(Loop::Break),
+                ROUND_CLOSE => TryOk(LoopState::Break),
                 COMMA => {
                     self.bump();
-                    TryOk(Loop::Continue)
+                    TryOk(LoopState::Continue)
                 }
                 _ => TryErr(self.get_expect_any_error(&[COMMA, ROUND_CLOSE])),
             };
         }
 
-        Ok(Loop::None)
+        Ok(LoopState::None)
     }
-}
-
-enum Loop {
-    None,
-    Break,
-    Continue,
 }

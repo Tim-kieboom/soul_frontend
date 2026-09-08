@@ -1,7 +1,4 @@
-use ast_model::{
-    expression::{AnyArray, Array, ArrayFiller, Binding, Expression, StructConstructor},
-    soul_type::SoulType,
-};
+use ast_model::{AnyArray, Array, ArrayFiller, Binding, Expression, SoulType, StructConstructor};
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
     Ident,

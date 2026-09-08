@@ -1,4 +1,4 @@
-use ast_model::{AstStore, Module, statements::StatementKind};
+use ast_model::{AstStore, Module, StatementKind};
 use soul_utils::fault::Severity;
 
 use crate::tests::{get_statement, parse};

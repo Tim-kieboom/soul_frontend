@@ -16,61 +16,45 @@ pub mod fault;
 #[cfg(test)]
 mod tests;
 
-use std::collections::HashMap;
-
 use ast_model::{
-    AstStore, FunctionKind, NodeId,
-    declare_store::DeclareStore,
-    expression::ExpressionId,
-    expression::ExpressionKind,
-    operators::BinaryOperatorKind,
-    soul_type::SoulType,
-    statements::{StatementKind, VarPattern},
+    self as ast, SoulType, declare_store::DeclareStore, operators::BinaryOperatorKind,
 };
+
 use fault::{MirErrorKind, MirResult};
-use mir_model::{BasicBlock, LocalId, MirFunction, MirType, Operand, Place, Rvalue, Terminator};
+use mir_model as mir;
 use soul_utils::{
     FunctionId, TypeModifier, collections::vec_map::VecMap, fault::Fault, ids::IdGenerator,
     span::Span,
 };
 
 pub fn lower_function(
-    store: &AstStore,
+    store: &ast::AstStore,
     declares: &DeclareStore,
     function_id: FunctionId,
-) -> MirResult<MirFunction> {
+) -> MirResult<mir::Function> {
     let function = match &store.functions[function_id] {
-        FunctionKind::Normal(function) => function,
-        FunctionKind::Signature(signature) => {
+        ast::FunctionKind::Normal(function) => function,
+        ast::FunctionKind::Signature(signature) => {
             return Err(Fault::error_with_kind(
                 MirErrorKind::SignatureOnlyFunctionHasNoBody,
                 Some(signature.span),
             ));
         }
     };
+
     let signature = &function.signature.value;
     let fn_span = function.signature.span;
+    let mut lowerer = Lowerer::new(store, declares);
 
-    let mut lowerer = Lowerer {
-        store,
-        declares,
-        locals: VecMap::new(),
-        local_gen: IdGenerator::new(),
-        node_to_local: HashMap::new(),
-    };
-
-    for param in &signature.parameters {
-        require_primitive(&param.ty, param.name.span())?;
-        let modifier = if param.is_mut {
-            TypeModifier::Mut
-        } else {
-            TypeModifier::Const
-        };
-        let local = lowerer.alloc_local(param.ty.clone(), modifier, param.name.span());
-        lowerer.node_to_local.insert(param.id, local);
+    for parameter in &signature.parameters {
+        let span = parameter.name.span();
+        require_primitive(&parameter.ty, span)?;
+        let modifier = parameter.mutable.to_type_modifier();
+        let local = lowerer.alloc_local(parameter.ty.clone(), modifier, span);
+        lowerer.node_to_local.insert(parameter.id, local);
     }
-    let arg_count = signature.parameters.len();
 
+    let arg_count = signature.parameters.len();
     require_primitive(&signature.return_type, signature.name.span())?;
     let return_local = lowerer.alloc_local(
         signature.return_type.clone(),
@@ -82,42 +66,15 @@ pub fn lower_function(
     let mut terminator = None;
 
     let block = &store.blocks[function.block];
-    for &stmt_id in &block.statements {
-        let stmt = &store.statements[stmt_id];
+    for &id in &block.statements {
+        let stmt = &store.statements[id];
         match &stmt.node {
-            StatementKind::Variable(var) => {
-                let VarPattern::Simple { binding, modifier } = &var.pattern else {
-                    return Err(Fault::error_with_kind(
-                        MirErrorKind::NonSimpleVariablePatternUnsupported,
-                        Some(stmt.span),
-                    ));
-                };
-                let Some(init) = var.initialize_value else {
-                    return Err(Fault::error_with_kind(
-                        MirErrorKind::UninitializedVariableUnsupported,
-                        Some(stmt.span),
-                    ));
-                };
-                let ty = declares
-                    .get_variable_type(binding.id)
-                    .and_then(|(_, ty, _)| ty.clone())
-                    .ok_or_else(|| {
-                        Fault::error_with_kind(
-                            MirErrorKind::VariableHasNoResolvedType,
-                            Some(binding.ident.span()),
-                        )
-                    })?;
-
-                require_primitive(&ty, binding.ident.span())?;
-
-                let rvalue = lowerer.lower_rvalue(init, &mut statements)?;
-                let local = lowerer.alloc_local(ty, *modifier, binding.ident.span());
-                lowerer.node_to_local.insert(binding.id, local);
-                statements.push(mir_model::Statement::Assign(Place::local(local), rvalue));
+            ast::StatementKind::Variable(var) => {
+                lower_variable(declares, &mut lowerer, &mut statements, stmt, var)?;
             }
-            StatementKind::Expression { expression, .. } => {
+            ast::StatementKind::Expression { expression, .. } => {
                 let expr = &store.expressions[*expression];
-                let ExpressionKind::Return(Some(value_id)) = &expr.node else {
+                let ast::ExpressionKind::Return(Some(value_id)) = &expr.node else {
                     return Err(Fault::error_with_kind(
                         MirErrorKind::NonReturnTerminalStatementUnsupported,
                         Some(stmt.span),
@@ -125,10 +82,10 @@ pub fn lower_function(
                 };
                 let rvalue = lowerer.lower_rvalue(*value_id, &mut statements)?;
                 statements.push(mir_model::Statement::Assign(
-                    Place::local(return_local),
+                    mir::Place::local(return_local),
                     rvalue,
                 ));
-                terminator = Some(Terminator::Return);
+                terminator = Some(mir::Terminator::Return);
                 break;
             }
             _ => {
@@ -144,20 +101,17 @@ pub fn lower_function(
         Fault::error_with_kind(MirErrorKind::MissingReturnStatement, Some(fn_span))
     })?;
 
-    // A single basic block is all this slice ever produces; a real block
-    // generator is introduced once control flow (the next slice) needs more than
-    // one, so a fresh one-shot allocator is enough here.
     let mut blocks = VecMap::new();
     let bb0 = IdGenerator::<mir_model::BlockId>::new().alloc();
     blocks.insert(
         bb0,
-        BasicBlock {
+        mir::BasicBlock {
             statements,
             terminator,
         },
     );
 
-    Ok(MirFunction {
+    Ok(mir::Function {
         name: function_id,
         locals: lowerer.locals,
         blocks,
@@ -166,10 +120,45 @@ pub fn lower_function(
     })
 }
 
-/// Every primitive scalar is `AutoCopy` per `soul-lang.md` §11, which is what lets
-/// this slice always lower a variable read as `Operand::Copy` without checking a
-/// real `AutoCopy` bound (that check doesn't exist yet in the resolver) — so
-/// non-primitive types are out of scope until it does.
+fn lower_variable(
+    declares: &DeclareStore,
+    lowerer: &mut Lowerer<'_>,
+    statements: &mut Vec<mir_model::Statement>,
+    stmt: &ast::Statement,
+    var: &ast::Variable,
+) -> Result<(), Fault<MirErrorKind>> {
+    let ast::VarPattern::Simple { binding, modifier } = &var.pattern else {
+        return Err(Fault::error_with_kind(
+            MirErrorKind::NonSimpleVariablePatternUnsupported,
+            Some(stmt.span),
+        ));
+    };
+
+    let Some(init) = var.initialize_value else {
+        return Err(Fault::error_with_kind(
+            MirErrorKind::UninitializedVariableUnsupported,
+            Some(stmt.span),
+        ));
+    };
+
+    let ty = declares
+        .get_variable_type(binding.id)
+        .and_then(|(_, ty, _)| ty.clone())
+        .ok_or_else(|| {
+            Fault::error_with_kind(
+                MirErrorKind::VariableHasNoResolvedType,
+                Some(binding.ident.span()),
+            )
+        })?;
+
+    require_primitive(&ty, binding.ident.span())?;
+    let rvalue = lowerer.lower_rvalue(init, statements)?;
+    let local = lowerer.alloc_local(ty, *modifier, binding.ident.span());
+    lowerer.node_to_local.insert(binding.id, local);
+    statements.push(mir::Statement::Assign(mir::Place::local(local), rvalue));
+    Ok(())
+}
+
 fn require_primitive(ty: &SoulType, span: Span) -> MirResult<()> {
     if matches!(ty, SoulType::Primitive(_)) {
         Ok(())
@@ -195,16 +184,25 @@ fn is_supported_arithmetic_op(op: BinaryOperatorKind) -> bool {
 }
 
 struct Lowerer<'a> {
-    store: &'a AstStore,
+    store: &'a ast::AstStore,
     declares: &'a DeclareStore,
-    locals: VecMap<LocalId, mir_model::LocalDecl>,
-    local_gen: IdGenerator<LocalId>,
-    node_to_local: HashMap<NodeId, LocalId>,
+    locals: VecMap<mir::LocalId, mir_model::LocalDecl>,
+    local_alloc: IdGenerator<mir::LocalId>,
+    node_to_local: VecMap<ast::NodeId, mir::LocalId>,
 }
-
 impl<'a> Lowerer<'a> {
-    fn alloc_local(&mut self, ty: MirType, mutability: TypeModifier, span: Span) -> LocalId {
-        let id = self.local_gen.alloc();
+    fn new(store: &'a ast::AstStore, declares: &'a DeclareStore) -> Self {
+        Self {
+            store,
+            declares,
+            locals: VecMap::new(),
+            local_alloc: IdGenerator::new(),
+            node_to_local: VecMap::new(),
+        }
+    }
+
+    fn alloc_local(&mut self, ty: mir::Type, mutability: TypeModifier, span: Span) -> mir::LocalId {
+        let id = self.local_alloc.alloc();
         self.locals.insert(
             id,
             mir_model::LocalDecl {
@@ -216,17 +214,14 @@ impl<'a> Lowerer<'a> {
         id
     }
 
-    /// An `Rvalue`: either a flat binary op between two operands, or a bare
-    /// operand. Each operand may itself be an arbitrarily nested expression —
-    /// see `lower_operand` for how that's flattened into three-address form.
     fn lower_rvalue(
         &mut self,
-        expr_id: ExpressionId,
+        expr_id: ast::ExpressionId,
         statements: &mut Vec<mir_model::Statement>,
-    ) -> MirResult<Rvalue> {
+    ) -> MirResult<mir::Rvalue> {
         let expr = &self.store.expressions[expr_id];
         match &expr.node {
-            ExpressionKind::Binary(binary) => {
+            ast::ExpressionKind::Binary(binary) => {
                 if !is_supported_arithmetic_op(binary.operator.value) {
                     return Err(Fault::error_with_kind(
                         MirErrorKind::UnsupportedBinaryOperator,
@@ -235,42 +230,35 @@ impl<'a> Lowerer<'a> {
                 }
                 let left = self.lower_operand(binary.left, statements)?;
                 let right = self.lower_operand(binary.right, statements)?;
-                Ok(Rvalue::BinaryOp(binary.operator.value, left, right))
+                Ok(mir::Rvalue::BinaryOp(binary.operator.value, left, right))
             }
-            _ => Ok(Rvalue::Use(self.lower_operand(expr_id, statements)?)),
+            _ => Ok(mir::Rvalue::Use(self.lower_operand(expr_id, statements)?)),
         }
     }
 
-    /// An operand every `Rvalue` consumes: a literal constant, a read of an
-    /// already-lowered local, or — for a nested compound expression like
-    /// `b * c` inside `a + b * c` — a fresh temporary. The temporary is lowered
-    /// three-address-code style: recursively lower the sub-expression to an
-    /// `Rvalue`, assign it to a new local sized by the sub-expression's
-    /// resolver-computed type, and read that local back as the operand. All
-    /// primitive scalars are `AutoCopy` (soul-lang.md §11), so every variable
-    /// (and every temporary this creates) reads back as `Operand::Copy` in this
-    /// slice — never `Move`.
     fn lower_operand(
         &mut self,
-        expr_id: ExpressionId,
+        expr_id: ast::ExpressionId,
         statements: &mut Vec<mir_model::Statement>,
-    ) -> MirResult<Operand> {
+    ) -> MirResult<mir::Operand> {
         let expr = &self.store.expressions[expr_id];
         match &expr.node {
-            ExpressionKind::Literal((_, literal)) => Ok(Operand::Constant(literal.clone())),
-            ExpressionKind::Variable(var) => {
+            ast::ExpressionKind::Literal((_, literal)) => {
+                Ok(mir::Operand::Constant(literal.clone()))
+            }
+            ast::ExpressionKind::Variable(var) => {
                 let resolved = self.declares.get_variable_resolve(var.id).ok_or_else(|| {
                     Fault::error_with_kind(
                         MirErrorKind::VariableHasNoResolvedBinding,
                         Some(expr.span),
                     )
                 })?;
-                let local = *self.node_to_local.get(&resolved).ok_or_else(|| {
+                let local = *self.node_to_local.get(resolved).ok_or_else(|| {
                     Fault::error_with_kind(MirErrorKind::VariableNotBoundToLocal, Some(expr.span))
                 })?;
-                Ok(Operand::Copy(Place::local(local)))
+                Ok(mir::Operand::Copy(mir::Place::local(local)))
             }
-            ExpressionKind::Binary(_) => {
+            ast::ExpressionKind::Binary(_) => {
                 let span = expr.span;
                 let ty = self
                     .declares
@@ -285,9 +273,9 @@ impl<'a> Lowerer<'a> {
                 require_primitive(&ty, span)?;
 
                 let rvalue = self.lower_rvalue(expr_id, statements)?;
-                let temp = self.alloc_local(ty, TypeModifier::Const, span);
-                statements.push(mir_model::Statement::Assign(Place::local(temp), rvalue));
-                Ok(Operand::Copy(Place::local(temp)))
+                let temp = self.alloc_local(ty, TypeModifier::Comptime, span);
+                statements.push(mir::Statement::Assign(mir::Place::local(temp), rvalue));
+                Ok(mir::Operand::Copy(mir::Place::local(temp)))
             }
             _ => Err(Fault::error_with_kind(
                 MirErrorKind::UnsupportedOperandExpression,

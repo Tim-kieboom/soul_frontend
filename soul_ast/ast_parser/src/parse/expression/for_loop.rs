@@ -1,7 +1,4 @@
-use ast_model::{
-    expression::{Binding, ExpressionId, For, ForCondition},
-    statements::VarPattern,
-};
+use ast_model::{Binding, ExpressionId, For, ForCondition, VarPattern};
 use soul_utils::{
     TypeModifier,
     collections::try_result::{ResultTryErr, ResultTryNotValue, TryError, TryOk},
@@ -45,7 +42,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                         if index.is_some() {
                             return Err(Fault::error_with_kind(
                                 crate::fault::AstErrorKind::InvalidSymbolHere {
-                                    symbol: Symbol::Comma.as_str().into(),
+                                    symbol: Symbol::Comma,
                                 },
                                 Some(self.span_combine(start_span)),
                             ));
@@ -83,7 +80,7 @@ impl<'a, 'f> Parser<'a, 'f> {
 
     fn try_parse_foreach_elements(&mut self) -> AstTryResult<(VarPattern, ExpressionId), ()> {
         let var_pattern = self
-            .parse_var_pattern(TypeModifier::Const)
+            .parse_var_pattern(TypeModifier::Comptime)
             .try_not_value()?;
         self.expect(&IN).try_not_value()?;
         let collection = self.parse_expression_id(&[CURLY_OPEN]).try_err()?;

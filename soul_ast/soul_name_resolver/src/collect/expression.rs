@@ -1,11 +1,7 @@
 use ast_model::{
-    AstStore,
-    block::BlockId,
-    expression::{
-        AnyArray, Binding, Constructor, ExpressionId, ExpressionKind, FieldAccess, For,
-        ForCondition, FunctionCall, FunctionCalleeKind, If, IfBranch, IfCondition, Lambda, Match,
-        MatchMethod, MatchPattern, StringFormat, StructConstructor, TypeOf, VariableExpression,
-    },
+    AnyArray, AstStore, Binding, BlockId, Constructor, ExpressionId, ExpressionKind, FieldAccess,
+    For, ForCondition, FunctionCall, FunctionCalleeKind, If, IfBranch, IfCondition, Lambda, Match,
+    MatchMethod, MatchPattern, StringFormat, StructConstructor, TypeOf, VariableExpression,
 };
 use soul_utils::span::Span;
 

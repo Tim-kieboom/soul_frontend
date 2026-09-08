@@ -1,10 +1,6 @@
 use ast_model::{
-    FunctionKind,
-    expression::{Expression, ExpressionKind},
-    soul_type::{SoulType, Stub},
-    statements::{
-        FunctionSignature, FunctionSignatureHelper, Statement, StatementKind, Trait, TypeDef,
-    },
+    Expression, ExpressionKind, FunctionKind, FunctionSignature, FunctionSignatureHelper, SoulType,
+    Statement, StatementKind, Stub, Trait, TypeDef,
 };
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{

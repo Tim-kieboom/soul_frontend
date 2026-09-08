@@ -1,26 +1,20 @@
 use ast_model::{
-    expression::Binding,
-    statements::{
-        NamedTuplePattern, Statement, TuplePattern, VarConstructorPattern, VarNamedPattern,
-        VarPattern, Variable,
-    },
+    AssignType, Binding, NamedTuplePattern, Statement, TuplePattern, VarConstructorPattern,
+    VarNamedPattern, VarPattern, Variable,
 };
-use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
+use soul_tokenizer::model::TokenKind;
 use soul_utils::{
-    Ident, TypeModifier, collections::try_result::ToResult, define_symbols, fault::Fault,
-    soul_names::Symbol,
+    Ident, TypeModifier, collections::try_result::ToResult, fault::Fault, soul_names::Symbol,
 };
 
 use crate::{
-    fault::AstResult,
+    fault::{AstErrorKind, AstResult},
     parser::Parser,
     utils::{
         COLON, COMMA, CURLY_CLOSE, CURLY_OPEN, DOUBLE_DOT, ROUND_CLOSE, ROUND_OPEN,
         STAMENT_END_TOKENS,
     },
 };
-
-const MUT_STR: &str = KeyWord::Mut.as_str();
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_variable(&mut self) -> Result<Statement, crate::fault::AstFault> {
@@ -33,9 +27,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         // Error: `mut` is not allowed on compound patterns
         if modifier != TypeModifier::Immut && !matches!(pattern, VarPattern::Simple { .. }) {
             return Err(Fault::error_with_kind(
-                crate::fault::AstErrorKind::MutOnCompoundPattern {
-                    modifier: MUT_STR.into(),
-                },
+                AstErrorKind::MutOnCompoundPattern,
                 Some(pattern_start),
             ));
         }
@@ -83,7 +75,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         if assign_type != AssignType::Declaration && assign_type != AssignType::Assign {
             return Err(Fault::error_with_kind(
                 crate::fault::AstErrorKind::InvalidAssignOperatorForDeclaration {
-                    assign_op: assign_type.as_str().into(),
+                    assign: assign_type,
                 },
                 Some(self.token().span),
             ));
@@ -183,7 +175,7 @@ impl<'a, 'f> Parser<'a, 'f> {
                 break;
             }
 
-            elements.push(self.parse_var_pattern(TypeModifier::Const)?);
+            elements.push(self.parse_var_pattern(TypeModifier::Comptime)?);
         }
 
         self.expect(&ROUND_CLOSE)?;
@@ -302,26 +294,3 @@ impl<'a, 'f> Parser<'a, 'f> {
         }))
     }
 }
-
-define_symbols!(
-
-    /// Assignment operators for variable assignment and modification.
-    ///
-    /// These operators are used to assign values to variables, with various
-    /// compound assignment forms.
-    pub enum AssignType {
-        /// Declaration assignment (`:=`).
-        Declaration => ":=", Symbol::ColonAssign,
-
-        /// Simple assignment (`=`).
-        Assign => "=", Symbol::Assign,
-        AddAssign => "+=", Symbol::PlusEq,
-        SubAssign => "-=", Symbol::MinusEq,
-        MulAssign => "*=", Symbol::StarEq,
-        DivAssign => "/=", Symbol::SlashEq,
-        ModAssign => "%=", Symbol::ModEq,
-        BitAndAssign => "&=", Symbol::AndEq,
-        BitOrAssign => "|=", Symbol::OrEq,
-        BitXorAssign => "^=", Symbol::XorEq,
-    }
-);

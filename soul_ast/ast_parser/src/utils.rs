@@ -160,7 +160,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             TokenKind::Types(val) => Ok(val.as_str()),
             _ => Err(Fault::error_with_kind(
                 crate::fault::AstErrorKind::ExpectedIdent {
-                    found: self.token().kind.display().into_boxed_str(),
+                    found: self.token().kind.clone(),
                 },
                 Some(self.token().span),
             )),
@@ -190,7 +190,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     /// Creates error for expected single token kind.
     pub(super) fn get_expect_ident_error(&self, string: &str) -> crate::fault::AstFault {
         Fault::error_with_kind(
-            crate::fault::AstErrorKind::ExpectedExactIdent {
+            crate::fault::AstErrorKind::ExpectedExactToken {
                 expected: string.into(),
                 found: self.token().kind.display().into_boxed_str(),
             },
@@ -246,7 +246,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         Some(match self.token().kind {
             TokenKind::Keyword(KeyWord::Const) => {
                 self.bump();
-                TypeModifier::Const
+                TypeModifier::Comptime
             }
             _ => return None,
         })
@@ -256,7 +256,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         if !matches!(self.token().kind, TokenKind::Ident(_)) {
             return Err(Fault::error_with_kind(
                 crate::fault::AstErrorKind::ExpectedIdent {
-                    found: self.token().kind.display().into_boxed_str(),
+                    found: self.token().kind.clone(),
                 },
                 Some(self.token().span),
             ));

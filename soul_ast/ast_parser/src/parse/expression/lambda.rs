@@ -1,8 +1,4 @@
-use ast_model::{
-    block::Block,
-    expression::{Expression, ExpressionId, ExpressionKind, Lambda},
-    statements::{Statement, VarPattern},
-};
+use ast_model::{Block, Expression, ExpressionId, ExpressionKind, Lambda, Statement, VarPattern};
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{TypeModifier, soul_names::Symbol, span::Span};
 
@@ -14,7 +10,7 @@ impl<'a, 'f> Parser<'a, 'f> {
     pub(super) fn try_parse_lambda(&mut self, start_span: Span) -> Option<Expression> {
         let saved = self.tokens.current_position();
 
-        let pattern = self.parse_var_pattern(TypeModifier::Const).ok()?;
+        let pattern = self.parse_var_pattern(TypeModifier::Comptime).ok()?;
 
         if self.current_is(&LAMBDA_ARROW) {
             self.bump();

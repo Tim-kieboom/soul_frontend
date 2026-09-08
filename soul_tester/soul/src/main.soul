@@ -1,6 +1,7 @@
 GLOBAL :: 1
 GLOBAL_INT: int :: 2
 
-main() {
+main(): int {
     TEST :: 1
+    return 0
 }

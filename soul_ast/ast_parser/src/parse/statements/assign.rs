@@ -2,15 +2,12 @@ use std::{iter, sync::LazyLock};
 
 use crate::{
     fault::AstResult,
-    parse::statements::variable::AssignType,
     parser::Parser,
     utils::{CURLY_CLOSE, SEMI_COLON, STAMENT_END_TOKENS},
 };
 use ast_model::{
-    AstStore,
-    expression::{Expression, ExpressionId},
+    AssignType, Assignment, AstStore, Expression, ExpressionId, Statement, StatementKind,
     operators::{BinaryOperator, BinaryOperatorKind},
-    statements::{Assignment, Statement, StatementKind},
 };
 use soul_tokenizer::model::TokenKind;
 use soul_utils::{fault::Fault, span::Span};
@@ -46,7 +43,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             _ => {
                 return Err(Fault::error_with_kind(
                     crate::fault::AstErrorKind::ExpectedAssignSymbol {
-                        found: assign_token.kind.display().into_boxed_str(),
+                        found: assign_token.kind,
                     },
                     Some(self.span_combine(start_span)),
                 ));

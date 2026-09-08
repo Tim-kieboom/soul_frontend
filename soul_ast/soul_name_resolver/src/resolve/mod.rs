@@ -1,4 +1,4 @@
-use ast_model::block::BlockId;
+use ast_model::BlockId;
 use soul_utils::{soul_error_internal, span::ModuleId};
 
 use crate::NameResolver;

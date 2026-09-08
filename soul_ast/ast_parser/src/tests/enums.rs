@@ -1,8 +1,4 @@
-use ast_model::{
-    expression::ExpressionKind,
-    soul_type::SoulType,
-    statements::{EnumVariant, StatementKind, UnionKind},
-};
+use ast_model::{EnumVariant, ExpressionKind, Literal, SoulType, StatementKind, UnionKind};
 use soul_utils::{fault::Severity, soul_names::PrimitiveTypes};
 
 use crate::tests::{get_statement, parse};
@@ -119,7 +115,7 @@ fn enum_assigned_variants() {
             let expr = &store.expressions[*value];
             match &expr.node {
                 ExpressionKind::Literal((_, lit)) => {
-                    assert_eq!(*lit, ast_model::literal::Literal::Uint(1))
+                    assert_eq!(*lit, Literal::Uint(1))
                 }
                 _ => panic!("expected Literal expression"),
             }
@@ -132,7 +128,7 @@ fn enum_assigned_variants() {
             let expr = &store.expressions[*value];
             match &expr.node {
                 ExpressionKind::Literal((_, lit)) => {
-                    assert_eq!(*lit, ast_model::literal::Literal::Uint(2))
+                    assert_eq!(*lit, Literal::Uint(2))
                 }
                 _ => panic!("expected Literal expression"),
             }
@@ -253,9 +249,7 @@ fn enum_with_underlying_type() {
     assert_eq!(enum_.variants.len(), 2);
     assert_eq!(
         enum_.impl_type,
-        Some(ast_model::soul_type::SoulType::Primitive(
-            PrimitiveTypes::Int
-        ))
+        Some(SoulType::Primitive(PrimitiveTypes::Int))
     );
 }
 
@@ -336,12 +330,9 @@ fn enum_named_union_variant_field_types() {
     };
     assert_eq!(name.as_str(), "Bar");
     assert_eq!(parameters.len(), 2);
-    assert_eq!(
-        parameters[0].1,
-        ast_model::soul_type::SoulType::Primitive(PrimitiveTypes::Int)
-    );
+    assert_eq!(parameters[0].1, SoulType::Primitive(PrimitiveTypes::Int));
     assert_eq!(
         parameters[1].1,
-        ast_model::soul_type::SoulType::Primitive(PrimitiveTypes::Boolean)
+        SoulType::Primitive(PrimitiveTypes::Boolean)
     );
 }

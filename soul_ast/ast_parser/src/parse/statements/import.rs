@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use ast_model::statements::{Import, ImportItem, ImportKind, ImportPath, Statement, StatementKind};
+use ast_model::{Import, ImportItem, ImportKind, ImportPath, Statement, StatementKind};
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
     Ident, collections::soul_import_path::SoulImportPath, fault::Fault, soul_names::Symbol,
@@ -172,7 +172,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             _ => {
                 self.log_fault(Fault::error_with_kind(
                     crate::fault::AstErrorKind::TokenNotAllowedInImport {
-                        found: self.token().kind.display().into_boxed_str(),
+                        found: self.token().kind.clone(),
                     },
                     Some(self.token().span),
                 ));

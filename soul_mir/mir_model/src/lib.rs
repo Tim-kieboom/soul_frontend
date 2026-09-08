@@ -7,7 +7,7 @@
 //! calls, structs, borrow checking) are new passes over an already-complete shape
 //! rather than a shape migration.
 
-use ast_model::{literal::Literal, operators::BinaryOperatorKind, soul_type::SoulType};
+use ast_model::{Literal, SoulType, operators::BinaryOperatorKind};
 use soul_utils::{
     FunctionId, TypeModifier, collections::vec_map::VecMap, impl_soul_ids, span::Span,
 };
@@ -18,7 +18,7 @@ impl_soul_ids!(LocalId, BlockId);
 /// now: M1/M2 only ever see concrete types. Once generics (M3) land this needs to
 /// grow a `Param(String)` placeholder variant (see `docs/mir-design.md`'s Generics
 /// section) — deliberately not added yet since nothing constructs it today.
-pub type MirType = SoulType;
+pub type Type = SoulType;
 
 /// A constant value baked into MIR. A plain alias onto the frontend's literal
 /// representation; revisit if MIR ever needs a constant shape the AST doesn't
@@ -26,7 +26,7 @@ pub type MirType = SoulType;
 pub type ConstValue = Literal;
 
 #[derive(Debug, serde::Serialize)]
-pub struct MirFunction {
+pub struct Function {
     pub name: FunctionId,
     pub locals: VecMap<LocalId, LocalDecl>,
     pub blocks: VecMap<BlockId, BasicBlock>,
@@ -38,7 +38,7 @@ pub struct MirFunction {
 
 #[derive(Debug, serde::Serialize)]
 pub struct LocalDecl {
-    pub ty: MirType,
+    pub ty: Type,
     pub mutability: TypeModifier,
     pub span: Span,
 }
@@ -73,7 +73,7 @@ pub enum Rvalue {
     UnaryOp(ast_model::operators::UnaryOperatorKind, Operand),
     Ref { mutable: bool, place: Place },
     Aggregate(AggregateKind, Vec<Operand>),
-    Cast(Operand, MirType),
+    Cast(Operand, Type),
 }
 
 #[derive(Debug, serde::Serialize)]

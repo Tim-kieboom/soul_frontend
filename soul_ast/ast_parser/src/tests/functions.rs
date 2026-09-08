@@ -1,8 +1,6 @@
 use ast_model::{
-    expression::{ExpressionKind, FunctionCall},
-    literal::Literal,
-    soul_type::{Generic, SoulType, Stub},
-    statements::{Function, FunctionModifier, StatementKind},
+    ExpressionKind, Function, FunctionCall, FunctionModifier, FunctionThisKind, Generic, Literal,
+    SoulType, StatementKind, Stub,
 };
 use soul_utils::fault::Severity;
 
@@ -260,7 +258,6 @@ fn function_with_this_ref() {
         ast_model::FunctionKind::Normal(f) => f,
         _ => panic!("expected Normal function"),
     };
-    use ast_model::statements::FunctionThisKind;
     assert_eq!(signature.value.function_kind, FunctionThisKind::ConstRef);
 }
 
@@ -283,14 +280,11 @@ fn function_with_mut_this() {
         _ => panic!("expected Function"),
     };
     let func = &store.functions[func_id];
-    let ast_model::statements::Function { signature, .. } = match func {
+    let ast_model::Function { signature, .. } = match func {
         ast_model::FunctionKind::Normal(f) => f,
         _ => panic!("expected Normal function"),
     };
-    assert_eq!(
-        signature.value.function_kind,
-        ast_model::statements::FunctionThisKind::MutRef
-    );
+    assert_eq!(signature.value.function_kind, FunctionThisKind::MutRef);
 }
 
 // ----------------------------------------------------------------
@@ -312,14 +306,11 @@ fn function_with_this_consume() {
         _ => panic!("expected Function"),
     };
     let func = &store.functions[func_id];
-    let ast_model::statements::Function { signature, .. } = match func {
+    let ast_model::Function { signature, .. } = match func {
         ast_model::FunctionKind::Normal(f) => f,
         _ => panic!("expected Normal function"),
     };
-    assert_eq!(
-        signature.value.function_kind,
-        ast_model::statements::FunctionThisKind::Consume
-    );
+    assert_eq!(signature.value.function_kind, FunctionThisKind::Consume);
 }
 
 // ----------------------------------------------------------------
@@ -341,7 +332,7 @@ fn function_with_generics() {
         _ => panic!("expected Function"),
     };
     let func = &store.functions[func_id];
-    let ast_model::statements::Function { signature, .. } = match func {
+    let ast_model::Function { signature, .. } = match func {
         ast_model::FunctionKind::Normal(f) => f,
         _ => panic!("expected Normal function"),
     };
@@ -370,7 +361,7 @@ fn function_with_parameter_default() {
         _ => panic!("expected Function"),
     };
     let func = &store.functions[func_id];
-    let ast_model::statements::Function { signature, .. } = match func {
+    let ast_model::Function { signature, .. } = match func {
         ast_model::FunctionKind::Normal(f) => f,
         _ => panic!("expected Normal function"),
     };
@@ -398,7 +389,7 @@ fn pub_function() {
         _ => panic!("expected Function"),
     };
     let func = &store.functions[func_id];
-    let ast_model::statements::Function { signature, .. } = match func {
+    let ast_model::Function { signature, .. } = match func {
         ast_model::FunctionKind::Normal(f) => f,
         _ => panic!("expected Normal function"),
     };

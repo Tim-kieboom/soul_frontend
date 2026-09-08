@@ -1,6 +1,6 @@
 use std::{fmt, rc::Rc};
 
-use soul_utils::{Ident, SharedStr, soul_names::PrimitiveTypes};
+use soul_utils::{Ident, Mutable, SharedStr, soul_names::PrimitiveTypes};
 
 #[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum SoulType {
@@ -209,17 +209,6 @@ pub struct ReferenceType {
     pub lifetime: Option<Ident>,
     /// Whether the reference is mutable.
     pub mutable: Mutable,
-}
-
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum Mutable {
-    Mut,
-    Immut,
-}
-impl Mutable {
-    pub fn is_mut(&self) -> bool {
-        matches!(self, Mutable::Mut)
-    }
 }
 
 /// An as-yet-unresolved named type reference (e.g. a struct/enum/trait name

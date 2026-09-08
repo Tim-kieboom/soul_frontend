@@ -1,6 +1,13 @@
+use std::{fmt::Display, path::PathBuf};
+
+use ast_model::{AssignType, SoulType};
+use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
+    SharedStr,
     collections::try_result::TryResult,
     fault::{Fault, UnclassifiedKind},
+    literal::StringTag,
+    soul_names::{Operator, Symbol},
 };
 
 /// Structured error kinds for the AST parser. `Unclassified` is a migration
@@ -23,22 +30,22 @@ pub enum AstErrorKind {
     #[error("expected element type after array size, e.g. `[64]char`")]
     ArrayMissingElementType,
 
-    #[error("expected string_literal of language name but got {found}")]
-    ExpectedLanguageStringLiteral { found: Box<str> },
+    #[error("expected string_literal of language name but got {}", found.display())]
+    ExpectedLanguageStringLiteral { found: TokenKind },
 
-    #[error("expected normal string_literal of language name but got {tag} string_literal")]
-    ExpectedNormalLanguageStringLiteral { tag: Box<str> },
+    #[error("expected normal string_literal of language name but got {tag:?} string_literal")]
+    ExpectedNormalLanguageStringLiteral { tag: StringTag },
 
     #[error("language {language} is not supported")]
     UnsupportedExternLanguage { language: Box<str> },
 
     #[error(
-        "'{modifier}' modifier cannot be applied to compound patterns; use per-binding '{modifier}' instead (e.g., ({modifier} a, b))"
+        "'mut' modifier cannot be applied to compound patterns; use per-binding 'mut' instead (e.g., (mut a, b))"
     )]
-    MutOnCompoundPattern { modifier: Box<str> },
+    MutOnCompoundPattern,
 
-    #[error("'{assign_op}' is not valid for variable declaration (can use ['=', ':='])")]
-    InvalidAssignOperatorForDeclaration { assign_op: Box<str> },
+    #[error("'{}' is not valid for variable declaration (can use ['=', ':='])", assign.as_str())]
+    InvalidAssignOperatorForDeclaration { assign: AssignType },
 
     #[error("'mut' cannot be applied to constructor patterns; use per-field 'mut' instead")]
     MutOnConstructorPattern,
@@ -66,8 +73,8 @@ pub enum AstErrorKind {
     #[error("expected format string part or end of format string")]
     UnterminatedFormatString,
 
-    #[error("can not have {keyword} in expression")]
-    KeywordNotAllowedInExpression { keyword: Box<str> },
+    #[error("can not have `{}` in expression", keyword.as_str())]
+    KeywordNotAllowedInExpression { keyword: KeyWord },
 
     #[error("expected '(' or ':[' after 'new'")]
     ExpectedNewArguments,
@@ -78,8 +85,8 @@ pub enum AstErrorKind {
     #[error("expected '=>' in match arm")]
     ExpectedMatchArrow,
 
-    #[error("`{symbol}` is invalid")]
-    InvalidSymbolHere { symbol: Box<str> },
+    #[error("`{}` is invalid", symbol.as_str())]
+    InvalidSymbolHere { symbol: Symbol },
 
     #[error("should be ident")]
     ExpectedIdentBeforeCallArguments,
@@ -87,8 +94,8 @@ pub enum AstErrorKind {
     #[error("expected identifier after '.'")]
     ExpectedIdentAfterDot,
 
-    #[error("'{found}' should be a assign symbool")]
-    ExpectedAssignSymbol { found: Box<str> },
+    #[error("'{}' should be a assign symbool", found.display())]
+    ExpectedAssignSymbol { found: TokenKind },
 
     #[error("expected ',' or '}}' in import list")]
     ExpectedCommaOrCurlyCloseInImportList,
@@ -96,8 +103,8 @@ pub enum AstErrorKind {
     #[error("could not pop path")]
     CouldNotPopImportPath,
 
-    #[error("'{found}' should be '=' or ':='")]
-    InvalidAssignSymbol { found: Box<str> },
+    #[error("'{}' should be '=' or ':='", found.display())]
+    InvalidAssignSymbol { found: TokenKind },
 
     #[error("expected '=' or ':=' after constructor pattern")]
     ExpectedAssignAfterConstructorPattern,
@@ -108,16 +115,16 @@ pub enum AstErrorKind {
     #[error("`{found}` is not a valid operator")]
     InvalidOperator { found: Box<str> },
 
-    #[error("`{found}` is not a valid unary operator")]
-    InvalidUnaryOperator { found: Box<str> },
+    #[error("`{}` is not a valid unary operator", found.as_str())]
+    InvalidUnaryOperator { found: Operator },
 
     #[error("expected ident or `null` or `!null` but got {found}")]
     ExpectedIdentOrNullForTypeof { found: Box<str> },
 
-    #[error("expected `{expected1}` or `{expected2}`, but got `{found}`")]
+    #[error("expected `{}` or `{}`, but got `{found}`", expected1.as_str(), expected2.as_str())]
     ExpectedAssignOrDeclaration {
-        expected1: Box<str>,
-        expected2: Box<str>,
+        expected1: AssignType,
+        expected2: AssignType,
         found: Box<str>,
     },
 
@@ -127,8 +134,8 @@ pub enum AstErrorKind {
     #[error("expected ident")]
     ExpectedIdentForTypeAssert,
 
-    #[error("can not have '{else_kw}' or '{else_kw} {if_kw}' after '{else_kw}'")]
-    DuplicateElseBranch { else_kw: Box<str>, if_kw: Box<str> },
+    #[error("can not have 'else or 'else if' after 'else'")]
+    DuplicateElseBranch,
 
     #[error("expected a literal or '_' for match pattern")]
     ExpectedLiteralOrWildcardPattern,
@@ -148,11 +155,11 @@ pub enum AstErrorKind {
     #[error("external crate '{lib_name}' not found in Soul.toml dependencies")]
     ExternalCrateNotFound { lib_name: Box<str> },
 
-    #[error("no 'mod.soul' found in folder '{path}'")]
-    MissingModFile { path: Box<str> },
+    #[error("no 'mod.soul' found in folder '{path:?}'")]
+    MissingModFile { path: PathBuf },
 
     #[error("file '{path}' not found")]
-    ModuleFileNotFound { path: Box<str> },
+    ModuleFileNotFound { path: PathBuf },
 
     #[error(
         "crate '{crate_name}' has no root file (lib.soul, main.soul, or mod.soul) in '{source_root}'"
@@ -162,17 +169,14 @@ pub enum AstErrorKind {
         source_root: Box<str>,
     },
 
-    #[error("token '{found}' not allowed in array typeWrapper")]
-    InvalidArrayTypeWrapperToken { found: Box<str> },
+    #[error("token '{}' not allowed in array typeWrapper", found.display())]
+    InvalidArrayTypeWrapperToken { found: TokenKind },
 
-    #[error("expected ident got `{found}`")]
-    ExpectedIdent { found: Box<str> },
+    #[error("expected ident got `{}`", found.display())]
+    ExpectedIdent { found: TokenKind },
 
-    #[error("expected: `{expected}` but found: `{found}`")]
+    #[error("expected: `{}` but found: `{}`", expected, found)]
     ExpectedExactToken { expected: Box<str>, found: Box<str> },
-
-    #[error("expected: `{expected}` but found: `{found}`")]
-    ExpectedExactIdent { expected: Box<str>, found: Box<str> },
 
     #[error("expected on of: [`{expected}`] but found: `{found}`")]
     ExpectedOneOfTokens { expected: Box<str>, found: Box<str> },
@@ -183,13 +187,13 @@ pub enum AstErrorKind {
     #[error("you can not have a non default parameter after default parameter")]
     NonDefaultParameterAfterDefault,
 
-    #[error("'{found}' not allowed in import")]
-    TokenNotAllowedInImport { found: Box<str> },
+    #[error("'{}' not allowed in import", found.display())]
+    TokenNotAllowedInImport { found: TokenKind },
 
     #[error(
         "`{token}` at the end of a line can only be used for expressions at the end of a block"
     )]
-    ExpressionOnlyAtEndOfBlock { token: Box<str> },
+    ExpressionOnlyAtEndOfBlock { token: Symbol },
 
     #[error("{kind} can not be used in struct body")]
     StatementNotAllowedInBody { kind: Box<str> },
@@ -198,13 +202,13 @@ pub enum AstErrorKind {
     VariableNotAllowedInUseBlock,
 
     #[error("keyword '{keyword}' can not be type")]
-    KeywordUsedAsType { keyword: Box<str> },
+    KeywordUsedAsType { keyword: KeyWord },
 
     // ----------------------------------------------------------------
     //  Name resolution (soul_name_resolver shares this CrateContext)
     // ----------------------------------------------------------------
-    #[error("module `{path}` not found in ModuleStore")]
-    ImportedModuleNotFound { path: Box<str> },
+    #[error("module `{path:?}` not found in ModuleStore")]
+    ImportedModuleNotFound { path: PathBuf },
 
     #[error("module `{module_name}` does not export `{item}`")]
     ModuleDoesNotExportItem {
@@ -298,15 +302,8 @@ pub enum AstErrorKind {
         got: usize,
     },
 
-    #[error(
-        "variant `{enum_name}.{variant_name}` argument type mismatch: expected `{expected}`, got `{got}`"
-    )]
-    EnumVariantArgumentTypeMismatch {
-        enum_name: Box<str>,
-        variant_name: Box<str>,
-        expected: Box<str>,
-        got: Box<str>,
-    },
+    #[error("{0}")]
+    EnumVariantArgumentTypeMismatch(Box<EnumVariantArgumentTypeMismatch>),
 
     #[error("return type mismatch: expected `{expected}`, got nothing")]
     ReturnTypeMismatchMissing { expected: Box<str> },
@@ -322,6 +319,28 @@ pub enum AstErrorKind {
 
     #[error(transparent)]
     LexError(#[from] soul_tokenizer::fault::TokenErrorKind),
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct EnumVariantArgumentTypeMismatch {
+    pub enum_name: SharedStr,
+    pub variant_name: SharedStr,
+    pub expected: SoulType,
+    pub got: SoulType,
+}
+impl Display for EnumVariantArgumentTypeMismatch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        format_args!(
+            "variant `{}.{}` argument type mismatch: expected `{:?}`, got `{:?}`",
+            self.enum_name, self.variant_name, self.expected, self.got,
+        )
+        .fmt(f)
+    }
+}
+impl From<EnumVariantArgumentTypeMismatch> for AstErrorKind {
+    fn from(value: EnumVariantArgumentTypeMismatch) -> Self {
+        Self::EnumVariantArgumentTypeMismatch(Box::new(value))
+    }
 }
 
 impl From<UnclassifiedKind> for AstErrorKind {

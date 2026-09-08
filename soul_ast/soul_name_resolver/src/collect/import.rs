@@ -1,9 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use ast_model::{
-    EntryKind, HeaderEntry, NodeId,
-    scope::ScopeModuleEntry,
-    statements::{ImportItem, ImportKind, ImportPath},
+    EntryKind, HeaderEntry, ImportItem, ImportKind, ImportPath, NodeId, scope::ScopeModuleEntry,
 };
 use ast_parser::fault::AstErrorKind;
 use soul_utils::{
@@ -82,7 +80,7 @@ impl<'a> NameResolver<'a> {
             None => {
                 self.log_error(
                     AstErrorKind::ImportedModuleNotFound {
-                        path: format!("{:?}", pathbuf).into(),
+                        path: pathbuf.clone(),
                     },
                     Some(span),
                 );

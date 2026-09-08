@@ -1,11 +1,7 @@
 use ast_model::{
-    expression::{
-        AnyArray, Constructor, ExpressionId, ExpressionKind, FieldAccess, For, ForCondition, If,
-        IfBranch, IfCondition, Lambda, Match, MatchMethod, StringFormat, StructConstructor,
-        VariableExpression,
-    },
-    scope::ScopeValue,
-    statements::VarPattern,
+    AnyArray, Constructor, ExpressionId, ExpressionKind, FieldAccess, For, ForCondition, If,
+    IfBranch, IfCondition, Lambda, Match, MatchMethod, StringFormat, StructConstructor, VarPattern,
+    VariableExpression, scope::ScopeValue,
 };
 use ast_parser::fault::AstErrorKind;
 use soul_tokenizer::model::types::Types;

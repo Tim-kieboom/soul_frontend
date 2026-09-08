@@ -8,10 +8,7 @@ use soul_utils::{
     span::{ModuleId, Span},
 };
 
-use crate::{
-    NodeId,
-    statements::{ImportItem, ImportKind, Variable},
-};
+use crate::{ImportItem, ImportKind, NodeId, Variable};
 
 impl_soul_ids!(ScopeId);
 

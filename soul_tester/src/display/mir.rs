@@ -7,10 +7,14 @@ use crate::{
 };
 use anyhow::Result;
 use mir_model::{
-    AggregateKind, LocalDecl, LocalId, MirFunction, Operand, Place, PlaceElem, Rvalue, Statement, Terminator,
+    AggregateKind, Function, LocalDecl, LocalId, Operand, Place, PlaceElem, Rvalue, Statement,
+    Terminator,
 };
 use mir_run::MirProgram;
-use soul_utils::{TypeModifier, collections::vec_map::{VecMap, VecMapIndex}};
+use soul_utils::{
+    TypeModifier,
+    collections::vec_map::{VecMap, VecMapIndex},
+};
 
 /// Writes a pretty-printed textual dump of every lowered `MirFunction` (mirrors
 /// `display::ast::display_ast`'s `tree.soulc`, but for MIR — see
@@ -53,7 +57,7 @@ fn block_str(id: impl VecMapIndex) -> String {
     format!("bb{}", id.index())
 }
 
-fn write_function(writer: &mut impl Writer, function: &MirFunction) -> Result<()> {
+fn write_function(writer: &mut impl Writer, function: &Function) -> Result<()> {
     let mut locals = function.locals.entries().enumerate();
 
     push_fmt!(writer, "{:?}(", function.name)?;
@@ -62,14 +66,14 @@ fn write_function(writer: &mut impl Writer, function: &MirFunction) -> Result<()
     write_return_local(writer, &mut locals)?;
     writer.push_str(" {\n")?;
 
-    write_locals(writer, function, &mut locals)?;    
+    write_locals(writer, function, &mut locals)?;
     write_block(writer, function)?;
 
     writer.push_str("}\n")?;
     Ok(())
 }
 
-fn write_block(writer: &mut impl Writer, function: &MirFunction) -> Result<()> {
+fn write_block(writer: &mut impl Writer, function: &Function) -> Result<()> {
     for (block_id, block) in function.blocks.entries() {
         push_fmt!(writer, "    {}: {{\n", block_str(block_id))?;
         for statement in &block.statements {
@@ -84,9 +88,13 @@ fn write_block(writer: &mut impl Writer, function: &MirFunction) -> Result<()> {
     Ok(())
 }
 
-fn write_locals<'a, Iter>(writer: &mut impl Writer, function: &MirFunction, locals: &mut Enumerate<Iter>) -> Result<()> 
-where 
-    Iter: Iterator<Item = (LocalId, &'a LocalDecl)>
+fn write_locals<'a, Iter>(
+    writer: &mut impl Writer,
+    function: &Function,
+    locals: &mut Enumerate<Iter>,
+) -> Result<()>
+where
+    Iter: Iterator<Item = (LocalId, &'a LocalDecl)>,
 {
     writer.push_str("\tlocals: [\n\t\t")?;
     let last_index = function.locals.len().saturating_sub(1);
@@ -100,9 +108,13 @@ where
     Ok(())
 }
 
-fn write_parameters<'a, Iter>(writer: &mut impl Writer, function: &MirFunction, locals: &mut Enumerate<Iter>) -> Result<()> 
-where 
-    Iter: Iterator<Item = (LocalId, &'a LocalDecl)>
+fn write_parameters<'a, Iter>(
+    writer: &mut impl Writer,
+    function: &Function,
+    locals: &mut Enumerate<Iter>,
+) -> Result<()>
+where
+    Iter: Iterator<Item = (LocalId, &'a LocalDecl)>,
 {
     for i in 0..function.arg_count {
         if i > 0 {
@@ -117,16 +129,17 @@ where
     Ok(())
 }
 
-fn write_return_local<'a, Iter>(writer: &mut impl Writer, locals: &mut Enumerate<Iter>) -> Result<()>
-where 
-    Iter: Iterator<Item = (LocalId, &'a LocalDecl)>
+fn write_return_local<'a, Iter>(
+    writer: &mut impl Writer,
+    locals: &mut Enumerate<Iter>,
+) -> Result<()>
+where
+    Iter: Iterator<Item = (LocalId, &'a LocalDecl)>,
 {
     writer.push_str("-> ")?;
 
     match locals.next() {
-        Some((_i, (id, decl))) => {
-            write_local(writer, id, decl)?
-        }
+        Some((_i, (id, decl))) => write_local(writer, id, decl)?,
         None => writer.push_str("<missing return local>")?,
     };
     Ok(())
@@ -137,7 +150,7 @@ fn write_local(writer: &mut impl Writer, id: LocalId, decl: &LocalDecl) -> Resul
     let ty = &decl.ty;
     match decl.mutability {
         TypeModifier::Mut => writer.push_str("mut ")?,
-        TypeModifier::Const => writer.push_str("const ")?,
+        TypeModifier::Comptime => writer.push_str("const ")?,
         TypeModifier::Immut => (),
     }
     push_fmt!(writer, "{name}: {ty:?}")?;

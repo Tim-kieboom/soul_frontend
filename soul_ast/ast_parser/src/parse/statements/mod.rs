@@ -1,8 +1,5 @@
 use ast_model::{
-    FunctionKind,
-    block::{Block, BlockId},
-    expression::Binding,
-    statements::{Statement, StatementId, VarPattern, Variable},
+    AssignType, Binding, Block, BlockId, FunctionKind, Statement, StatementId, VarPattern, Variable,
 };
 use soul_tokenizer::model::TokenKind;
 use soul_utils::{
@@ -15,7 +12,6 @@ use soul_utils::{
 
 use crate::{
     fault::{AstFault, AstResult, AstTryResult},
-    parse::statements::variable::AssignType,
     parser::Parser,
     utils::{
         ARROW_LEFT, COLON, COLON_ASSIGN, CURLY_CLOSE, CURLY_OPEN, DOT, HASH, NOT, ROUND_OPEN,
@@ -88,7 +84,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             self.log_fault(
                 Fault::error_with_kind(
                     crate::fault::AstErrorKind::ExpressionOnlyAtEndOfBlock {
-                        token: Symbol::SemiColon.as_str().into(),
+                        token: Symbol::SemiColon,
                     },
                     Some(self.token().span),
                 )
@@ -126,7 +122,7 @@ impl<'a, 'f> Parser<'a, 'f> {
         Ok(self.forest.store.insert_block(Block {
             statements,
             span: self.span_combine(start_span),
-            is_const: modifier == TypeModifier::Const,
+            is_const: modifier == TypeModifier::Comptime,
         }))
     }
 
@@ -289,8 +285,8 @@ impl<'a, 'f> Parser<'a, 'f> {
             Some(AssignType::Declaration) => Ok(AssignType::Declaration),
             _ => Err(Fault::error_with_kind(
                 crate::fault::AstErrorKind::ExpectedAssignOrDeclaration {
-                    expected1: AssignType::Assign.as_str().into(),
-                    expected2: AssignType::Declaration.as_str().into(),
+                    expected1: AssignType::Assign,
+                    expected2: AssignType::Declaration,
                     found: self.token().kind.display().into_boxed_str(),
                 },
                 Some(self.token().span),
@@ -381,10 +377,10 @@ impl<'a, 'f> Parser<'a, 'f> {
                 is_public: false,
                 pattern: VarPattern::Simple {
                     binding: Binding::new(self.alloc_node(), Ident::new(name, start_span)),
-                    modifier: TypeModifier::Const,
+                    modifier: TypeModifier::Comptime,
                 },
                 ty: None,
-                modifier: TypeModifier::Const,
+                modifier: TypeModifier::Comptime,
                 initialize_value: Some(value),
             },
             self.span_combine(start_span),
@@ -434,7 +430,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             other => {
                 return Err(Fault::error_with_kind(
                     crate::fault::AstErrorKind::ExpectedIdent {
-                        found: other.display().into_boxed_str(),
+                        found: other.clone(),
                     },
                     Some(self.token().span),
                 ));

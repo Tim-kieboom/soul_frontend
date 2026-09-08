@@ -1,9 +1,7 @@
 use ast_model::{
-    NodeId,
-    block::{Block, BlockId},
-    expression::{Binding, Expression, ExpressionId},
+    Binding, Block, BlockId, Expression, ExpressionId, FunctionSignature, NodeId, Statement,
+    StatementId,
     scope::{Scope, ScopeBuilder, ScopeTypeEntry, ScopeValue},
-    statements::{FunctionSignature, Statement, StatementId},
 };
 use ast_parser::fault::AstErrorKind;
 use soul_utils::{

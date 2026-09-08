@@ -1,16 +1,5 @@
 pub use crate::ast::*;
-use crate::{
-    ast::{
-        block::{Block, BlockId},
-        expression::{Expression, ExpressionId},
-        statements::{
-            Enum, Function, FunctionSignature, InnerFunctionSignature, Statement, StatementId,
-            Struct, Trait,
-        },
-    },
-    declare_store::DeclareStore,
-    scope::ScopeBuilder,
-};
+use crate::{declare_store::DeclareStore, scope::ScopeBuilder};
 use soul_utils::{
     CrateContext, FunctionId, Ident,
     collections::{

@@ -1,6 +1,6 @@
 use std::{mem::swap, str::FromStr};
 
-use ast_model::expression::{
+use ast_model::{
     Constructor, Deref, Expression, ExpressionId, ExpressionKind, FunctionCallee,
     FunctionCalleeKind, MatchMethod, MatchMethodArm, MatchMethodVariant, Ref, TypeOf, TypeofKind,
     VariableExpression,
@@ -163,7 +163,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             if !matches!(left.node, ExpressionKind::Variable(_)) {
                 return Err(Fault::error_with_kind(
                     crate::fault::AstErrorKind::InvalidSymbolHere {
-                        symbol: Symbol::Dot.as_str().into(),
+                        symbol: Symbol::Dot,
                     },
                     Some(self.token().span),
                 ));

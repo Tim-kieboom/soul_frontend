@@ -1,8 +1,4 @@
-use ast_model::{
-    FunctionKind,
-    soul_type::{SoulType, Stub},
-    statements::{Import, ImportKind, StatementKind, Struct},
-};
+use ast_model::{FunctionKind, Import, ImportKind, SoulType, StatementKind, Struct, Stub};
 use soul_utils::{SharedStr, fault::Severity, soul_names::PrimitiveTypes};
 
 use crate::tests::{get_statement, parse};

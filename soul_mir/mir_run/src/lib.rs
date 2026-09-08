@@ -20,7 +20,7 @@ mod tests;
 use std::time::Instant;
 
 use ast_model::{AstTree, FunctionKind};
-use mir_model::MirFunction;
+use mir_model::Function;
 use mir_parser::{fault::MirErrorKind, lower_function};
 use soul_utils::{
     CrateContext, FunctionId,
@@ -28,11 +28,8 @@ use soul_utils::{
     compiler_options::CompilerOptions,
 };
 
-/// The functions this slice's `lower_function` successfully handled. Functions
-/// it couldn't lower simply aren't present here — their reason why is a `Fault`
-/// pushed into `context`, not a separate error list (see module docs).
 pub struct MirProgram {
-    pub functions: VecMap<FunctionId, MirFunction>,
+    pub functions: VecMap<FunctionId, Function>,
 }
 impl MirProgram {
     pub const fn empty() -> Self {
@@ -51,12 +48,7 @@ pub fn to_mir<K>(
     let time = Instant::now();
 
     let mut functions = VecMap::new();
-
     for (id, kind) in ast.crates.store.functions.entries() {
-        // Extern/signature-only declarations have no body to lower; `lower_function`
-        // itself would fault on them (see its `NotANormalFunction`-equivalent
-        // check), but skipping here avoids spamming a fault for every extern
-        // declaration in a file that otherwise lowers cleanly.
         if !matches!(kind, FunctionKind::Normal(_)) {
             continue;
         }
@@ -70,6 +62,5 @@ pub fn to_mir<K>(
     }
 
     benchmark.add_benchmark("mir", time.elapsed());
-
     MirProgram { functions }
 }

@@ -1,7 +1,4 @@
-use ast_model::{
-    expression::ExpressionKind,
-    statements::{StatementKind, VarPattern},
-};
+use ast_model::{ExpressionKind, StatementKind, VarPattern};
 use soul_utils::{TypeModifier, fault::Severity};
 
 use crate::tests::{get_statement, parse};
@@ -30,7 +27,7 @@ fn simple_lambda() {
         &lambda.parameters[0],
         VarPattern::Simple {
             binding,
-            modifier: TypeModifier::Const,
+            modifier: TypeModifier::Comptime,
         } if binding.ident.as_str() == "x"
     ));
 }

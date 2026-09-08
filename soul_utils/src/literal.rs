@@ -14,7 +14,7 @@ pub enum StringLiteral {
     Cstr(String),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum StringTag {
     /// `c`
     CStr,

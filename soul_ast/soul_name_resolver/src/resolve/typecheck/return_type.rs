@@ -1,8 +1,5 @@
 use ast_model::{
-    block::BlockId,
-    expression::{ExpressionId, ExpressionKind, If, IfBranch},
-    soul_type::{Generic, SoulType},
-    statements::StatementKind,
+    BlockId, ExpressionId, ExpressionKind, Generic, If, IfBranch, SoulType, StatementKind,
 };
 use ast_parser::fault::AstErrorKind;
 use soul_utils::span::Span;

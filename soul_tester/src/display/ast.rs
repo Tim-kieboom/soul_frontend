@@ -11,18 +11,12 @@ use crate::{
 };
 use anyhow::Result;
 use ast_model::{
-    AstStore, AstTree, ExternalCrateData, FunctionKind, NodeId,
-    block::BlockId,
-    expression::{
-        AnyArray, ExpressionId, ExpressionKind, ForCondition, FunctionCalleeKind, IfBranch,
-        IfCondition, Lambda, MatchPattern, TypeofKind,
-    },
-    soul_type::{ArrayKind, Generic, SoulType, TupleKind},
-    statements::{
-        Assignment, Enum, EnumVariant, FunctionModifier, FunctionThisKind, ImplBlock, Import,
-        ImportItem, ImportKind, Parameter, Statement, StatementId, StatementKind, Struct, Trait,
-        TypeDef, UnionKind, UseBlock, VarPattern, Variable,
-    },
+    AnyArray, ArrayKind, Assignment, AstStore, AstTree, BlockId, Enum, EnumVariant, ExpressionId,
+    ExpressionKind, ExternalCrateData, ForCondition, FunctionCalleeKind, FunctionKind,
+    FunctionModifier, FunctionThisKind, Generic, IfBranch, IfCondition, ImplBlock, Import,
+    ImportItem, ImportKind, Lambda, MatchPattern, NodeId, Parameter, SoulType, Statement,
+    StatementId, StatementKind, Struct, Trait, TupleKind, TypeDef, TypeofKind, UnionKind, UseBlock,
+    VarPattern, Variable,
 };
 use soul_tokenizer::model::{
     keyword::KeyWord::{self},
@@ -466,7 +460,7 @@ impl<'a, K, W: Writer> Displayer<'a, K, W> {
         }
 
         if let Some(value) = variable.initialize_value {
-            let assign_str = if variable.modifier == TypeModifier::Const {
+            let assign_str = if variable.modifier == TypeModifier::Comptime {
                 " :: "
             } else if variable.ty.is_some() {
                 " = "
@@ -810,7 +804,11 @@ impl<'a, K, W: Writer> Displayer<'a, K, W> {
             push_fmt!(
                 self,
                 "{}{}: ",
-                if parameter.is_mut { "mut " } else { "" },
+                if parameter.mutable.is_mut() {
+                    "mut "
+                } else {
+                    ""
+                },
                 parameter.name.as_str()
             )?;
             self.write_type(&parameter.ty)?;

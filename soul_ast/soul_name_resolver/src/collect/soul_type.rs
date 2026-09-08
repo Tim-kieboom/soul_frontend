@@ -1,4 +1,4 @@
-use ast_model::soul_type::SoulType;
+use ast_model::SoulType;
 
 use crate::NameResolver;
 

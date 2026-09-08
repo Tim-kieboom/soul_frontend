@@ -1,7 +1,4 @@
-use ast_model::{
-    expression::{Expression, ExpressionId},
-    soul_type::SoulType,
-};
+use ast_model::{Expression, ExpressionId, SoulType};
 use soul_tokenizer::model::TokenKind;
 use soul_utils::{
     collections::try_result::{ResultTryErr, TryErr, TryError, TryNotValue, TryOk},
@@ -14,11 +11,11 @@ use crate::{
     utils::{ARROW_LEFT, ARROW_RIGHT, ASSIGN, COMMA},
 };
 
-mod expression;
-mod function;
-mod parse_module;
-mod soul_type;
-mod statements;
+pub mod expression;
+pub mod function;
+pub mod parse_module;
+pub mod soul_type;
+pub mod statements;
 
 impl<'a, 'f> Parser<'a, 'f> {
     pub(crate) fn parse_generic_define(

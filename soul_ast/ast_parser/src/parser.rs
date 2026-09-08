@@ -1,12 +1,8 @@
-use ast_model::{
-    AstModuleStore, CrateForest, Module,
-    block::{Block, BlockId},
-    soul_type::SoulType,
-};
+use ast_model::{AstModuleStore, Block, BlockId, CrateForest, Module, SoulType};
 use soul_tokenizer::TokenStream;
 #[cfg(debug_assertions)]
 use soul_tokenizer::model::Token;
-use soul_utils::{CrateContext, collections::vec_set::VecSet, ids::IdAlloc, soul_error_internal};
+use soul_utils::{CrateContext, collections::vec_set::VecSet, soul_error_internal};
 use soul_utils::{
     collections::{crate_store::CrateStore, module_store::ModuleStore},
     span::ModuleId,
@@ -58,7 +54,7 @@ impl<'a, 'f> Parser<'a, 'f> {
             name,
             parent,
             modules: VecSet::new(),
-            global: BlockId::error(),
+            global: BlockId::ERROR,
             header: HashMap::default(),
         };
         info.forest.modules_mut().insert(id, module);

@@ -1,7 +1,4 @@
-use ast_model::{
-    soul_type::SoulType,
-    statements::{EnumVariant, StatementKind, UnionKind},
-};
+use ast_model::{EnumVariant, SoulType, StatementKind, UnionKind};
 use soul_utils::{fault::Severity, soul_names::PrimitiveTypes};
 
 use crate::tests::{get_statement, parse};

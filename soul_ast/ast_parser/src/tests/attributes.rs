@@ -1,4 +1,4 @@
-use ast_model::statements::{StatementKind, VarPattern};
+use ast_model::{StatementKind, VarPattern};
 use soul_utils::fault::Severity;
 
 use crate::tests::{get_statement, parse};

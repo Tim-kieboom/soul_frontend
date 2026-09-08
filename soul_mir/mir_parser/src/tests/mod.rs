@@ -59,7 +59,7 @@ fn find_function(store: &AstStore, name: &str) -> FunctionId {
         .unwrap_or_else(|| panic!("no function named `{name}` found"))
 }
 
-fn lower_source(source: &str, function_name: &str) -> MirResult<mir_model::MirFunction> {
+fn lower_source(source: &str, function_name: &str) -> MirResult<mir_model::Function> {
     let ast = resolve_source(source);
     let function_id = find_function(&ast.crates.store, function_name);
     lower_function(&ast.crates.store, &ast.declares, function_id)
@@ -69,7 +69,7 @@ fn lower_source(source: &str, function_name: &str) -> MirResult<mir_model::MirFu
 /// a span — matching the "every fault has a kind and a location" convention used
 /// by every other pipeline stage's faults.
 fn assert_rejected_matching(
-    result: &MirResult<mir_model::MirFunction>,
+    result: &MirResult<mir_model::Function>,
     predicate: impl Fn(&MirErrorKind) -> bool,
 ) {
     let Err(fault) = result else {
@@ -86,7 +86,7 @@ fn assert_rejected_matching(
     );
 }
 
-fn assert_rejected_with(result: &MirResult<mir_model::MirFunction>, expected: MirErrorKind) {
+fn assert_rejected_with(result: &MirResult<mir_model::Function>, expected: MirErrorKind) {
     assert_rejected_matching(result, |kind| *kind == expected);
 }
 

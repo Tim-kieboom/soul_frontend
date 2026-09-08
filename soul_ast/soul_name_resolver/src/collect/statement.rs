@@ -1,17 +1,11 @@
 use ast_model::{
-    CustomType, FunctionKind,
-    expression::{ExpressionId, ExpressionKind},
-    literal::Literal,
-    scope::ScopeValue,
-    soul_type::SoulType,
-    statements::{
-        EnumVariant, Function, FunctionSignature, FunctionThisKind, StatementId, StatementKind,
-        UseBlock, VarPattern, Variable,
-    },
+    CustomType, EnumVariant, ExpressionId, ExpressionKind, Function, FunctionKind,
+    FunctionSignature, FunctionThisKind, Literal, SoulType, StatementId, StatementKind, UseBlock,
+    VarPattern, Variable, scope::ScopeValue,
 };
 use ast_parser::fault::{AstErrorKind, AstFault};
 use soul_utils::{
-    FunctionId, Ident, TypeModifier, fault::Fault, soul_error_internal, soul_names::PrimitiveTypes,
+    FunctionId, Ident, fault::Fault, soul_error_internal, soul_names::PrimitiveTypes,
 };
 
 use crate::NameResolver;
@@ -197,11 +191,7 @@ impl<'a> NameResolver<'a> {
             let name = parameter.name.as_shared_str();
             self.insert_value(name, parameter.id, span, ScopeValue::Variable);
 
-            let modifier = if parameter.is_mut {
-                TypeModifier::Mut
-            } else {
-                TypeModifier::Immut
-            };
+            let modifier = parameter.mutable.to_type_modifier();
             self.declares.insert_variable_type(
                 parameter.id,
                 modifier,

@@ -6,12 +6,8 @@ use soul_utils::{
 };
 
 use crate::{
-    AstStore, NodeId,
-    block::BlockId,
-    literal::Literal,
+    AstStore, BlockId, Literal, NodeId, SoulType, VarPattern,
     operators::{BinaryOperator, UnaryOperator},
-    soul_type::SoulType,
-    statements::VarPattern,
 };
 
 impl_soul_ids!(ExpressionId);

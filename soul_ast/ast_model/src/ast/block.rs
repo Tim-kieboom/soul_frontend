@@ -1,6 +1,6 @@
 use soul_utils::{impl_soul_ids, span::Span};
 
-use crate::statements::StatementId;
+use crate::StatementId;
 
 impl_soul_ids!(BlockId);
 

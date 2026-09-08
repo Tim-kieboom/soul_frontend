@@ -1,8 +1,5 @@
 use ast_model::{
-    expression::ExpressionKind,
-    literal::Literal,
-    soul_type::SoulType,
-    statements::{StatementKind, VarPattern, Variable},
+    AssignType, ExpressionKind, Literal, SoulType, StatementKind, VarPattern, Variable,
 };
 use soul_utils::{TypeModifier, fault::Severity};
 
@@ -536,7 +533,7 @@ fn tuple_with_per_binding_mut() {
         matches!(&tuple.elements[0], VarPattern::Simple { binding, modifier } if binding.ident.as_str() == "a" && *modifier == TypeModifier::Mut)
     );
     assert!(
-        matches!(&tuple.elements[1], VarPattern::Simple { binding, modifier } if binding.ident.as_str() == "b" && *modifier == TypeModifier::Const)
+        matches!(&tuple.elements[1], VarPattern::Simple { binding, modifier } if binding.ident.as_str() == "b" && *modifier == TypeModifier::Comptime)
     );
 }
 
@@ -598,8 +595,8 @@ fn invalid_assign_operator_for_declaration_is_rejected() {
     assert!(
         context.faults.faults.iter().any(|fault| matches!(
             fault.kind(),
-            crate::fault::AstErrorKind::InvalidAssignOperatorForDeclaration { assign_op }
-                if assign_op.as_ref() == "+="
+            crate::fault::AstErrorKind::InvalidAssignOperatorForDeclaration { assign }
+                if *assign == AssignType::AddAssign
         )),
         "{:#?}",
         context.faults.faults

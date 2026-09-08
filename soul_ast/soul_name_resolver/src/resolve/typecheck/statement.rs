@@ -1,4 +1,4 @@
-use ast_model::statements::Assignment;
+use ast_model::Assignment;
 use ast_parser::fault::AstErrorKind;
 use soul_utils::TypeModifier;
 
@@ -11,7 +11,7 @@ impl<'a> NameResolver<'a> {
             return;
         };
 
-        if matches!(modifier, TypeModifier::Immut | TypeModifier::Const) {
+        if matches!(modifier, TypeModifier::Immut | TypeModifier::Comptime) {
             let span = self.get_expression(assignment.left).map(|expr| expr.span);
 
             self.log_error(AstErrorKind::AssignToImmutableVariable, span);

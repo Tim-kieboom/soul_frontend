@@ -1,19 +1,14 @@
 use std::{fs, path::PathBuf, sync::LazyLock};
 
 use ast_model::{
-    AstStore, AstTree, Module,
-    expression::{
-        AnyArray, Constructor, ExpressionKind, FunctionCall, FunctionCalleeKind, MatchMethod,
-        StructConstructor, TypeOf, TypeofKind,
-    },
-    literal::Literal,
-    operators::BinaryOperatorKind,
-    soul_type::{ArrayKind, ArrayType, Mutable, ReferenceType, SoulType, Stub},
-    statements::{Assignment, Import, ImportKind, Statement, StatementKind, Variable},
+    AnyArray, ArrayKind, ArrayType, Assignment, AstStore, AstTree, Constructor, ExpressionKind,
+    FunctionCall, FunctionCalleeKind, Import, ImportKind, Literal, MatchMethod, Module,
+    ReferenceType, SoulType, Statement, StatementKind, StructConstructor, Stub, TypeOf, TypeofKind,
+    Variable, operators::BinaryOperatorKind,
 };
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
-    CrateContext, SharedStr,
+    CrateContext, Mutable, SharedStr,
     collections::{
         crate_store::{CrateEntry, CrateStore},
         module_store::ModuleStore,
@@ -369,7 +364,7 @@ fn struct_constructor() {
                 }) => {
                     assert_eq!(
                         *struct_type,
-                        SoulType::Stub(ast_model::soul_type::Stub {
+                        SoulType::Stub(Stub {
                             name: "Point".into(),
                             generics: vec![]
                         })
@@ -532,15 +527,12 @@ fn type_alias() {
         StatementKind::TypeDef(def) => {
             assert_eq!(
                 def.new_type,
-                SoulType::Stub(ast_model::soul_type::Stub {
+                SoulType::Stub(Stub {
                     name: "MyInt".into(),
                     generics: vec![]
                 })
             );
-            assert_eq!(
-                def.old_type,
-                SoulType::Primitive(soul_utils::soul_names::PrimitiveTypes::Int)
-            );
+            assert_eq!(def.old_type, SoulType::Primitive(PrimitiveTypes::Int));
             assert!(!def.is_distinct);
         }
         _ => panic!("expected TypeDef statement"),

@@ -1,7 +1,4 @@
-use ast_model::{
-    expression::ExpressionKind, literal::Literal, operators::BinaryOperatorKind,
-    statements::StatementKind,
-};
+use ast_model::{ExpressionKind, Literal, StatementKind, operators::BinaryOperatorKind};
 use soul_utils::fault::Severity;
 
 use crate::tests::{get_statement, parse};

@@ -1,15 +1,15 @@
 use crate::{
-    AstStore, NodeId,
-    block::BlockId,
-    expression::{Binding, Expression, ExpressionId, ExpressionKind, FunctionCall},
-    soul_type::{Generic, SoulType},
+    AstStore, Binding, BlockId, Expression, ExpressionId, ExpressionKind, FunctionCall, Generic,
+    NodeId, SoulType,
 };
 use soul_utils::{
-    FunctionId, Ident, TypeModifier, bitflags,
+    FunctionId, Ident, Mutable, TypeModifier, bitflags,
     collections::soul_import_path::SoulImportPath,
+    define_symbols,
     error::SoulResult,
     fault::Fault,
     impl_soul_ids, soul_error_internal,
+    soul_names::Symbol,
     span::{ItemMetaData, Span, Spanned},
 };
 
@@ -274,7 +274,7 @@ impl Variable {
             ty,
             is_public: false,
             initialize_value: value,
-            modifier: TypeModifier::Const,
+            modifier: TypeModifier::Comptime,
         }
     }
 
@@ -353,7 +353,7 @@ pub struct Parameter {
     pub id: NodeId,
     pub name: Ident,
     pub ty: SoulType,
-    pub is_mut: bool,
+    pub mutable: Mutable,
     pub default: Option<ExpressionId>,
 }
 
@@ -368,6 +368,29 @@ impl ExternLanguage {
         }
     }
 }
+
+define_symbols!(
+
+    /// Assignment operators for variable assignment and modification.
+    ///
+    /// These operators are used to assign values to variables, with various
+    /// compound assignment forms.
+    pub enum AssignType {
+        /// Declaration assignment (`:=`).
+        Declaration => ":=", Symbol::ColonAssign,
+
+        /// Simple assignment (`=`).
+        Assign => "=", Symbol::Assign,
+        AddAssign => "+=", Symbol::PlusEq,
+        SubAssign => "-=", Symbol::MinusEq,
+        MulAssign => "*=", Symbol::StarEq,
+        DivAssign => "/=", Symbol::SlashEq,
+        ModAssign => "%=", Symbol::ModEq,
+        BitAndAssign => "&=", Symbol::AndEq,
+        BitOrAssign => "|=", Symbol::OrEq,
+        BitXorAssign => "^=", Symbol::XorEq,
+    }
+);
 
 /// Optional `this` parameter type.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]

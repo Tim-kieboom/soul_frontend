@@ -1,10 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    CustomType, NodeId,
-    expression::ExpressionId,
-    soul_type::SoulType,
-    statements::{Enum, InnerFunctionSignature, Struct, Trait},
+    CustomType, Enum, ExpressionId, InnerFunctionSignature, NodeId, SoulType, Struct, Trait,
 };
 use soul_utils::{
     FunctionId, SharedStr, TypeModifier, collections::vec_map::VecMap,

@@ -1,13 +1,11 @@
 use ast_model::{
-    CustomType,
-    expression::{AnyArray, Binary, ExpressionId, ExpressionKind, StructConstructor},
-    literal::Literal,
-    operators::BinaryOperatorKind,
-    soul_type::{Mutable, ReferenceType, SoulType, Stub},
-    statements::{Field, Struct, VarPattern},
+    AnyArray, Binary, CustomType, ExpressionId, ExpressionKind, Field, Literal, ReferenceType,
+    SoulType, Struct, StructConstructor, Stub, VarPattern, operators::BinaryOperatorKind,
 };
 use ast_parser::fault::{AstErrorKind, AstFault};
-use soul_utils::{Ident, TypeModifier, fault::Fault, soul_names::PrimitiveTypes, span::Span};
+use soul_utils::{
+    Ident, Mutable, TypeModifier, fault::Fault, soul_names::PrimitiveTypes, span::Span,
+};
 
 use super::function_call::{generic_name_of, is_generic_parameter};
 use crate::NameResolver;
