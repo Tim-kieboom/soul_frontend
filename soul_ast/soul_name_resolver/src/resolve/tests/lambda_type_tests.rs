@@ -32,10 +32,7 @@ fn resolve_source(source: &str) -> AstTree {
     ast
 }
 
-fn fault_count_matching(
-    ast: &AstTree,
-    predicate: impl Fn(&AstErrorKind) -> bool,
-) -> usize {
+fn fault_count_matching(ast: &AstTree, predicate: impl Fn(&AstErrorKind) -> bool) -> usize {
     ast.faults()
         .iter()
         .filter(|fault| predicate(fault.kind()))

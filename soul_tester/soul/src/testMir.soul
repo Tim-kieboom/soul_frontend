@@ -111,9 +111,9 @@ logicalOrCondition(a: int, b: int): bool {
     return a == b || a > b
 }
 
-whileWithComparisonCondition(n: int): int {
+whileWithComparisonCondition(mut n: int): int {
     for n > 0 {
-        break
+        n -= 1
     }
     return n
 }
@@ -137,4 +137,15 @@ notOfComparisonCondition(a: int, b: int): int {
         return 1
     }
     return 2
+}
+
+reassignParameter(mut a: int): int {
+    a = 5
+    return a
+}
+
+reassignLocal(): int {
+    mut x := 1
+    x = 2
+    return x
 }

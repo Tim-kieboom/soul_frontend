@@ -129,12 +129,7 @@ fn linkage_str(linkage: &soul_utils::linkage::Linkage) -> &'static str {
 }
 
 impl<'a, W: Writer> Displayer<'a, W> {
-    fn new(
-        ast: &'a AstTree,
-        root_dir: &'a Path,
-        store: &'a AstStore,
-        writer: &'a mut W,
-    ) -> Self {
+    fn new(ast: &'a AstTree, root_dir: &'a Path, store: &'a AstStore, writer: &'a mut W) -> Self {
         Self {
             ast,
             store,

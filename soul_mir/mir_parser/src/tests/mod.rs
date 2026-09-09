@@ -269,7 +269,6 @@ fn if_without_else_joins_after_the_then_branch() {
     )
     .expect("expected successful lowering");
 
-    // entry (switchInt) + then (return 1) + join (return 2)
     assert_eq!(mir.blocks.entries().count(), 3, "{:#?}", mir.blocks);
 
     let switch_blocks = mir
@@ -298,8 +297,6 @@ fn if_else_where_both_branches_return_has_no_join_block() {
     )
     .expect("expected successful lowering");
 
-    // entry (switchInt) + then (return 1) + else (return 2) — no join block,
-    // since both branches terminate and nothing reaches it.
     assert_eq!(mir.blocks.entries().count(), 3, "{:#?}", mir.blocks);
 }
 
@@ -335,7 +332,6 @@ fn while_loop_with_break_reaches_the_exit_block() {
     )
     .expect("expected successful lowering");
 
-    // entry (goto header) + header (switchInt) + body (goto exit via break) + exit (return)
     assert_eq!(mir.blocks.entries().count(), 4, "{:#?}", mir.blocks);
 }
 
@@ -468,7 +464,7 @@ fn logical_and_of_two_comparisons_is_lowered_as_nested_temps() {
         .entries()
         .next()
         .expect("expected an entry block");
-    // `a > b` -> temp, `c < d` -> temp, `temp1 && temp2` -> temp, then switchInt.
+
     assert_eq!(entry.statements.len(), 3, "{:#?}", entry.statements);
 
     let mir_model::Statement::Assign(_, Rvalue::BinaryOp(op, ..)) = &entry.statements[2] else {
@@ -497,8 +493,6 @@ fn bool_variable_condition_lowers_directly_with_no_temp() {
     )
     .expect("expected successful lowering");
 
-    // `flag` (param) + the return local, and nothing else: a bare bool
-    // variable condition needs no extra temp.
     assert_eq!(mir.locals.entries().count(), 2, "{:#?}", mir.locals);
 
     let (_, entry) = mir
@@ -582,7 +576,7 @@ fn not_of_a_comparison_composes_with_the_existing_temp_flattening() {
         .entries()
         .next()
         .expect("expected an entry block");
-    // `a > b` -> temp, `!temp` -> temp, then switchInt.
+
     assert_eq!(entry.statements.len(), 2, "{:#?}", entry.statements);
 }
 
@@ -590,4 +584,71 @@ fn not_of_a_comparison_composes_with_the_existing_temp_flattening() {
 fn unary_negation_is_rejected() {
     let result = lower_source("f(a: int): int {\n    return -a\n}\n", "f");
     assert_rejected_with(&result, MirErrorKind::UnsupportedUnaryOperator);
+}
+
+#[test]
+fn assignment_to_a_mutable_parameter_reuses_its_existing_local() {
+    let mir = lower_source("f(mut a: int): int {\n    a = 5\n    return a\n}\n", "f")
+        .expect("expected successful lowering");
+
+    assert_eq!(mir.locals.entries().count(), 2, "{:#?}", mir.locals);
+
+    let (_, block) = mir.blocks.entries().next().unwrap();
+    assert_eq!(block.statements.len(), 2, "{:#?}", block.statements);
+
+    let mir_model::Statement::Assign(assign_place, Rvalue::Use(Operand::Constant(_))) =
+        &block.statements[0]
+    else {
+        panic!(
+            "expected the first statement to assign the constant into `a`'s local, got {:#?}",
+            block.statements[0]
+        );
+    };
+
+    let mir_model::Statement::Assign(_, Rvalue::Use(Operand::Copy(read_place))) =
+        &block.statements[1]
+    else {
+        panic!(
+            "expected the second statement to read `a` back for the return, got {:#?}",
+            block.statements[1]
+        );
+    };
+    assert_eq!(
+        assign_place.local, read_place.local,
+        "expected the assignment and the later read to target the same local"
+    );
+}
+
+#[test]
+fn compound_assignment_is_desugared_into_a_binary_read_of_the_same_local() {
+    let mir = lower_source("f(mut n: int): int {\n    n -= 1\n    return n\n}\n", "f")
+        .expect("expected successful lowering");
+
+    let (_, block) = mir.blocks.entries().next().unwrap();
+    assert_eq!(block.statements.len(), 2, "{:#?}", block.statements);
+
+    let mir_model::Statement::Assign(assign_place, Rvalue::BinaryOp(op, left, _)) =
+        &block.statements[0]
+    else {
+        panic!(
+            "expected `n -= 1` to lower to a BinaryOp assignment, got {:#?}",
+            block.statements[0]
+        );
+    };
+    assert_eq!(*op, ast_model::operators::BinaryOperatorKind::Sub);
+    assert!(
+        matches!(left, Operand::Copy(place) if place.local == assign_place.local),
+        "expected `n -= 1` to read the current value of `n`'s own local"
+    );
+}
+
+#[test]
+fn assignment_to_a_let_declared_local_reuses_its_local() {
+    let mir = lower_source(
+        "f(): int {\n    mut x := 1\n    x = 2\n    return x\n}\n",
+        "f",
+    )
+    .expect("expected successful lowering");
+
+    assert_eq!(mir.locals.entries().count(), 2, "{:#?}", mir.locals);
 }

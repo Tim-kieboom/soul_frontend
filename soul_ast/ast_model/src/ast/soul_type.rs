@@ -56,8 +56,8 @@ pub enum SoulType {
     },
 }
 impl SoulType {
-    pub fn is_primitive_kind(&self, _kind: PrimitiveTypes) -> bool {
-        matches!(self, SoulType::Primitive(_kind))
+    pub fn is_primitive_kind(&self, kind: PrimitiveTypes) -> bool {
+        matches!(self, SoulType::Primitive(actual) if *actual == kind)
     }
 }
 impl fmt::Debug for SoulType {

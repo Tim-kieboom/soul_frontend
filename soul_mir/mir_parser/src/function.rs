@@ -152,6 +152,7 @@ impl<'a> FunctionLowerer<'a> {
     ) -> MirResult<()> {
         match &statement.node {
             ast::StatementKind::Variable(variable) => self.lower_variable(statement, variable),
+            ast::StatementKind::Assignment(assignment) => self.lower_assignment(assignment),
             ast::StatementKind::Expression { expression, .. } => {
                 self.lower_expression_statement(return_local, statement, *expression)
             }
@@ -160,6 +161,50 @@ impl<'a> FunctionLowerer<'a> {
                 Some(statement.span),
             )),
         }
+    }
+
+    /// Lowers `left = right` (compound assignments like `n -= 1` are already
+    /// desugared by the parser into `left = left - 1` before this ever runs,
+    /// so `lower_rvalue` handles the right-hand side with no special-casing).
+    /// `left` is only supported as a bare, already-declared variable — no
+    /// arrays/structs/pointers exist as values in this slice yet, so there's
+    /// no `Place` projection to assign through for `arr[i]`/`obj.field`/`*p`.
+    /// That non-`Variable` case is currently unreachable from any resolver-
+    /// accepted Soul source (every path to it needs a struct/array/pointer-
+    /// typed binding, which `require_primitive` already rejects earlier) —
+    /// this check is defensive, forward-compatible code, not dead weight.
+    fn lower_assignment(&mut self, assignment: &ast::Assignment) -> MirResult<()> {
+        let left = &self.store.expressions[assignment.left];
+        let ast::ExpressionKind::Variable(var) = &left.node else {
+            return Err(Fault::error_with_kind(
+                MirErrorKind::AssignmentTargetUnsupported,
+                Some(left.span),
+            ));
+        };
+
+        let local = self.resolve_local(var, left.span)?;
+        let rvalue = self.lower_rvalue(assignment.right)?;
+        self.statements
+            .push(mir::Statement::Assign(mir::Place::local(local), rvalue));
+        Ok(())
+    }
+
+    fn resolve_local(&self, var: &ast::VariableExpression, span: Span) -> MirResult<mir::LocalId> {
+        let Some(resolved) = self.declares.get_variable_resolve(var.id) else {
+            return Err(Fault::error_with_kind(
+                MirErrorKind::VariableHasNoResolvedBinding,
+                Some(span),
+            ));
+        };
+
+        let Some(local) = self.node_to_local.get(resolved) else {
+            return Err(Fault::error_with_kind(
+                MirErrorKind::VariableNotBoundToLocal,
+                Some(span),
+            ));
+        };
+
+        Ok(*local)
     }
 
     fn lower_expression_statement(
@@ -350,16 +395,16 @@ impl<'a> FunctionLowerer<'a> {
 
     fn is_type_boolean(&self, var: &ast_model::VariableExpression) -> bool {
         let Some(resolved) = self.declares.get_variable_resolve(var.id) else {
-            return false
+            return false;
         };
 
         let Some((_, Some(ty), _)) = self.declares.get_variable_type(resolved) else {
-            return false
+            return false;
         };
 
-        return ty.is_primitive_kind(PrimitiveTypes::Boolean)
+        ty.is_primitive_kind(PrimitiveTypes::Boolean)
     }
-    
+
     fn lower_variable(
         &mut self,
         stmt: &ast::Statement,
@@ -447,21 +492,8 @@ impl<'a> FunctionLowerer<'a> {
                 Ok(mir::Operand::Constant(literal.clone()))
             }
             ast::ExpressionKind::Variable(var) => {
-                let Some(resolved) = self.declares.get_variable_resolve(var.id) else {
-                    return Err(Fault::error_with_kind(
-                        MirErrorKind::VariableHasNoResolvedBinding,
-                        Some(expr.span),
-                    ));
-                };
-
-                let Some(local) = self.node_to_local.get(resolved) else {
-                    return Err(Fault::error_with_kind(
-                        MirErrorKind::VariableNotBoundToLocal,
-                        Some(expr.span),
-                    ));
-                };
-
-                Ok(mir::Operand::Copy(mir::Place::local(*local)))
+                let local = self.resolve_local(var, expr.span)?;
+                Ok(mir::Operand::Copy(mir::Place::local(local)))
             }
             ast::ExpressionKind::Binary(_) => {
                 let span = expr.span;

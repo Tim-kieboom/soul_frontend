@@ -18,11 +18,7 @@ mod utils;
 
 /// Resolves all names (variables, functions, types) in `ast`'s root module,
 /// filling in the store's declarations and scope/resolution info in place.
-pub fn name_resolve(
-    module_store: &mut ModuleStore,
-    ast: &mut AstTree,
-    crate_store: &CrateStore,
-) {
+pub fn name_resolve(module_store: &mut ModuleStore, ast: &mut AstTree, crate_store: &CrateStore) {
     let root = ast.root;
     let mut resolver = NameResolver::new(ast.root, module_store, ast, crate_store);
     resolver.collect_module(root);

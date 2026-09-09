@@ -1,5 +1,9 @@
 pub use crate::ast::*;
-use crate::{declare_store::DeclareStore, fault::{AstErrorKind, AstFault}, scope::ScopeBuilder};
+use crate::{
+    declare_store::DeclareStore,
+    fault::{AstErrorKind, AstFault},
+    scope::ScopeBuilder,
+};
 use soul_utils::{
     CrateContext, FunctionId, Ident,
     collections::{
@@ -14,8 +18,8 @@ use soul_utils::{
 use std::{collections::HashMap, path::PathBuf};
 
 mod ast;
-pub mod fault;
 pub mod declare_store;
+pub mod fault;
 pub mod scope;
 
 /// Per-crate metadata. module_ids tracks which ModuleIds belong to this crate.

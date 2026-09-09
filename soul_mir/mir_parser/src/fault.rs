@@ -76,6 +76,11 @@ pub enum MirErrorKind {
 
     #[error("statement is unreachable: every preceding path already returned, broke, or continued")]
     UnreachableStatement,
+
+    #[error(
+        "only a bare (already-declared) variable is supported as an assignment target in this lowering slice"
+    )]
+    AssignmentTargetUnsupported,
 }
 
 impl From<UnclassifiedKind> for MirErrorKind {
