@@ -20,7 +20,7 @@ mod utils;
 /// filling in the store's declarations and scope/resolution info in place.
 pub fn name_resolve(
     module_store: &mut ModuleStore,
-    ast: &mut AstTree<AstErrorKind>,
+    ast: &mut AstTree,
     crate_store: &CrateStore,
 ) {
     let root = ast.root;
@@ -56,7 +56,7 @@ impl<'a> NameResolver<'a> {
     pub fn new(
         module: ModuleId,
         modules: &'a mut ModuleStore,
-        ast: &'a mut AstTree<AstErrorKind>,
+        ast: &'a mut AstTree,
         crate_store: &'a CrateStore,
     ) -> Self {
         Self {

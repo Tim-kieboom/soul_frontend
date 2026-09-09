@@ -28,7 +28,7 @@ fn write_module(dir: &Path, name: &str, content: &str) {
     fs::write(dir.join(format!("{name}.soul")), content).expect("failed to write test module");
 }
 
-fn resolve_in_dir(dir: &Path, source: &str) -> AstTree<AstErrorKind> {
+fn resolve_in_dir(dir: &Path, source: &str) -> AstTree {
     let mut module_store = ModuleStore::new();
     module_store.insert_root(PathBuf::from("root.soul"));
     let root = module_store.get_root_id();
@@ -54,7 +54,7 @@ fn resolve_in_dir(dir: &Path, source: &str) -> AstTree<AstErrorKind> {
 }
 
 fn fault_count_matching(
-    ast: &AstTree<AstErrorKind>,
+    ast: &AstTree,
     predicate: impl Fn(&AstErrorKind) -> bool,
 ) -> usize {
     ast.faults()

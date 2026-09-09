@@ -55,7 +55,11 @@ pub enum SoulType {
         return_type: Box<SoulType>,
     },
 }
-
+impl SoulType {
+    pub fn is_primitive_kind(&self, _kind: PrimitiveTypes) -> bool {
+        matches!(self, SoulType::Primitive(_kind))
+    }
+}
 impl fmt::Debug for SoulType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

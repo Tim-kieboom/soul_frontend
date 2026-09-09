@@ -10,7 +10,7 @@ use soul_utils::{
 
 use crate::name_resolve;
 
-fn resolve_source(source: &str) -> AstTree<AstErrorKind> {
+fn resolve_source(source: &str) -> AstTree {
     let mut module_store = ModuleStore::new();
     module_store.insert_root(PathBuf::from("test.soul"));
     let root = module_store.get_root_id();
@@ -35,7 +35,7 @@ fn resolve_source(source: &str) -> AstTree<AstErrorKind> {
     ast
 }
 
-fn expression_type_of_binding(ast: &AstTree<AstErrorKind>, name: &str) -> Option<SoulType> {
+fn expression_type_of_binding(ast: &AstTree, name: &str) -> Option<SoulType> {
     ast.crates.store.statements.values().find_map(|statement| {
         let StatementKind::Variable(variable) = &statement.node else {
             return None;
@@ -52,7 +52,7 @@ fn expression_type_of_binding(ast: &AstTree<AstErrorKind>, name: &str) -> Option
     })
 }
 
-fn type_mismatch_fault_count(ast: &AstTree<AstErrorKind>) -> usize {
+fn type_mismatch_fault_count(ast: &AstTree) -> usize {
     ast.faults()
         .iter()
         .filter(|fault| {

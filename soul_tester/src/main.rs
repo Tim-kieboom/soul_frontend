@@ -4,7 +4,6 @@ use crate::display::{
 };
 use anyhow::Result;
 use ast_model::AstTree;
-use ast_parser::fault::AstErrorKind;
 use ast_run::{AstRequest, to_ast};
 use mir_parser::fault::MirErrorKind;
 use mir_run::MirProgram;
@@ -138,14 +137,14 @@ fn tokenize<'a>(file: &'a str, modules: &ModuleStore) -> Result<TokenStream<'a>>
     Ok(tokens)
 }
 
-fn ast<'a>(tokens: TokenStream<'a>, request: AstRequest<'a>) -> Result<AstTree<AstErrorKind>> {
+fn ast<'a>(tokens: TokenStream<'a>, request: AstRequest<'a>) -> Result<AstTree> {
     let ast = to_ast(tokens, request, &config::COMPILER_OPTIONS);
     display_ast(&ast)?;
     Ok(ast)
 }
 
 fn mir(
-    ast: &AstTree<AstErrorKind>,
+    ast: &AstTree,
     benchmark: &mut Benchmark,
     all_faults: &mut FaultCollector,
 ) -> MirProgram {

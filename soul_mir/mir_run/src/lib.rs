@@ -39,8 +39,8 @@ impl MirProgram {
     }
 }
 
-pub fn to_mir<K>(
-    ast: &AstTree<K>,
+pub fn to_mir(
+    ast: &AstTree,
     benchmark: &mut Benchmark,
     context: &mut CrateContext<MirErrorKind>,
     _options: &CompilerOptions,

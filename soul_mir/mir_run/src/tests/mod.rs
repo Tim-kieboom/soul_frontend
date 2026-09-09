@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 
 use ast_model::AstTree;
-use ast_parser::fault::AstErrorKind;
 use ast_run::{AstRequest, to_ast};
 use mir_parser::fault::MirErrorKind;
 use soul_tokenizer::to_token_stream;
@@ -14,13 +13,13 @@ use soul_utils::{
 
 use crate::MirProgram;
 
-fn create_mir<K>(ast: &AstTree<K>) -> (MirProgram, CrateContext<MirErrorKind>) {
+fn create_mir(ast: &AstTree) -> (MirProgram, CrateContext<MirErrorKind>) {
     let mut benchmark = Benchmark::new();
     create_mir_with_benchmark(ast, &mut benchmark)
 }
 
-fn create_mir_with_benchmark<K>(
-    ast: &AstTree<K>,
+fn create_mir_with_benchmark(
+    ast: &AstTree,
     benchmark: &mut Benchmark,
 ) -> (MirProgram, CrateContext<MirErrorKind>) {
     let mut context = CrateContext::default();
@@ -28,7 +27,7 @@ fn create_mir_with_benchmark<K>(
     (mir, context)
 }
 
-fn build_ast(source: &str) -> AstTree<AstErrorKind> {
+fn build_ast(source: &str) -> AstTree {
     let mut module_store = ModuleStore::new();
     module_store.insert_root(PathBuf::from("test.soul"));
     let root = module_store.get_root_id();

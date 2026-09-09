@@ -7,7 +7,7 @@ use soul_utils::collections::{crate_store::CrateStore, module_store::ModuleStore
 
 use crate::name_resolve;
 
-fn resolve_source(source: &str) -> AstTree<AstErrorKind> {
+fn resolve_source(source: &str) -> AstTree {
     let mut module_store = ModuleStore::new();
     module_store.insert_root(PathBuf::from("test.soul"));
     let root = module_store.get_root_id();
@@ -32,7 +32,7 @@ fn resolve_source(source: &str) -> AstTree<AstErrorKind> {
     ast
 }
 
-fn intrinsic_fault_count(ast: &AstTree<AstErrorKind>) -> usize {
+fn intrinsic_fault_count(ast: &AstTree) -> usize {
     ast.faults()
         .iter()
         .filter(|fault| {

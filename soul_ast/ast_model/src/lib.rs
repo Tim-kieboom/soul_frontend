@@ -1,12 +1,12 @@
 pub use crate::ast::*;
-use crate::{declare_store::DeclareStore, scope::ScopeBuilder};
+use crate::{declare_store::DeclareStore, fault::{AstErrorKind, AstFault}, scope::ScopeBuilder};
 use soul_utils::{
     CrateContext, FunctionId, Ident,
     collections::{
         vec_map::{VecMap, VecMapIndex},
         vec_set::VecSet,
     },
-    fault::{Fault, FaultCollector, UnclassifiedKind},
+    fault::FaultCollector,
     ids::IdGenerator,
     linkage::Linkage,
     span::ModuleId,
@@ -14,6 +14,7 @@ use soul_utils::{
 use std::{collections::HashMap, path::PathBuf};
 
 mod ast;
+pub mod fault;
 pub mod declare_store;
 pub mod scope;
 
@@ -36,9 +37,9 @@ pub struct CrateForest {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct AstTree<K = UnclassifiedKind> {
+pub struct AstTree {
     pub root: ModuleId,
-    pub context: CrateContext<K>,
+    pub context: CrateContext<AstErrorKind>,
     pub scope_info: ScopeInfo,
     pub declares: DeclareStore,
     pub crates: CrateForest,
@@ -155,7 +156,7 @@ impl AstStore {
     }
 }
 
-impl<K> AstTree<K> {
+impl AstTree {
     pub fn new(root: ModuleId) -> Self {
         Self {
             root,
@@ -166,17 +167,17 @@ impl<K> AstTree<K> {
         }
     }
 
-    pub fn faults(&self) -> &FaultCollector<K> {
+    pub fn faults(&self) -> &FaultCollector<AstErrorKind> {
         &self.context.faults
     }
 
-    pub fn drain_faults(&mut self) -> FaultCollector<K> {
+    pub fn drain_faults(&mut self) -> FaultCollector<AstErrorKind> {
         let mut faults = FaultCollector::default();
         std::mem::swap(&mut self.context.faults, &mut faults);
         faults
     }
 
-    pub fn log_fault(&mut self, fault: Fault<K>) {
+    pub fn log_fault(&mut self, fault: AstFault) {
         self.context.faults.push(fault);
     }
 }

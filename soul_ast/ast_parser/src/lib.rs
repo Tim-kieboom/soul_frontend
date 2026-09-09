@@ -10,7 +10,7 @@ use soul_utils::{
 
 use crate::parser::Parser;
 
-pub mod fault;
+pub use ast_model::fault;
 mod parse;
 mod parser;
 mod utils;

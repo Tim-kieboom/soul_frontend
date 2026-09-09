@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use ast_model::{AstStore, AstTree, FunctionKind, declare_store::DeclareStore};
-use ast_parser::{ParseInfo, fault::AstErrorKind, parse_module};
+use ast_parser::{ParseInfo, parse_module};
 use mir_model::{ConstValue, Operand, Rvalue};
 use soul_name_resolver::name_resolve;
 use soul_tokenizer::to_token_stream;
@@ -15,7 +15,7 @@ use crate::{
     fault::{MirErrorKind, MirResult},
 };
 
-fn resolve_source(source: &str) -> AstTree<AstErrorKind> {
+fn resolve_source(source: &str) -> AstTree {
     let mut module_store = ModuleStore::new();
     module_store.insert_root(PathBuf::from("test.soul"));
     let root = module_store.get_root_id();
@@ -487,4 +487,107 @@ fn bitwise_and_condition_is_rejected_as_non_bool() {
         "f",
     );
     assert_rejected_with(&result, MirErrorKind::UnsupportedConditionExpression);
+}
+
+#[test]
+fn bool_variable_condition_lowers_directly_with_no_temp() {
+    let mir = lower_source(
+        "f(flag: bool): int {\n    if flag {\n        return 1\n    }\n    return 2\n}\n",
+        "f",
+    )
+    .expect("expected successful lowering");
+
+    // `flag` (param) + the return local, and nothing else: a bare bool
+    // variable condition needs no extra temp.
+    assert_eq!(mir.locals.entries().count(), 2, "{:#?}", mir.locals);
+
+    let (_, entry) = mir
+        .blocks
+        .entries()
+        .next()
+        .expect("expected an entry block");
+    assert_eq!(
+        entry.statements.len(),
+        0,
+        "a bare bool variable condition needs no temp, {:#?}",
+        entry.statements
+    );
+    let mir_model::Terminator::SwitchInt { discriminant, .. } = &entry.terminator else {
+        panic!(
+            "expected the entry block to end in a switchInt, got {:#?}",
+            entry.terminator
+        );
+    };
+    assert!(
+        matches!(discriminant, Operand::Copy(_)),
+        "expected switchInt to read the `flag` parameter directly, got {discriminant:#?}"
+    );
+}
+
+#[test]
+fn non_bool_variable_condition_is_rejected() {
+    let result = lower_source(
+        "f(a: int): int {\n    if a {\n        return 1\n    }\n    return 2\n}\n",
+        "f",
+    );
+    assert_rejected_with(&result, MirErrorKind::UnsupportedConditionExpression);
+}
+
+#[test]
+fn unary_not_condition_lowers_via_a_temp() {
+    let mir = lower_source(
+        "f(flag: bool): int {\n    if !flag {\n        return 1\n    }\n    return 2\n}\n",
+        "f",
+    )
+    .expect("expected successful lowering");
+
+    let (_, entry) = mir
+        .blocks
+        .entries()
+        .next()
+        .expect("expected an entry block");
+    assert_eq!(entry.statements.len(), 1, "{:#?}", entry.statements);
+
+    let mir_model::Statement::Assign(cond_place, Rvalue::UnaryOp(op, _)) = &entry.statements[0]
+    else {
+        panic!(
+            "expected the `!` to be assigned to a temp, got {:#?}",
+            entry.statements[0]
+        );
+    };
+    assert_eq!(*op, ast_model::operators::UnaryOperatorKind::Not);
+
+    let mir_model::Terminator::SwitchInt { discriminant, .. } = &entry.terminator else {
+        panic!(
+            "expected the entry block to end in a switchInt, got {:#?}",
+            entry.terminator
+        );
+    };
+    assert!(
+        matches!(discriminant, Operand::Copy(place) if place.local == cond_place.local),
+        "expected switchInt to read back the `!flag` temp"
+    );
+}
+
+#[test]
+fn not_of_a_comparison_composes_with_the_existing_temp_flattening() {
+    let mir = lower_source(
+        "f(a: int, b: int): int {\n    if !(a > b) {\n        return 1\n    }\n    return 2\n}\n",
+        "f",
+    )
+    .expect("expected successful lowering");
+
+    let (_, entry) = mir
+        .blocks
+        .entries()
+        .next()
+        .expect("expected an entry block");
+    // `a > b` -> temp, `!temp` -> temp, then switchInt.
+    assert_eq!(entry.statements.len(), 2, "{:#?}", entry.statements);
+}
+
+#[test]
+fn unary_negation_is_rejected() {
+    let result = lower_source("f(a: int): int {\n    return -a\n}\n", "f");
+    assert_rejected_with(&result, MirErrorKind::UnsupportedUnaryOperator);
 }

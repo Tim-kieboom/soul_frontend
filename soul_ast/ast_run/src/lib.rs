@@ -1,7 +1,7 @@
 use std::{path::PathBuf, time::Instant};
 
 use ast_model::AstTree;
-use ast_parser::{ParseInfo, fault::AstErrorKind, parse_module};
+use ast_parser::{ParseInfo, parse_module};
 use soul_name_resolver::name_resolve;
 use soul_tokenizer::TokenStream;
 use soul_utils::{
@@ -22,7 +22,7 @@ pub fn to_ast<'a>(
     tokens: TokenStream<'a>,
     request: AstRequest<'a>,
     _options: &CompilerOptions,
-) -> AstTree<AstErrorKind> {
+) -> AstTree {
     let AstRequest {
         source_folder,
         benchmark,

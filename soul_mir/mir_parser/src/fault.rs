@@ -41,6 +41,9 @@ pub enum MirErrorKind {
     )]
     UnsupportedBinaryOperator,
 
+    #[error("only the `!` (logical not) unary operator is supported in this lowering slice")]
+    UnsupportedUnaryOperator,
+
     #[error("variable has no resolved binding")]
     VariableHasNoResolvedBinding,
 
@@ -51,12 +54,12 @@ pub enum MirErrorKind {
     NestedExpressionHasNoResolvedType,
 
     #[error(
-        "only literals, variables, and arithmetic/comparison/logical binary expressions are supported as operands in this lowering slice"
+        "only literals, variables, arithmetic/comparison/logical binary expressions, and `!` are supported as operands in this lowering slice"
     )]
     UnsupportedOperandExpression,
 
     #[error(
-        "only a bare `bool` literal or a comparison/logical (`&&`/`||`) expression is supported as an `if`/`while` condition in this lowering slice"
+        "only a bare `bool` literal/variable, `!<bool>`, or a comparison/logical (`&&`/`||`) expression is supported as an `if`/`while` condition in this lowering slice"
     )]
     UnsupportedConditionExpression,
 

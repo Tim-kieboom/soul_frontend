@@ -1,5 +1,7 @@
 use ast_model::{
-    self as ast, SoulType, declare_store::DeclareStore, operators::BinaryOperatorKind,
+    self as ast, SoulType,
+    declare_store::DeclareStore,
+    operators::{BinaryOperatorKind, UnaryOperatorKind},
 };
 use mir_model as mir;
 use soul_utils::{
@@ -320,24 +322,44 @@ impl<'a> FunctionLowerer<'a> {
     }
 
     fn lower_bool_condition(&mut self, expr_id: ast::ExpressionId) -> MirResult<mir::Operand> {
-        let expr = &self.store.expressions[expr_id];
-        let is_bool = match &expr.node {
-            ast::ExpressionKind::Literal((_, ast::Literal::Bool(_))) => true,
-            ast::ExpressionKind::Binary(_) => matches!(
-                self.declares.get_expression_type(expr_id),
-                Some(SoulType::Primitive(PrimitiveTypes::Boolean))
-            ),
-            _ => false,
-        };
-        if !is_bool {
+        if !self.expression_is_bool(expr_id) {
+            let span = self.store.expressions[expr_id].span;
             return Err(Fault::error_with_kind(
                 MirErrorKind::UnsupportedConditionExpression,
-                Some(expr.span),
+                Some(span),
             ));
         }
         self.lower_operand(expr_id)
     }
 
+    fn expression_is_bool(&self, expr_id: ast::ExpressionId) -> bool {
+        let expr = &self.store.expressions[expr_id];
+        match &expr.node {
+            ast::ExpressionKind::Literal((_, ast::Literal::Bool(_))) => true,
+            ast::ExpressionKind::Variable(var) => self.is_type_boolean(var),
+            ast::ExpressionKind::Unary(unary) => {
+                matches!(unary.operator.value, UnaryOperatorKind::Not)
+            }
+            ast::ExpressionKind::Binary(_) => matches!(
+                self.declares.get_expression_type(expr_id),
+                Some(SoulType::Primitive(PrimitiveTypes::Boolean))
+            ),
+            _ => false,
+        }
+    }
+
+    fn is_type_boolean(&self, var: &ast_model::VariableExpression) -> bool {
+        let Some(resolved) = self.declares.get_variable_resolve(var.id) else {
+            return false
+        };
+
+        let Some((_, Some(ty), _)) = self.declares.get_variable_type(resolved) else {
+            return false
+        };
+
+        return ty.is_primitive_kind(PrimitiveTypes::Boolean)
+    }
+    
     fn lower_variable(
         &mut self,
         stmt: &ast::Statement,
@@ -404,6 +426,16 @@ impl<'a> FunctionLowerer<'a> {
                 let right = self.lower_operand(binary.right)?;
                 Ok(mir::Rvalue::BinaryOp(binary.operator.value, left, right))
             }
+            ast::ExpressionKind::Unary(unary) => {
+                if !matches!(unary.operator.value, UnaryOperatorKind::Not) {
+                    return Err(Fault::error_with_kind(
+                        MirErrorKind::UnsupportedUnaryOperator,
+                        Some(expr.span),
+                    ));
+                }
+                let operand = self.lower_operand(unary.value)?;
+                Ok(mir::Rvalue::UnaryOp(unary.operator.value, operand))
+            }
             _ => Ok(mir::Rvalue::Use(self.lower_operand(expr_id)?)),
         }
     }
@@ -448,6 +480,21 @@ impl<'a> FunctionLowerer<'a> {
 
                 let rvalue = self.lower_rvalue(expr_id)?;
                 let temp = self.alloc_local(ty, TypeModifier::Immut, span);
+                self.statements
+                    .push(mir::Statement::Assign(mir::Place::local(temp), rvalue));
+                Ok(mir::Operand::Copy(mir::Place::local(temp)))
+            }
+            // Only `!` is supported (checked inside `lower_rvalue`, which this
+            // calls first), and it's always `bool`-typed — unlike `Binary`,
+            // there's no resolver-recorded type to look up for `Unary`.
+            ast::ExpressionKind::Unary(_) => {
+                let span = expr.span;
+                let rvalue = self.lower_rvalue(expr_id)?;
+                let temp = self.alloc_local(
+                    SoulType::Primitive(PrimitiveTypes::Boolean),
+                    TypeModifier::Immut,
+                    span,
+                );
                 self.statements
                     .push(mir::Statement::Assign(mir::Place::local(temp), rvalue));
                 Ok(mir::Operand::Copy(mir::Place::local(temp)))

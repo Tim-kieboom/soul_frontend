@@ -1,6 +1,6 @@
 use std::{fmt::Display, path::PathBuf};
 
-use ast_model::{AssignType, SoulType};
+use crate::{AssignType, SoulType};
 use soul_tokenizer::model::{TokenKind, keyword::KeyWord};
 use soul_utils::{
     SharedStr,

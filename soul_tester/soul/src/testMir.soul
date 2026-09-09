@@ -117,3 +117,24 @@ whileWithComparisonCondition(n: int): int {
     }
     return n
 }
+
+boolVariableCondition(flag: bool): int {
+    if flag {
+        return 1
+    }
+    return 2
+}
+
+notCondition(flag: bool): int {
+    if !flag {
+        return 1
+    }
+    return 2
+}
+
+notOfComparisonCondition(a: int, b: int): int {
+    if !(a > b) {
+        return 1
+    }
+    return 2
+}
