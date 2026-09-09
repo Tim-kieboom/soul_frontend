@@ -106,7 +106,7 @@ impl<'a> NameResolver<'a> {
         if old_entry.is_some() {
             self.log_error(
                 AstErrorKind::TypeAlreadyExistsInScope {
-                    name: name.as_str().into(),
+                    name: name.as_shared_str(),
                 },
                 Some(name.span()),
             );
@@ -131,7 +131,7 @@ impl<'a> NameResolver<'a> {
         if old_entry.is_some() {
             self.log_error(
                 AstErrorKind::TypeAlreadyExistsInScope {
-                    name: name.as_str().into(),
+                    name: name.as_shared_str(),
                 },
                 Some(name.span()),
             );
@@ -156,7 +156,7 @@ impl<'a> NameResolver<'a> {
         if old_entry.is_some() {
             self.log_error(
                 AstErrorKind::TypeAlreadyExistsInScope {
-                    name: name.as_str().into(),
+                    name: name.as_shared_str(),
                 },
                 Some(name.span()),
             );

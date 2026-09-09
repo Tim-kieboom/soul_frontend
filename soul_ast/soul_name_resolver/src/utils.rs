@@ -80,7 +80,7 @@ impl<'a> NameResolver<'a> {
         {
             self.log_error(
                 AstErrorKind::ValueAlreadyExistsInScope {
-                    name: name.as_ref().into(),
+                    name,
                 },
                 Some(span),
             );

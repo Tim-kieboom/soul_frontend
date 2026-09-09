@@ -168,7 +168,7 @@ fn non_primitive_return_type_is_rejected() {
 #[test]
 fn destructuring_variable_pattern_is_rejected() {
     let result = lower_source(
-        "f(): int {\n    (a, b) := get_pair()\n    return a\n}\n",
+        "get_pair(): (int, int) {\n    return .(1, 2)\n}\nf(): int {\n    (a, b) := get_pair()\n    return a\n}\n",
         "f",
     );
     assert_rejected_with(&result, MirErrorKind::NonSimpleVariablePatternUnsupported);
@@ -331,7 +331,10 @@ fn call_with_multiple_arguments_lowers_each_before_the_call() {
     // like any other nested compound expression.
     assert_eq!(entry.statements.len(), 1, "{:#?}", entry.statements);
 
-    let mir_model::Terminator::Call { arguments: args, .. } = &entry.terminator else {
+    let mir_model::Terminator::Call {
+        arguments: args, ..
+    } = &entry.terminator
+    else {
         panic!(
             "expected the entry block to end in a Call, got {:#?}",
             entry.terminator
@@ -804,4 +807,121 @@ fn assignment_to_a_let_declared_local_reuses_its_local() {
     .expect("expected successful lowering");
 
     assert_eq!(mir.locals.entries().count(), 2, "{:#?}", mir.locals);
+}
+
+#[test]
+fn assert_intrinsic_lowers_to_an_assert_terminator() {
+    let mir = lower_source("f(): none {\n    assert(true)\n}\n", "f")
+        .expect("expected successful lowering");
+
+    // entry (ends in Assert) + continuation (falls off the end -> Return).
+    assert_eq!(mir.blocks.entries().count(), 2, "{:#?}", mir.blocks);
+
+    let (_, entry) = mir.blocks.entries().next().unwrap();
+    assert!(entry.statements.is_empty(), "{:#?}", entry.statements);
+    let mir_model::Terminator::Assert {
+        cond,
+        expected,
+        target,
+        ..
+    } = &entry.terminator
+    else {
+        panic!(
+            "expected the entry block to end in an Assert, got {:#?}",
+            entry.terminator
+        );
+    };
+    assert!(matches!(cond, Operand::Constant(ConstValue::Bool(true))));
+    assert!(*expected);
+
+    let continuation = mir
+        .blocks
+        .get(*target)
+        .expect("expected the success continuation block to exist");
+    assert!(matches!(
+        continuation.terminator,
+        mir_model::Terminator::Return
+    ));
+}
+
+#[test]
+fn assert_condition_reuses_the_bool_condition_machinery() {
+    let mir = lower_source("f(a: int, b: int): none {\n    assert(a > b)\n}\n", "f")
+        .expect("expected successful lowering");
+
+    let (_, entry) = mir.blocks.entries().next().unwrap();
+    // `a > b` must be flattened into a temp first, exactly like an `if`
+    // condition would, since `lower_assert_intrinsic` reuses
+    // `lower_bool_condition`.
+    assert_eq!(entry.statements.len(), 1, "{:#?}", entry.statements);
+    let mir_model::Statement::Assign(cond_place, Rvalue::BinaryOp(op, ..)) = &entry.statements[0]
+    else {
+        panic!(
+            "expected the comparison to be assigned to a temp, got {:#?}",
+            entry.statements[0]
+        );
+    };
+    assert_eq!(*op, ast_model::operators::BinaryOperatorKind::Gt);
+
+    let mir_model::Terminator::Assert { cond, .. } = &entry.terminator else {
+        panic!(
+            "expected the entry block to end in an Assert, got {:#?}",
+            entry.terminator
+        );
+    };
+    assert!(matches!(cond, Operand::Copy(place) if place.local == cond_place.local));
+}
+
+#[test]
+fn panic_intrinsic_diverges_with_no_reachable_continuation() {
+    let mir = lower_source("f(): none {\n    panic(\"oops\")\n}\n", "f")
+        .expect("expected successful lowering");
+
+    // No continuation block is ever inserted for `panic`'s dead `target` —
+    // same discipline as an `if`/`else` where both arms terminate.
+    assert_eq!(mir.blocks.entries().count(), 1, "{:#?}", mir.blocks);
+
+    let (_, entry) = mir.blocks.entries().next().unwrap();
+    let mir_model::Terminator::Assert {
+        cond,
+        expected,
+        msg,
+        ..
+    } = &entry.terminator
+    else {
+        panic!(
+            "expected the entry block to end in an Assert, got {:#?}",
+            entry.terminator
+        );
+    };
+    assert!(matches!(cond, Operand::Constant(ConstValue::Bool(false))));
+    assert!(*expected);
+    assert!(matches!(msg, Operand::Constant(ConstValue::Str(s)) if s == "oops"));
+}
+
+#[test]
+fn assert_used_as_a_value_is_rejected() {
+    // `x := assert(true)` fails earlier, at the variable's own
+    // `VariableHasNoResolvedType` check — the resolver never assigns a type
+    // to an intrinsic call at all. Routing through `return` instead reaches
+    // `lower_operand` directly (via `lower_rvalue`'s catch-all), isolating
+    // the check this test is actually after.
+    let result = lower_source("f(): int {\n    return assert(true)\n}\n", "f");
+    assert_rejected_with(&result, MirErrorKind::CannotUseNoneValueAsOperand);
+}
+
+#[test]
+fn unsupported_intrinsic_is_rejected_with_a_clear_fault() {
+    // `t: int` (not the intrinsic's real expected `typeid` parameter type) is
+    // deliberate — MIR doesn't type-check intrinsic arguments, dispatch on
+    // `kind` happens before any argument is even lowered, so a bogus but
+    // primitive-typed argument is enough to isolate this check without
+    // needing `typeid` (non-primitive) support to exist first.
+    let result = lower_source("f(t: int): none {\n    intrinsic.typeinfo(t)\n}\n", "f");
+    assert_rejected_with(
+        &result,
+        MirErrorKind::UnsupportedIntrinsic {
+            name: "typeinfo".into(),
+        },
+    );
 }

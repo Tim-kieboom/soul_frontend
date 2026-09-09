@@ -51,8 +51,8 @@ impl<'a> NameResolver<'a> {
             else {
                 faults.push(Fault::error_with_kind(
                     AstErrorKind::StructHasNoField {
-                        struct_name: stub.name.as_str().into(),
-                        field_name: field_name.as_str().into(),
+                        struct_name: stub.name.clone(),
+                        field_name: field_name.as_shared_str(),
                     },
                     Some(field_name.span()),
                 ));
@@ -106,7 +106,7 @@ impl<'a> NameResolver<'a> {
 
             faults.push(Fault::error_with_kind(
                 AstErrorKind::FieldTypeMismatch {
-                    field_name: field_name.as_str().into(),
+                    field_name: field_name.as_shared_str(),
                     expected: format!("{field_ty:?}").into(),
                     got: format!("{value_ty:?}").into(),
                 },

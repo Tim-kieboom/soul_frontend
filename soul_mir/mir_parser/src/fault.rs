@@ -95,6 +95,22 @@ pub enum MirErrorKind {
 
     #[error("`return <expr>` isn't valid in a `none`-returning function")]
     UnexpectedReturnValue,
+
+    #[error("intrinsic `{name}` isn't supported in this lowering slice")]
+    UnsupportedIntrinsic { name: Box<str> },
+
+    /// The resolver logs a fault on an intrinsic arity mismatch but still
+    /// stores the resolution and lets the call through — so a malformed
+    /// `assert()`/`panic()` call can genuinely reach MIR lowering with the
+    /// wrong argument count. This is the graceful fault for that, not a
+    /// defensive/unreachable one: guard the argument index with it instead
+    /// of indexing `call.arguments` directly.
+    #[error("intrinsic `{name}` expects {expected} argument(s), got {got}")]
+    IntrinsicArityMismatch {
+        name: Box<str>,
+        expected: usize,
+        got: usize,
+    },
 }
 
 impl From<UnclassifiedKind> for MirErrorKind {

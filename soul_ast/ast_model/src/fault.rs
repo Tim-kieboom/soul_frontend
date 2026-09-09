@@ -217,16 +217,16 @@ pub enum AstErrorKind {
     },
 
     #[error("{kind} '{name}' is private")]
-    ItemIsPrivate { kind: Box<str>, name: Box<str> },
+    ItemIsPrivate { kind: Box<str>, name: SharedStr },
 
     #[error("{kind} '{name}' already exists")]
-    ItemAliasAlreadyExists { kind: Box<str>, name: Box<str> },
+    ItemAliasAlreadyExists { kind: Box<str>, name: SharedStr },
 
     #[error("type of name {name} already exists in scope")]
-    TypeAlreadyExistsInScope { name: Box<str> },
+    TypeAlreadyExistsInScope { name: SharedStr },
 
     #[error("`{name}` already exists in scope")]
-    ValueAlreadyExistsInScope { name: Box<str> },
+    ValueAlreadyExistsInScope { name: SharedStr },
 
     #[error("parent and child function can not have the same name")]
     ParentChildFunctionSameName,
@@ -247,10 +247,13 @@ pub enum AstErrorKind {
     VariableNameInvalidStart { found: char },
 
     #[error("variable '{name}' is used before its declaration")]
-    VariableUsedBeforeDeclaration { name: Box<str> },
+    VariableUsedBeforeDeclaration { name: SharedStr },
 
     #[error("variable '{name}' is undefined in scope")]
-    UndefinedVariable { name: Box<str> },
+    UndefinedVariable { name: SharedStr },
+
+    #[error("function '{name}' is undefined")]
+    UndefinedFunction { name: SharedStr },
 
     #[error("unknown intrinsic 'intrinsic.{path}'")]
     UnknownIntrinsic { path: Box<str> },
@@ -264,14 +267,14 @@ pub enum AstErrorKind {
 
     #[error("'{function_name}' not found in {location}")]
     FunctionNotFoundIn {
-        function_name: Box<str>,
+        function_name: SharedStr,
         location: Box<str>,
     },
 
     #[error("struct `{struct_name}` has no field `{field_name}`")]
     StructHasNoField {
-        struct_name: Box<str>,
-        field_name: Box<str>,
+        struct_name: SharedStr,
+        field_name: SharedStr,
     },
 
     #[error("generic parameter `{generic_name}` inferred as both `{first}` and `{second}`")]
@@ -283,7 +286,7 @@ pub enum AstErrorKind {
 
     #[error("field `{field_name}` type mismatch: expected `{expected}`, got `{got}`")]
     FieldTypeMismatch {
-        field_name: Box<str>,
+        field_name: SharedStr,
         expected: Box<str>,
         got: Box<str>,
     },
@@ -296,8 +299,8 @@ pub enum AstErrorKind {
 
     #[error("variant `{enum_name}.{variant_name}` expects {expected} argument(s), got {got}")]
     EnumVariantArityMismatch {
-        enum_name: Box<str>,
-        variant_name: Box<str>,
+        enum_name: SharedStr,
+        variant_name: SharedStr,
         expected: usize,
         got: usize,
     },

@@ -144,6 +144,19 @@ pub enum Terminator {
         place: Place,
         target: BlockId,
     },
+    /// `assert(cond)` / `panic(msg)`. Mirrors rustc's `Assert` terminator
+    /// (minus `unwind`, since this compiler has no unwinding model): if
+    /// `cond == expected`, execution continues at `target`; otherwise it
+    /// panics with `msg`. An unconditional `panic(msg)` is `cond:
+    /// Constant(Bool(false)), expected: true` — always takes the panic path,
+    /// so `target` is allocated (the shape requires a `BlockId`) but never
+    /// actually reachable, and lowering doesn't insert a real block for it.
+    Assert {
+        cond: Operand,
+        expected: bool,
+        msg: Operand,
+        target: BlockId,
+    },
     Return,
     /// Target for a diverging `Call`; also a bodyless infinite `for {}`.
     Unreachable,

@@ -47,6 +47,10 @@ fn is_undefined_variable(kind: &AstErrorKind) -> bool {
     matches!(kind, AstErrorKind::UndefinedVariable { .. })
 }
 
+fn is_undefined_function_named(name: &str) -> impl Fn(&AstErrorKind) -> bool + '_ {
+    move |kind| matches!(kind, AstErrorKind::UndefinedFunction { name: got } if got.as_ref() == name)
+}
+
 #[test]
 fn bare_undefined_variable_reports_exactly_one_fault() {
     let ast = resolve_source("main() {\n    b := a\n}\n");
@@ -63,9 +67,15 @@ fn defined_variable_reports_no_undefined_fault() {
 }
 
 #[test]
-fn calling_an_undefined_function_is_not_yet_caught() {
+fn calling_an_undefined_function_reports_exactly_one_fault() {
     let ast = resolve_source("main() {\n    thisFunctionDoesNotExist()\n}\n");
-    assert_eq!(ast.faults().iter().count(), 0);
+    assert_eq!(
+        fault_count_matching(
+            &ast,
+            is_undefined_function_named("thisFunctionDoesNotExist")
+        ),
+        1
+    );
 }
 
 #[test]

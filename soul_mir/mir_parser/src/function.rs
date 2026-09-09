@@ -6,7 +6,7 @@ use ast_model::{
 use mir_model as mir;
 use soul_utils::{
     TypeModifier, collections::vec_map::VecMap, fault::Fault, ids::IdGenerator,
-    soul_names::PrimitiveTypes, span::Span,
+    intrinsics::IntrinsicFunction, soul_names::PrimitiveTypes, span::Span,
 };
 
 use crate::fault::{MirErrorKind, MirResult};
@@ -221,6 +221,99 @@ impl<'a> FunctionLowerer<'a> {
         Ok(*local)
     }
 
+    /// The one argument an `assert`/`panic` intrinsic call takes, guarded
+    /// against arity mismatches — the resolver logs a fault on a wrong count
+    /// but still stores the resolution and lets the call through, so this
+    /// must not assume `call.arguments` has the expected length.
+    fn intrinsic_sole_argument(
+        &self,
+        call: &ast::FunctionCall,
+        kind: IntrinsicFunction,
+        span: Span,
+    ) -> MirResult<ast::ExpressionId> {
+        match call.arguments.as_slice() {
+            [argument] => Ok(argument.value),
+            _ => Err(Fault::error_with_kind(
+                MirErrorKind::IntrinsicArityMismatch {
+                    name: kind.as_str().into(),
+                    expected: kind.arity(),
+                    got: call.arguments.len(),
+                },
+                Some(span),
+            )),
+        }
+    }
+
+    /// Lowers `assert(cond)`: continues normally if `cond` is `true`,
+    /// otherwise panics. `cond` goes through the same `lower_bool_condition`
+    /// machinery as an `if`/`while` condition — same restrictions apply.
+    fn lower_assert_intrinsic(&mut self, call: &ast::FunctionCall, span: Span) -> MirResult<()> {
+        let cond_expr = self.intrinsic_sole_argument(call, IntrinsicFunction::Assert, span)?;
+        let cond = self.lower_bool_condition(cond_expr)?;
+        let msg = mir::Operand::Constant(mir::ConstValue::Str("assertion failed".to_string()));
+
+        let next = self.new_block();
+        self.seal(
+            mir::Terminator::Assert {
+                cond,
+                expected: true,
+                msg,
+                target: next,
+            },
+            Some(next),
+        );
+        Ok(())
+    }
+
+    /// Lowers `panic(msg)`: unconditionally diverges. Modeled as an `Assert`
+    /// that's always false against `expected: true`, so it always takes the
+    /// panic path — `target` is allocated (the shape needs a `BlockId`) but
+    /// genuinely unreachable, so no block is ever inserted for it, and the
+    /// cursor becomes unreachable afterward (`next: None`), same as `return`.
+    fn lower_panic_intrinsic(&mut self, call: &ast::FunctionCall, span: Span) -> MirResult<()> {
+        let msg_expr = self.intrinsic_sole_argument(call, IntrinsicFunction::Panic, span)?;
+        let msg = self.lower_operand(msg_expr)?;
+
+        let dead = self.new_block();
+        self.seal(
+            mir::Terminator::Assert {
+                cond: mir::Operand::Constant(mir::ConstValue::Bool(false)),
+                expected: true,
+                msg,
+                target: dead,
+            },
+            None,
+        );
+        Ok(())
+    }
+
+    /// Dispatches an intrinsic call reached in statement position. `Ok(None)`
+    /// means `call` isn't an intrinsic at all (no `IntrinsicResolve` stored
+    /// for it) — the caller should fall through to the ordinary
+    /// `FunctionResolve`-based `lower_call` path instead.
+    fn try_lower_intrinsic_statement(
+        &mut self,
+        call: &ast::FunctionCall,
+        span: Span,
+    ) -> MirResult<Option<()>> {
+        let Some(resolve) = self.declares.get_intrinsic_resolve(call.id) else {
+            return Ok(None);
+        };
+        match resolve.kind {
+            IntrinsicFunction::Assert => self.lower_assert_intrinsic(call, span)?,
+            IntrinsicFunction::Panic => self.lower_panic_intrinsic(call, span)?,
+            other => {
+                return Err(Fault::error_with_kind(
+                    MirErrorKind::UnsupportedIntrinsic {
+                        name: other.as_str().into(),
+                    },
+                    Some(span),
+                ));
+            }
+        }
+        Ok(Some(()))
+    }
+
     /// Lowers a free-function call `name(args...)`. Only the plain shape is
     /// supported this slice: no method-call callee, no generics, no named
     /// arguments, no `defer f()` — each of those gets `UnsupportedCallShape`.
@@ -337,6 +430,12 @@ impl<'a> FunctionLowerer<'a> {
             ast::ExpressionKind::Break => self.lower_break(expr.span),
             ast::ExpressionKind::Continue => self.lower_continue(expr.span),
             ast::ExpressionKind::FunctionCall(call) => {
+                if self
+                    .try_lower_intrinsic_statement(call, expr.span)?
+                    .is_some()
+                {
+                    return Ok(());
+                }
                 const WANTS_NO_RESULT: bool = false;
                 self.lower_call(call, expr.span, WANTS_NO_RESULT)?;
                 Ok(())
@@ -645,9 +744,26 @@ impl<'a> FunctionLowerer<'a> {
                 Ok(mir::Operand::Copy(mir::Place::local(temp)))
             }
             ast::ExpressionKind::FunctionCall(call) => {
-                const WANTS_RESULT: bool = true;
-                
                 let span = expr.span;
+                // Every intrinsic today is either `none`-returning
+                // (`assert`/`panic`) or not yet lowerable at all — there's no
+                // intrinsic that can currently produce a usable value, so any
+                // intrinsic call reached here is always an error.
+                if let Some(resolve) = self.declares.get_intrinsic_resolve(call.id) {
+                    return Err(Fault::error_with_kind(
+                        match resolve.kind {
+                            IntrinsicFunction::Assert | IntrinsicFunction::Panic => {
+                                MirErrorKind::CannotUseNoneValueAsOperand
+                            }
+                            other => MirErrorKind::UnsupportedIntrinsic {
+                                name: other.as_str().into(),
+                            },
+                        },
+                        Some(span),
+                    ));
+                }
+
+                const WANTS_RESULT: bool = true;
                 match self.lower_call(call, span, WANTS_RESULT)? {
                     Some(operand) => Ok(operand),
                     // Only reachable if the resolver let a `none`-returning

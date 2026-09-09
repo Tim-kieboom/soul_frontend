@@ -178,7 +178,7 @@ impl<'a> NameResolver<'a> {
                     self.context,
                     AstErrorKind::ItemIsPrivate {
                         kind: entry.value.variant_name().into(),
-                        name: alias_name.as_str().into(),
+                        name: alias_name.as_shared_str(),
                     },
                     Some(alias_name.span()),
                 );
@@ -196,7 +196,7 @@ impl<'a> NameResolver<'a> {
                     self.context,
                     AstErrorKind::ItemAliasAlreadyExists {
                         kind: entry.value.variant_name().into(),
-                        name: alias_name.as_str().into(),
+                        name: alias_name.as_shared_str(),
                     },
                     Some(alias_name.span()),
                 );
@@ -217,7 +217,7 @@ impl<'a> NameResolver<'a> {
             self.log_error(
                 AstErrorKind::ItemIsPrivate {
                     kind: "variable".into(),
-                    name: alias_name.as_str().into(),
+                    name: alias_name.as_shared_str(),
                 },
                 Some(alias_name.span()),
             );
@@ -227,7 +227,7 @@ impl<'a> NameResolver<'a> {
             self.log_error(
                 AstErrorKind::ItemAliasAlreadyExists {
                     kind: "variable".into(),
-                    name: alias_name.as_str().into(),
+                    name: alias_name.as_shared_str(),
                 },
                 Some(alias_name.span()),
             );
@@ -239,7 +239,7 @@ impl<'a> NameResolver<'a> {
             self.log_error(
                 AstErrorKind::ItemIsPrivate {
                     kind: "function".into(),
-                    name: alias_name.as_str().into(),
+                    name: alias_name.as_shared_str(),
                 },
                 Some(alias_name.span()),
             );
@@ -249,7 +249,7 @@ impl<'a> NameResolver<'a> {
             self.log_error(
                 AstErrorKind::ItemAliasAlreadyExists {
                     kind: "function".into(),
-                    name: alias_name.as_str().into(),
+                    name: alias_name.as_shared_str(),
                 },
                 Some(alias_name.span()),
             );

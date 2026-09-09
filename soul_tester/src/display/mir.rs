@@ -13,11 +13,11 @@ use mir_model::{
 };
 use mir_run::MirProgram;
 use soul_utils::{
-    FunctionId, SharedStr, TypeModifier, collections::vec_map::{VecMap, VecMapIndex},
+    FunctionId, SharedStr, TypeModifier,
+    collections::vec_map::{VecMap, VecMapIndex},
 };
 
 pub(crate) fn display_mir(program: &MirProgram, ast: &AstStore) -> Result<()> {
-    
     let mut output_path = config::CONFIG.output_path().join("mir");
     output_path.push("tree.soulc");
 
@@ -49,14 +49,11 @@ where
 
 struct Displayer<'a, W: Writer> {
     writer: &'a mut W,
-    ast: &'a AstStore
+    ast: &'a AstStore,
 }
 impl<'a, W: Writer> Displayer<'a, W> {
     pub fn new(writer: &'a mut W, ast: &'a AstStore) -> Self {
-        Self {
-            ast,
-            writer,
-        }
+        Self { ast, writer }
     }
 
     fn write_function(&mut self, function: &Function) -> Result<()> {
@@ -79,7 +76,6 @@ impl<'a, W: Writer> Displayer<'a, W> {
 
     fn write_block(&mut self, function: &Function) -> Result<()> {
         for (block_id, block) in function.blocks.entries() {
-            
             push_fmt!(self, "    {}: {{\n", block_str(block_id))?;
             for statement in &block.statements {
                 self.push_str("        ")?;
@@ -302,6 +298,18 @@ impl<'a, W: Writer> Displayer<'a, W> {
             Terminator::Drop { place, target } => {
                 self.push_str("drop(")?;
                 self.write_place(place)?;
+                push_fmt!(self, ") -> {}", block_str(*target))?;
+            }
+            Terminator::Assert {
+                cond,
+                expected,
+                msg,
+                target,
+            } => {
+                self.push_str("assert(")?;
+                self.write_operand(cond)?;
+                push_fmt!(self, " == {expected}, ")?;
+                self.write_operand(msg)?;
                 push_fmt!(self, ") -> {}", block_str(*target))?;
             }
             Terminator::Return => {

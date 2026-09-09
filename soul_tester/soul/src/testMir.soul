@@ -180,3 +180,15 @@ callDiscardingNonNoneResult(): none {
 callingANoneFunction(): none {
     logMessage()
 }
+
+assertSimpleCondition(): none {
+    assert(true)
+}
+
+assertComparisonCondition(a: int, b: int): none {
+    assert(a > b)
+}
+
+panicUnconditionally(): none {
+    panic("oops")
+}

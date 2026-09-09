@@ -113,7 +113,7 @@ impl<'a> NameResolver<'a> {
                 if resolved < self.synthetic_id_boundary && variable.id < resolved {
                     self.log_error(
                         AstErrorKind::VariableUsedBeforeDeclaration {
-                            name: name.as_str().into(),
+                            name: name.as_shared_str(),
                         },
                         Some(name.span()),
                     );
@@ -126,7 +126,7 @@ impl<'a> NameResolver<'a> {
             }
             None => self.log_error(
                 AstErrorKind::UndefinedVariable {
-                    name: name.as_str().into(),
+                    name: name.as_shared_str(),
                 },
                 Some(name.span()),
             ),

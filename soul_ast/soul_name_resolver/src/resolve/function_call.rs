@@ -31,6 +31,17 @@ impl<'a> NameResolver<'a> {
             return;
         }
 
+        // `assert`/`panic` are the only intrinsics callable bare (no
+        // `intrinsic.` prefix) — checked only when there's no callee at all,
+        // so a qualified call (e.g. a method named `assert`) is unaffected.
+        if call.callee.is_none()
+            && let Ok(kind) = IntrinsicFunction::from_str(call.name.as_str())
+            && kind.callable_bare()
+        {
+            self.check_and_insert_intrinsic(kind, call.name.as_str(), call);
+            return;
+        }
+
         self.resolve_call(expression_id, call);
     }
 
@@ -50,7 +61,7 @@ impl<'a> NameResolver<'a> {
 
         if var_id < self.synthetic_id_boundary && call.id < var_id {
             self.log_error(
-                AstErrorKind::VariableUsedBeforeDeclaration { name: name.into() },
+                AstErrorKind::VariableUsedBeforeDeclaration { name: call.name.as_shared_str() },
                 Some(call.name.span()),
             );
             return true;
@@ -106,6 +117,15 @@ impl<'a> NameResolver<'a> {
             return;
         };
 
+        self.check_and_insert_intrinsic(kind, path, call);
+    }
+
+    fn check_and_insert_intrinsic(
+        &mut self,
+        kind: IntrinsicFunction,
+        path: &str,
+        call: &FunctionCall,
+    ) {
         if call.arguments.len() != kind.arity() {
             self.log_error(
                 AstErrorKind::IntrinsicArityMismatch {
@@ -148,6 +168,10 @@ impl<'a> NameResolver<'a> {
                 }
                 None if self.resolve_variable_callable(expression_id, call) => {}
                 None => {
+                    self.log_error(
+                        AstErrorKind::UndefinedFunction { name: call.name.as_shared_str() },
+                        Some(call.name.span()),
+                    );
                     self.declares.insert_function_resolve(
                         call.id,
                         FunctionResolve {
@@ -198,7 +222,12 @@ impl<'a> NameResolver<'a> {
 
         let Some(id) = resolved else {
             if !has_owner_type {
-                self.resolve_variable_callable(expression_id, call);
+                if !self.resolve_variable_callable(expression_id, call) {
+                    self.log_error(
+                        AstErrorKind::UndefinedFunction { name: call.name.as_shared_str() },
+                        Some(call.name.span()),
+                    );
+                }
             } else if let Some(owner_ty) = &owner_type {
                 self.check_enum_variant_construction(owner_ty, call);
             }
@@ -394,14 +423,13 @@ impl<'a> NameResolver<'a> {
         module_entry: &ScopeModuleEntry,
         call: &FunctionCall,
     ) -> FunctionId {
-        let function_name = call.name.as_str();
         let location = match &module_entry.crate_name {
             Some(crate_name) => format!("crate '{crate_name}'"),
             None => format!("module '{}'", module_entry.module_name),
         };
         self.log_error(
             AstErrorKind::FunctionNotFoundIn {
-                function_name: function_name.into(),
+                function_name: call.name.as_shared_str(),
                 location: location.into(),
             },
             Some(call.name.span()),

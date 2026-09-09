@@ -117,8 +117,8 @@ impl<'a> NameResolver<'a> {
         if call.arguments.len() != parameters.len() {
             self.log_error(
                 AstErrorKind::EnumVariantArityMismatch {
-                    enum_name: stub.name.as_str().into(),
-                    variant_name: variant_name.into(),
+                    enum_name: stub.name.clone(),
+                    variant_name: call.name.as_shared_str(),
                     expected: parameters.len(),
                     got: call.arguments.len(),
                 },
