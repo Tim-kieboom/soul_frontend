@@ -54,7 +54,7 @@ pub enum MirErrorKind {
     NestedExpressionHasNoResolvedType,
 
     #[error(
-        "only literals, variables, arithmetic/comparison/logical binary expressions, and `!` are supported as operands in this lowering slice"
+        "only literals, variables, arithmetic/comparison/logical binary expressions, `!`, and calls are supported as operands in this lowering slice"
     )]
     UnsupportedOperandExpression,
 
@@ -81,6 +81,20 @@ pub enum MirErrorKind {
         "only a bare (already-declared) variable is supported as an assignment target in this lowering slice"
     )]
     AssignmentTargetUnsupported,
+
+    #[error("function call has no resolved target")]
+    FunctionCallHasNoResolvedTarget,
+
+    #[error(
+        "only a plain `name(args...)` free-function call is supported in this lowering slice — no method-call receiver, generics, named arguments, or `defer`"
+    )]
+    UnsupportedCallShape,
+
+    #[error("a `none`-returning call's result can't be used as a value")]
+    CannotUseNoneValueAsOperand,
+
+    #[error("`return <expr>` isn't valid in a `none`-returning function")]
+    UnexpectedReturnValue,
 }
 
 impl From<UnclassifiedKind> for MirErrorKind {

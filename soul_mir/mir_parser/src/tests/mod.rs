@@ -125,7 +125,7 @@ fn lowers_arithmetic_with_a_variable_and_a_return() {
     else {
         panic!("expected second statement to assign a bare Use(Copy(..))");
     };
-    assert_eq!(place.local, mir.return_local);
+    assert_eq!(Some(place.local), mir.return_local);
 }
 
 #[test]
@@ -153,7 +153,13 @@ fn missing_return_is_rejected() {
 
 #[test]
 fn non_primitive_return_type_is_rejected() {
-    let result = lower_source("f() {\n    x := 1\n}\n", "f");
+    // `f() { .. }` with no declared return type is a `none`-returning
+    // function, which is now valid (see `none_returning_function_...` tests
+    // below) — a struct return type isolates a genuine non-primitive type.
+    let result = lower_source(
+        "struct Point { x: int }\nf(): Point {\n    return Point{x: 1}\n}\n",
+        "f",
+    );
     assert_rejected_matching(&result, |kind| {
         matches!(kind, MirErrorKind::NonPrimitiveType { .. })
     });
@@ -210,7 +216,7 @@ fn nested_compound_expression_is_lowered_via_a_temporary() {
         );
     };
     assert_eq!(*op, ast_model::operators::BinaryOperatorKind::Add);
-    assert_eq!(ret_place.local, mir.return_local);
+    assert_eq!(Some(ret_place.local), mir.return_local);
     assert!(
         matches!(right, Operand::Copy(place) if place.local == temp_place.local),
         "expected the outer expression's right operand to read back the temp from statement 0"
@@ -228,21 +234,168 @@ fn nested_compound_expression_is_lowered_via_a_temporary() {
 }
 
 #[test]
-fn function_call_in_body_is_rejected() {
-    let result = lower_source(
+fn return_of_a_call_result_lowers_via_the_call_terminator() {
+    let mir = lower_source(
         "g(): int { return 1 }\nf(): int {\n    return g()\n}\n",
         "f",
-    );
-    assert_rejected_with(&result, MirErrorKind::UnsupportedOperandExpression);
+    )
+    .expect("expected successful lowering");
+
+    // entry (ends in the Call) + continuation (reads the result, returns).
+    assert_eq!(mir.blocks.entries().count(), 2, "{:#?}", mir.blocks);
+
+    let (_, entry) = mir.blocks.entries().next().unwrap();
+    assert!(entry.statements.is_empty(), "{:#?}", entry.statements);
+    let mir_model::Terminator::Call {
+        arguments: args,
+        destination,
+        target,
+        ..
+    } = &entry.terminator
+    else {
+        panic!(
+            "expected the entry block to end in a Call, got {:#?}",
+            entry.terminator
+        );
+    };
+    assert!(args.is_empty());
+    let destination_local = destination
+        .as_ref()
+        .expect("expected a destination since the call's result is used")
+        .local;
+    let continuation_id = target.expect("expected a continuation block");
+
+    let continuation = mir
+        .blocks
+        .get(continuation_id)
+        .expect("expected the continuation block to exist");
+    let mir_model::Statement::Assign(ret_place, Rvalue::Use(Operand::Copy(read_place))) =
+        &continuation.statements[0]
+    else {
+        panic!(
+            "expected the continuation to read the call's result back, got {:#?}",
+            continuation.statements
+        );
+    };
+    assert_eq!(read_place.local, destination_local);
+    assert_eq!(Some(ret_place.local), mir.return_local);
+    assert!(matches!(
+        continuation.terminator,
+        mir_model::Terminator::Return
+    ));
 }
 
 #[test]
-fn nested_function_call_operand_is_rejected() {
-    let result = lower_source(
+fn call_embedded_in_a_larger_expression_splits_the_block() {
+    let mir = lower_source(
         "g(): int { return 1 }\nf(a: int): int {\n    return a + g()\n}\n",
         "f",
+    )
+    .expect("expected successful lowering");
+
+    // entry (ends in the Call) + continuation (computes `a + <result>`, returns).
+    assert_eq!(mir.blocks.entries().count(), 2, "{:#?}", mir.blocks);
+
+    let (_, entry) = mir.blocks.entries().next().unwrap();
+    assert!(
+        matches!(entry.terminator, mir_model::Terminator::Call { .. }),
+        "{:#?}",
+        entry.terminator
     );
-    assert_rejected_with(&result, MirErrorKind::UnsupportedOperandExpression);
+
+    let (_, continuation) = mir.blocks.entries().nth(1).unwrap();
+    let mir_model::Statement::Assign(_, Rvalue::BinaryOp(op, ..)) = &continuation.statements[0]
+    else {
+        panic!(
+            "expected the continuation to compute `a + <call result>`, got {:#?}",
+            continuation.statements
+        );
+    };
+    assert_eq!(*op, ast_model::operators::BinaryOperatorKind::Add);
+    assert!(matches!(
+        continuation.terminator,
+        mir_model::Terminator::Return
+    ));
+}
+
+#[test]
+fn call_with_multiple_arguments_lowers_each_before_the_call() {
+    let mir = lower_source(
+        "g(x: int, y: int): int { return x }\nf(a: int, b: int): int {\n    return g(a, b + 1)\n}\n",
+        "f",
+    )
+    .expect("expected successful lowering");
+
+    let (_, entry) = mir.blocks.entries().next().unwrap();
+    // `b + 1` must be flattened into its own temp before the call, exactly
+    // like any other nested compound expression.
+    assert_eq!(entry.statements.len(), 1, "{:#?}", entry.statements);
+
+    let mir_model::Terminator::Call { arguments: args, .. } = &entry.terminator else {
+        panic!(
+            "expected the entry block to end in a Call, got {:#?}",
+            entry.terminator
+        );
+    };
+    assert_eq!(args.len(), 2, "{:#?}", args);
+}
+
+#[test]
+fn bare_statement_call_discards_the_result_even_when_non_none() {
+    // The trailing `;` matters: a semicolon-less call in tail position gets
+    // implicit-return treatment (checked against `f`'s own return type by the
+    // resolver), which isn't what this test is isolating.
+    let mir = lower_source("g(): int { return 1 }\nf(): none {\n    g();\n}\n", "f")
+        .expect("expected successful lowering");
+
+    let (_, entry) = mir.blocks.entries().next().unwrap();
+    let mir_model::Terminator::Call { destination, .. } = &entry.terminator else {
+        panic!(
+            "expected the entry block to end in a Call, got {:#?}",
+            entry.terminator
+        );
+    };
+    assert!(
+        destination.is_none(),
+        "a bare statement call's result must be discarded even though `g` returns `int`, got {:#?}",
+        destination
+    );
+}
+
+#[test]
+fn none_returning_function_can_fall_off_the_end() {
+    let mir =
+        lower_source("f(): none {\n    x := 1\n}\n", "f").expect("expected successful lowering");
+
+    assert_eq!(mir.return_local, None);
+    let (_, block) = mir.blocks.entries().next().unwrap();
+    assert!(matches!(block.terminator, mir_model::Terminator::Return));
+}
+
+#[test]
+fn none_returning_function_with_a_bare_return() {
+    let mir = lower_source(
+        "f(): none {\n    if true {\n        return\n    }\n}\n",
+        "f",
+    )
+    .expect("expected successful lowering");
+
+    assert_eq!(mir.return_local, None);
+}
+
+#[test]
+fn calling_a_none_returning_function_as_a_statement() {
+    let mir = lower_source("g(): none {\n}\nf(): none {\n    g()\n}\n", "f")
+        .expect("expected successful lowering");
+
+    let (_, entry) = mir.blocks.entries().next().unwrap();
+    let mir_model::Terminator::Call { destination, .. } = &entry.terminator else {
+        panic!(
+            "expected the entry block to end in a Call, got {:#?}",
+            entry.terminator
+        );
+    };
+    assert!(destination.is_none());
 }
 
 #[test]

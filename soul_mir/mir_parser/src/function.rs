@@ -65,12 +65,19 @@ impl<'a> FunctionLowerer<'a> {
         }
 
         let arg_count = signature.parameters.len();
-        require_primitive(&signature.return_type, signature.name.span())?;
-        let return_local = self.alloc_local(
-            signature.return_type.clone(),
-            TypeModifier::Mut,
-            signature.name.span(),
-        );
+        // A `none`(void)-returning function has nothing to hold a return value
+        // in, so it gets no `return_local` at all — see `Function::return_local`.
+        let is_none_return = matches!(signature.return_type, SoulType::None);
+        let return_local = if is_none_return {
+            None
+        } else {
+            require_primitive(&signature.return_type, signature.name.span())?;
+            Some(self.alloc_local(
+                signature.return_type.clone(),
+                TypeModifier::Mut,
+                signature.name.span(),
+            ))
+        };
 
         let entry = self.new_block();
         self.current = Some(entry);
@@ -79,10 +86,17 @@ impl<'a> FunctionLowerer<'a> {
         self.lower_body(return_local, &statement_ids)?;
 
         if self.current.is_some() {
-            return Err(Fault::error_with_kind(
-                MirErrorKind::MissingReturnStatement,
-                Some(fn_span),
-            ));
+            if is_none_return {
+                // Falling off the end of a `none`-returning function is valid
+                // (an implicit `return`) — unlike every other return type,
+                // where it's `MissingReturnStatement`.
+                self.seal(mir::Terminator::Return, None);
+            } else {
+                return Err(Fault::error_with_kind(
+                    MirErrorKind::MissingReturnStatement,
+                    Some(fn_span),
+                ));
+            }
         }
 
         Ok(mir::Function {
@@ -129,7 +143,7 @@ impl<'a> FunctionLowerer<'a> {
 
     fn lower_body(
         &mut self,
-        return_local: mir::LocalId,
+        return_local: Option<mir::LocalId>,
         statements: &[ast::StatementId],
     ) -> MirResult<()> {
         for &id in statements {
@@ -147,7 +161,7 @@ impl<'a> FunctionLowerer<'a> {
 
     fn lower_statement(
         &mut self,
-        return_local: mir::LocalId,
+        return_local: Option<mir::LocalId>,
         statement: &ast::Statement,
     ) -> MirResult<()> {
         match &statement.node {
@@ -207,15 +221,105 @@ impl<'a> FunctionLowerer<'a> {
         Ok(*local)
     }
 
+    /// Lowers a free-function call `name(args...)`. Only the plain shape is
+    /// supported this slice: no method-call callee, no generics, no named
+    /// arguments, no `defer f()` — each of those gets `UnsupportedCallShape`.
+    ///
+    /// A call is a *terminator* (`mir_model::Terminator::Call`), not a plain
+    /// statement, because it can diverge — so this seals the current block
+    /// with the call and opens a fresh one as the continuation, returning the
+    /// operand that reads the result (if any) out of that new block. Every
+    /// caller of this (an operand deep inside `a + f(b)`, a loop condition,
+    /// etc.) only ever looks at the *returned* operand, never assumes which
+    /// block is current afterward, so this composes with the rest of the
+    /// lowerer for free — nothing needs to change at the call sites.
+    fn lower_call(
+        &mut self,
+        call: &ast::FunctionCall,
+        span: Span,
+        want_result: bool,
+    ) -> MirResult<Option<mir::Operand>> {
+        if call.callee.is_some() || !call.generics.is_empty() {
+            return Err(Fault::error_with_kind(
+                MirErrorKind::UnsupportedCallShape,
+                Some(span),
+            ));
+        }
+
+        let Some(resolve) = self.declares.get_function_resolve(call.id) else {
+            return Err(Fault::error_with_kind(
+                MirErrorKind::FunctionCallHasNoResolvedTarget,
+                Some(span),
+            ));
+        };
+        if resolve.is_defer {
+            return Err(Fault::error_with_kind(
+                MirErrorKind::UnsupportedCallShape,
+                Some(span),
+            ));
+        }
+
+        let Some((signature, _)) = self.declares.get_function(resolve.id) else {
+            return Err(Fault::error_with_kind(
+                MirErrorKind::FunctionCallHasNoResolvedTarget,
+                Some(span),
+            ));
+        };
+        let return_type = signature.return_type.clone();
+
+        let mut args = Vec::with_capacity(call.arguments.len());
+        for argument in &call.arguments {
+            if argument.name.is_some() {
+                return Err(Fault::error_with_kind(
+                    MirErrorKind::UnsupportedCallShape,
+                    Some(span),
+                ));
+            }
+            args.push(self.lower_operand(argument.value)?);
+        }
+
+        let is_none_return = matches!(return_type, SoulType::None);
+        let destination_local = if want_result && !is_none_return {
+            require_primitive(&return_type, span)?;
+            Some(self.alloc_local(return_type, TypeModifier::Immut, span))
+        } else {
+            None
+        };
+        let destination = destination_local.map(mir::Place::local);
+
+        let next = self.new_block();
+        self.seal(
+            mir::Terminator::Call {
+                id: resolve.id,
+                arguments: args,
+                destination,
+                target: Some(next),
+            },
+            Some(next),
+        );
+
+        Ok(destination_local.map(|local| mir::Operand::Copy(mir::Place::local(local))))
+    }
+
     fn lower_expression_statement(
         &mut self,
-        return_local: mir::LocalId,
+        return_local: Option<mir::LocalId>,
         stmt: &ast::Statement,
         expression: ast::ExpressionId,
     ) -> MirResult<()> {
         let expr = &self.store.expressions[expression];
         match &expr.node {
             ast::ExpressionKind::Return(Some(value_id)) => {
+                // A `return <expr>` in a `none`-returning function would mean
+                // the resolver let a value flow into a `none` context, which
+                // it type-checks against — trust that and treat this as
+                // defensive, not user-reachable.
+                let Some(return_local) = return_local else {
+                    return Err(Fault::error_with_kind(
+                        MirErrorKind::UnexpectedReturnValue,
+                        Some(expr.span),
+                    ));
+                };
                 let rvalue = self.lower_rvalue(*value_id)?;
                 self.statements.push(mir::Statement::Assign(
                     mir::Place::local(return_local),
@@ -224,10 +328,19 @@ impl<'a> FunctionLowerer<'a> {
                 self.seal(mir::Terminator::Return, None);
                 Ok(())
             }
+            ast::ExpressionKind::Return(None) => {
+                self.seal(mir::Terminator::Return, None);
+                Ok(())
+            }
             ast::ExpressionKind::If(if_expr) => self.lower_if(return_local, if_expr, expr.span),
             ast::ExpressionKind::For(for_expr) => self.lower_for(return_local, for_expr, expr.span),
             ast::ExpressionKind::Break => self.lower_break(expr.span),
             ast::ExpressionKind::Continue => self.lower_continue(expr.span),
+            ast::ExpressionKind::FunctionCall(call) => {
+                const WANTS_NO_RESULT: bool = false;
+                self.lower_call(call, expr.span, WANTS_NO_RESULT)?;
+                Ok(())
+            }
             _ => Err(Fault::error_with_kind(
                 MirErrorKind::NonReturnTerminalStatementUnsupported,
                 Some(stmt.span),
@@ -237,7 +350,7 @@ impl<'a> FunctionLowerer<'a> {
 
     fn lower_if(
         &mut self,
-        return_local: mir::LocalId,
+        return_local: Option<mir::LocalId>,
         if_expr: &ast::If,
         span: Span,
     ) -> MirResult<()> {
@@ -298,7 +411,7 @@ impl<'a> FunctionLowerer<'a> {
 
     fn lower_for(
         &mut self,
-        return_local: mir::LocalId,
+        return_local: Option<mir::LocalId>,
         for_expr: &ast::For,
         span: Span,
     ) -> MirResult<()> {
@@ -530,6 +643,22 @@ impl<'a> FunctionLowerer<'a> {
                 self.statements
                     .push(mir::Statement::Assign(mir::Place::local(temp), rvalue));
                 Ok(mir::Operand::Copy(mir::Place::local(temp)))
+            }
+            ast::ExpressionKind::FunctionCall(call) => {
+                const WANTS_RESULT: bool = true;
+                
+                let span = expr.span;
+                match self.lower_call(call, span, WANTS_RESULT)? {
+                    Some(operand) => Ok(operand),
+                    // Only reachable if the resolver let a `none`-returning
+                    // call's result flow into a value context — trust the
+                    // resolver's own type-checking to prevent this, same as
+                    // `UnexpectedReturnValue`.
+                    None => Err(Fault::error_with_kind(
+                        MirErrorKind::CannotUseNoneValueAsOperand,
+                        Some(span),
+                    )),
+                }
             }
             _ => Err(Fault::error_with_kind(
                 MirErrorKind::UnsupportedOperandExpression,

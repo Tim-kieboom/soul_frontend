@@ -32,8 +32,11 @@ pub struct Function {
     pub blocks: VecMap<BlockId, BasicBlock>,
     /// `locals[0..arg_count]` are parameters, by convention.
     pub arg_count: usize,
-    /// Holds the return value; conventionally `locals[arg_count]`.
-    pub return_local: LocalId,
+    /// Holds the return value; conventionally `locals[arg_count]`. `None` for a
+    /// `none`(void)-returning function — there's no value to hold, so no local
+    /// is allocated for one rather than allocating a phantom, never-touched
+    /// `none`-typed local just to fill this field.
+    pub return_local: Option<LocalId>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -127,9 +130,12 @@ pub enum Terminator {
         otherwise: BlockId,
     },
     Call {
-        func: FunctionId,
-        args: Vec<Operand>,
-        destination: Place,
+        id: FunctionId,
+        arguments: Vec<Operand>,
+        /// `None` when the callee returns `none`, or when the caller discards
+        /// a non-`none` result (a bare `f(x);` statement) — either way there's
+        /// nothing to write the result into.
+        destination: Option<Place>,
         /// `None` = diverges (panics, or return type is `!`).
         target: Option<BlockId>,
     },

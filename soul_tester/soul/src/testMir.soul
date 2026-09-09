@@ -149,3 +149,34 @@ reassignLocal(): int {
     x = 2
     return x
 }
+
+callee(x: int): int {
+    return x + 1
+}
+
+callResultReturned(): int {
+    return callee(41)
+}
+
+callEmbeddedInExpression(a: int): int {
+    return a + callee(a)
+}
+
+callWithMultipleArguments(x: int, y: int): int {
+    return x + y
+}
+
+callWithExpressionArgument(a: int, b: int): int {
+    return callWithMultipleArguments(a, b + 1)
+}
+
+logMessage(): none {
+}
+
+callDiscardingNonNoneResult(): none {
+    callee(1);
+}
+
+callingANoneFunction(): none {
+    logMessage()
+}
