@@ -1,4 +1,4 @@
 // expect: 42
-main(): u8 {
+main(): i32 {
     return 42
 }

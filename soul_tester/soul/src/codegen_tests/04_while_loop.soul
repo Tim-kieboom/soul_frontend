@@ -1,11 +1,11 @@
 // expect: 0
-countdown(mut n: u8): u8 {
+countdown(mut n: i32): i32 {
     for n > 0 {
         n -= 1
     }
     return n
 }
 
-main(): u8 {
+main(): i32 {
     return countdown(5)
 }

@@ -7,11 +7,11 @@ use crate::{
 };
 use anyhow::Result;
 use ast_model::AstStore;
+use mir_model::MirProgram;
 use mir_model::{
     AggregateKind, Function, LocalDecl, LocalId, Operand, Place, PlaceElem, Rvalue, Statement,
     Terminator,
 };
-use mir_model::MirProgram;
 use soul_utils::{
     FunctionId, SharedStr, TypeModifier,
     collections::vec_map::{VecMap, VecMapIndex},

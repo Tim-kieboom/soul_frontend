@@ -1,5 +1,5 @@
 // expect: 1
-main(): u8 {
+main(): i32 {
     a := 3_u8
     if a > 2 {
         return 1

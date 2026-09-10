@@ -9,24 +9,45 @@
 //! via `llc`/a linker is a separate, currently-manual step (see
 //! `docs/compiler-pipeline-plan.md`).
 
-use anyhow::{Context as _, Result, anyhow, bail};
+pub mod fault;
+
 use ast_model::{AstStore, SoulType, operators::BinaryOperatorKind};
 use inkwell::{
     IntPredicate,
     basic_block::BasicBlock as LlvmBlock,
-    builder::Builder,
+    builder::{Builder, BuilderError},
     context::Context,
     module::Module,
     types::IntType,
     values::{FunctionValue, IntValue, PointerValue},
 };
-use mir_model::{BlockId, ConstValue, Function, LocalId, MirProgram, Operand, Rvalue, Statement, Terminator};
+use mir_model::{
+    BlockId, ConstValue, Function, LocalId, MirProgram, Operand, Rvalue, Statement, Terminator,
+};
 use soul_utils::{
-    FunctionId, collections::vec_map::{VecMap, VecMapIndex}, soul_names::PrimitiveTypes,
+    FunctionId,
+    collections::vec_map::{VecMap, VecMapIndex},
+    fault::Fault,
+    soul_names::PrimitiveTypes,
 };
 
-/// Builds an LLVM module containing every function in `functions`. `ast` is
-/// only used to recover each function's source name (MIR itself only has
+use crate::fault::{CodegenErrorKind, CodegenResult};
+
+fn llvm_err(err: BuilderError) -> Fault<CodegenErrorKind> {
+    Fault::error_with_kind(
+        CodegenErrorKind::LlvmBuilderError {
+            message: err.to_string().into_boxed_str(),
+        },
+        None,
+    )
+}
+
+fn err(kind: CodegenErrorKind) -> Fault<CodegenErrorKind> {
+    Fault::error_with_kind(kind, None)
+}
+
+/// Builds an LLVM module containing every function in `mir`. `ast` is only
+/// used to recover each function's source name (MIR itself only has
 /// `FunctionId`s) — the entry point a linker looks for (`main`) has to match
 /// the Soul function's actual declared name exactly.
 pub fn codegen_module<'ctx>(
@@ -34,8 +55,7 @@ pub fn codegen_module<'ctx>(
     module_name: &str,
     mir: &MirProgram,
     ast: &AstStore,
-) -> Result<Module<'ctx>> {
-
+) -> CodegenResult<Module<'ctx>> {
     let module = context.create_module(module_name);
     let mut codegen = ModuleCodegen {
         context,
@@ -53,11 +73,11 @@ pub fn codegen_module<'ctx>(
     Ok(module)
 }
 
-fn function_name(ast: &AstStore, id: FunctionId) -> Result<&str> {
+fn function_name(ast: &AstStore, id: FunctionId) -> CodegenResult<&str> {
     let kind = ast
         .functions
         .get(id)
-        .ok_or_else(|| anyhow!("{id:?} has no AST entry"))?;
+        .ok_or_else(|| err(CodegenErrorKind::MissingAstEntry { id }))?;
 
     Ok(kind.signature().name.as_str())
 }
@@ -73,7 +93,7 @@ struct ModuleCodegen<'ctx, 'a> {
 impl<'ctx, 'a> ModuleCodegen<'ctx, 'a> {
     /// Declares every function's signature up front, so calls can reference a
     /// callee regardless of definition order (including mutual recursion).
-    fn declare_all_functions(&mut self) -> Result<()> {
+    fn declare_all_functions(&mut self) -> CodegenResult<()> {
         for (id, function) in self.mir.functions.entries() {
             let name = function_name(self.ast, id)?;
 
@@ -81,9 +101,8 @@ impl<'ctx, 'a> ModuleCodegen<'ctx, 'a> {
                 .locals
                 .entries()
                 .take(function.arg_count)
-                .map(|(_, decl)| llvm_int_type(self.context, &decl.ty))
-                .collect::<Result<Vec<_>>>()
-                .with_context(|| format!("in `{name}`'s parameters"))?;
+                .map(|(_, decl)| llvm_int_type(self.context, decl))
+                .collect::<CodegenResult<Vec<_>>>()?;
 
             let param_metadata_types = param_types
                 .iter()
@@ -92,14 +111,13 @@ impl<'ctx, 'a> ModuleCodegen<'ctx, 'a> {
 
             let return_type = function
                 .return_local
-                .map(|local| llvm_int_type(self.context, &function.locals[local].ty))
-                .transpose()
-                .with_context(|| format!("in `{name}`'s return type"))?;
+                .map(|local| llvm_int_type(self.context, &function.locals[local]))
+                .transpose()?;
 
             // The C ABI's `main` always returns `i32` (that's what becomes
             // the process exit code) regardless of Soul's declared return
-            // type — `codegen_terminator`'s `Return` case zero-extends to
-            // match whenever this widening actually applies.
+            // type — `codegen_terminator`'s `Return` case widens to match
+            // whenever this differs from the natural return type.
             let fn_type = if name == "main" {
                 self.context
                     .i32_type()
@@ -120,11 +138,13 @@ impl<'ctx, 'a> ModuleCodegen<'ctx, 'a> {
         Ok(())
     }
 
-    fn codegen_function(&mut self, id: FunctionId, function: &Function) -> Result<()> {
+    fn codegen_function(&mut self, id: FunctionId, function: &Function) -> CodegenResult<()> {
         let name = function_name(self.ast, id)?;
-        let fn_value = *self.function_values.get(id)
-            .ok_or_else(|| anyhow!("{id:?} not Found"))?;
-        
+        let fn_value = *self
+            .function_values
+            .get(id)
+            .ok_or_else(|| err(CodegenErrorKind::MissingAstEntry { id }))?;
+
         let builder = self.context.create_builder();
 
         // A dedicated `entry` block holding only the parameter/local allocas,
@@ -136,20 +156,17 @@ impl<'ctx, 'a> ModuleCodegen<'ctx, 'a> {
 
         let mut locals: VecMap<LocalId, PointerValue<'ctx>> = VecMap::new();
         for (local_id, decl) in function.locals.entries() {
-
-            let ty = llvm_int_type(self.context, &decl.ty)
-                .with_context(|| format!("in `{name}`'s local {local_id:?}"))?;
-
+            let ty = llvm_int_type(self.context, decl)?;
             let slot = builder
                 .build_alloca(ty, &format!("_{}", local_id.index()))
-                .map_err(|e| anyhow!("{e}"))?;
-
+                .map_err(llvm_err)?;
             locals.insert(local_id, slot);
         }
-        // Params are `locals[0..arg_count]` *by position*, not by a
-        // specific `LocalId` value — `LocalId`s are 1-based (whatever
-        // `IdGenerator` happens to start at), not the 0-based index a naive
-        // `LocalId::new_index(i)` would reconstruct.
+
+        // Params are `locals[0..arg_count]` *by position*: the actual
+        // `LocalId`s backing them aren't necessarily `0..arg_count` as
+        // values (whatever `IdGenerator` happens to start at), so they're
+        // read off `function.locals` itself rather than reconstructed.
         let param_locals: Vec<LocalId> = function
             .locals
             .entries()
@@ -160,19 +177,18 @@ impl<'ctx, 'a> ModuleCodegen<'ctx, 'a> {
         for (i, &param_local) in param_locals.iter().enumerate() {
             let param_value = fn_value
                 .get_nth_param(i as u32)
-                .ok_or_else(|| anyhow!("`{name}` is missing parameter {i}"))?;
+                .ok_or_else(|| err(CodegenErrorKind::MissingParameterValue { index: i }))?;
 
             builder
-                .build_store(locals[param_local], param_value)?;
+                .build_store(locals[param_local], param_value)
+                .map_err(llvm_err)?;
         }
 
         let mut blocks: VecMap<BlockId, LlvmBlock<'ctx>> = VecMap::new();
         for (block_id, _) in function.blocks.entries() {
-
             let llvm_block = self
                 .context
                 .append_basic_block(fn_value, &format!("bb{}", block_id.index()));
-
             blocks.insert(block_id, llvm_block);
         }
 
@@ -184,17 +200,17 @@ impl<'ctx, 'a> ModuleCodegen<'ctx, 'a> {
             .blocks
             .entries()
             .next()
-            .ok_or_else(|| anyhow!("`{name}` has no blocks"))?;
+            .ok_or_else(|| err(CodegenErrorKind::FunctionHasNoBlocks))?;
 
         builder
-            .build_unconditional_branch(blocks[mir_entry_id])?;
+            .build_unconditional_branch(blocks[mir_entry_id])
+            .map_err(llvm_err)?;
 
         let mut fn_codegen = FunctionCodegen {
             context: self.context,
             module: self.module,
             builder,
             function,
-            name,
             is_entry_point: name == "main",
             locals,
             blocks,
@@ -214,7 +230,6 @@ struct FunctionCodegen<'ctx, 'a> {
     module: &'a Module<'ctx>,
     builder: Builder<'ctx>,
     function: &'a Function,
-    name: &'a str,
     is_entry_point: bool,
     locals: VecMap<LocalId, PointerValue<'ctx>>,
     blocks: VecMap<BlockId, LlvmBlock<'ctx>>,
@@ -223,7 +238,11 @@ struct FunctionCodegen<'ctx, 'a> {
 }
 
 impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
-    fn codegen_block(&mut self, block_id: BlockId, block: &mir_model::BasicBlock) -> Result<()> {
+    fn codegen_block(
+        &mut self,
+        block_id: BlockId,
+        block: &mir_model::BasicBlock,
+    ) -> CodegenResult<()> {
         self.builder.position_at_end(self.blocks[block_id]);
         for statement in &block.statements {
             self.codegen_statement(statement)?;
@@ -231,20 +250,17 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
         self.codegen_terminator(&block.terminator)
     }
 
-    fn codegen_statement(&mut self, statement: &Statement) -> Result<()> {
+    fn codegen_statement(&mut self, statement: &Statement) -> CodegenResult<()> {
         match statement {
             Statement::Assign(place, rvalue) => {
                 if !place.projection.is_empty() {
-                    bail!(
-                        "in `{}`: place projections (field/index/deref) aren't supported in this codegen slice",
-                        self.name
-                    );
+                    return Err(err(CodegenErrorKind::PlaceProjectionUnsupported));
                 }
                 let ty = self.local_type(place.local)?;
                 let value = self.codegen_rvalue(rvalue, ty)?;
                 self.builder
                     .build_store(self.locals[place.local], value)
-                    .map_err(|e| anyhow!("{e}"))?;
+                    .map_err(llvm_err)?;
                 Ok(())
             }
             // Move/drop tracking has no runtime effect yet (see
@@ -255,12 +271,12 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
         }
     }
 
-    fn codegen_terminator(&mut self, terminator: &Terminator) -> Result<()> {
+    fn codegen_terminator(&mut self, terminator: &Terminator) -> CodegenResult<()> {
         match terminator {
             Terminator::Goto(target) => {
                 self.builder
                     .build_unconditional_branch(self.blocks[*target])
-                    .map_err(|e| anyhow!("{e}"))?;
+                    .map_err(llvm_err)?;
             }
             Terminator::SwitchInt {
                 discriminant,
@@ -272,16 +288,10 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
                 let bool_ty = self.context.bool_type();
                 let cond = self.codegen_operand(discriminant, bool_ty)?;
                 let [(value, target)] = targets.as_slice() else {
-                    bail!(
-                        "in `{}`: switchInt with != 1 target isn't supported in this codegen slice (only bool if/while conditions are constructed today)",
-                        self.name
-                    );
+                    return Err(err(CodegenErrorKind::SwitchIntTargetCountUnsupported));
                 };
                 let ConstValue::Bool(expect_true) = value else {
-                    bail!(
-                        "in `{}`: switchInt target value must be a bool constant in this codegen slice",
-                        self.name
-                    );
+                    return Err(err(CodegenErrorKind::SwitchIntTargetValueUnsupported));
                 };
                 let (then_block, else_block) = if *expect_true {
                     (self.blocks[*target], self.blocks[*otherwise])
@@ -290,7 +300,7 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
                 };
                 self.builder
                     .build_conditional_branch(cond, then_block, else_block)
-                    .map_err(|e| anyhow!("{e}"))?;
+                    .map_err(llvm_err)?;
             }
             Terminator::Call {
                 id,
@@ -301,12 +311,12 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
                 let callee_mir = self
                     .functions
                     .get(*id)
-                    .ok_or_else(|| anyhow!("call to {id:?} has no MIR body"))?;
+                    .ok_or_else(|| err(CodegenErrorKind::CallHasNoMirBody { id: *id }))?;
 
                 let callee_value = *self
                     .function_values
                     .get(*id)
-                    .ok_or_else(|| anyhow!("call to {id:?} was never declared"))?;
+                    .ok_or_else(|| err(CodegenErrorKind::CallNeverDeclared { id: *id }))?;
 
                 // Same "by position, not by reconstructed `LocalId`" rule as
                 // the parameter-store loop in `codegen_function`.
@@ -319,44 +329,38 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
                 let mut args = Vec::with_capacity(arguments.len());
                 for (i, arg) in arguments.iter().enumerate() {
                     let param_local = *callee_param_locals.get(i).ok_or_else(|| {
-                        anyhow!("call to {id:?} passes more arguments than it has parameters")
+                        err(CodegenErrorKind::CallArgumentCountMismatch { id: *id })
                     })?;
-                    let param_ty = llvm_int_type(self.context, &callee_mir.locals[param_local].ty)
-                        .with_context(|| format!("in `{}`'s call argument {i}", self.name))?;
+                    let param_ty = llvm_int_type(self.context, &callee_mir.locals[param_local])?;
                     args.push(self.codegen_operand(arg, param_ty)?.into());
                 }
 
                 let call = self
                     .builder
                     .build_call(callee_value, &args, "call")
-                    .map_err(|e| anyhow!("{e}"))?;
+                    .map_err(llvm_err)?;
 
                 if let Some(place) = destination {
                     if !place.projection.is_empty() {
-                        bail!(
-                            "in `{}`: place projections aren't supported in this codegen slice",
-                            self.name
-                        );
+                        return Err(err(CodegenErrorKind::PlaceProjectionUnsupported));
                     }
                     let result = call
                         .try_as_basic_value()
                         .left()
-                        .ok_or_else(|| anyhow!("call result used but callee returns `none`"))?;
+                        .ok_or_else(|| err(CodegenErrorKind::CallResultIsNone))?;
                     self.builder
                         .build_store(self.locals[place.local], result)
-                        .map_err(|e| anyhow!("{e}"))?;
+                        .map_err(llvm_err)?;
                 }
 
                 match target {
                     Some(target) => {
                         self.builder
                             .build_unconditional_branch(self.blocks[*target])
-                            .map_err(|e| anyhow!("{e}"))?;
+                            .map_err(llvm_err)?;
                     }
                     None => {
-                        self.builder
-                            .build_unreachable()
-                            .map_err(|e| anyhow!("{e}"))?;
+                        self.builder.build_unreachable().map_err(llvm_err)?;
                     }
                 }
             }
@@ -379,23 +383,21 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
                 let ok = self
                     .builder
                     .build_int_compare(IntPredicate::EQ, cond, expect_true, "assert_ok")
-                    .map_err(|e| anyhow!("{e}"))?;
+                    .map_err(llvm_err)?;
 
                 let panic_block = self
                     .context
                     .insert_basic_block_after(self.builder.get_insert_block().unwrap(), "panic");
                 self.builder
                     .build_conditional_branch(ok, self.blocks[*target], panic_block)
-                    .map_err(|e| anyhow!("{e}"))?;
+                    .map_err(llvm_err)?;
 
                 self.builder.position_at_end(panic_block);
-                let abort_fn = self.abort_function()?;
+                let abort_fn = self.abort_function();
                 self.builder
                     .build_call(abort_fn, &[], "abort_call")
-                    .map_err(|e| anyhow!("{e}"))?;
-                self.builder
-                    .build_unreachable()
-                    .map_err(|e| anyhow!("{e}"))?;
+                    .map_err(llvm_err)?;
+                self.builder.build_unreachable().map_err(llvm_err)?;
             }
             Terminator::Return => match self.function.return_local {
                 Some(local) => {
@@ -403,69 +405,76 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
                     let value = self
                         .builder
                         .build_load(ty, self.locals[local], "ret")
-                        .map_err(|e| anyhow!("{e}"))?
+                        .map_err(llvm_err)?
                         .into_int_value();
-                    // `main`'s LLVM-level return is forced to `i32` (see
-                    // `declare_all_functions`) regardless of Soul's declared
-                    // return type — widen to match, since the process exit
-                    // code convention needs that exact ABI.
                     if self.is_entry_point {
-                        let i32_ty = self.context.i32_type();
-                        let widened = self
-                            .builder
-                            .build_int_z_extend(value, i32_ty, "exit_code")
-                            .map_err(|e| anyhow!("{e}"))?;
-                        self.builder
-                            .build_return(Some(&widened))
-                            .map_err(|e| anyhow!("{e}"))?;
+                        self.build_entry_point_return(value, ty)?;
                     } else {
-                        self.builder
-                            .build_return(Some(&value))
-                            .map_err(|e| anyhow!("{e}"))?;
+                        self.builder.build_return(Some(&value)).map_err(llvm_err)?;
                     }
                 }
                 None if self.is_entry_point => {
                     let zero = self.context.i32_type().const_zero();
-                    self.builder
-                        .build_return(Some(&zero))
-                        .map_err(|e| anyhow!("{e}"))?;
+                    self.builder.build_return(Some(&zero)).map_err(llvm_err)?;
                 }
                 None => {
-                    self.builder
-                        .build_return(None)
-                        .map_err(|e| anyhow!("{e}"))?;
+                    self.builder.build_return(None).map_err(llvm_err)?;
                 }
             },
             Terminator::Unreachable => {
-                self.builder
-                    .build_unreachable()
-                    .map_err(|e| anyhow!("{e}"))?;
+                self.builder.build_unreachable().map_err(llvm_err)?;
             }
             Terminator::Drop { .. } => {
-                bail!(
-                    "in `{}`: `Drop` isn't constructed by lowering yet and isn't supported in codegen either",
-                    self.name
-                );
+                return Err(err(CodegenErrorKind::DropUnsupported));
             }
         }
         Ok(())
     }
 
+    /// `main`'s LLVM-level return is forced to `i32` (see
+    /// `declare_all_functions`) since that's what the C ABI/process exit
+    /// code convention needs, regardless of Soul's declared return type.
+    /// Narrower types (`bool`, `u8`, ...) are zero-extended; `i32` itself
+    /// passes through unchanged (LLVM's `zext` requires the destination to
+    /// be strictly wider than the source — a same-width "extension" is
+    /// invalid IR, not a no-op); anything wider is a real, reported error
+    /// rather than a silent truncation.
+    fn build_entry_point_return(
+        &self,
+        value: IntValue<'ctx>,
+        ty: IntType<'ctx>,
+    ) -> CodegenResult<()> {
+        let i32_ty = self.context.i32_type();
+        let bits = ty.get_bit_width();
+        let value = match bits.cmp(&32) {
+            std::cmp::Ordering::Less => self
+                .builder
+                .build_int_z_extend(value, i32_ty, "exit_code")
+                .map_err(llvm_err)?,
+            std::cmp::Ordering::Equal => value,
+            std::cmp::Ordering::Greater => {
+                return Err(err(CodegenErrorKind::EntryPointReturnTypeTooWide));
+            }
+        };
+        self.builder.build_return(Some(&value)).map_err(llvm_err)?;
+        Ok(())
+    }
+
     /// The C runtime's `abort()`, declared lazily (once per module) the
     /// first time an `assert`/`panic` is actually codegen'd.
-    fn abort_function(&self) -> Result<FunctionValue<'ctx>> {
+    fn abort_function(&self) -> FunctionValue<'ctx> {
         if let Some(existing) = self.module.get_function("abort") {
-            return Ok(existing);
+            return existing;
         }
         let fn_type = self.context.void_type().fn_type(&[], false);
-        Ok(self.module.add_function("abort", fn_type, None))
+        self.module.add_function("abort", fn_type, None)
     }
 
     fn codegen_rvalue(
         &mut self,
         rvalue: &Rvalue,
         result_ty: IntType<'ctx>,
-    ) -> Result<IntValue<'ctx>> {
+    ) -> CodegenResult<IntValue<'ctx>> {
         match rvalue {
             Rvalue::Use(operand) => self.codegen_operand(operand, result_ty),
             Rvalue::BinaryOp(op, left, right) => {
@@ -473,7 +482,7 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
                     .operand_type(left)
                     .or_else(|| self.operand_type(right))
                     .unwrap_or(result_ty);
-                
+
                 let l = self.codegen_operand(left, operand_ty)?;
                 let r = self.codegen_operand(right, operand_ty)?;
                 let signed = self.operand_is_signed(left) || self.operand_is_signed(right);
@@ -483,21 +492,16 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
                 let bool_ty = self.context.bool_type();
                 let value = self.codegen_operand(operand, bool_ty)?;
                 match op {
-                    ast_model::operators::UnaryOperatorKind::Not => Ok(self
-                        .builder
-                        .build_not(value, "not")
-                        .map_err(|e| anyhow!("{e}"))?),
-                    other => bail!(
-                        "in `{}`: unary operator `{other:?}` isn't supported in this codegen slice",
-                        self.name
-                    ),
+                    ast_model::operators::UnaryOperatorKind::Not => {
+                        self.builder.build_not(value, "not").map_err(llvm_err)
+                    }
+                    other => Err(err(CodegenErrorKind::UnsupportedUnaryOperator {
+                        op: format!("{other:?}").into_boxed_str(),
+                    })),
                 }
             }
             Rvalue::Ref { .. } | Rvalue::Aggregate(..) | Rvalue::Cast(..) => {
-                bail!(
-                    "in `{}`: references/aggregates/casts aren't supported in this codegen slice",
-                    self.name
-                )
+                Err(err(CodegenErrorKind::UnsupportedRvalue))
             }
         }
     }
@@ -508,7 +512,7 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
         l: IntValue<'ctx>,
         r: IntValue<'ctx>,
         signed: bool,
-    ) -> Result<IntValue<'ctx>> {
+    ) -> CodegenResult<IntValue<'ctx>> {
         use BinaryOperatorKind::*;
         let b = &self.builder;
         let v = match op {
@@ -531,36 +535,37 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
             Ge => b.build_int_compare(IntPredicate::UGE, l, r, "ge"),
             LogAnd => b.build_and(l, r, "and"),
             LogOr => b.build_or(l, r, "or"),
-            other => bail!(
-                "in `{}`: binary operator `{other:?}` isn't supported in this codegen slice",
-                self.name
-            ),
+            other => {
+                return Err(err(CodegenErrorKind::UnsupportedBinaryOperator {
+                    op: format!("{other:?}").into_boxed_str(),
+                }));
+            }
         };
-        v.map_err(|e| anyhow!("{e}"))
+        v.map_err(llvm_err)
     }
 
-    fn codegen_operand(&mut self, operand: &Operand, ty: IntType<'ctx>) -> Result<IntValue<'ctx>> {
+    fn codegen_operand(
+        &mut self,
+        operand: &Operand,
+        ty: IntType<'ctx>,
+    ) -> CodegenResult<IntValue<'ctx>> {
         match operand {
             Operand::Copy(place) | Operand::Move(place) => {
                 if !place.projection.is_empty() {
-                    bail!(
-                        "in `{}`: place projections aren't supported in this codegen slice",
-                        self.name
-                    );
+                    return Err(err(CodegenErrorKind::PlaceProjectionUnsupported));
                 }
                 let value = self
                     .builder
                     .build_load(ty, self.locals[place.local], "load")
-                    .map_err(|e| anyhow!("{e}"))?;
+                    .map_err(llvm_err)?;
                 Ok(value.into_int_value())
             }
             Operand::Constant(value) => const_int(ty, value),
         }
     }
 
-    fn local_type(&self, local: LocalId) -> Result<IntType<'ctx>> {
-        llvm_int_type(self.context, &self.function.locals[local].ty)
-            .with_context(|| format!("in `{}`'s local {local:?}", self.name))
+    fn local_type(&self, local: LocalId) -> CodegenResult<IntType<'ctx>> {
+        llvm_int_type(self.context, &self.function.locals[local])
     }
 
     /// The LLVM type a place-backed operand is stored as, if it is one — a
@@ -585,12 +590,16 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
     }
 }
 
-fn const_int<'ctx>(ty: IntType<'ctx>, value: &ConstValue) -> Result<IntValue<'ctx>> {
+fn const_int<'ctx>(ty: IntType<'ctx>, value: &ConstValue) -> CodegenResult<IntValue<'ctx>> {
     Ok(match value {
         ConstValue::Bool(b) => ty.const_int(u64::from(*b), false),
         ConstValue::Int(n) => ty.const_int(*n as u64, true),
         ConstValue::Uint(n) => ty.const_int(*n as u64, false),
-        other => bail!("constant `{other:?}` isn't supported in this codegen slice"),
+        other => {
+            return Err(err(CodegenErrorKind::UnsupportedConstant {
+                value: format!("{other:?}").into_boxed_str(),
+            }));
+        }
     })
 }
 
@@ -602,9 +611,17 @@ fn is_signed(prim: PrimitiveTypes) -> bool {
     )
 }
 
-fn llvm_int_type<'ctx>(context: &'ctx Context, ty: &SoulType) -> Result<IntType<'ctx>> {
-    let SoulType::Primitive(prim) = ty else {
-        bail!("type `{ty:?}` isn't a primitive scalar, which is all this codegen slice supports");
+fn llvm_int_type<'ctx>(
+    context: &'ctx Context,
+    decl: &mir_model::LocalDecl,
+) -> CodegenResult<IntType<'ctx>> {
+    let SoulType::Primitive(prim) = &decl.ty else {
+        return Err(Fault::error_with_kind(
+            CodegenErrorKind::NonPrimitiveType {
+                ty: format!("{:?}", decl.ty).into_boxed_str(),
+            },
+            Some(decl.span),
+        ));
     };
     use PrimitiveTypes::*;
     Ok(match prim {
@@ -617,6 +634,13 @@ fn llvm_int_type<'ctx>(context: &'ctx Context, ty: &SoulType) -> Result<IntType<
         // Platform-sized: this codegen slice only targets 64-bit hosts.
         Int | Uint | CInt | CUint | UntypedInt | UntypedUint => context.i64_type(),
         Char8 => context.i8_type(),
-        other => bail!("type `{other:?}` isn't supported in this codegen slice"),
+        other => {
+            return Err(Fault::error_with_kind(
+                CodegenErrorKind::UnsupportedPrimitiveType {
+                    ty: format!("{other:?}").into_boxed_str(),
+                },
+                Some(decl.span),
+            ));
+        }
     })
 }

@@ -1,5 +1,5 @@
 // expect: 2
-main(): u8 {
+main(): i32 {
     if false {
         return 1
     }

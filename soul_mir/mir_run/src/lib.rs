@@ -23,9 +23,7 @@ use ast_model::{AstTree, FunctionKind};
 use mir_model::MirProgram;
 use mir_parser::{MirLowerer, fault::MirErrorKind};
 use soul_utils::{
-    CrateContext,
-    collections::benchmark::Benchmark,
-    compiler_options::CompilerOptions,
+    CrateContext, collections::benchmark::Benchmark, compiler_options::CompilerOptions,
 };
 
 pub fn to_mir(
