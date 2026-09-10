@@ -5,7 +5,8 @@ use crate::display::{
 use anyhow::Result;
 use ast_model::AstTree;
 use ast_run::{AstRequest, to_ast};
-use mir_run::MirProgram;
+use inkwell::context::Context;
+use mir_model::MirProgram;
 use soul_tokenizer::{TokenStream, to_token_stream};
 use soul_utils::{
     CrateContext,
@@ -19,14 +20,14 @@ use soul_utils::{
 };
 
 use std::{
-    io::{self, stdout}, path::{Path, PathBuf},
+    io::{self, stdout},
+    path::{Path, PathBuf},
 };
 
 mod config;
 mod display;
 
 fn main() {
-
     match frontend(&mut Benchmark::new()) {
         Ok(true) => println!("{GREEN}success{DEFAULT}"),
         Ok(false) => eprintln!("{RED}failed{DEFAULT}"),
@@ -64,6 +65,10 @@ fn frontend(benchmark: &mut Benchmark) -> Result<bool> {
         mir(&ast, benchmark, &mut all_faults)
     };
     display_mir(&mir_program, &ast.crates.store)?;
+
+    if !ast_failed {
+        codegen(&mir_program, &ast.crates.store)?;
+    }
 
     for fault in all_faults.iter() {
         display_fault(fault, &module_store, &config::PRINT_CONFIGS, &mut stdout())?;
@@ -147,4 +152,25 @@ fn mir(ast: &AstTree, benchmark: &mut Benchmark, all_faults: &mut FaultCollector
     let mir_program = mir_run::to_mir(ast, benchmark, &mut mir_context, &config::COMPILER_OPTIONS);
     all_faults.extend_into(mir_context.faults);
     mir_program
+}
+
+/// Codegen failures are reported but non-fatal — this is the first (smallest-
+/// slice) codegen pass, so plenty of otherwise-valid MIR (e.g. anything using
+/// `f64`) isn't supported yet, the same way MIR faults don't gate the overall
+/// AST-level pass/fail. See `mir_codegen`'s module docs for what's in scope.
+fn codegen(mir: &MirProgram, ast_store: &ast_model::AstStore) -> Result<()> {
+    let context = Context::create();
+    match mir_codegen::codegen_module(&context, "soul_module", &mir, ast_store) {
+        Ok(module) => {
+            let output_path = config::CONFIG.output_path().join("codegen");
+            std::fs::create_dir_all(&output_path)?;
+            module
+                .print_to_file(output_path.join("module.ll"))
+                .map_err(|e| anyhow::anyhow!("{e}"))?;
+        }
+        Err(err) => {
+            eprintln!("{RED}codegen skipped, error: {err}{DEFAULT}");
+        }
+    }
+    Ok(())
 }

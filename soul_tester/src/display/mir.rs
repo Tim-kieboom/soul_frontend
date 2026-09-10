@@ -11,7 +11,7 @@ use mir_model::{
     AggregateKind, Function, LocalDecl, LocalId, Operand, Place, PlaceElem, Rvalue, Statement,
     Terminator,
 };
-use mir_run::MirProgram;
+use mir_model::MirProgram;
 use soul_utils::{
     FunctionId, SharedStr, TypeModifier,
     collections::vec_map::{VecMap, VecMapIndex},

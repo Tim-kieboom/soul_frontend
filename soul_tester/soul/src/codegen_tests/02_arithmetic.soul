@@ -1,0 +1,8 @@
+// expect: 7
+addU8(a: u8, b: u8): u8 {
+    return a + b
+}
+
+main(): u8 {
+    return addU8(3, 4)
+}

@@ -1,0 +1,4 @@
+// expect: 42
+main(): u8 {
+    return 42
+}

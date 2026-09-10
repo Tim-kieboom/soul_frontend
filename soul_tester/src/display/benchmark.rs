@@ -19,7 +19,7 @@ pub(crate) fn display_benchmark(
     let bar = "-".repeat(max_name + 14);
     push_fmt!(writer, "|{bar}\n| Benchmark \n|{bar}\n")?;
     for (name, time) in benchmark.iter() {
-        push_fmt!(writer, "| {name:width$}: {time:?}\n", width = max_name+1)?;
+        push_fmt!(writer, "| {name:width$}: {time:?}\n", width = max_name + 1)?;
     }
 
     push_fmt!(writer, "|{bar}\n| total: {total:?}\n")?;

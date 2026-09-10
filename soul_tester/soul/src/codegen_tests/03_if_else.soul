@@ -1,0 +1,7 @@
+// expect: 2
+main(): u8 {
+    if false {
+        return 1
+    }
+    return 2
+}

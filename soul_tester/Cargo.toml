@@ -18,6 +18,8 @@ soul_name_resolver = { version = "0.1.0", path = "../soul_ast/soul_name_resolver
 mir_model = { version = "0.1.0", path = "../soul_mir/mir_model" }
 mir_parser = { version = "0.1.0", path = "../soul_mir/mir_parser" }
 mir_run = { version = "0.1.0", path = "../soul_mir/mir_run" }
+mir_codegen = { version = "0.1.0", path = "../soul_mir/mir_codegen" }
+inkwell = { version = "0.5", features = ["llvm16-0"] }
 soul_utils = { version = "0.1.0", path = "../soul_utils", default-features = false }
 
 [dev-dependencies]

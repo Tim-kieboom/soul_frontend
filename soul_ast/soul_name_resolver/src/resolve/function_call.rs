@@ -61,7 +61,9 @@ impl<'a> NameResolver<'a> {
 
         if var_id < self.synthetic_id_boundary && call.id < var_id {
             self.log_error(
-                AstErrorKind::VariableUsedBeforeDeclaration { name: call.name.as_shared_str() },
+                AstErrorKind::VariableUsedBeforeDeclaration {
+                    name: call.name.as_shared_str(),
+                },
                 Some(call.name.span()),
             );
             return true;
@@ -169,7 +171,9 @@ impl<'a> NameResolver<'a> {
                 None if self.resolve_variable_callable(expression_id, call) => {}
                 None => {
                     self.log_error(
-                        AstErrorKind::UndefinedFunction { name: call.name.as_shared_str() },
+                        AstErrorKind::UndefinedFunction {
+                            name: call.name.as_shared_str(),
+                        },
                         Some(call.name.span()),
                     );
                     self.declares.insert_function_resolve(
@@ -224,7 +228,9 @@ impl<'a> NameResolver<'a> {
             if !has_owner_type {
                 if !self.resolve_variable_callable(expression_id, call) {
                     self.log_error(
-                        AstErrorKind::UndefinedFunction { name: call.name.as_shared_str() },
+                        AstErrorKind::UndefinedFunction {
+                            name: call.name.as_shared_str(),
+                        },
                         Some(call.name.span()),
                     );
                 }

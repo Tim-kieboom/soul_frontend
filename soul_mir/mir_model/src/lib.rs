@@ -25,6 +25,17 @@ pub type Type = SoulType;
 /// (e.g. a post-monomorphization sized-array constant).
 pub type ConstValue = Literal;
 
+pub struct MirProgram {
+    pub functions: VecMap<FunctionId, Function>,
+}
+impl MirProgram {
+    pub const fn empty() -> Self {
+        Self {
+            functions: VecMap::const_default(),
+        }
+    }
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct Function {
     pub id: FunctionId,

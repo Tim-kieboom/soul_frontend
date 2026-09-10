@@ -20,24 +20,13 @@ mod tests;
 use std::time::Instant;
 
 use ast_model::{AstTree, FunctionKind};
-use mir_model::Function;
+use mir_model::MirProgram;
 use mir_parser::{MirLowerer, fault::MirErrorKind};
 use soul_utils::{
-    CrateContext, FunctionId,
-    collections::{benchmark::Benchmark, vec_map::VecMap},
+    CrateContext,
+    collections::benchmark::Benchmark,
     compiler_options::CompilerOptions,
 };
-
-pub struct MirProgram {
-    pub functions: VecMap<FunctionId, Function>,
-}
-impl MirProgram {
-    pub const fn empty() -> Self {
-        Self {
-            functions: VecMap::const_default(),
-        }
-    }
-}
 
 pub fn to_mir(
     ast: &AstTree,

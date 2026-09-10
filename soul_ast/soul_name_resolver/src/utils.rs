@@ -78,12 +78,7 @@ impl<'a> NameResolver<'a> {
             .insert_value(name.clone(), kind, id)
             .is_some()
         {
-            self.log_error(
-                AstErrorKind::ValueAlreadyExistsInScope {
-                    name,
-                },
-                Some(span),
-            );
+            self.log_error(AstErrorKind::ValueAlreadyExistsInScope { name }, Some(span));
         }
     }
 
