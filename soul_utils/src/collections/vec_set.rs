@@ -1,12 +1,14 @@
 use std::ops::Index;
 
+use serde::ser::SerializeTuple;
+
 use crate::collections::vec_map::{VecMap, VecMapIndex};
 
 /// A set-like data structure backed by a [`VecMap`].
 ///
 /// Each unique index `I` maps to a presence marker `()`.
 /// This provides O(1) lookup and set operations using ID types.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VecSet<I: VecMapIndex> {
     map: VecMap<I, ()>,
 }
@@ -106,5 +108,34 @@ impl<I: VecMapIndex> FromIterator<I> for VecSet<I> {
 impl<I: VecMapIndex> Default for VecSet<I> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl<I> serde::Serialize for VecSet<I>
+where
+    I: serde::Serialize + VecMapIndex,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut map = serializer.serialize_tuple(self.len())?;
+        for index in self.entries() {
+            map.serialize_element(&index)?;
+        }
+        map.end()
+    }
+}
+
+impl<'de, I> serde::Deserialize<'de> for VecSet<I>
+where
+    I: serde::Deserialize<'de> + VecMapIndex,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let list = Vec::<I>::deserialize(deserializer)?;
+        Ok(VecSet::from_vec(list))
     }
 }
