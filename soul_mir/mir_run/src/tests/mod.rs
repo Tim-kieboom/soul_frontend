@@ -103,7 +103,7 @@ fn out_of_scope_function_pushes_a_fault_into_the_context_not_a_panic() {
 
 #[test]
 fn extern_c_function_lowers_into_externs_not_functions() {
-    let ast = build_ast(r#"extern "C" printf(fmt: &char): int {}"#);
+    let ast = build_ast(r#"extern "C" printf(fmt: &char): int"#);
 
     let (program, context) = create_mir(&ast);
 

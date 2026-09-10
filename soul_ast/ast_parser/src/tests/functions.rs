@@ -211,7 +211,7 @@ fn function_call_with_args() {
 // ----------------------------------------------------------------
 #[test]
 fn extern_function_c() {
-    let (module, store, context) = parse(r#"extern "C" printf(fmt: &char): int {}"#);
+    let (module, store, context) = parse(r#"extern "C" printf(fmt: &char): int"#);
     assert_eq!(
         context.faults.count_severity(Severity::Error),
         0,
