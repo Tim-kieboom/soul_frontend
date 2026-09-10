@@ -5,7 +5,6 @@ use crate::display::{
 use anyhow::Result;
 use ast_model::AstTree;
 use ast_run::{AstRequest, to_ast};
-use mir_parser::fault::MirErrorKind;
 use mir_run::MirProgram;
 use soul_tokenizer::{TokenStream, to_token_stream};
 use soul_utils::{
@@ -20,14 +19,14 @@ use soul_utils::{
 };
 
 use std::{
-    io::{self, stdout},
-    path::{Path, PathBuf},
+    io::{self, stdout}, path::{Path, PathBuf},
 };
 
 mod config;
 mod display;
 
 fn main() {
+
     match frontend(&mut Benchmark::new()) {
         Ok(true) => println!("{GREEN}success{DEFAULT}"),
         Ok(false) => eprintln!("{RED}failed{DEFAULT}"),
@@ -144,7 +143,7 @@ fn ast<'a>(tokens: TokenStream<'a>, request: AstRequest<'a>) -> Result<AstTree> 
 }
 
 fn mir(ast: &AstTree, benchmark: &mut Benchmark, all_faults: &mut FaultCollector) -> MirProgram {
-    let mut mir_context = CrateContext::<MirErrorKind>::default();
+    let mut mir_context = CrateContext::default();
     let mir_program = mir_run::to_mir(ast, benchmark, &mut mir_context, &config::COMPILER_OPTIONS);
     all_faults.extend_into(mir_context.faults);
     mir_program
