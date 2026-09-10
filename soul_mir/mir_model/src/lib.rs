@@ -27,13 +27,36 @@ pub type ConstValue = Literal;
 
 pub struct MirProgram {
     pub functions: VecMap<FunctionId, Function>,
+    /// `extern "C"` declarations — a signature with no body to lower at all,
+    /// not a `Function` missing its blocks. Kept in a separate map rather
+    /// than folded into `functions` so codegen can tell "declare only, no
+    /// body to emit" apart from "should have a body" at the type level,
+    /// instead of via a sentinel-empty `blocks`/`locals`.
+    pub externs: VecMap<FunctionId, ExternFunction>,
 }
 impl MirProgram {
     pub const fn empty() -> Self {
         Self {
             functions: VecMap::const_default(),
+            externs: VecMap::const_default(),
         }
     }
+}
+
+/// An `extern "C"` function declaration: just enough to declare it to LLVM
+/// and lower calls to it — no body, no locals, no blocks. Every param/return
+/// type is passed through as whatever `SoulType` the signature declared;
+/// unlike `Function`'s body-lowering, there's no lowering logic here that
+/// could break on a type it doesn't understand, so nothing is rejected at
+/// this stage — codegen is the sole judge of which types it can actually
+/// represent (see `mir_codegen`'s `NonPrimitiveType`/`UnsupportedPrimitiveType`).
+#[derive(Debug, serde::Serialize)]
+pub struct ExternFunction {
+    pub id: FunctionId,
+    pub params: Vec<Type>,
+    /// `None` for a `none`(void)-returning extern function — same convention
+    /// as `Function::return_local`.
+    pub return_type: Option<Type>,
 }
 
 #[derive(Debug, serde::Serialize)]

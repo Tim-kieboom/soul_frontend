@@ -152,13 +152,35 @@ impl<'a> NameResolver<'a> {
         let signature = &function_kind.signature();
         self.check_function_name(&signature.name);
 
-        if let FunctionKind::Normal(function) = function_kind {
-            self.collect_function(function);
+        match function_kind {
+            FunctionKind::Normal(function) => self.collect_function(function),
+            // A signature-only declaration (currently only `extern "C"` is
+            // lowerable past this point — see `mir_parser`) still needs to
+            // be name-registered the same way a normal function is, just
+            // without any of the body-scope bookkeeping there's no body to
+            // need: no `push_scope`, no `this`/parameter *variable* scope
+            // entries (nothing ever resolves a name against them, since
+            // there's no body to do that resolving in).
+            FunctionKind::Signature(signature) => self.collect_extern_signature(signature),
         }
 
         if self.current.in_global {
             self.header_insert_function_id(function_id);
         }
+    }
+
+    fn collect_extern_signature(&mut self, signature: &FunctionSignature) {
+        let id = self.declare_function(signature);
+        let inner = &signature.value;
+
+        self.collect_type(&inner.method_type);
+        self.collect_type(&inner.return_type);
+        for parameter in &inner.parameters {
+            self.collect_type(&parameter.ty);
+        }
+
+        self.declares
+            .insert_functions(id, inner.clone(), self.current.module);
     }
 
     fn collect_function(&mut self, function: &Function) {

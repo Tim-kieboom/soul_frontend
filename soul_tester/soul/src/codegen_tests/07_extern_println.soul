@@ -1,0 +1,8 @@
+// expect: 0
+// expect_stdout: Hello from Soul!
+extern "C" puts(message: cstr): int {}
+
+main(): i32 {
+    puts(c"Hello from Soul!")
+    return 0
+}

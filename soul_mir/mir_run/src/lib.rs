@@ -19,7 +19,7 @@ mod tests;
 
 use std::time::Instant;
 
-use ast_model::{AstTree, FunctionKind};
+use ast_model::AstTree;
 use mir_model::MirProgram;
 use mir_parser::{MirLowerer, fault::MirErrorKind};
 use soul_utils::{
@@ -34,19 +34,17 @@ pub fn to_mir(
 ) -> MirProgram {
     let time = Instant::now();
 
+    // No pre-filter by `FunctionKind` here: `lower_function` itself already
+    // handles every case (a normal body, an `extern "C"` declaration, or a
+    // non-extern signature-only stub it correctly faults on).
     let mut lowerer = MirLowerer::new(&ast.crates.store, &ast.declares);
-    for (id, kind) in ast.crates.store.functions.entries() {
-        if !matches!(kind, FunctionKind::Normal(_)) {
-            continue;
-        }
-
+    for (id, _) in ast.crates.store.functions.entries() {
         if let Err(fault) = lowerer.lower_function(id) {
             context.faults.push(fault);
         }
     }
 
     benchmark.add_benchmark("mir", time.elapsed());
-    MirProgram {
-        functions: lowerer.into_functions(),
-    }
+    let (functions, externs) = lowerer.into_functions_and_externs();
+    MirProgram { functions, externs }
 }

@@ -1,9 +1,19 @@
-//! MIR-to-LLVM-IR codegen. First (smallest-slice) pass: primitive scalar
-//! locals only (no aggregates — nothing in MIR produces one yet), stack-slot
-//! (`alloca`) locals rather than SSA/phi reconstruction (MIR isn't SSA —
-//! e.g. a `while` loop reassigns the same local across blocks — so this
-//! mirrors the simplest, well-known "every local gets a stack slot" codegen
-//! strategy rather than building a whole SSA-reconstruction pass for M1).
+//! MIR-to-LLVM-IR codegen. First (smallest-slice) pass: primitive scalar and
+//! pointer (`cstr`/references) locals only (no aggregates — nothing in MIR
+//! produces one yet), stack-slot (`alloca`) locals rather than SSA/phi
+//! reconstruction (MIR isn't SSA — e.g. a `while` loop reassigns the same
+//! local across blocks — so this mirrors the simplest, well-known "every
+//! local gets a stack slot" codegen strategy rather than building a whole
+//! SSA-reconstruction pass for M1).
+//!
+//! Values are represented as inkwell's own `BasicValueEnum`/`BasicTypeEnum`
+//! (int-or-pointer-or-...) rather than a narrower `IntValue`-only type,
+//! since `extern "C"` calls need pointer-typed parameters/arguments. Every
+//! site that needs specifically an int (arithmetic/comparison operators,
+//! branch conditions) checks explicitly via `expect_int` rather than calling
+//! `BasicValueEnum::into_int_value()`, which panics on a mismatch instead of
+//! producing a fault — this pass never trusts an earlier stage to rule that
+//! out by construction.
 //!
 //! Emits an in-memory `inkwell::Module`; turning that into an object file/exe
 //! via `llc`/a linker is a separate, currently-manual step (see
@@ -11,24 +21,28 @@
 
 pub mod fault;
 
+use std::cell::Cell;
+
 use ast_model::{AstStore, SoulType, operators::BinaryOperatorKind};
 use inkwell::{
-    IntPredicate,
+    AddressSpace, IntPredicate,
     basic_block::BasicBlock as LlvmBlock,
     builder::{Builder, BuilderError},
     context::Context,
-    module::Module,
-    types::IntType,
-    values::{FunctionValue, IntValue, PointerValue},
+    module::{Linkage, Module},
+    types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum, IntType},
+    values::{BasicValueEnum, FunctionValue, IntValue, PointerValue},
 };
 use mir_model::{
-    BlockId, ConstValue, Function, LocalId, MirProgram, Operand, Rvalue, Statement, Terminator,
+    BlockId, ConstValue, ExternFunction, Function, LocalId, MirProgram, Operand, Rvalue, Statement,
+    Terminator,
 };
 use soul_utils::{
     FunctionId,
     collections::vec_map::{VecMap, VecMapIndex},
     fault::Fault,
     soul_names::PrimitiveTypes,
+    span::Span,
 };
 
 use crate::fault::{CodegenErrorKind, CodegenResult};
@@ -46,10 +60,20 @@ fn err(kind: CodegenErrorKind) -> Fault<CodegenErrorKind> {
     Fault::error_with_kind(kind, None)
 }
 
-/// Builds an LLVM module containing every function in `mir`. `ast` is only
-/// used to recover each function's source name (MIR itself only has
-/// `FunctionId`s) — the entry point a linker looks for (`main`) has to match
-/// the Soul function's actual declared name exactly.
+/// Narrows a value to an `IntValue`, faulting (not panicking) if it's
+/// actually a pointer — the guard every int-only operator/branch-condition
+/// site goes through.
+fn expect_int(value: BasicValueEnum<'_>) -> CodegenResult<IntValue<'_>> {
+    match value {
+        BasicValueEnum::IntValue(v) => Ok(v),
+        _ => Err(err(CodegenErrorKind::ExpectedIntOperand)),
+    }
+}
+
+/// Builds an LLVM module containing every function/extern declaration in
+/// `mir`. `ast` is only used to recover each function's source name (MIR
+/// itself only has `FunctionId`s) — the entry point a linker looks for
+/// (`main`) has to match the Soul function's actual declared name exactly.
 pub fn codegen_module<'ctx>(
     context: &'ctx Context,
     module_name: &str,
@@ -63,6 +87,7 @@ pub fn codegen_module<'ctx>(
         mir,
         ast,
         function_values: VecMap::new(),
+        string_counter: Cell::new(0),
     };
 
     codegen.declare_all_functions()?;
@@ -88,11 +113,18 @@ struct ModuleCodegen<'ctx, 'a> {
     context: &'ctx Context,
     module: &'a Module<'ctx>,
     function_values: VecMap<FunctionId, FunctionValue<'ctx>>,
+    /// Shared across every function's codegen so string-literal globals get
+    /// module-wide-unique names, not per-function-restarting ones.
+    string_counter: Cell<usize>,
 }
 
 impl<'ctx, 'a> ModuleCodegen<'ctx, 'a> {
     /// Declares every function's signature up front, so calls can reference a
-    /// callee regardless of definition order (including mutual recursion).
+    /// callee regardless of definition order (including mutual recursion) —
+    /// and declares every `extern "C"` function as a bodyless external
+    /// declaration (never passed to `codegen_function`, so no blocks are
+    /// ever appended to it — that omission alone is what makes it a true
+    /// external declaration rather than a defined-but-empty function).
     fn declare_all_functions(&mut self) -> CodegenResult<()> {
         for (id, function) in self.mir.functions.entries() {
             let name = function_name(self.ast, id)?;
@@ -101,17 +133,17 @@ impl<'ctx, 'a> ModuleCodegen<'ctx, 'a> {
                 .locals
                 .entries()
                 .take(function.arg_count)
-                .map(|(_, decl)| llvm_int_type(self.context, decl))
+                .map(|(_, decl)| llvm_type(self.context, &decl.ty, Some(decl.span)))
                 .collect::<CodegenResult<Vec<_>>>()?;
 
-            let param_metadata_types = param_types
-                .iter()
-                .map(|ty| (*ty).into())
-                .collect::<Vec<_>>();
+            let param_metadata_types = param_metadata(&param_types);
 
             let return_type = function
                 .return_local
-                .map(|local| llvm_int_type(self.context, &function.locals[local]))
+                .map(|local| {
+                    let decl = &function.locals[local];
+                    llvm_type(self.context, &decl.ty, Some(decl.span))
+                })
                 .transpose()?;
 
             // The C ABI's `main` always returns `i32` (that's what becomes
@@ -135,6 +167,32 @@ impl<'ctx, 'a> ModuleCodegen<'ctx, 'a> {
             let fn_value = self.module.add_function(name, fn_type, None);
             self.function_values.insert(id, fn_value);
         }
+
+        for (id, extern_fn) in self.mir.externs.entries() {
+            let name = function_name(self.ast, id)?;
+
+            let param_types = extern_fn
+                .params
+                .iter()
+                .map(|ty| llvm_type(self.context, ty, None))
+                .collect::<CodegenResult<Vec<_>>>()?;
+            let param_metadata_types = param_metadata(&param_types);
+
+            let fn_type = match &extern_fn.return_type {
+                Some(ty) => {
+                    llvm_type(self.context, ty, None)?.fn_type(&param_metadata_types, false)
+                }
+                None => self
+                    .context
+                    .void_type()
+                    .fn_type(&param_metadata_types, false),
+            };
+
+            let fn_value = self
+                .module
+                .add_function(name, fn_type, Some(Linkage::External));
+            self.function_values.insert(id, fn_value);
+        }
         Ok(())
     }
 
@@ -156,7 +214,7 @@ impl<'ctx, 'a> ModuleCodegen<'ctx, 'a> {
 
         let mut locals: VecMap<LocalId, PointerValue<'ctx>> = VecMap::new();
         for (local_id, decl) in function.locals.entries() {
-            let ty = llvm_int_type(self.context, decl)?;
+            let ty = llvm_type(self.context, &decl.ty, Some(decl.span))?;
             let slot = builder
                 .build_alloca(ty, &format!("_{}", local_id.index()))
                 .map_err(llvm_err)?;
@@ -216,6 +274,8 @@ impl<'ctx, 'a> ModuleCodegen<'ctx, 'a> {
             blocks,
             function_values: &self.function_values,
             functions: &self.mir.functions,
+            externs: &self.mir.externs,
+            string_counter: &self.string_counter,
         };
         for (block_id, block) in function.blocks.entries() {
             fn_codegen.codegen_block(block_id, block)?;
@@ -223,6 +283,10 @@ impl<'ctx, 'a> ModuleCodegen<'ctx, 'a> {
 
         Ok(())
     }
+}
+
+fn param_metadata<'ctx>(types: &[BasicTypeEnum<'ctx>]) -> Vec<BasicMetadataTypeEnum<'ctx>> {
+    types.iter().map(|ty| (*ty).into()).collect()
 }
 
 struct FunctionCodegen<'ctx, 'a> {
@@ -235,6 +299,8 @@ struct FunctionCodegen<'ctx, 'a> {
     blocks: VecMap<BlockId, LlvmBlock<'ctx>>,
     function_values: &'a VecMap<FunctionId, FunctionValue<'ctx>>,
     functions: &'a VecMap<FunctionId, Function>,
+    externs: &'a VecMap<FunctionId, ExternFunction>,
+    string_counter: &'a Cell<usize>,
 }
 
 impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
@@ -285,8 +351,8 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
             } => {
                 // Only ever constructed from a bare `bool` condition in this
                 // slice (`if`/`while`), so the discriminant is always `i1`.
-                let bool_ty = self.context.bool_type();
-                let cond = self.codegen_operand(discriminant, bool_ty)?;
+                let bool_ty = self.context.bool_type().into();
+                let cond = expect_int(self.codegen_operand(discriminant, bool_ty)?)?;
                 let [(value, target)] = targets.as_slice() else {
                     return Err(err(CodegenErrorKind::SwitchIntTargetCountUnsupported));
                 };
@@ -308,31 +374,45 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
                 destination,
                 target,
             } => {
-                let callee_mir = self
-                    .functions
-                    .get(*id)
-                    .ok_or_else(|| err(CodegenErrorKind::CallHasNoMirBody { id: *id }))?;
+                // A callee is either a real `Function` (with a body, so its
+                // param types come from its locals) or an `extern "C"`
+                // declaration (no body, types come straight from the
+                // `ExternFunction` signature) — never both, never neither.
+                let param_types = if let Some(callee_mir) = self.functions.get(*id) {
+                    let callee_param_locals: Vec<LocalId> = callee_mir
+                        .locals
+                        .entries()
+                        .take(callee_mir.arg_count)
+                        .map(|(id, _)| id)
+                        .collect();
+                    callee_param_locals
+                        .iter()
+                        .map(|&local| {
+                            let decl = &callee_mir.locals[local];
+                            llvm_type(self.context, &decl.ty, Some(decl.span))
+                        })
+                        .collect::<CodegenResult<Vec<_>>>()?
+                } else if let Some(extern_fn) = self.externs.get(*id) {
+                    extern_fn
+                        .params
+                        .iter()
+                        .map(|ty| llvm_type(self.context, ty, None))
+                        .collect::<CodegenResult<Vec<_>>>()?
+                } else {
+                    return Err(err(CodegenErrorKind::CallHasNoMirBody { id: *id }));
+                };
 
                 let callee_value = *self
                     .function_values
                     .get(*id)
                     .ok_or_else(|| err(CodegenErrorKind::CallNeverDeclared { id: *id }))?;
 
-                // Same "by position, not by reconstructed `LocalId`" rule as
-                // the parameter-store loop in `codegen_function`.
-                let callee_param_locals: Vec<LocalId> = callee_mir
-                    .locals
-                    .entries()
-                    .take(callee_mir.arg_count)
-                    .map(|(id, _)| id)
-                    .collect();
+                if arguments.len() > param_types.len() {
+                    return Err(err(CodegenErrorKind::CallArgumentCountMismatch { id: *id }));
+                }
                 let mut args = Vec::with_capacity(arguments.len());
-                for (i, arg) in arguments.iter().enumerate() {
-                    let param_local = *callee_param_locals.get(i).ok_or_else(|| {
-                        err(CodegenErrorKind::CallArgumentCountMismatch { id: *id })
-                    })?;
-                    let param_ty = llvm_int_type(self.context, &callee_mir.locals[param_local])?;
-                    args.push(self.codegen_operand(arg, param_ty)?.into());
+                for (arg, param_ty) in arguments.iter().zip(param_types.iter()) {
+                    args.push(self.codegen_operand(arg, *param_ty)?.into());
                 }
 
                 let call = self
@@ -374,8 +454,8 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
                 // this slice, see `docs/compiler-pipeline-plan.md`'s M1
                 // scope) — a failed assert/an unconditional `panic` both just
                 // abort the process.
-                let bool_ty = self.context.bool_type();
-                let cond = self.codegen_operand(cond, bool_ty)?;
+                let bool_ty = self.context.bool_type().into();
+                let cond = expect_int(self.codegen_operand(cond, bool_ty)?)?;
                 let expect_true = self
                     .context
                     .bool_type()
@@ -405,10 +485,9 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
                     let value = self
                         .builder
                         .build_load(ty, self.locals[local], "ret")
-                        .map_err(llvm_err)?
-                        .into_int_value();
+                        .map_err(llvm_err)?;
                     if self.is_entry_point {
-                        self.build_entry_point_return(value, ty)?;
+                        self.build_entry_point_return(value)?;
                     } else {
                         self.builder.build_return(Some(&value)).map_err(llvm_err)?;
                     }
@@ -434,18 +513,16 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
     /// `main`'s LLVM-level return is forced to `i32` (see
     /// `declare_all_functions`) since that's what the C ABI/process exit
     /// code convention needs, regardless of Soul's declared return type.
-    /// Narrower types (`bool`, `u8`, ...) are zero-extended; `i32` itself
-    /// passes through unchanged (LLVM's `zext` requires the destination to
-    /// be strictly wider than the source — a same-width "extension" is
-    /// invalid IR, not a no-op); anything wider is a real, reported error
-    /// rather than a silent truncation.
-    fn build_entry_point_return(
-        &self,
-        value: IntValue<'ctx>,
-        ty: IntType<'ctx>,
-    ) -> CodegenResult<()> {
+    /// Narrower int types (`bool`, `u8`, ...) are zero-extended; `i32`
+    /// itself passes through unchanged (LLVM's `zext` requires the
+    /// destination to be strictly wider than the source — a same-width
+    /// "extension" is invalid IR, not a no-op); anything wider, or a
+    /// pointer, is a real, reported error rather than a silent truncation
+    /// or a panic.
+    fn build_entry_point_return(&self, value: BasicValueEnum<'ctx>) -> CodegenResult<()> {
+        let value = expect_int(value)?;
         let i32_ty = self.context.i32_type();
-        let bits = ty.get_bit_width();
+        let bits = value.get_type().get_bit_width();
         let value = match bits.cmp(&32) {
             std::cmp::Ordering::Less => self
                 .builder
@@ -470,11 +547,31 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
         self.module.add_function("abort", fn_type, None)
     }
 
+    /// Materializes a Soul string literal as a null-terminated LLVM global
+    /// byte-array constant and returns a pointer to it — the only way a
+    /// `cstr` value currently comes into existence (there's no other
+    /// `cstr`-producing expression in this slice, so this is the sole
+    /// producer of one). Not deduplicated across equal literals: correctness
+    /// over compactness for this first slice.
+    fn codegen_string_constant(&mut self, s: &str) -> PointerValue<'ctx> {
+        let id = self.string_counter.get();
+        self.string_counter.set(id + 1);
+
+        let const_str = self.context.const_string(s.as_bytes(), true);
+        let global = self
+            .module
+            .add_global(const_str.get_type(), None, &format!("str.{id}"));
+        global.set_initializer(&const_str);
+        global.set_constant(true);
+        global.set_linkage(Linkage::Private);
+        global.as_pointer_value()
+    }
+
     fn codegen_rvalue(
         &mut self,
         rvalue: &Rvalue,
-        result_ty: IntType<'ctx>,
-    ) -> CodegenResult<IntValue<'ctx>> {
+        result_ty: BasicTypeEnum<'ctx>,
+    ) -> CodegenResult<BasicValueEnum<'ctx>> {
         match rvalue {
             Rvalue::Use(operand) => self.codegen_operand(operand, result_ty),
             Rvalue::BinaryOp(op, left, right) => {
@@ -483,18 +580,20 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
                     .or_else(|| self.operand_type(right))
                     .unwrap_or(result_ty);
 
-                let l = self.codegen_operand(left, operand_ty)?;
-                let r = self.codegen_operand(right, operand_ty)?;
+                let l = expect_int(self.codegen_operand(left, operand_ty)?)?;
+                let r = expect_int(self.codegen_operand(right, operand_ty)?)?;
                 let signed = self.operand_is_signed(left) || self.operand_is_signed(right);
-                self.codegen_binary_op(*op, l, r, signed)
+                Ok(self.codegen_binary_op(*op, l, r, signed)?.into())
             }
             Rvalue::UnaryOp(op, operand) => {
-                let bool_ty = self.context.bool_type();
-                let value = self.codegen_operand(operand, bool_ty)?;
+                let bool_ty = self.context.bool_type().into();
+                let value = expect_int(self.codegen_operand(operand, bool_ty)?)?;
                 match op {
-                    ast_model::operators::UnaryOperatorKind::Not => {
-                        self.builder.build_not(value, "not").map_err(llvm_err)
-                    }
+                    ast_model::operators::UnaryOperatorKind::Not => Ok(self
+                        .builder
+                        .build_not(value, "not")
+                        .map_err(llvm_err)?
+                        .into()),
                     other => Err(err(CodegenErrorKind::UnsupportedUnaryOperator {
                         op: format!("{other:?}").into_boxed_str(),
                     })),
@@ -547,30 +646,50 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
     fn codegen_operand(
         &mut self,
         operand: &Operand,
-        ty: IntType<'ctx>,
-    ) -> CodegenResult<IntValue<'ctx>> {
+        ty: BasicTypeEnum<'ctx>,
+    ) -> CodegenResult<BasicValueEnum<'ctx>> {
         match operand {
             Operand::Copy(place) | Operand::Move(place) => {
                 if !place.projection.is_empty() {
                     return Err(err(CodegenErrorKind::PlaceProjectionUnsupported));
                 }
-                let value = self
-                    .builder
+                self.builder
                     .build_load(ty, self.locals[place.local], "load")
-                    .map_err(llvm_err)?;
-                Ok(value.into_int_value())
+                    .map_err(llvm_err)
             }
-            Operand::Constant(value) => const_int(ty, value),
+            Operand::Constant(value) => self.codegen_constant(ty, value),
         }
     }
 
-    fn local_type(&self, local: LocalId) -> CodegenResult<IntType<'ctx>> {
-        llvm_int_type(self.context, &self.function.locals[local])
+    fn codegen_constant(
+        &mut self,
+        ty: BasicTypeEnum<'ctx>,
+        value: &ConstValue,
+    ) -> CodegenResult<BasicValueEnum<'ctx>> {
+        match ty {
+            BasicTypeEnum::IntType(int_ty) => Ok(const_int(int_ty, value)?.into()),
+            BasicTypeEnum::PointerType(_) => match value {
+                ConstValue::Str(s) | ConstValue::Cstr(s) => {
+                    Ok(self.codegen_string_constant(s).into())
+                }
+                other => Err(err(CodegenErrorKind::UnsupportedConstant {
+                    value: format!("{other:?}").into_boxed_str(),
+                })),
+            },
+            other => Err(err(CodegenErrorKind::UnsupportedPrimitiveType {
+                ty: format!("{other:?}").into_boxed_str(),
+            })),
+        }
+    }
+
+    fn local_type(&self, local: LocalId) -> CodegenResult<BasicTypeEnum<'ctx>> {
+        let decl = &self.function.locals[local];
+        llvm_type(self.context, &decl.ty, Some(decl.span))
     }
 
     /// The LLVM type a place-backed operand is stored as, if it is one — a
     /// bare constant operand carries no type of its own (see the module docs).
-    fn operand_type(&self, operand: &Operand) -> Option<IntType<'ctx>> {
+    fn operand_type(&self, operand: &Operand) -> Option<BasicTypeEnum<'ctx>> {
         match operand {
             Operand::Copy(place) | Operand::Move(place) if place.projection.is_empty() => {
                 self.local_type(place.local).ok()
@@ -611,36 +730,45 @@ fn is_signed(prim: PrimitiveTypes) -> bool {
     )
 }
 
-fn llvm_int_type<'ctx>(
+/// Maps a Soul type to its LLVM representation. Integers/`bool` map to the
+/// matching `IntType`; `cstr` and any reference/pointer type map to an
+/// (opaque, LLVM-16-style) pointer type — everything else (aggregates,
+/// floats, ...) isn't supported in this codegen slice yet.
+fn llvm_type<'ctx>(
     context: &'ctx Context,
-    decl: &mir_model::LocalDecl,
-) -> CodegenResult<IntType<'ctx>> {
-    let SoulType::Primitive(prim) = &decl.ty else {
-        return Err(Fault::error_with_kind(
-            CodegenErrorKind::NonPrimitiveType {
-                ty: format!("{:?}", decl.ty).into_boxed_str(),
-            },
-            Some(decl.span),
-        ));
-    };
+    ty: &SoulType,
+    span: Option<Span>,
+) -> CodegenResult<BasicTypeEnum<'ctx>> {
     use PrimitiveTypes::*;
-    Ok(match prim {
-        Boolean => context.bool_type(),
-        Int8 | Uint8 => context.i8_type(),
-        Int16 | Uint16 | Char16 => context.i16_type(),
-        Int32 | Uint32 | Char | Char32 => context.i32_type(),
-        Int64 | Uint64 | Char64 => context.i64_type(),
-        Int128 | Uint128 => context.i128_type(),
-        // Platform-sized: this codegen slice only targets 64-bit hosts.
-        Int | Uint | CInt | CUint | UntypedInt | UntypedUint => context.i64_type(),
-        Char8 => context.i8_type(),
-        other => {
-            return Err(Fault::error_with_kind(
-                CodegenErrorKind::UnsupportedPrimitiveType {
-                    ty: format!("{other:?}").into_boxed_str(),
-                },
-                Some(decl.span),
-            ));
+    match ty {
+        SoulType::Primitive(prim) => Ok(match prim {
+            Boolean => context.bool_type().into(),
+            Int8 | Uint8 => context.i8_type().into(),
+            Int16 | Uint16 | Char16 => context.i16_type().into(),
+            Int32 | Uint32 | Char | Char32 => context.i32_type().into(),
+            Int64 | Uint64 | Char64 => context.i64_type().into(),
+            Int128 | Uint128 => context.i128_type().into(),
+            // Platform-sized: this codegen slice only targets 64-bit hosts.
+            Int | Uint | CInt | CUint | UntypedInt | UntypedUint => context.i64_type().into(),
+            Char8 => context.i8_type().into(),
+            CStr => context.ptr_type(AddressSpace::default()).into(),
+            other => {
+                return Err(Fault::error_with_kind(
+                    CodegenErrorKind::UnsupportedPrimitiveType {
+                        ty: format!("{other:?}").into_boxed_str(),
+                    },
+                    span,
+                ));
+            }
+        }),
+        SoulType::Reference(_) | SoulType::Pointer(_) => {
+            Ok(context.ptr_type(AddressSpace::default()).into())
         }
-    })
+        other => Err(Fault::error_with_kind(
+            CodegenErrorKind::NonPrimitiveType {
+                ty: format!("{other:?}").into_boxed_str(),
+            },
+            span,
+        )),
+    }
 }

@@ -29,14 +29,32 @@ LL_PATH = SOUL_TESTER_DIR / "soul" / "output" / "codegen" / "module.ll"
 CLANG = Path(r"C:\llvm-16\bin\clang.exe")
 
 EXPECT_RE = re.compile(r"//\s*expect:\s*(\d+)")
+EXPECT_STDOUT_RE = re.compile(r"//\s*expect_stdout:\s*(.+)")
+
+
+def _leading_comment_lines(soul_file: Path) -> list[str]:
+    lines = []
+    for line in soul_file.read_text(encoding="utf-8").splitlines():
+        if not line.strip().startswith("//"):
+            break
+        lines.append(line)
+    return lines
 
 
 def read_expected(soul_file: Path) -> int:
-    first_line = soul_file.read_text(encoding="utf-8").splitlines()[0]
-    match = EXPECT_RE.search(first_line)
-    if not match:
-        raise ValueError(f"{soul_file}: missing '// expect: N' on the first line")
-    return int(match.group(1))
+    for line in _leading_comment_lines(soul_file):
+        match = EXPECT_RE.search(line)
+        if match:
+            return int(match.group(1))
+    raise ValueError(f"{soul_file}: missing a leading '// expect: N' comment")
+
+
+def read_expected_stdout(soul_file: Path) -> str | None:
+    for line in _leading_comment_lines(soul_file):
+        match = EXPECT_STDOUT_RE.search(line)
+        if match:
+            return match.group(1).strip()
+    return None
 
 
 def set_main_path(relative_path: str) -> None:
@@ -60,7 +78,7 @@ def run_soul_tester() -> None:
         raise RuntimeError(f"codegen was skipped:\n{result.stderr}")
 
 
-def build_and_run_exe(exe_path: Path) -> int:
+def build_and_run_exe(exe_path: Path) -> tuple[int, str]:
     compile_result = subprocess.run(
         [str(CLANG), str(LL_PATH), "-o", str(exe_path)],
         capture_output=True,
@@ -72,7 +90,7 @@ def build_and_run_exe(exe_path: Path) -> int:
         )
 
     run_result = subprocess.run([str(exe_path)], capture_output=True, text=True)
-    return run_result.returncode
+    return run_result.returncode, run_result.stdout
 
 
 def main() -> int:
@@ -89,17 +107,30 @@ def main() -> int:
             expected = read_expected(soul_file)
             relative_path = f"codegen_tests/{name}"
 
+            expected_stdout = read_expected_stdout(soul_file)
+
             try:
                 set_main_path(relative_path)
                 run_soul_tester()
                 exe_path = soul_file.with_suffix(".exe")
-                actual = build_and_run_exe(exe_path)
+                actual, stdout = build_and_run_exe(exe_path)
                 exe_path.unlink(missing_ok=True)
 
-                if actual == expected:
-                    print(f"PASS  {name}: exit code {actual}")
+                exit_ok = actual == expected
+                stdout_ok = expected_stdout is None or expected_stdout in stdout
+
+                if exit_ok and stdout_ok:
+                    detail = f"exit code {actual}"
+                    if expected_stdout is not None:
+                        detail += ", stdout matched"
+                    print(f"PASS  {name}: {detail}")
                 else:
-                    print(f"FAIL  {name}: expected {expected}, got {actual}")
+                    if not exit_ok:
+                        print(f"FAIL  {name}: expected exit code {expected}, got {actual}")
+                    if not stdout_ok:
+                        print(
+                            f"FAIL  {name}: expected stdout to contain {expected_stdout!r}, got {stdout!r}"
+                        )
                     failures.append(name)
             except Exception as exc:  # noqa: BLE001 - report and keep going
                 print(f"ERROR {name}: {exc}")

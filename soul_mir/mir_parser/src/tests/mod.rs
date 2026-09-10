@@ -402,8 +402,13 @@ fn calling_a_none_returning_function_as_a_statement() {
 }
 
 #[test]
-fn non_normal_function_is_rejected() {
-    let ast = resolve_source(r#"extern "C" printf(fmt: &char): int {}"#);
+fn non_extern_signature_only_function_is_rejected() {
+    // A trait method declaration is signature-only (no body) but isn't
+    // `extern "C"` either — unlike an extern declaration, there's no FFI
+    // target to lower it to, so it's correctly still rejected (see
+    // `extern_c_signature_lowers_into_an_extern_function_with_no_type_restriction`
+    // for the case that *is* now supported).
+    let ast = resolve_source("trait Greeter {\n    greet(): none\n}\n");
     let function_id = ast
         .crates
         .store
@@ -923,5 +928,46 @@ fn unsupported_intrinsic_is_rejected_with_a_clear_fault() {
         MirErrorKind::UnsupportedIntrinsic {
             name: "typeinfo".into(),
         },
+    );
+}
+
+#[test]
+fn extern_c_signature_lowers_into_an_extern_function_with_no_type_restriction() {
+    let ast = resolve_source(r#"extern "C" printCStr(message: cstr): none"#);
+    let (id, _) = ast
+        .crates
+        .store
+        .functions
+        .entries()
+        .find(|(_, kind)| matches!(kind, FunctionKind::Signature(_)))
+        .expect("expected one signature-only function");
+
+    let mut lowerer = MirLowerer::new(&ast.crates.store, &ast.declares);
+    lowerer
+        .lower_function(id)
+        .expect("expected extern lowering to succeed");
+    let (functions, externs) = lowerer.into_functions_and_externs();
+
+    assert_eq!(
+        functions.entries().count(),
+        0,
+        "an extern declaration has no body — it must not end up as a `Function`"
+    );
+    let (_, extern_fn) = externs
+        .entries()
+        .next()
+        .expect("expected the extern declaration in `externs`");
+    assert_eq!(extern_fn.params.len(), 1);
+    assert!(
+        matches!(
+            &extern_fn.params[0],
+            ast_model::SoulType::Primitive(soul_utils::soul_names::PrimitiveTypes::CStr)
+        ),
+        "{:?}",
+        extern_fn.params[0]
+    );
+    assert_eq!(
+        extern_fn.return_type, None,
+        "a `none`-returning extern function should have no return type, same as `Function::return_local`"
     );
 }

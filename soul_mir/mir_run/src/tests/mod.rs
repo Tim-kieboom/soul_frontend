@@ -102,16 +102,25 @@ fn out_of_scope_function_pushes_a_fault_into_the_context_not_a_panic() {
 }
 
 #[test]
-fn extern_function_is_skipped_without_pushing_a_fault() {
+fn extern_c_function_lowers_into_externs_not_functions() {
     let ast = build_ast(r#"extern "C" printf(fmt: &char): int {}"#);
 
     let (program, context) = create_mir(&ast);
 
-    assert_eq!(program.functions.entries().count(), 0);
+    assert_eq!(
+        program.functions.entries().count(),
+        0,
+        "an extern declaration has no body — it must not end up in `functions`"
+    );
+    assert_eq!(
+        program.externs.entries().count(),
+        1,
+        "expected the extern declaration to be lowered into `externs`"
+    );
     assert_eq!(
         context.faults.iter().count(),
         0,
-        "extern declarations should be skipped, not pushed as a lowering fault: {:#?}",
+        "a supported extern \"C\" declaration shouldn't fault: {:#?}",
         context.faults.iter().collect::<Vec<_>>()
     );
 }

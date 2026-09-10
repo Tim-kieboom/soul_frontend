@@ -1,4 +1,7 @@
-use soul_utils::{FunctionId, fault::{Fault, UnclassifiedKind}};
+use soul_utils::{
+    FunctionId,
+    fault::{Fault, UnclassifiedKind},
+};
 
 /// Structured error kinds for MIR-to-LLVM codegen. `Unclassified` is a
 /// migration fallback carrying the raw message from call sites not yet
@@ -23,9 +26,7 @@ pub enum CodegenErrorKind {
     #[error("type `{ty}` isn't supported in this codegen slice")]
     UnsupportedPrimitiveType { ty: Box<str> },
 
-    #[error(
-        "place projections (field/index/deref) aren't supported in this codegen slice"
-    )]
+    #[error("place projections (field/index/deref) aren't supported in this codegen slice")]
     PlaceProjectionUnsupported,
 
     #[error(
@@ -48,6 +49,17 @@ pub enum CodegenErrorKind {
     #[error("call result used but callee returns `none`")]
     CallResultIsNone,
 
+    /// Arithmetic/comparison/logical operators are int-only in this slice —
+    /// checked explicitly here rather than trusting the resolver to have
+    /// already ruled a pointer out, since `into_int_value()`-style unwraps
+    /// would otherwise panic on real (if malformed) input instead of
+    /// faulting cleanly.
+    #[error("expected an integer operand, got a pointer")]
+    ExpectedIntOperand,
+
+    #[error("expected a pointer operand, got an integer")]
+    ExpectedPointerOperand,
+
     #[error("unary operator `{op}` isn't supported in this codegen slice")]
     UnsupportedUnaryOperator { op: Box<str> },
 
@@ -60,9 +72,7 @@ pub enum CodegenErrorKind {
     #[error("constant `{value}` isn't supported in this codegen slice")]
     UnsupportedConstant { value: Box<str> },
 
-    #[error(
-        "`Drop` isn't constructed by lowering yet and isn't supported in codegen either"
-    )]
+    #[error("`Drop` isn't constructed by lowering yet and isn't supported in codegen either")]
     DropUnsupported,
 
     #[error("function has no blocks")]
@@ -71,9 +81,7 @@ pub enum CodegenErrorKind {
     #[error("function is missing parameter {index}")]
     MissingParameterValue { index: usize },
 
-    #[error(
-        "`main`'s return type is wider than the 32-bit process exit code convention supports"
-    )]
+    #[error("`main`'s return type is wider than the 32-bit process exit code convention supports")]
     EntryPointReturnTypeTooWide,
 
     /// An LLVM builder call failed — this is an internal-consistency error
