@@ -40,6 +40,7 @@ use mir_model::{
 use soul_utils::{
     FunctionId,
     collections::vec_map::{VecMap, VecMapIndex},
+    compiler_options::{CompilerOptions, PlatformInfo},
     fault::Fault,
     soul_names::PrimitiveTypes,
     span::Span,
@@ -79,6 +80,7 @@ pub fn codegen_module<'ctx>(
     module_name: &str,
     mir: &MirProgram,
     ast: &AstStore,
+    options: &CompilerOptions,
 ) -> CodegenResult<Module<'ctx>> {
     let module = context.create_module(module_name);
     let mut codegen = ModuleCodegen {
@@ -86,6 +88,7 @@ pub fn codegen_module<'ctx>(
         module: &module,
         mir,
         ast,
+        platform: options.platform,
         function_values: VecMap::new(),
         string_counter: Cell::new(0),
     };
@@ -112,6 +115,7 @@ struct ModuleCodegen<'ctx, 'a> {
     mir: &'a MirProgram,
     context: &'ctx Context,
     module: &'a Module<'ctx>,
+    platform: PlatformInfo,
     function_values: VecMap<FunctionId, FunctionValue<'ctx>>,
     /// Shared across every function's codegen so string-literal globals get
     /// module-wide-unique names, not per-function-restarting ones.
@@ -133,7 +137,7 @@ impl<'ctx, 'a> ModuleCodegen<'ctx, 'a> {
                 .locals
                 .entries()
                 .take(function.arg_count)
-                .map(|(_, decl)| llvm_type(self.context, &decl.ty, Some(decl.span)))
+                .map(|(_, decl)| llvm_type(self.context, &self.platform, &decl.ty, Some(decl.span)))
                 .collect::<CodegenResult<Vec<_>>>()?;
 
             let param_metadata_types = param_metadata(&param_types);
@@ -142,7 +146,7 @@ impl<'ctx, 'a> ModuleCodegen<'ctx, 'a> {
                 .return_local
                 .map(|local| {
                     let decl = &function.locals[local];
-                    llvm_type(self.context, &decl.ty, Some(decl.span))
+                    llvm_type(self.context, &self.platform, &decl.ty, Some(decl.span))
                 })
                 .transpose()?;
 
@@ -174,14 +178,13 @@ impl<'ctx, 'a> ModuleCodegen<'ctx, 'a> {
             let param_types = extern_fn
                 .params
                 .iter()
-                .map(|ty| llvm_type(self.context, ty, None))
+                .map(|ty| llvm_type(self.context, &self.platform, ty, None))
                 .collect::<CodegenResult<Vec<_>>>()?;
             let param_metadata_types = param_metadata(&param_types);
 
             let fn_type = match &extern_fn.return_type {
-                Some(ty) => {
-                    llvm_type(self.context, ty, None)?.fn_type(&param_metadata_types, false)
-                }
+                Some(ty) => llvm_type(self.context, &self.platform, ty, None)?
+                    .fn_type(&param_metadata_types, false),
                 None => self
                     .context
                     .void_type()
@@ -214,7 +217,7 @@ impl<'ctx, 'a> ModuleCodegen<'ctx, 'a> {
 
         let mut locals: VecMap<LocalId, PointerValue<'ctx>> = VecMap::new();
         for (local_id, decl) in function.locals.entries() {
-            let ty = llvm_type(self.context, &decl.ty, Some(decl.span))?;
+            let ty = llvm_type(self.context, &self.platform, &decl.ty, Some(decl.span))?;
             let slot = builder
                 .build_alloca(ty, &format!("_{}", local_id.index()))
                 .map_err(llvm_err)?;
@@ -267,6 +270,7 @@ impl<'ctx, 'a> ModuleCodegen<'ctx, 'a> {
         let mut fn_codegen = FunctionCodegen {
             context: self.context,
             module: self.module,
+            platform: self.platform,
             builder,
             function,
             is_entry_point: name == "main",
@@ -292,6 +296,7 @@ fn param_metadata<'ctx>(types: &[BasicTypeEnum<'ctx>]) -> Vec<BasicMetadataTypeE
 struct FunctionCodegen<'ctx, 'a> {
     context: &'ctx Context,
     module: &'a Module<'ctx>,
+    platform: PlatformInfo,
     builder: Builder<'ctx>,
     function: &'a Function,
     is_entry_point: bool,
@@ -389,14 +394,14 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
                         .iter()
                         .map(|&local| {
                             let decl = &callee_mir.locals[local];
-                            llvm_type(self.context, &decl.ty, Some(decl.span))
+                            llvm_type(self.context, &self.platform, &decl.ty, Some(decl.span))
                         })
                         .collect::<CodegenResult<Vec<_>>>()?
                 } else if let Some(extern_fn) = self.externs.get(*id) {
                     extern_fn
                         .params
                         .iter()
-                        .map(|ty| llvm_type(self.context, ty, None))
+                        .map(|ty| llvm_type(self.context, &self.platform, ty, None))
                         .collect::<CodegenResult<Vec<_>>>()?
                 } else {
                     return Err(err(CodegenErrorKind::CallHasNoMirBody { id: *id }));
@@ -684,7 +689,7 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
 
     fn local_type(&self, local: LocalId) -> CodegenResult<BasicTypeEnum<'ctx>> {
         let decl = &self.function.locals[local];
-        llvm_type(self.context, &decl.ty, Some(decl.span))
+        llvm_type(self.context, &self.platform, &decl.ty, Some(decl.span))
     }
 
     /// The LLVM type a place-backed operand is stored as, if it is one — a
@@ -736,6 +741,7 @@ fn is_signed(prim: PrimitiveTypes) -> bool {
 /// floats, ...) isn't supported in this codegen slice yet.
 fn llvm_type<'ctx>(
     context: &'ctx Context,
+    platform: &PlatformInfo,
     ty: &SoulType,
     span: Option<Span>,
 ) -> CodegenResult<BasicTypeEnum<'ctx>> {
@@ -748,11 +754,12 @@ fn llvm_type<'ctx>(
             Int32 | Uint32 | Char | Char32 => context.i32_type().into(),
             Int64 | Uint64 | Char64 => context.i64_type().into(),
             Int128 | Uint128 => context.i128_type().into(),
-            // Platform-sized (pointer-width): this codegen slice only targets 64-bit hosts.
-            Int | Uint | UntypedInt | UntypedUint => context.i64_type().into(),
-            // C's `int`/`unsigned int` are fixed at 32 bits on the LP64/LLP64 targets this compiles for,
-            // regardless of pointer width.
-            CInt | CUint => context.i32_type().into(),
+            // Platform-sized (pointer-width).
+            Int | Uint | UntypedInt | UntypedUint => {
+                context.custom_width_int_type(platform.pointer_bits).into()
+            }
+            // C's `int`/`unsigned int` — always 32 bits here, regardless of pointer width.
+            CInt | CUint => context.custom_width_int_type(platform.c_int_bits).into(),
             Char8 => context.i8_type().into(),
             CStr => context.ptr_type(AddressSpace::default()).into(),
             other => {

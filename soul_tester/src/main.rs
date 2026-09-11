@@ -160,7 +160,13 @@ fn mir(ast: &AstTree, benchmark: &mut Benchmark, all_faults: &mut FaultCollector
 /// AST-level pass/fail. See `mir_codegen`'s module docs for what's in scope.
 fn codegen(mir: &MirProgram, ast_store: &ast_model::AstStore) -> Result<()> {
     let context = Context::create();
-    match mir_codegen::codegen_module(&context, "soul_module", mir, ast_store) {
+    match mir_codegen::codegen_module(
+        &context,
+        "soul_module",
+        mir,
+        ast_store,
+        &config::COMPILER_OPTIONS,
+    ) {
         Ok(module) => {
             let output_path = config::CONFIG.output_path().join("codegen");
             std::fs::create_dir_all(&output_path)?;

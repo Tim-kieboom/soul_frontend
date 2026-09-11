@@ -3,12 +3,16 @@ use std::{
     sync::LazyLock,
 };
 
-use soul_utils::{compiler_options::CompilerOptions, fault::Severity};
+use soul_utils::{
+    compiler_options::{CompilerOptions, PlatformInfo},
+    fault::Severity,
+};
 
 const RAW_CONFIG: &str = include_str!("../config.json");
 pub static CONFIG: LazyLock<Configs> = LazyLock::new(parse_config);
 pub const COMPILER_OPTIONS: CompilerOptions = CompilerOptions {
     fail_level: Severity::Error,
+    platform: PlatformInfo::new_windows_x86_64(),
 };
 
 pub const PRINT_CONFIGS: PrintConfigs = PrintConfigs {

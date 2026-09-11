@@ -20,12 +20,16 @@ use soul_utils::{
         crate_store::{CrateEntry, CrateStore, Manifest},
         module_store::ModuleStore,
     },
-    compiler_options::CompilerOptions,
+    compiler_options::{CompilerOptions, PlatformInfo},
     fault::Severity,
 };
 
 const COMPILER_OPTIONS: CompilerOptions = CompilerOptions {
     fail_level: Severity::Error,
+    platform: PlatformInfo {
+        pointer_bits: 64,
+        c_int_bits: 32,
+    },
 };
 
 struct Input {
