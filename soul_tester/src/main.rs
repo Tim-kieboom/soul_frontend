@@ -6,6 +6,7 @@ use anyhow::Result;
 use ast_model::AstTree;
 use ast_run::{AstRequest, to_ast};
 use inkwell::context::Context;
+use mir_codegen::to_llvm;
 use mir_model::MirProgram;
 use soul_tokenizer::{TokenStream, to_token_stream};
 use soul_utils::{
@@ -59,15 +60,15 @@ fn frontend(benchmark: &mut Benchmark) -> Result<bool> {
     let mut all_faults = ast.drain_faults().into_unclassified();
 
     let ast_failed = failed(&all_faults);
-    let mir_program = if ast_failed {
+    let mir = if ast_failed {
         MirProgram::empty()
     } else {
         mir(&ast, benchmark, &mut all_faults)
     };
-    display_mir(&mir_program, &ast.crates.store)?;
+    display_mir(&mir, &ast.crates.store)?;
 
     if !ast_failed {
-        codegen(&mir_program, &ast.crates.store, &ast.declares)?;
+        codegen(&mir, &ast)?;
     }
 
     for fault in all_faults.iter() {
@@ -158,20 +159,8 @@ fn mir(ast: &AstTree, benchmark: &mut Benchmark, all_faults: &mut FaultCollector
 /// slice) codegen pass, so plenty of otherwise-valid MIR (e.g. anything using
 /// `f64`) isn't supported yet, the same way MIR faults don't gate the overall
 /// AST-level pass/fail. See `mir_codegen`'s module docs for what's in scope.
-fn codegen(
-    mir: &MirProgram,
-    ast_store: &ast_model::AstStore,
-    declares: &ast_model::declare_store::DeclareStore,
-) -> Result<()> {
-    let context = Context::create();
-    match mir_codegen::codegen_module(
-        &context,
-        "soul_module",
-        mir,
-        ast_store,
-        declares,
-        &config::COMPILER_OPTIONS,
-    ) {
+fn codegen(mir: &MirProgram, ast: &AstTree) -> Result<()> {
+    match to_llvm(&Context::create(), mir, ast, &config::COMPILER_OPTIONS) {
         Ok(module) => {
             let output_path = config::CONFIG.output_path().join("codegen");
             std::fs::create_dir_all(&output_path)?;

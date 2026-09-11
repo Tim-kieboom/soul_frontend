@@ -1,0 +1,226 @@
+//! Operand/rvalue codegen: turns a MIR `Operand`/`Rvalue` into an LLVM
+//! `BasicValueEnum` — split out of `function` since it's a distinct concern
+//! from control flow (blocks/statements/terminators) and place resolution.
+
+use ast_model::{
+    SoulType,
+    operators::{BinaryOperatorKind, UnaryOperatorKind},
+};
+use inkwell::{
+    IntPredicate,
+    module::Linkage,
+    types::BasicTypeEnum,
+    values::{BasicValueEnum, IntValue, PointerValue},
+};
+use mir_model::{AggregateKind, ConstValue, Operand, Rvalue};
+
+use crate::{
+    err,
+    fault::{CodegenErrorKind, CodegenResult},
+    function::FunctionCodegen,
+    llvm_err,
+    types::{const_int, expect_int, is_signed},
+};
+
+impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
+    /// Materializes a Soul string literal as a null-terminated LLVM global
+    /// byte-array constant and returns a pointer to it — the only way a
+    /// `cstr` value currently comes into existence (there's no other
+    /// `cstr`-producing expression in this slice, so this is the sole
+    /// producer of one). Not deduplicated across equal literals: correctness
+    /// over compactness for this first slice.
+    fn codegen_string_constant(&mut self, s: &str) -> PointerValue<'ctx> {
+        let id = self.string_counter.get();
+        self.string_counter.set(id + 1);
+
+        let const_str = self.context.const_string(s.as_bytes(), true);
+        let global = self
+            .module
+            .add_global(const_str.get_type(), None, &format!("str.{id}"));
+        global.set_initializer(&const_str);
+        global.set_constant(true);
+        global.set_linkage(Linkage::Private);
+        global.as_pointer_value()
+    }
+
+    pub(crate) fn codegen_rvalue(
+        &mut self,
+        rvalue: &Rvalue,
+        result_ty: BasicTypeEnum<'ctx>,
+    ) -> CodegenResult<BasicValueEnum<'ctx>> {
+        match rvalue {
+            Rvalue::Use(operand) => self.codegen_operand(operand, result_ty),
+            Rvalue::BinaryOp(op, left, right) => self.codegen_binary(result_ty, op, left, right),
+            Rvalue::UnaryOp(op, operand) => self.codegen_unary(op, operand),
+            Rvalue::Aggregate(AggregateKind::Struct, operands) => {
+                self.codegen_struct_aggregate(operands, result_ty)
+            }
+            Rvalue::Ref { .. } | Rvalue::Aggregate(..) | Rvalue::Cast(..) => {
+                Err(err(CodegenErrorKind::UnsupportedRvalue))
+            }
+        }
+    }
+
+    fn codegen_unary(
+        &mut self,
+        op: &UnaryOperatorKind,
+        operand: &Operand,
+    ) -> CodegenResult<BasicValueEnum<'ctx>> {
+        let bool_ty = self.context.bool_type().into();
+        let value = expect_int(self.codegen_operand(operand, bool_ty)?)?;
+        match op {
+            UnaryOperatorKind::Not => Ok(self
+                .builder
+                .build_not(value, "not")
+                .map_err(llvm_err)?
+                .into()),
+
+            other => Err(err(CodegenErrorKind::UnsupportedUnaryOperator {
+                op: format!("{other:?}").into_boxed_str(),
+            })),
+        }
+    }
+
+    fn codegen_binary(
+        &mut self,
+        result_ty: BasicTypeEnum<'ctx>,
+        op: &BinaryOperatorKind,
+        left: &Operand,
+        right: &Operand,
+    ) -> CodegenResult<BasicValueEnum<'ctx>> {
+        let operand_ty = self
+            .operand_type(left)
+            .or_else(|| self.operand_type(right))
+            .unwrap_or(result_ty);
+
+        let l = expect_int(self.codegen_operand(left, operand_ty)?)?;
+        let r = expect_int(self.codegen_operand(right, operand_ty)?)?;
+        let signed = self.operand_is_signed(left) || self.operand_is_signed(right);
+        Ok(self.codegen_binary_op(*op, l, r, signed)?.into())
+    }
+
+    /// Builds a struct value field-by-field: an `undef` of the destination
+    /// struct type, then one `insertvalue` per operand — `operands` is
+    /// already in the struct's declared field order (see `llvm_type`'s
+    /// docs), so it lines up positionally with the struct type's own fields.
+    fn codegen_struct_aggregate(
+        &mut self,
+        operands: &[Operand],
+        result_ty: BasicTypeEnum<'ctx>,
+    ) -> CodegenResult<BasicValueEnum<'ctx>> {
+        let BasicTypeEnum::StructType(struct_ty) = result_ty else {
+            return Err(err(CodegenErrorKind::PlaceProjectionUnsupported));
+        };
+
+        let mut value = struct_ty.get_undef();
+        for (index, operand) in operands.iter().enumerate() {
+            let field_ty = struct_ty
+                .get_field_type_at_index(index as u32)
+                .ok_or(CodegenErrorKind::PlaceProjectionUnsupported)
+                .map_err(err)?;
+
+            let field_value = self.codegen_operand(operand, field_ty)?;
+            value = self
+                .builder
+                .build_insert_value(value, field_value, index as u32, "field")
+                .map_err(llvm_err)?
+                .into_struct_value();
+        }
+
+        Ok(value.into())
+    }
+
+    fn codegen_binary_op(
+        &mut self,
+        op: BinaryOperatorKind,
+        l: IntValue<'ctx>,
+        r: IntValue<'ctx>,
+        signed: bool,
+    ) -> CodegenResult<IntValue<'ctx>> {
+        use BinaryOperatorKind::*;
+        let b = &self.builder;
+        let v = match op {
+            Add => b.build_int_add(l, r, "add"),
+            Sub => b.build_int_sub(l, r, "sub"),
+            Mul => b.build_int_mul(l, r, "mul"),
+            Div if signed => b.build_int_signed_div(l, r, "sdiv"),
+            Div => b.build_int_unsigned_div(l, r, "udiv"),
+            Mod if signed => b.build_int_signed_rem(l, r, "srem"),
+            Mod => b.build_int_unsigned_rem(l, r, "urem"),
+            Eq => b.build_int_compare(IntPredicate::EQ, l, r, "eq"),
+            NotEq => b.build_int_compare(IntPredicate::NE, l, r, "ne"),
+            Lt if signed => b.build_int_compare(IntPredicate::SLT, l, r, "lt"),
+            Lt => b.build_int_compare(IntPredicate::ULT, l, r, "lt"),
+            Gt if signed => b.build_int_compare(IntPredicate::SGT, l, r, "gt"),
+            Gt => b.build_int_compare(IntPredicate::UGT, l, r, "gt"),
+            Le if signed => b.build_int_compare(IntPredicate::SLE, l, r, "le"),
+            Le => b.build_int_compare(IntPredicate::ULE, l, r, "le"),
+            Ge if signed => b.build_int_compare(IntPredicate::SGE, l, r, "ge"),
+            Ge => b.build_int_compare(IntPredicate::UGE, l, r, "ge"),
+            LogAnd => b.build_and(l, r, "and"),
+            LogOr => b.build_or(l, r, "or"),
+            other => {
+                return Err(err(CodegenErrorKind::UnsupportedBinaryOperator {
+                    op: format!("{other:?}").into_boxed_str(),
+                }));
+            }
+        };
+        v.map_err(llvm_err)
+    }
+
+    pub(crate) fn codegen_operand(
+        &mut self,
+        operand: &Operand,
+        ty: BasicTypeEnum<'ctx>,
+    ) -> CodegenResult<BasicValueEnum<'ctx>> {
+        match operand {
+            Operand::Copy(place) | Operand::Move(place) => {
+                let (ptr, _) = self.resolve_place(place)?;
+                self.builder.build_load(ty, ptr, "load").map_err(llvm_err)
+            }
+            Operand::Constant(value) => self.codegen_constant(ty, value),
+        }
+    }
+
+    fn codegen_constant(
+        &mut self,
+        ty: BasicTypeEnum<'ctx>,
+        value: &ConstValue,
+    ) -> CodegenResult<BasicValueEnum<'ctx>> {
+        match ty {
+            BasicTypeEnum::IntType(int_ty) => Ok(const_int(int_ty, value)?.into()),
+            BasicTypeEnum::PointerType(_) => match value {
+                ConstValue::Str(s) | ConstValue::Cstr(s) => {
+                    Ok(self.codegen_string_constant(s).into())
+                }
+                other => Err(err(CodegenErrorKind::UnsupportedConstant {
+                    value: format!("{other:?}").into_boxed_str(),
+                })),
+            },
+            other => Err(err(CodegenErrorKind::UnsupportedPrimitiveType {
+                ty: format!("{other:?}").into_boxed_str(),
+            })),
+        }
+    }
+
+    /// The LLVM type a place-backed operand is stored as, if it is one — a
+    /// bare constant operand carries no type of its own (see the module docs).
+    fn operand_type(&self, operand: &Operand) -> Option<BasicTypeEnum<'ctx>> {
+        match operand {
+            Operand::Copy(place) | Operand::Move(place) if place.projection.is_empty() => {
+                self.local_type(place.local).ok()
+            }
+            _ => None,
+        }
+    }
+
+    fn operand_is_signed(&self, operand: &Operand) -> bool {
+        match operand {
+            Operand::Copy(place) | Operand::Move(place) if place.projection.is_empty() => {
+                matches!(&self.function.locals[place.local].ty, SoulType::Primitive(p) if is_signed(*p))
+            }
+            Operand::Constant(ConstValue::Int(_)) => true,
+            _ => false,
+        }
+    }
+}
