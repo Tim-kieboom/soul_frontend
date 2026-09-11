@@ -155,9 +155,10 @@ fn missing_return_is_rejected() {
 fn non_primitive_return_type_is_rejected() {
     // `f() { .. }` with no declared return type is a `none`-returning
     // function, which is now valid (see `none_returning_function_...` tests
-    // below) — an array return type isolates a genuine non-primitive,
-    // non-struct type (structs are now accepted, see the struct tests below).
-    let result = lower_source("f(a: [2]int): [2]int {\n    return a\n}\n", "f");
+    // below) — a heap-array return type isolates a genuine non-primitive
+    // type still out of scope (structs and fixed-size arrays/slices are now
+    // accepted, see the struct and array tests below).
+    let result = lower_source("f(a: []int): []int {\n    return a\n}\n", "f");
     assert_rejected_matching(&result, |kind| {
         matches!(kind, MirErrorKind::NonPrimitiveType { .. })
     });
@@ -294,6 +295,138 @@ fn struct_constructor_lowers_to_an_aggregate_in_declared_field_order() {
         &operands[1],
         Operand::Constant(ConstValue::Uint(2))
     ));
+}
+
+#[test]
+fn array_literal_lowers_to_an_aggregate_in_literal_order() {
+    // `a` is only constructed here, not indexed — a fixed-size array can't
+    // be indexed directly in this slice (see
+    // `indexing_a_fixed_size_array_directly_is_rejected` below); it has to
+    // go through a slice first.
+    let mir = lower_source("f(): int {\n    a: [2]int = [1, 2]\n    return 0\n}\n", "f")
+        .expect("expected successful lowering");
+
+    let (_, block) = mir.blocks.entries().next().expect("expected one block");
+    let mir_model::Statement::Assign(_, Rvalue::Aggregate(kind, operands)) = &block.statements[0]
+    else {
+        panic!(
+            "expected the first statement to construct an Aggregate, got {:#?}",
+            block.statements[0]
+        );
+    };
+    assert!(matches!(kind, mir_model::AggregateKind::Array));
+    assert_eq!(operands.len(), 2);
+    assert!(matches!(
+        &operands[0],
+        Operand::Constant(ConstValue::Uint(1))
+    ));
+    assert!(matches!(
+        &operands[1],
+        Operand::Constant(ConstValue::Uint(2))
+    ));
+}
+
+#[test]
+fn array_reference_lowers_to_a_ref_plus_fat_pointer_aggregate() {
+    let mir = lower_source(
+        "f(): int {\n    a: [2]int = [1, 2]\n    s: [&]int = &a\n    return s[0]\n}\n",
+        "f",
+    )
+    .expect("expected successful lowering");
+
+    let (_, block) = mir.blocks.entries().next().expect("expected one block");
+    // statements[0]: `a`'s Aggregate construction (checked above); [1]: the
+    // Ref-producing temp `&a` builds; [2]: the `{ptr, len}` Aggregate for `s`.
+    let mir_model::Statement::Assign(_, Rvalue::Ref { place, .. }) = &block.statements[1] else {
+        panic!(
+            "expected the second statement to build a bare Ref, got {:#?}",
+            block.statements[1]
+        );
+    };
+    assert!(
+        place.projection.is_empty(),
+        "expected a Ref straight at `a`'s own local, got {:#?}",
+        place.projection
+    );
+
+    let mir_model::Statement::Assign(_, Rvalue::Aggregate(kind, operands)) = &block.statements[2]
+    else {
+        panic!(
+            "expected the third statement to construct the slice Aggregate, got {:#?}",
+            block.statements[2]
+        );
+    };
+    assert!(matches!(kind, mir_model::AggregateKind::Array));
+    assert_eq!(operands.len(), 2);
+    assert!(matches!(&operands[0], Operand::Copy(_)));
+    assert!(matches!(
+        &operands[1],
+        Operand::Constant(ConstValue::Uint(2))
+    ));
+}
+
+#[test]
+fn slice_index_read_lowers_to_a_place_with_an_index_projection() {
+    let mir = lower_source(
+        "f(s: [&]int): int {\n    i: uint = 0\n    return s[i]\n}\n",
+        "f",
+    )
+    .expect("expected successful lowering");
+
+    let (_, block) = mir.blocks.entries().next().expect("expected one block");
+    // statements[0]: `i`'s own assignment; [1]: the `return s[i]` read.
+    let mir_model::Statement::Assign(_, Rvalue::Use(Operand::Copy(place))) = &block.statements[1]
+    else {
+        panic!(
+            "expected a bare Use(Copy(..)) assignment, got {:#?}",
+            block.statements[1]
+        );
+    };
+    assert!(
+        matches!(
+            place.projection.as_slice(),
+            [mir_model::PlaceElem::Index(_)]
+        ),
+        "expected a single Index(..) projection, got {:#?}",
+        place.projection
+    );
+}
+
+#[test]
+fn slice_index_write_lowers_to_an_assign_through_an_index_projection() {
+    let mir = lower_source(
+        "f(mut s: [&mut]int): int {\n    s[0] = 5\n    return s[0]\n}\n",
+        "f",
+    )
+    .expect("expected successful lowering");
+
+    let (_, block) = mir.blocks.entries().next().expect("expected one block");
+    // statements[0]: the literal index `0` materialized into its own temp
+    // (see `operand_local`); [1]: the actual `s[0] = 5` write.
+    let mir_model::Statement::Assign(place, Rvalue::Use(Operand::Constant(ConstValue::Uint(5)))) =
+        &block.statements[1]
+    else {
+        panic!(
+            "expected the second statement to assign a constant, got {:#?}",
+            block.statements[1]
+        );
+    };
+    assert!(
+        matches!(
+            place.projection.as_slice(),
+            [mir_model::PlaceElem::Index(_)]
+        ),
+        "expected a single Index(..) projection, got {:#?}",
+        place.projection
+    );
+}
+
+#[test]
+fn indexing_a_fixed_size_array_directly_is_rejected() {
+    let result = lower_source("f(a: [2]int): int {\n    return a[0]\n}\n", "f");
+    assert_rejected_matching(&result, |kind| {
+        matches!(kind, MirErrorKind::IndexTargetNotASlice { .. })
+    });
 }
 
 #[test]

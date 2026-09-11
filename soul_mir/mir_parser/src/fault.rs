@@ -113,9 +113,9 @@ pub enum MirErrorKind {
     },
 
     #[error(
-        "only field access on a variable or another field access — `variable.field` or `object.field.field` — is supported in this lowering slice"
+        "only a variable, a field access (`object.field`), or an index (`collection[i]`) — any nesting of those — is supported as a place expression in this lowering slice"
     )]
-    UnsupportedFieldAccessObject,
+    UnsupportedPlaceExpression,
 
     #[error("`..` default-filled struct constructors aren't supported in this lowering slice")]
     StructConstructorDefaultsUnsupported,
@@ -130,6 +130,16 @@ pub enum MirErrorKind {
         struct_name: Box<str>,
         field: Box<str>,
     },
+
+    #[error(
+        "only indexing into a slice (`[&]T`/`[&mut]T`) is supported in this lowering slice, not `{ty}`"
+    )]
+    IndexTargetNotASlice { ty: Box<str> },
+
+    #[error(
+        "only `&`/`@` on a fixed-size array (`[N]T`) is supported (to produce a slice) in this lowering slice, not `{ty}`"
+    )]
+    ArrayReferenceUnsupported { ty: Box<str> },
 }
 
 impl From<UnclassifiedKind> for MirErrorKind {

@@ -3,11 +3,11 @@
 //! these but none of them own any codegen *state* (no `Context`/`Builder`
 //! wrapper, just pure functions over inkwell's type/value builders).
 
-use ast_model::{SoulType, Struct, declare_store::DeclareStore};
+use ast_model::{ArrayKind, SoulType, Struct, declare_store::DeclareStore};
 use inkwell::{
     AddressSpace,
     context::Context,
-    types::{BasicMetadataTypeEnum, BasicTypeEnum, IntType},
+    types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum, IntType},
     values::{BasicValueEnum, IntValue},
 };
 use mir_model::ConstValue;
@@ -124,9 +124,46 @@ pub(crate) fn llvm_type<'ctx>(
             Ok(context.ptr_type(AddressSpace::default()).into())
         }
         SoulType::Stub(_) => stub_type(context, platform, declares, module, ty, span),
+        SoulType::Array(array) => array_type(context, platform, declares, module, array, span),
         other => Err(Fault::error_with_kind(
             CodegenErrorKind::NonPrimitiveType {
                 ty: format!("{other:?}").into_boxed_str(),
+            },
+            span,
+        )),
+    }
+}
+
+/// `[N]T` maps to a real fixed-size LLVM array (a value type, `N` elements
+/// inline) — the only array kind that can be *constructed* as a value in
+/// this slice (array literals). `[&]T`/`[&mut]T` map to a fat pointer: a
+/// two-field `{ptr, len}` struct, `len` at pointer width to match `int`'s
+/// own width (see `Int`/`Uint` above) — decided up front so bounds checking
+/// can land later without changing the representation. `[_]T`/`[]T`
+/// (wildcard-sized stack arrays, heap arrays) aren't supported yet.
+fn array_type<'ctx>(
+    context: &'ctx Context,
+    platform: &PlatformInfo,
+    declares: &DeclareStore,
+    module: Option<ModuleId>,
+    array: &ast_model::ArrayType,
+    span: Option<Span>,
+) -> CodegenResult<BasicTypeEnum<'ctx>> {
+    match array.kind {
+        ArrayKind::StackArray(len) => {
+            let element_ty = llvm_type(context, platform, declares, module, &array.of_type, span)?;
+            Ok(element_ty.array_type(len as u32).into())
+        }
+        ArrayKind::MutSlice | ArrayKind::ConstSlice => {
+            let ptr_ty = context.ptr_type(AddressSpace::default());
+            let len_ty = context.custom_width_int_type(platform.pointer_bits);
+            Ok(context
+                .struct_type(&[ptr_ty.into(), len_ty.into()], false)
+                .into())
+        }
+        ArrayKind::StackArrayWildcard | ArrayKind::HeapArray => Err(Fault::error_with_kind(
+            CodegenErrorKind::NonPrimitiveType {
+                ty: format!("{:?}", SoulType::Array(array.clone())).into_boxed_str(),
             },
             span,
         )),

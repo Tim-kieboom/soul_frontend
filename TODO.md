@@ -59,13 +59,37 @@ No `Res`/`.pass`/`?T`, no unions, no generics, no borrow checking yet.
   - Not yet supported: struct-typed binary-op operands' signedness (`operand_is_signed` doesn't look
     through a `Field` projection — doesn't matter for a bare field read, would matter for `p.x - 1`
     on a signed field)
+- [x] Array literal construction, `&arr`-to-slice, and slice indexing (read+write) — proven via
+      `12_slice_index.soul`. Scoped to fixed-size arrays (`[N]T`, only as the thing you *reference*)
+      and slices (`[&]T`/`[&mut]T`, only as the thing you *index*) — not wildcard-sized (`[_]T`) or
+      heap (`[]T`) arrays, and no bounds checking yet (see below):
+  - `mir_parser`: generalized `resolve_field_place` into `resolve_place_expr`, a shared place
+    resolver dispatching on variable/field-access/index (so `o.items[i].x` composes into one `Place`
+    with a three-element projection, same pattern as nested field chains). `[1, 2]` lowers to
+    `Rvalue::Aggregate(AggregateKind::Array, ..)` in literal order (arity trusted from the resolver,
+    same as struct constructors). `&arr` on a fixed-size-array place lowers to *two* statements — a
+    plain `Rvalue::Ref` into a pointer temp, then `Aggregate(Array, [ptr, compile-time-constant len])`
+    — deliberately not a single-step `Rvalue::Ref`, so `Ref` itself stays bare-pointer-only per the
+    original grill-me decision. `collection[index]` lowers to a `Place` with a `PlaceElem::Index`
+    projection; the index expression is always materialized into a `uint` temp (`operand_local`) to
+    avoid width-mismatch risk from re-typing whatever concrete int type it already had.
+  - `mir_codegen`: `llvm_type` maps `[N]T` to a real LLVM array type and `[&]T`/`[&mut]T` to a
+    `{ptr, len}` struct (`len` at pointer width). `resolve_place`'s walk now tracks the *Soul* type
+    (not just the LLVM type) through each projection step — unlike a struct field (queryable straight
+    off its LLVM `StructType`), an opaque LLVM pointer carries no pointee-type info at all, so the
+    element type after an `Index` step has to come from the `ArrayType` on the Soul side instead.
+    `Rvalue::Ref` codegens for the first time (just the address `resolve_place` computes, no load —
+    by construction it's never handed an array-typed place, see above). `codegen_aggregate` (renamed
+    from the struct-only version) now branches on `StructType` vs `ArrayType` destinations, since a
+    fixed-size array's `insertvalue` target isn't struct-shaped.
+  - Not yet supported: bounds checking (the fat-pointer `len` field is carried but unread — this was
+    the whole point of deciding the representation up front), indexing a raw `[N]T` directly (only a
+    slice can be indexed — reference it first), `&`/`@` mutability not checked against `[&]`/`[&mut]`
+    (that's the M2 borrow checker's job, same as struct field mutability)
 - [ ] Finish MIR lowering coverage for M1 language surface (non-generic traits; diverging calls for
       div-by-zero / out-of-bounds per mir-design.md)
-  - [ ] Array/slice indexing (separate from struct fields — scoped during the grill-me session):
-        slices only for now (not stack/heap arrays), fat-pointer (ptr+len) representation decided
-        up front so bounds checking can land later without an ABI break, `&arr`-on-an-array-typed-
-        place lowers to something other than plain `Rvalue::Ref` in MIR (bare `Ref` stays
-        pointer-only) — no bounds checking yet, see below
+  - [ ] Bounds checking on slice indexing — not started, not designed yet (the `len` field exists
+        precisely so this can land without an ABI break)
   - [ ] Overflow checking on arithmetic ops (`+`/`-`/`*`/...), assert-style like Rust's debug
         overflow checks — not started, not designed yet
 - [x] `soul_mir/mir_codegen` — LLVM IR emission via `inkwell` (`features = ["llvm16-0"]`, Windows
@@ -78,7 +102,7 @@ No `Res`/`.pass`/`?T`, no unions, no generics, no borrow checking yet.
       `clang.exe` (`C:\llvm-16\bin\clang.exe`) over the emitted `.ll`, then runs the resulting exe
       and checks both exit code (`// expect: N`) and stdout (`// expect_stdout: <substring>`); this
       is currently the real correctness oracle for the pipeline (`soul_tester/soul/src/codegen_tests/`,
-      11 passing exe tests). Still manual/script-driven, not integrated into `cargo test`.
+      12 passing exe tests). Still manual/script-driven, not integrated into `cargo test`.
 - [ ] Establish positive+negative test pairs as typecheck/MIR lowering lands (currently unclear
       whether existing parser/resolver suites cover rejection cases — see "Testing strategy" in
       compiler-pipeline-plan.md)

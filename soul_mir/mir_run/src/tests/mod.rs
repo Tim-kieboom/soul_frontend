@@ -81,10 +81,11 @@ fn lowers_every_lowerable_function_with_no_errors() {
 
 #[test]
 fn out_of_scope_function_pushes_a_fault_into_the_context_not_a_panic() {
-    // Struct-typed params/locals are supported now (see `mir_parser`'s own
-    // struct tests) — an array type isolates a genuine non-primitive,
-    // non-struct type this lowering slice still doesn't support.
-    let ast = build_ast("f(a: [2]int): [2]int {\n    return a\n}\n");
+    // Struct-typed and fixed-size-array/slice-typed params/locals are
+    // supported now (see `mir_parser`'s own struct and array tests) — a
+    // heap-array type isolates a genuine non-primitive type this lowering
+    // slice still doesn't support.
+    let ast = build_ast("f(a: []int): []int {\n    return a\n}\n");
 
     let (program, context) = create_mir(&ast);
 
@@ -132,7 +133,7 @@ fn extern_c_function_lowers_into_externs_not_functions() {
 #[test]
 fn mixed_program_lowers_what_it_can_and_faults_on_the_rest() {
     let ast = build_ast(
-        "okFn(a: int, b: int): int {\n    return a + b\n}\nbadFn(a: [2]int): [2]int {\n    return a\n}\n",
+        "okFn(a: int, b: int): int {\n    return a + b\n}\nbadFn(a: []int): []int {\n    return a\n}\n",
     );
 
     let (program, context) = create_mir(&ast);

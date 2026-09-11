@@ -6,8 +6,9 @@
 
 use std::cell::Cell;
 
-use ast_model::AstStore;
+use ast_model::{ArrayKind, AstStore, SoulType};
 use inkwell::{
+    AddressSpace,
     basic_block::BasicBlock as LlvmBlock,
     builder::Builder,
     types::BasicTypeEnum,
@@ -26,6 +27,7 @@ use crate::{
     fault::{CodegenErrorKind, CodegenResult},
     llvm_err,
     module::ModuleCodegen,
+    types::{expect_int, resolve_struct},
 };
 
 pub(crate) struct FunctionCodegen<'ctx, 'a> {
@@ -177,36 +179,116 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
 
     /// Resolves a `Place` to the pointer it reads/writes through and the
     /// LLVM type at that location — the base local's own alloca and type for
-    /// an empty projection, or (today) a single `GEP` step through a struct
-    /// field for a `[Field(index)]` projection. `PlaceElem::Index`/`Deref`
-    /// aren't produced by any MIR lowering yet, so they still fault here.
+    /// an empty projection, then one step per projection element: a `GEP`
+    /// through a struct field for `Field(index)`, or a load-then-`GEP`
+    /// through a slice's data pointer for `Index(local)` (see
+    /// `step_into_index`). Tracks the *Soul* type (not just the LLVM type)
+    /// through the walk — unlike a struct's fields (queryable straight off
+    /// its LLVM `StructType`), an opaque LLVM pointer carries no pointee-type
+    /// info at all, so the element type after an `Index` step has to come
+    /// from the Soul-level `ArrayType` instead. `Deref` isn't produced by any
+    /// MIR lowering yet, so it still faults here.
     pub(crate) fn resolve_place(
         &self,
         place: &Place,
     ) -> CodegenResult<(PointerValue<'ctx>, BasicTypeEnum<'ctx>)> {
         let mut ptr = self.locals[place.local];
-        let mut ty = self.local_type(place.local)?;
+        let mut soul_ty = self.function.locals[place.local].ty.clone();
 
         for elem in &place.projection {
-            let PlaceElem::Field(index) = elem else {
-                return Err(err(CodegenErrorKind::PlaceProjectionUnsupported));
+            soul_ty = match elem {
+                PlaceElem::Field(index) => self.step_into_field(&mut ptr, &soul_ty, *index)?,
+                PlaceElem::Index(index_local) => {
+                    self.step_into_index(&mut ptr, &soul_ty, *index_local)?
+                }
+                PlaceElem::Deref => return Err(err(CodegenErrorKind::PlaceProjectionUnsupported)),
             };
-            let BasicTypeEnum::StructType(struct_ty) = ty else {
-                return Err(err(CodegenErrorKind::PlaceProjectionUnsupported));
-            };
-            let field_ty = struct_ty
-                .get_field_type_at_index(*index as u32)
-                .ok_or(CodegenErrorKind::PlaceProjectionUnsupported)
-                .map_err(err)?;
-
-            ptr = self
-                .builder
-                .build_struct_gep(struct_ty, ptr, *index as u32, "field_ptr")
-                .map_err(llvm_err)?;
-            ty = field_ty;
         }
 
+        let ty = self.ctx.llvm_type(self.soul_module, &soul_ty, None)?;
         Ok((ptr, ty))
+    }
+
+    /// One `Field(index)` step: `soul_ty` must resolve to a declared struct;
+    /// GEPs `ptr` to that field's address and returns the field's own type.
+    fn step_into_field(
+        &self,
+        ptr: &mut PointerValue<'ctx>,
+        soul_ty: &SoulType,
+        index: usize,
+    ) -> CodegenResult<SoulType> {
+        let struct_ = resolve_struct(self.ctx.declares, self.soul_module, soul_ty)
+            .ok_or_else(|| err(CodegenErrorKind::PlaceProjectionUnsupported))?;
+        let field_ty = struct_
+            .fields
+            .get(index)
+            .and_then(|field| field.value.ty.clone())
+            .ok_or_else(|| err(CodegenErrorKind::PlaceProjectionUnsupported))?;
+
+        let BasicTypeEnum::StructType(struct_llvm_ty) =
+            self.ctx.llvm_type(self.soul_module, soul_ty, None)?
+        else {
+            return Err(err(CodegenErrorKind::PlaceProjectionUnsupported));
+        };
+        *ptr = self
+            .builder
+            .build_struct_gep(struct_llvm_ty, *ptr, index as u32, "field_ptr")
+            .map_err(llvm_err)?;
+
+        Ok(field_ty)
+    }
+
+    /// One `Index(index_local)` step: `soul_ty` must be a slice
+    /// (`[&]T`/`[&mut]T`). Loads the slice's data pointer out of its `ptr`
+    /// field (field 0 of the `{ptr, len}` fat pointer built by `array_type`),
+    /// loads the runtime index out of `index_local`, then GEPs the data
+    /// pointer by that index (element-sized steps, since the GEP is typed as
+    /// the element's own LLVM type) — no bounds check against `len` yet.
+    fn step_into_index(
+        &self,
+        ptr: &mut PointerValue<'ctx>,
+        soul_ty: &SoulType,
+        index_local: LocalId,
+    ) -> CodegenResult<SoulType> {
+        let SoulType::Array(array) = soul_ty else {
+            return Err(err(CodegenErrorKind::PlaceProjectionUnsupported));
+        };
+        if !matches!(array.kind, ArrayKind::MutSlice | ArrayKind::ConstSlice) {
+            return Err(err(CodegenErrorKind::PlaceProjectionUnsupported));
+        }
+        let element_ty = (*array.of_type).clone();
+
+        let BasicTypeEnum::StructType(slice_llvm_ty) =
+            self.ctx.llvm_type(self.soul_module, soul_ty, None)?
+        else {
+            return Err(err(CodegenErrorKind::PlaceProjectionUnsupported));
+        };
+        let ptr_field_addr = self
+            .builder
+            .build_struct_gep(slice_llvm_ty, *ptr, 0, "slice_ptr_addr")
+            .map_err(llvm_err)?;
+        let opaque_ptr_ty = self.ctx.context.ptr_type(AddressSpace::default());
+        let data_ptr = self
+            .builder
+            .build_load(opaque_ptr_ty, ptr_field_addr, "slice_ptr")
+            .map_err(llvm_err)?
+            .into_pointer_value();
+
+        let index_llvm_ty = self.local_type(index_local)?;
+        let index_value = self
+            .builder
+            .build_load(index_llvm_ty, self.locals[index_local], "index")
+            .map_err(llvm_err)?;
+        let index_value = expect_int(index_value)?;
+
+        let element_llvm_ty = self.ctx.llvm_type(self.soul_module, &element_ty, None)?;
+        *ptr = unsafe {
+            self.builder
+                .build_gep(element_llvm_ty, data_ptr, &[index_value], "elem_ptr")
+                .map_err(llvm_err)?
+        };
+
+        Ok(element_ty)
     }
 }
 

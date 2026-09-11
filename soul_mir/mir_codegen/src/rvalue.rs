@@ -53,10 +53,20 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
             Rvalue::Use(operand) => self.codegen_operand(operand, result_ty),
             Rvalue::BinaryOp(op, left, right) => self.codegen_binary(result_ty, op, left, right),
             Rvalue::UnaryOp(op, operand) => self.codegen_unary(op, operand),
-            Rvalue::Aggregate(AggregateKind::Struct, operands) => {
-                self.codegen_struct_aggregate(operands, result_ty)
+            Rvalue::Aggregate(AggregateKind::Struct | AggregateKind::Array, operands) => {
+                self.codegen_aggregate(operands, result_ty)
             }
-            Rvalue::Ref { .. } | Rvalue::Aggregate(..) | Rvalue::Cast(..) => {
+            // Just the address `resolve_place` already computes, no load —
+            // this is the bare-pointer case only (see `resolve_field_place`'s
+            // docs in `mir_parser`): a reference to an array-typed place is
+            // never lowered as a plain `Ref`, it's lowered as an
+            // `Aggregate(Array, [Ref-to-first-element, len])` instead, so by
+            // the time a `Ref` reaches codegen its place is never an array.
+            Rvalue::Ref { place, .. } => {
+                let (ptr, _) = self.resolve_place(place)?;
+                Ok(ptr.into())
+            }
+            Rvalue::Aggregate(..) | Rvalue::Cast(..) => {
                 Err(err(CodegenErrorKind::UnsupportedRvalue))
             }
         }
@@ -100,35 +110,53 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
         Ok(self.codegen_binary_op(*op, l, r, signed)?.into())
     }
 
-    /// Builds a struct value field-by-field: an `undef` of the destination
-    /// struct type, then one `insertvalue` per operand — `operands` is
-    /// already in the struct's declared field order (see `llvm_type`'s
-    /// docs), so it lines up positionally with the struct type's own fields.
-    fn codegen_struct_aggregate(
+    /// Builds an aggregate value element-by-element: an `undef` of the
+    /// destination type, then one `insertvalue` per operand. Used for real
+    /// structs and the compiler-synthesized `{ptr, len}` slice fat pointer
+    /// (both a `StructType` destination — `operands` in declared field
+    /// order for a struct, always `[data pointer, length]` for a slice —
+    /// this function doesn't care which, since it only ever reads the
+    /// *destination* LLVM type, never the `AggregateKind` tag), and for a
+    /// fixed-size array literal (an `ArrayType` destination, one uniform
+    /// element type instead of a per-index field type).
+    fn codegen_aggregate(
         &mut self,
         operands: &[Operand],
         result_ty: BasicTypeEnum<'ctx>,
     ) -> CodegenResult<BasicValueEnum<'ctx>> {
-        let BasicTypeEnum::StructType(struct_ty) = result_ty else {
-            return Err(err(CodegenErrorKind::PlaceProjectionUnsupported));
-        };
+        match result_ty {
+            BasicTypeEnum::StructType(struct_ty) => {
+                let mut value = struct_ty.get_undef();
+                for (index, operand) in operands.iter().enumerate() {
+                    let field_ty = struct_ty
+                        .get_field_type_at_index(index as u32)
+                        .ok_or(CodegenErrorKind::PlaceProjectionUnsupported)
+                        .map_err(err)?;
 
-        let mut value = struct_ty.get_undef();
-        for (index, operand) in operands.iter().enumerate() {
-            let field_ty = struct_ty
-                .get_field_type_at_index(index as u32)
-                .ok_or(CodegenErrorKind::PlaceProjectionUnsupported)
-                .map_err(err)?;
-
-            let field_value = self.codegen_operand(operand, field_ty)?;
-            value = self
-                .builder
-                .build_insert_value(value, field_value, index as u32, "field")
-                .map_err(llvm_err)?
-                .into_struct_value();
+                    let field_value = self.codegen_operand(operand, field_ty)?;
+                    value = self
+                        .builder
+                        .build_insert_value(value, field_value, index as u32, "field")
+                        .map_err(llvm_err)?
+                        .into_struct_value();
+                }
+                Ok(value.into())
+            }
+            BasicTypeEnum::ArrayType(array_ty) => {
+                let element_ty = array_ty.get_element_type();
+                let mut value = array_ty.get_undef();
+                for (index, operand) in operands.iter().enumerate() {
+                    let element_value = self.codegen_operand(operand, element_ty)?;
+                    value = self
+                        .builder
+                        .build_insert_value(value, element_value, index as u32, "elem")
+                        .map_err(llvm_err)?
+                        .into_array_value();
+                }
+                Ok(value.into())
+            }
+            _ => Err(err(CodegenErrorKind::PlaceProjectionUnsupported)),
         }
-
-        Ok(value.into())
     }
 
     fn codegen_binary_op(

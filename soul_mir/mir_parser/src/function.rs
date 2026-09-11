@@ -135,13 +135,25 @@ impl<'a> FunctionLowerer<'a> {
         self.block_alloc = IdGenerator::new();
     }
 
-    /// Accepts primitives and structs whose name resolves to a declaration in
-    /// this function's module — the boundary this lowering slice actually
-    /// knows how to turn into MIR locals/places. Everything else (arrays,
-    /// references, generics, an undeclared/unresolvable name) still faults,
-    /// same as before struct support existed.
+    /// Accepts primitives, structs whose name resolves to a declaration in
+    /// this function's module, and fixed-size-array/slice-typed arrays
+    /// (`[N]T`, `[&]T`, `[&mut]T`) — the boundary this lowering slice
+    /// actually knows how to turn into MIR locals/places. Everything else
+    /// (wildcard/heap arrays, references, generics, an undeclared/
+    /// unresolvable name) still faults, same as before struct support
+    /// existed.
     fn require_lowerable(&self, ty: &SoulType, span: Span) -> MirResult<()> {
-        if matches!(ty, SoulType::Primitive(_)) || self.resolve_struct(ty).is_some() {
+        let is_lowerable_array = matches!(
+            ty,
+            SoulType::Array(array) if matches!(
+                array.kind,
+                ast::ArrayKind::StackArray(_) | ast::ArrayKind::MutSlice | ast::ArrayKind::ConstSlice
+            )
+        );
+        if matches!(ty, SoulType::Primitive(_))
+            || self.resolve_struct(ty).is_some()
+            || is_lowerable_array
+        {
             return Ok(());
         }
         Err(Fault::error_with_kind(
@@ -224,18 +236,18 @@ impl<'a> FunctionLowerer<'a> {
     /// Lowers `left = right` (compound assignments like `n -= 1` are already
     /// desugared by the parser into `left = left - 1` before this ever runs,
     /// so `lower_rvalue` handles the right-hand side with no special-casing).
-    /// `left` is a bare, already-declared variable, or a struct field write
-    /// (`p.x = 1`, via the same `Field`-projection machinery as a field
-    /// read) — `arr[i]`/`*p` as an assignment target still faults, since
-    /// nothing lowers those places yet.
+    /// `left` is a bare, already-declared variable, or any other place
+    /// expression `resolve_place_expr` accepts (a struct field write, a
+    /// slice-index write) — `*p` as an assignment target still faults, since
+    /// nothing lowers pointer-dereference places yet.
     fn lower_assignment(&mut self, assignment: &ast::Assignment) -> MirResult<()> {
         let left = &self.store.expressions[assignment.left];
         let place = match &left.node {
             ast::ExpressionKind::Variable(var) => {
                 mir::Place::local(self.resolve_local(var, left.span)?)
             }
-            ast::ExpressionKind::FieldAccess(field_access) => {
-                self.resolve_field_place(field_access, left.span)?.0
+            ast::ExpressionKind::FieldAccess(_) | ast::ExpressionKind::Index(_) => {
+                self.resolve_place_expr(assignment.left, left.span)?.0
             }
             _ => {
                 return Err(Fault::error_with_kind(
@@ -268,39 +280,50 @@ impl<'a> FunctionLowerer<'a> {
         Ok(*local)
     }
 
+    /// Resolves an arbitrary "place expression" — a variable, a field access
+    /// (`object.field`), an index (`collection[i]`), or any nesting of those
+    /// — into a `Place` plus its resolved type. The shared entry point
+    /// `resolve_field_place`'s object, `resolve_index_place`'s collection,
+    /// and `lower_ref`'s referenced value all recurse through, so
+    /// `o.items[i].x` ends up as one `Place` with a three-element
+    /// projection, not a chain of temporaries. Anything else (a
+    /// call/constructor result, ...) still faults — those aren't places
+    /// this slice can project through.
+    fn resolve_place_expr(
+        &mut self,
+        expr_id: ast::ExpressionId,
+        span: Span,
+    ) -> MirResult<(mir::Place, SoulType)> {
+        let expr = &self.store.expressions[expr_id];
+        match &expr.node {
+            ast::ExpressionKind::Variable(var) => {
+                let local = self.resolve_local(var, expr.span)?;
+                Ok((mir::Place::local(local), self.locals[local].ty.clone()))
+            }
+            ast::ExpressionKind::FieldAccess(field_access) => {
+                self.resolve_field_place(field_access, expr.span)
+            }
+            ast::ExpressionKind::Index(index) => self.resolve_index_place(index, expr.span),
+            _ => Err(Fault::error_with_kind(
+                MirErrorKind::UnsupportedPlaceExpression,
+                Some(span),
+            )),
+        }
+    }
+
     /// Lowers `object.field` into a `Place` with a `Field` projection
     /// appended onto the object's own place — read or write, straight off
     /// whatever storage the struct value already lives in (no temp/copy).
-    /// `object` is either a bare variable, or itself a field access
-    /// (`o.inner.x`), resolved recursively — one `Field` projection gets
-    /// pushed per `.field` step, so `o.inner.x` ends up as a single `Place`
-    /// with a two-element projection, not a chain of temporaries. Also
-    /// returns the resolved place's own type (the innermost field's declared
-    /// type), since a recursive caller needs it to resolve the *next* struct.
-    /// Anything else as the object (a call/constructor result, an index
-    /// expression, ...) still faults — those aren't places this slice can
-    /// project through.
+    /// Also returns the resolved place's own type (the innermost field's
+    /// declared type), since a recursive caller needs it to resolve the
+    /// *next* struct.
     fn resolve_field_place(
-        &self,
+        &mut self,
         field_access: &ast::FieldAccess,
         span: Span,
     ) -> MirResult<(mir::Place, SoulType)> {
-        let object = &self.store.expressions[field_access.object];
-        let (mut place, object_ty) = match &object.node {
-            ast::ExpressionKind::Variable(var) => {
-                let local = self.resolve_local(var, object.span)?;
-                (mir::Place::local(local), self.locals[local].ty.clone())
-            }
-            ast::ExpressionKind::FieldAccess(inner) => {
-                self.resolve_field_place(inner, object.span)?
-            }
-            _ => {
-                return Err(Fault::error_with_kind(
-                    MirErrorKind::UnsupportedFieldAccessObject,
-                    Some(span),
-                ));
-            }
-        };
+        let object_span = self.store.expressions[field_access.object].span;
+        let (mut place, object_ty) = self.resolve_place_expr(field_access.object, object_span)?;
 
         let struct_ = self.resolve_struct(&object_ty).ok_or_else(|| {
             Fault::error_with_kind(
@@ -338,15 +361,155 @@ impl<'a> FunctionLowerer<'a> {
         Ok((place, field_ty))
     }
 
+    /// Lowers `collection[index]` into a `Place` with an `Index` projection
+    /// appended onto the collection's own place. Only a slice
+    /// (`[&]T`/`[&mut]T`) collection is supported — indexing directly into a
+    /// fixed-size array/wildcard/heap array isn't (per the M1 scope: those
+    /// only ever get *referenced* into a slice first, see `lower_ref`). No
+    /// bounds check against the slice's length is emitted yet.
+    fn resolve_index_place(
+        &mut self,
+        index: &ast::Index,
+        span: Span,
+    ) -> MirResult<(mir::Place, SoulType)> {
+        let collection_span = self.store.expressions[index.collection].span;
+        let (mut place, collection_ty) =
+            self.resolve_place_expr(index.collection, collection_span)?;
+
+        let SoulType::Array(array) = &collection_ty else {
+            return Err(Fault::error_with_kind(
+                MirErrorKind::IndexTargetNotASlice {
+                    ty: format!("{collection_ty:?}").into(),
+                },
+                Some(span),
+            ));
+        };
+        if !matches!(
+            array.kind,
+            ast::ArrayKind::MutSlice | ast::ArrayKind::ConstSlice
+        ) {
+            return Err(Fault::error_with_kind(
+                MirErrorKind::IndexTargetNotASlice {
+                    ty: format!("{collection_ty:?}").into(),
+                },
+                Some(span),
+            ));
+        }
+        let element_ty = (*array.of_type).clone();
+
+        // Indices are always non-negative offsets in this slice — always
+        // materialize into a `uint` temp rather than trying to preserve
+        // whatever concrete int type the index expression happened to have
+        // (matching the existing "untyped int literal defaults to `uint`"
+        // convention elsewhere in this lowerer).
+        let index_local =
+            self.operand_local(index.index, SoulType::Primitive(PrimitiveTypes::Uint), span)?;
+
+        place.projection.push(mir::PlaceElem::Index(index_local));
+        Ok((place, element_ty))
+    }
+
+    /// Materializes an expression into a `LocalId` holding its value —
+    /// `PlaceElem::Index` needs an actual local to reference, not an
+    /// arbitrary `Operand`. Reuses an already-existing local as-is when the
+    /// expression is just a bare variable (no extra temp/copy, and no risk
+    /// of a width mismatch from re-typing it as `ty`); otherwise allocates a
+    /// fresh temp of type `ty` and assigns into it.
+    fn operand_local(
+        &mut self,
+        expr_id: ast::ExpressionId,
+        ty: SoulType,
+        span: Span,
+    ) -> MirResult<mir::LocalId> {
+        let expr = &self.store.expressions[expr_id];
+        if let ast::ExpressionKind::Variable(var) = &expr.node {
+            return self.resolve_local(var, expr.span);
+        }
+
+        let rvalue = self.lower_rvalue(expr_id)?;
+        let temp = self.alloc_local(ty, TypeModifier::Immut, span);
+        self.statements
+            .push(mir::Statement::Assign(mir::Place::local(temp), rvalue));
+        Ok(temp)
+    }
+
     /// Lowers `object.field` as a read — see `resolve_field_place`.
     fn lower_field_access(
-        &self,
+        &mut self,
         field_access: &ast::FieldAccess,
         span: Span,
     ) -> MirResult<mir::Operand> {
         Ok(mir::Operand::Copy(
             self.resolve_field_place(field_access, span)?.0,
         ))
+    }
+
+    /// Lowers `collection[index]` as a read — see `resolve_index_place`.
+    fn lower_index_access(&mut self, index: &ast::Index, span: Span) -> MirResult<mir::Operand> {
+        Ok(mir::Operand::Copy(self.resolve_index_place(index, span)?.0))
+    }
+
+    /// Lowers `&value`/`@value`. For a fixed-size array (`[N]T`) place, this
+    /// produces a slice instead of a plain pointer: a bare pointer to an
+    /// array carries no length, so — decided up front so a later bounds
+    /// check can land without an ABI break — referencing an array always
+    /// builds the `{ptr, len}` fat pointer (`AggregateKind::Array`, `len` a
+    /// compile-time constant since only fixed-size arrays are supported
+    /// here) rather than a plain `Rvalue::Ref`. Anything else (an ordinary
+    /// `&x`) still lowers to a plain `Rvalue::Ref` — the bifurcation is
+    /// entirely at the MIR-lowering level, `Ref` itself stays bare-pointer
+    /// only.
+    fn lower_ref(&mut self, ref_: &ast::Ref, span: Span) -> MirResult<mir::Rvalue> {
+        let (place, value_ty) = self.resolve_place_expr(ref_.value, span)?;
+        let mutable = ref_.is_mutable;
+
+        let SoulType::Array(array) = &value_ty else {
+            return Ok(mir::Rvalue::Ref { mutable, place });
+        };
+        let ast::ArrayKind::StackArray(len) = array.kind else {
+            return Err(Fault::error_with_kind(
+                MirErrorKind::ArrayReferenceUnsupported {
+                    ty: format!("{value_ty:?}").into(),
+                },
+                Some(span),
+            ));
+        };
+        let element_ty = (*array.of_type).clone();
+
+        let ptr_ty = SoulType::Reference(ast::ReferenceType {
+            inner: Box::new(element_ty),
+            lifetime: None,
+            mutable: if mutable {
+                soul_utils::Mutable::Mut
+            } else {
+                soul_utils::Mutable::Immut
+            },
+        });
+        let ptr_temp = self.alloc_local(ptr_ty, TypeModifier::Immut, span);
+        self.statements.push(mir::Statement::Assign(
+            mir::Place::local(ptr_temp),
+            mir::Rvalue::Ref { mutable, place },
+        ));
+
+        Ok(mir::Rvalue::Aggregate(
+            mir::AggregateKind::Array,
+            vec![
+                mir::Operand::Copy(mir::Place::local(ptr_temp)),
+                mir::Operand::Constant(mir::ConstValue::Uint(len as u128)),
+            ],
+        ))
+    }
+
+    /// Lowers `[v1, v2, ...]` into `Rvalue::Aggregate` — the resolver already
+    /// validated the literal's arity against its target `[N]T` type, so this
+    /// doesn't re-check it; a mismatch here would mean the resolver let bad
+    /// input through, same defensive category as elsewhere in this lowerer.
+    fn lower_array_literal(&mut self, array: &ast::Array) -> MirResult<mir::Rvalue> {
+        let mut operands = Vec::with_capacity(array.values.len());
+        for &value_id in &array.values {
+            operands.push(self.lower_operand(value_id)?);
+        }
+        Ok(mir::Rvalue::Aggregate(mir::AggregateKind::Array, operands))
     }
 
     /// The one argument an `assert`/`panic` intrinsic call takes, guarded
@@ -824,6 +987,10 @@ impl<'a> FunctionLowerer<'a> {
             ast::ExpressionKind::StructConstructor(ctor) => {
                 self.lower_struct_constructor(ctor, expr.span)
             }
+            ast::ExpressionKind::Ref(ref_) => self.lower_ref(ref_, expr.span),
+            ast::ExpressionKind::Array(ast::AnyArray::Array(array)) => {
+                self.lower_array_literal(array)
+            }
             _ => Ok(mir::Rvalue::Use(self.lower_operand(expr_id)?)),
         }
     }
@@ -902,6 +1069,7 @@ impl<'a> FunctionLowerer<'a> {
             ast::ExpressionKind::FieldAccess(field_access) => {
                 self.lower_field_access(field_access, expr.span)
             }
+            ast::ExpressionKind::Index(index) => self.lower_index_access(index, expr.span),
             ast::ExpressionKind::Binary(_) => {
                 let span = expr.span;
                 let ty = self
