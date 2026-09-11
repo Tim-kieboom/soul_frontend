@@ -359,17 +359,39 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
             .build_int_compare(IntPredicate::UGE, index, len_value, "out_of_bounds")
             .map_err(llvm_err)?;
 
-        self.trap_if(out_of_bounds, "bounds")
+        self.trap_if(out_of_bounds, "bounds", "index out of bounds")
     }
 
-    /// Traps via `abort` when `bad` (an `i1`) is true; otherwise falls
-    /// through. Splits the current block into a `<label>_fail` block that
-    /// aborts and a `<label>_ok` continuation where the caller keeps
-    /// emitting — the shape `codegen_assert`'s panic path already uses for a
-    /// MIR-level `Assert` terminator, generalized here for runtime checks
-    /// (slice-index bounds, arithmetic overflow) that arise mid-block rather
-    /// than at a block boundary.
-    pub(crate) fn trap_if(&self, bad: IntValue<'ctx>, label: &str) -> CodegenResult<()> {
+    /// Traps via the panic runtime (`panic_function`) when `bad` (an `i1`)
+    /// is true, with a static, compile-time-known `message`; otherwise falls
+    /// through. Materializes `message` as its own global string (via
+    /// `codegen_string_constant` — not deduplicated across call sites, same
+    /// tradeoff it already makes) and hands it to `trap_with_message`.
+    pub(crate) fn trap_if(
+        &self,
+        bad: IntValue<'ctx>,
+        label: &str,
+        message: &str,
+    ) -> CodegenResult<()> {
+        let msg_ptr = self.codegen_string_constant(message);
+        self.trap_with_message(bad, label, msg_ptr)
+    }
+
+    /// Traps via the panic runtime (`panic_function`) when `bad` (an `i1`)
+    /// is true, passing `msg_ptr` (a `cstr`-typed pointer, already computed
+    /// by the caller) as the panic message; otherwise falls through. Splits
+    /// the current block into a `<label>_fail` block that panics and a
+    /// `<label>_ok` continuation where the caller keeps emitting — used for
+    /// runtime checks (slice-index bounds, arithmetic overflow) that arise
+    /// mid-block rather than at a block boundary, unlike `codegen_assert`'s
+    /// MIR-level `Assert` terminator, which branches straight to its own
+    /// pre-existing MIR target block instead of a synthetic one.
+    pub(crate) fn trap_with_message(
+        &self,
+        bad: IntValue<'ctx>,
+        label: &str,
+        msg_ptr: PointerValue<'ctx>,
+    ) -> CodegenResult<()> {
         let current_block = self
             .builder
             .get_insert_block()
@@ -388,9 +410,9 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
             .map_err(llvm_err)?;
 
         self.builder.position_at_end(fail_block);
-        let abort_fn = self.abort_function();
+        let panic_fn = self.panic_function()?;
         self.builder
-            .build_call(abort_fn, &[], "abort_call")
+            .build_call(panic_fn, &[msg_ptr.into()], "panic_call")
             .map_err(llvm_err)?;
         self.builder.build_unreachable().map_err(llvm_err)?;
 

@@ -88,15 +88,12 @@ No `Res`/`.pass`/`?T`, no unions, no generics, no borrow checking yet.
     the index to `len`'s pointer width (sign-extend for a signed index, zero-extend otherwise — a
     negative signed index sign-extends to a huge unsigned value and is caught by the same unsigned
     `>=` compare as an over-long one), then hands the resulting `bad` condition to `trap_if` (a shared
-    helper: splits the current block into a `<label>_fail` block that calls `abort()` — the same
-    `abort_function` helper `codegen_assert`'s panic path already declares — and a `<label>_ok`
-    continuation where the caller's own GEP/load/store keeps emitting). Applies uniformly to both
-    slice reads and writes, since both go through `resolve_place`.
+    helper: splits the current block into a `<label>_fail` block that panics — see the panic-runtime
+    entry below — and a `<label>_ok` continuation where the caller's own GEP/load/store keeps
+    emitting). Applies uniformly to both slice reads and writes, since both go through `resolve_place`.
   - Not yet supported: indexing a raw `[N]T` directly (only a slice can be indexed — reference it
     first), `&`/`@` mutability not checked against `[&]`/`[&mut]` (that's the M2 borrow checker's job,
-    same as struct field mutability), a friendlier panic message (bounds-check failure and every other
-    `assert`-driven panic both just call bare `abort()` — no message/location, that's a broader panic-
-    infra concern not scoped to this pass)
+    same as struct field mutability)
 - [x] Overflow checking on arithmetic ops (`+`/`-`/`*`), assert-style like Rust's debug overflow
       checks — proven via `14_arith_overflow_check.soul` (`i32::MAX + 1` aborts instead of wrapping).
       `codegen_checked_arith` (`mir_codegen/src/rvalue.rs`) replaces the plain `build_int_add/sub/mul`
@@ -105,6 +102,51 @@ No `Res`/`.pass`/`?T`, no unions, no generics, no borrow checking yet.
       `{result, i1 overflowed}` pair, and traps via the same `trap_if` helper bounds checking uses.
       Div/Mod are untouched by this pass — division overflow (`INT_MIN / -1`) and div-by-zero are a
       separate, not-yet-designed concern (see below).
+- [x] Rust-`panic!`-style panic runtime (message, no backtrace, no unwinding) — replaces every bare
+      `abort()` call (bounds check, overflow check, and the MIR-level `Assert` terminator that
+      `assert(cond)`/`panic(msg)` already lowered to, whose `msg` operand codegen used to just
+      discard). Proven via `15_assert_panic_message.soul` and `16_panic_intrinsic_message.soul`
+      (stdout matched against `panic: <message>`), plus `expect_stdout` added to `13_slice_bounds_check.soul`/`14_arith_overflow_check.soul`.
+  - `mir_codegen/src/terminator.rs`: `panic_function` lazily declares *and defines* (once per module)
+      a `soul_panic(msg: cstr)` function — `printf("panic: %s\n", msg)`, `fflush(NULL)`, `abort()`,
+      `unreachable` — building its body with the same per-function `self.builder` used for the
+      function currently being codegen'd (saves/restores the builder's insertion point around it,
+      since there's no separate builder per LLVM function). Every panicking construct now calls this
+      instead of `abort()` directly. `codegen_assert` passes `Assert`'s own `msg` operand through
+      unchanged (already codegen'able via the existing `cstr` operand path); `trap_if` (bounds/overflow)
+      materializes a static, per-call-site message as its own global string via
+      `codegen_string_constant` (now `pub(crate)`, reused from `rvalue.rs`), and hands it to a new
+      lower-level `trap_with_message`.
+  - Real bug found and fixed along the way: `printf`'s output sat in a fully-buffered `stdout` and was
+      silently lost, since `abort()` terminates the process immediately without libc's normal at-exit
+      flush — caught by actually running a built exe and checking its stdout, not just its exit code
+      (an `expect_stdout` match would've silently short-circuited to "test never printed anything" had
+      it not been checked by hand first). Fixed with an `fflush(NULL)` call between `printf` and
+      `abort()`.
+  - Also found and fixed: `codegen_assert` indexed `self.blocks[*target]` unconditionally, but an
+      unconditional `panic(msg)` lowers to an `Assert` whose `target` is never given a real block
+      (`lower_panic_intrinsic`'s own docs say so — the "ok" path is provably unreachable) — this
+      panicked on the very first exe test that actually exercised `panic(msg)` end-to-end. Fixed by
+      branching straight to the panic block when `self.blocks.get(*target)` is `None`, instead of
+      indexing.
+  - Not yet supported: **location** (`file:line:col`, à la `thread 'main' panicked at src/main.rs:4:5`)
+      — see the design note directly below; a backtrace (explicitly out of scope for this pass, per
+      the user's own framing)
+  - [ ] Panic location (`file:line:col`) — design sketch, not started:
+      `mir_model`'s `Statement`/`Rvalue`/`Terminator` carry no `Span` at all today (only `LocalDecl`
+      does — see the doc comment on `CodegenErrorKind`), so the blocker isn't codegen, it's that the
+      span of e.g. an `Index` projection or a `BinaryOp` never survives past `mir_parser`. Landing this
+      would need: (1) a `Span` field added to the MIR shapes that can panic (or a side-table keyed by
+      statement/place, to avoid bloating every `Statement`) — `mir_parser` already has the span in
+      hand at every lowering site (`resolve_index_place`, `lower_ref`, `codegen_binary`'s caller in
+      `lower_rvalue`, etc.), it just isn't threaded onto the MIR node it produces; (2) `mir_codegen`
+      turning that `Span` into a `file:line:col` string — either resolved once per module into a
+      handful of shared globals (spans repeat across a function) or, simpler first cut, one global
+      string literal per panic site, same as the message strings today; (3) extending `soul_panic`'s
+      signature to `(msg: cstr, location: cstr)` and reformatting to
+      `"panic: {msg}\n  at {location}\n"` (or splitting into two `printf` args). None of this changes
+      the panic *mechanism* built in this pass — `trap_if`/`trap_with_message`/`panic_function` stay
+      exactly as they are, only the message payload grows a second string.
 - [ ] Finish MIR lowering coverage for M1 language surface (non-generic traits; diverging calls for
       div-by-zero per mir-design.md)
 - [x] `soul_mir/mir_codegen` — LLVM IR emission via `inkwell` (`features = ["llvm16-0"]`, Windows
@@ -117,7 +159,7 @@ No `Res`/`.pass`/`?T`, no unions, no generics, no borrow checking yet.
       `clang.exe` (`C:\llvm-16\bin\clang.exe`) over the emitted `.ll`, then runs the resulting exe
       and checks both exit code (`// expect: N`) and stdout (`// expect_stdout: <substring>`); this
       is currently the real correctness oracle for the pipeline (`soul_tester/soul/src/codegen_tests/`,
-      14 passing exe tests). Still manual/script-driven, not integrated into `cargo test`.
+      16 passing exe tests). Still manual/script-driven, not integrated into `cargo test`.
 - [ ] Establish positive+negative test pairs as typecheck/MIR lowering lands (currently unclear
       whether existing parser/resolver suites cover rejection cases — see "Testing strategy" in
       compiler-pipeline-plan.md)

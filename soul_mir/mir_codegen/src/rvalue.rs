@@ -29,8 +29,9 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
     /// `cstr` value currently comes into existence (there's no other
     /// `cstr`-producing expression in this slice, so this is the sole
     /// producer of one). Not deduplicated across equal literals: correctness
-    /// over compactness for this first slice.
-    fn codegen_string_constant(&mut self, s: &str) -> PointerValue<'ctx> {
+    /// over compactness for this first slice. Also reused by
+    /// `function::trap_if` to materialize a static panic message.
+    pub(crate) fn codegen_string_constant(&self, s: &str) -> PointerValue<'ctx> {
         let id = self.string_counter.get();
         self.string_counter.set(id + 1);
 
@@ -215,13 +216,25 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
         signed: bool,
     ) -> CodegenResult<IntValue<'ctx>> {
         use BinaryOperatorKind::*;
-        let name = match (op, signed) {
-            (Add, true) => "llvm.sadd.with.overflow",
-            (Add, false) => "llvm.uadd.with.overflow",
-            (Sub, true) => "llvm.ssub.with.overflow",
-            (Sub, false) => "llvm.usub.with.overflow",
-            (Mul, true) => "llvm.smul.with.overflow",
-            (Mul, false) => "llvm.umul.with.overflow",
+        let (name, message) = match (op, signed) {
+            (Add, true) => ("llvm.sadd.with.overflow", "attempt to add with overflow"),
+            (Add, false) => ("llvm.uadd.with.overflow", "attempt to add with overflow"),
+            (Sub, true) => (
+                "llvm.ssub.with.overflow",
+                "attempt to subtract with overflow",
+            ),
+            (Sub, false) => (
+                "llvm.usub.with.overflow",
+                "attempt to subtract with overflow",
+            ),
+            (Mul, true) => (
+                "llvm.smul.with.overflow",
+                "attempt to multiply with overflow",
+            ),
+            (Mul, false) => (
+                "llvm.umul.with.overflow",
+                "attempt to multiply with overflow",
+            ),
             _ => unreachable!("codegen_checked_arith is only called for Add/Sub/Mul"),
         };
 
@@ -257,7 +270,7 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
             .map_err(llvm_err)?
             .into_int_value();
 
-        self.trap_if(overflowed, "overflow")?;
+        self.trap_if(overflowed, "overflow", message)?;
 
         Ok(value)
     }

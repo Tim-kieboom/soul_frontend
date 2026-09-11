@@ -3,8 +3,9 @@
 //! to — split out since each is its own small, self-contained concern.
 
 use inkwell::{
-    IntPredicate,
-    values::{BasicValueEnum, FunctionValue},
+    AddressSpace, IntPredicate,
+    module::Linkage,
+    values::{BasicValueEnum, FunctionValue, PointerValue},
 };
 use mir_model::{BlockId, ConstValue, LocalId, Operand, Place, Terminator};
 use soul_utils::FunctionId;
@@ -43,10 +44,10 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
             Terminator::Assert {
                 cond,
                 expected,
+                msg,
                 target,
-                ..
             } => {
-                self.codegen_assert(cond, *expected, target)?;
+                self.codegen_assert(cond, *expected, msg, target)?;
             }
             Terminator::Return => self.codegen_return()?,
             Terminator::Unreachable => {
@@ -86,10 +87,16 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
         Ok(())
     }
 
+    /// `msg` is the panic message `assert(cond)`/`panic(msg)` lowering
+    /// already attaches to this terminator (a `cstr`/`str` operand) — codegen
+    /// for both used to discard it and call bare `abort()`; it now flows
+    /// through to `panic_function` so a failing assert/panic actually prints
+    /// its message before aborting.
     fn codegen_assert(
         &mut self,
         cond: &Operand,
         expected: bool,
+        msg: &Operand,
         target: &BlockId,
     ) -> CodegenResult<()> {
         let bool_ty = self.ctx.context.bool_type().into();
@@ -105,19 +112,36 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
             .build_int_compare(IntPredicate::EQ, cond, expect_true, "assert_ok")
             .map_err(llvm_err)?;
 
+        let ptr_ty = self.ctx.context.ptr_type(AddressSpace::default()).into();
+        let msg_ptr = self.codegen_operand(msg, ptr_ty)?.into_pointer_value();
+
         let panic_block = self
             .ctx
             .context
             .insert_basic_block_after(self.builder.get_insert_block().unwrap(), "panic");
 
-        self.builder
-            .build_conditional_branch(ok, self.blocks[*target], panic_block)
-            .map_err(llvm_err)?;
+        // An unconditional `panic(msg)` lowers to an `Assert` whose `target`
+        // is never given a real block (see `lower_panic_intrinsic`'s docs:
+        // the "ok" path is provably unreachable, so no block is inserted for
+        // it) — branching straight to `panic_block` instead of indexing
+        // `self.blocks[*target]` avoids an out-of-bounds panic on that case.
+        match self.blocks.get(*target) {
+            Some(&ok_block) => {
+                self.builder
+                    .build_conditional_branch(ok, ok_block, panic_block)
+                    .map_err(llvm_err)?;
+            }
+            None => {
+                self.builder
+                    .build_unconditional_branch(panic_block)
+                    .map_err(llvm_err)?;
+            }
+        }
 
         self.builder.position_at_end(panic_block);
-        let abort_fn = self.abort_function();
+        let panic_fn = self.panic_function()?;
         self.builder
-            .build_call(abort_fn, &[], "abort_call")
+            .build_call(panic_fn, &[msg_ptr.into()], "panic_call")
             .map_err(llvm_err)?;
 
         self.builder.build_unreachable().map_err(llvm_err)?;
@@ -262,14 +286,113 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
         Ok(())
     }
 
-    /// The C runtime's `abort()`, declared lazily (once per module) the
-    /// first time an `assert`/`panic` is actually codegen'd. Also used by
-    /// `function::build_bounds_check` for out-of-bounds slice indexing.
+    /// The C runtime's `abort()`, declared lazily (once per module) — used
+    /// only by `panic_function` now (every panicking construct funnels
+    /// through that instead of calling `abort()` directly).
     pub(crate) fn abort_function(&self) -> FunctionValue<'ctx> {
         if let Some(existing) = self.ctx.module.get_function("abort") {
             return existing;
         }
         let fn_type = self.ctx.context.void_type().fn_type(&[], false);
         self.ctx.module.add_function("abort", fn_type, None)
+    }
+
+    /// libc's variadic `printf`, declared lazily (once per module) — used
+    /// only by `panic_function` to print a panic message before aborting.
+    fn printf_function(&self) -> FunctionValue<'ctx> {
+        if let Some(existing) = self.ctx.module.get_function("printf") {
+            return existing;
+        }
+        let ptr_ty = self.ctx.context.ptr_type(AddressSpace::default());
+        let fn_type = self.ctx.context.i32_type().fn_type(&[ptr_ty.into()], true);
+        self.ctx.module.add_function("printf", fn_type, None)
+    }
+
+    /// libc's `fflush`, declared lazily (once per module) — `panic_function`
+    /// calls this with a null `FILE*` (meaning "every open stream") right
+    /// before `abort()`. Without it, `printf`'s message sits in a
+    /// fully-buffered `stdout` and is silently lost: `abort()` terminates the
+    /// process immediately, it doesn't run libc's normal at-exit flush.
+    fn fflush_function(&self) -> FunctionValue<'ctx> {
+        if let Some(existing) = self.ctx.module.get_function("fflush") {
+            return existing;
+        }
+        let ptr_ty = self.ctx.context.ptr_type(AddressSpace::default());
+        let fn_type = self.ctx.context.i32_type().fn_type(&[ptr_ty.into()], false);
+        self.ctx.module.add_function("fflush", fn_type, None)
+    }
+
+    /// `"panic: %s\n"`, null-terminated — the one format string
+    /// `panic_function` prints every message through. A private global
+    /// rather than a per-call constant since there's only ever one of these
+    /// per module (unlike `codegen_string_constant`'s per-literal globals).
+    fn panic_format_string(&self) -> PointerValue<'ctx> {
+        let const_str = self.ctx.context.const_string(b"panic: %s\n", true);
+        let global = self
+            .ctx
+            .module
+            .add_global(const_str.get_type(), None, "panic_fmt");
+        global.set_initializer(&const_str);
+        global.set_constant(true);
+        global.set_linkage(Linkage::Private);
+        global.as_pointer_value()
+    }
+
+    /// The panic runtime: prints `msg` (a `cstr`-typed pointer) via `printf`
+    /// then calls `abort()` — a Rust-`panic!`-style trap (no unwinding, no
+    /// backtrace: this compiler has no unwinding model) instead of a bare,
+    /// silent `abort()`. Declared *and defined* lazily (once per module,
+    /// cached the same way as `abort_function`) the first time any
+    /// panicking construct — an out-of-bounds slice index, an arithmetic
+    /// overflow, a MIR-level `assert`/`panic()` — is actually codegen'd;
+    /// every one of those funnels through this single function. Building its
+    /// body reuses `self.builder` (there's no separate builder per LLVM
+    /// function), so the caller's own insertion point is saved and restored
+    /// around it.
+    pub(crate) fn panic_function(&self) -> CodegenResult<FunctionValue<'ctx>> {
+        if let Some(existing) = self.ctx.module.get_function("soul_panic") {
+            return Ok(existing);
+        }
+
+        let ptr_ty = self.ctx.context.ptr_type(AddressSpace::default());
+        let fn_type = self
+            .ctx
+            .context
+            .void_type()
+            .fn_type(&[ptr_ty.into()], false);
+        let function = self.ctx.module.add_function("soul_panic", fn_type, None);
+
+        let resume_block = self.builder.get_insert_block();
+        let entry = self.ctx.context.append_basic_block(function, "entry");
+        self.builder.position_at_end(entry);
+
+        let format = self.panic_format_string();
+        let msg = function
+            .get_nth_param(0)
+            .ok_or_else(|| err(CodegenErrorKind::MissingParameterValue { index: 0 }))?
+            .into_pointer_value();
+
+        let printf_fn = self.printf_function();
+        self.builder
+            .build_call(printf_fn, &[format.into(), msg.into()], "printf_call")
+            .map_err(llvm_err)?;
+
+        let fflush_fn = self.fflush_function();
+        let null_stream = ptr_ty.const_null();
+        self.builder
+            .build_call(fflush_fn, &[null_stream.into()], "fflush_call")
+            .map_err(llvm_err)?;
+
+        let abort_fn = self.abort_function();
+        self.builder
+            .build_call(abort_fn, &[], "abort_call")
+            .map_err(llvm_err)?;
+        self.builder.build_unreachable().map_err(llvm_err)?;
+
+        if let Some(block) = resume_block {
+            self.builder.position_at_end(block);
+        }
+
+        Ok(function)
     }
 }

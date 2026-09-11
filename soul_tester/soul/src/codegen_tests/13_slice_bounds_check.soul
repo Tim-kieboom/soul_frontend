@@ -1,4 +1,5 @@
 // expect: 3221226505
+// expect_stdout: panic: index out of bounds
 main(): i32 {
     a: [2]i32 = [1, 2]
     s: [&]i32 = &a
