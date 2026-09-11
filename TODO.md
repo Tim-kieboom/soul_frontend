@@ -87,20 +87,26 @@ No `Res`/`.pass`/`?T`, no unions, no generics, no borrow checking yet.
     before the element GEP — loads the slice's own `len` field (fat-pointer field 1), widens/narrows
     the index to `len`'s pointer width (sign-extend for a signed index, zero-extend otherwise — a
     negative signed index sign-extends to a huge unsigned value and is caught by the same unsigned
-    `<` compare as an over-long one), then splits the current block into a `bounds_ok` continuation
-    (where the caller's own GEP/load/store keeps emitting) and a `bounds_fail` block that calls
-    `abort()` — reuses the exact same `abort_function` helper `codegen_assert`'s panic path already
-    declares, mirroring its panic-block shape. Applies uniformly to both slice reads and writes, since
-    both go through `resolve_place`.
+    `>=` compare as an over-long one), then hands the resulting `bad` condition to `trap_if` (a shared
+    helper: splits the current block into a `<label>_fail` block that calls `abort()` — the same
+    `abort_function` helper `codegen_assert`'s panic path already declares — and a `<label>_ok`
+    continuation where the caller's own GEP/load/store keeps emitting). Applies uniformly to both
+    slice reads and writes, since both go through `resolve_place`.
   - Not yet supported: indexing a raw `[N]T` directly (only a slice can be indexed — reference it
     first), `&`/`@` mutability not checked against `[&]`/`[&mut]` (that's the M2 borrow checker's job,
     same as struct field mutability), a friendlier panic message (bounds-check failure and every other
     `assert`-driven panic both just call bare `abort()` — no message/location, that's a broader panic-
     infra concern not scoped to this pass)
+- [x] Overflow checking on arithmetic ops (`+`/`-`/`*`), assert-style like Rust's debug overflow
+      checks — proven via `14_arith_overflow_check.soul` (`i32::MAX + 1` aborts instead of wrapping).
+      `codegen_checked_arith` (`mir_codegen/src/rvalue.rs`) replaces the plain `build_int_add/sub/mul`
+      calls with the matching LLVM `{s,u}{add,sub,mul}.with.overflow` intrinsic (chosen on the same
+      `signed` flag every other signed-vs-unsigned branch in this file already uses), extracts the
+      `{result, i1 overflowed}` pair, and traps via the same `trap_if` helper bounds checking uses.
+      Div/Mod are untouched by this pass — division overflow (`INT_MIN / -1`) and div-by-zero are a
+      separate, not-yet-designed concern (see below).
 - [ ] Finish MIR lowering coverage for M1 language surface (non-generic traits; diverging calls for
       div-by-zero per mir-design.md)
-  - [ ] Overflow checking on arithmetic ops (`+`/`-`/`*`/...), assert-style like Rust's debug
-        overflow checks — not started, not designed yet
 - [x] `soul_mir/mir_codegen` — LLVM IR emission via `inkwell` (`features = ["llvm16-0"]`, Windows
       only) implemented for scalar/pointer/struct locals, arithmetic/comparison/logical ops, if/while,
       function calls, `extern "C"` functions (incl. `cstr`/pointer params and correct C-vs-Soul
@@ -111,7 +117,7 @@ No `Res`/`.pass`/`?T`, no unions, no generics, no borrow checking yet.
       `clang.exe` (`C:\llvm-16\bin\clang.exe`) over the emitted `.ll`, then runs the resulting exe
       and checks both exit code (`// expect: N`) and stdout (`// expect_stdout: <substring>`); this
       is currently the real correctness oracle for the pipeline (`soul_tester/soul/src/codegen_tests/`,
-      13 passing exe tests). Still manual/script-driven, not integrated into `cargo test`.
+      14 passing exe tests). Still manual/script-driven, not integrated into `cargo test`.
 - [ ] Establish positive+negative test pairs as typecheck/MIR lowering lands (currently unclear
       whether existing parser/resolver suites cover rejection cases — see "Testing strategy" in
       compiler-pipeline-plan.md)

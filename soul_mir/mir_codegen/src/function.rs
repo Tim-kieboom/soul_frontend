@@ -312,12 +312,9 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
     /// field's pointer-width — a `Variable` index keeps its own declared
     /// type rather than being retyped, see `operand_local` in `mir_parser` —
     /// so `index` is first widened/narrowed to `len`'s width, sign-extending
-    /// for a signed index and zero-extending otherwise, before an unsigned
-    /// `<` compare; a negative signed index sign-extends to a huge unsigned
-    /// value and is caught the same way as an over-long one). Splits the
-    /// current block into a `bounds_fail` block that aborts and a
-    /// `bounds_ok` continuation where the caller's own GEP/load/store keeps
-    /// emitting — mirrors `codegen_assert`'s panic-block shape.
+    /// for a signed index and zero-extending otherwise; a negative signed
+    /// index sign-extends to a huge unsigned value and is caught the same
+    /// way as an over-long one).
     fn build_bounds_check(
         &self,
         slice_llvm_ty: StructType<'ctx>,
@@ -357,11 +354,22 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
             std::cmp::Ordering::Equal => index,
         };
 
-        let in_bounds = self
+        let out_of_bounds = self
             .builder
-            .build_int_compare(IntPredicate::ULT, index, len_value, "bounds_ok")
+            .build_int_compare(IntPredicate::UGE, index, len_value, "out_of_bounds")
             .map_err(llvm_err)?;
 
+        self.trap_if(out_of_bounds, "bounds")
+    }
+
+    /// Traps via `abort` when `bad` (an `i1`) is true; otherwise falls
+    /// through. Splits the current block into a `<label>_fail` block that
+    /// aborts and a `<label>_ok` continuation where the caller keeps
+    /// emitting — the shape `codegen_assert`'s panic path already uses for a
+    /// MIR-level `Assert` terminator, generalized here for runtime checks
+    /// (slice-index bounds, arithmetic overflow) that arise mid-block rather
+    /// than at a block boundary.
+    pub(crate) fn trap_if(&self, bad: IntValue<'ctx>, label: &str) -> CodegenResult<()> {
         let current_block = self
             .builder
             .get_insert_block()
@@ -369,14 +377,14 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
         let fail_block = self
             .ctx
             .context
-            .insert_basic_block_after(current_block, "bounds_fail");
+            .insert_basic_block_after(current_block, &format!("{label}_fail"));
         let ok_block = self
             .ctx
             .context
-            .insert_basic_block_after(fail_block, "bounds_ok");
+            .insert_basic_block_after(fail_block, &format!("{label}_ok"));
 
         self.builder
-            .build_conditional_branch(in_bounds, ok_block, fail_block)
+            .build_conditional_branch(bad, fail_block, ok_block)
             .map_err(llvm_err)?;
 
         self.builder.position_at_end(fail_block);

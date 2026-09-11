@@ -75,6 +75,9 @@ pub enum CodegenErrorKind {
     #[error("`Drop` isn't constructed by lowering yet and isn't supported in codegen either")]
     DropUnsupported,
 
+    #[error("LLVM intrinsic `{name}` isn't available in this build of LLVM")]
+    OverflowIntrinsicUnavailable { name: Box<str> },
+
     #[error("function has no blocks")]
     FunctionHasNoBlocks,
 

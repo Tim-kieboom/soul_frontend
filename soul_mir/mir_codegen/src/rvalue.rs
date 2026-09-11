@@ -8,6 +8,7 @@ use ast_model::{
 };
 use inkwell::{
     IntPredicate,
+    intrinsics::Intrinsic,
     module::Linkage,
     types::BasicTypeEnum,
     values::{BasicValueEnum, IntValue, PointerValue},
@@ -167,11 +168,12 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
         signed: bool,
     ) -> CodegenResult<IntValue<'ctx>> {
         use BinaryOperatorKind::*;
+        if matches!(op, Add | Sub | Mul) {
+            return self.codegen_checked_arith(op, l, r, signed);
+        }
+
         let b = &self.builder;
         let v = match op {
-            Add => b.build_int_add(l, r, "add"),
-            Sub => b.build_int_sub(l, r, "sub"),
-            Mul => b.build_int_mul(l, r, "mul"),
             Div if signed => b.build_int_signed_div(l, r, "sdiv"),
             Div => b.build_int_unsigned_div(l, r, "udiv"),
             Mod if signed => b.build_int_signed_rem(l, r, "srem"),
@@ -195,6 +197,69 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
             }
         };
         v.map_err(llvm_err)
+    }
+
+    /// `Add`/`Sub`/`Mul` via LLVM's `{s,u}{add,sub,mul}.with.overflow`
+    /// intrinsics (chosen on `signed`, matching every other signed-vs-
+    /// unsigned branch in this file) instead of the plain `build_int_*`
+    /// ops — Rust-debug-build-style: traps via `abort` (`trap_if`, shared
+    /// with slice-index bounds checking) the instant an overflow occurs,
+    /// rather than silently wrapping. Each intrinsic returns a `{result, i1
+    /// overflowed}` struct; the result is only ever used once `trap_if` has
+    /// confirmed `overflowed` is false.
+    fn codegen_checked_arith(
+        &mut self,
+        op: BinaryOperatorKind,
+        l: IntValue<'ctx>,
+        r: IntValue<'ctx>,
+        signed: bool,
+    ) -> CodegenResult<IntValue<'ctx>> {
+        use BinaryOperatorKind::*;
+        let name = match (op, signed) {
+            (Add, true) => "llvm.sadd.with.overflow",
+            (Add, false) => "llvm.uadd.with.overflow",
+            (Sub, true) => "llvm.ssub.with.overflow",
+            (Sub, false) => "llvm.usub.with.overflow",
+            (Mul, true) => "llvm.smul.with.overflow",
+            (Mul, false) => "llvm.umul.with.overflow",
+            _ => unreachable!("codegen_checked_arith is only called for Add/Sub/Mul"),
+        };
+
+        let int_ty = l.get_type();
+        let intrinsic = Intrinsic::find(name).ok_or_else(|| {
+            err(CodegenErrorKind::OverflowIntrinsicUnavailable { name: name.into() })
+        })?;
+        let fn_value = intrinsic
+            .get_declaration(self.ctx.module, &[int_ty.into()])
+            .ok_or_else(|| {
+                err(CodegenErrorKind::OverflowIntrinsicUnavailable { name: name.into() })
+            })?;
+
+        let call = self
+            .builder
+            .build_call(fn_value, &[l.into(), r.into()], "arith_with_overflow")
+            .map_err(llvm_err)?;
+        let result_struct = call
+            .try_as_basic_value()
+            .left()
+            .ok_or(CodegenErrorKind::CallResultIsNone)
+            .map_err(err)?
+            .into_struct_value();
+
+        let value = self
+            .builder
+            .build_extract_value(result_struct, 0, "arith_result")
+            .map_err(llvm_err)?
+            .into_int_value();
+        let overflowed = self
+            .builder
+            .build_extract_value(result_struct, 1, "arith_overflowed")
+            .map_err(llvm_err)?
+            .into_int_value();
+
+        self.trap_if(overflowed, "overflow")?;
+
+        Ok(value)
     }
 
     pub(crate) fn codegen_operand(
