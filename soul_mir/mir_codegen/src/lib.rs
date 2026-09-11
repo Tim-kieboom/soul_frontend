@@ -19,16 +19,20 @@
 //! via `llc`/a linker is a separate, currently-manual step (see
 //! `docs/compiler-pipeline-plan.md`).
 //!
-//! Split into: `module` (declares every function/extern's LLVM signature,
-//! then drives one `FunctionCodegen` per real function body), `function`
-//! (control flow — blocks/statements/terminators — and place resolution for
-//! one function body), `rvalue` (operand/rvalue-to-`BasicValueEnum` codegen,
-//! a distinct concern from `function`'s control flow), and `types` (the
-//! Soul-type-to-LLVM-type mapping and the small constant/int-width helpers
-//! that go with it).
+//! Split into: `ctx` (the small `Copy` bundle of context/module/declares/
+//! platform that `ModuleCodegen` and `FunctionCodegen` each hold a copy of,
+//! rather than duplicating those four fields directly), `module` (declares
+//! every function/extern's LLVM signature, then drives one `FunctionCodegen`
+//! per real function body), `function` (per-function driver —
+//! blocks/statements — and place resolution), `terminator`
+//! (terminator-specific codegen: `Call`/`Assert`/`SwitchInt`/`Return`),
+//! `rvalue` (operand/rvalue-to-`BasicValueEnum` codegen, a distinct concern
+//! from control flow), and `types` (the Soul-type-to-LLVM-type mapping and
+//! the small constant/int-width helpers that go with it).
 
 pub mod fault;
 
+mod ctx;
 mod function;
 mod module;
 mod rvalue;

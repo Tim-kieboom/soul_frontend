@@ -1,8 +1,12 @@
+//! Terminator codegen: the block-ending constructs (`Call`, `Assert`,
+//! `SwitchInt`, `Return`, ...) that `function`'s per-block driver dispatches
+//! to — split out since each is its own small, self-contained concern.
+
 use inkwell::{
     IntPredicate,
     values::{BasicValueEnum, FunctionValue},
 };
-use mir_model::{BlockId, ConstValue, LocalId, Place, Terminator};
+use mir_model::{BlockId, ConstValue, LocalId, Operand, Place, Terminator};
 use soul_utils::FunctionId;
 
 use crate::{
@@ -34,7 +38,7 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
                 destination,
                 target,
             } => {
-                self.codegen_call(id, arguments, destination, target)?;
+                self.codegen_call(*id, arguments, destination, target)?;
             }
             Terminator::Assert {
                 cond,
@@ -42,7 +46,7 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
                 target,
                 ..
             } => {
-                self.codegen_assert(cond, expected, target)?;
+                self.codegen_assert(cond, *expected, target)?;
             }
             Terminator::Return => self.codegen_return()?,
             Terminator::Unreachable => {
@@ -73,7 +77,7 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
         }
 
         if self.is_entry_point {
-            let zero = self.context.i32_type().const_zero();
+            let zero = self.ctx.context.i32_type().const_zero();
             self.builder.build_return(Some(&zero)).map_err(llvm_err)?;
             return Ok(());
         }
@@ -84,16 +88,17 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
 
     fn codegen_assert(
         &mut self,
-        cond: &mir_model::Operand,
-        expected: &bool,
+        cond: &Operand,
+        expected: bool,
         target: &BlockId,
     ) -> CodegenResult<()> {
-        let bool_ty = self.context.bool_type().into();
+        let bool_ty = self.ctx.context.bool_type().into();
         let cond = expect_int(self.codegen_operand(cond, bool_ty)?)?;
         let expect_true = self
+            .ctx
             .context
             .bool_type()
-            .const_int(u64::from(*expected), false);
+            .const_int(u64::from(expected), false);
 
         let ok = self
             .builder
@@ -101,6 +106,7 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
             .map_err(llvm_err)?;
 
         let panic_block = self
+            .ctx
             .context
             .insert_basic_block_after(self.builder.get_insert_block().unwrap(), "panic");
 
@@ -120,13 +126,17 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
 
     fn codegen_call(
         &mut self,
-        id: &FunctionId,
-        arguments: &[mir_model::Operand],
+        id: FunctionId,
+        arguments: &[Operand],
         destination: &Option<Place>,
         target: &Option<BlockId>,
     ) -> CodegenResult<()> {
-        let callee_module = self.declares.get_function(*id).map(|(_, module)| *module);
-        let param_types = if let Some(callee_mir) = self.functions.get(*id) {
+        let callee_module = self
+            .ctx
+            .declares
+            .get_function(id)
+            .map(|(_, module)| *module);
+        let param_types = if let Some(callee_mir) = self.functions.get(id) {
             let callee_param_locals: Vec<LocalId> = callee_mir
                 .locals
                 .entries()
@@ -138,26 +148,26 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
                 .iter()
                 .map(|&local| {
                     let decl = &callee_mir.locals[local];
-                    self.llvm_type(callee_module, &decl.ty, Some(decl.span))
+                    self.ctx.llvm_type(callee_module, &decl.ty, Some(decl.span))
                 })
                 .collect::<CodegenResult<Vec<_>>>()?
-        } else if let Some(extern_fn) = self.externs.get(*id) {
+        } else if let Some(extern_fn) = self.externs.get(id) {
             extern_fn
                 .params
                 .iter()
-                .map(|ty| self.llvm_type(callee_module, ty, None))
+                .map(|ty| self.ctx.llvm_type(callee_module, ty, None))
                 .collect::<CodegenResult<Vec<_>>>()?
         } else {
-            return Err(err(CodegenErrorKind::CallHasNoMirBody { id: *id }));
+            return Err(err(CodegenErrorKind::CallHasNoMirBody { id }));
         };
 
         let callee_value = *self
             .function_values
-            .get(*id)
-            .ok_or_else(|| err(CodegenErrorKind::CallNeverDeclared { id: *id }))?;
+            .get(id)
+            .ok_or_else(|| err(CodegenErrorKind::CallNeverDeclared { id }))?;
 
         if arguments.len() > param_types.len() {
-            return Err(err(CodegenErrorKind::CallArgumentCountMismatch { id: *id }));
+            return Err(err(CodegenErrorKind::CallArgumentCountMismatch { id }));
         }
 
         let mut args = Vec::with_capacity(arguments.len());
@@ -201,13 +211,13 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
 
     fn codegen_switchint(
         &mut self,
-        discriminant: &mir_model::Operand,
-        targets: &Vec<(ast_model::Literal, BlockId)>,
+        discriminant: &Operand,
+        targets: &[(ConstValue, BlockId)],
         otherwise: &BlockId,
     ) -> CodegenResult<()> {
-        let bool_ty = self.context.bool_type().into();
+        let bool_ty = self.ctx.context.bool_type().into();
         let cond = expect_int(self.codegen_operand(discriminant, bool_ty)?)?;
-        let [(value, target)] = targets.as_slice() else {
+        let [(value, target)] = targets else {
             return Err(err(CodegenErrorKind::SwitchIntTargetCountUnsupported));
         };
         let ConstValue::Bool(expect_true) = value else {
@@ -236,7 +246,7 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
     /// or a panic.
     fn build_entry_point_return(&self, value: BasicValueEnum<'ctx>) -> CodegenResult<()> {
         let value = expect_int(value)?;
-        let i32_ty = self.context.i32_type();
+        let i32_ty = self.ctx.context.i32_type();
         let bits = value.get_type().get_bit_width();
         let value = match bits.cmp(&32) {
             std::cmp::Ordering::Less => self
@@ -255,10 +265,10 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
     /// The C runtime's `abort()`, declared lazily (once per module) the
     /// first time an `assert`/`panic` is actually codegen'd.
     fn abort_function(&self) -> FunctionValue<'ctx> {
-        if let Some(existing) = self.module.get_function("abort") {
+        if let Some(existing) = self.ctx.module.get_function("abort") {
             return existing;
         }
-        let fn_type = self.context.void_type().fn_type(&[], false);
-        self.module.add_function("abort", fn_type, None)
+        let fn_type = self.ctx.context.void_type().fn_type(&[], false);
+        self.ctx.module.add_function("abort", fn_type, None)
     }
 }

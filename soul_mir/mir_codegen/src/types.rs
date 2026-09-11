@@ -21,8 +21,6 @@ use soul_utils::{
 use crate::{
     err,
     fault::{CodegenErrorKind, CodegenResult},
-    function::FunctionCodegen,
-    module::ModuleCodegen,
 };
 
 pub(crate) fn param_metadata<'ctx>(
@@ -69,41 +67,6 @@ pub(crate) fn resolve_struct<'d>(
         return None;
     };
     declares.get_struct_by_name(&stub.name, module?)
-}
-
-impl<'ctx, 'a> ModuleCodegen<'ctx, 'a> {
-    pub(crate) fn llvm_type(
-        &self,
-        module: Option<ModuleId>,
-        ty: &SoulType,
-        span: Option<Span>,
-    ) -> CodegenResult<BasicTypeEnum<'ctx>> {
-        llvm_type(
-            self.context,
-            &self.platform,
-            self.declares,
-            module,
-            ty,
-            span,
-        )
-    }
-}
-impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
-    pub(crate) fn llvm_type(
-        &self,
-        module: Option<ModuleId>,
-        ty: &SoulType,
-        span: Option<Span>,
-    ) -> CodegenResult<BasicTypeEnum<'ctx>> {
-        llvm_type(
-            self.context,
-            &self.platform,
-            self.declares,
-            module,
-            ty,
-            span,
-        )
-    }
 }
 
 /// Narrows a value to an `IntValue`, faulting (not panicking) if it's

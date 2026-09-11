@@ -1,17 +1,15 @@
-//! Per-function codegen: lowers a single MIR `Function`'s blocks/statements/
-//! terminators into LLVM IR against an already-declared LLVM function value.
-//! Operand/rvalue-to-`BasicValueEnum` codegen lives in `rvalue` instead —
-//! this file owns control flow (blocks/statements/terminators) and place
-//! resolution.
+//! Per-function codegen: lowers a single MIR `Function`'s blocks/statements
+//! into LLVM IR against an already-declared LLVM function value. Terminator
+//! codegen lives in `terminator` and operand/rvalue-to-`BasicValueEnum`
+//! codegen lives in `rvalue` instead — this file owns the per-block/
+//! per-statement driver and place resolution.
 
 use std::cell::Cell;
 
-use ast_model::{AstStore, declare_store::DeclareStore};
+use ast_model::AstStore;
 use inkwell::{
     basic_block::BasicBlock as LlvmBlock,
     builder::Builder,
-    context::Context,
-    module::Module,
     types::BasicTypeEnum,
     values::{FunctionValue, PointerValue},
 };
@@ -19,11 +17,11 @@ use mir_model::{BlockId, ExternFunction, Function, LocalId, Place, PlaceElem, St
 use soul_utils::{
     FunctionId,
     collections::vec_map::{VecMap, VecMapIndex},
-    compiler_options::PlatformInfo,
     span::ModuleId,
 };
 
 use crate::{
+    ctx::CodegenCtx,
     err,
     fault::{CodegenErrorKind, CodegenResult},
     llvm_err,
@@ -31,50 +29,19 @@ use crate::{
 };
 
 pub(crate) struct FunctionCodegen<'ctx, 'a> {
-    pub context: &'ctx Context,
-    pub module: &'a Module<'ctx>,
-    pub declares: &'a DeclareStore,
+    pub(crate) ctx: CodegenCtx<'ctx, 'a>,
     /// The Soul module this function was declared in — not to be confused
-    /// with `module`, the LLVM `Module` being emitted into.
-    pub soul_module: Option<ModuleId>,
-    pub platform: PlatformInfo,
-    pub builder: Builder<'ctx>,
-    pub function: &'a Function,
-    pub is_entry_point: bool,
-    pub locals: VecMap<LocalId, PointerValue<'ctx>>,
-    pub blocks: VecMap<BlockId, LlvmBlock<'ctx>>,
-    pub function_values: &'a VecMap<FunctionId, FunctionValue<'ctx>>,
-    pub functions: &'a VecMap<FunctionId, Function>,
-    pub externs: &'a VecMap<FunctionId, ExternFunction>,
-    pub string_counter: &'a Cell<usize>,
-}
-impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
-    pub fn new(
-        this: &'a ModuleCodegen<'ctx, 'a>,
-        soul_module: Option<ModuleId>,
-        builder: Builder<'ctx>,
-        function: &'a Function,
-        is_entry_point: bool,
-        locals: VecMap<LocalId, PointerValue<'ctx>>,
-        blocks: VecMap<BlockId, LlvmBlock<'ctx>>,
-    ) -> Self {
-        Self {
-            context: this.context,
-            module: this.module,
-            declares: this.declares,
-            platform: this.platform,
-            function_values: &this.function_values,
-            functions: &this.mir.functions,
-            externs: &this.mir.externs,
-            string_counter: &this.string_counter,
-            soul_module,
-            builder,
-            function,
-            is_entry_point,
-            locals,
-            blocks,
-        }
-    }
+    /// with `ctx.module`, the LLVM `Module` being emitted into.
+    pub(crate) soul_module: Option<ModuleId>,
+    pub(crate) builder: Builder<'ctx>,
+    pub(crate) function: &'a Function,
+    pub(crate) is_entry_point: bool,
+    pub(crate) locals: VecMap<LocalId, PointerValue<'ctx>>,
+    pub(crate) blocks: VecMap<BlockId, LlvmBlock<'ctx>>,
+    pub(crate) function_values: &'a VecMap<FunctionId, FunctionValue<'ctx>>,
+    pub(crate) functions: &'a VecMap<FunctionId, Function>,
+    pub(crate) externs: &'a VecMap<FunctionId, ExternFunction>,
+    pub(crate) string_counter: &'a Cell<usize>,
 }
 impl<'ctx, 'a> ModuleCodegen<'ctx, 'a> {
     pub(crate) fn codegen_function(
@@ -89,18 +56,18 @@ impl<'ctx, 'a> ModuleCodegen<'ctx, 'a> {
             .get(id)
             .ok_or_else(|| err(CodegenErrorKind::MissingAstEntry { id }))?;
 
-        let builder = self.context.create_builder();
+        let builder = self.ctx.context.create_builder();
 
         // A dedicated `entry` block holding only the parameter/local allocas,
         // ahead of the MIR blocks proper — keeps every alloca in the
         // function's first block (what LLVM's mem2reg pass expects) without
         // having to special-case MIR's own entry block for it.
-        let entry = self.context.append_basic_block(fn_value, "entry");
+        let entry = self.ctx.context.append_basic_block(fn_value, "entry");
         builder.position_at_end(entry);
 
         let mut locals: VecMap<LocalId, PointerValue<'ctx>> = VecMap::new();
         for (local_id, decl) in function.locals.entries() {
-            let ty = self.llvm_type(module, &decl.ty, Some(decl.span))?;
+            let ty = self.ctx.llvm_type(module, &decl.ty, Some(decl.span))?;
             let slot = builder
                 .build_alloca(ty, &format!("_{}", local_id.index()))
                 .map_err(llvm_err)?;
@@ -131,6 +98,7 @@ impl<'ctx, 'a> ModuleCodegen<'ctx, 'a> {
         let mut blocks: VecMap<BlockId, LlvmBlock<'ctx>> = VecMap::new();
         for (block_id, _) in function.blocks.entries() {
             let llvm_block = self
+                .ctx
                 .context
                 .append_basic_block(fn_value, &format!("bb{}", block_id.index()));
             blocks.insert(block_id, llvm_block);
@@ -150,16 +118,19 @@ impl<'ctx, 'a> ModuleCodegen<'ctx, 'a> {
             .build_unconditional_branch(blocks[mir_entry_id])
             .map_err(llvm_err)?;
 
-        let is_entry_point = name == "main";
-        let mut fn_codegen = FunctionCodegen::new(
-            self,
-            module,
+        let mut fn_codegen = FunctionCodegen {
+            ctx: self.ctx,
+            soul_module: module,
+            function_values: &self.function_values,
+            functions: &self.mir.functions,
+            externs: &self.mir.externs,
+            string_counter: &self.string_counter,
             builder,
             function,
-            is_entry_point,
+            is_entry_point: name == "main",
             locals,
             blocks,
-        );
+        };
 
         for (block_id, block) in function.blocks.entries() {
             fn_codegen.codegen_block(block_id, block)?;
@@ -200,7 +171,8 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
 
     pub(crate) fn local_type(&self, local: LocalId) -> CodegenResult<BasicTypeEnum<'ctx>> {
         let decl = &self.function.locals[local];
-        self.llvm_type(self.soul_module, &decl.ty, Some(decl.span))
+        self.ctx
+            .llvm_type(self.soul_module, &decl.ty, Some(decl.span))
     }
 
     /// Resolves a `Place` to the pointer it reads/writes through and the

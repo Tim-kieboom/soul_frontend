@@ -33,8 +33,9 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
         let id = self.string_counter.get();
         self.string_counter.set(id + 1);
 
-        let const_str = self.context.const_string(s.as_bytes(), true);
+        let const_str = self.ctx.context.const_string(s.as_bytes(), true);
         let global = self
+            .ctx
             .module
             .add_global(const_str.get_type(), None, &format!("str.{id}"));
         global.set_initializer(&const_str);
@@ -66,7 +67,7 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
         op: &UnaryOperatorKind,
         operand: &Operand,
     ) -> CodegenResult<BasicValueEnum<'ctx>> {
-        let bool_ty = self.context.bool_type().into();
+        let bool_ty = self.ctx.context.bool_type().into();
         let value = expect_int(self.codegen_operand(operand, bool_ty)?)?;
         match op {
             UnaryOperatorKind::Not => Ok(self
