@@ -30,28 +30,32 @@ No `Res`/`.pass`/`?T`, no unions, no generics, no borrow checking yet.
 - [x] MIR lowering: none-returning functions and calls
 - [x] Bare assert/panic and undefined-fn checks
 - [x] MIR display/serialization, fault plumbing
-- [x] Struct name resolution: `DeclareStore.struct_names: HashMap<(SharedStr, ModuleId), NodeId>`
+- [x] Struct name resolution: `DeclareStore.struct_names: VecMap<ModuleId, HashMap<SharedStr, NodeId>>`
       (`get_struct_by_name`), populated in `try_insert_struct`, lets a later pass resolve a
       struct-typed `SoulType::Stub`'s bare name back to its `Struct` declaration without re-walking
-      scopes. Turned out narrower than first scoped during grill-me ("build a whole declare+resolve
-      system mirroring functions") — `soul_name_resolver` already had working struct
-      field-type-checking via `lookup_type`/`get_custom_type` (proved by the passing
-      `field_access_type_tests.rs`); the only real gap was this one name index, not missing anywhere.
-- [x] Struct field reads/construction lowered through the whole pipeline and proven via a real exe
-      (`09_struct_field_read.soul`, per the "prove one vertical slice before extending further"
-      decision from grill-me):
+      scopes — keyed by `ModuleId` first (rather than a flat `HashMap<(SharedStr, ModuleId), _>`) so a
+      lookup hashes a bare `&str` instead of allocating an owned `SharedStr`. Turned out narrower than
+      first scoped during grill-me ("build a whole declare+resolve system mirroring functions") —
+      `soul_name_resolver` already had working struct field-type-checking via
+      `lookup_type`/`get_custom_type` (proved by the passing `field_access_type_tests.rs`); the only
+      real gap was this one name index, not missing anywhere.
+- [x] Struct field reads/writes/construction lowered through the whole pipeline and proven via real
+      exes (`09_struct_field_read.soul`, `10_struct_field_write.soul`, per the "prove one vertical
+      slice before extending further" decision from grill-me):
   - `mir_parser`: `FunctionLowerer` resolves each function's module once via `declares.get_function`,
     accepts struct-typed params/locals/returns (`require_lowerable`), lowers `Struct{..}` construction
     to `Rvalue::Aggregate(AggregateKind::Struct, ..)` with operands reordered to the struct's
-    *declared* field order (not literal order), and lowers `variable.field` reads to a `Place` with a
-    `PlaceElem::Field(index)` projection reusing the variable's own storage (no copy)
+    *declared* field order (not literal order), and lowers `variable.field` reads/writes to a `Place`
+    with a `PlaceElem::Field(index)` projection reusing the variable's own storage (no copy) — shared
+    via `resolve_field_place`, used from both `lower_operand` (read) and `lower_assignment` (write);
+    mutability isn't enforced here (that's the M2 borrow checker's job)
   - `mir_codegen`: `llvm_type` builds an LLVM struct type per resolved `Stub`; `resolve_place` walks a
-    single `Field` projection via `build_struct_gep`; `Rvalue::Aggregate` codegens via
-    `get_undef`+`build_insert_value` per field
-  - Not yet supported: field **writes** (`p.x = 1`, still `AssignmentTargetUnsupported`), nested
-    field chains (`o.inner.x`, only a bare `variable.field` object is accepted), struct-typed
-    binary-op operands' signedness (`operand_is_signed` doesn't look through a `Field` projection —
-    doesn't matter for a bare field read, would matter for `p.x - 1` on a signed field)
+    single `Field` projection via `build_struct_gep` for both loads and stores; `Rvalue::Aggregate`
+    codegens via `get_undef`+`build_insert_value` per field
+  - Not yet supported: nested field chains (`o.inner.x`, only a bare `variable.field` object is
+    accepted), struct-typed binary-op operands' signedness (`operand_is_signed` doesn't look through
+    a `Field` projection — doesn't matter for a bare field read, would matter for `p.x - 1` on a
+    signed field)
 - [ ] Finish MIR lowering coverage for M1 language surface (non-generic traits; diverging calls for
       div-by-zero / out-of-bounds per mir-design.md)
   - [ ] Array/slice indexing (separate from struct fields — scoped during the grill-me session):
@@ -71,7 +75,7 @@ No `Res`/`.pass`/`?T`, no unions, no generics, no borrow checking yet.
       `clang.exe` (`C:\llvm-16\bin\clang.exe`) over the emitted `.ll`, then runs the resulting exe
       and checks both exit code (`// expect: N`) and stdout (`// expect_stdout: <substring>`); this
       is currently the real correctness oracle for the pipeline (`soul_tester/soul/src/codegen_tests/`,
-      9 passing exe tests). Still manual/script-driven, not integrated into `cargo test`.
+      10 passing exe tests). Still manual/script-driven, not integrated into `cargo test`.
 - [ ] Establish positive+negative test pairs as typecheck/MIR lowering lands (currently unclear
       whether existing parser/resolver suites cover rejection cases — see "Testing strategy" in
       compiler-pipeline-plan.md)

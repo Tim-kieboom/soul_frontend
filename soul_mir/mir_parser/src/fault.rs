@@ -78,7 +78,7 @@ pub enum MirErrorKind {
     UnreachableStatement,
 
     #[error(
-        "only a bare (already-declared) variable is supported as an assignment target in this lowering slice"
+        "only a bare (already-declared) variable or a struct field (`variable.field`) is supported as an assignment target in this lowering slice"
     )]
     AssignmentTargetUnsupported,
 

@@ -234,6 +234,47 @@ fn struct_constructor_lowers_to_an_aggregate_in_declared_field_order() {
 }
 
 #[test]
+fn struct_field_write_lowers_to_an_assign_through_a_field_projection() {
+    let mir = lower_source(
+        "struct Point { x: int }\nf(mut p: Point): int {\n    p.x = 5\n    return p.x\n}\n",
+        "f",
+    )
+    .expect("expected successful lowering");
+
+    let (_, block) = mir.blocks.entries().next().expect("expected one block");
+    let mir_model::Statement::Assign(place, Rvalue::Use(Operand::Constant(ConstValue::Uint(5)))) =
+        &block.statements[0]
+    else {
+        panic!(
+            "expected the first statement to assign a constant, got {:#?}",
+            block.statements[0]
+        );
+    };
+    assert!(
+        matches!(
+            place.projection.as_slice(),
+            [mir_model::PlaceElem::Field(0)]
+        ),
+        "expected a single Field(0) projection, got {:#?}",
+        place.projection
+    );
+}
+
+#[test]
+fn field_write_on_an_immutable_object_is_still_lowered_the_same_way() {
+    // Mutability enforcement is the borrow checker's job (M2, not started
+    // yet per mir-design.md) — this lowering slice doesn't gate on it.
+    let mir = lower_source(
+        "struct Point { x: int }\nf(p: Point): int {\n    p.x = 5\n    return p.x\n}\n",
+        "f",
+    )
+    .expect("expected successful lowering");
+
+    let (_, block) = mir.blocks.entries().next().expect("expected one block");
+    assert_eq!(block.statements.len(), 2, "{:#?}", block.statements);
+}
+
+#[test]
 fn nested_compound_expression_is_lowered_via_a_temporary() {
     let mir = lower_source(
         "f(a: int, b: int, c: int): int {\n    return a + b * c\n}\n",

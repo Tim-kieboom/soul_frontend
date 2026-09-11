@@ -224,24 +224,29 @@ impl<'a> FunctionLowerer<'a> {
     /// Lowers `left = right` (compound assignments like `n -= 1` are already
     /// desugared by the parser into `left = left - 1` before this ever runs,
     /// so `lower_rvalue` handles the right-hand side with no special-casing).
-    /// `left` is only supported as a bare, already-declared variable — struct
-    /// *reads* (`p.x`) are lowered (see `lower_field_access`), but writing
-    /// through a field (`p.x = 1`) isn't yet, so `obj.field`/`arr[i]`/`*p` as
-    /// an assignment target still faults here rather than lowering to a
-    /// `Place` with a projection.
+    /// `left` is a bare, already-declared variable, or a struct field write
+    /// (`p.x = 1`, via the same `Field`-projection machinery as a field
+    /// read) — `arr[i]`/`*p` as an assignment target still faults, since
+    /// nothing lowers those places yet.
     fn lower_assignment(&mut self, assignment: &ast::Assignment) -> MirResult<()> {
         let left = &self.store.expressions[assignment.left];
-        let ast::ExpressionKind::Variable(var) = &left.node else {
-            return Err(Fault::error_with_kind(
-                MirErrorKind::AssignmentTargetUnsupported,
-                Some(left.span),
-            ));
+        let place = match &left.node {
+            ast::ExpressionKind::Variable(var) => {
+                mir::Place::local(self.resolve_local(var, left.span)?)
+            }
+            ast::ExpressionKind::FieldAccess(field_access) => {
+                self.resolve_field_place(field_access, left.span)?
+            }
+            _ => {
+                return Err(Fault::error_with_kind(
+                    MirErrorKind::AssignmentTargetUnsupported,
+                    Some(left.span),
+                ));
+            }
         };
 
-        let local = self.resolve_local(var, left.span)?;
         let rvalue = self.lower_rvalue(assignment.right)?;
-        self.statements
-            .push(mir::Statement::Assign(mir::Place::local(local), rvalue));
+        self.statements.push(mir::Statement::Assign(place, rvalue));
         Ok(())
     }
 
@@ -264,15 +269,15 @@ impl<'a> FunctionLowerer<'a> {
     }
 
     /// Lowers `variable.field` into a `Place` with a `Field` projection
-    /// appended onto the object's own local — reads only, straight off
+    /// appended onto the object's own local — read or write, straight off
     /// whatever storage the struct value already lives in (no temp/copy).
     /// Only a bare variable object is supported in this slice (no chained
     /// field access, no field access on a call/constructor result).
-    fn lower_field_access(
+    fn resolve_field_place(
         &self,
         field_access: &ast::FieldAccess,
         span: Span,
-    ) -> MirResult<mir::Operand> {
+    ) -> MirResult<mir::Place> {
         let object = &self.store.expressions[field_access.object];
         let ast::ExpressionKind::Variable(var) = &object.node else {
             return Err(Fault::error_with_kind(
@@ -311,7 +316,18 @@ impl<'a> FunctionLowerer<'a> {
 
         let mut place = mir::Place::local(local);
         place.projection.push(mir::PlaceElem::Field(index));
-        Ok(mir::Operand::Copy(place))
+        Ok(place)
+    }
+
+    /// Lowers `variable.field` as a read — see `resolve_field_place`.
+    fn lower_field_access(
+        &self,
+        field_access: &ast::FieldAccess,
+        span: Span,
+    ) -> MirResult<mir::Operand> {
+        Ok(mir::Operand::Copy(
+            self.resolve_field_place(field_access, span)?,
+        ))
     }
 
     /// The one argument an `assert`/`panic` intrinsic call takes, guarded
