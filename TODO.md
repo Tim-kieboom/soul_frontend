@@ -49,13 +49,16 @@ No `Res`/`.pass`/`?T`, no unions, no generics, no borrow checking yet.
     with a `PlaceElem::Field(index)` projection reusing the variable's own storage (no copy) — shared
     via `resolve_field_place`, used from both `lower_operand` (read) and `lower_assignment` (write);
     mutability isn't enforced here (that's the M2 borrow checker's job)
-  - `mir_codegen`: `llvm_type` builds an LLVM struct type per resolved `Stub`; `resolve_place` walks a
-    single `Field` projection via `build_struct_gep` for both loads and stores; `Rvalue::Aggregate`
+  - `mir_codegen`: `llvm_type` builds an LLVM struct type per resolved `Stub`; `resolve_place` walks
+    an arbitrary-length `Field` projection chain via `build_struct_gep` for both loads and stores (no
+    codegen changes were needed to support nested chains — it was already general); `Rvalue::Aggregate`
     codegens via `get_undef`+`build_insert_value` per field
-  - Not yet supported: nested field chains (`o.inner.x`, only a bare `variable.field` object is
-    accepted), struct-typed binary-op operands' signedness (`operand_is_signed` doesn't look through
-    a `Field` projection — doesn't matter for a bare field read, would matter for `p.x - 1` on a
-    signed field)
+  - [x] Nested field chains (`o.inner.x`, both reads and writes): `resolve_field_place` in `mir_parser`
+    now recurses when the field-access object is itself a field access, building one `Place` with a
+    multi-element `Field` projection rather than a chain of temporaries
+  - Not yet supported: struct-typed binary-op operands' signedness (`operand_is_signed` doesn't look
+    through a `Field` projection — doesn't matter for a bare field read, would matter for `p.x - 1`
+    on a signed field)
 - [ ] Finish MIR lowering coverage for M1 language surface (non-generic traits; diverging calls for
       div-by-zero / out-of-bounds per mir-design.md)
   - [ ] Array/slice indexing (separate from struct fields — scoped during the grill-me session):
@@ -75,7 +78,7 @@ No `Res`/`.pass`/`?T`, no unions, no generics, no borrow checking yet.
       `clang.exe` (`C:\llvm-16\bin\clang.exe`) over the emitted `.ll`, then runs the resulting exe
       and checks both exit code (`// expect: N`) and stdout (`// expect_stdout: <substring>`); this
       is currently the real correctness oracle for the pipeline (`soul_tester/soul/src/codegen_tests/`,
-      10 passing exe tests). Still manual/script-driven, not integrated into `cargo test`.
+      11 passing exe tests). Still manual/script-driven, not integrated into `cargo test`.
 - [ ] Establish positive+negative test pairs as typecheck/MIR lowering lands (currently unclear
       whether existing parser/resolver suites cover rejection cases — see "Testing strategy" in
       compiler-pipeline-plan.md)

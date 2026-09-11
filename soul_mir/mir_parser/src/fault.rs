@@ -113,7 +113,7 @@ pub enum MirErrorKind {
     },
 
     #[error(
-        "only field access directly on a bare (already-declared) variable — `variable.field` — is supported in this lowering slice"
+        "only field access on a variable or another field access — `variable.field` or `object.field.field` — is supported in this lowering slice"
     )]
     UnsupportedFieldAccessObject,
 

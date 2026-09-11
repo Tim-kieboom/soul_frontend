@@ -203,6 +203,69 @@ fn struct_field_read_lowers_to_a_field_projection() {
 }
 
 #[test]
+fn nested_struct_field_read_lowers_to_a_single_place_with_two_projections() {
+    let mir = lower_source(
+        "struct Inner { x: int }\nstruct Outer { inner: Inner }\nf(o: Outer): int {\n    return o.inner.x\n}\n",
+        "f",
+    )
+    .expect("expected successful lowering");
+
+    // param `o` + the `int` return local — `o.inner.x` reuses `o`'s own
+    // storage via a two-element `Field` projection, no temp for `o.inner`.
+    assert_eq!(mir.locals.entries().count(), 2);
+
+    let (_, block) = mir.blocks.entries().next().expect("expected one block");
+    let mir_model::Statement::Assign(_, Rvalue::Use(Operand::Copy(place))) = &block.statements[0]
+    else {
+        panic!(
+            "expected a bare Use(Copy(..)) assignment, got {:#?}",
+            block.statements[0]
+        );
+    };
+    assert!(
+        matches!(
+            place.projection.as_slice(),
+            [
+                mir_model::PlaceElem::Field(0),
+                mir_model::PlaceElem::Field(0)
+            ]
+        ),
+        "expected a two-element Field(0), Field(0) projection, got {:#?}",
+        place.projection
+    );
+}
+
+#[test]
+fn nested_struct_field_write_lowers_to_an_assign_through_two_projections() {
+    let mir = lower_source(
+        "struct Inner { x: int }\nstruct Outer { inner: Inner }\nf(mut o: Outer): int {\n    o.inner.x = 5\n    return o.inner.x\n}\n",
+        "f",
+    )
+    .expect("expected successful lowering");
+
+    let (_, block) = mir.blocks.entries().next().expect("expected one block");
+    let mir_model::Statement::Assign(place, Rvalue::Use(Operand::Constant(ConstValue::Uint(5)))) =
+        &block.statements[0]
+    else {
+        panic!(
+            "expected the first statement to assign a constant, got {:#?}",
+            block.statements[0]
+        );
+    };
+    assert!(
+        matches!(
+            place.projection.as_slice(),
+            [
+                mir_model::PlaceElem::Field(0),
+                mir_model::PlaceElem::Field(0)
+            ]
+        ),
+        "expected a two-element Field(0), Field(0) projection, got {:#?}",
+        place.projection
+    );
+}
+
+#[test]
 fn struct_constructor_lowers_to_an_aggregate_in_declared_field_order() {
     let mir = lower_source(
         "struct Point {\n    x: int\n    y: int\n}\nf(): int {\n    p: Point = Point{y: 2, x: 1}\n    return p.x\n}\n",

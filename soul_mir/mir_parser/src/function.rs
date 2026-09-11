@@ -235,7 +235,7 @@ impl<'a> FunctionLowerer<'a> {
                 mir::Place::local(self.resolve_local(var, left.span)?)
             }
             ast::ExpressionKind::FieldAccess(field_access) => {
-                self.resolve_field_place(field_access, left.span)?
+                self.resolve_field_place(field_access, left.span)?.0
             }
             _ => {
                 return Err(Fault::error_with_kind(
@@ -268,26 +268,40 @@ impl<'a> FunctionLowerer<'a> {
         Ok(*local)
     }
 
-    /// Lowers `variable.field` into a `Place` with a `Field` projection
-    /// appended onto the object's own local — read or write, straight off
+    /// Lowers `object.field` into a `Place` with a `Field` projection
+    /// appended onto the object's own place — read or write, straight off
     /// whatever storage the struct value already lives in (no temp/copy).
-    /// Only a bare variable object is supported in this slice (no chained
-    /// field access, no field access on a call/constructor result).
+    /// `object` is either a bare variable, or itself a field access
+    /// (`o.inner.x`), resolved recursively — one `Field` projection gets
+    /// pushed per `.field` step, so `o.inner.x` ends up as a single `Place`
+    /// with a two-element projection, not a chain of temporaries. Also
+    /// returns the resolved place's own type (the innermost field's declared
+    /// type), since a recursive caller needs it to resolve the *next* struct.
+    /// Anything else as the object (a call/constructor result, an index
+    /// expression, ...) still faults — those aren't places this slice can
+    /// project through.
     fn resolve_field_place(
         &self,
         field_access: &ast::FieldAccess,
         span: Span,
-    ) -> MirResult<mir::Place> {
+    ) -> MirResult<(mir::Place, SoulType)> {
         let object = &self.store.expressions[field_access.object];
-        let ast::ExpressionKind::Variable(var) = &object.node else {
-            return Err(Fault::error_with_kind(
-                MirErrorKind::UnsupportedFieldAccessObject,
-                Some(span),
-            ));
+        let (mut place, object_ty) = match &object.node {
+            ast::ExpressionKind::Variable(var) => {
+                let local = self.resolve_local(var, object.span)?;
+                (mir::Place::local(local), self.locals[local].ty.clone())
+            }
+            ast::ExpressionKind::FieldAccess(inner) => {
+                self.resolve_field_place(inner, object.span)?
+            }
+            _ => {
+                return Err(Fault::error_with_kind(
+                    MirErrorKind::UnsupportedFieldAccessObject,
+                    Some(span),
+                ));
+            }
         };
 
-        let local = self.resolve_local(var, object.span)?;
-        let object_ty = self.locals[local].ty.clone();
         let struct_ = self.resolve_struct(&object_ty).ok_or_else(|| {
             Fault::error_with_kind(
                 MirErrorKind::NonPrimitiveType {
@@ -298,11 +312,13 @@ impl<'a> FunctionLowerer<'a> {
         })?;
 
         let field_name = field_access.field.as_str();
-        let index = struct_
+        let (index, field_ty) = struct_
             .fields
             .iter()
-            .position(|field| {
-                matches!(&field.value.pattern, ast::VarPattern::Simple { binding, .. } if binding.ident.as_str() == field_name)
+            .enumerate()
+            .find_map(|(index, field)| {
+                let is_match = matches!(&field.value.pattern, ast::VarPattern::Simple { binding, .. } if binding.ident.as_str() == field_name);
+                is_match.then(|| (index, field.value.ty.clone()))
             })
             .ok_or_else(|| {
                 Fault::error_with_kind(
@@ -314,19 +330,22 @@ impl<'a> FunctionLowerer<'a> {
                 )
             })?;
 
-        let mut place = mir::Place::local(local);
+        let field_ty = field_ty.ok_or_else(|| {
+            Fault::error_with_kind(MirErrorKind::VariableHasNoResolvedType, Some(span))
+        })?;
+
         place.projection.push(mir::PlaceElem::Field(index));
-        Ok(place)
+        Ok((place, field_ty))
     }
 
-    /// Lowers `variable.field` as a read — see `resolve_field_place`.
+    /// Lowers `object.field` as a read — see `resolve_field_place`.
     fn lower_field_access(
         &self,
         field_access: &ast::FieldAccess,
         span: Span,
     ) -> MirResult<mir::Operand> {
         Ok(mir::Operand::Copy(
-            self.resolve_field_place(field_access, span)?,
+            self.resolve_field_place(field_access, span)?.0,
         ))
     }
 
