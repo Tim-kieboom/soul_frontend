@@ -748,8 +748,11 @@ fn llvm_type<'ctx>(
             Int32 | Uint32 | Char | Char32 => context.i32_type().into(),
             Int64 | Uint64 | Char64 => context.i64_type().into(),
             Int128 | Uint128 => context.i128_type().into(),
-            // Platform-sized: this codegen slice only targets 64-bit hosts.
-            Int | Uint | CInt | CUint | UntypedInt | UntypedUint => context.i64_type().into(),
+            // Platform-sized (pointer-width): this codegen slice only targets 64-bit hosts.
+            Int | Uint | UntypedInt | UntypedUint => context.i64_type().into(),
+            // C's `int`/`unsigned int` are fixed at 32 bits on the LP64/LLP64 targets this compiles for,
+            // regardless of pointer width.
+            CInt | CUint => context.i32_type().into(),
             Char8 => context.i8_type().into(),
             CStr => context.ptr_type(AddressSpace::default()).into(),
             other => {
