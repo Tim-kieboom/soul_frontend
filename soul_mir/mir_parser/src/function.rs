@@ -5,8 +5,13 @@ use ast_model::{
 };
 use mir_model as mir;
 use soul_utils::{
-    TypeModifier, collections::vec_map::VecMap, fault::Fault, ids::IdGenerator,
-    intrinsics::IntrinsicFunction, soul_names::PrimitiveTypes, span::Span,
+    TypeModifier,
+    collections::vec_map::VecMap,
+    fault::Fault,
+    ids::IdGenerator,
+    intrinsics::IntrinsicFunction,
+    soul_names::PrimitiveTypes,
+    span::{ModuleId, Span},
 };
 
 use crate::fault::{MirErrorKind, MirResult};
@@ -23,6 +28,11 @@ struct LoopTargets {
 pub struct FunctionLowerer<'a> {
     store: &'a ast::AstStore,
     declares: &'a DeclareStore,
+    /// The module the function currently being lowered was declared in — set
+    /// at the start of each `lower()` call, needed to resolve a struct-typed
+    /// `SoulType::Stub`'s bare name back to its declaration (struct names are
+    /// only unique per module).
+    module: Option<ModuleId>,
     local_alloc: IdGenerator<mir::LocalId>,
     node_to_local: VecMap<ast::NodeId, mir::LocalId>,
     locals: VecMap<mir::LocalId, mir::LocalDecl>,
@@ -39,6 +49,7 @@ impl<'a> FunctionLowerer<'a> {
         Self {
             store,
             declares,
+            module: None,
             current: None,
             loops: vec![],
             statements: vec![],
@@ -55,10 +66,14 @@ impl<'a> FunctionLowerer<'a> {
 
         let signature = &function.signature.value;
         let fn_span = function.signature.span;
+        self.module = self
+            .declares
+            .get_function(signature.id)
+            .map(|(_, module)| *module);
 
         for parameter in &signature.parameters {
             let span = parameter.name.span();
-            require_primitive(&parameter.ty, span)?;
+            self.require_lowerable(&parameter.ty, span)?;
             let modifier = parameter.mutable.to_type_modifier();
             let local = self.alloc_local(parameter.ty.clone(), modifier, span);
             self.node_to_local.insert(parameter.id, local);
@@ -71,7 +86,7 @@ impl<'a> FunctionLowerer<'a> {
         let return_local = if is_none_return {
             None
         } else {
-            require_primitive(&signature.return_type, signature.name.span())?;
+            self.require_lowerable(&signature.return_type, signature.name.span())?;
             Some(self.alloc_local(
                 signature.return_type.clone(),
                 TypeModifier::Mut,
@@ -111,12 +126,41 @@ impl<'a> FunctionLowerer<'a> {
     fn reset(&mut self) {
         self.loops.clear();
         self.current = None;
+        self.module = None;
         self.blocks.clear();
         self.locals.clear();
         self.statements.clear();
         self.node_to_local.clear();
         self.local_alloc = IdGenerator::new();
         self.block_alloc = IdGenerator::new();
+    }
+
+    /// Accepts primitives and structs whose name resolves to a declaration in
+    /// this function's module — the boundary this lowering slice actually
+    /// knows how to turn into MIR locals/places. Everything else (arrays,
+    /// references, generics, an undeclared/unresolvable name) still faults,
+    /// same as before struct support existed.
+    fn require_lowerable(&self, ty: &SoulType, span: Span) -> MirResult<()> {
+        if matches!(ty, SoulType::Primitive(_)) || self.resolve_struct(ty).is_some() {
+            return Ok(());
+        }
+        Err(Fault::error_with_kind(
+            MirErrorKind::NonPrimitiveType {
+                ty: format!("{ty:?}").into(),
+            },
+            Some(span),
+        ))
+    }
+
+    /// Resolves a struct-typed `SoulType::Stub`'s bare name back to its
+    /// `Struct` declaration in this function's module. `None` for anything
+    /// that isn't a `Stub`, or a `Stub` that doesn't name a struct in scope
+    /// (an enum/trait, a generic, or an unresolved name).
+    fn resolve_struct(&self, ty: &SoulType) -> Option<&ast::Struct> {
+        let SoulType::Stub(stub) = ty else {
+            return None;
+        };
+        self.declares.get_struct_by_name(&stub.name, self.module?)
     }
 
     fn new_block(&mut self) -> mir::BlockId {
@@ -180,13 +224,11 @@ impl<'a> FunctionLowerer<'a> {
     /// Lowers `left = right` (compound assignments like `n -= 1` are already
     /// desugared by the parser into `left = left - 1` before this ever runs,
     /// so `lower_rvalue` handles the right-hand side with no special-casing).
-    /// `left` is only supported as a bare, already-declared variable — no
-    /// arrays/structs/pointers exist as values in this slice yet, so there's
-    /// no `Place` projection to assign through for `arr[i]`/`obj.field`/`*p`.
-    /// That non-`Variable` case is currently unreachable from any resolver-
-    /// accepted Soul source (every path to it needs a struct/array/pointer-
-    /// typed binding, which `require_primitive` already rejects earlier) —
-    /// this check is defensive, forward-compatible code, not dead weight.
+    /// `left` is only supported as a bare, already-declared variable — struct
+    /// *reads* (`p.x`) are lowered (see `lower_field_access`), but writing
+    /// through a field (`p.x = 1`) isn't yet, so `obj.field`/`arr[i]`/`*p` as
+    /// an assignment target still faults here rather than lowering to a
+    /// `Place` with a projection.
     fn lower_assignment(&mut self, assignment: &ast::Assignment) -> MirResult<()> {
         let left = &self.store.expressions[assignment.left];
         let ast::ExpressionKind::Variable(var) = &left.node else {
@@ -219,6 +261,57 @@ impl<'a> FunctionLowerer<'a> {
         };
 
         Ok(*local)
+    }
+
+    /// Lowers `variable.field` into a `Place` with a `Field` projection
+    /// appended onto the object's own local — reads only, straight off
+    /// whatever storage the struct value already lives in (no temp/copy).
+    /// Only a bare variable object is supported in this slice (no chained
+    /// field access, no field access on a call/constructor result).
+    fn lower_field_access(
+        &self,
+        field_access: &ast::FieldAccess,
+        span: Span,
+    ) -> MirResult<mir::Operand> {
+        let object = &self.store.expressions[field_access.object];
+        let ast::ExpressionKind::Variable(var) = &object.node else {
+            return Err(Fault::error_with_kind(
+                MirErrorKind::UnsupportedFieldAccessObject,
+                Some(span),
+            ));
+        };
+
+        let local = self.resolve_local(var, object.span)?;
+        let object_ty = self.locals[local].ty.clone();
+        let struct_ = self.resolve_struct(&object_ty).ok_or_else(|| {
+            Fault::error_with_kind(
+                MirErrorKind::NonPrimitiveType {
+                    ty: format!("{object_ty:?}").into(),
+                },
+                Some(span),
+            )
+        })?;
+
+        let field_name = field_access.field.as_str();
+        let index = struct_
+            .fields
+            .iter()
+            .position(|field| {
+                matches!(&field.value.pattern, ast::VarPattern::Simple { binding, .. } if binding.ident.as_str() == field_name)
+            })
+            .ok_or_else(|| {
+                Fault::error_with_kind(
+                    MirErrorKind::StructFieldNotFound {
+                        struct_name: struct_.name.as_str().into(),
+                        field: field_name.into(),
+                    },
+                    Some(span),
+                )
+            })?;
+
+        let mut place = mir::Place::local(local);
+        place.projection.push(mir::PlaceElem::Field(index));
+        Ok(mir::Operand::Copy(place))
     }
 
     /// The one argument an `assert`/`panic` intrinsic call takes, guarded
@@ -373,7 +466,7 @@ impl<'a> FunctionLowerer<'a> {
 
         let is_none_return = matches!(return_type, SoulType::None);
         let destination_local = if want_result && !is_none_return {
-            require_primitive(&return_type, span)?;
+            self.require_lowerable(&return_type, span)?;
             Some(self.alloc_local(return_type, TypeModifier::Immut, span))
         } else {
             None
@@ -647,7 +740,7 @@ impl<'a> FunctionLowerer<'a> {
                 )
             })?;
 
-        require_primitive(&ty, binding.ident.span())?;
+        self.require_lowerable(&ty, binding.ident.span())?;
         let rvalue = self.lower_rvalue(init)?;
         let local = self.alloc_local(ty, *modifier, binding.ident.span());
         self.node_to_local.insert(binding.id, local);
@@ -693,8 +786,72 @@ impl<'a> FunctionLowerer<'a> {
                 let operand = self.lower_operand(unary.value)?;
                 Ok(mir::Rvalue::UnaryOp(unary.operator.value, operand))
             }
+            ast::ExpressionKind::StructConstructor(ctor) => {
+                self.lower_struct_constructor(ctor, expr.span)
+            }
             _ => Ok(mir::Rvalue::Use(self.lower_operand(expr_id)?)),
         }
+    }
+
+    /// Lowers `Struct{field: value, ...}` into `Rvalue::Aggregate`, with the
+    /// operands reordered to match the struct's own declared field order (not
+    /// constructor-literal order) — that's what `PlaceElem::Field(usize)`
+    /// indexes into later, both here and at every field-read site.
+    fn lower_struct_constructor(
+        &mut self,
+        ctor: &ast::StructConstructor,
+        span: Span,
+    ) -> MirResult<mir::Rvalue> {
+        if ctor.defaults {
+            return Err(Fault::error_with_kind(
+                MirErrorKind::StructConstructorDefaultsUnsupported,
+                Some(span),
+            ));
+        }
+
+        // Cloned so the field list doesn't keep borrowing `self.declares`
+        // across the `&mut self` calls to `lower_operand` below.
+        let struct_ = self
+            .resolve_struct(&ctor.struct_type)
+            .cloned()
+            .ok_or_else(|| {
+                Fault::error_with_kind(
+                    MirErrorKind::NonPrimitiveType {
+                        ty: format!("{:?}", ctor.struct_type).into(),
+                    },
+                    Some(span),
+                )
+            })?;
+
+        let mut operands = Vec::with_capacity(struct_.fields.len());
+        for field in &struct_.fields {
+            let ast::VarPattern::Simple { binding, .. } = &field.value.pattern else {
+                return Err(Fault::error_with_kind(
+                    MirErrorKind::NonSimpleVariablePatternUnsupported,
+                    Some(span),
+                ));
+            };
+            let field_name = binding.ident.as_str();
+
+            let value_id = ctor
+                .values
+                .iter()
+                .find(|(name, _)| name.as_str() == field_name)
+                .map(|(_, value_id)| *value_id)
+                .ok_or_else(|| {
+                    Fault::error_with_kind(
+                        MirErrorKind::StructFieldNotFound {
+                            struct_name: struct_.name.as_str().into(),
+                            field: field_name.into(),
+                        },
+                        Some(span),
+                    )
+                })?;
+
+            operands.push(self.lower_operand(value_id)?);
+        }
+
+        Ok(mir::Rvalue::Aggregate(mir::AggregateKind::Struct, operands))
     }
 
     fn lower_operand(&mut self, expr_id: ast::ExpressionId) -> MirResult<mir::Operand> {
@@ -706,6 +863,9 @@ impl<'a> FunctionLowerer<'a> {
             ast::ExpressionKind::Variable(var) => {
                 let local = self.resolve_local(var, expr.span)?;
                 Ok(mir::Operand::Copy(mir::Place::local(local)))
+            }
+            ast::ExpressionKind::FieldAccess(field_access) => {
+                self.lower_field_access(field_access, expr.span)
             }
             ast::ExpressionKind::Binary(_) => {
                 let span = expr.span;

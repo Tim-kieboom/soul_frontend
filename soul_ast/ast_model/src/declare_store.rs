@@ -21,6 +21,16 @@ pub struct DeclareStore {
     intrinsic_resolves: VecMap<NodeId, IntrinsicResolve>,
     /// All structs declarations, indexed by their ID.
     custom_types: VecMap<NodeId, (CustomType, ModuleId)>,
+    /// Struct name -> declaration `NodeId`, per module. Lets a later pass
+    /// (MIR lowering) resolve a struct-typed `SoulType::Stub`'s bare name
+    /// back to its `Struct` declaration without re-walking scopes the way
+    /// name resolution itself does — struct declarations only ever live at
+    /// module scope, so a flat per-module map is enough (no nested-scope
+    /// shadowing to account for, unlike local variables). Keyed by `ModuleId`
+    /// first (rather than a single `HashMap<(SharedStr, ModuleId), _>`) so a
+    /// lookup can hash a bare `&str` against the inner map instead of having
+    /// to allocate an owned `SharedStr` just to build a lookup key.
+    struct_names: VecMap<ModuleId, HashMap<SharedStr, NodeId>>,
     /// All function declarations, indexed by their ID.
     functions: VecMap<FunctionId, (InnerFunctionSignature, ModuleId)>,
     /// All function declarations, indexed by their ID.
@@ -42,6 +52,7 @@ impl DeclareStore {
             variable_resolves: VecMap::new(),
             functions: VecMap::new(),
             custom_types: VecMap::new(),
+            struct_names: VecMap::new(),
             variable_type: VecMap::new(),
             function_names: HashMap::new(),
             function_resolves: VecMap::new(),
@@ -114,6 +125,9 @@ impl DeclareStore {
             return;
         }
 
+        self.struct_names
+            .get_mut_or_default(module)
+            .insert(obj.name.as_shared_str(), index);
         self.custom_types
             .insert(index, (CustomType::Struct(obj.clone()), module));
     }
@@ -121,6 +135,17 @@ impl DeclareStore {
     /// Retrieves a struct/enum/trait declaration by its own declaration NodeId.
     pub fn get_custom_type(&self, index: NodeId) -> Option<&(CustomType, ModuleId)> {
         self.custom_types.get(index)
+    }
+
+    /// Resolves a struct's bare name (e.g. the name inside a
+    /// `SoulType::Stub` that a struct-typed value carries) back to its
+    /// `Struct` declaration, scoped to the module it was declared in.
+    pub fn get_struct_by_name(&self, name: &str, module: ModuleId) -> Option<&Struct> {
+        let index = *self.struct_names.get(module)?.get(name)?;
+        match self.custom_types.get(index) {
+            Some((CustomType::Struct(struct_), _)) => Some(struct_),
+            _ => None,
+        }
     }
 
     /// Records that a variable reference node resolves to the declaration

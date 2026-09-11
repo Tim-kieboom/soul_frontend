@@ -155,11 +155,9 @@ fn missing_return_is_rejected() {
 fn non_primitive_return_type_is_rejected() {
     // `f() { .. }` with no declared return type is a `none`-returning
     // function, which is now valid (see `none_returning_function_...` tests
-    // below) — a struct return type isolates a genuine non-primitive type.
-    let result = lower_source(
-        "struct Point { x: int }\nf(): Point {\n    return Point{x: 1}\n}\n",
-        "f",
-    );
+    // below) — an array return type isolates a genuine non-primitive,
+    // non-struct type (structs are now accepted, see the struct tests below).
+    let result = lower_source("f(a: [2]int): [2]int {\n    return a\n}\n", "f");
     assert_rejected_matching(&result, |kind| {
         matches!(kind, MirErrorKind::NonPrimitiveType { .. })
     });
@@ -175,14 +173,64 @@ fn destructuring_variable_pattern_is_rejected() {
 }
 
 #[test]
-fn struct_typed_parameter_is_rejected() {
-    let result = lower_source(
+fn struct_field_read_lowers_to_a_field_projection() {
+    let mir = lower_source(
         "struct Point { x: int }\nf(p: Point): int {\n    return p.x\n}\n",
         "f",
+    )
+    .expect("expected successful lowering");
+
+    // param `p` + the `int` return local — reading `p.x` reuses `p`'s own
+    // storage via a `Field` projection, no extra temp local.
+    assert_eq!(mir.locals.entries().count(), 2);
+
+    let (_, block) = mir.blocks.entries().next().expect("expected one block");
+    let mir_model::Statement::Assign(_, Rvalue::Use(Operand::Copy(place))) = &block.statements[0]
+    else {
+        panic!(
+            "expected a bare Use(Copy(..)) assignment, got {:#?}",
+            block.statements[0]
+        );
+    };
+    assert!(
+        matches!(
+            place.projection.as_slice(),
+            [mir_model::PlaceElem::Field(0)]
+        ),
+        "expected a single Field(0) projection, got {:#?}",
+        place.projection
     );
-    assert_rejected_matching(&result, |kind| {
-        matches!(kind, MirErrorKind::NonPrimitiveType { .. })
-    });
+}
+
+#[test]
+fn struct_constructor_lowers_to_an_aggregate_in_declared_field_order() {
+    let mir = lower_source(
+        "struct Point {\n    x: int\n    y: int\n}\nf(): int {\n    p: Point = Point{y: 2, x: 1}\n    return p.x\n}\n",
+        "f",
+    )
+    .expect("expected successful lowering");
+
+    let (_, block) = mir.blocks.entries().next().expect("expected one block");
+    let mir_model::Statement::Assign(_, Rvalue::Aggregate(kind, operands)) = &block.statements[0]
+    else {
+        panic!(
+            "expected the first statement to construct an Aggregate, got {:#?}",
+            block.statements[0]
+        );
+    };
+    assert!(matches!(kind, mir_model::AggregateKind::Struct));
+    // Field-literal order was `y, x`; the aggregate's operands must follow
+    // the struct's *declared* order (`x, y`) instead, since that's what the
+    // `Field(usize)` projections used to read it back index into.
+    assert_eq!(operands.len(), 2);
+    assert!(matches!(
+        &operands[0],
+        Operand::Constant(ConstValue::Uint(1))
+    ));
+    assert!(matches!(
+        &operands[1],
+        Operand::Constant(ConstValue::Uint(2))
+    ));
 }
 
 #[test]

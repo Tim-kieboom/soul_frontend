@@ -23,7 +23,9 @@ pub mod fault;
 
 use std::cell::Cell;
 
-use ast_model::{AstStore, SoulType, operators::BinaryOperatorKind};
+use ast_model::{
+    AstStore, SoulType, Struct, declare_store::DeclareStore, operators::BinaryOperatorKind,
+};
 use inkwell::{
     AddressSpace, IntPredicate,
     basic_block::BasicBlock as LlvmBlock,
@@ -34,8 +36,8 @@ use inkwell::{
     values::{BasicValueEnum, FunctionValue, IntValue, PointerValue},
 };
 use mir_model::{
-    BlockId, ConstValue, ExternFunction, Function, LocalId, MirProgram, Operand, Rvalue, Statement,
-    Terminator,
+    AggregateKind, BlockId, ConstValue, ExternFunction, Function, LocalId, MirProgram, Operand,
+    Place, PlaceElem, Rvalue, Statement, Terminator,
 };
 use soul_utils::{
     FunctionId,
@@ -43,7 +45,7 @@ use soul_utils::{
     compiler_options::{CompilerOptions, PlatformInfo},
     fault::Fault,
     soul_names::PrimitiveTypes,
-    span::Span,
+    span::{ModuleId, Span},
 };
 
 use crate::fault::{CodegenErrorKind, CodegenResult};
@@ -80,6 +82,7 @@ pub fn codegen_module<'ctx>(
     module_name: &str,
     mir: &MirProgram,
     ast: &AstStore,
+    declares: &DeclareStore,
     options: &CompilerOptions,
 ) -> CodegenResult<Module<'ctx>> {
     let module = context.create_module(module_name);
@@ -88,6 +91,7 @@ pub fn codegen_module<'ctx>(
         module: &module,
         mir,
         ast,
+        declares,
         platform: options.platform,
         function_values: VecMap::new(),
         string_counter: Cell::new(0),
@@ -113,6 +117,7 @@ fn function_name(ast: &AstStore, id: FunctionId) -> CodegenResult<&str> {
 struct ModuleCodegen<'ctx, 'a> {
     ast: &'a AstStore,
     mir: &'a MirProgram,
+    declares: &'a DeclareStore,
     context: &'ctx Context,
     module: &'a Module<'ctx>,
     platform: PlatformInfo,
@@ -123,6 +128,12 @@ struct ModuleCodegen<'ctx, 'a> {
 }
 
 impl<'ctx, 'a> ModuleCodegen<'ctx, 'a> {
+    /// The module a function/extern was declared in, needed to resolve a
+    /// struct-typed `SoulType::Stub`'s bare name back to its declaration.
+    fn module_of(&self, id: FunctionId) -> Option<ModuleId> {
+        self.declares.get_function(id).map(|(_, module)| *module)
+    }
+
     /// Declares every function's signature up front, so calls can reference a
     /// callee regardless of definition order (including mutual recursion) —
     /// and declares every `extern "C"` function as a bodyless external
@@ -132,12 +143,22 @@ impl<'ctx, 'a> ModuleCodegen<'ctx, 'a> {
     fn declare_all_functions(&mut self) -> CodegenResult<()> {
         for (id, function) in self.mir.functions.entries() {
             let name = function_name(self.ast, id)?;
+            let module = self.module_of(id);
 
             let param_types = function
                 .locals
                 .entries()
                 .take(function.arg_count)
-                .map(|(_, decl)| llvm_type(self.context, &self.platform, &decl.ty, Some(decl.span)))
+                .map(|(_, decl)| {
+                    llvm_type(
+                        self.context,
+                        &self.platform,
+                        self.declares,
+                        module,
+                        &decl.ty,
+                        Some(decl.span),
+                    )
+                })
                 .collect::<CodegenResult<Vec<_>>>()?;
 
             let param_metadata_types = param_metadata(&param_types);
@@ -146,7 +167,14 @@ impl<'ctx, 'a> ModuleCodegen<'ctx, 'a> {
                 .return_local
                 .map(|local| {
                     let decl = &function.locals[local];
-                    llvm_type(self.context, &self.platform, &decl.ty, Some(decl.span))
+                    llvm_type(
+                        self.context,
+                        &self.platform,
+                        self.declares,
+                        module,
+                        &decl.ty,
+                        Some(decl.span),
+                    )
                 })
                 .transpose()?;
 
@@ -174,17 +202,34 @@ impl<'ctx, 'a> ModuleCodegen<'ctx, 'a> {
 
         for (id, extern_fn) in self.mir.externs.entries() {
             let name = function_name(self.ast, id)?;
+            let module = self.module_of(id);
 
             let param_types = extern_fn
                 .params
                 .iter()
-                .map(|ty| llvm_type(self.context, &self.platform, ty, None))
+                .map(|ty| {
+                    llvm_type(
+                        self.context,
+                        &self.platform,
+                        self.declares,
+                        module,
+                        ty,
+                        None,
+                    )
+                })
                 .collect::<CodegenResult<Vec<_>>>()?;
             let param_metadata_types = param_metadata(&param_types);
 
             let fn_type = match &extern_fn.return_type {
-                Some(ty) => llvm_type(self.context, &self.platform, ty, None)?
-                    .fn_type(&param_metadata_types, false),
+                Some(ty) => llvm_type(
+                    self.context,
+                    &self.platform,
+                    self.declares,
+                    module,
+                    ty,
+                    None,
+                )?
+                .fn_type(&param_metadata_types, false),
                 None => self
                     .context
                     .void_type()
@@ -201,6 +246,7 @@ impl<'ctx, 'a> ModuleCodegen<'ctx, 'a> {
 
     fn codegen_function(&mut self, id: FunctionId, function: &Function) -> CodegenResult<()> {
         let name = function_name(self.ast, id)?;
+        let module = self.module_of(id);
         let fn_value = *self
             .function_values
             .get(id)
@@ -217,7 +263,14 @@ impl<'ctx, 'a> ModuleCodegen<'ctx, 'a> {
 
         let mut locals: VecMap<LocalId, PointerValue<'ctx>> = VecMap::new();
         for (local_id, decl) in function.locals.entries() {
-            let ty = llvm_type(self.context, &self.platform, &decl.ty, Some(decl.span))?;
+            let ty = llvm_type(
+                self.context,
+                &self.platform,
+                self.declares,
+                module,
+                &decl.ty,
+                Some(decl.span),
+            )?;
             let slot = builder
                 .build_alloca(ty, &format!("_{}", local_id.index()))
                 .map_err(llvm_err)?;
@@ -270,6 +323,8 @@ impl<'ctx, 'a> ModuleCodegen<'ctx, 'a> {
         let mut fn_codegen = FunctionCodegen {
             context: self.context,
             module: self.module,
+            declares: self.declares,
+            soul_module: module,
             platform: self.platform,
             builder,
             function,
@@ -296,6 +351,10 @@ fn param_metadata<'ctx>(types: &[BasicTypeEnum<'ctx>]) -> Vec<BasicMetadataTypeE
 struct FunctionCodegen<'ctx, 'a> {
     context: &'ctx Context,
     module: &'a Module<'ctx>,
+    declares: &'a DeclareStore,
+    /// The Soul module this function was declared in — not to be confused
+    /// with `module`, the LLVM `Module` being emitted into.
+    soul_module: Option<ModuleId>,
     platform: PlatformInfo,
     builder: Builder<'ctx>,
     function: &'a Function,
@@ -324,14 +383,9 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
     fn codegen_statement(&mut self, statement: &Statement) -> CodegenResult<()> {
         match statement {
             Statement::Assign(place, rvalue) => {
-                if !place.projection.is_empty() {
-                    return Err(err(CodegenErrorKind::PlaceProjectionUnsupported));
-                }
-                let ty = self.local_type(place.local)?;
+                let (ptr, ty) = self.resolve_place(place)?;
                 let value = self.codegen_rvalue(rvalue, ty)?;
-                self.builder
-                    .build_store(self.locals[place.local], value)
-                    .map_err(llvm_err)?;
+                self.builder.build_store(ptr, value).map_err(llvm_err)?;
                 Ok(())
             }
             // Move/drop tracking has no runtime effect yet (see
@@ -383,6 +437,8 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
                 // param types come from its locals) or an `extern "C"`
                 // declaration (no body, types come straight from the
                 // `ExternFunction` signature) — never both, never neither.
+                // The callee's own module, not the caller's — they can differ.
+                let callee_module = self.declares.get_function(*id).map(|(_, module)| *module);
                 let param_types = if let Some(callee_mir) = self.functions.get(*id) {
                     let callee_param_locals: Vec<LocalId> = callee_mir
                         .locals
@@ -394,14 +450,30 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
                         .iter()
                         .map(|&local| {
                             let decl = &callee_mir.locals[local];
-                            llvm_type(self.context, &self.platform, &decl.ty, Some(decl.span))
+                            llvm_type(
+                                self.context,
+                                &self.platform,
+                                self.declares,
+                                callee_module,
+                                &decl.ty,
+                                Some(decl.span),
+                            )
                         })
                         .collect::<CodegenResult<Vec<_>>>()?
                 } else if let Some(extern_fn) = self.externs.get(*id) {
                     extern_fn
                         .params
                         .iter()
-                        .map(|ty| llvm_type(self.context, &self.platform, ty, None))
+                        .map(|ty| {
+                            llvm_type(
+                                self.context,
+                                &self.platform,
+                                self.declares,
+                                callee_module,
+                                ty,
+                                None,
+                            )
+                        })
                         .collect::<CodegenResult<Vec<_>>>()?
                 } else {
                     return Err(err(CodegenErrorKind::CallHasNoMirBody { id: *id }));
@@ -604,10 +676,43 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
                     })),
                 }
             }
+            Rvalue::Aggregate(AggregateKind::Struct, operands) => {
+                self.codegen_struct_aggregate(operands, result_ty)
+            }
             Rvalue::Ref { .. } | Rvalue::Aggregate(..) | Rvalue::Cast(..) => {
                 Err(err(CodegenErrorKind::UnsupportedRvalue))
             }
         }
+    }
+
+    /// Builds a struct value field-by-field: an `undef` of the destination
+    /// struct type, then one `insertvalue` per operand — `operands` is
+    /// already in the struct's declared field order (see `llvm_type`'s
+    /// docs), so it lines up positionally with the struct type's own fields.
+    fn codegen_struct_aggregate(
+        &mut self,
+        operands: &[Operand],
+        result_ty: BasicTypeEnum<'ctx>,
+    ) -> CodegenResult<BasicValueEnum<'ctx>> {
+        let BasicTypeEnum::StructType(struct_ty) = result_ty else {
+            return Err(err(CodegenErrorKind::PlaceProjectionUnsupported));
+        };
+
+        let mut value = struct_ty.get_undef();
+        for (index, operand) in operands.iter().enumerate() {
+            let field_ty = struct_ty
+                .get_field_type_at_index(index as u32)
+                .ok_or(CodegenErrorKind::PlaceProjectionUnsupported)
+                .map_err(err)?;
+            let field_value = self.codegen_operand(operand, field_ty)?;
+            value = self
+                .builder
+                .build_insert_value(value, field_value, index as u32, "field")
+                .map_err(llvm_err)?
+                .into_struct_value();
+        }
+
+        Ok(value.into())
     }
 
     fn codegen_binary_op(
@@ -655,12 +760,8 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
     ) -> CodegenResult<BasicValueEnum<'ctx>> {
         match operand {
             Operand::Copy(place) | Operand::Move(place) => {
-                if !place.projection.is_empty() {
-                    return Err(err(CodegenErrorKind::PlaceProjectionUnsupported));
-                }
-                self.builder
-                    .build_load(ty, self.locals[place.local], "load")
-                    .map_err(llvm_err)
+                let (ptr, _) = self.resolve_place(place)?;
+                self.builder.build_load(ty, ptr, "load").map_err(llvm_err)
             }
             Operand::Constant(value) => self.codegen_constant(ty, value),
         }
@@ -689,7 +790,48 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
 
     fn local_type(&self, local: LocalId) -> CodegenResult<BasicTypeEnum<'ctx>> {
         let decl = &self.function.locals[local];
-        llvm_type(self.context, &self.platform, &decl.ty, Some(decl.span))
+        llvm_type(
+            self.context,
+            &self.platform,
+            self.declares,
+            self.soul_module,
+            &decl.ty,
+            Some(decl.span),
+        )
+    }
+
+    /// Resolves a `Place` to the pointer it reads/writes through and the
+    /// LLVM type at that location — the base local's own alloca and type for
+    /// an empty projection, or (today) a single `GEP` step through a struct
+    /// field for a `[Field(index)]` projection. `PlaceElem::Index`/`Deref`
+    /// aren't produced by any MIR lowering yet, so they still fault here.
+    fn resolve_place(
+        &self,
+        place: &Place,
+    ) -> CodegenResult<(PointerValue<'ctx>, BasicTypeEnum<'ctx>)> {
+        let mut ptr = self.locals[place.local];
+        let mut ty = self.local_type(place.local)?;
+
+        for elem in &place.projection {
+            let PlaceElem::Field(index) = elem else {
+                return Err(err(CodegenErrorKind::PlaceProjectionUnsupported));
+            };
+            let BasicTypeEnum::StructType(struct_ty) = ty else {
+                return Err(err(CodegenErrorKind::PlaceProjectionUnsupported));
+            };
+            let field_ty = struct_ty
+                .get_field_type_at_index(*index as u32)
+                .ok_or(CodegenErrorKind::PlaceProjectionUnsupported)
+                .map_err(err)?;
+
+            ptr = self
+                .builder
+                .build_struct_gep(struct_ty, ptr, *index as u32, "field_ptr")
+                .map_err(llvm_err)?;
+            ty = field_ty;
+        }
+
+        Ok((ptr, ty))
     }
 
     /// The LLVM type a place-backed operand is stored as, if it is one — a
@@ -735,13 +877,34 @@ fn is_signed(prim: PrimitiveTypes) -> bool {
     )
 }
 
+/// Resolves a struct-typed `SoulType::Stub`'s bare name back to its `Struct`
+/// declaration — mirrors `mir_parser`'s own `resolve_struct`, since codegen
+/// gets handed the exact same unresolved `SoulType` MIR lowering already
+/// accepted. `None` for anything that isn't a `Stub`, or a `Stub` that
+/// doesn't name an in-scope struct.
+fn resolve_struct<'d>(
+    declares: &'d DeclareStore,
+    module: Option<ModuleId>,
+    ty: &SoulType,
+) -> Option<&'d Struct> {
+    let SoulType::Stub(stub) = ty else {
+        return None;
+    };
+    declares.get_struct_by_name(&stub.name, module?)
+}
+
 /// Maps a Soul type to its LLVM representation. Integers/`bool` map to the
 /// matching `IntType`; `cstr` and any reference/pointer type map to an
-/// (opaque, LLVM-16-style) pointer type — everything else (aggregates,
-/// floats, ...) isn't supported in this codegen slice yet.
+/// (opaque, LLVM-16-style) pointer type; a struct maps to an LLVM struct
+/// type with one field per declared field, in declared order (the same
+/// order `mir_parser` uses for `Rvalue::Aggregate` operands and
+/// `PlaceElem::Field` indices) — everything else (arrays, floats, ...) isn't
+/// supported in this codegen slice yet.
 fn llvm_type<'ctx>(
     context: &'ctx Context,
     platform: &PlatformInfo,
+    declares: &DeclareStore,
+    module: Option<ModuleId>,
     ty: &SoulType,
     span: Option<Span>,
 ) -> CodegenResult<BasicTypeEnum<'ctx>> {
@@ -773,6 +936,34 @@ fn llvm_type<'ctx>(
         }),
         SoulType::Reference(_) | SoulType::Pointer(_) => {
             Ok(context.ptr_type(AddressSpace::default()).into())
+        }
+        SoulType::Stub(_) => {
+            let struct_ = resolve_struct(declares, module, ty).ok_or_else(|| {
+                Fault::error_with_kind(
+                    CodegenErrorKind::NonPrimitiveType {
+                        ty: format!("{ty:?}").into_boxed_str(),
+                    },
+                    span,
+                )
+            })?;
+
+            let field_types = struct_
+                .fields
+                .iter()
+                .map(|field| {
+                    let field_ty = field.value.ty.as_ref().ok_or_else(|| {
+                        Fault::error_with_kind(
+                            CodegenErrorKind::NonPrimitiveType {
+                                ty: format!("{ty:?}").into_boxed_str(),
+                            },
+                            span,
+                        )
+                    })?;
+                    llvm_type(context, platform, declares, module, field_ty, span)
+                })
+                .collect::<CodegenResult<Vec<_>>>()?;
+
+            Ok(context.struct_type(&field_types, false).into())
         }
         other => Err(Fault::error_with_kind(
             CodegenErrorKind::NonPrimitiveType {

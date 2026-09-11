@@ -67,7 +67,7 @@ fn frontend(benchmark: &mut Benchmark) -> Result<bool> {
     display_mir(&mir_program, &ast.crates.store)?;
 
     if !ast_failed {
-        codegen(&mir_program, &ast.crates.store)?;
+        codegen(&mir_program, &ast.crates.store, &ast.declares)?;
     }
 
     for fault in all_faults.iter() {
@@ -158,13 +158,18 @@ fn mir(ast: &AstTree, benchmark: &mut Benchmark, all_faults: &mut FaultCollector
 /// slice) codegen pass, so plenty of otherwise-valid MIR (e.g. anything using
 /// `f64`) isn't supported yet, the same way MIR faults don't gate the overall
 /// AST-level pass/fail. See `mir_codegen`'s module docs for what's in scope.
-fn codegen(mir: &MirProgram, ast_store: &ast_model::AstStore) -> Result<()> {
+fn codegen(
+    mir: &MirProgram,
+    ast_store: &ast_model::AstStore,
+    declares: &ast_model::declare_store::DeclareStore,
+) -> Result<()> {
     let context = Context::create();
     match mir_codegen::codegen_module(
         &context,
         "soul_module",
         mir,
         ast_store,
+        declares,
         &config::COMPILER_OPTIONS,
     ) {
         Ok(module) => {

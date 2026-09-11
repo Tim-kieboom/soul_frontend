@@ -111,6 +111,25 @@ pub enum MirErrorKind {
         expected: usize,
         got: usize,
     },
+
+    #[error(
+        "only field access directly on a bare (already-declared) variable — `variable.field` — is supported in this lowering slice"
+    )]
+    UnsupportedFieldAccessObject,
+
+    #[error("`..` default-filled struct constructors aren't supported in this lowering slice")]
+    StructConstructorDefaultsUnsupported,
+
+    /// The resolver already rejects a struct constructor missing a field
+    /// value, or a field-access naming a field the struct doesn't have
+    /// (`StructHasNoField`), before this ever runs — reaching this means the
+    /// resolver let bad input through, same defensive category as
+    /// `UnexpectedReturnValue`.
+    #[error("struct `{struct_name}` has no field `{field}`")]
+    StructFieldNotFound {
+        struct_name: Box<str>,
+        field: Box<str>,
+    },
 }
 
 impl From<UnclassifiedKind> for MirErrorKind {
