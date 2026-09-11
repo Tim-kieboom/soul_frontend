@@ -175,6 +175,51 @@ impl<'a> FunctionLowerer<'a> {
         self.declares.get_struct_by_name(&stub.name, self.module?)
     }
 
+    /// The Soul type held at `place`, walking its projection the same way
+    /// `resolve_field_place`/`resolve_index_place` computed it in the first
+    /// place — a pure, side-effect-free re-derivation (no statements
+    /// emitted, unlike those two), used by `operand_type` to type an
+    /// already-lowered operand without re-lowering it. `None` for anything
+    /// this walk can't resolve (a `Deref`, an unresolvable struct/field).
+    fn place_type(&self, place: &mir::Place) -> Option<SoulType> {
+        let mut ty = self.locals.get(place.local)?.ty.clone();
+        for elem in &place.projection {
+            ty = match elem {
+                mir::PlaceElem::Field(index) => {
+                    if let SoulType::TupleKind(ast::TupleKind::Tuple(types)) = &ty {
+                        types.get(*index)?.clone()
+                    } else {
+                        let struct_ = self.resolve_struct(&ty)?;
+                        struct_.fields.get(*index)?.value.ty.clone()?
+                    }
+                }
+                mir::PlaceElem::Index(_) => {
+                    let SoulType::Array(array) = &ty else {
+                        return None;
+                    };
+                    (*array.of_type).clone()
+                }
+                mir::PlaceElem::Deref => return None,
+            };
+        }
+        Some(ty)
+    }
+
+    /// The Soul type an already-lowered operand carries, if any — a bare
+    /// constant carries no type of its own (mirrors `mir_codegen::rvalue`'s
+    /// `operand_type`, one layer up: Soul types here, LLVM types there).
+    /// Needed because the resolver never assigns a type to a `FieldAccess`/
+    /// `Index` *expression* (see `resolve_place_expr`'s docs), so a checked
+    /// binary op between two such operands can't be typed by looking the
+    /// original AST expression up in `self.declares` — it has to walk the
+    /// already-built `Place` instead.
+    fn operand_type(&self, operand: &mir::Operand) -> Option<SoulType> {
+        match operand {
+            mir::Operand::Copy(place) | mir::Operand::Move(place) => self.place_type(place),
+            mir::Operand::Constant(_) => None,
+        }
+    }
+
     fn new_block(&mut self) -> mir::BlockId {
         self.block_alloc.alloc()
     }
@@ -405,8 +450,77 @@ impl<'a> FunctionLowerer<'a> {
         let index_local =
             self.operand_local(index.index, SoulType::Primitive(PrimitiveTypes::Uint), span)?;
 
+        self.emit_bounds_check(&place, index_local, span);
+
         place.projection.push(mir::PlaceElem::Index(index_local));
         Ok((place, element_ty))
+    }
+
+    /// `assert(index < collection.len())` — mirrors rustc's own `Len` +
+    /// comparison + `Assert` shape: bounds checking is an ordinary MIR
+    /// terminator here, not a codegen-level "insert a panicking branch
+    /// here" mechanism (`mir_codegen` only has to implement `Rvalue::Len`
+    /// and the already-generic `Assert` terminator). `index_local` is cast
+    /// to `uint` first if it isn't already one — `operand_local` reuses a
+    /// bare-`Variable` index's own declared type as-is (see its docs), but
+    /// `Len` is always `uint`-typed and the comparison needs matching
+    /// widths, so a non-`uint` index goes through `Rvalue::Cast` first.
+    fn emit_bounds_check(
+        &mut self,
+        collection: &mir::Place,
+        index_local: mir::LocalId,
+        span: Span,
+    ) {
+        let uint = SoulType::Primitive(PrimitiveTypes::Uint);
+
+        let len_local = self.alloc_local(uint.clone(), TypeModifier::Immut, span);
+        self.statements.push(mir::Statement::Assign(
+            mir::Place::local(len_local),
+            mir::Rvalue::Len(collection.clone()),
+        ));
+
+        let index_local = if self.locals[index_local]
+            .ty
+            .is_primitive_kind(PrimitiveTypes::Uint)
+        {
+            index_local
+        } else {
+            let cast = self.alloc_local(uint.clone(), TypeModifier::Immut, span);
+            self.statements.push(mir::Statement::Assign(
+                mir::Place::local(cast),
+                mir::Rvalue::Cast(
+                    mir::Operand::Copy(mir::Place::local(index_local)),
+                    uint.clone(),
+                ),
+            ));
+            cast
+        };
+
+        let cond_local = self.alloc_local(
+            SoulType::Primitive(PrimitiveTypes::Boolean),
+            TypeModifier::Immut,
+            span,
+        );
+        self.statements.push(mir::Statement::Assign(
+            mir::Place::local(cond_local),
+            mir::Rvalue::BinaryOp(
+                BinaryOperatorKind::Lt,
+                mir::Operand::Copy(mir::Place::local(index_local)),
+                mir::Operand::Copy(mir::Place::local(len_local)),
+            ),
+        ));
+
+        let msg = mir::Operand::Constant(mir::ConstValue::Str("index out of bounds".to_string()));
+        let next = self.new_block();
+        self.seal(
+            mir::Terminator::Assert {
+                cond: mir::Operand::Copy(mir::Place::local(cond_local)),
+                expected: true,
+                msg,
+                target: next,
+            },
+            Some(next),
+        );
     }
 
     /// Materializes an expression into a `LocalId` holding its value —
@@ -972,6 +1086,15 @@ impl<'a> FunctionLowerer<'a> {
                 }
                 let left = self.lower_operand(binary.left)?;
                 let right = self.lower_operand(binary.right)?;
+                if is_checked_arith_op(binary.operator.value) {
+                    return self.lower_checked_binary_op(
+                        binary.operator.value,
+                        left,
+                        right,
+                        expr_id,
+                        expr.span,
+                    );
+                }
                 Ok(mir::Rvalue::BinaryOp(binary.operator.value, left, right))
             }
             ast::ExpressionKind::Unary(unary) => {
@@ -993,6 +1116,77 @@ impl<'a> FunctionLowerer<'a> {
             }
             _ => Ok(mir::Rvalue::Use(self.lower_operand(expr_id)?)),
         }
+    }
+
+    /// `Add`/`Sub`/`Mul` trap on overflow via an ordinary MIR `Assert`
+    /// instead of a codegen-level check: assigns `Rvalue::CheckedBinaryOp`
+    /// into a fresh `(T, bool)` tuple temp, asserts the `bool` half (field
+    /// `1`) is `false`, then hands back `Rvalue::Use` of the result half
+    /// (field `0`) as if this had been an ordinary `BinaryOp` all along —
+    /// so every existing call site (`lower_operand`'s nested-expression
+    /// materialization, a top-level `lower_assignment`/`lower_variable`)
+    /// needs no change at all.
+    fn lower_checked_binary_op(
+        &mut self,
+        op: BinaryOperatorKind,
+        left: mir::Operand,
+        right: mir::Operand,
+        expr_id: ast::ExpressionId,
+        span: Span,
+    ) -> MirResult<mir::Rvalue> {
+        // Prefer deriving the type from whichever operand is actually a
+        // place: the resolver never types a `FieldAccess`/`Index`
+        // *expression* (see `resolve_place_expr`'s docs), so
+        // `self.declares.get_expression_type(expr_id)` alone would leave an
+        // expression like `s[0] + s[1]` untyped even though each operand's
+        // own place type is known. Only fall back to the resolver's
+        // whole-expression type when both operands are bare constants
+        // (`3 + 4`) and so carry no place of their own.
+        let result_ty = self
+            .operand_type(&left)
+            .or_else(|| self.operand_type(&right))
+            .or_else(|| self.declares.get_expression_type(expr_id).cloned())
+            .ok_or_else(|| {
+                Fault::error_with_kind(MirErrorKind::NestedExpressionHasNoResolvedType, Some(span))
+            })?;
+        require_primitive(&result_ty, span)?;
+
+        let tuple_ty = SoulType::TupleKind(ast::TupleKind::Tuple(vec![
+            result_ty,
+            SoulType::Primitive(PrimitiveTypes::Boolean),
+        ]));
+        let tuple_local = self.alloc_local(tuple_ty, TypeModifier::Immut, span);
+        let tuple_place = mir::Place::local(tuple_local);
+        self.statements.push(mir::Statement::Assign(
+            tuple_place.clone(),
+            mir::Rvalue::CheckedBinaryOp(op, left, right),
+        ));
+
+        let mut overflowed_place = tuple_place.clone();
+        overflowed_place.projection.push(mir::PlaceElem::Field(1));
+
+        let msg_text = match op {
+            BinaryOperatorKind::Add => "attempt to add with overflow",
+            BinaryOperatorKind::Sub => "attempt to subtract with overflow",
+            BinaryOperatorKind::Mul => "attempt to multiply with overflow",
+            _ => unreachable!("lower_checked_binary_op is only called for Add/Sub/Mul"),
+        };
+        let msg = mir::Operand::Constant(mir::ConstValue::Str(msg_text.to_string()));
+
+        let next = self.new_block();
+        self.seal(
+            mir::Terminator::Assert {
+                cond: mir::Operand::Copy(overflowed_place),
+                expected: false,
+                msg,
+                target: next,
+            },
+            Some(next),
+        );
+
+        let mut result_place = tuple_place;
+        result_place.projection.push(mir::PlaceElem::Field(0));
+        Ok(mir::Rvalue::Use(mir::Operand::Copy(result_place)))
     }
 
     /// Lowers `Struct{field: value, ...}` into `Rvalue::Aggregate`, with the
@@ -1176,5 +1370,15 @@ fn is_supported_binary_op(op: BinaryOperatorKind) -> bool {
             | BinaryOperatorKind::Ge
             | BinaryOperatorKind::LogAnd
             | BinaryOperatorKind::LogOr
+    )
+}
+
+/// `Add`/`Sub`/`Mul` — the ops `lower_checked_binary_op` traps on overflow
+/// for. Div/Mod are deliberately excluded: division overflow (`INT_MIN /
+/// -1`) and div-by-zero are a separate, not-yet-designed concern.
+fn is_checked_arith_op(op: BinaryOperatorKind) -> bool {
+    matches!(
+        op,
+        BinaryOperatorKind::Add | BinaryOperatorKind::Sub | BinaryOperatorKind::Mul
     )
 }

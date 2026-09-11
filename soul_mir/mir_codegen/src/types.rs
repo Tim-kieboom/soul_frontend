@@ -3,7 +3,7 @@
 //! these but none of them own any codegen *state* (no `Context`/`Builder`
 //! wrapper, just pure functions over inkwell's type/value builders).
 
-use ast_model::{ArrayKind, SoulType, Struct, declare_store::DeclareStore};
+use ast_model::{ArrayKind, SoulType, Struct, TupleKind, declare_store::DeclareStore};
 use inkwell::{
     AddressSpace,
     context::Context,
@@ -125,6 +125,13 @@ pub(crate) fn llvm_type<'ctx>(
         }
         SoulType::Stub(_) => stub_type(context, platform, declares, module, ty, span),
         SoulType::Array(array) => array_type(context, platform, declares, module, array, span),
+        SoulType::TupleKind(TupleKind::Tuple(types)) => {
+            let field_types = types
+                .iter()
+                .map(|ty| llvm_type(context, platform, declares, module, ty, span))
+                .collect::<CodegenResult<Vec<_>>>()?;
+            Ok(context.struct_type(&field_types, false).into())
+        }
         other => Err(Fault::error_with_kind(
             CodegenErrorKind::NonPrimitiveType {
                 ty: format!("{other:?}").into_boxed_str(),

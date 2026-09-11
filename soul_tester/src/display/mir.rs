@@ -226,6 +226,13 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 push_fmt!(self, " {} ", op.as_str())?;
                 self.write_operand(right)?;
             }
+            Rvalue::CheckedBinaryOp(op, left, right) => {
+                self.push_str("checked(")?;
+                self.write_operand(left)?;
+                push_fmt!(self, " {} ", op.as_str())?;
+                self.write_operand(right)?;
+                self.push_char(')')?;
+            }
             Rvalue::UnaryOp(op, operand) => {
                 self.push_str(op.as_str())?;
                 self.write_operand(operand)?;
@@ -248,6 +255,11 @@ impl<'a, W: Writer> Displayer<'a, W> {
             Rvalue::Cast(operand, ty) => {
                 self.write_operand(operand)?;
                 push_fmt!(self, " as {ty:?}")?;
+            }
+            Rvalue::Len(place) => {
+                self.push_str("len(")?;
+                self.write_place(place)?;
+                self.push_char(')')?;
             }
         }
         Ok(())

@@ -6,13 +6,13 @@
 
 use std::cell::Cell;
 
-use ast_model::{ArrayKind, AstStore, SoulType};
+use ast_model::{ArrayKind, AstStore, SoulType, TupleKind};
 use inkwell::{
-    AddressSpace, IntPredicate,
+    AddressSpace,
     basic_block::BasicBlock as LlvmBlock,
     builder::Builder,
-    types::{BasicTypeEnum, StructType},
-    values::{FunctionValue, IntValue, PointerValue},
+    types::BasicTypeEnum,
+    values::{FunctionValue, PointerValue},
 };
 use mir_model::{BlockId, ExternFunction, Function, LocalId, Place, PlaceElem, Statement};
 use soul_utils::{
@@ -27,7 +27,7 @@ use crate::{
     fault::{CodegenErrorKind, CodegenResult},
     llvm_err,
     module::ModuleCodegen,
-    types::{expect_int, is_signed, resolve_struct},
+    types::{expect_int, resolve_struct},
 };
 
 pub(crate) struct FunctionCodegen<'ctx, 'a> {
@@ -209,21 +209,32 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
         Ok((ptr, ty))
     }
 
-    /// One `Field(index)` step: `soul_ty` must resolve to a declared struct;
-    /// GEPs `ptr` to that field's address and returns the field's own type.
+    /// One `Field(index)` step: `soul_ty` must be either a declared struct or
+    /// a positional tuple (the `(T, bool)` a `CheckedBinaryOp` assigns into,
+    /// or a real struct — this function doesn't care which, same as
+    /// `codegen_aggregate`'s destination-type-only dispatch, since both map
+    /// to an LLVM `StructType`). GEPs `ptr` to that field's address and
+    /// returns the field's own type.
     fn step_into_field(
         &self,
         ptr: &mut PointerValue<'ctx>,
         soul_ty: &SoulType,
         index: usize,
     ) -> CodegenResult<SoulType> {
-        let struct_ = resolve_struct(self.ctx.declares, self.soul_module, soul_ty)
-            .ok_or_else(|| err(CodegenErrorKind::PlaceProjectionUnsupported))?;
-        let field_ty = struct_
-            .fields
-            .get(index)
-            .and_then(|field| field.value.ty.clone())
-            .ok_or_else(|| err(CodegenErrorKind::PlaceProjectionUnsupported))?;
+        let field_ty = if let SoulType::TupleKind(TupleKind::Tuple(types)) = soul_ty {
+            types
+                .get(index)
+                .cloned()
+                .ok_or_else(|| err(CodegenErrorKind::PlaceProjectionUnsupported))?
+        } else {
+            let struct_ = resolve_struct(self.ctx.declares, self.soul_module, soul_ty)
+                .ok_or_else(|| err(CodegenErrorKind::PlaceProjectionUnsupported))?;
+            struct_
+                .fields
+                .get(index)
+                .and_then(|field| field.value.ty.clone())
+                .ok_or_else(|| err(CodegenErrorKind::PlaceProjectionUnsupported))?
+        };
 
         let BasicTypeEnum::StructType(struct_llvm_ty) =
             self.ctx.llvm_type(self.soul_module, soul_ty, None)?
@@ -241,10 +252,13 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
     /// One `Index(index_local)` step: `soul_ty` must be a slice
     /// (`[&]T`/`[&mut]T`). Loads the slice's data pointer out of its `ptr`
     /// field (field 0 of the `{ptr, len}` fat pointer built by `array_type`),
-    /// loads the runtime index out of `index_local`, checks it against the
-    /// slice's own `len` field (`build_bounds_check`), then GEPs the data
+    /// loads the runtime index out of `index_local`, then GEPs the data
     /// pointer by that index (element-sized steps, since the GEP is typed as
-    /// the element's own LLVM type).
+    /// the element's own LLVM type). Bounds checking against the slice's own
+    /// `len` field happens at the MIR level now (`mir_parser`'s
+    /// `emit_bounds_check`, an ordinary `Rvalue::Len` + comparison +
+    /// `Terminator::Assert`) rather than here — this step trusts the index is
+    /// already in range.
     fn step_into_index(
         &self,
         ptr: &mut PointerValue<'ctx>,
@@ -259,21 +273,7 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
         }
         let element_ty = (*array.of_type).clone();
 
-        let BasicTypeEnum::StructType(slice_llvm_ty) =
-            self.ctx.llvm_type(self.soul_module, soul_ty, None)?
-        else {
-            return Err(err(CodegenErrorKind::PlaceProjectionUnsupported));
-        };
-        let ptr_field_addr = self
-            .builder
-            .build_struct_gep(slice_llvm_ty, *ptr, 0, "slice_ptr_addr")
-            .map_err(llvm_err)?;
-        let opaque_ptr_ty = self.ctx.context.ptr_type(AddressSpace::default());
-        let data_ptr = self
-            .builder
-            .build_load(opaque_ptr_ty, ptr_field_addr, "slice_ptr")
-            .map_err(llvm_err)?
-            .into_pointer_value();
+        let data_ptr = self.slice_data_ptr(*ptr, soul_ty)?;
 
         let index_llvm_ty = self.local_type(index_local)?;
         let index_value = self
@@ -281,9 +281,6 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
             .build_load(index_llvm_ty, self.locals[index_local], "index")
             .map_err(llvm_err)?;
         let index_value = expect_int(index_value)?;
-        let index_signed = self.local_is_signed_int(index_local)?;
-
-        self.build_bounds_check(slice_llvm_ty, *ptr, index_value, index_signed)?;
 
         let element_llvm_ty = self.ctx.llvm_type(self.soul_module, &element_ty, None)?;
         *ptr = unsafe {
@@ -295,129 +292,28 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
         Ok(element_ty)
     }
 
-    /// Whether `local`'s declared type is a signed integer — used only to
-    /// pick sign- vs zero-extension when widening an index to the slice
-    /// `len` field's width in `build_bounds_check`. Non-primitive/non-int
-    /// locals can't reach here (`expect_int` on the loaded value already
-    /// faults first), so this only ever inspects `SoulType::Primitive`.
-    fn local_is_signed_int(&self, local: LocalId) -> CodegenResult<bool> {
-        match &self.function.locals[local].ty {
-            SoulType::Primitive(prim) => Ok(is_signed(*prim)),
-            _ => Ok(false),
-        }
-    }
-
-    /// Traps via `abort` if `index` is out of bounds for the slice at
-    /// `slice_ptr` (`index_llvm_ty`'s bit width may differ from the `len`
-    /// field's pointer-width — a `Variable` index keeps its own declared
-    /// type rather than being retyped, see `operand_local` in `mir_parser` —
-    /// so `index` is first widened/narrowed to `len`'s width, sign-extending
-    /// for a signed index and zero-extending otherwise; a negative signed
-    /// index sign-extends to a huge unsigned value and is caught the same
-    /// way as an over-long one).
-    fn build_bounds_check(
+    /// Loads a slice place's data pointer out of its `ptr` field (field 0 of
+    /// the `{ptr, len}` fat pointer) — the part `step_into_index` and
+    /// `codegen_len` (in `rvalue.rs`) both need.
+    pub(crate) fn slice_data_ptr(
         &self,
-        slice_llvm_ty: StructType<'ctx>,
         slice_ptr: PointerValue<'ctx>,
-        index: IntValue<'ctx>,
-        index_signed: bool,
-    ) -> CodegenResult<()> {
-        let len_field_addr = self
-            .builder
-            .build_struct_gep(slice_llvm_ty, slice_ptr, 1, "slice_len_addr")
-            .map_err(llvm_err)?;
-        let len_llvm_ty = slice_llvm_ty
-            .get_field_type_at_index(1)
-            .ok_or_else(|| err(CodegenErrorKind::PlaceProjectionUnsupported))?
-            .into_int_type();
-        let len_value = self
-            .builder
-            .build_load(len_llvm_ty, len_field_addr, "slice_len")
-            .map_err(llvm_err)?
-            .into_int_value();
-
-        let index_bits = index.get_type().get_bit_width();
-        let len_bits = len_llvm_ty.get_bit_width();
-        let index = match index_bits.cmp(&len_bits) {
-            std::cmp::Ordering::Less if index_signed => self
-                .builder
-                .build_int_s_extend(index, len_llvm_ty, "idx_sext")
-                .map_err(llvm_err)?,
-            std::cmp::Ordering::Less => self
-                .builder
-                .build_int_z_extend(index, len_llvm_ty, "idx_zext")
-                .map_err(llvm_err)?,
-            std::cmp::Ordering::Greater => self
-                .builder
-                .build_int_truncate(index, len_llvm_ty, "idx_trunc")
-                .map_err(llvm_err)?,
-            std::cmp::Ordering::Equal => index,
+        slice_soul_ty: &SoulType,
+    ) -> CodegenResult<PointerValue<'ctx>> {
+        let BasicTypeEnum::StructType(slice_llvm_ty) =
+            self.ctx.llvm_type(self.soul_module, slice_soul_ty, None)?
+        else {
+            return Err(err(CodegenErrorKind::PlaceProjectionUnsupported));
         };
-
-        let out_of_bounds = self
+        let ptr_field_addr = self
             .builder
-            .build_int_compare(IntPredicate::UGE, index, len_value, "out_of_bounds")
+            .build_struct_gep(slice_llvm_ty, slice_ptr, 0, "slice_ptr_addr")
             .map_err(llvm_err)?;
-
-        self.trap_if(out_of_bounds, "bounds", "index out of bounds")
-    }
-
-    /// Traps via the panic runtime (`panic_function`) when `bad` (an `i1`)
-    /// is true, with a static, compile-time-known `message`; otherwise falls
-    /// through. Materializes `message` as its own global string (via
-    /// `codegen_string_constant` — not deduplicated across call sites, same
-    /// tradeoff it already makes) and hands it to `trap_with_message`.
-    pub(crate) fn trap_if(
-        &self,
-        bad: IntValue<'ctx>,
-        label: &str,
-        message: &str,
-    ) -> CodegenResult<()> {
-        let msg_ptr = self.codegen_string_constant(message);
-        self.trap_with_message(bad, label, msg_ptr)
-    }
-
-    /// Traps via the panic runtime (`panic_function`) when `bad` (an `i1`)
-    /// is true, passing `msg_ptr` (a `cstr`-typed pointer, already computed
-    /// by the caller) as the panic message; otherwise falls through. Splits
-    /// the current block into a `<label>_fail` block that panics and a
-    /// `<label>_ok` continuation where the caller keeps emitting — used for
-    /// runtime checks (slice-index bounds, arithmetic overflow) that arise
-    /// mid-block rather than at a block boundary, unlike `codegen_assert`'s
-    /// MIR-level `Assert` terminator, which branches straight to its own
-    /// pre-existing MIR target block instead of a synthetic one.
-    pub(crate) fn trap_with_message(
-        &self,
-        bad: IntValue<'ctx>,
-        label: &str,
-        msg_ptr: PointerValue<'ctx>,
-    ) -> CodegenResult<()> {
-        let current_block = self
-            .builder
-            .get_insert_block()
-            .ok_or_else(|| err(CodegenErrorKind::PlaceProjectionUnsupported))?;
-        let fail_block = self
-            .ctx
-            .context
-            .insert_basic_block_after(current_block, &format!("{label}_fail"));
-        let ok_block = self
-            .ctx
-            .context
-            .insert_basic_block_after(fail_block, &format!("{label}_ok"));
-
+        let opaque_ptr_ty = self.ctx.context.ptr_type(AddressSpace::default());
         self.builder
-            .build_conditional_branch(bad, fail_block, ok_block)
-            .map_err(llvm_err)?;
-
-        self.builder.position_at_end(fail_block);
-        let panic_fn = self.panic_function()?;
-        self.builder
-            .build_call(panic_fn, &[msg_ptr.into()], "panic_call")
-            .map_err(llvm_err)?;
-        self.builder.build_unreachable().map_err(llvm_err)?;
-
-        self.builder.position_at_end(ok_block);
-        Ok(())
+            .build_load(opaque_ptr_ty, ptr_field_addr, "slice_ptr")
+            .map_err(llvm_err)
+            .map(|v| v.into_pointer_value())
     }
 }
 

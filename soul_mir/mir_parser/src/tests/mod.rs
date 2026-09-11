@@ -106,26 +106,41 @@ fn lowers_arithmetic_with_a_variable_and_a_return() {
     .expect("expected successful lowering");
 
     assert_eq!(mir.arg_count, 2);
-    assert_eq!(mir.locals.entries().count(), 4);
-    assert_eq!(mir.blocks.entries().count(), 1);
+    // `a + b` now traps on overflow (see `lower_checked_binary_op`), which
+    // splits the function into an arithmetic block and a continuation.
+    assert_eq!(mir.blocks.entries().count(), 2, "{:#?}", mir.blocks);
 
-    let (_, block) = mir.blocks.entries().next().expect("expected one block");
-    assert_eq!(block.statements.len(), 2, "{:#?}", block.statements);
-    assert!(matches!(block.terminator, mir_model::Terminator::Return));
+    let mut blocks = mir.blocks.entries();
+    let (_, entry) = blocks.next().expect("expected an entry block");
+    assert_eq!(entry.statements.len(), 1, "{:#?}", entry.statements);
 
-    let mir_model::Statement::Assign(_, Rvalue::BinaryOp(op, left, right)) = &block.statements[0]
+    let mir_model::Statement::Assign(tuple_place, Rvalue::CheckedBinaryOp(op, left, right)) =
+        &entry.statements[0]
     else {
-        panic!("expected first statement to assign a BinaryOp");
+        panic!("expected first statement to assign a CheckedBinaryOp");
     };
     assert_eq!(*op, ast_model::operators::BinaryOperatorKind::Add);
     assert!(matches!(left, Operand::Copy(_)));
     assert!(matches!(right, Operand::Copy(_)));
 
-    let mir_model::Statement::Assign(place, Rvalue::Use(Operand::Copy(_))) = &block.statements[1]
+    let mir_model::Terminator::Assert {
+        cond: Operand::Copy(overflow_place),
+        expected: false,
+        target,
+        ..
+    } = &entry.terminator
     else {
-        panic!("expected second statement to assign a bare Use(Copy(..))");
+        panic!("expected the entry block to end in an overflow Assert");
     };
-    assert_eq!(Some(place.local), mir.return_local);
+    assert_eq!(overflow_place.local, tuple_place.local);
+    assert!(matches!(
+        overflow_place.projection.as_slice(),
+        [mir_model::PlaceElem::Field(1)]
+    ));
+
+    let (ok_id, ok_block) = blocks.next().expect("expected a continuation block");
+    assert_eq!(*target, ok_id);
+    assert!(matches!(ok_block.terminator, mir_model::Terminator::Return));
 }
 
 #[test]
@@ -373,22 +388,23 @@ fn slice_index_read_lowers_to_a_place_with_an_index_projection() {
     )
     .expect("expected successful lowering");
 
-    let (_, block) = mir.blocks.entries().next().expect("expected one block");
-    // statements[0]: `i`'s own assignment; [1]: the `return s[i]` read.
-    let mir_model::Statement::Assign(_, Rvalue::Use(Operand::Copy(place))) = &block.statements[1]
-    else {
-        panic!(
-            "expected a bare Use(Copy(..)) assignment, got {:#?}",
-            block.statements[1]
-        );
-    };
+    // `s[i]` now emits a MIR-level bounds check (`Len` + comparison +
+    // `Assert`) ahead of the actual indexed read, splitting the function
+    // into several blocks — search all of them for the read itself instead
+    // of assuming which block/offset it lands at.
+    let found = mir.blocks.entries().any(|(_, block)| {
+        block.statements.iter().any(|statement| {
+            matches!(
+                statement,
+                mir_model::Statement::Assign(_, Rvalue::Use(Operand::Copy(read_place)))
+                if matches!(read_place.projection.as_slice(), [mir_model::PlaceElem::Index(_)])
+            )
+        })
+    });
     assert!(
-        matches!(
-            place.projection.as_slice(),
-            [mir_model::PlaceElem::Index(_)]
-        ),
-        "expected a single Index(..) projection, got {:#?}",
-        place.projection
+        found,
+        "expected a Use(Copy(..)) read through a single Index(..) projection somewhere in {:#?}",
+        mir.blocks
     );
 }
 
@@ -400,24 +416,22 @@ fn slice_index_write_lowers_to_an_assign_through_an_index_projection() {
     )
     .expect("expected successful lowering");
 
-    let (_, block) = mir.blocks.entries().next().expect("expected one block");
-    // statements[0]: the literal index `0` materialized into its own temp
-    // (see `operand_local`); [1]: the actual `s[0] = 5` write.
-    let mir_model::Statement::Assign(place, Rvalue::Use(Operand::Constant(ConstValue::Uint(5)))) =
-        &block.statements[1]
-    else {
-        panic!(
-            "expected the second statement to assign a constant, got {:#?}",
-            block.statements[1]
-        );
-    };
+    // `s[0] = 5` now emits a MIR-level bounds check ahead of the write too —
+    // search all blocks for the write itself rather than assuming which
+    // block/offset it lands at.
+    let found = mir.blocks.entries().any(|(_, block)| {
+        block.statements.iter().any(|statement| {
+            matches!(
+                statement,
+                mir_model::Statement::Assign(place, Rvalue::Use(Operand::Constant(ConstValue::Uint(5))))
+                if matches!(place.projection.as_slice(), [mir_model::PlaceElem::Index(_)])
+            )
+        })
+    });
     assert!(
-        matches!(
-            place.projection.as_slice(),
-            [mir_model::PlaceElem::Index(_)]
-        ),
-        "expected a single Index(..) projection, got {:#?}",
-        place.projection
+        found,
+        "expected an Assign through a single Index(..) projection with a constant 5, somewhere in {:#?}",
+        mir.blocks
     );
 }
 
@@ -478,43 +492,72 @@ fn nested_compound_expression_is_lowered_via_a_temporary() {
     )
     .expect("expected successful lowering");
 
-    assert_eq!(mir.locals.entries().count(), 5);
+    // Both `+` and `*` now trap on overflow (`lower_checked_binary_op`),
+    // splitting this into several blocks instead of two statements in one —
+    // search across all of them rather than assuming exact block/statement
+    // indices.
+    let all_statements: Vec<&mir_model::Statement> = mir
+        .blocks
+        .entries()
+        .flat_map(|(_, block)| &block.statements)
+        .collect();
 
-    let (_, block) = mir.blocks.entries().next().unwrap();
-    assert_eq!(block.statements.len(), 2, "{:#?}", block.statements);
+    let mul_tuple = all_statements
+        .iter()
+        .find_map(|statement| match statement {
+            mir_model::Statement::Assign(place, Rvalue::CheckedBinaryOp(op, ..))
+                if *op == ast_model::operators::BinaryOperatorKind::Mul =>
+            {
+                Some(place)
+            }
+            _ => None,
+        })
+        .expect("expected a CheckedBinaryOp(Mul, ..) assignment somewhere");
 
-    let mir_model::Statement::Assign(temp_place, Rvalue::BinaryOp(op, _, _)) = &block.statements[0]
-    else {
-        panic!(
-            "expected first statement to assign the nested `b * c` to a temp, got {:#?}",
-            block.statements[0]
-        );
-    };
-    assert_eq!(*op, ast_model::operators::BinaryOperatorKind::Mul);
-
-    let mir_model::Statement::Assign(ret_place, Rvalue::BinaryOp(op, _, right)) =
-        &block.statements[1]
-    else {
-        panic!(
-            "expected second statement to assign the outer `a + ..` to the return local, got {:#?}",
-            block.statements[1]
-        );
-    };
-    assert_eq!(*op, ast_model::operators::BinaryOperatorKind::Add);
-    assert_eq!(Some(ret_place.local), mir.return_local);
-    assert!(
-        matches!(right, Operand::Copy(place) if place.local == temp_place.local),
-        "expected the outer expression's right operand to read back the temp from statement 0"
-    );
+    // The `b * c` tuple's result field (0) must get copied into its own
+    // temp before the outer `a + ..` reads it.
+    let temp = all_statements
+        .iter()
+        .find_map(|statement| match statement {
+            mir_model::Statement::Assign(place, Rvalue::Use(Operand::Copy(read_place)))
+                if read_place.local == mul_tuple.local
+                    && matches!(
+                        read_place.projection.as_slice(),
+                        [mir_model::PlaceElem::Field(0)]
+                    ) =>
+            {
+                Some(place.local)
+            }
+            _ => None,
+        })
+        .expect("expected the Mul tuple's result field to be copied into a temp");
 
     let temp_decl = mir
         .locals
-        .get(temp_place.local)
+        .get(temp)
         .expect("expected the temp to have a local declaration");
     assert_eq!(
         temp_decl.mutability,
         soul_utils::TypeModifier::Immut,
         "a temp holding a runtime-computed sub-expression must not be marked `Comptime`"
+    );
+
+    let add_reads_temp = all_statements.iter().any(|statement| {
+        matches!(
+            statement,
+            mir_model::Statement::Assign(
+                _,
+                Rvalue::CheckedBinaryOp(
+                    ast_model::operators::BinaryOperatorKind::Add,
+                    _,
+                    Operand::Copy(right),
+                ),
+            ) if right.local == temp
+        )
+    });
+    assert!(
+        add_reads_temp,
+        "expected the outer `a + ..` to read back the `b * c` temp"
     );
 }
 
@@ -578,8 +621,10 @@ fn call_embedded_in_a_larger_expression_splits_the_block() {
     )
     .expect("expected successful lowering");
 
-    // entry (ends in the Call) + continuation (computes `a + <result>`, returns).
-    assert_eq!(mir.blocks.entries().count(), 2, "{:#?}", mir.blocks);
+    // entry (ends in the Call) + a checked-add block (`a + <result>` now
+    // traps on overflow too, so it splits again for its own Assert) + a
+    // final block that returns.
+    assert_eq!(mir.blocks.entries().count(), 3, "{:#?}", mir.blocks);
 
     let (_, entry) = mir.blocks.entries().next().unwrap();
     assert!(
@@ -588,17 +633,23 @@ fn call_embedded_in_a_larger_expression_splits_the_block() {
         entry.terminator
     );
 
-    let (_, continuation) = mir.blocks.entries().nth(1).unwrap();
-    let mir_model::Statement::Assign(_, Rvalue::BinaryOp(op, ..)) = &continuation.statements[0]
+    let (_, add_block) = mir.blocks.entries().nth(1).unwrap();
+    let mir_model::Statement::Assign(_, Rvalue::CheckedBinaryOp(op, ..)) = &add_block.statements[0]
     else {
         panic!(
             "expected the continuation to compute `a + <call result>`, got {:#?}",
-            continuation.statements
+            add_block.statements
         );
     };
     assert_eq!(*op, ast_model::operators::BinaryOperatorKind::Add);
     assert!(matches!(
-        continuation.terminator,
+        add_block.terminator,
+        mir_model::Terminator::Assert { .. }
+    ));
+
+    let (_, final_block) = mir.blocks.entries().nth(2).unwrap();
+    assert!(matches!(
+        final_block.terminator,
         mir_model::Terminator::Return
     ));
 }
@@ -611,19 +662,22 @@ fn call_with_multiple_arguments_lowers_each_before_the_call() {
     )
     .expect("expected successful lowering");
 
-    let (_, entry) = mir.blocks.entries().next().unwrap();
     // `b + 1` must be flattened into its own temp before the call, exactly
-    // like any other nested compound expression.
-    assert_eq!(entry.statements.len(), 1, "{:#?}", entry.statements);
+    // like any other nested compound expression — and, now that `+` traps
+    // on overflow, that temp's own computation splits its own block ahead
+    // of the call rather than landing as a single statement in the entry
+    // block, so search for whichever block actually ends in the Call.
+    let (_, call_block) = mir
+        .blocks
+        .entries()
+        .find(|(_, block)| matches!(block.terminator, mir_model::Terminator::Call { .. }))
+        .expect("expected some block to end in a Call");
 
     let mir_model::Terminator::Call {
         arguments: args, ..
-    } = &entry.terminator
+    } = &call_block.terminator
     else {
-        panic!(
-            "expected the entry block to end in a Call, got {:#?}",
-            entry.terminator
-        );
+        unreachable!("just matched on Terminator::Call");
     };
     assert_eq!(args.len(), 2, "{:#?}", args);
 }
@@ -1070,21 +1124,43 @@ fn compound_assignment_is_desugared_into_a_binary_read_of_the_same_local() {
     let mir = lower_source("f(mut n: int): int {\n    n -= 1\n    return n\n}\n", "f")
         .expect("expected successful lowering");
 
-    let (_, block) = mir.blocks.entries().next().unwrap();
-    assert_eq!(block.statements.len(), 2, "{:#?}", block.statements);
+    // `n -= 1` desugars to `n = n - 1`, and `-` now traps on overflow, so
+    // the arithmetic lands in a fresh tuple temp (not `n`'s own place)
+    // with `n` reassigned from its result field afterward — search across
+    // all blocks instead of assuming a single block/statement shape.
+    let all_statements: Vec<&mir_model::Statement> = mir
+        .blocks
+        .entries()
+        .flat_map(|(_, block)| &block.statements)
+        .collect();
 
-    let mir_model::Statement::Assign(assign_place, Rvalue::BinaryOp(op, left, _)) =
-        &block.statements[0]
-    else {
-        panic!(
-            "expected `n -= 1` to lower to a BinaryOp assignment, got {:#?}",
-            block.statements[0]
-        );
-    };
-    assert_eq!(*op, ast_model::operators::BinaryOperatorKind::Sub);
+    let (tuple_local, n_local) = all_statements
+        .iter()
+        .find_map(|statement| match statement {
+            mir_model::Statement::Assign(
+                place,
+                Rvalue::CheckedBinaryOp(
+                    ast_model::operators::BinaryOperatorKind::Sub,
+                    Operand::Copy(left),
+                    _,
+                ),
+            ) => Some((place.local, left.local)),
+            _ => None,
+        })
+        .expect("expected `n -= 1` to lower to a CheckedBinaryOp(Sub, ..) reading `n`'s own local");
+
+    let reassigns_n = all_statements.iter().any(|statement| {
+        matches!(
+            statement,
+            mir_model::Statement::Assign(place, Rvalue::Use(Operand::Copy(read_place)))
+            if place.local == n_local
+                && read_place.local == tuple_local
+                && matches!(read_place.projection.as_slice(), [mir_model::PlaceElem::Field(0)])
+        )
+    });
     assert!(
-        matches!(left, Operand::Copy(place) if place.local == assign_place.local),
-        "expected `n -= 1` to read the current value of `n`'s own local"
+        reassigns_n,
+        "expected `n` to be reassigned from the Sub tuple's result field"
     );
 }
 

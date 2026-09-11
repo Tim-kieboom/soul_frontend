@@ -13,7 +13,7 @@ use inkwell::{
     types::BasicTypeEnum,
     values::{BasicValueEnum, IntValue, PointerValue},
 };
-use mir_model::{AggregateKind, ConstValue, Operand, Rvalue};
+use mir_model::{AggregateKind, ConstValue, Operand, Place, Rvalue};
 
 use crate::{
     err,
@@ -29,9 +29,8 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
     /// `cstr` value currently comes into existence (there's no other
     /// `cstr`-producing expression in this slice, so this is the sole
     /// producer of one). Not deduplicated across equal literals: correctness
-    /// over compactness for this first slice. Also reused by
-    /// `function::trap_if` to materialize a static panic message.
-    pub(crate) fn codegen_string_constant(&self, s: &str) -> PointerValue<'ctx> {
+    /// over compactness for this first slice.
+    fn codegen_string_constant(&self, s: &str) -> PointerValue<'ctx> {
         let id = self.string_counter.get();
         self.string_counter.set(id + 1);
 
@@ -54,6 +53,9 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
         match rvalue {
             Rvalue::Use(operand) => self.codegen_operand(operand, result_ty),
             Rvalue::BinaryOp(op, left, right) => self.codegen_binary(result_ty, op, left, right),
+            Rvalue::CheckedBinaryOp(op, left, right) => {
+                self.codegen_checked_binary(result_ty, *op, left, right)
+            }
             Rvalue::UnaryOp(op, operand) => self.codegen_unary(op, operand),
             Rvalue::Aggregate(AggregateKind::Struct | AggregateKind::Array, operands) => {
                 self.codegen_aggregate(operands, result_ty)
@@ -68,9 +70,9 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
                 let (ptr, _) = self.resolve_place(place)?;
                 Ok(ptr.into())
             }
-            Rvalue::Aggregate(..) | Rvalue::Cast(..) => {
-                Err(err(CodegenErrorKind::UnsupportedRvalue))
-            }
+            Rvalue::Len(place) => self.codegen_len(place),
+            Rvalue::Cast(operand, _) => self.codegen_cast(operand, result_ty),
+            Rvalue::Aggregate(..) => Err(err(CodegenErrorKind::UnsupportedRvalue)),
         }
     }
 
@@ -169,10 +171,6 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
         signed: bool,
     ) -> CodegenResult<IntValue<'ctx>> {
         use BinaryOperatorKind::*;
-        if matches!(op, Add | Sub | Mul) {
-            return self.codegen_checked_arith(op, l, r, signed);
-        }
-
         let b = &self.builder;
         let v = match op {
             Div if signed => b.build_int_signed_div(l, r, "sdiv"),
@@ -202,77 +200,126 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
 
     /// `Add`/`Sub`/`Mul` via LLVM's `{s,u}{add,sub,mul}.with.overflow`
     /// intrinsics (chosen on `signed`, matching every other signed-vs-
-    /// unsigned branch in this file) instead of the plain `build_int_*`
-    /// ops — Rust-debug-build-style: traps via `abort` (`trap_if`, shared
-    /// with slice-index bounds checking) the instant an overflow occurs,
-    /// rather than silently wrapping. Each intrinsic returns a `{result, i1
-    /// overflowed}` struct; the result is only ever used once `trap_if` has
-    /// confirmed `overflowed` is false.
-    fn codegen_checked_arith(
+    /// unsigned branch in this file), returning the raw `{result, i1
+    /// overflowed}` struct the intrinsic produces directly as the `(T,
+    /// bool)` tuple value `mir_parser`'s `lower_checked_binary_op` assigns
+    /// this into — LLVM uniques anonymous struct types structurally, so the
+    /// intrinsic's own `{iN, i1}` return type and the destination tuple's
+    /// synthesized `StructType` are the same type, no repacking needed.
+    /// Deciding whether the overflow actually traps isn't this function's
+    /// concern any more: `mir_parser` already emits a `Terminator::Assert`
+    /// on the tuple's `bool` field before the result (field `0`) is ever
+    /// read, so this only has to compute the pair.
+    fn codegen_checked_binary(
         &mut self,
+        result_ty: BasicTypeEnum<'ctx>,
         op: BinaryOperatorKind,
-        l: IntValue<'ctx>,
-        r: IntValue<'ctx>,
-        signed: bool,
-    ) -> CodegenResult<IntValue<'ctx>> {
+        left: &Operand,
+        right: &Operand,
+    ) -> CodegenResult<BasicValueEnum<'ctx>> {
+        let BasicTypeEnum::StructType(tuple_ty) = result_ty else {
+            return Err(err(CodegenErrorKind::PlaceProjectionUnsupported));
+        };
+        let operand_ty = tuple_ty
+            .get_field_type_at_index(0)
+            .ok_or_else(|| err(CodegenErrorKind::PlaceProjectionUnsupported))?;
+
+        let l = expect_int(self.codegen_operand(left, operand_ty)?)?;
+        let r = expect_int(self.codegen_operand(right, operand_ty)?)?;
+        let signed = self.operand_is_signed(left) || self.operand_is_signed(right);
+
         use BinaryOperatorKind::*;
-        let (name, message) = match (op, signed) {
-            (Add, true) => ("llvm.sadd.with.overflow", "attempt to add with overflow"),
-            (Add, false) => ("llvm.uadd.with.overflow", "attempt to add with overflow"),
-            (Sub, true) => (
-                "llvm.ssub.with.overflow",
-                "attempt to subtract with overflow",
-            ),
-            (Sub, false) => (
-                "llvm.usub.with.overflow",
-                "attempt to subtract with overflow",
-            ),
-            (Mul, true) => (
-                "llvm.smul.with.overflow",
-                "attempt to multiply with overflow",
-            ),
-            (Mul, false) => (
-                "llvm.umul.with.overflow",
-                "attempt to multiply with overflow",
-            ),
-            _ => unreachable!("codegen_checked_arith is only called for Add/Sub/Mul"),
+        let name = match (op, signed) {
+            (Add, true) => "llvm.sadd.with.overflow",
+            (Add, false) => "llvm.uadd.with.overflow",
+            (Sub, true) => "llvm.ssub.with.overflow",
+            (Sub, false) => "llvm.usub.with.overflow",
+            (Mul, true) => "llvm.smul.with.overflow",
+            (Mul, false) => "llvm.umul.with.overflow",
+            _ => unreachable!("codegen_checked_binary is only reached for Add/Sub/Mul"),
         };
 
-        let int_ty = l.get_type();
         let intrinsic = Intrinsic::find(name).ok_or_else(|| {
             err(CodegenErrorKind::OverflowIntrinsicUnavailable { name: name.into() })
         })?;
         let fn_value = intrinsic
-            .get_declaration(self.ctx.module, &[int_ty.into()])
+            .get_declaration(self.ctx.module, &[operand_ty])
             .ok_or_else(|| {
                 err(CodegenErrorKind::OverflowIntrinsicUnavailable { name: name.into() })
             })?;
 
         let call = self
             .builder
-            .build_call(fn_value, &[l.into(), r.into()], "arith_with_overflow")
+            .build_call(fn_value, &[l.into(), r.into()], "checked_arith")
             .map_err(llvm_err)?;
-        let result_struct = call
-            .try_as_basic_value()
+
+        call.try_as_basic_value()
             .left()
             .ok_or(CodegenErrorKind::CallResultIsNone)
-            .map_err(err)?
-            .into_struct_value();
+            .map_err(err)
+    }
 
-        let value = self
+    /// The runtime length of a slice place — loads field `1` of its
+    /// `{ptr, len}` fat pointer (`resolve_place` on a bare slice-typed place
+    /// returns the fat pointer's own address and `StructType`). Used by
+    /// `mir_parser`'s bounds-check lowering (`emit_bounds_check`) ahead of a
+    /// comparison and a `Terminator::Assert`.
+    fn codegen_len(&mut self, place: &Place) -> CodegenResult<BasicValueEnum<'ctx>> {
+        let (ptr, ty) = self.resolve_place(place)?;
+        let BasicTypeEnum::StructType(slice_ty) = ty else {
+            return Err(err(CodegenErrorKind::PlaceProjectionUnsupported));
+        };
+        let len_field_ty = slice_ty
+            .get_field_type_at_index(1)
+            .ok_or_else(|| err(CodegenErrorKind::PlaceProjectionUnsupported))?;
+        let len_addr = self
             .builder
-            .build_extract_value(result_struct, 0, "arith_result")
-            .map_err(llvm_err)?
-            .into_int_value();
-        let overflowed = self
-            .builder
-            .build_extract_value(result_struct, 1, "arith_overflowed")
-            .map_err(llvm_err)?
-            .into_int_value();
+            .build_struct_gep(slice_ty, ptr, 1, "slice_len_addr")
+            .map_err(llvm_err)?;
+        self.builder
+            .build_load(len_field_ty, len_addr, "slice_len")
+            .map_err(llvm_err)
+    }
 
-        self.trap_if(overflowed, "overflow", message)?;
+    /// Widens/narrows an int operand to `result_ty`'s width — sign-extending
+    /// when the source is a signed int, zero-extending otherwise, truncating
+    /// when narrowing (a no-op when the widths already match). Used by
+    /// `mir_parser`'s bounds-check lowering to normalize an index to the
+    /// slice `len` field's `uint` width before comparing them — a
+    /// bare-`Variable` index keeps its own declared type rather than being
+    /// retyped (see `operand_local`), so it isn't necessarily already that
+    /// width. A negative signed index sign-extends to a huge unsigned value,
+    /// so it's still caught by the same unsigned compare as an over-long one.
+    fn codegen_cast(
+        &mut self,
+        operand: &Operand,
+        result_ty: BasicTypeEnum<'ctx>,
+    ) -> CodegenResult<BasicValueEnum<'ctx>> {
+        let BasicTypeEnum::IntType(dst_ty) = result_ty else {
+            return Err(err(CodegenErrorKind::UnsupportedRvalue));
+        };
+        let src_ty = self.operand_type(operand).unwrap_or(result_ty);
+        let signed = self.operand_is_signed(operand);
+        let value = expect_int(self.codegen_operand(operand, src_ty)?)?;
 
-        Ok(value)
+        let src_bits = value.get_type().get_bit_width();
+        let dst_bits = dst_ty.get_bit_width();
+        let casted = match src_bits.cmp(&dst_bits) {
+            std::cmp::Ordering::Less if signed => self
+                .builder
+                .build_int_s_extend(value, dst_ty, "cast_sext")
+                .map_err(llvm_err)?,
+            std::cmp::Ordering::Less => self
+                .builder
+                .build_int_z_extend(value, dst_ty, "cast_zext")
+                .map_err(llvm_err)?,
+            std::cmp::Ordering::Greater => self
+                .builder
+                .build_int_truncate(value, dst_ty, "cast_trunc")
+                .map_err(llvm_err)?,
+            std::cmp::Ordering::Equal => value,
+        };
+        Ok(casted.into())
     }
 
     pub(crate) fn codegen_operand(

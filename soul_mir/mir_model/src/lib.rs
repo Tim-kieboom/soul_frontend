@@ -107,10 +107,25 @@ pub enum Statement {
 pub enum Rvalue {
     Use(Operand),
     BinaryOp(BinaryOperatorKind, Operand, Operand),
+    /// `Add`/`Sub`/`Mul` that traps on overflow instead of wrapping. Produces
+    /// a `(T, bool)` tuple (result, overflowed) — mirrors rustc's own
+    /// `CheckedBinaryOp` shape: lowering assigns this into a tuple-typed
+    /// temp, then emits a `Terminator::Assert` on the `bool` half (field
+    /// `1`) before using the result (field `0`), so the overflow *check* is
+    /// an ordinary MIR `Assert` rather than something `mir_codegen` has to
+    /// special-case.
+    CheckedBinaryOp(BinaryOperatorKind, Operand, Operand),
     UnaryOp(ast_model::operators::UnaryOperatorKind, Operand),
-    Ref { mutable: bool, place: Place },
+    Ref {
+        mutable: bool,
+        place: Place,
+    },
     Aggregate(AggregateKind, Vec<Operand>),
     Cast(Operand, Type),
+    /// The runtime length of a slice-typed place (`[&]T`/`[&mut]T`'s own
+    /// `len` field) — always `uint`-typed. Used by bounds-check lowering to
+    /// compare against an index before an `Assert`, same as rustc's `Len`.
+    Len(Place),
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -130,7 +145,7 @@ pub enum Operand {
     Constant(ConstValue),
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct Place {
     pub local: LocalId,
     pub projection: Vec<PlaceElem>,
@@ -146,7 +161,7 @@ impl Place {
     }
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub enum PlaceElem {
     Field(usize),
     Index(LocalId),

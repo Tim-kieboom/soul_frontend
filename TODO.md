@@ -83,40 +83,84 @@ No `Res`/`.pass`/`?T`, no unions, no generics, no borrow checking yet.
     by construction it's never handed an array-typed place, see above). `codegen_aggregate` (renamed
     from the struct-only version) now branches on `StructType` vs `ArrayType` destinations, since a
     fixed-size array's `insertvalue` target isn't struct-shaped.
-  - `mir_codegen`: `step_into_index` (in `resolve_place`'s walk) now emits a `build_bounds_check`
-    before the element GEP — loads the slice's own `len` field (fat-pointer field 1), widens/narrows
-    the index to `len`'s pointer width (sign-extend for a signed index, zero-extend otherwise — a
-    negative signed index sign-extends to a huge unsigned value and is caught by the same unsigned
-    `>=` compare as an over-long one), then hands the resulting `bad` condition to `trap_if` (a shared
-    helper: splits the current block into a `<label>_fail` block that panics — see the panic-runtime
-    entry below — and a `<label>_ok` continuation where the caller's own GEP/load/store keeps
-    emitting). Applies uniformly to both slice reads and writes, since both go through `resolve_place`.
+  - Bounds checking and overflow checking were originally implemented as codegen-level ad hoc
+    branch-splitting (see history), then **moved into MIR itself**, mirroring rustc's own `Len`/
+    `CheckedBinaryOp`/`Assert` shapes — see the two `[x]` entries directly below. `mir_codegen` no
+    longer decides *when* to trap at all; it just implements the (now fully generic) MIR primitives
+    that make the trap, and every check is visible in the MIR dump instead of only in the LLVM IR.
+- [x] Bounds checking on slice indexing, **at the MIR level** (moved off the original codegen-level
+      implementation — see history at the bottom of this file for that version) — proven via
+      `13_slice_bounds_check.soul`.
+  - `mir_model`: new `Rvalue::Len(Place)` (the slice's own runtime `len`, mirroring rustc's `Len`).
+  - `mir_parser`: `resolve_index_place`'s `emit_bounds_check` now emits, ahead of the actual
+    `PlaceElem::Index` projection: `len_local = Len(collection)`; casts the index to `uint` first if
+    it isn't already one (`operand_local` reuses a bare-`Variable` index's own declared type as-is,
+    so it isn't always pre-normalized — see the new `Rvalue::Cast` below); `cond = index < len`; then
+    seals the block with `Terminator::Assert { cond, expected: true, msg: "index out of bounds",
+    target: next }`. Bounds checking is now indistinguishable, MIR-shape-wise, from a hand-written
+    `assert(i < s.len())` — `mir_codegen` doesn't know or care that it came from indexing.
+  - `mir_codegen`: `Rvalue::Len` loads field `1` of the slice's `{ptr, len}` fat pointer
+    (`rvalue::codegen_len`). `step_into_index` no longer does any bounds checking at all — it trusts
+    the index is in range, exactly as if the MIR simply never proved otherwise.
   - Not yet supported: indexing a raw `[N]T` directly (only a slice can be indexed — reference it
     first), `&`/`@` mutability not checked against `[&]`/`[&mut]` (that's the M2 borrow checker's job,
     same as struct field mutability)
-- [x] Overflow checking on arithmetic ops (`+`/`-`/`*`), assert-style like Rust's debug overflow
-      checks — proven via `14_arith_overflow_check.soul` (`i32::MAX + 1` aborts instead of wrapping).
-      `codegen_checked_arith` (`mir_codegen/src/rvalue.rs`) replaces the plain `build_int_add/sub/mul`
-      calls with the matching LLVM `{s,u}{add,sub,mul}.with.overflow` intrinsic (chosen on the same
-      `signed` flag every other signed-vs-unsigned branch in this file already uses), extracts the
-      `{result, i1 overflowed}` pair, and traps via the same `trap_if` helper bounds checking uses.
-      Div/Mod are untouched by this pass — division overflow (`INT_MIN / -1`) and div-by-zero are a
-      separate, not-yet-designed concern (see below).
-- [x] Rust-`panic!`-style panic runtime (message, no backtrace, no unwinding) — replaces every bare
-      `abort()` call (bounds check, overflow check, and the MIR-level `Assert` terminator that
-      `assert(cond)`/`panic(msg)` already lowered to, whose `msg` operand codegen used to just
-      discard). Proven via `15_assert_panic_message.soul` and `16_panic_intrinsic_message.soul`
-      (stdout matched against `panic: <message>`), plus `expect_stdout` added to `13_slice_bounds_check.soul`/`14_arith_overflow_check.soul`.
+- [x] Overflow checking on arithmetic ops (`+`/`-`/`*`), **at the MIR level** (moved off the original
+      codegen-level implementation) — proven via `14_arith_overflow_check.soul` (`i32::MAX + 1`
+      aborts instead of wrapping).
+  - `mir_model`: new `Rvalue::CheckedBinaryOp(op, left, right)`, producing a `(T, bool)` tuple
+    (result, overflowed) — mirrors rustc's own `CheckedBinaryOp` shape exactly. Reuses
+    `AggregateKind`'s pre-existing (until now unused) `Tuple` variant's *type* side —
+    `SoulType::TupleKind(TupleKind::Tuple(..))` — not a new `Rvalue` aggregate-construction case
+    (the tuple value itself is never built via `Aggregate`; the intrinsic call's own return value
+    *is* the tuple, see below).
+  - `mir_parser`: `is_checked_arith_op` routes `Add`/`Sub`/`Mul` (only) through
+    `lower_checked_binary_op` instead of a plain `Rvalue::BinaryOp` — assigns `CheckedBinaryOp` into
+    a fresh tuple-typed temp, seals the block with `Terminator::Assert { cond: tuple.1, expected:
+    false, msg: "attempt to {add,subtract,multiply} with overflow", target: next }`, then returns
+    `Rvalue::Use(Copy(tuple.0))` as if this had been an ordinary `BinaryOp` all along — every
+    existing call site (`lower_operand`'s nested-expression materialization, a top-level
+    `lower_assignment`/`lower_variable`/`return`) needed no change at all. The tuple's element type
+    is derived from whichever *operand* actually carries a place-backed type (a new `operand_type`/
+    `place_type` pair, mirroring `mir_codegen::rvalue`'s own `operand_type` one layer up) rather than
+    the resolver's per-expression type table — needed because the resolver never types a
+    `FieldAccess`/`Index` *expression* (`s[0] + s[1]`'s own type would otherwise be unresolvable),
+    falling back to the resolver's whole-expression type only when both operands are bare constants
+    (`3 + 4`, neither a place).
+  - `mir_codegen`: `Rvalue::CheckedBinaryOp` calls the matching LLVM `{s,u}{add,sub,mul}.with.overflow`
+    intrinsic and returns its `{result, i1 overflowed}` struct *directly* as the tuple value — LLVM
+    uniques anonymous struct types structurally, so the intrinsic's own return type and the
+    synthesized tuple `StructType` are the same type, no repacking needed. Deciding whether to trap
+    isn't `mir_codegen`'s job any more; it only computes the pair.
+  - New `Rvalue::Cast(Operand, Type)` codegen (previously declared in `mir_model` but never
+    implemented) — sign-extends/zero-extends/truncates an int operand to the destination width,
+    based on the *source*'s signedness. Currently only reachable from the bounds-check index
+    normalization above; general implicit/explicit int-to-int casts elsewhere in the language aren't
+    wired to it yet.
+  - `step_into_field` (struct-field `Place` resolution) now also accepts a positional-tuple
+    `SoulType::TupleKind(TupleKind::Tuple(..))` destination alongside a declared struct — needed so
+    `PlaceElem::Field(0)`/`Field(1)` can address a `CheckedBinaryOp` tuple's result/overflow halves,
+    not just a real struct's fields; `llvm_type` gained a matching `TupleKind::Tuple` → anonymous
+    LLVM `StructType` mapping.
+  - Div/Mod are untouched by this pass — division overflow (`INT_MIN / -1`) and div-by-zero are a
+    separate, not-yet-designed concern (see below).
+- [x] Rust-`panic!`-style panic runtime (message, no backtrace, no unwinding) — every panicking
+      construct is now an ordinary MIR `Terminator::Assert` (bounds check, overflow check,
+      `assert(cond)`/`panic(msg)` — see the bounds-checking/overflow-checking entries above for how
+      the first two now get there), and `codegen_assert` is the *only* place `mir_codegen` ever calls
+      the panic runtime from. Proven via `15_assert_panic_message.soul` and
+      `16_panic_intrinsic_message.soul` (stdout matched against `panic: <message>`), plus
+      `expect_stdout` added to `13_slice_bounds_check.soul`/`14_arith_overflow_check.soul`.
   - `mir_codegen/src/terminator.rs`: `panic_function` lazily declares *and defines* (once per module)
       a `soul_panic(msg: cstr)` function — `printf("panic: %s\n", msg)`, `fflush(NULL)`, `abort()`,
       `unreachable` — building its body with the same per-function `self.builder` used for the
       function currently being codegen'd (saves/restores the builder's insertion point around it,
-      since there's no separate builder per LLVM function). Every panicking construct now calls this
-      instead of `abort()` directly. `codegen_assert` passes `Assert`'s own `msg` operand through
-      unchanged (already codegen'able via the existing `cstr` operand path); `trap_if` (bounds/overflow)
-      materializes a static, per-call-site message as its own global string via
-      `codegen_string_constant` (now `pub(crate)`, reused from `rvalue.rs`), and hands it to a new
-      lower-level `trap_with_message`.
+      since there's no separate builder per LLVM function). `codegen_assert` passes `Assert`'s own
+      `msg` operand straight through to it (already codegen'able via the existing `cstr` operand
+      path) — no bespoke codegen-level "materialize a message, split a block, trap" helper exists any
+      more (an earlier version of this pass had `trap_if`/`trap_with_message` for that; both were
+      deleted once bounds/overflow checking moved into MIR, since every trap now just *is* an
+      `Assert`).
   - Real bug found and fixed along the way: `printf`'s output sat in a fully-buffered `stdout` and was
       silently lost, since `abort()` terminates the process immediately without libc's normal at-exit
       flush — caught by actually running a built exe and checking its stdout, not just its exit code
@@ -145,8 +189,8 @@ No `Res`/`.pass`/`?T`, no unions, no generics, no borrow checking yet.
       string literal per panic site, same as the message strings today; (3) extending `soul_panic`'s
       signature to `(msg: cstr, location: cstr)` and reformatting to
       `"panic: {msg}\n  at {location}\n"` (or splitting into two `printf` args). None of this changes
-      the panic *mechanism* built in this pass — `trap_if`/`trap_with_message`/`panic_function` stay
-      exactly as they are, only the message payload grows a second string.
+      the panic *mechanism* built in this pass — `panic_function`/`codegen_assert` stay exactly as
+      they are, only the message payload grows a second string.
 - [ ] Finish MIR lowering coverage for M1 language surface (non-generic traits; diverging calls for
       div-by-zero per mir-design.md)
 - [x] `soul_mir/mir_codegen` — LLVM IR emission via `inkwell` (`features = ["llvm16-0"]`, Windows
