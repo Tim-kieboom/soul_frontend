@@ -8,11 +8,11 @@ use std::cell::Cell;
 
 use ast_model::{ArrayKind, AstStore, SoulType};
 use inkwell::{
-    AddressSpace,
+    AddressSpace, IntPredicate,
     basic_block::BasicBlock as LlvmBlock,
     builder::Builder,
-    types::BasicTypeEnum,
-    values::{FunctionValue, PointerValue},
+    types::{BasicTypeEnum, StructType},
+    values::{FunctionValue, IntValue, PointerValue},
 };
 use mir_model::{BlockId, ExternFunction, Function, LocalId, Place, PlaceElem, Statement};
 use soul_utils::{
@@ -27,7 +27,7 @@ use crate::{
     fault::{CodegenErrorKind, CodegenResult},
     llvm_err,
     module::ModuleCodegen,
-    types::{expect_int, resolve_struct},
+    types::{expect_int, is_signed, resolve_struct},
 };
 
 pub(crate) struct FunctionCodegen<'ctx, 'a> {
@@ -241,9 +241,10 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
     /// One `Index(index_local)` step: `soul_ty` must be a slice
     /// (`[&]T`/`[&mut]T`). Loads the slice's data pointer out of its `ptr`
     /// field (field 0 of the `{ptr, len}` fat pointer built by `array_type`),
-    /// loads the runtime index out of `index_local`, then GEPs the data
+    /// loads the runtime index out of `index_local`, checks it against the
+    /// slice's own `len` field (`build_bounds_check`), then GEPs the data
     /// pointer by that index (element-sized steps, since the GEP is typed as
-    /// the element's own LLVM type) — no bounds check against `len` yet.
+    /// the element's own LLVM type).
     fn step_into_index(
         &self,
         ptr: &mut PointerValue<'ctx>,
@@ -280,6 +281,9 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
             .build_load(index_llvm_ty, self.locals[index_local], "index")
             .map_err(llvm_err)?;
         let index_value = expect_int(index_value)?;
+        let index_signed = self.local_is_signed_int(index_local)?;
+
+        self.build_bounds_check(slice_llvm_ty, *ptr, index_value, index_signed)?;
 
         let element_llvm_ty = self.ctx.llvm_type(self.soul_module, &element_ty, None)?;
         *ptr = unsafe {
@@ -289,6 +293,101 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
         };
 
         Ok(element_ty)
+    }
+
+    /// Whether `local`'s declared type is a signed integer — used only to
+    /// pick sign- vs zero-extension when widening an index to the slice
+    /// `len` field's width in `build_bounds_check`. Non-primitive/non-int
+    /// locals can't reach here (`expect_int` on the loaded value already
+    /// faults first), so this only ever inspects `SoulType::Primitive`.
+    fn local_is_signed_int(&self, local: LocalId) -> CodegenResult<bool> {
+        match &self.function.locals[local].ty {
+            SoulType::Primitive(prim) => Ok(is_signed(*prim)),
+            _ => Ok(false),
+        }
+    }
+
+    /// Traps via `abort` if `index` is out of bounds for the slice at
+    /// `slice_ptr` (`index_llvm_ty`'s bit width may differ from the `len`
+    /// field's pointer-width — a `Variable` index keeps its own declared
+    /// type rather than being retyped, see `operand_local` in `mir_parser` —
+    /// so `index` is first widened/narrowed to `len`'s width, sign-extending
+    /// for a signed index and zero-extending otherwise, before an unsigned
+    /// `<` compare; a negative signed index sign-extends to a huge unsigned
+    /// value and is caught the same way as an over-long one). Splits the
+    /// current block into a `bounds_fail` block that aborts and a
+    /// `bounds_ok` continuation where the caller's own GEP/load/store keeps
+    /// emitting — mirrors `codegen_assert`'s panic-block shape.
+    fn build_bounds_check(
+        &self,
+        slice_llvm_ty: StructType<'ctx>,
+        slice_ptr: PointerValue<'ctx>,
+        index: IntValue<'ctx>,
+        index_signed: bool,
+    ) -> CodegenResult<()> {
+        let len_field_addr = self
+            .builder
+            .build_struct_gep(slice_llvm_ty, slice_ptr, 1, "slice_len_addr")
+            .map_err(llvm_err)?;
+        let len_llvm_ty = slice_llvm_ty
+            .get_field_type_at_index(1)
+            .ok_or_else(|| err(CodegenErrorKind::PlaceProjectionUnsupported))?
+            .into_int_type();
+        let len_value = self
+            .builder
+            .build_load(len_llvm_ty, len_field_addr, "slice_len")
+            .map_err(llvm_err)?
+            .into_int_value();
+
+        let index_bits = index.get_type().get_bit_width();
+        let len_bits = len_llvm_ty.get_bit_width();
+        let index = match index_bits.cmp(&len_bits) {
+            std::cmp::Ordering::Less if index_signed => self
+                .builder
+                .build_int_s_extend(index, len_llvm_ty, "idx_sext")
+                .map_err(llvm_err)?,
+            std::cmp::Ordering::Less => self
+                .builder
+                .build_int_z_extend(index, len_llvm_ty, "idx_zext")
+                .map_err(llvm_err)?,
+            std::cmp::Ordering::Greater => self
+                .builder
+                .build_int_truncate(index, len_llvm_ty, "idx_trunc")
+                .map_err(llvm_err)?,
+            std::cmp::Ordering::Equal => index,
+        };
+
+        let in_bounds = self
+            .builder
+            .build_int_compare(IntPredicate::ULT, index, len_value, "bounds_ok")
+            .map_err(llvm_err)?;
+
+        let current_block = self
+            .builder
+            .get_insert_block()
+            .ok_or_else(|| err(CodegenErrorKind::PlaceProjectionUnsupported))?;
+        let fail_block = self
+            .ctx
+            .context
+            .insert_basic_block_after(current_block, "bounds_fail");
+        let ok_block = self
+            .ctx
+            .context
+            .insert_basic_block_after(fail_block, "bounds_ok");
+
+        self.builder
+            .build_conditional_branch(in_bounds, ok_block, fail_block)
+            .map_err(llvm_err)?;
+
+        self.builder.position_at_end(fail_block);
+        let abort_fn = self.abort_function();
+        self.builder
+            .build_call(abort_fn, &[], "abort_call")
+            .map_err(llvm_err)?;
+        self.builder.build_unreachable().map_err(llvm_err)?;
+
+        self.builder.position_at_end(ok_block);
+        Ok(())
     }
 }
 

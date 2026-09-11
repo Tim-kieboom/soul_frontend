@@ -263,8 +263,9 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
     }
 
     /// The C runtime's `abort()`, declared lazily (once per module) the
-    /// first time an `assert`/`panic` is actually codegen'd.
-    fn abort_function(&self) -> FunctionValue<'ctx> {
+    /// first time an `assert`/`panic` is actually codegen'd. Also used by
+    /// `function::build_bounds_check` for out-of-bounds slice indexing.
+    pub(crate) fn abort_function(&self) -> FunctionValue<'ctx> {
         if let Some(existing) = self.ctx.module.get_function("abort") {
             return existing;
         }

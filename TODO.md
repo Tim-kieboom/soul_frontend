@@ -59,10 +59,11 @@ No `Res`/`.pass`/`?T`, no unions, no generics, no borrow checking yet.
   - Not yet supported: struct-typed binary-op operands' signedness (`operand_is_signed` doesn't look
     through a `Field` projection — doesn't matter for a bare field read, would matter for `p.x - 1`
     on a signed field)
-- [x] Array literal construction, `&arr`-to-slice, and slice indexing (read+write) — proven via
-      `12_slice_index.soul`. Scoped to fixed-size arrays (`[N]T`, only as the thing you *reference*)
-      and slices (`[&]T`/`[&mut]T`, only as the thing you *index*) — not wildcard-sized (`[_]T`) or
-      heap (`[]T`) arrays, and no bounds checking yet (see below):
+- [x] Array literal construction, `&arr`-to-slice, and slice indexing (read+write), plus bounds
+      checking on slice indexing — proven via `12_slice_index.soul` and `13_slice_bounds_check.soul`.
+      Scoped to fixed-size arrays (`[N]T`, only as the thing you *reference*) and slices
+      (`[&]T`/`[&mut]T`, only as the thing you *index*) — not wildcard-sized (`[_]T`) or heap (`[]T`)
+      arrays:
   - `mir_parser`: generalized `resolve_field_place` into `resolve_place_expr`, a shared place
     resolver dispatching on variable/field-access/index (so `o.items[i].x` composes into one `Place`
     with a three-element projection, same pattern as nested field chains). `[1, 2]` lowers to
@@ -82,14 +83,22 @@ No `Res`/`.pass`/`?T`, no unions, no generics, no borrow checking yet.
     by construction it's never handed an array-typed place, see above). `codegen_aggregate` (renamed
     from the struct-only version) now branches on `StructType` vs `ArrayType` destinations, since a
     fixed-size array's `insertvalue` target isn't struct-shaped.
-  - Not yet supported: bounds checking (the fat-pointer `len` field is carried but unread — this was
-    the whole point of deciding the representation up front), indexing a raw `[N]T` directly (only a
-    slice can be indexed — reference it first), `&`/`@` mutability not checked against `[&]`/`[&mut]`
-    (that's the M2 borrow checker's job, same as struct field mutability)
+  - `mir_codegen`: `step_into_index` (in `resolve_place`'s walk) now emits a `build_bounds_check`
+    before the element GEP — loads the slice's own `len` field (fat-pointer field 1), widens/narrows
+    the index to `len`'s pointer width (sign-extend for a signed index, zero-extend otherwise — a
+    negative signed index sign-extends to a huge unsigned value and is caught by the same unsigned
+    `<` compare as an over-long one), then splits the current block into a `bounds_ok` continuation
+    (where the caller's own GEP/load/store keeps emitting) and a `bounds_fail` block that calls
+    `abort()` — reuses the exact same `abort_function` helper `codegen_assert`'s panic path already
+    declares, mirroring its panic-block shape. Applies uniformly to both slice reads and writes, since
+    both go through `resolve_place`.
+  - Not yet supported: indexing a raw `[N]T` directly (only a slice can be indexed — reference it
+    first), `&`/`@` mutability not checked against `[&]`/`[&mut]` (that's the M2 borrow checker's job,
+    same as struct field mutability), a friendlier panic message (bounds-check failure and every other
+    `assert`-driven panic both just call bare `abort()` — no message/location, that's a broader panic-
+    infra concern not scoped to this pass)
 - [ ] Finish MIR lowering coverage for M1 language surface (non-generic traits; diverging calls for
-      div-by-zero / out-of-bounds per mir-design.md)
-  - [ ] Bounds checking on slice indexing — not started, not designed yet (the `len` field exists
-        precisely so this can land without an ABI break)
+      div-by-zero per mir-design.md)
   - [ ] Overflow checking on arithmetic ops (`+`/`-`/`*`/...), assert-style like Rust's debug
         overflow checks — not started, not designed yet
 - [x] `soul_mir/mir_codegen` — LLVM IR emission via `inkwell` (`features = ["llvm16-0"]`, Windows
@@ -102,7 +111,7 @@ No `Res`/`.pass`/`?T`, no unions, no generics, no borrow checking yet.
       `clang.exe` (`C:\llvm-16\bin\clang.exe`) over the emitted `.ll`, then runs the resulting exe
       and checks both exit code (`// expect: N`) and stdout (`// expect_stdout: <substring>`); this
       is currently the real correctness oracle for the pipeline (`soul_tester/soul/src/codegen_tests/`,
-      12 passing exe tests). Still manual/script-driven, not integrated into `cargo test`.
+      13 passing exe tests). Still manual/script-driven, not integrated into `cargo test`.
 - [ ] Establish positive+negative test pairs as typecheck/MIR lowering lands (currently unclear
       whether existing parser/resolver suites cover rejection cases — see "Testing strategy" in
       compiler-pipeline-plan.md)
