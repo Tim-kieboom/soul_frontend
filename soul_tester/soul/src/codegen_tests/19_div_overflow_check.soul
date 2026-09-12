@@ -1,0 +1,8 @@
+// expect: 3221226505
+// expect_stdout: panic: attempt to divide with overflow
+// expect_stdout: 19_div_overflow_check.soul:7:
+main(): i32 {
+    a: i32 = -2147483648
+    b: i32 = -1
+    return a / b
+}

@@ -135,7 +135,7 @@ pub enum AggregateKind {
     Array,
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub enum Operand {
     /// `place`'s type is `Copy` or `AutoCopy`; reading it doesn't invalidate the source.
     Copy(Place),

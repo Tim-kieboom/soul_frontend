@@ -142,8 +142,35 @@ No `Res`/`.pass`/`?T`, no unions, no generics, no borrow checking yet.
     `PlaceElem::Field(0)`/`Field(1)` can address a `CheckedBinaryOp` tuple's result/overflow halves,
     not just a real struct's fields; `llvm_type` gained a matching `TupleKind::Tuple` → anonymous
     LLVM `StructType` mapping.
-  - Div/Mod are untouched by this pass — division overflow (`INT_MIN / -1`) and div-by-zero are a
-    separate, not-yet-designed concern (see below).
+  - Div/Mod were untouched by this pass — division overflow (`INT_MIN / -1`) and div-by-zero are
+    handled separately below.
+- [x] Overflow checking on `/`/`%` (division by zero, and — signed only — `MIN / -1`/`MIN % -1`) —
+      proven via `17_div_by_zero_check.soul`, `18_mod_by_zero_check.soul`, `19_div_overflow_check.soul`,
+      `21_mod_overflow_check.soul` (all abort with the matching message+location), plus
+      `20_div_mod_normal.soul` as a regression guard that ordinary division/remainder still compute
+      the right answer with checking on.
+  - Unlike `+`/`-`/`*`, there's no `{s,u}div/rem.with.overflow` LLVM intrinsic to call, so this
+    doesn't produce a `(T, bool)` tuple the way `CheckedBinaryOp` does — `mir_parser`'s new
+    `lower_checked_div` instead emits explicit MIR-level `Assert`s ahead of an ordinary, now-safe
+    `Rvalue::BinaryOp(Div/Mod, ..)`, mirroring rustc's own checked-division lowering (which does the
+    same thing for the same reason): `assert(divisor != 0, "attempt to {divide,calculate the
+    remainder with a divisor of} ... zero")`, then — only when the operand type is signed —
+    `assert(!(dividend == MIN && divisor == -1), "attempt to {divide,calculate the remainder} with
+    overflow")`. `mir_codegen` needed zero changes: by the time `Div`/`Mod` reach
+    `codegen_binary_op`, the checks already ran, so the existing `build_int_signed_div`/`_rem`/
+    `_unsigned_div`/`_rem` arms are unchanged.
+  - Computing the actual `MIN` constant needed the operand's concrete bit width, which — for
+    `int`/`cint` — is platform-sized (`PlatformInfo.pointer_bits`/`c_int_bits`) and only known once
+    `mir_parser` is handed a `&CompilerOptions` (already true, from the `MirOptions` toggle work).
+    New `signed_primitive_min(prim, platform)` is the one place in `mir_parser` that reads
+    `PlatformInfo` for this reason, despite that struct's own doc comment saying nothing upstream of
+    codegen normally needs to — there's no way to express "the minimum value of whatever width this
+    turns out to be" as a single width-agnostic MIR constant the way `0`/`-1` already are.
+  - `mir_model::Operand` gained `Clone` (needed to reuse the same dividend/divisor operand across
+    both the division itself and its guard-condition comparisons).
+  - Gated behind the same `MirOptions::CHECK_ALGORITHMIC_OVERFLOW` flag as `+`/`-`/`*` rather than a
+    separate flag — division-by-zero and overflow are bucketed with the rest of "checked arithmetic"
+    here, not split out on their own.
 - [x] Rust-`panic!`-style panic runtime (message, no backtrace, no unwinding) — every panicking
       construct is now an ordinary MIR `Terminator::Assert` (bounds check, overflow check,
       `assert(cond)`/`panic(msg)` — see the bounds-checking/overflow-checking entries above for how
@@ -196,8 +223,8 @@ No `Res`/`.pass`/`?T`, no unions, no generics, no borrow checking yet.
     - `scripts/run_codegen_tests.py`'s `// expect_stdout:` was single-shot (first match only, later
       ones silently ignored) — generalized to collect every `expect_stdout` line in a file so a test
       can assert both the message and the location independently.
-- [ ] Finish MIR lowering coverage for M1 language surface (non-generic traits; diverging calls for
-      div-by-zero per mir-design.md)
+- [ ] Finish MIR lowering coverage for M1 language surface (non-generic traits) — div-by-zero is now
+      handled (see the `/`/`%` overflow-checking entry above), so this is just traits now
 - [x] `soul_mir/mir_codegen` — LLVM IR emission via `inkwell` (`features = ["llvm16-0"]`, Windows
       only) implemented for scalar/pointer/struct locals, arithmetic/comparison/logical ops, if/while,
       function calls, `extern "C"` functions (incl. `cstr`/pointer params and correct C-vs-Soul
@@ -208,7 +235,7 @@ No `Res`/`.pass`/`?T`, no unions, no generics, no borrow checking yet.
       `clang.exe` (`C:\llvm-16\bin\clang.exe`) over the emitted `.ll`, then runs the resulting exe
       and checks both exit code (`// expect: N`) and stdout (`// expect_stdout: <substring>`); this
       is currently the real correctness oracle for the pipeline (`soul_tester/soul/src/codegen_tests/`,
-      16 passing exe tests). Still manual/script-driven, not integrated into `cargo test`.
+      21 passing exe tests). Still manual/script-driven, not integrated into `cargo test`.
 - [ ] Establish positive+negative test pairs as typecheck/MIR lowering lands (currently unclear
       whether existing parser/resolver suites cover rejection cases — see "Testing strategy" in
       compiler-pipeline-plan.md)

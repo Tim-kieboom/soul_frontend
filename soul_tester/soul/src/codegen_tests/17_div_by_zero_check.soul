@@ -1,0 +1,7 @@
+// expect: 3221226505
+// expect_stdout: panic: attempt to divide by zero
+// expect_stdout: 17_div_by_zero_check.soul:6:
+main(): i32 {
+    d: i32 = 0
+    return 10 / d
+}
