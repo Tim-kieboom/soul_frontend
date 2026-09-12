@@ -8,7 +8,6 @@ use soul_utils::{
     fault::Severity,
 };
 
-const RAW_CONFIG: &str = include_str!("../config.json");
 pub static CONFIG: LazyLock<Configs> = LazyLock::new(parse_config);
 
 const MIR_OPTIONS: MirOptions = MirOptions::empty()
@@ -27,8 +26,35 @@ pub const PRINT_CONFIGS: PrintConfigs = PrintConfigs {
     color: true,
 };
 
+/// `config.json`'s own location, resolved relative to the running exe
+/// rather than baked in at compile time (`include_str!`) — needed so
+/// `scripts/run_codegen_tests.py` can build `soul_tester` once and then
+/// invoke `target/debug/soul_tester.exe` directly for every test file,
+/// rewriting `config.json` between runs without forcing a recompile each
+/// time. Assumes the exe lives three directories under the repo root
+/// (`target/<profile>/soul_tester.exe`, `cargo`'s own default layout) —
+/// doesn't hold under a custom `--target-dir`, but this binary is only ever
+/// invoked via `cargo run`/`cargo build` or the test script, never shipped.
+fn config_path() -> PathBuf {
+    let exe = std::env::current_exe().expect("failed to resolve the running exe's own path");
+    exe.parent()
+        .and_then(Path::parent)
+        .and_then(Path::parent)
+        .unwrap_or_else(|| {
+            panic!(
+                "expected {} to live three directories under the repo root (target/<profile>/soul_tester.exe)",
+                exe.display()
+            )
+        })
+        .join("soul_tester")
+        .join("config.json")
+}
+
 fn parse_config() -> Configs {
-    let json = serde_json::from_str(RAW_CONFIG).expect("should have not parse error");
+    let path = config_path();
+    let raw = std::fs::read_to_string(&path)
+        .unwrap_or_else(|e| panic!("failed to read config at {}: {e}", path.display()));
+    let json: JsonConfigs = serde_json::from_str(&raw).expect("should have not parse error");
     Configs::new(json)
 }
 

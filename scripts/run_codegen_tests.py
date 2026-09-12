@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Codegen exe-correctness test runner.
 
-For each `.soul` file under `soul_tester/soul/src/codegen_tests/`:
-  1. point soul_tester's config.json at it and run soul_tester (soul -> MIR
-     -> LLVM IR, written to soul_tester/soul/output/codegen/module.ll)
+Builds `soul_tester` once up front, then for each `.soul` file under
+`soul_tester/soul/src/codegen_tests/`:
+  1. point soul_tester's config.json at it and run the already-built
+     soul_tester exe directly (soul -> MIR -> LLVM IR, written to
+     soul_tester/soul/output/codegen/module.ll)
   2. invoke clang (LLVM 16, matching mir_codegen's target) to compile+link
      module.ll into a native exe
   3. run the exe and compare its process exit code against the `// expect: N`
@@ -13,6 +15,13 @@ This is the M1 codegen correctness oracle: MIR/AST faults only ever proved
 the compiler didn't crash, never that generated code computes the right
 answer — this is the first stage where that's actually checked, by running
 real produced machine code.
+
+Runs the built exe directly rather than `cargo run` per test: profiling
+showed `cargo run` cost ~2.2s per invocation (vs a ~0.24s baseline with no
+source change) because rewriting config.json used to force a recompile —
+`config.json` is now read at runtime (see `soul_tester::config::config_path`)
+specifically so this script can build once and invoke the exe 20+ times
+without paying that cost each time.
 """
 
 import json
@@ -26,6 +35,7 @@ SOUL_TESTER_DIR = REPO_ROOT / "soul_tester"
 CONFIG_PATH = SOUL_TESTER_DIR / "config.json"
 TESTS_DIR = SOUL_TESTER_DIR / "soul" / "src" / "codegen_tests"
 LL_PATH = SOUL_TESTER_DIR / "soul" / "output" / "codegen" / "module.ll"
+SOUL_TESTER_EXE = REPO_ROOT / "target" / "debug" / "soul_tester.exe"
 CLANG = Path(r"C:\llvm-16\bin\clang.exe")
 
 EXPECT_RE = re.compile(r"//\s*expect:\s*(\d+)")
@@ -63,9 +73,27 @@ def set_main_path(relative_path: str) -> None:
     CONFIG_PATH.write_text(json.dumps(config, indent=4) + "\n", encoding="utf-8")
 
 
+def build_soul_tester() -> None:
+    """Builds soul_tester once, up front — an explicit, hard-stop step
+    rather than letting a compile failure surface 20+ times as a confusing
+    per-test error once the loop starts invoking the (nonexistent/stale)
+    exe directly."""
+    result = subprocess.run(
+        ["cargo", "build", "-p", "soul_tester"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        print("soul_tester failed to build:", file=sys.stderr)
+        print(result.stdout, file=sys.stderr)
+        print(result.stderr, file=sys.stderr)
+        raise SystemExit(1)
+
+
 def run_soul_tester() -> None:
     result = subprocess.run(
-        ["cargo", "run", "-p", "soul_tester"],
+        [str(SOUL_TESTER_EXE)],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
@@ -94,12 +122,14 @@ def build_and_run_exe(exe_path: Path) -> tuple[int, str]:
 
 
 def main() -> int:
-    original_config = CONFIG_PATH.read_text(encoding="utf-8")
     test_files = sorted(TESTS_DIR.glob("*.soul"))
     if not test_files:
         print(f"no test files found under {TESTS_DIR}", file=sys.stderr)
         return 1
 
+    build_soul_tester()
+
+    original_config = CONFIG_PATH.read_text(encoding="utf-8")
     failures = []
     try:
         for soul_file in test_files:
