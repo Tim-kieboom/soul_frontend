@@ -57,7 +57,7 @@ macro_rules! bitflags {
             }
 
             #[inline]
-            pub const fn union(&self, other: Self) -> Self {
+            pub const fn add(&self, other: Self) -> Self {
                 Self(self.0 | other.0)
             }
 
@@ -81,14 +81,14 @@ macro_rules! bitflags {
             type Output = Self;
             #[inline]
             fn bitor(self, rhs: Self) -> Self::Output {
-                self.union(rhs)
+                self.add(rhs)
             }
         }
 
         impl core::ops::BitOrAssign for $Name {
             #[inline]
             fn bitor_assign(&mut self, rhs: Self) {
-                *self = self.union(rhs);
+                *self = self.add(rhs);
             }
         }
 

@@ -19,12 +19,15 @@ use soul_utils::{
         benchmark::Benchmark,
         crate_store::{CrateEntry, CrateStore, Manifest},
         module_store::ModuleStore,
-    },
-    compiler_options::{CompilerOptions, PlatformInfo},
-    fault::Severity,
+    }, compiler_options::{CompilerOptions, MirOptions, PlatformInfo}, fault::Severity,
 };
 
+const MIR_OPTIONS: MirOptions = MirOptions::empty()
+    .add(MirOptions::CHECK_ALGORITHMIC_OVERFLOW)
+    .add(MirOptions::CHECK_INDEX_OUT_OF_BOUNDS);
+
 const COMPILER_OPTIONS: CompilerOptions = CompilerOptions {
+    mir: MIR_OPTIONS,
     fail_level: Severity::Error,
     platform: PlatformInfo {
         pointer_bits: 64,

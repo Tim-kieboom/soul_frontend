@@ -68,7 +68,7 @@ fn frontend(benchmark: &mut Benchmark) -> Result<bool> {
     display_mir(&mir, &ast.crates.store)?;
 
     if !ast_failed {
-        codegen(&mir, &ast)?;
+        codegen(&mir, &ast, benchmark)?;
     }
 
     for fault in all_faults.iter() {
@@ -159,18 +159,21 @@ fn mir(ast: &AstTree, benchmark: &mut Benchmark, all_faults: &mut FaultCollector
 /// slice) codegen pass, so plenty of otherwise-valid MIR (e.g. anything using
 /// `f64`) isn't supported yet, the same way MIR faults don't gate the overall
 /// AST-level pass/fail. See `mir_codegen`'s module docs for what's in scope.
-fn codegen(mir: &MirProgram, ast: &AstTree) -> Result<()> {
-    match to_llvm(&Context::create(), mir, ast, &config::COMPILER_OPTIONS) {
-        Ok(module) => {
-            let output_path = config::CONFIG.output_path().join("codegen");
-            std::fs::create_dir_all(&output_path)?;
-            module
-                .print_to_file(output_path.join("module.ll"))
-                .map_err(|e| anyhow::anyhow!("{e}"))?;
-        }
+fn codegen(mir: &MirProgram, ast: &AstTree, benchmark: &mut Benchmark) -> Result<()> {
+    
+    let context = Context::create();
+    let module = match to_llvm(&context, benchmark, mir, ast, &config::COMPILER_OPTIONS) {
+        Ok(val) => val,
         Err(err) => {
             eprintln!("{RED}codegen skipped, error: {}{DEFAULT}", err.message());
+            return Ok(())
         }
-    }
+    };
+
+    let output_path = config::CONFIG.output_path().join("codegen");
+    std::fs::create_dir_all(&output_path)?;
+    module
+        .print_to_file(output_path.join("module.ll"))
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
     Ok(())
 }

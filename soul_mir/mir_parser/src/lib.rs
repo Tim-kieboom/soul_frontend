@@ -19,7 +19,7 @@ mod tests;
 use ast_model::{self as ast, AstStore, declare_store::DeclareStore};
 
 use mir_model as mir;
-use soul_utils::{FunctionId, collections::vec_map::VecMap, fault::Fault};
+use soul_utils::{FunctionId, collections::vec_map::VecMap, compiler_options::CompilerOptions, fault::Fault};
 
 use crate::{
     fault::{MirErrorKind, MirResult},
@@ -35,12 +35,12 @@ pub struct MirLowerer<'a> {
     externs: VecMap<FunctionId, mir::ExternFunction>,
 }
 impl<'a> MirLowerer<'a> {
-    pub fn new(store: &'a AstStore, declares: &'a DeclareStore) -> Self {
+    pub fn new(store: &'a AstStore, declares: &'a DeclareStore, options: &'a CompilerOptions) -> Self {
         Self {
+            store,
             functions: VecMap::new(),
             externs: VecMap::new(),
-            function_lowerer: FunctionLowerer::new(store, declares),
-            store,
+            function_lowerer: FunctionLowerer::new(store, declares, options),
         }
     }
 

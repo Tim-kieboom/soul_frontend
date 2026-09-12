@@ -5,7 +5,6 @@ use crate::span::Span;
 #[derive(
     Debug,
     Clone,
-    Default,
     Copy,
     PartialEq,
     Eq,
@@ -17,8 +16,17 @@ use crate::span::Span;
 pub enum Severity {
     Note = 0,
     Warning = 1,
-    #[default]
     Error = 2,
+}
+impl Severity {
+    pub const fn const_default() -> Self {
+        Self::Error
+    }
+}
+impl Default for Severity {
+    fn default() -> Self {
+        Self::const_default()
+    }
 }
 
 /// Fallback fault kind for call sites that have not yet been migrated to a

@@ -5,10 +5,7 @@ use ast_run::{AstRequest, to_ast};
 use mir_parser::fault::MirErrorKind;
 use soul_tokenizer::to_token_stream;
 use soul_utils::{
-    CrateContext,
-    collections::{benchmark::Benchmark, crate_store::CrateStore, module_store::ModuleStore},
-    compiler_options::{CompilerOptions, PlatformInfo},
-    fault::Severity,
+    CrateContext, collections::{benchmark::Benchmark, crate_store::CrateStore, module_store::ModuleStore}, compiler_options::{CompilerOptions, MirOptions, PlatformInfo}, fault::Severity,
 };
 
 use crate::MirProgram;
@@ -23,7 +20,7 @@ fn create_mir_with_benchmark(
     benchmark: &mut Benchmark,
 ) -> (MirProgram, CrateContext<MirErrorKind>) {
     let mut context = CrateContext::default();
-    let mir = crate::to_mir(ast, benchmark, &mut context, &CompilerOptions::default());
+    let mir = crate::to_mir(ast, benchmark, &mut context, &CompilerOptions::const_default());
     (mir, context)
 }
 
@@ -35,7 +32,13 @@ fn build_ast(source: &str) -> AstTree {
 
     let tokens = to_token_stream(source, root).expect("test source failed to tokenize");
     let mut benchmark = Benchmark::new();
+    
+    let mir = MirOptions::empty()
+        .add(MirOptions::CHECK_ALGORITHMIC_OVERFLOW)
+        .add(MirOptions::CHECK_INDEX_OUT_OF_BOUNDS);
+
     let options = CompilerOptions {
+        mir,
         fail_level: Severity::Error,
         platform: PlatformInfo::default(),
     };

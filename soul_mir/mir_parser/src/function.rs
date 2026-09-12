@@ -5,13 +5,7 @@ use ast_model::{
 };
 use mir_model as mir;
 use soul_utils::{
-    TypeModifier,
-    collections::vec_map::VecMap,
-    fault::Fault,
-    ids::IdGenerator,
-    intrinsics::IntrinsicFunction,
-    soul_names::PrimitiveTypes,
-    span::{ModuleId, Span},
+    TypeModifier, collections::vec_map::VecMap, compiler_options::{CompilerOptions, MirOptions}, fault::Fault, ids::IdGenerator, intrinsics::IntrinsicFunction, soul_names::PrimitiveTypes, span::{ModuleId, Span},
 };
 
 use crate::fault::{MirErrorKind, MirResult};
@@ -28,10 +22,6 @@ struct LoopTargets {
 pub struct FunctionLowerer<'a> {
     store: &'a ast::AstStore,
     declares: &'a DeclareStore,
-    /// The module the function currently being lowered was declared in — set
-    /// at the start of each `lower()` call, needed to resolve a struct-typed
-    /// `SoulType::Stub`'s bare name back to its declaration (struct names are
-    /// only unique per module).
     module: Option<ModuleId>,
     local_alloc: IdGenerator<mir::LocalId>,
     node_to_local: VecMap<ast::NodeId, mir::LocalId>,
@@ -43,11 +33,14 @@ pub struct FunctionLowerer<'a> {
     current: Option<mir::BlockId>,
     statements: Vec<mir::Statement>,
     loops: Vec<LoopTargets>,
+
+    options: &'a CompilerOptions,
 }
 impl<'a> FunctionLowerer<'a> {
-    pub(crate) fn new(store: &'a ast::AstStore, declares: &'a DeclareStore) -> Self {
+    pub(crate) fn new(store: &'a ast::AstStore, declares: &'a DeclareStore, options: &'a CompilerOptions) -> Self {
         Self {
             store,
+            options,
             declares,
             module: None,
             current: None,
@@ -250,7 +243,7 @@ impl<'a> FunctionLowerer<'a> {
         for &id in statements {
             let statement = &self.store.statements[id];
             if self.is_terminated() {
-                return Err(Fault::error_with_kind(
+                return Err(Fault::warning_with_kind(
                     MirErrorKind::UnreachableStatement,
                     Some(statement.span),
                 ));
@@ -450,7 +443,9 @@ impl<'a> FunctionLowerer<'a> {
         let index_local =
             self.operand_local(index.index, SoulType::Primitive(PrimitiveTypes::Uint), span)?;
 
-        self.emit_bounds_check(&place, index_local, span);
+        if self.options.mir.contains(MirOptions::CHECK_INDEX_OUT_OF_BOUNDS) {
+            self.emit_bounds_check(&place, index_local, span);
+        }
 
         place.projection.push(mir::PlaceElem::Index(index_local));
         Ok((place, element_ty))
@@ -471,9 +466,9 @@ impl<'a> FunctionLowerer<'a> {
         index_local: mir::LocalId,
         span: Span,
     ) {
-        let uint = SoulType::Primitive(PrimitiveTypes::Uint);
+        const UINT: SoulType = SoulType::Primitive(PrimitiveTypes::Uint);
 
-        let len_local = self.alloc_local(uint.clone(), TypeModifier::Immut, span);
+        let len_local = self.alloc_local(UINT, TypeModifier::Immut, span);
         self.statements.push(mir::Statement::Assign(
             mir::Place::local(len_local),
             mir::Rvalue::Len(collection.clone()),
@@ -485,12 +480,12 @@ impl<'a> FunctionLowerer<'a> {
         {
             index_local
         } else {
-            let cast = self.alloc_local(uint.clone(), TypeModifier::Immut, span);
+            let cast = self.alloc_local(UINT, TypeModifier::Immut, span);
             self.statements.push(mir::Statement::Assign(
                 mir::Place::local(cast),
                 mir::Rvalue::Cast(
                     mir::Operand::Copy(mir::Place::local(index_local)),
-                    uint.clone(),
+                    UINT,
                 ),
             ));
             cast
@@ -1075,6 +1070,9 @@ impl<'a> FunctionLowerer<'a> {
     }
 
     fn lower_rvalue(&mut self, expr_id: ast::ExpressionId) -> MirResult<mir::Rvalue> {
+        
+        let should_check_overflow = || self.options.mir.contains(MirOptions::CHECK_ALGORITHMIC_OVERFLOW);
+        
         let expr = &self.store.expressions[expr_id];
         match &expr.node {
             ast::ExpressionKind::Binary(binary) => {
@@ -1086,7 +1084,7 @@ impl<'a> FunctionLowerer<'a> {
                 }
                 let left = self.lower_operand(binary.left)?;
                 let right = self.lower_operand(binary.right)?;
-                if is_checked_arith_op(binary.operator.value) {
+                if is_checked_arith_op(binary.operator.value) && should_check_overflow() {
                     return self.lower_checked_binary_op(
                         binary.operator.value,
                         left,
@@ -1149,6 +1147,7 @@ impl<'a> FunctionLowerer<'a> {
             .ok_or_else(|| {
                 Fault::error_with_kind(MirErrorKind::NestedExpressionHasNoResolvedType, Some(span))
             })?;
+
         require_primitive(&result_ty, span)?;
 
         let tuple_ty = SoulType::TupleKind(ast::TupleKind::Tuple(vec![

@@ -8,12 +8,25 @@ use soul_tokenizer::to_token_stream;
 use soul_utils::{
     FunctionId,
     collections::{crate_store::CrateStore, module_store::ModuleStore},
+    compiler_options::{CompilerOptions, MirOptions},
 };
 
 use crate::{
     MirLowerer,
     fault::{MirErrorKind, MirResult},
 };
+
+// Tests exercise the checked-arithmetic/bounds-check MIR shapes, so run with
+// every `MirOptions` flag on — matching `mir_run`'s own test fixtures, and
+// unlike `soul_tester`'s production config, which currently defaults both
+// off (see `soul_tester::config::COMPILER_OPTIONS`).
+const OPTIONS: CompilerOptions = CompilerOptions {
+    mir: MirOptions::all(),
+    ..CompilerOptions::const_default()
+};
+fn create_lowerer<'a>(ast: &'a AstTree) -> MirLowerer<'a> {
+    MirLowerer::new(&ast.crates.store, &ast.declares, &OPTIONS)
+}
 
 fn resolve_source(source: &str) -> AstTree {
     let mut module_store = ModuleStore::new();
@@ -64,7 +77,7 @@ fn lower_function(
     declares: &DeclareStore,
     id: FunctionId,
 ) -> MirResult<mir_model::Function> {
-    let mut lowerer = MirLowerer::new(store, declares);
+    let mut lowerer = MirLowerer::new(store, declares, &OPTIONS);
     lowerer.lower_function(id)?;
     Ok(lowerer.functions.into_values().next().unwrap())
 }
@@ -1303,7 +1316,7 @@ fn extern_c_signature_lowers_into_an_extern_function_with_no_type_restriction() 
         .find(|(_, kind)| matches!(kind, FunctionKind::Signature(_)))
         .expect("expected one signature-only function");
 
-    let mut lowerer = MirLowerer::new(&ast.crates.store, &ast.declares);
+    let mut lowerer = create_lowerer(&ast);
     lowerer
         .lower_function(id)
         .expect("expected extern lowering to succeed");

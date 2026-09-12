@@ -39,10 +39,12 @@ mod rvalue;
 mod terminator;
 mod types;
 
+use std::time::Instant;
+
 use ast_model::AstTree;
 use inkwell::{builder::BuilderError, context::Context, module::Module};
 use mir_model::MirProgram;
-use soul_utils::{compiler_options::CompilerOptions, fault::Fault};
+use soul_utils::{collections::benchmark::Benchmark, compiler_options::CompilerOptions, fault::Fault};
 
 use crate::{
     fault::{CodegenErrorKind, CodegenResult},
@@ -51,18 +53,22 @@ use crate::{
 
 pub fn to_llvm<'ctx>(
     context: &'ctx Context,
+    benchmark: &mut Benchmark,
     mir: &MirProgram,
     ast: &AstTree,
     options: &CompilerOptions,
 ) -> CodegenResult<Module<'ctx>> {
-    codegen_module(
+    let timer = Instant::now();
+    let module = codegen_module(
         context,
         "soul_module",
         mir,
         &ast.crates.store,
         &ast.declares,
         options,
-    )
+    );
+    benchmark.add_benchmark("codegen", timer.elapsed());
+    module
 }
 
 fn llvm_err(err: BuilderError) -> Fault<CodegenErrorKind> {

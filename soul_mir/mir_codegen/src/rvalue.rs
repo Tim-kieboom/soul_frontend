@@ -173,6 +173,14 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
         use BinaryOperatorKind::*;
         let b = &self.builder;
         let v = match op {
+            // Reached only when `mir_parser`'s `CHECK_ALGORITHMIC_OVERFLOW`
+            // option is off — otherwise `Add`/`Sub`/`Mul` always lower to
+            // `Rvalue::CheckedBinaryOp` (`codegen_checked_binary`) instead.
+            // Plain wrapping ops, matching the option being disabled.
+            Add => b.build_int_add(l, r, "add"),
+            Sub => b.build_int_sub(l, r, "sub"),
+            Mul => b.build_int_mul(l, r, "mul"),
+            
             Div if signed => b.build_int_signed_div(l, r, "sdiv"),
             Div => b.build_int_unsigned_div(l, r, "udiv"),
             Mod if signed => b.build_int_signed_rem(l, r, "srem"),

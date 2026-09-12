@@ -1,7 +1,9 @@
-GLOBAL :: 1
-GLOBAL_INT: int :: 2
 
-main(): int {
-    TEST :: 1
+main(): i32 {
+    MAX_U8 :: 255_u8
+    number: u8 = MAX_U8 + 1
+    arr: [2]int = [1, 2]
+    slice: [&]int = &arr
+    outOfBounds: int = slice[3]
     return 0
 }

@@ -4,20 +4,25 @@ use std::{
 };
 
 use soul_utils::{
-    compiler_options::{CompilerOptions, PlatformInfo},
-    fault::Severity,
+    compiler_options::{CompilerOptions, MirOptions, PlatformInfo}, fault::Severity,
 };
 
 const RAW_CONFIG: &str = include_str!("../config.json");
 pub static CONFIG: LazyLock<Configs> = LazyLock::new(parse_config);
+
+const MIR_OPTIONS: MirOptions = MirOptions::empty()
+    .add(MirOptions::CHECK_ALGORITHMIC_OVERFLOW)
+    .add(MirOptions::CHECK_INDEX_OUT_OF_BOUNDS);
+
 pub const COMPILER_OPTIONS: CompilerOptions = CompilerOptions {
+    mir: MIR_OPTIONS,
     fail_level: Severity::Error,
     platform: PlatformInfo::new_windows_x86_64(),
 };
 
 pub const PRINT_CONFIGS: PrintConfigs = PrintConfigs {
     #[cfg(feature = "error_backtrace")]
-    backtrace: false,
+    backtrace: true,
     color: true,
 };
 

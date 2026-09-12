@@ -1,9 +1,25 @@
-use crate::fault::Severity;
+use crate::{bitflags, fault::Severity};
 
-#[derive(Default)]
+bitflags!{
+    pub struct MirOptions: u8 {
+        CHECK_ALGORITHMIC_OVERFLOW = 1 << 0, 
+        CHECK_INDEX_OUT_OF_BOUNDS = 1 << 1,
+    }
+}
+
 pub struct CompilerOptions {
     pub fail_level: Severity,
     pub platform: PlatformInfo,
+    pub mir: MirOptions,
+}
+impl CompilerOptions {
+    pub const fn const_default() -> Self {
+        Self {
+            fail_level: Severity::const_default(),
+            platform: PlatformInfo::const_default(),
+            mir: MirOptions::all(),
+        }
+    }
 }
 
 /// Target-specific integer widths codegen needs to turn a Soul type like
@@ -30,9 +46,13 @@ impl PlatformInfo {
             c_int_bits: 32,
         }
     }
+
+    pub const fn const_default() -> Self {
+        Self::new_windows_x86_64()
+    }
 }
 impl Default for PlatformInfo {
     fn default() -> Self {
-        Self::new_windows_x86_64()
+        Self::const_default()
     }
 }
