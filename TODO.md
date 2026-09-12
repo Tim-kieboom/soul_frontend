@@ -64,7 +64,7 @@ No `Res`/`.pass`/`?T`, no unions, no generics, no borrow checking yet.
       Scoped to fixed-size arrays (`[N]T`, only as the thing you *reference*) and slices
       (`[&]T`/`[&mut]T`, only as the thing you *index*) — not wildcard-sized (`[_]T`) or heap (`[]T`)
       arrays:
-  - `mir_parser`: generalized `resolve_field_place` into `resolve_place_expr`, a shared place
+  - `mir_parser`: generalized `resolve_field_place` into `resolve_place_expression`, a shared place
     resolver dispatching on variable/field-access/index (so `o.items[i].x` composes into one `Place`
     with a three-element projection, same pattern as nested field chains). `[1, 2]` lowers to
     `Rvalue::Aggregate(AggregateKind::Array, ..)` in literal order (arity trusted from the resolver,

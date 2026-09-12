@@ -17,7 +17,6 @@ pub mod fault;
 mod tests;
 
 use ast_model::{self as ast, AstStore, declare_store::DeclareStore};
-
 use mir_model as mir;
 use soul_utils::{
     FunctionId, collections::vec_map::VecMap, compiler_options::CompilerOptions, fault::Fault,
