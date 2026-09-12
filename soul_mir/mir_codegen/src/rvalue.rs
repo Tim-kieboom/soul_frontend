@@ -7,11 +7,11 @@ use ast_model::{
     operators::{BinaryOperatorKind, UnaryOperatorKind},
 };
 use inkwell::{
-    IntPredicate,
+    FloatPredicate, IntPredicate,
     intrinsics::Intrinsic,
     module::Linkage,
     types::BasicTypeEnum,
-    values::{BasicValueEnum, IntValue, PointerValue},
+    values::{BasicValueEnum, FloatValue, IntValue, PointerValue},
 };
 use mir_model::{AggregateKind, ConstValue, Operand, Place, Rvalue};
 
@@ -20,7 +20,7 @@ use crate::{
     fault::{CodegenErrorKind, CodegenResult},
     function::FunctionCodegen,
     llvm_err,
-    types::{const_int, expect_int, is_signed},
+    types::{const_float, const_int, expect_float, expect_int, is_signed},
 };
 
 impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
@@ -109,10 +109,73 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
             .or_else(|| self.operand_type(right))
             .unwrap_or(result_ty);
 
+        if let BasicTypeEnum::FloatType(_) = operand_ty {
+            let l = expect_float(self.codegen_operand(left, operand_ty)?)?;
+            let r = expect_float(self.codegen_operand(right, operand_ty)?)?;
+            return self.codegen_float_binary_op(*op, l, r);
+        }
+
         let l = expect_int(self.codegen_operand(left, operand_ty)?)?;
         let r = expect_int(self.codegen_operand(right, operand_ty)?)?;
         let signed = self.operand_is_signed(left) || self.operand_is_signed(right);
         Ok(self.codegen_binary_op(*op, l, r, signed)?.into())
+    }
+
+    /// The float counterpart to `codegen_binary_op` — no signed/unsigned
+    /// distinction (floats have none), and no checked-arithmetic path either
+    /// (`mir_parser` never routes a float `Add`/`Sub`/`Mul`/`Div` through
+    /// `lower_checked_binary_op`/`lower_checked_div`: IEEE 754 overflow
+    /// saturates to `inf`/`-inf` rather than being undefined behavior the
+    /// way integer overflow and `INT_MIN / -1` are, so there's nothing to
+    /// trap). Comparisons use the ordered (`O*`) `FloatPredicate`s — `NaN`
+    /// compares false against everything including itself, so `ONE`/`OLT`/
+    /// etc. (as opposed to the unordered `U*` variants) match how every
+    /// other language with IEEE floats defines `==`/`<`/etc.
+    fn codegen_float_binary_op(
+        &mut self,
+        op: BinaryOperatorKind,
+        l: FloatValue<'ctx>,
+        r: FloatValue<'ctx>,
+    ) -> CodegenResult<BasicValueEnum<'ctx>> {
+        use BinaryOperatorKind::*;
+        let b = &self.builder;
+        let v: BasicValueEnum = match op {
+            Add => b.build_float_add(l, r, "fadd").map_err(llvm_err)?.into(),
+            Sub => b.build_float_sub(l, r, "fsub").map_err(llvm_err)?.into(),
+            Mul => b.build_float_mul(l, r, "fmul").map_err(llvm_err)?.into(),
+            Div => b.build_float_div(l, r, "fdiv").map_err(llvm_err)?.into(),
+            Mod => b.build_float_rem(l, r, "frem").map_err(llvm_err)?.into(),
+            Eq => b
+                .build_float_compare(FloatPredicate::OEQ, l, r, "feq")
+                .map_err(llvm_err)?
+                .into(),
+            NotEq => b
+                .build_float_compare(FloatPredicate::ONE, l, r, "fne")
+                .map_err(llvm_err)?
+                .into(),
+            Lt => b
+                .build_float_compare(FloatPredicate::OLT, l, r, "flt")
+                .map_err(llvm_err)?
+                .into(),
+            Gt => b
+                .build_float_compare(FloatPredicate::OGT, l, r, "fgt")
+                .map_err(llvm_err)?
+                .into(),
+            Le => b
+                .build_float_compare(FloatPredicate::OLE, l, r, "fle")
+                .map_err(llvm_err)?
+                .into(),
+            Ge => b
+                .build_float_compare(FloatPredicate::OGE, l, r, "fge")
+                .map_err(llvm_err)?
+                .into(),
+            other => {
+                return Err(err(CodegenErrorKind::UnsupportedBinaryOperator {
+                    op: format!("{other:?}").into_boxed_str(),
+                }));
+            }
+        };
+        Ok(v)
     }
 
     /// Builds an aggregate value element-by-element: an `undef` of the
@@ -352,6 +415,7 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
     ) -> CodegenResult<BasicValueEnum<'ctx>> {
         match ty {
             BasicTypeEnum::IntType(int_ty) => Ok(const_int(int_ty, value)?.into()),
+            BasicTypeEnum::FloatType(float_ty) => Ok(const_float(float_ty, value)?.into()),
             BasicTypeEnum::PointerType(_) => match value {
                 ConstValue::Str(s) | ConstValue::Cstr(s) => {
                     Ok(self.codegen_string_constant(s).into())

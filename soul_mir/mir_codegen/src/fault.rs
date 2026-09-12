@@ -57,6 +57,9 @@ pub enum CodegenErrorKind {
     #[error("expected an integer operand, got a pointer")]
     ExpectedIntOperand,
 
+    #[error("expected a float operand, got an int or a pointer")]
+    ExpectedFloatOperand,
+
     #[error("expected a pointer operand, got an integer")]
     ExpectedPointerOperand,
 

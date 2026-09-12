@@ -224,6 +224,24 @@ impl<'a> FunctionLowerer<'a> {
         }
     }
 
+    /// Whether a binary expression's operands are float-typed — same
+    /// operand-then-whole-expression fallback `lower_checked_binary_op`/
+    /// `lower_checked_div` use to type themselves, reused here so
+    /// `lower_rvalue` can decide *before* routing into either of those
+    /// whether this is even an integer operation to begin with.
+    fn is_float_operand(
+        &self,
+        left: &mir::Operand,
+        right: &mir::Operand,
+        expr_id: ast::ExpressionId,
+    ) -> bool {
+        let ty = self
+            .operand_type(left)
+            .or_else(|| self.operand_type(right))
+            .or_else(|| self.declares.get_expression_type(expr_id).cloned());
+        matches!(ty, Some(SoulType::Primitive(p)) if is_float_primitive(p))
+    }
+
     fn new_block(&mut self) -> mir::BlockId {
         self.block_alloc.alloc()
     }
@@ -1102,7 +1120,16 @@ impl<'a> FunctionLowerer<'a> {
                 }
                 let left = self.lower_operand(binary.left)?;
                 let right = self.lower_operand(binary.right)?;
-                if is_checked_arith_op(binary.operator.value) && should_check_overflow() {
+                // Floats never go through the checked-arithmetic/checked-div
+                // paths: IEEE 754 overflow saturates to `inf`/`-inf` rather
+                // than being UB the way integer overflow and `INT_MIN / -1`
+                // are, and there's no `{s,u}*.with.overflow`-style intrinsic
+                // for floats for `lower_checked_binary_op` to call anyway.
+                let is_float = self.is_float_operand(&left, &right, expr_id);
+                if !is_float
+                    && is_checked_arith_op(binary.operator.value)
+                    && should_check_overflow()
+                {
                     return self.lower_checked_binary_op(
                         binary.operator.value,
                         left,
@@ -1111,7 +1138,8 @@ impl<'a> FunctionLowerer<'a> {
                         expr.span,
                     );
                 }
-                if is_checked_div_op(binary.operator.value) && should_check_overflow() {
+                if !is_float && is_checked_div_op(binary.operator.value) && should_check_overflow()
+                {
                     return self.lower_checked_div(
                         binary.operator.value,
                         left,
@@ -1530,6 +1558,19 @@ fn is_checked_arith_op(op: BinaryOperatorKind) -> bool {
 /// can't represent, since the mathematical result overflows the type).
 fn is_checked_div_op(op: BinaryOperatorKind) -> bool {
     matches!(op, BinaryOperatorKind::Div | BinaryOperatorKind::Mod)
+}
+
+/// Mirrors `mir_codegen::types::is_float` one layer up (`SoulType` here,
+/// `PrimitiveTypes` there) — used by `is_float_operand` to keep floats out
+/// of the checked-arithmetic/checked-div lowering paths.
+fn is_float_primitive(prim: PrimitiveTypes) -> bool {
+    matches!(
+        prim,
+        PrimitiveTypes::Float16
+            | PrimitiveTypes::Float32
+            | PrimitiveTypes::Float64
+            | PrimitiveTypes::UntypedFloat
+    )
 }
 
 /// The minimum representable value of a signed primitive integer type, or

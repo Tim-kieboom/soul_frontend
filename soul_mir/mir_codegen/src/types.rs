@@ -7,8 +7,8 @@ use ast_model::{ArrayKind, SoulType, Struct, TupleKind, declare_store::DeclareSt
 use inkwell::{
     AddressSpace,
     context::Context,
-    types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum, IntType},
-    values::{BasicValueEnum, IntValue},
+    types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FloatType, IntType},
+    values::{BasicValueEnum, FloatValue, IntValue},
 };
 use mir_model::ConstValue;
 use soul_utils::{
@@ -53,6 +53,27 @@ pub(crate) fn is_signed(prim: PrimitiveTypes) -> bool {
     )
 }
 
+/// Builds a float constant — the `const_int` of the float world. `Int`/
+/// `Uint` literals are accepted too (truncated to the destination's own
+/// precision) since an untyped int literal can unify with a float-typed
+/// context (`x: f64 = 5`) the same way it already does at the resolver
+/// level.
+pub(crate) fn const_float<'ctx>(
+    ty: FloatType<'ctx>,
+    value: &ConstValue,
+) -> CodegenResult<FloatValue<'ctx>> {
+    Ok(match value {
+        ConstValue::Float(f) => ty.const_float(*f),
+        ConstValue::Int(n) => ty.const_float(*n as f64),
+        ConstValue::Uint(n) => ty.const_float(*n as f64),
+        other => {
+            return Err(err(CodegenErrorKind::UnsupportedConstant {
+                value: format!("{other:?}").into_boxed_str(),
+            }));
+        }
+    })
+}
+
 /// Resolves a struct-typed `SoulType::Stub`'s bare name back to its `Struct`
 /// declaration — mirrors `mir_parser`'s own `resolve_struct`, since codegen
 /// gets handed the exact same unresolved `SoulType` MIR lowering already
@@ -79,13 +100,22 @@ pub(crate) fn expect_int(value: BasicValueEnum<'_>) -> CodegenResult<IntValue<'_
     }
 }
 
+/// Narrows a value to a `FloatValue`, faulting if it's actually an int or a
+/// pointer — the float-side counterpart to `expect_int`.
+pub(crate) fn expect_float(value: BasicValueEnum<'_>) -> CodegenResult<FloatValue<'_>> {
+    match value {
+        BasicValueEnum::FloatValue(v) => Ok(v),
+        _ => Err(err(CodegenErrorKind::ExpectedFloatOperand)),
+    }
+}
+
 /// Maps a Soul type to its LLVM representation. Integers/`bool` map to the
-/// matching `IntType`; `cstr` and any reference/pointer type map to an
-/// (opaque, LLVM-16-style) pointer type; a struct maps to an LLVM struct
-/// type with one field per declared field, in declared order (the same
-/// order `mir_parser` uses for `Rvalue::Aggregate` operands and
-/// `PlaceElem::Field` indices) — everything else (arrays, floats, ...) isn't
-/// supported in this codegen slice yet.
+/// matching `IntType`; `f32`/`f64` map to the matching `FloatType` (`f16`
+/// isn't supported yet — falls through to `UnsupportedPrimitiveType`); `cstr`
+/// and any reference/pointer type map to an (opaque, LLVM-16-style) pointer
+/// type; a struct maps to an LLVM struct type with one field per declared
+/// field, in declared order (the same order `mir_parser` uses for
+/// `Rvalue::Aggregate` operands and `PlaceElem::Field` indices).
 pub(crate) fn llvm_type<'ctx>(
     context: &'ctx Context,
     platform: &PlatformInfo,
@@ -111,6 +141,11 @@ pub(crate) fn llvm_type<'ctx>(
             CInt | CUint => context.custom_width_int_type(platform.c_int_bits).into(),
             Char8 => context.i8_type().into(),
             CStr => context.ptr_type(AddressSpace::default()).into(),
+            Float32 => context.f32_type().into(),
+            // Untyped float literals default to `f64` the same way an
+            // untyped int literal defaults to `int` elsewhere in this file
+            // — matches the resolver's own `UntypedFloat` widening.
+            Float64 | UntypedFloat => context.f64_type().into(),
             other => {
                 return Err(Fault::error_with_kind(
                     CodegenErrorKind::UnsupportedPrimitiveType {

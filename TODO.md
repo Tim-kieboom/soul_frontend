@@ -230,12 +230,34 @@ No `Res`/`.pass`/`?T`, no unions, no generics, no borrow checking yet.
       function calls, `extern "C"` functions (incl. `cstr`/pointer params and correct C-vs-Soul
       integer widths via `PlatformInfo`, see below), string/cstr constants, and process-exit-code
       `main` codegen. Structured fault system (`CodegenErrorKind`) replaces `anyhow`.
-  - [ ] `f32`/`f64` unsupported (`UnsupportedPrimitiveType`) — no float codegen yet
+  - [x] `f32`/`f64` arithmetic (`+`/`-`/`*`/`/`/`%`) and comparisons (`==`/`!=`/`<`/`>`/`<=`/`>=`) —
+        proven via `22_float_arithmetic.soul`, `23_float_ops.soul` (all six ops + all six
+        comparisons on `f64`), `24_f32_arithmetic.soul`. `f16` deliberately still unsupported (falls
+        through to `UnsupportedPrimitiveType` in `llvm_type` — no direct C ABI use for it yet).
+    - `ast_model`/tokenizer/`soul_name_resolver` already had everything needed (`PrimitiveTypes::
+      Float16/32/64/UntypedFloat`, `Literal::Float(f64)`, float-literal lexing, and the resolver's
+      numeric-promotion tables) — this was purely a `mir_codegen`/`mir_parser` gap, not a frontend one.
+    - `mir_codegen::types`: `llvm_type` maps `Float32`/`Float64` (and `UntypedFloat`, defaulting to
+      `f64` the same way an untyped int literal defaults to `int`) to the matching LLVM `FloatType`.
+      New `const_float`/`expect_float` mirror `const_int`/`expect_int`.
+    - `mir_codegen::rvalue`: `codegen_binary` branches to a new `codegen_float_binary_op` when the
+      resolved operand type is a `FloatType` — no signed/unsigned split (floats have none), using
+      `build_float_add/sub/mul/div/rem` and `build_float_compare` with the *ordered* (`O*`)
+      `FloatPredicate`s (`NaN` compares false against everything per IEEE 754, matching how every
+      other language defines float `==`/`<`/etc.). `codegen_constant` gained a `FloatType` arm.
+    - `mir_parser`: floats are explicitly kept **out** of the checked-arithmetic/checked-div lowering
+      (`is_float_operand`, checked before routing into `lower_checked_binary_op`/`lower_checked_div`)
+      — IEEE 754 overflow saturates to `inf`/`-inf` rather than being UB the way integer overflow and
+      `INT_MIN / -1` are, and there's no `{s,u}*.with.overflow`-style intrinsic for floats anyway, so
+      a float `+`/`-`/`*`/`/`/`%` always lowers to a plain, unchecked `Rvalue::BinaryOp`.
+    - Not yet supported: `f16`, int↔float casts (`Rvalue::Cast` codegen still assumes an `IntType`
+      destination), float constants/locals inside structs or arrays (structurally should already work
+      once `llvm_type` recurses into a float field/element, but untested).
 - [x] Wire codegen output through to an actual `.exe` — `scripts/run_codegen_tests.py` drives
       `clang.exe` (`C:\llvm-16\bin\clang.exe`) over the emitted `.ll`, then runs the resulting exe
       and checks both exit code (`// expect: N`) and stdout (`// expect_stdout: <substring>`); this
       is currently the real correctness oracle for the pipeline (`soul_tester/soul/src/codegen_tests/`,
-      21 passing exe tests). Still manual/script-driven, not integrated into `cargo test`.
+      24 passing exe tests). Still manual/script-driven, not integrated into `cargo test`.
 - [ ] Establish positive+negative test pairs as typecheck/MIR lowering lands (currently unclear
       whether existing parser/resolver suites cover rejection cases — see "Testing strategy" in
       compiler-pipeline-plan.md)
