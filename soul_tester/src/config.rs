@@ -4,7 +4,8 @@ use std::{
 };
 
 use soul_utils::{
-    compiler_options::{CompilerOptions, MirOptions, PlatformInfo}, fault::Severity,
+    compiler_options::{CompilerOptions, MirOptions, PlatformInfo},
+    fault::Severity,
 };
 
 const RAW_CONFIG: &str = include_str!("../config.json");

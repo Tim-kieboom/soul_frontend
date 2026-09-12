@@ -10,6 +10,7 @@
 use ast_model::{SoulType, declare_store::DeclareStore};
 use inkwell::{context::Context, module::Module, types::BasicTypeEnum};
 use soul_utils::{
+    collections::module_store::ModuleStore,
     compiler_options::PlatformInfo,
     span::{ModuleId, Span},
 };
@@ -21,6 +22,10 @@ pub(crate) struct CodegenCtx<'ctx, 'a> {
     pub(crate) context: &'ctx Context,
     pub(crate) module: &'a Module<'ctx>,
     pub(crate) declares: &'a DeclareStore,
+    /// Resolves a `Span`'s `ModuleId` back to the source file it came from —
+    /// needed only to format a panic's `"file:line:col"` location
+    /// (`terminator::codegen_assert`), nothing else in codegen touches it.
+    pub(crate) modules: &'a ModuleStore,
     pub(crate) platform: PlatformInfo,
 }
 

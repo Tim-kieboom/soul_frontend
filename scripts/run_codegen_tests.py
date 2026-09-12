@@ -49,12 +49,12 @@ def read_expected(soul_file: Path) -> int:
     raise ValueError(f"{soul_file}: missing a leading '// expect: N' comment")
 
 
-def read_expected_stdout(soul_file: Path) -> str | None:
-    for line in _leading_comment_lines(soul_file):
-        match = EXPECT_STDOUT_RE.search(line)
-        if match:
-            return match.group(1).strip()
-    return None
+def read_expected_stdout(soul_file: Path) -> list[str]:
+    return [
+        match.group(1).strip()
+        for line in _leading_comment_lines(soul_file)
+        if (match := EXPECT_STDOUT_RE.search(line))
+    ]
 
 
 def set_main_path(relative_path: str) -> None:
@@ -117,20 +117,18 @@ def main() -> int:
                 exe_path.unlink(missing_ok=True)
 
                 exit_ok = actual == expected
-                stdout_ok = expected_stdout is None or expected_stdout in stdout
+                missing_stdout = [s for s in expected_stdout if s not in stdout]
 
-                if exit_ok and stdout_ok:
+                if exit_ok and not missing_stdout:
                     detail = f"exit code {actual}"
-                    if expected_stdout is not None:
+                    if expected_stdout:
                         detail += ", stdout matched"
                     print(f"PASS  {name}: {detail}")
                 else:
                     if not exit_ok:
                         print(f"FAIL  {name}: expected exit code {expected}, got {actual}")
-                    if not stdout_ok:
-                        print(
-                            f"FAIL  {name}: expected stdout to contain {expected_stdout!r}, got {stdout!r}"
-                        )
+                    for s in missing_stdout:
+                        print(f"FAIL  {name}: expected stdout to contain {s!r}, got {stdout!r}")
                     failures.append(name)
             except Exception as exc:  # noqa: BLE001 - report and keep going
                 print(f"ERROR {name}: {exc}")

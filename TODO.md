@@ -173,24 +173,29 @@ No `Res`/`.pass`/`?T`, no unions, no generics, no borrow checking yet.
       panicked on the very first exe test that actually exercised `panic(msg)` end-to-end. Fixed by
       branching straight to the panic block when `self.blocks.get(*target)` is `None`, instead of
       indexing.
-  - Not yet supported: **location** (`file:line:col`, à la `thread 'main' panicked at src/main.rs:4:5`)
-      — see the design note directly below; a backtrace (explicitly out of scope for this pass, per
-      the user's own framing)
-  - [ ] Panic location (`file:line:col`) — design sketch, not started:
-      `mir_model`'s `Statement`/`Rvalue`/`Terminator` carry no `Span` at all today (only `LocalDecl`
-      does — see the doc comment on `CodegenErrorKind`), so the blocker isn't codegen, it's that the
-      span of e.g. an `Index` projection or a `BinaryOp` never survives past `mir_parser`. Landing this
-      would need: (1) a `Span` field added to the MIR shapes that can panic (or a side-table keyed by
-      statement/place, to avoid bloating every `Statement`) — `mir_parser` already has the span in
-      hand at every lowering site (`resolve_index_place`, `lower_ref`, `codegen_binary`'s caller in
-      `lower_rvalue`, etc.), it just isn't threaded onto the MIR node it produces; (2) `mir_codegen`
-      turning that `Span` into a `file:line:col` string — either resolved once per module into a
-      handful of shared globals (spans repeat across a function) or, simpler first cut, one global
-      string literal per panic site, same as the message strings today; (3) extending `soul_panic`'s
-      signature to `(msg: cstr, location: cstr)` and reformatting to
-      `"panic: {msg}\n  at {location}\n"` (or splitting into two `printf` args). None of this changes
-      the panic *mechanism* built in this pass — `panic_function`/`codegen_assert` stay exactly as
-      they are, only the message payload grows a second string.
+  - [x] Panic location (`file:line:col`, à la `thread 'main' panicked at src/main.rs:4:5`) — proven
+      via `expect_stdout` assertions on all four panic-message exe tests (`13`-`16`) matching
+      `"<file>.soul:<line>:"`. Still no backtrace (explicitly out of scope, per the user's own
+      framing).
+    - `mir_model::Terminator::Assert` gained a `span: Span` field — the only MIR shape change needed;
+      `mir_parser` already had the span in hand at every `Assert`-emission site
+      (`emit_bounds_check`, `lower_checked_binary_op`, `lower_assert_intrinsic`,
+      `lower_panic_intrinsic`) and just had to stop discarding it.
+    - `mir_codegen` needed a way to turn a `Span`'s `ModuleId` into an actual file path, which nothing
+      in `mir_codegen`/`mir_parser` carries today (only the top-level driver's own
+      `soul_utils::collections::module_store::ModuleStore` does — the same one
+      `soul_tester::display::fault` already uses for its own compile-time diagnostics). Threaded a
+      `&ModuleStore` through `to_llvm` → `codegen_module` → `CodegenCtx` (a new field alongside
+      `declares`/`platform`) so `terminator::codegen_assert`'s new `location_string` helper can
+      resolve it and format `"{path}:{line}:{col}"` (the `Span`'s *start* position only — a single
+      point, like Rust's own panic locations, not the `start..end` range `Span`'s `Debug` impl prints
+      for compile-time diagnostics) as its own global string constant, reusing
+      `codegen_string_constant` (back to `pub(crate)`, shared with `rvalue.rs`).
+    - `soul_panic`'s signature widened to `(msg: cstr, location: cstr)`, printing
+      `"panic: {msg}\n  at {location}\n"`.
+    - `scripts/run_codegen_tests.py`'s `// expect_stdout:` was single-shot (first match only, later
+      ones silently ignored) — generalized to collect every `expect_stdout` line in a file so a test
+      can assert both the message and the location independently.
 - [ ] Finish MIR lowering coverage for M1 language surface (non-generic traits; diverging calls for
       div-by-zero per mir-design.md)
 - [x] `soul_mir/mir_codegen` — LLVM IR emission via `inkwell` (`features = ["llvm16-0"]`, Windows

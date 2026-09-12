@@ -200,11 +200,14 @@ pub enum Terminator {
     /// Constant(Bool(false)), expected: true` — always takes the panic path,
     /// so `target` is allocated (the shape requires a `BlockId`) but never
     /// actually reachable, and lowering doesn't insert a real block for it.
+    /// `span` is the source location this panics *at* — `codegen_assert`
+    /// turns it into the `"file:line:col"` string printed alongside `msg`.
     Assert {
         cond: Operand,
         expected: bool,
         msg: Operand,
         target: BlockId,
+        span: Span,
     },
     Return,
     /// Target for a diverging `Call`; also a bodyless infinite `for {}`.

@@ -1,8 +1,8 @@
 use crate::{bitflags, fault::Severity};
 
-bitflags!{
+bitflags! {
     pub struct MirOptions: u8 {
-        CHECK_ALGORITHMIC_OVERFLOW = 1 << 0, 
+        CHECK_ALGORITHMIC_OVERFLOW = 1 << 0,
         CHECK_INDEX_OUT_OF_BOUNDS = 1 << 1,
     }
 }

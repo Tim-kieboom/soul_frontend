@@ -12,7 +12,10 @@ use inkwell::{
 };
 use mir_model::MirProgram;
 use soul_utils::{
-    FunctionId, collections::vec_map::VecMap, compiler_options::CompilerOptions, span::ModuleId,
+    FunctionId,
+    collections::{module_store::ModuleStore, vec_map::VecMap},
+    compiler_options::CompilerOptions,
+    span::ModuleId,
 };
 
 use crate::{
@@ -29,6 +32,7 @@ pub(crate) fn codegen_module<'ctx>(
     mir: &MirProgram,
     ast: &AstStore,
     declares: &DeclareStore,
+    modules: &ModuleStore,
     options: &CompilerOptions,
 ) -> CodegenResult<Module<'ctx>> {
     let module = context.create_module(module_name);
@@ -39,6 +43,7 @@ pub(crate) fn codegen_module<'ctx>(
             context,
             module: &module,
             declares,
+            modules,
             platform: options.platform,
         },
         string_counter: Cell::new(0),

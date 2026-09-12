@@ -19,7 +19,9 @@ use soul_utils::{
         benchmark::Benchmark,
         crate_store::{CrateEntry, CrateStore, Manifest},
         module_store::ModuleStore,
-    }, compiler_options::{CompilerOptions, MirOptions, PlatformInfo}, fault::Severity,
+    },
+    compiler_options::{CompilerOptions, MirOptions, PlatformInfo},
+    fault::Severity,
 };
 
 const MIR_OPTIONS: MirOptions = MirOptions::empty()

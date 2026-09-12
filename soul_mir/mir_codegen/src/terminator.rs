@@ -8,7 +8,7 @@ use inkwell::{
     values::{BasicValueEnum, FunctionValue, PointerValue},
 };
 use mir_model::{BlockId, ConstValue, LocalId, Operand, Place, Terminator};
-use soul_utils::FunctionId;
+use soul_utils::{FunctionId, span::Span};
 
 use crate::{
     err,
@@ -46,8 +46,9 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
                 expected,
                 msg,
                 target,
+                span,
             } => {
-                self.codegen_assert(cond, *expected, msg, target)?;
+                self.codegen_assert(cond, *expected, msg, target, *span)?;
             }
             Terminator::Return => self.codegen_return()?,
             Terminator::Unreachable => {
@@ -91,13 +92,16 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
     /// already attaches to this terminator (a `cstr`/`str` operand) — codegen
     /// for both used to discard it and call bare `abort()`; it now flows
     /// through to `panic_function` so a failing assert/panic actually prints
-    /// its message before aborting.
+    /// its message before aborting. `span` is `Assert`'s own source location,
+    /// turned into a `"file:line:col"` string (`location_string`) and passed
+    /// alongside `msg`.
     fn codegen_assert(
         &mut self,
         cond: &Operand,
         expected: bool,
         msg: &Operand,
         target: &BlockId,
+        span: Span,
     ) -> CodegenResult<()> {
         let bool_ty = self.ctx.context.bool_type().into();
         let cond = expect_int(self.codegen_operand(cond, bool_ty)?)?;
@@ -114,6 +118,7 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
 
         let ptr_ty = self.ctx.context.ptr_type(AddressSpace::default()).into();
         let msg_ptr = self.codegen_operand(msg, ptr_ty)?.into_pointer_value();
+        let location_ptr = self.location_string(span);
 
         let panic_block = self
             .ctx
@@ -141,11 +146,35 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
         self.builder.position_at_end(panic_block);
         let panic_fn = self.panic_function()?;
         self.builder
-            .build_call(panic_fn, &[msg_ptr.into()], "panic_call")
+            .build_call(
+                panic_fn,
+                &[msg_ptr.into(), location_ptr.into()],
+                "panic_call",
+            )
             .map_err(llvm_err)?;
 
         self.builder.build_unreachable().map_err(llvm_err)?;
         Ok(())
+    }
+
+    /// `"{path}:{line}:{col}"` for `span`'s *start* position (a single point,
+    /// like Rust's own panic locations — not the `start..end` range `Span`'s
+    /// `Debug` impl prints for diagnostics), materialized as its own global
+    /// string constant (`codegen_string_constant`, reused from `rvalue.rs`).
+    /// Falls back to `"<unknown location>"` if `span.module` isn't in
+    /// `self.ctx.modules` — should never happen in practice, but this is a
+    /// diagnostics nicety, not worth failing the whole codegen pass over.
+    fn location_string(&self, span: Span) -> PointerValue<'ctx> {
+        let location = match self.ctx.modules.get_path(span.module) {
+            Some(path) => format!(
+                "{}:{}:{}",
+                path.display(),
+                span.start.line,
+                span.start.offset
+            ),
+            None => "<unknown location>".to_string(),
+        };
+        self.codegen_string_constant(&location)
     }
 
     fn codegen_call(
@@ -322,12 +351,13 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
         self.ctx.module.add_function("fflush", fn_type, None)
     }
 
-    /// `"panic: %s\n"`, null-terminated — the one format string
-    /// `panic_function` prints every message through. A private global
-    /// rather than a per-call constant since there's only ever one of these
-    /// per module (unlike `codegen_string_constant`'s per-literal globals).
+    /// `"panic: %s\n  at %s\n"`, null-terminated — the one format string
+    /// `panic_function` prints every message+location pair through. A
+    /// private global rather than a per-call constant since there's only
+    /// ever one of these per module (unlike `codegen_string_constant`'s
+    /// per-literal globals).
     fn panic_format_string(&self) -> PointerValue<'ctx> {
-        let const_str = self.ctx.context.const_string(b"panic: %s\n", true);
+        let const_str = self.ctx.context.const_string(b"panic: %s\n  at %s\n", true);
         let global = self
             .ctx
             .module
@@ -338,17 +368,17 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
         global.as_pointer_value()
     }
 
-    /// The panic runtime: prints `msg` (a `cstr`-typed pointer) via `printf`
-    /// then calls `abort()` — a Rust-`panic!`-style trap (no unwinding, no
-    /// backtrace: this compiler has no unwinding model) instead of a bare,
-    /// silent `abort()`. Declared *and defined* lazily (once per module,
-    /// cached the same way as `abort_function`) the first time any
-    /// panicking construct — an out-of-bounds slice index, an arithmetic
-    /// overflow, a MIR-level `assert`/`panic()` — is actually codegen'd;
-    /// every one of those funnels through this single function. Building its
-    /// body reuses `self.builder` (there's no separate builder per LLVM
-    /// function), so the caller's own insertion point is saved and restored
-    /// around it.
+    /// The panic runtime: prints `msg` and `location` (both `cstr`-typed
+    /// pointers) via `printf` then calls `abort()` — a Rust-`panic!`-style
+    /// trap (no unwinding, no backtrace: this compiler has no unwinding
+    /// model) instead of a bare, silent `abort()`. Declared *and defined*
+    /// lazily (once per module, cached the same way as `abort_function`) the
+    /// first time any panicking construct — an out-of-bounds slice index, an
+    /// arithmetic overflow, a MIR-level `assert`/`panic()` — is actually
+    /// codegen'd; every one of those funnels through this single function.
+    /// Building its body reuses `self.builder` (there's no separate builder
+    /// per LLVM function), so the caller's own insertion point is saved and
+    /// restored around it.
     pub(crate) fn panic_function(&self) -> CodegenResult<FunctionValue<'ctx>> {
         if let Some(existing) = self.ctx.module.get_function("soul_panic") {
             return Ok(existing);
@@ -359,7 +389,7 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
             .ctx
             .context
             .void_type()
-            .fn_type(&[ptr_ty.into()], false);
+            .fn_type(&[ptr_ty.into(), ptr_ty.into()], false);
         let function = self.ctx.module.add_function("soul_panic", fn_type, None);
 
         let resume_block = self.builder.get_insert_block();
@@ -371,10 +401,18 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
             .get_nth_param(0)
             .ok_or_else(|| err(CodegenErrorKind::MissingParameterValue { index: 0 }))?
             .into_pointer_value();
+        let location = function
+            .get_nth_param(1)
+            .ok_or_else(|| err(CodegenErrorKind::MissingParameterValue { index: 1 }))?
+            .into_pointer_value();
 
         let printf_fn = self.printf_function();
         self.builder
-            .build_call(printf_fn, &[format.into(), msg.into()], "printf_call")
+            .build_call(
+                printf_fn,
+                &[format.into(), msg.into(), location.into()],
+                "printf_call",
+            )
             .map_err(llvm_err)?;
 
         let fflush_fn = self.fflush_function();

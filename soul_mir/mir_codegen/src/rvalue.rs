@@ -29,8 +29,9 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
     /// `cstr` value currently comes into existence (there's no other
     /// `cstr`-producing expression in this slice, so this is the sole
     /// producer of one). Not deduplicated across equal literals: correctness
-    /// over compactness for this first slice.
-    fn codegen_string_constant(&self, s: &str) -> PointerValue<'ctx> {
+    /// over compactness for this first slice. Also reused by
+    /// `terminator::codegen_assert` to materialize a panic's location string.
+    pub(crate) fn codegen_string_constant(&self, s: &str) -> PointerValue<'ctx> {
         let id = self.string_counter.get();
         self.string_counter.set(id + 1);
 
@@ -180,7 +181,7 @@ impl<'ctx, 'a> FunctionCodegen<'ctx, 'a> {
             Add => b.build_int_add(l, r, "add"),
             Sub => b.build_int_sub(l, r, "sub"),
             Mul => b.build_int_mul(l, r, "mul"),
-            
+
             Div if signed => b.build_int_signed_div(l, r, "sdiv"),
             Div => b.build_int_unsigned_div(l, r, "udiv"),
             Mod if signed => b.build_int_signed_rem(l, r, "srem"),

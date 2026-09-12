@@ -5,7 +5,14 @@ use ast_model::{
 };
 use mir_model as mir;
 use soul_utils::{
-    TypeModifier, collections::vec_map::VecMap, compiler_options::{CompilerOptions, MirOptions}, fault::Fault, ids::IdGenerator, intrinsics::IntrinsicFunction, soul_names::PrimitiveTypes, span::{ModuleId, Span},
+    TypeModifier,
+    collections::vec_map::VecMap,
+    compiler_options::{CompilerOptions, MirOptions},
+    fault::Fault,
+    ids::IdGenerator,
+    intrinsics::IntrinsicFunction,
+    soul_names::PrimitiveTypes,
+    span::{ModuleId, Span},
 };
 
 use crate::fault::{MirErrorKind, MirResult};
@@ -37,7 +44,11 @@ pub struct FunctionLowerer<'a> {
     options: &'a CompilerOptions,
 }
 impl<'a> FunctionLowerer<'a> {
-    pub(crate) fn new(store: &'a ast::AstStore, declares: &'a DeclareStore, options: &'a CompilerOptions) -> Self {
+    pub(crate) fn new(
+        store: &'a ast::AstStore,
+        declares: &'a DeclareStore,
+        options: &'a CompilerOptions,
+    ) -> Self {
         Self {
             store,
             options,
@@ -443,7 +454,11 @@ impl<'a> FunctionLowerer<'a> {
         let index_local =
             self.operand_local(index.index, SoulType::Primitive(PrimitiveTypes::Uint), span)?;
 
-        if self.options.mir.contains(MirOptions::CHECK_INDEX_OUT_OF_BOUNDS) {
+        if self
+            .options
+            .mir
+            .contains(MirOptions::CHECK_INDEX_OUT_OF_BOUNDS)
+        {
             self.emit_bounds_check(&place, index_local, span);
         }
 
@@ -483,10 +498,7 @@ impl<'a> FunctionLowerer<'a> {
             let cast = self.alloc_local(UINT, TypeModifier::Immut, span);
             self.statements.push(mir::Statement::Assign(
                 mir::Place::local(cast),
-                mir::Rvalue::Cast(
-                    mir::Operand::Copy(mir::Place::local(index_local)),
-                    UINT,
-                ),
+                mir::Rvalue::Cast(mir::Operand::Copy(mir::Place::local(index_local)), UINT),
             ));
             cast
         };
@@ -513,6 +525,7 @@ impl<'a> FunctionLowerer<'a> {
                 expected: true,
                 msg,
                 target: next,
+                span,
             },
             Some(next),
         );
@@ -659,6 +672,7 @@ impl<'a> FunctionLowerer<'a> {
                 expected: true,
                 msg,
                 target: next,
+                span,
             },
             Some(next),
         );
@@ -681,6 +695,7 @@ impl<'a> FunctionLowerer<'a> {
                 expected: true,
                 msg,
                 target: dead,
+                span,
             },
             None,
         );
@@ -1070,9 +1085,12 @@ impl<'a> FunctionLowerer<'a> {
     }
 
     fn lower_rvalue(&mut self, expr_id: ast::ExpressionId) -> MirResult<mir::Rvalue> {
-        
-        let should_check_overflow = || self.options.mir.contains(MirOptions::CHECK_ALGORITHMIC_OVERFLOW);
-        
+        let should_check_overflow = || {
+            self.options
+                .mir
+                .contains(MirOptions::CHECK_ALGORITHMIC_OVERFLOW)
+        };
+
         let expr = &self.store.expressions[expr_id];
         match &expr.node {
             ast::ExpressionKind::Binary(binary) => {
@@ -1179,6 +1197,7 @@ impl<'a> FunctionLowerer<'a> {
                 expected: false,
                 msg,
                 target: next,
+                span,
             },
             Some(next),
         );

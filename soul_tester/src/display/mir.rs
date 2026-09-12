@@ -317,6 +317,7 @@ impl<'a, W: Writer> Displayer<'a, W> {
                 expected,
                 msg,
                 target,
+                span: _,
             } => {
                 self.push_str("assert(")?;
                 self.write_operand(cond)?;

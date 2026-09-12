@@ -44,7 +44,11 @@ use std::time::Instant;
 use ast_model::AstTree;
 use inkwell::{builder::BuilderError, context::Context, module::Module};
 use mir_model::MirProgram;
-use soul_utils::{collections::benchmark::Benchmark, compiler_options::CompilerOptions, fault::Fault};
+use soul_utils::{
+    collections::{benchmark::Benchmark, module_store::ModuleStore},
+    compiler_options::CompilerOptions,
+    fault::Fault,
+};
 
 use crate::{
     fault::{CodegenErrorKind, CodegenResult},
@@ -56,6 +60,7 @@ pub fn to_llvm<'ctx>(
     benchmark: &mut Benchmark,
     mir: &MirProgram,
     ast: &AstTree,
+    modules: &ModuleStore,
     options: &CompilerOptions,
 ) -> CodegenResult<Module<'ctx>> {
     let timer = Instant::now();
@@ -65,6 +70,7 @@ pub fn to_llvm<'ctx>(
         mir,
         &ast.crates.store,
         &ast.declares,
+        modules,
         options,
     );
     benchmark.add_benchmark("codegen", timer.elapsed());
